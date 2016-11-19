@@ -51,8 +51,8 @@
 #   test                run tests
 #
 # Options:
-#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
-#                       (some OpenVDB 3.x features will be disabled)
+#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
+#                       (some OpenVDB 4.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -272,7 +272,7 @@ ifeq (yes,$(has_log4cplus))
     INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
 endif
 
-CXXFLAGS += -std=c++0x
+CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (yes,$(has_blosc))
@@ -281,8 +281,8 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (2,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+ifeq (3,$(strip $(abi)))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
@@ -353,12 +353,22 @@ INCLUDE_NAMES := \
     math/Vec3.h \
     math/Vec4.h \
     Metadata.h \
-    metadata/Metadata.h \
-    metadata/MetaMap.h \
-    metadata/StringMetadata.h \
+    MetaMap.h \
     openvdb.h \
     Platform.h \
     PlatformConfig.h \
+    points/AttributeArray.h \
+    points/AttributeArrayString.h \
+    points/AttributeGroup.h \
+    points/AttributeSet.h \
+    points/IndexFilter.h \
+    points/IndexIterator.h \
+    points/PointAttribute.h \
+    points/PointConversion.h \
+    points/PointCount.h \
+    points/PointDataGrid.h \
+    points/PointGroup.h \
+    points/StreamCompression.h \
     tools/ChangeBackground.h \
     tools/Clip.h \
     tools/Composite.h \
@@ -406,6 +416,7 @@ INCLUDE_NAMES := \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
     tree/Iterator.h \
+    tree/LeafBuffer.h \
     tree/LeafManager.h \
     tree/LeafNode.h \
     tree/LeafNodeBool.h \
@@ -442,10 +453,15 @@ SRC_NAMES := \
     math/Proximity.cc \
     math/QuantizedUnitVec.cc \
     math/Transform.cc \
-    metadata/Metadata.cc \
-    metadata/MetaMap.cc \
+    Metadata.cc \
+    MetaMap.cc \
     openvdb.cc \
     Platform.cc \
+    points/AttributeArray.cc \
+    points/AttributeArrayString.cc \
+    points/AttributeGroup.cc \
+    points/AttributeSet.cc \
+    points/StreamCompression.cc \
     util/Formats.cc \
     util/Util.cc \
 #
@@ -456,6 +472,10 @@ UNITTEST_INCLUDE_NAMES := \
 
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
+    unittest/TestAttributeArray.cc \
+    unittest/TestAttributeArrayString.cc \
+    unittest/TestAttributeSet.cc \
+    unittest/TestAttributeGroup.cc \
     unittest/TestBBox.cc \
     unittest/TestConjGradient.cc \
     unittest/TestCoord.cc \
@@ -475,6 +495,8 @@ UNITTEST_SRC_NAMES := \
     unittest/TestGridDescriptor.cc \
     unittest/TestGridIO.cc \
     unittest/TestGridTransformer.cc \
+    unittest/TestIndexFilter.cc \
+    unittest/TestIndexIterator.cc \
     unittest/TestInit.cc \
     unittest/TestInt32Metadata.cc \
     unittest/TestInt64Metadata.cc \
@@ -504,6 +526,11 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeMask.cc \
     unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointAttribute.cc \
+    unittest/TestPointConversion.cc \
+    unittest/TestPointCount.cc \
+    unittest/TestPointDataLeaf.cc \
+    unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
     unittest/TestPointsToMask.cc \
@@ -515,6 +542,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestRay.cc \
     unittest/TestStats.cc \
     unittest/TestStream.cc \
+    unittest/TestStreamCompression.cc \
     unittest/TestStringMetadata.cc \
     unittest/TestTools.cc \
     unittest/TestTopologyToLevelSet.cc \
@@ -530,6 +558,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVec3Metadata.cc \
     unittest/TestVolumeRayIntersector.cc \
     unittest/TestVolumeToMesh.cc \
+    unittest/TestVolumeToSpheres.cc \
 #
 
 DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/python.txt

@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBTransformNode.cc
 /// @author FX R&D OpenVDB team
 
 #include "OpenVDBPlugin.h"
@@ -270,14 +271,15 @@ MStatus OpenVDBTransformNode::compute(const MPlug& plug, MDataBlock& data)
 
             for (mvdb::GridCPtrVecIter it = grids.begin(); it != grids.end(); ++it) {
 
-                openvdb::GridBase::Ptr grid = (*it)->copyGrid(); // shallow copy, shares the tree
+                openvdb::GridBase::ConstPtr grid = (*it)->copyGrid(); // shallow copy, shares tree
 
                 // Merge the transform's current affine representation with the new affine map.
                 AffineMap::Ptr compound(
                     new AffineMap(*grid->transform().baseMap()->getAffineMap(), map));
 
                 // Simplify the affine map and replace the transform.
-                grid->setTransform(Transform::Ptr(new Transform(openvdb::math::simplify(compound))));
+                openvdb::ConstPtrCast<openvdb::GridBase>(grid)->setTransform(
+                    Transform::Ptr(new Transform(openvdb::math::simplify(compound))));
 
                 outputVdb->insert(grid);
             }

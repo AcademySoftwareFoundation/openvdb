@@ -64,7 +64,10 @@ void (MetadataWrap::*copy1)(const Metadata&) = &MetadataWrap::copy;
 } // end anonymous namespace
 
 
-void exportMetadata()
+void exportMetadata();
+
+void
+exportMetadata()
 {
     py::class_<MetadataWrap, boost::noncopyable> clss(
         /*classname=*/"Metadata",

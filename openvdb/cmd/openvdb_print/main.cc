@@ -47,7 +47,7 @@ const char* INDENT = "   ";
 const char* gProgName = "";
 
 void
-usage(int exitStatus = EXIT_FAILURE)
+usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 {
     std::cerr <<
 "Usage: " << gProgName << " in.vdb [in.vdb ...] [options]\n" <<

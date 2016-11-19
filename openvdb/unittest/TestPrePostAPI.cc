@@ -388,7 +388,8 @@ TestPrePostAPI::testMaps()
             CPPUNIT_ASSERT( correct.eq(result, TOL));
         }
         {
-            const Mat4d result = ustm.postShear(13., X_AXIS, Z_AXIS)->getAffineMap()->getConstMat4();
+            const Mat4d result =
+                ustm.postShear(13., X_AXIS, Z_AXIS)->getAffineMap()->getConstMat4();
             CPPUNIT_ASSERT( correct.eq(result, TOL));
         }
         {
@@ -587,14 +588,16 @@ TestPrePostAPI::testFrustumTransform()
 {
     using namespace openvdb::math;
 
-    typedef BBox<Vec3d> BBoxd;
+    using BBoxd = BBox<Vec3d>;
 
     double TOL = 1e-7;
     {
 
         BBoxd bbox(Vec3d(-5,-5,0), Vec3d(5,5,10));
-        Transform::Ptr t = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
-        Transform::Ptr tinv = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
+        Transform::Ptr t = Transform::createFrustumTransform(
+            bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
+        Transform::Ptr tinv = Transform::createFrustumTransform(
+            bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
 
 
         // create matrix with pre-API
@@ -615,8 +618,10 @@ TestPrePostAPI::testFrustumTransform()
 
         // test this by verifying that equvilent interal matrix
         // represenations are inverses
-        NonlinearFrustumMap::Ptr frustum = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( t->baseMap() );
-        NonlinearFrustumMap::Ptr frustuminv = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( tinv->baseMap() );
+        NonlinearFrustumMap::Ptr frustum =
+            openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(t->baseMap());
+        NonlinearFrustumMap::Ptr frustuminv =
+            openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(tinv->baseMap());
 
         Mat4d m = frustum->secondMap().getMat4();
         Mat4d minv = frustuminv->secondMap().getMat4();
@@ -648,7 +653,8 @@ TestPrePostAPI::testFrustumTransform()
     {
 
         BBoxd bbox(Vec3d(-5,-5,0), Vec3d(5,5,10));
-        Transform::Ptr t = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
+        Transform::Ptr t = Transform::createFrustumTransform(
+            bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
 
 
         Mat4d m = Mat4d::identity();
@@ -677,7 +683,8 @@ TestPrePostAPI::testFrustumTransform()
         t->preMult(minv);
         t->postMult(minv);
 
-        NonlinearFrustumMap::Ptr frustum = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( t->baseMap() );
+        NonlinearFrustumMap::Ptr frustum =
+            openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(t->baseMap());
         Mat4d mtest = frustum->secondMap().getMat4();
 
         // verify that the results is the scale
@@ -704,7 +711,6 @@ TestPrePostAPI::testFrustumTransform()
 
 
 }
-
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

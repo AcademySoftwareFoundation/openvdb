@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-///
+
 /// @author Ken Museth
 ///
 /// @file LevelSetPlatonic.h
@@ -71,12 +71,13 @@ namespace tools {
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetPlatonic(int faceCount,// 4, 6, 8, 12 or 20
-                       float scale = 1.0f,
-                       const Vec3f& center = Vec3f(0.0f),
-                       float voxelSize = 0.1f,
-                       float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                       InterruptT* interrupt = NULL);
+createLevelSetPlatonic(
+    int faceCount, // 4, 6, 8, 12 or 20
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt = nullptr);
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
 /// representation of a platonic solid.
@@ -92,11 +93,12 @@ createLevelSetPlatonic(int faceCount,// 4, 6, 8, 12 or 20
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetPlatonic(int faceCount,// 4, 6, 8, 12 or 20
-                       float scale = 1.0f,
-                       const Vec3f& center = Vec3f(0.0f),
-                       float voxelSize = 0.1f,
-                       float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetPlatonic(
+    int faceCount,// 4, 6, 8, 12 or 20
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(faceCount, scale, center, voxelSize, halfWidth, &tmp);
@@ -116,14 +118,15 @@ createLevelSetPlatonic(int faceCount,// 4, 6, 8, 12 or 20
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetTetrahedron(float scale = 1.0f,
-                          const Vec3f& center = Vec3f(0.0f),
-                          float voxelSize = 0.1f,
-                          float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                          InterruptT* interrupt =  NULL)
+createLevelSetTetrahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt =  nullptr)
 {
-    return createLevelSetPlatonic<GridType, InterruptT>(4, scale, center,
-                                                        voxelSize, halfWidth, interrupt);
+    return createLevelSetPlatonic<GridType, InterruptT>(
+        4, scale, center, voxelSize, halfWidth, interrupt);
 }
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -137,10 +140,11 @@ createLevelSetTetrahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetTetrahedron(float scale = 1.0f,
-                          const Vec3f& center = Vec3f(0.0f),
-                          float voxelSize = 0.1f,
-                          float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetTetrahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(4, scale, center, voxelSize, halfWidth, &tmp);
@@ -160,11 +164,12 @@ createLevelSetTetrahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetCube(float scale = 1.0f,
-                   const Vec3f& center = Vec3f(0.0f),
-                   float voxelSize = 0.1f,
-                   float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                   InterruptT* interrupt =  NULL)
+createLevelSetCube(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt =  nullptr)
 {
     return createLevelSetPlatonic<GridType>(6, scale, center, voxelSize, halfWidth, interrupt);
 }
@@ -180,10 +185,11 @@ createLevelSetCube(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetCube(float scale = 1.0f,
-                   const Vec3f& center = Vec3f(0.0f),
-                   float voxelSize = 0.1f,
-                   float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetCube(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(6, scale, center, voxelSize, halfWidth, &tmp);
@@ -203,11 +209,12 @@ createLevelSetCube(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetOctahedron(float scale = 1.0f,
-                         const Vec3f& center = Vec3f(0.0f),
-                         float voxelSize = 0.1f,
-                         float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                         InterruptT* interrupt =  NULL)
+createLevelSetOctahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt = nullptr)
 {
     return createLevelSetPlatonic<GridType>(8, scale, center, voxelSize, halfWidth, interrupt);
 }
@@ -223,10 +230,11 @@ createLevelSetOctahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetOctahedron(float scale = 1.0f,
-                         const Vec3f& center = Vec3f(0.0f),
-                         float voxelSize = 0.1f,
-                         float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetOctahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(8, scale, center, voxelSize, halfWidth, &tmp);
@@ -246,11 +254,12 @@ createLevelSetOctahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetDodecahedron(float scale = 1.0f,
-                           const Vec3f& center = Vec3f(0.0f),
-                           float voxelSize = 0.1f,
-                           float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                           InterruptT* interrupt =  NULL)
+createLevelSetDodecahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt = nullptr)
 {
     return createLevelSetPlatonic<GridType>(12, scale, center, voxelSize, halfWidth, interrupt);
 }
@@ -266,10 +275,11 @@ createLevelSetDodecahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetDodecahedron(float scale = 1.0f,
-                           const Vec3f& center = Vec3f(0.0f),
-                           float voxelSize = 0.1f,
-                           float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetDodecahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(12, scale, center, voxelSize, halfWidth, &tmp);
@@ -289,11 +299,12 @@ createLevelSetDodecahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetIcosahedron(float scale = 1.0f,
-                          const Vec3f& center = Vec3f(0.0f),
-                          float voxelSize = 0.1f,
-                          float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-                          InterruptT* interrupt =  NULL)
+createLevelSetIcosahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
+    InterruptT* interrupt = nullptr)
 {
     return createLevelSetPlatonic<GridType>(20, scale, center, voxelSize, halfWidth, interrupt);
 }
@@ -309,10 +320,11 @@ createLevelSetIcosahedron(float scale = 1.0f,
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template<typename GridType>
 typename GridType::Ptr
-createLevelSetIcosahedron(float scale = 1.0f,
-                          const Vec3f& center = Vec3f(0.0f),
-                          float voxelSize = 0.1f,
-                          float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+createLevelSetIcosahedron(
+    float scale = 1.0f,
+    const Vec3f& center = Vec3f(0.0f),
+    float voxelSize = 0.1f,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     util::NullInterrupter tmp;
     return createLevelSetPlatonic<GridType>(20, scale, center, voxelSize, halfWidth, &tmp);
@@ -323,7 +335,7 @@ createLevelSetIcosahedron(float scale = 1.0f,
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
 createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
-                       float voxelSize, float halfWidth, InterruptT *interrupt)
+    float voxelSize, float halfWidth, InterruptT *interrupt)
 {
     // GridType::ValueType is required to be a floating-point scalar.
     BOOST_STATIC_ASSERT(boost::is_floating_point<typename GridType::ValueType>::value);
@@ -338,7 +350,7 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 
         vtx.push_back( Vec3f( 0.0f,          1.0f,         0.0f) );
         vtx.push_back( Vec3f(-0.942810297f, -0.333329707f, 0.0f) );
-        vtx.push_back( Vec3f( 0.471405149f, -0.333329707f, 0.816497624) );
+        vtx.push_back( Vec3f( 0.471405149f, -0.333329707f, 0.816497624f) );
         vtx.push_back( Vec3f( 0.471405149f, -0.333329707f, -0.816497624f) );
 
         tri.push_back( Vec3I(0, 2, 3) );
@@ -475,7 +487,7 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 
     typename GridType::Ptr grid;
 
-    if (interrupt == NULL) {
+    if (interrupt == nullptr) {
         util::NullInterrupter tmp;
         grid = meshToLevelSet<GridType>(tmp, *xform, vtx, tri, qua, halfWidth);
     } else {

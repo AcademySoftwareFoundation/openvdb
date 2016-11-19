@@ -450,6 +450,11 @@ protected:
     virtual OP_ERROR cookMySop(OP_Context&);
 };
 
+
+int inputRangeCB(void*, int, float, const PRM_Template*);
+int outputRangeCB(void*, int, float, const PRM_Template*);
+
+
 int
 inputRangeCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 {

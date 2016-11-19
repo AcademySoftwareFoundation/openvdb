@@ -28,10 +28,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-/// @file   ConjGradient.h
+/// @file    ConjGradient.h
 /// @authors D.J. Hill, Peter Cucka
-/// @brief  Preconditioned conjugate gradient solver (solves @e Ax = @e b using
-///         the conjugate gradient method with one of a selection of preconditioners)
+/// @brief   Preconditioned conjugate gradient solver (solves @e Ax = @e b using
+///          the conjugate gradient method with one of a selection of preconditioners)
 
 #ifndef OPENVDB_MATH_CONJGRADIENT_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_CONJGRADIENT_HAS_BEEN_INCLUDED
@@ -41,7 +41,6 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_array.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -58,9 +57,9 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 namespace pcg {
 
-typedef Index32 SizeType;
+using SizeType = Index32;
 
-typedef tbb::blocked_range<SizeType> SizeRange;
+using SizeRange = tbb::blocked_range<SizeType>;
 
 template<typename ValueType> class Vector;
 
@@ -166,17 +165,17 @@ template<typename T>
 class Vector
 {
 public:
-    typedef T ValueType;
-    typedef boost::shared_ptr<Vector> Ptr;
+    using ValueType = T;
+    using Ptr = SharedPtr<Vector>;
 
     /// Construct an empty vector.
-    Vector(): mData(NULL), mSize(0) {}
+    Vector(): mData(nullptr), mSize(0) {}
     /// Construct a vector of @a n elements, with uninitialized values.
     Vector(SizeType n): mData(new T[n]), mSize(n) {}
     /// Construct a vector of @a n elements and initialize each element to the given value.
     Vector(SizeType n, const ValueType& val): mData(new T[n]), mSize(n) { this->fill(val); }
 
-    ~Vector() { mSize = 0; delete[] mData; mData = NULL; }
+    ~Vector() { mSize = 0; delete[] mData; mData = nullptr; }
 
     /// Deep copy the given vector.
     Vector(const Vector&);
@@ -252,9 +251,8 @@ private:
     SizeType mSize;
 };
 
-typedef Vector<float> VectorS;
-typedef Vector<double> VectorD;
-//typedef Vector<double> LinearVector;
+using VectorS = Vector<float>;
+using VectorD = Vector<double>;
 
 
 ////////////////////////////////////////
@@ -266,9 +264,9 @@ template<typename ValueType_, SizeType STENCIL_SIZE>
 class SparseStencilMatrix
 {
 public:
-    typedef ValueType_ ValueType;
-    typedef Vector<ValueType> VectorType;
-    typedef boost::shared_ptr<SparseStencilMatrix> Ptr;
+    using ValueType = ValueType_;
+    using VectorType = Vector<ValueType>;
+    using Ptr = SharedPtr<SparseStencilMatrix>;
 
     class ConstValueIter;
     class ConstRow;
@@ -356,7 +354,7 @@ private:
     class RowBase
     {
     public:
-        typedef DataType_ DataType;
+        using DataType = DataType_;
 
         static SizeType capacity() { return STENCIL_SIZE; }
 
@@ -405,7 +403,7 @@ private:
         DataType mData;
     };
 
-    typedef RowBase<ConstRowData> ConstRowBase;
+    using ConstRowBase = RowBase<ConstRowData>;
 
 public:
     /// Iterator over the stored values in a row of this matrix
@@ -493,11 +491,11 @@ template<typename T>
 class Preconditioner
 {
 public:
-    typedef T ValueType;
-    typedef boost::shared_ptr<Preconditioner> Ptr;
+    using ValueType = T;
+    using Ptr = SharedPtr<Preconditioner>;
 
     template<SizeType STENCIL_SIZE> Preconditioner(const SparseStencilMatrix<T, STENCIL_SIZE>&) {}
-    virtual ~Preconditioner() {}
+    virtual ~Preconditioner() = default;
 
     virtual bool isValid() const { return true; }
 
@@ -659,36 +657,32 @@ Vector<T>::scale(const Scalar& s)
 template<typename T>
 struct Vector<T>::DeterministicDotProductOp
 {
-    DeterministicDotProductOp(const T* a_, const T* b_, 
-                              const SizeType binCount_, const SizeType arraySize_, T* reducetmp_): 
+    DeterministicDotProductOp(const T* a_, const T* b_,
+            const SizeType binCount_, const SizeType arraySize_, T* reducetmp_):
         a(a_), b(b_), binCount(binCount_), arraySize(arraySize_), reducetmp(reducetmp_) {}
-    
+
     void operator()(const SizeRange& range) const
     {
-        
-        const SizeType binSize = arraySize / binCount; 
-        
+        const SizeType binSize = arraySize / binCount;
+
         // Iterate over bins (array segments)
         for (SizeType n = range.begin(), N = range.end(); n < N; ++n) {
             const SizeType begin = n * binSize;
-            const SizeType end   = (n == binCount-1) ? arraySize : begin + binSize;
+            const SizeType end = (n == binCount-1) ? arraySize : begin + binSize;
 
-            // Compute the partial sum for this array segment 
+            // Compute the partial sum for this array segment
             T sum = zeroVal<T>();
-            for (SizeType i = begin; i < end; ++i) {
-                
-                sum += a[i] * b[i];
-            }
+            for (SizeType i = begin; i < end; ++i) { sum += a[i] * b[i]; }
             // Store the partial sum
             reducetmp[n] = sum;
         }
     }
 
-    
+
     const T* a;
     const T* b;
     const SizeType binCount;
-    const SizeType arraySize; 
+    const SizeType arraySize;
     T* reducetmp;
 };
 
@@ -715,21 +709,21 @@ Vector<T>::dot(const Vector<T>& other) const
 
     } else {
 
-        // Compute the dot product by segmenting the arrays into 
-        // a predetermined number of sub arrays in parallel and 
+        // Compute the dot product by segmenting the arrays into
+        // a predetermined number of sub arrays in parallel and
         // accumulate the finial result in series.
-        
+
         const SizeType binCount = 100;
         T partialSums[100];
-        
-        tbb::parallel_for(SizeRange(0, binCount), 
-                          DeterministicDotProductOp(aData, bData, binCount, arraySize, partialSums));
+
+        tbb::parallel_for(SizeRange(0, binCount),
+            DeterministicDotProductOp(aData, bData, binCount, arraySize, partialSums));
 
         for (SizeType n = 0; n < binCount; ++n) {
             result += partialSums[n];
         }
     }
-    
+
     return result;
 }
 
@@ -1324,10 +1318,10 @@ private:
     struct ApplyOp;
 
 public:
-    typedef typename MatrixType::ValueType ValueType;
-    typedef Preconditioner<ValueType> BaseType;
-    typedef Vector<ValueType> VectorType;
-    typedef boost::shared_ptr<JacobiPreconditioner> Ptr;
+    using ValueType = typename MatrixType::ValueType;
+    using BaseType = Preconditioner<ValueType>;
+    using VectorType = Vector<ValueType>;
+    using Ptr = SharedPtr<JacobiPreconditioner>;
 
     JacobiPreconditioner(const MatrixType& A): BaseType(A), mDiag(A.numRows())
     {
@@ -1335,9 +1329,9 @@ public:
         tbb::parallel_for(SizeRange(0, A.numRows()), InitOp(A, mDiag.data()));
     }
 
-    virtual ~JacobiPreconditioner() {}
+    virtual ~JacobiPreconditioner() override = default;
 
-    virtual void apply(const Vector<ValueType>& r, Vector<ValueType>& z)
+    void apply(const Vector<ValueType>& r, Vector<ValueType>& z) override
     {
         const SizeType size = mDiag.size();
 
@@ -1390,13 +1384,13 @@ private:
     struct TransposeOp;
 
 public:
-    typedef typename MatrixType::ValueType ValueType;
-    typedef Preconditioner<ValueType> BaseType;
-    typedef Vector<ValueType> VectorType;
-    typedef boost::shared_ptr<IncompleteCholeskyPreconditioner> Ptr;
-    typedef SparseStencilMatrix<ValueType, 4>    TriangularMatrix;
-    typedef typename TriangularMatrix::ConstRow  TriangleConstRow;
-    typedef typename TriangularMatrix::RowEditor TriangleRowEditor;
+    using ValueType = typename MatrixType::ValueType;
+    using BaseType = Preconditioner<ValueType>;
+    using VectorType = Vector<ValueType>;
+    using Ptr = SharedPtr<IncompleteCholeskyPreconditioner>;
+    using TriangularMatrix = SparseStencilMatrix<ValueType, 4>;
+    using TriangleConstRow = typename TriangularMatrix::ConstRow;
+    using TriangleRowEditor = typename TriangularMatrix::RowEditor;
 
     IncompleteCholeskyPreconditioner(const MatrixType& matrix)
         : BaseType(matrix)
@@ -1491,11 +1485,11 @@ public:
             TransposeOp(matrix, mLowerTriangular, mUpperTriangular));
     }
 
-    virtual ~IncompleteCholeskyPreconditioner() {}
+    ~IncompleteCholeskyPreconditioner() override = default;
 
-    virtual bool isValid() const { return mPassedCompatibilityCondition; }
+    bool isValid() const override { return mPassedCompatibilityCondition; }
 
-    virtual void apply(const Vector<ValueType>& rVec, Vector<ValueType>& zVec)
+    void apply(const Vector<ValueType>& rVec, Vector<ValueType>& zVec) override
     {
         if (!mPassedCompatibilityCondition) {
             OPENVDB_THROW(ArithmeticError, "invalid Cholesky decomposition");
@@ -1671,8 +1665,8 @@ solve(
     Interrupter& interrupter,
     const State& termination)
 {
-    typedef typename PositiveDefMatrix::ValueType ValueType;
-    typedef Vector<ValueType> VectorType;
+    using ValueType = typename PositiveDefMatrix::ValueType;
+    using VectorType = Vector<ValueType>;
 
     State result;
     result.success = false;
@@ -1701,7 +1695,7 @@ solve(
 
     // Compute norm of B (the source)
     const ValueType tmp = bVec.infNorm();
-    const ValueType infNormOfB = isZero(tmp) ? 1.f : tmp;
+    const ValueType infNormOfB = isZero(tmp) ? ValueType(1) : tmp;
 
     // Compute rVec: residual = b - Ax.
     VectorType rVec(size); // vector of residuals

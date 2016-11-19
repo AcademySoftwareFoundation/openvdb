@@ -28,21 +28,19 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <sstream>
-#include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <cppunit/extensions/HelperMacros.h>
+#include <sstream>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 class TestLaplacian: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestLaplacian);
     CPPUNIT_TEST(testISLaplacian);                    // Laplacian in Index Space
@@ -171,8 +169,7 @@ TestLaplacian::testWSLaplacian()
     math::MapBase::Ptr rotated_map = map.preRotate(1.5, math::X_AXIS);
     // verify the new map is an affine map
     CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
-    math::AffineMap::Ptr affine_map =
-        boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+    math::AffineMap::Ptr affine_map = StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
     // the laplacian is invariant to rotation
     result = math::Laplacian<math::AffineMap, math::CD_SECOND>::result(
@@ -242,7 +239,7 @@ TestLaplacian::testWSLaplacianFrustum()
 
     math::Vec3d trans(2,2,2);
     math::NonlinearFrustumMap::Ptr map =
-        boost::static_pointer_cast<math::NonlinearFrustumMap, math::MapBase>(
+        StaticPtrCast<math::NonlinearFrustumMap, math::MapBase>(
             frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
     CPPUNIT_ASSERT(!map->hasUniformScale());
@@ -312,8 +309,7 @@ TestLaplacian::testWSLaplacianStencil()
     math::MapBase::Ptr rotated_map = map.preRotate(1.5, math::X_AXIS);
     // verify the new map is an affine map
     CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
-    math::AffineMap::Ptr affine_map =
-        boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+    math::AffineMap::Ptr affine_map = StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
     // the laplacian is invariant to rotation
     math::SevenPointStencil<FloatGrid> sevenpt(*grid);

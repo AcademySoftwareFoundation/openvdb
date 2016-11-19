@@ -662,7 +662,9 @@ SOP_OpenVDB_Fracture::process(
             for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
                 for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
                     for (GA_Offset i = start; i < end; ++i) {
-                        if (primClassifier.getClass(cutterGeo->primitiveIndex(i)) == classId) {
+                        if (classId == primClassifier.getClass(
+                            static_cast<int>(cutterGeo->primitiveIndex(i))))
+                        {
                             ++numPrims;
                         }
                     }
@@ -685,7 +687,9 @@ SOP_OpenVDB_Fracture::process(
                 for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
                     for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
                         for (GA_Offset i = start; i < end; ++i) {
-                            if (primClassifier.getClass(cutterGeo->primitiveIndex(i)) == classId) {
+                            if (classId == primClassifier.getClass(
+                                static_cast<int>(cutterGeo->primitiveIndex(i))))
+                            {
                                 const GA_Primitive* primRef = cutterGeo->getPrimitiveList().get(i);
                                 vtxn = primRef->getVertexCount();
 
@@ -786,7 +790,7 @@ SOP_OpenVDB_Fracture::process(
         openvdb::Int64Metadata::Ptr offmeta =
             grid->template getMetadata<openvdb::Int64Metadata>("houdiniorigoffset");
         if (offmeta) {
-            origvdboff = (GA_Offset)offmeta->value();
+            origvdboff = static_cast<GA_Offset>(offmeta->value());
         }
         if (origvdboff != GA_INVALID_OFFSET) {
             totalpiececount(origvdboff)++;
@@ -800,7 +804,7 @@ SOP_OpenVDB_Fracture::process(
         openvdb::Int64Metadata::Ptr offmeta =
             grid->template getMetadata<openvdb::Int64Metadata>("houdiniorigoffset");
         if (offmeta) {
-            origvdboff = (GA_Offset)offmeta->value();
+            origvdboff = static_cast<GA_Offset>(offmeta->value());
         }
         if (origvdboff != GA_INVALID_OFFSET) {
             totalpiececount(origvdboff)++;
@@ -816,7 +820,7 @@ SOP_OpenVDB_Fracture::process(
         openvdb::Int64Metadata::Ptr offmeta =
             grid->template getMetadata<openvdb::Int64Metadata>("houdiniorigoffset");
         if (offmeta) {
-            origvdboff = (GA_Offset)offmeta->value();
+            origvdboff = static_cast<GA_Offset>(offmeta->value());
             grid->removeMeta("houdiniorigoffset");
         }
 
@@ -830,12 +834,12 @@ SOP_OpenVDB_Fracture::process(
             && totalpiececount(origvdboff) > 1)
         {
             UT_WorkBuffer buf;
-            buf.sprintf("%s_%d", (const char *) name, piececount(origvdboff));
+            buf.sprintf("%s_%d", static_cast<const char*>(name), piececount(origvdboff));
             piececount(origvdboff)++;
             name.harden(buf.buffer());
         }
 
-        GU_PrimVDB* vdb = hvdb::createVdbPrimitive(*gdp, grid, (const char *) name);
+        GU_PrimVDB* vdb = hvdb::createVdbPrimitive(*gdp, grid, static_cast<const char*>(name));
 
         if (origvdboff != GA_INVALID_OFFSET)
         {
@@ -867,7 +871,7 @@ SOP_OpenVDB_Fracture::process(
 
         if (name.isstring() && name_h.isValid())
         {
-            name_h.set(vdb->getMapOffset(), (const char *) name);
+            name_h.set(vdb->getMapOffset(), static_cast<const char*>(name));
         }
     }
 
@@ -885,7 +889,7 @@ SOP_OpenVDB_Fracture::process(
         openvdb::Int64Metadata::Ptr offmeta =
             grid->template getMetadata<openvdb::Int64Metadata>("houdiniorigoffset");
         if (offmeta) {
-            origvdboff = (GA_Offset)offmeta->value();
+            origvdboff = static_cast<GA_Offset>(offmeta->value());
             grid->removeMeta("houdiniorigoffset");
         }
 
@@ -898,11 +902,11 @@ SOP_OpenVDB_Fracture::process(
         if (name.isstring() && origvdboff != GA_INVALID_OFFSET)
         {
             UT_WorkBuffer buf;
-            buf.sprintf("%s_%d", (const char *) name, piececount(origvdboff));
+            buf.sprintf("%s_%d", static_cast<const char*>(name), piececount(origvdboff));
             piececount(origvdboff)++;
             name.harden(buf.buffer());
         }
-        GU_PrimVDB* vdb = hvdb::createVdbPrimitive(*gdp, grid, (const char *) name);
+        GU_PrimVDB* vdb = hvdb::createVdbPrimitive(*gdp, grid, static_cast<const char*>(name));
         if (origvdboff != GA_INVALID_OFFSET)
         {
             GU_PrimVDB* origvdb =
@@ -924,7 +928,7 @@ SOP_OpenVDB_Fracture::process(
         }
         if (name.isstring() && name_h.isValid())
         {
-            name_h.set(vdb->getMapOffset(), (const char *) name);
+            name_h.set(vdb->getMapOffset(), static_cast<const char*>(name));
         }
 
         if (group) group->add(vdb);

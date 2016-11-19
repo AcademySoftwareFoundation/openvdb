@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file NodeManager.h
 ///
 /// @author Ken Museth
@@ -112,10 +112,8 @@ public:
             {
                 assert(this->isValid());
             }
-            Iterator& operator=(const Iterator& other)
-            {
-                mRange = other.mRange; mPos = other.mPos; return *this;
-            }
+            Iterator(const Iterator&) = default;
+            Iterator& operator=(const Iterator&) = default;
             /// Advance to the next node.
             Iterator& operator++() { ++mPos; return *this; }
             /// Return a reference to the node to which this iterator is pointing.
@@ -199,7 +197,7 @@ private:
         }
         const NodeOp mNodeOp;
     };// NodeList::NodeTransformer
-    
+
     // Private struct of NodeList that performs parallel_reduce
     template<typename NodeOp>
     struct NodeReducer
@@ -207,7 +205,7 @@ private:
         NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp), mOwnsOp(false)
         {
         }
-        NodeReducer(const NodeReducer& other, tbb::split) : 
+        NodeReducer(const NodeReducer& other, tbb::split) :
             mNodeOp(new NodeOp(*(other.mNodeOp), tbb::split())), mOwnsOp(true)
         {
         }
@@ -228,7 +226,7 @@ private:
         NodeOp *mNodeOp;
         const bool mOwnsOp;
     };// NodeList::NodeReducer
-    
+
 
 protected:
     ListT mList;
@@ -299,7 +297,7 @@ public:
     {
         this->foreachTopDown<NodeOp>(op, threaded, grainSize);
     }
-    
+
     template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
@@ -530,7 +528,7 @@ public:
     ///  template<typename TreeType>
     ///  struct NodeCountOp
     ///  {
-    ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0) 
+    ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
     ///      {
     ///      }
     ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
@@ -547,10 +545,10 @@ public:
     ///      // do nothing for the root node
     ///      void operator()(const typename TreeT::RootNodeType& node)
     ///      {
-    ///      }  
+    ///      }
     ///      // count the internal and leaf nodes
     ///      template<typename NodeT>
-    ///      void operator()(const NodeT& node) 
+    ///      void operator()(const NodeT& node)
     ///      {
     ///          ++(nodeCount[NodeT::LEVEL]);
     ///          ++totalCount;

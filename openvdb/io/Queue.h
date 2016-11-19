@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file Queue.h
 /// @author Peter Cucka
 
@@ -36,10 +36,10 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
 #include <algorithm> // for std::copy
+#include <functional>
 #include <iterator> // for std::back_inserter
+#include <memory>
 
 
 namespace openvdb {
@@ -57,10 +57,10 @@ class Archive;
 ///
 /// @par Example:
 /// @code
-/// #include <boost/bind.hpp>
-/// #include <tbb/concurrent_hash_map.h>
 /// #include <openvdb/openvdb.h>
 /// #include <openvdb/io/Queue.h>
+/// #include <tbb/concurrent_hash_map.h>
+/// #include <functional>
 ///
 /// using openvdb::io::Queue;
 ///
@@ -68,7 +68,7 @@ class Archive;
 /// {
 ///     // Use a concurrent container, because queue callback functions
 ///     // must be thread-safe.
-///     typedef tbb::concurrent_hash_map<Queue::Id, std::string> FilenameMap;
+///     using FilenameMap = tbb::concurrent_hash_map<Queue::Id, std::string>;
 ///     FilenameMap filenames;
 ///
 ///     // Callback function that prints the status of a completed task.
@@ -94,7 +94,8 @@ class Archive;
 ///
 ///     // Register the callback() method of the MyNotifier object
 ///     // to receive notifications of completed tasks.
-///     queue.addNotifier(boost::bind(&MyNotifier::callback, &notifier, _1, _2));
+///     queue.addNotifier(std::bind(&MyNotifier::callback, &notifier,
+///         std::placeholders::_1, std::placeholders::_2));
 ///
 ///     // Queue grids for output (e.g., for each step of a simulation).
 ///     for (int step = 1; step <= 10; ++step) {
@@ -133,7 +134,7 @@ public:
     static const Index32 DEFAULT_TIMEOUT = 120; // seconds
 
     /// ID number of a queued task or of a registered notification callback
-    typedef Index32 Id;
+    using Id = Index32;
 
     /// Status of a queued task
     enum Status { UNKNOWN, PENDING, SUCCEEDED, FAILED };
@@ -167,7 +168,7 @@ public:
     /// Subsequent queries of its status will return UNKNOWN.
     Status status(Id) const;
 
-    typedef boost::function<void (Id, Status)> Notifier;
+    using Notifier = std::function<void (Id, Status)>;
     /// @brief Register a function that will be called with a task's ID
     /// and status when that task completes, whether successfully or not.
     /// @return an ID that can be passed to removeNotifier() to deregister the function
@@ -243,7 +244,7 @@ private:
     Id writeGridVec(const GridCPtrVec&, const Archive&, const MetaMap&);
 
     struct Impl;
-    boost::shared_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 }; // class Queue
 
 

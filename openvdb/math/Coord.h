@@ -31,6 +31,7 @@
 #ifndef OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
+#include <array> // for std::array
 #include <openvdb/Platform.h>
 #include "Math.h"
 #include "Vec3.h"
@@ -55,15 +56,12 @@ public:
     typedef Int32 ValueType;
     typedef std::numeric_limits<ValueType> Limits;
 
-    Coord() { mVec[0] = mVec[1] = mVec[2] = 0; }
-    explicit Coord(Int32 xyz) { mVec[0] = mVec[1] = mVec[2] = xyz; }
-    Coord(Int32 x, Int32 y, Int32 z) { mVec[0] = x; mVec[1] = y; mVec[2] = z; }
-    explicit Coord(const Vec3i& v) { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
-    explicit Coord(const Vec3I& v)
-    {
-        mVec[0] = Int32(v[0]); mVec[1] = Int32(v[1]); mVec[2] = Int32(v[2]);
-    }
-    explicit Coord(const Int32* v) { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
+    Coord(): mVec{{0, 0, 0}} {}
+    explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
+    Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
+    explicit Coord(const Vec3i& v): mVec{{v[0], v[1], v[2]}} {}
+    explicit Coord(const Vec3I& v): mVec{{Int32(v[0]), Int32(v[1]), Int32(v[2])}} {}
+    explicit Coord(const Int32* v): mVec{{v[0], v[1], v[2]}} {}
 
     /// @brief Return the smallest possible coordinate
     static Coord min() { return Coord(Limits::min()); }
@@ -91,11 +89,15 @@ public:
         return Coord(Int32(Ceil(xyz[0])), Int32(Ceil(xyz[1])), Int32(Ceil(xyz[2])));
     }
 
+    /// @brief Reset all three coordinates with the specified arguments
     Coord& reset(Int32 x, Int32 y, Int32 z)
     {
-        mVec[0] = x; mVec[1] = y; mVec[2] = z;
+        mVec[0] = x;
+        mVec[1] = y;
+        mVec[2] = z;
         return *this;
     }
+    /// @brief Reset all three coordinates with the same specified argument
     Coord& reset(Int32 xyz) { return this->reset(xyz, xyz, xyz); }
 
     Coord& setX(Int32 x) { mVec[0] = x; return *this; }
@@ -104,7 +106,9 @@ public:
 
     Coord& offset(Int32 dx, Int32 dy, Int32 dz)
     {
-        mVec[0]+=dx; mVec[1]+=dy; mVec[2]+=dz;
+        mVec[0] += dx;
+        mVec[1] += dy;
+        mVec[2] += dz;
         return *this;
     }
     Coord& offset(Int32 n) { return this->offset(n, n, n); }
@@ -116,12 +120,16 @@ public:
 
     Coord& operator+=(const Coord& rhs)
     {
-        mVec[0] += rhs[0]; mVec[1] += rhs[1]; mVec[2] += rhs[2];
+        mVec[0] += rhs[0];
+        mVec[1] += rhs[1];
+        mVec[2] += rhs[2];
         return *this;
     }
     Coord& operator-=(const Coord& rhs)
     {
-        mVec[0] -= rhs[0]; mVec[1] -= rhs[1]; mVec[2] -= rhs[2];
+        mVec[0] -= rhs[0];
+        mVec[1] -= rhs[1];
+        mVec[2] -= rhs[2];
         return *this;
     }
     Coord operator+(const Coord& rhs) const
@@ -152,13 +160,13 @@ public:
     Int32& z() { return mVec[2]; }
     Int32& operator[](size_t i) { assert(i < 3); return mVec[i]; }
 
-    const Int32* data() const { return mVec; }
-    Int32* data() { return mVec; }
-    const Int32* asPointer() const { return mVec; }
-    Int32* asPointer() { return mVec; }
+    const Int32* data() const { return mVec.data(); }
+    Int32* data() { return mVec.data(); }
+    const Int32* asPointer() const { return mVec.data(); }
+    Int32* asPointer() { return mVec.data(); }
     Vec3d asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
     Vec3s asVec3s() const { return Vec3s(float(mVec[0]), float(mVec[1]), float(mVec[2])); }
-    Vec3i asVec3i() const { return Vec3i(mVec); }
+    Vec3i asVec3i() const { return Vec3i(mVec.data()); }
     Vec3I asVec3I() const { return Vec3I(Index32(mVec[0]), Index32(mVec[1]), Index32(mVec[2])); }
     void asXYZ(Int32& x, Int32& y, Int32& z) const { x = mVec[0]; y = mVec[1]; z = mVec[2]; }
 
@@ -218,7 +226,7 @@ public:
                      std::max(lhs.y(), rhs.y()),
                      std::max(lhs.z(), rhs.z()));
     }
-    
+
     /// Return true if any of the components of @a a are smaller than the
     /// corresponding components of @a b.
     static inline bool lessThan(const Coord& a, const Coord& b)
@@ -232,22 +240,21 @@ public:
     /// @brief Return the index (0, 1 or 2) with the largest value.
     size_t maxIndex() const { return MaxIndex(mVec); }
 
-    void read(std::istream& is) { is.read(reinterpret_cast<char*>(mVec), sizeof(mVec)); }
+    void read(std::istream& is) { is.read(reinterpret_cast<char*>(mVec.data()), sizeof(mVec)); }
     void write(std::ostream& os) const
     {
-        os.write(reinterpret_cast<const char*>(mVec), sizeof(mVec));
+        os.write(reinterpret_cast<const char*>(mVec.data()), sizeof(mVec));
     }
 
 private:
-
-    Int32 mVec[3];
+    std::array<Int32, 3> mVec;
 }; // class Coord
 
 inline Coord
 Abs(const Coord& xyz)
 {
     return Coord(Abs(xyz[0]), Abs(xyz[1]), Abs(xyz[2]));
-}    
+}
 
 ////////////////////////////////////////
 
@@ -409,14 +416,14 @@ public:
     {
         return CoordBBox(mMin.offsetBy(-padding),mMax.offsetBy(padding));
     }
-    
+
     /// Expand this bounding box to enclose point (x, y, z).
     void expand(const Coord& xyz)
     {
         mMin.minComponent(xyz);
         mMax.maxComponent(xyz);
     }
-    
+
     /// Union this bounding box with the given bounding box.
     void expand(const CoordBBox& bbox)
     {
@@ -442,10 +449,10 @@ public:
     /// @brief Populates an array with the eight corner points of this bounding box.
     /// @details The ordering of the corner points is lexicographic.
     /// @warning It is assumed that the pointer can be incremented at
-    /// least seven times, i.e. has storage for eight Coord elements! 
+    /// least seven times, i.e. has storage for eight Coord elements!
     void getCornerPoints(Coord *p) const
     {
-        assert(p != NULL);
+        assert(p != nullptr);
         p->reset(mMin.x(), mMin.y(), mMin.z()); ++p;
         p->reset(mMin.x(), mMin.y(), mMax.z()); ++p;
         p->reset(mMin.x(), mMax.y(), mMin.z()); ++p;
@@ -467,7 +474,7 @@ public:
     CoordBBox& operator&= (Coord::Int32 n) { mMin &= n; mMax &= n; return *this; }
     CoordBBox& operator|= (Coord::Int32 n) { mMin |= n; mMax |= n; return *this; }
     //@}
-     
+
     /// Unserialize this bounding box from the given stream.
     void read(std::istream& is) { mMin.read(is); mMax.read(is); }
     /// Serialize this bounding box to the given stream.

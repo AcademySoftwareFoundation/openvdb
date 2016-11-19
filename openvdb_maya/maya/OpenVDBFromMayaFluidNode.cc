@@ -51,8 +51,6 @@
 namespace mvdb = openvdb_maya;
 
 
-////////////////////////////////////////
-
 struct OpenVDBFromMayaFluidNode : public MPxNode
 {
 public:
@@ -133,7 +131,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     MFnStringData strData;
 
 
-    aFluidNodeName = tAttr.create("FluidNodeName", "fluid", MFnData::kString, strData.create("fluidShape"), &stat);
+    aFluidNodeName = tAttr.create("FluidNodeName", "fluid", MFnData::kString,
+        strData.create("fluidShape"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aFluidNodeName);
@@ -146,7 +145,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aDensity);
     if (stat != MS::kSuccess) return stat;
 
-    aDensityName = tAttr.create("DensityName", "dname", MFnData::kString, strData.create("density"), &stat);
+    aDensityName = tAttr.create("DensityName", "dname", MFnData::kString,
+        strData.create("density"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aDensityName);
@@ -159,7 +159,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aTemperature);
     if (stat != MS::kSuccess) return stat;
 
-    aTemperatureName = tAttr.create("TemperatureName", "tname", MFnData::kString, strData.create("temperature"), &stat);
+    aTemperatureName = tAttr.create("TemperatureName", "tname", MFnData::kString,
+        strData.create("temperature"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aTemperatureName);
@@ -172,7 +173,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aPressure);
     if (stat != MS::kSuccess) return stat;
 
-    aPressureName = tAttr.create("PressureName", "pname", MFnData::kString, strData.create("pressure"), &stat);
+    aPressureName = tAttr.create("PressureName", "pname", MFnData::kString,
+        strData.create("pressure"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aPressureName);
@@ -185,7 +187,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aFuel);
     if (stat != MS::kSuccess) return stat;
 
-    aFuelName = tAttr.create("FuelName", "fname", MFnData::kString, strData.create("fuel"), &stat);
+    aFuelName = tAttr.create("FuelName", "fname", MFnData::kString,
+        strData.create("fuel"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aFuelName);
@@ -198,7 +201,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aFalloff);
     if (stat != MS::kSuccess) return stat;
 
-    aFalloffName = tAttr.create("FalloffName", "falloffname", MFnData::kString, strData.create("falloff"), &stat);
+    aFalloffName = tAttr.create("FalloffName", "falloffname", MFnData::kString,
+        strData.create("falloff"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aFalloffName);
@@ -211,7 +215,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aVelocity);
     if (stat != MS::kSuccess) return stat;
 
-    aVelocityName = tAttr.create("VelocityName", "vname", MFnData::kString, strData.create("velocity"), &stat);
+    aVelocityName = tAttr.create("VelocityName", "vname", MFnData::kString,
+        strData.create("velocity"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aVelocityName);
@@ -224,7 +229,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aColors);
     if (stat != MS::kSuccess) return stat;
 
-    aColorsName = tAttr.create("ColorsName", "cdname", MFnData::kString, strData.create("color"), &stat);
+    aColorsName = tAttr.create("ColorsName", "cdname", MFnData::kString,
+        strData.create("color"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aColorsName);
@@ -237,7 +243,8 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = addAttribute(aCoordinates);
     if (stat != MS::kSuccess) return stat;
 
-    aCoordinatesName = tAttr.create("CoordinatesName", "uvwname", MFnData::kString, strData.create("coordinates"), &stat);
+    aCoordinatesName = tAttr.create("CoordinatesName", "uvwname", MFnData::kString,
+        strData.create("coordinates"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     stat = addAttribute(aCoordinatesName);
@@ -248,7 +255,6 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     if (stat != MS::kSuccess) return stat;
     stat = addAttribute(aTime);
     if (stat != MS::kSuccess) return stat;
-
 
 
     // Setup the output vdb
@@ -322,11 +328,14 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     return MS::kSuccess;
 }
 
+
 ////////////////////////////////////////
+
 
 namespace internal {
 
-openvdb::math::Transform::Ptr getTransform(const MFnFluid& fluid)
+inline openvdb::math::Transform::Ptr
+getTransform(const MFnFluid& fluid)
 {
     // Construct local transform
     openvdb::Vec3I res;
@@ -383,13 +392,14 @@ void copyGrid(OpenVDBData& vdb, const std::string& name, const openvdb::math::Tr
 
 }; // namespace internal
 
+
 ////////////////////////////////////////
 
 
 MStatus OpenVDBFromMayaFluidNode::compute(const MPlug& plug, MDataBlock& data)
 {
     MStatus status;
-    
+
     if (plug == aVdbOutput) {
 
         data.inputValue(aTime, &status);

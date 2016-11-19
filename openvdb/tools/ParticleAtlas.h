@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file     ParticleAtlas.h
 ///
 /// @brief    Space-partitioning acceleration structure for particles, points with
@@ -49,7 +49,6 @@
 ///
 /// @author   Mihai Alden
 
-
 #ifndef OPENVDB_TOOLS_PARTICLE_ATLAS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PARTICLE_ATLAS_HAS_BEEN_INCLUDED
 
@@ -65,7 +64,13 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+#include <algorithm> // for std::min(), std::max()
+#include <cmath> // for std::sqrt()
 #include <deque>
+#include <limits>
+#include <memory>
+#include <utility> // for std::pair
+#include <vector>
 
 
 namespace openvdb {
@@ -86,8 +91,8 @@ namespace tools {
 /// struct ParticleArray
 /// {
 ///     // The type used to represent world-space positions
-///     typedef VectorType                      PosType;
-///     typedef typename PosType::value_type    ScalarType;
+///     using PosType = VectorType;
+///     using ScalarType = typename PosType::value_type;
 ///
 ///     // Return the number of particles in the array
 ///     size_t size() const;
@@ -105,11 +110,11 @@ namespace tools {
 template<typename PointIndexGridType = PointIndexGrid>
 struct ParticleAtlas
 {
-    typedef boost::shared_ptr<ParticleAtlas>            Ptr;
-    typedef boost::shared_ptr<const ParticleAtlas>      ConstPtr;
+    using Ptr = SharedPtr<ParticleAtlas>;
+    using ConstPtr = SharedPtr<const ParticleAtlas>;
 
-    typedef typename PointIndexGridType::Ptr            PointIndexGridPtr;
-    typedef typename PointIndexGridType::ValueType      IndexType;
+    using PointIndexGridPtr = typename PointIndexGridType::Ptr;
+    using IndexType = typename PointIndexGridType::ValueType;
 
     struct Iterator;
 
@@ -131,7 +136,8 @@ struct ParticleAtlas
     /// @param minVoxelSize     minimum voxel size limit
     /// @param maxLevels        maximum number of resolution levels
     template<typename ParticleArrayType>
-    static Ptr create(const ParticleArrayType& particles, double minVoxelSize, size_t maxLevels = 50);
+    static Ptr create(const ParticleArrayType& particles,
+        double minVoxelSize, size_t maxLevels = 50);
 
     /// @brief Returns the number of resolution levels.
     size_t levels() const { return mIndexGridArray.size(); }
@@ -158,7 +164,7 @@ private:
 }; // struct ParticleAtlas
 
 
-typedef ParticleAtlas<PointIndexGrid> ParticleIndexAtlas;
+using ParticleIndexAtlas = ParticleAtlas<PointIndexGrid>;
 
 
 ////////////////////////////////////////
@@ -172,9 +178,9 @@ typedef ParticleAtlas<PointIndexGrid> ParticleIndexAtlas;
 template<typename PointIndexGridType>
 struct ParticleAtlas<PointIndexGridType>::Iterator
 {
-    typedef typename PointIndexGridType::TreeType   TreeType;
-    typedef tree::ValueAccessor<const TreeType>     ConstAccessor;
-    typedef boost::scoped_ptr<ConstAccessor>        ConstAccessorPtr;
+    using TreeType = typename PointIndexGridType::TreeType;
+    using ConstAccessor = tree::ValueAccessor<const TreeType>;
+    using ConstAccessorPtr = std::unique_ptr<ConstAccessor>;
 
     /////
 
@@ -187,7 +193,8 @@ struct ParticleAtlas<PointIndexGridType>::Iterator
     /// @param radius    world-space search radius
     /// @param particles container conforming to the ParticleArray interface
     template<typename ParticleArrayType>
-    void worldSpaceSearchAndUpdate(const Vec3d& center, double radius, const ParticleArrayType& particles);
+    void worldSpaceSearchAndUpdate(const Vec3d& center, double radius,
+        const ParticleArrayType& particles);
 
     /// @brief Clear the iterator and update it with the result of the given
     ///        world-space radial query.
@@ -238,10 +245,10 @@ private:
 
     void clear();
 
-    typedef std::pair<const IndexType*, const IndexType*> Range;
-    typedef std::deque<Range>                             RangeDeque;
-    typedef typename RangeDeque::const_iterator           RangeDequeCIter;
-    typedef boost::scoped_array<IndexType>                IndexArray;
+    using Range = std::pair<const IndexType*, const IndexType*>;
+    using RangeDeque = std::deque<Range>;
+    using RangeDequeCIter = typename RangeDeque::const_iterator;
+    using IndexArray = boost::scoped_array<IndexType>;
 
     ParticleAtlas const * const mAtlas;
     boost::scoped_array<ConstAccessorPtr> mAccessorList;
@@ -265,9 +272,10 @@ namespace particle_atlas_internal {
 
 
 template<typename ParticleArrayT>
-struct ComputeExtremas {
-    typedef typename ParticleArrayT::PosType    PosType;
-    typedef typename PosType::value_type        ScalarType;
+struct ComputeExtremas
+{
+    using PosType = typename ParticleArrayT::PosType;
+    using ScalarType = typename PosType::value_type;
 
     ComputeExtremas(const ParticleArrayT& particles)
         : particleArray(&particles)
@@ -310,12 +318,12 @@ struct ComputeExtremas {
 template<typename ParticleArrayT, typename PointIndex>
 struct SplittableParticleArray
 {
-    typedef boost::shared_ptr<SplittableParticleArray>          Ptr;
-    typedef boost::shared_ptr<const SplittableParticleArray>    ConstPtr;
-    typedef ParticleArrayT                                      ParticleArray;
+    using Ptr = SharedPtr<SplittableParticleArray>;
+    using ConstPtr = SharedPtr<const SplittableParticleArray>;
+    using ParticleArray = ParticleArrayT;
 
-    typedef typename ParticleArray::PosType                     PosType;
-    typedef typename PosType::value_type                        ScalarType;
+    using PosType = typename ParticleArray::PosType;
+    using ScalarType = typename PosType::value_type;
 
     SplittableParticleArray(const ParticleArrayT& particles)
         : mIndexMap(), mParticleArray(&particles), mSize(particles.size())
@@ -334,8 +342,10 @@ struct SplittableParticleArray
 
     size_t size() const { return mSize; }
 
-    void getPos(size_t n, PosType& xyz) const { return mParticleArray->getPos(getGlobalIndex(n), xyz); }
-    void getRadius(size_t n, ScalarType& radius) const { return mParticleArray->getRadius(getGlobalIndex(n), radius); }
+    void getPos(size_t n, PosType& xyz) const
+        { return mParticleArray->getPos(getGlobalIndex(n), xyz); }
+    void getRadius(size_t n, ScalarType& radius) const
+        { return mParticleArray->getRadius(getGlobalIndex(n), radius); }
 
     ScalarType minRadius() const { return mMinRadius; }
     ScalarType maxRadius() const { return mMaxRadius; }
@@ -379,7 +389,8 @@ private:
     SplittableParticleArray& operator=(const SplittableParticleArray&);
 
     // Masked copy constructor
-    SplittableParticleArray(const SplittableParticleArray& other, const boost::scoped_array<bool>& mask)
+    SplittableParticleArray(const SplittableParticleArray& other,
+        const boost::scoped_array<bool>& mask)
         : mIndexMap(), mParticleArray(&other.particleArray()), mSize(0)
     {
         for (size_t n = 0, N = other.size(); n < N; ++n) {
@@ -427,14 +438,16 @@ private:
     void setIndexMap(boost::scoped_array<PointIndex>& newIndexMap,
         const boost::scoped_array<bool>& mask, bool maskValue) const
     {
-        if (mIndexMap.get() != NULL) {
+        if (mIndexMap.get() != nullptr) {
                 const PointIndex* indices = mIndexMap.get();
             for (size_t idx = 0, n = 0, N = mSize; n < N; ++n) {
                 if (mask[n] == maskValue) newIndexMap[idx++] = indices[n];
             }
         } else {
             for (size_t idx = 0, n = 0, N = mSize; n < N; ++n) {
-                if (mask[n] == maskValue) newIndexMap[idx++] = PointIndex(n);
+                if (mask[n] == maskValue) {
+                    newIndexMap[idx++] = PointIndex(static_cast<typename PointIndex::IntType>(n));
+                }
             }
         }
     }
@@ -454,12 +467,13 @@ struct RemapIndices {
 
     RemapIndices(const ParticleArrayType& particles, std::vector<PointIndexLeafNodeType*> nodes)
         : mParticles(&particles)
-        , mNodes(nodes.empty() ? NULL : &nodes.front())
+        , mNodes(nodes.empty() ? nullptr : &nodes.front())
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-        typedef typename PointIndexLeafNodeType::ValueType PointIndexType;
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        using PointIndexType = typename PointIndexLeafNodeType::ValueType;
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             PointIndexLeafNodeType& node = *mNodes[n];
@@ -470,7 +484,8 @@ struct RemapIndices {
                 const PointIndexType* end = begin + numIndices;
 
                 while (begin < end) {
-                    *begin = PointIndexType(mParticles->getGlobalIndex(*begin));
+                    *begin = PointIndexType(static_cast<typename PointIndexType::IntType>(
+                        mParticles->getGlobalIndex(*begin)));
                     ++begin;
                 }
             }
@@ -485,12 +500,12 @@ struct RemapIndices {
 template<typename ParticleArrayType, typename IndexT>
 struct RadialRangeFilter
 {
-    typedef typename ParticleArrayType::PosType             PosType;
-    typedef typename PosType::value_type                    ScalarType;
+    using PosType = typename ParticleArrayType::PosType;
+    using ScalarType = typename PosType::value_type;
 
-    typedef std::pair<const IndexT*, const IndexT*>         Range;
-    typedef std::deque<Range>                               RangeDeque;
-    typedef std::deque<IndexT>                              IndexDeque;
+    using Range = std::pair<const IndexT*, const IndexT*>;
+    using RangeDeque = std::deque<Range>;
+    using IndexDeque = std::deque<IndexT>;
 
     RadialRangeFilter(RangeDeque& ranges, IndexDeque& indices, const PosType& xyz,
         ScalarType radius, const ParticleArrayType& particles, bool hasUniformRadius = false)
@@ -573,12 +588,12 @@ private:
 template<typename ParticleArrayType, typename IndexT>
 struct BBoxFilter
 {
-    typedef typename ParticleArrayType::PosType     PosType;
-    typedef typename PosType::value_type            ScalarType;
+    using PosType = typename ParticleArrayType::PosType;
+    using ScalarType = typename PosType::value_type;
 
-    typedef std::pair<const IndexT*, const IndexT*> Range;
-    typedef std::deque<Range>                       RangeDeque;
-    typedef std::deque<IndexT>                      IndexDeque;
+    using Range = std::pair<const IndexT*, const IndexT*>;
+    using RangeDeque = std::deque<Range>;
+    using IndexDeque = std::deque<IndexT>;
 
     BBoxFilter(RangeDeque& ranges, IndexDeque& indices,
         const BBoxd& bbox, const ParticleArrayType& particles, bool hasUniformRadius = false)
@@ -701,10 +716,10 @@ inline void
 ParticleAtlas<PointIndexGridType>::construct(
     const ParticleArrayType& particles, double minVoxelSize, size_t maxLevels)
 {
-    typedef typename particle_atlas_internal::
-        SplittableParticleArray<ParticleArrayType, IndexType>   SplittableParticleArray;
-    typedef typename SplittableParticleArray::Ptr               SplittableParticleArrayPtr;
-    typedef typename ParticleArrayType::ScalarType              ScalarType;
+    using SplittableParticleArray =
+        typename particle_atlas_internal::SplittableParticleArray<ParticleArrayType, IndexType>;
+    using SplittableParticleArrayPtr = typename SplittableParticleArray::Ptr;
+    using ScalarType = typename ParticleArrayType::ScalarType;
 
     /////
 
@@ -729,7 +744,8 @@ ParticleAtlas<PointIndexGridType>::construct(
             const double particleRadiusLimit = voxelSizeArray.back() * double(2.0);
             if (maxParticleRadius < particleRadiusLimit) break;
 
-            SplittableParticleArrayPtr newLevel = levels.back()->split(ScalarType(particleRadiusLimit));
+            SplittableParticleArrayPtr newLevel =
+                levels.back()->split(ScalarType(particleRadiusLimit));
             if (!newLevel) break;
 
             levels.push_back(newLevel);
@@ -738,8 +754,8 @@ ParticleAtlas<PointIndexGridType>::construct(
 
         size_t numPoints = 0;
 
-        typedef typename PointIndexGridType::TreeType       PointIndexTreeType;
-        typedef typename PointIndexTreeType::LeafNodeType   PointIndexLeafNodeType;
+        using PointIndexTreeType = typename PointIndexGridType::TreeType;
+        using PointIndexLeafNodeType = typename PointIndexTreeType::LeafNodeType;
 
         std::vector<PointIndexLeafNodeType*> nodes;
 
@@ -752,14 +768,15 @@ ParticleAtlas<PointIndexGridType>::construct(
             mMinRadiusArray.push_back(double(particleArray.minRadius()));
             mMaxRadiusArray.push_back(double(particleArray.maxRadius()));
 
-            PointIndexGridPtr grid = createPointIndexGrid<PointIndexGridType>(particleArray, voxelSizeArray[n]);
+            PointIndexGridPtr grid =
+                createPointIndexGrid<PointIndexGridType>(particleArray, voxelSizeArray[n]);
 
             nodes.clear();
             grid->tree().getNodes(nodes);
 
             tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
-                particle_atlas_internal::RemapIndices<SplittableParticleArray, PointIndexLeafNodeType>
-                (particleArray, nodes));
+                particle_atlas_internal::RemapIndices<SplittableParticleArray,
+                    PointIndexLeafNodeType>(particleArray, nodes));
 
             mIndexGridArray.push_back(grid);
         }
@@ -794,7 +811,7 @@ inline
 ParticleAtlas<PointIndexGridType>::Iterator::Iterator(const ParticleAtlas& atlas)
     : mAtlas(&atlas)
     , mAccessorList()
-    , mRange(static_cast<IndexType*>(NULL), static_cast<IndexType*>(NULL))
+    , mRange(static_cast<IndexType*>(nullptr), static_cast<IndexType*>(nullptr))
     , mRangeList()
     , mIter(mRangeList.begin())
     , mIndexArray()
@@ -821,8 +838,8 @@ ParticleAtlas<PointIndexGridType>::Iterator::reset()
         mRange.first = mIndexArray.get();
         mRange.second = mRange.first + mIndexArraySize;
     } else {
-        mRange.first = static_cast<IndexType*>(NULL);
-        mRange.second = static_cast<IndexType*>(NULL);
+        mRange.first = static_cast<IndexType*>(nullptr);
+        mRange.second = static_cast<IndexType*>(nullptr);
     }
 }
 
@@ -874,8 +891,8 @@ template<typename PointIndexGridType>
 inline void
 ParticleAtlas<PointIndexGridType>::Iterator::clear()
 {
-    mRange.first = static_cast<IndexType*>(NULL);
-    mRange.second = static_cast<IndexType*>(NULL);
+    mRange.first = static_cast<IndexType*>(nullptr);
+    mRange.second = static_cast<IndexType*>(nullptr);
     mRangeList.clear();
     mIter = mRangeList.end();
     mIndexArray.reset();
@@ -887,8 +904,8 @@ template<typename PointIndexGridType>
 inline void
 ParticleAtlas<PointIndexGridType>::Iterator::updateFromLevel(size_t level)
 {
-    typedef typename PointIndexGridType::TreeType   TreeType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    using TreeType = typename PointIndexGridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     this->clear();
 
@@ -923,8 +940,8 @@ inline void
 ParticleAtlas<PointIndexGridType>::Iterator::worldSpaceSearchAndUpdate(
     const Vec3d& center, double radius, const ParticleArrayType& particles)
 {
-    typedef typename ParticleArrayType::PosType     PosType;
-    typedef typename ParticleArrayType::ScalarType  ScalarType;
+    using PosType = typename ParticleArrayType::PosType;
+    using ScalarType = typename ParticleArrayType::ScalarType;
 
     /////
 
@@ -969,9 +986,10 @@ ParticleAtlas<PointIndexGridType>::Iterator::worldSpaceSearchAndUpdate(
             xform.worldToIndexCellCentered(bMax + maxRadius));
 
         inscribedRegion.expand(1);
-        point_index_grid_internal::constructExclusiveRegions(searchRegions, region, inscribedRegion);
+        point_index_grid_internal::constructExclusiveRegions(
+            searchRegions, region, inscribedRegion);
 
-        typedef particle_atlas_internal::RadialRangeFilter<ParticleArrayType, IndexType> FilterType;
+        using FilterType = particle_atlas_internal::RadialRangeFilter<ParticleArrayType, IndexType>;
         FilterType filter(mRangeList, filteredIndices, pos, dist, particles, uniformRadius);
 
         for (size_t i = 0, I = searchRegions.size(); i < I; ++i) {
@@ -991,11 +1009,6 @@ inline void
 ParticleAtlas<PointIndexGridType>::Iterator::worldSpaceSearchAndUpdate(
     const BBoxd& bbox, const ParticleArrayType& particles)
 {
-    typedef typename ParticleArrayType::PosType     PosType;
-    typedef typename ParticleArrayType::ScalarType  ScalarType;
-
-    /////
-
     this->clear();
 
     std::deque<IndexType> filteredIndices;
@@ -1025,9 +1038,10 @@ ParticleAtlas<PointIndexGridType>::Iterator::worldSpaceSearchAndUpdate(
             xform.worldToIndexCellCentered(bbox.max() + maxRadius));
 
         inscribedRegion.expand(1);
-        point_index_grid_internal::constructExclusiveRegions(searchRegions, region, inscribedRegion);
+        point_index_grid_internal::constructExclusiveRegions(
+            searchRegions, region, inscribedRegion);
 
-        typedef particle_atlas_internal::BBoxFilter<ParticleArrayType, IndexType> FilterType;
+        using FilterType = particle_atlas_internal::BBoxFilter<ParticleArrayType, IndexType>;
         FilterType filter(mRangeList, filteredIndices, bbox, particles, uniformRadius);
 
         for (size_t i = 0, I = searchRegions.size(); i < I; ++i) {

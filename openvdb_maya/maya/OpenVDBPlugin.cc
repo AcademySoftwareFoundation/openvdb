@@ -162,6 +162,10 @@ NodeRegistry::deregisterNodes(MFnPlugin& plugin, MStatus& status)
 ////////////////////////////////////////
 
 
+MStatus initializePlugin(MObject);
+MStatus uninitializePlugin(MObject);
+
+
 MStatus
 initializePlugin(MObject obj)
 {

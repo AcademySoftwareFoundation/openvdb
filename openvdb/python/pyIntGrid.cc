@@ -34,6 +34,9 @@
 #include "pyGrid.h"
 
 
+void exportIntGrid();
+
+
 void
 exportIntGrid()
 {

@@ -28,10 +28,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Maps.h>
 #include <openvdb/util/MapsUtil.h>
+#include <cppunit/extensions/HelperMacros.h>
 
 
 class TestMaps: public CppUnit::TestCase
@@ -480,7 +480,7 @@ TestMaps::testFrustum()
 
     Vec3d trans(2,2,2);
     NonlinearFrustumMap::Ptr map =
-        boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(
+        openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(
             frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
     CPPUNIT_ASSERT(!map->hasUniformScale());
@@ -668,7 +668,7 @@ TestMaps::testCalcBoundingBox()
          openvdb::BBoxd bbox(Vec3d(0), Vec3d(100));
          NonlinearFrustumMap frustum(bbox, 2, 5);
          NonlinearFrustumMap::Ptr map =
-             boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(
+             openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(
                  frustum.preScale(Vec3d(2,2,2)));
          Vec3d center(20,20,10);
          double radius(1);
@@ -788,7 +788,6 @@ TestMaps::testJacobians()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
     }
     {
-
         openvdb::BBoxd bbox(Vec3d(0), Vec3d(100));
         NonlinearFrustumMap frustum(bbox, 1./6., 5);
         /// frustum will have depth, far plane - near plane = 5
@@ -796,9 +795,8 @@ TestMaps::testJacobians()
 
         Vec3d trans(2,2,2);
         NonlinearFrustumMap::Ptr map =
-            boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(
-            frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
-
+            openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(
+                frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
         const Vec3d test(1,2,3);
         const Vec3d origin(0, 0, 0);
@@ -826,8 +824,6 @@ TestMaps::testJacobians()
 
 
 }
-
-
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

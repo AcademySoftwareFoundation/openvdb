@@ -30,10 +30,10 @@
 
 #include "Metadata.h"
 
+#include <tbb/mutex.h>
 #include <map>
 #include <sstream>
 #include <vector>
-#include <tbb/mutex.h>
 
 
 namespace openvdb {

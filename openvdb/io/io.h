@@ -32,13 +32,13 @@
 #define OPENVDB_IO_IO_HAS_BEEN_INCLUDED
 
 #include <openvdb/Platform.h>
+#include <openvdb/Types.h> // for SharedPtr
 #include <openvdb/version.h>
 #include <boost/any.hpp>
-#include <boost/function.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include <functional>
 #include <iosfwd> // for std::ios_base
 #include <map>
+#include <memory>
 #include <string>
 
 
@@ -56,8 +56,8 @@ namespace io {
 class OPENVDB_API StreamMetadata
 {
 public:
-    typedef boost::shared_ptr<StreamMetadata> Ptr;
-    typedef boost::shared_ptr<const StreamMetadata> ConstPtr;
+    using Ptr = SharedPtr<StreamMetadata>;
+    using ConstPtr = SharedPtr<const StreamMetadata>;
 
     StreamMetadata();
     StreamMetadata(const StreamMetadata&);
@@ -91,9 +91,18 @@ public:
     bool writeGridStats() const;
     void setWriteGridStats(bool);
 
+    bool seekable() const;
+    void setSeekable(bool);
+
+    bool countingPasses() const;
+    void setCountingPasses(bool);
+
+    uint32_t pass() const;
+    void setPass(uint32_t);
+
     //@{
-    /// @brief Return a (reference to a) copy of the metadata of the grid currently
-    /// being read or written.
+    /// @brief Return a (reference to a) copy of the metadata of the grid
+    /// currently being read or written.
     /// @details Some grid metadata might duplicate information returned by
     /// gridClass(), backgroundPtr() and other accessors, but those values
     /// are not guaranteed to be kept in sync.
@@ -101,7 +110,7 @@ public:
     const MetaMap& gridMetadata() const;
     //@}
 
-    typedef std::map<std::string, boost::any> AuxDataMap;
+    using AuxDataMap = std::map<std::string, boost::any>;
     //@{
     /// @brief Return a map that can be populated with arbitrary user data.
     AuxDataMap& auxData();
@@ -113,7 +122,7 @@ public:
 
 private:
     struct Impl;
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 }; // class StreamMetadata
 
 
@@ -126,15 +135,25 @@ std::ostream& operator<<(std::ostream&, const StreamMetadata::AuxDataMap&);
 ////////////////////////////////////////
 
 
+/// @brief Leaf nodes that require multi-pass I/O must inherit from this struct.
+/// @sa Grid::hasMultiPassIO()
+struct MultiPass {};
+
+
+////////////////////////////////////////
+
+
 class File;
 
 /// @brief Handle to control the lifetime of a memory-mapped .vdb file
 class OPENVDB_API MappedFile
 {
 public:
-    typedef boost::shared_ptr<MappedFile> Ptr;
+    using Ptr = SharedPtr<MappedFile>;
 
     ~MappedFile();
+    MappedFile(const MappedFile&) = delete; // not copyable
+    MappedFile& operator=(const MappedFile&) = delete;
 
     /// Return the filename of the mapped file.
     std::string filename() const;
@@ -143,14 +162,14 @@ public:
     /// @details Typical usage is
     /// @code
     /// openvdb::io::MappedFile::Ptr mappedFile = ...;
-    /// boost::shared_ptr<std::streambuf> buf = mappedFile->createBuffer();
-    /// std::istream istrm(buf.get());
+    /// auto buf = mappedFile->createBuffer();
+    /// std::istream istrm{buf.get()};
     /// // Read from istrm...
     /// @endcode
     /// The buffer must persist as long as the stream is open.
-    boost::shared_ptr<std::streambuf> createBuffer() const;
+    SharedPtr<std::streambuf> createBuffer() const;
 
-    typedef boost::function<void(std::string /*filename*/)> Notifier;
+    using Notifier = std::function<void(std::string /*filename*/)>;
     /// @brief Register a function that will be called with this file's name
     /// when the file is unmapped.
     void setNotifier(const Notifier&);
@@ -162,11 +181,8 @@ private:
 
     explicit MappedFile(const std::string& filename, bool autoDelete = false);
 
-    MappedFile(const MappedFile&); // not copyable
-    MappedFile& operator=(const MappedFile&); // not copyable
-
     class Impl;
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 }; // class MappedFile
 
 
@@ -244,15 +260,15 @@ OPENVDB_API void setWriteGridStatsMetadata(std::ios_base&, bool writeGridStats);
 
 /// @brief Return a shared pointer to the memory-mapped file with which the given stream
 /// is associated, or a null pointer if the stream is not associated with a memory-mapped file.
-OPENVDB_API boost::shared_ptr<MappedFile> getMappedFilePtr(std::ios_base&);
+OPENVDB_API SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&);
 /// @brief Associate the given stream with (a shared pointer to) a memory-mapped file.
 /// @note The shared pointer object (not just the io::MappedFile object to which it points)
 /// must remain valid until the file is closed.
-OPENVDB_API void setMappedFilePtr(std::ios_base&, boost::shared_ptr<MappedFile>&);
+OPENVDB_API void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&);
 
 /// @brief Return a shared pointer to an object that stores metadata (file format,
 /// compression scheme, etc.) for use when reading from or writing to the given stream.
-OPENVDB_API boost::shared_ptr<StreamMetadata> getStreamMetadataPtr(std::ios_base&);
+OPENVDB_API SharedPtr<StreamMetadata> getStreamMetadataPtr(std::ios_base&);
 /// @brief Associate the given stream with (a shared pointer to) an object that stores
 /// metadata (file format, compression scheme, etc.) for use when reading from
 /// or writing to the stream.
@@ -261,10 +277,10 @@ OPENVDB_API boost::shared_ptr<StreamMetadata> getStreamMetadataPtr(std::ios_base
 /// @note The shared pointer object (not just the io::StreamMetadata object to which it points)
 /// must remain valid until the file is closed.
 OPENVDB_API void setStreamMetadataPtr(std::ios_base&,
-    boost::shared_ptr<StreamMetadata>&, bool transfer = true);
+    SharedPtr<StreamMetadata>&, bool transfer = true);
 /// @brief Dissociate the given stream from its metadata object (if it has one)
 /// and return a shared pointer to the object.
-OPENVDB_API boost::shared_ptr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
+OPENVDB_API SharedPtr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME

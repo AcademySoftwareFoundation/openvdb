@@ -43,17 +43,21 @@ namespace OPENVDB_VERSION_NAME {
 class OPENVDB_API Exception: public std::exception
 {
 public:
-    virtual const char* what() const throw()
+    Exception(const Exception&) = default;
+    Exception(Exception&&) = default;
+    Exception& operator=(const Exception&) = default;
+    Exception& operator=(Exception&&) = default;
+    ~Exception() override = default;
+
+    const char* what() const noexcept override
     {
-        try { return mMessage.c_str(); } catch (...) {};
-        return NULL;
+        try { return mMessage.c_str(); } catch (...) {}
+        return nullptr;
     }
 
-    virtual ~Exception() throw() {}
-
 protected:
-    Exception() throw() {}
-    explicit Exception(const char* eType, const std::string* const msg = NULL) throw()
+    Exception() noexcept {}
+    explicit Exception(const char* eType, const std::string* const msg = nullptr) noexcept
     {
         try {
             if (eType) mMessage = eType;
@@ -70,8 +74,8 @@ private:
 class OPENVDB_API _classname: public Exception \
 { \
 public: \
-    _classname() throw() : Exception( #_classname ) {} \
-    explicit _classname(const std::string &msg) throw() : Exception( #_classname , &msg) {} \
+    _classname() noexcept: Exception( #_classname ) {} \
+    explicit _classname(const std::string& msg) noexcept: Exception( #_classname , &msg) {} \
 }
 
 

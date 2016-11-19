@@ -161,9 +161,9 @@ struct PickleSuite: public py::pickle_suite
     /// Restore the given Transform to a saved state.
     static void setstate(py::object xformObj, py::object stateObj)
     {
-        math::Transform::Ptr xform;
+        math::Transform* xform = nullptr;
         {
-            py::extract<math::Transform::Ptr> x(xformObj);
+            py::extract<math::Transform*> x(xformObj);
             if (x.check()) xform = x();
             else return;
         }
@@ -246,6 +246,8 @@ struct PickleSuite: public py::pickle_suite
 
 } // namespace pyTransform
 
+
+void exportTransform();
 
 void
 exportTransform()

@@ -35,7 +35,6 @@
 #define OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
 #include <sstream>
-#include <boost/type_traits/is_integral.hpp>
 #include "Math.h"
 
 
@@ -43,6 +42,10 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+
+/// @brief Dummy class for tag dispatch of conversion constructors
+struct Conversion {};
+
 
 /// @class Tuple "Tuple.h"
 /// A base class for homogenous tuple types
@@ -54,23 +57,36 @@ public:
 
     static const int size = SIZE;
 
-    /// Default ctor.  Does nothing.  Required because declaring a copy (or
-    /// other) constructor means the default constructor gets left out.
+    /// @brief Default ctor.  Does nothing.
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default constructor.
     Tuple() {}
 
     /// Copy constructor.  Used when the class signature matches exactly.
-    inline Tuple(Tuple const &src) {
+    Tuple(Tuple const& src) {
         for (int i = 0; i < SIZE; ++i) {
             mm[i] = src.mm[i];
         }
     }
 
-    /// Conversion constructor.  Tuples with different value types and
-    /// different sizes can be interconverted using this member.  Converting
-    /// from a larger tuple results in truncation; converting from a smaller
-    /// tuple results in the extra data members being zeroed out.  This
-    /// function assumes that the integer 0 is convertible to the tuple's
-    /// value type.
+    /// @brief Assignment operator
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default assignment operator.
+    Tuple& operator=(Tuple const& src) {
+        if (&src != this) {
+            for (int i = 0; i < SIZE; ++i) {
+                mm[i] = src.mm[i];
+            }
+        }
+        return *this;
+    }
+
+    /// @brief Conversion constructor.
+    /// @details Tuples with different value types and different sizes can be
+    /// interconverted using this member.  Converting from a larger tuple
+    /// results in truncation; converting from a smaller tuple results in
+    /// the extra data members being zeroed out.  This function assumes that
+    /// the integer 0 is convertible to the tuple's value type.
     template <int src_size, typename src_valtype>
     explicit Tuple(Tuple<src_size, src_valtype> const &src) {
         enum { COPY_END = (SIZE < src_size ? SIZE : src_size) };

@@ -43,9 +43,8 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/static_assert.hpp>
+#include <memory>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -53,60 +52,115 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 // One-dimensional scalar types
-typedef uint32_t            Index32;
-typedef uint64_t            Index64;
-typedef Index32             Index;
-typedef int16_t             Int16;
-typedef int32_t             Int32;
-typedef int64_t             Int64;
-typedef Int32               Int;
-typedef unsigned char       Byte;
-typedef double              Real;
+using Index32 = uint32_t;
+using Index64 = uint64_t;
+using Index   = Index32;
+using Int16   = int16_t;
+using Int32   = int32_t;
+using Int64   = int64_t;
+using Int     = Int32;
+using Byte    = unsigned char;
+using Real    = double;
 
 // Two-dimensional vector types
-typedef math::Vec2<Real>    Vec2R;
-typedef math::Vec2<Index32> Vec2I;
-typedef math::Vec2<float>   Vec2f;
-typedef math::Vec2<half>    Vec2H;
+using Vec2R = math::Vec2<Real>;
+using Vec2I = math::Vec2<Index32>;
+using Vec2f = math::Vec2<float>;
+using Vec2H = math::Vec2<half>;
 using math::Vec2i;
 using math::Vec2s;
 using math::Vec2d;
 
 // Three-dimensional vector types
-typedef math::Vec3<Real>    Vec3R;
-typedef math::Vec3<Index32> Vec3I;
-typedef math::Vec3<float>   Vec3f;
-typedef math::Vec3<half>    Vec3H;
+using Vec3R = math::Vec3<Real>;
+using Vec3I = math::Vec3<Index32>;
+using Vec3f = math::Vec3<float>;
+using Vec3H = math::Vec3<half>;
+using Vec3U8 = math::Vec3<uint8_t>;
+using Vec3U16 = math::Vec3<uint16_t>;
 using math::Vec3i;
 using math::Vec3s;
 using math::Vec3d;
 
 using math::Coord;
 using math::CoordBBox;
-typedef math::BBox<Vec3d>   BBoxd;
+using BBoxd = math::BBox<Vec3d>;
 
 // Four-dimensional vector types
-typedef math::Vec4<Real>    Vec4R;
-typedef math::Vec4<Index32> Vec4I;
-typedef math::Vec4<float>   Vec4f;
-typedef math::Vec4<half>    Vec4H;
+using Vec4R = math::Vec4<Real>;
+using Vec4I = math::Vec4<Index32>;
+using Vec4f = math::Vec4<float>;
+using Vec4H = math::Vec4<half>;
 using math::Vec4i;
 using math::Vec4s;
 using math::Vec4d;
 
 // Three-dimensional matrix types
-typedef math::Mat3<Real>    Mat3R;
+using Mat3R = math::Mat3<Real>;
 
 // Four-dimensional matrix types
-typedef math::Mat4<Real>    Mat4R;
-typedef math::Mat4<double>  Mat4d;
-typedef math::Mat4<float>   Mat4s;
+using Mat4R = math::Mat4<Real>;
+using Mat4d = math::Mat4<double>;
+using Mat4s = math::Mat4<float>;
 
 // Quaternions
-typedef math::Quat<Real>    QuatR;
+using QuatR = math::Quat<Real>;
 
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};
+
+
+#ifdef OPENVDB_3_ABI_COMPATIBLE
+
+// Use Boost shared pointers in OpenVDB 3 ABI compatibility mode.
+template<typename T> using SharedPtr = boost::shared_ptr<T>;
+
+template<typename T, typename U> inline SharedPtr<T>
+ConstPtrCast(const SharedPtr<U>& ptr) { return boost::const_pointer_cast<T, U>(ptr); }
+
+template<typename T, typename U> inline SharedPtr<T>
+DynamicPtrCast(const SharedPtr<U>& ptr) { return boost::dynamic_pointer_cast<T, U>(ptr); }
+
+template<typename T, typename U> inline SharedPtr<T>
+StaticPtrCast(const SharedPtr<U>& ptr) { return boost::static_pointer_cast<T, U>(ptr); }
+
+#else // if !defined(OPENVDB_3_ABI_COMPATIBLE)
+
+// Use STL shared pointers from OpenVDB 4 on.
+template<typename T> using SharedPtr = std::shared_ptr<T>;
+
+/// @brief Return a new shared pointer that points to the same object
+/// as the given pointer but with possibly different <TT>const</TT>-ness.
+/// @par Example:
+/// @code
+/// FloatGrid::ConstPtr grid = ...;
+/// FloatGrid::Ptr nonConstGrid = ConstPtrCast<FloatGrid>(grid);
+/// FloatGrid::ConstPtr constGrid = ConstPtrCast<const FloatGrid>(nonConstGrid);
+/// @endcode
+template<typename T, typename U> inline SharedPtr<T>
+ConstPtrCast(const SharedPtr<U>& ptr) { return std::const_pointer_cast<T, U>(ptr); }
+
+/// @brief Return a new shared pointer that is either null or points to
+/// the same object as the given pointer after a @c dynamic_cast.
+/// @par Example:
+/// @code
+/// GridBase::ConstPtr grid = ...;
+/// FloatGrid::ConstPtr floatGrid = DynamicPtrCast<const FloatGrid>(grid);
+/// @endcode
+template<typename T, typename U> inline SharedPtr<T>
+DynamicPtrCast(const SharedPtr<U>& ptr) { return std::dynamic_pointer_cast<T, U>(ptr); }
+
+/// @brief Return a new shared pointer that points to the same object
+/// as the given pointer after a @c static_cast.
+/// @par Example:
+/// @code
+/// FloatGrid::Ptr floatGrid = ...;
+/// GridBase::Ptr grid = StaticPtrCast<GridBase>(floatGrid);
+/// @endcode
+template<typename T, typename U> inline SharedPtr<T>
+StaticPtrCast(const SharedPtr<U>& ptr) { return std::static_pointer_cast<T, U>(ptr); }
+
+#endif // OPENVDB_3_ABI_COMPATIBLE
 
 
 ////////////////////////////////////////
@@ -118,9 +172,9 @@ class ValueMask {};
 template<typename IntType_, Index Kind>
 struct PointIndex
 {
-    BOOST_STATIC_ASSERT(boost::is_integral<IntType_>::value);
+    static_assert(std::is_integral<IntType_>::value, "PointIndex requires an integer value type");
 
-    typedef IntType_ IntType;
+    using IntType = IntType_;
 
     PointIndex(IntType i = IntType(0)): mIndex(i) {}
 
@@ -135,11 +189,11 @@ private:
 };
 
 
-typedef PointIndex<Index32, 0> PointIndex32;
-typedef PointIndex<Index64, 0> PointIndex64;
+using PointIndex32 = PointIndex<Index32, 0>;
+using PointIndex64 = PointIndex<Index64, 0>;
 
-typedef PointIndex<Index32, 1> PointDataIndex32;
-typedef PointIndex<Index64, 1> PointDataIndex64;
+using PointDataIndex32 = PointIndex<Index32, 1>;
+using PointDataIndex64 = PointIndex<Index64, 1>;
 
 
 ////////////////////////////////////////
@@ -148,22 +202,25 @@ typedef PointIndex<Index64, 1> PointDataIndex64;
 template<typename T> struct VecTraits {
     static const bool IsVec = false;
     static const int Size = 1;
-    typedef T ElementType;
+    using ElementType = T;
 };
+
 template<typename T> struct VecTraits<math::Vec2<T> > {
     static const bool IsVec = true;
     static const int Size = 2;
-    typedef T ElementType;
+    using ElementType = T;
 };
+
 template<typename T> struct VecTraits<math::Vec3<T> > {
     static const bool IsVec = true;
     static const int Size = 3;
-    typedef T ElementType;
+    using ElementType = T;
 };
+
 template<typename T> struct VecTraits<math::Vec4<T> > {
     static const bool IsVec = true;
     static const int Size = 4;
-    typedef T ElementType;
+    using ElementType = T;
 };
 
 
@@ -172,15 +229,8 @@ template<typename T> struct VecTraits<math::Vec4<T> > {
 
 /// @brief CanConvertType<FromType, ToType>::value is @c true if a value
 /// of type @a ToType can be constructed from a value of type @a FromType.
-///
-/// @note @c boost::is_convertible tests for implicit convertibility only.
-/// What we want is the equivalent of C++11's @c std::is_constructible,
-/// which allows for explicit conversions as well.  Unfortunately, not all
-/// compilers support @c std::is_constructible yet, so for now, types that
-/// can only be converted explicitly have to be indicated with specializations
-/// of this template.
 template<typename FromType, typename ToType>
-struct CanConvertType { enum { value = boost::is_convertible<FromType, ToType>::value }; };
+struct CanConvertType { enum { value = std::is_constructible<ToType, FromType>::value }; };
 
 // Specializations for vector types, which can be constructed from values
 // of their own ValueTypes (or values that can be converted to their ValueTypes),
@@ -198,12 +248,13 @@ struct CanConvertType<T0, math::Vec3<T1> > { enum { value = CanConvertType<T0, T
 template<typename T0, typename T1>
 struct CanConvertType<T0, math::Vec4<T1> > { enum { value = CanConvertType<T0, T1>::value }; };
 template<> struct CanConvertType<PointIndex32, PointDataIndex32> { enum {value = true}; };
-template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };    
+template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };
 template<typename T>
 struct CanConvertType<T, ValueMask> { enum {value = CanConvertType<T, bool>::value}; };
 template<typename T>
 struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::value}; };
-    
+
+
 ////////////////////////////////////////
 
 
@@ -274,20 +325,28 @@ enum MergePolicy {
 template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
 template<> inline const char* typeNameAsString<ValueMask>()         { return "mask"; }
+template<> inline const char* typeNameAsString<half>()              { return "half"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
+template<> inline const char* typeNameAsString<uint8_t>()           { return "uint8"; }
+template<> inline const char* typeNameAsString<int16_t>()           { return "int16"; }
+template<> inline const char* typeNameAsString<uint16_t>()          { return "uint16"; }
 template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
 template<> inline const char* typeNameAsString<uint32_t>()          { return "uint32"; }
 template<> inline const char* typeNameAsString<int64_t>()           { return "int64"; }
 template<> inline const char* typeNameAsString<Vec2i>()             { return "vec2i"; }
 template<> inline const char* typeNameAsString<Vec2s>()             { return "vec2s"; }
 template<> inline const char* typeNameAsString<Vec2d>()             { return "vec2d"; }
+template<> inline const char* typeNameAsString<Vec3U8>()            { return "vec3u8"; }
+template<> inline const char* typeNameAsString<Vec3U16>()           { return "vec3u16"; }
 template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat4s>()             { return "mat4s"; }
 template<> inline const char* typeNameAsString<Mat4d>()             { return "mat4d"; }
+template<> inline const char* typeNameAsString<math::Quats>()       { return "quats"; }
+template<> inline const char* typeNameAsString<math::Quatd>()       { return "quatd"; }
 template<> inline const char* typeNameAsString<PointIndex32>()      { return "ptidx32"; }
 template<> inline const char* typeNameAsString<PointIndex64>()      { return "ptidx64"; }
 template<> inline const char* typeNameAsString<PointDataIndex32>()  { return "ptdataidx32"; }
@@ -312,8 +371,8 @@ template<typename AValueType, typename BValueType = AValueType>
 class CombineArgs
 {
 public:
-    typedef AValueType AValueT;
-    typedef BValueType BValueT;
+    using AValueT = AValueType;
+    using BValueT = BValueType;
 
     CombineArgs()
         : mAValPtr(NULL)
@@ -418,6 +477,7 @@ struct SwappedCombineOp
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_3_ABI_COMPATIBLE
 /// In copy constructors, members stored as shared pointers can be handled
 /// in several ways:
 /// <dl>
@@ -432,15 +492,16 @@ struct SwappedCombineOp
 /// <dd>Create a deep copy of the member.
 /// </dl>
 enum CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
+#endif
 
 
-// Dummy class that distinguishes shallow copy constructors from
-// deep copy constructors
+/// @brief Tag dispatch class that distinguishes shallow copy constructors
+/// from deep copy constructors
 class ShallowCopy {};
-// Dummy class that distinguishes topology copy constructors from
-// deep copy constructors
+/// @brief Tag dispatch class that distinguishes topology copy constructors
+/// from deep copy constructors
 class TopologyCopy {};
-// Dummy class that distinguishes constructors during file input
+/// @brief Tag dispatch class that distinguishes constructors during file input
 class PartialCreate {};
 
 } // namespace OPENVDB_VERSION_NAME

@@ -72,6 +72,15 @@ public:
         }
     }
 
+    Mat& operator=(Mat const& src) {
+        if (&src != this) {
+            for (unsigned i = 0; i < numElements(); ++i) {
+                mm[i] = src.mm[i];
+            }
+        }
+        return *this;
+    }
+
     /// @return string representation of matrix
     /// Since output is multiline, optional indentation argument prefixes
     /// each newline with that much white space. It does not indent
@@ -136,6 +145,13 @@ public:
         is.read(reinterpret_cast<char*>(&mm), sizeof(T)*SIZE*SIZE);
     }
 
+    /// Return the maximum of the absolute of all elements in this matrix
+    T absMax() const {
+        T x = static_cast<T>(std::fabs(mm[0]));
+        for (int i = 1; i < SIZE*SIZE; ++i)
+            x = std::max(x, static_cast<T>(std::fabs(mm[i])));
+        return x;
+    }
 
 protected:
     T mm[SIZE*SIZE];
@@ -771,94 +787,65 @@ padMat4(MatType& dest)
 
 /// @brief Solve for A=B*B, given A.
 /// @details Denman-Beavers square root iteration
-template <typename MatType>
+template<typename MatType>
 inline void
-sqrtSolve(const MatType &aA, MatType &aB, double aTol=0.01)
+sqrtSolve(const MatType& aA, MatType& aB, double aTol=0.01)
 {
-    unsigned int iterations = (unsigned int)(log(aTol)/log(0.5));
-    MatType Y[2];
-    MatType Z[2];
-    MatType invY;
-    MatType invZ;
+    unsigned int iterations = static_cast<unsigned int>(log(aTol)/log(0.5));
 
-    unsigned int current = 0;
-
-    Y[0]=aA;
+    MatType Y[2], Z[2];
+    Y[0] = aA;
     Z[0] = MatType::identity();
 
-    unsigned int iteration;
-    for (iteration=0; iteration<iterations; iteration++)
-    {
+    unsigned int current = 0;
+    for (unsigned int iteration=0; iteration < iterations; iteration++) {
         unsigned int last = current;
         current = !current;
 
-        invY = Y[last].inverse();
-        invZ = Z[last].inverse();
+        MatType invY = Y[last].inverse();
+        MatType invZ = Z[last].inverse();
 
-        Y[current]=0.5*(Y[last]+invZ);
-        Z[current]=0.5*(Z[last]+invY);
+        Y[current] = 0.5 * (Y[last] + invZ);
+        Z[current] = 0.5 * (Z[last] + invY);
     }
-
-    MatType &R = Y[current];
-
-    aB=R;
+    aB = Y[current];
 }
 
 
-template <typename MatType>
+template<typename MatType>
 inline void
-powSolve(const MatType &aA, MatType &aB, double aPower, double aTol=0.01)
+powSolve(const MatType& aA, MatType& aB, double aPower, double aTol=0.01)
 {
-    unsigned int iterations = (unsigned int)(log(aTol)/log(0.5));
+    unsigned int iterations = static_cast<unsigned int>(log(aTol)/log(0.5));
 
-    const bool inverted = ( aPower < 0.0 );
+    const bool inverted = (aPower < 0.0);
+    if (inverted) { aPower = -aPower; }
 
-    if (inverted) {
-        aPower = -aPower;
-    }
-
-    unsigned int whole = (unsigned int)aPower;
+    unsigned int whole = static_cast<unsigned int>(aPower);
     double fraction = aPower - whole;
 
-    MatType R;
-    R = MatType::identity();
-
+    MatType R = MatType::identity();
     MatType partial = aA;
 
     double contribution = 1.0;
-
-    unsigned int iteration;
-
-    for (iteration=0; iteration< iterations; iteration++)
-    {
+    for (unsigned int iteration = 0; iteration < iterations; iteration++) {
         sqrtSolve(partial, partial, aTol);
         contribution *= 0.5;
-
-        if (fraction>=contribution)
-        {
+        if (fraction >= contribution) {
             R *= partial;
-            fraction-=contribution;
+            fraction -= contribution;
         }
     }
 
     partial = aA;
-    while (whole)
-    {
-        if (whole & 1) {
-            R *= partial;
-        }
-        whole>>=1;
-        if(whole) {
-            partial*=partial;
-        }
+    while (whole) {
+        if (whole & 1) { R *= partial; }
+        whole >>= 1;
+        if (whole) { partial *= partial; }
     }
 
-    if (inverted) {
-        aB = R.inverse();
-    }
-    else {
-        aB = R;
-    }
+    if (inverted) { aB = R.inverse(); }
+    else { aB = R; }
 }
 
 
@@ -876,8 +863,8 @@ template<typename MatType>
 inline bool
 isInvertible(const MatType& m)
 {
-    typedef typename MatType::ValueType  value_type;
-    return !isApproxEqual(m.det(), (value_type)0);
+    typedef typename MatType::ValueType ValueType;
+    return !isApproxEqual(m.det(), ValueType(0));
 }
 
 

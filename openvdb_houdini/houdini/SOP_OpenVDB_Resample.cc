@@ -289,7 +289,7 @@ struct SOP_OpenVDB_Resample::RebuildOp
         } catch (openvdb::TypeError&) {
             self->addWarning(SOP_MESSAGE, ("skipped rebuild of level set grid "
                 + grid.getName() + " of type " + grid.type()).c_str());
-            outGrid = grid.copy();
+            outGrid = openvdb::ConstPtrCast<GridT>(grid.copy());
         }
     }
 }; // struct RebuildOp
@@ -436,7 +436,11 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
 
             // Create a new, empty output grid of the same type as the input grid
             // and with the same metadata.
+#ifdef OPENVDB_3_ABI_COMPATIBLE
             hvdb::GridPtr outGrid = grid.copyGrid(/*tree=*/openvdb::CP_NEW);
+#else
+            hvdb::GridPtr outGrid = grid.copyGridWithNewTree();
+#endif
 
             UT_AutoInterrupt scopedInterrupt(
                 ("Resampling " + it.getPrimitiveName().toStdString()).c_str());

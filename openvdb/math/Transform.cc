@@ -46,7 +46,7 @@ namespace math {
 
 
 Transform::Transform(const MapBase::Ptr& map):
-    mMap(boost::const_pointer_cast</*to=*/MapBase, /*from=*/const MapBase>(map))
+    mMap(ConstPtrCast</*to=*/MapBase, /*from=*/const MapBase>(map))
 {
     // auto-convert to simplest type
     if (!mMap->isType<UniformScaleMap>() && mMap->isLinear()) {
@@ -56,7 +56,7 @@ Transform::Transform(const MapBase::Ptr& map):
 }
 
 Transform::Transform(const Transform& other):
-    mMap(boost::const_pointer_cast</*to=*/MapBase, /*from=*/const MapBase>(other.baseMap()))
+    mMap(ConstPtrCast</*to=*/MapBase, /*from=*/const MapBase>(other.baseMap()))
 {
 }
 
@@ -195,8 +195,8 @@ Transform::isIdentity() const
     if (mMap->isLinear()) {
         return mMap->getAffineMap()->isIdentity();
     } else if ( mMap->isType<NonlinearFrustumMap>() ) {
-        NonlinearFrustumMap::Ptr frustum
-            = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
+        NonlinearFrustumMap::Ptr frustum =
+            StaticPtrCast<NonlinearFrustumMap, MapBase>(mMap);
         return frustum->isIdentity();
     }
     // unknown nonlinear map type
@@ -252,18 +252,20 @@ Transform::preMult(const Mat4d& m)
     } else if (mMap->isType<NonlinearFrustumMap>() ) {
 
         NonlinearFrustumMap::Ptr currentFrustum =
-            boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
+            StaticPtrCast<NonlinearFrustumMap, MapBase>(mMap);
 
         const Mat4d currentMat4 = currentFrustum->secondMap().getMat4();
         const Mat4d newMat4 = m * currentMat4;
 
-        AffineMap affine(newMat4);
+        AffineMap affine{newMat4};
 
-        NonlinearFrustumMap::Ptr frustum( new NonlinearFrustumMap( currentFrustum->getBBox(),
-                                                                   currentFrustum->getTaper(),
-                                                                   currentFrustum->getDepth(),
-                                                                   affine.copy() ) );
-        mMap = boost::static_pointer_cast<MapBase, NonlinearFrustumMap>( frustum );
+        NonlinearFrustumMap::Ptr frustum{new NonlinearFrustumMap{
+            currentFrustum->getBBox(),
+            currentFrustum->getTaper(),
+            currentFrustum->getDepth(),
+            affine.copy()
+        }};
+        mMap = StaticPtrCast<MapBase, NonlinearFrustumMap>(frustum);
     }
 
 }
@@ -316,24 +318,26 @@ Transform::postMult(const Mat4d& m)
         const Mat4d currentMat4 = mMap->getAffineMap()->getMat4();
         const Mat4d newMat4 = currentMat4 * m;
 
-        AffineMap::Ptr affineMap( new AffineMap( newMat4) );
+        AffineMap::Ptr affineMap{new AffineMap{newMat4}};
         mMap = simplify(affineMap);
 
-    } else if (mMap->isType<NonlinearFrustumMap>() ) {
+    } else if (mMap->isType<NonlinearFrustumMap>()) {
 
         NonlinearFrustumMap::Ptr currentFrustum =
-            boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
+            StaticPtrCast<NonlinearFrustumMap, MapBase>(mMap);
 
         const Mat4d currentMat4 = currentFrustum->secondMap().getMat4();
         const Mat4d newMat4 =  currentMat4 * m;
 
-        AffineMap affine(newMat4);
+        AffineMap affine{newMat4};
 
-        NonlinearFrustumMap::Ptr frustum( new NonlinearFrustumMap( currentFrustum->getBBox(),
-                                                                   currentFrustum->getTaper(),
-                                                                   currentFrustum->getDepth(),
-                                                                   affine.copy() ) );
-        mMap = boost::static_pointer_cast<MapBase, NonlinearFrustumMap>( frustum );
+        NonlinearFrustumMap::Ptr frustum{new NonlinearFrustumMap{
+            currentFrustum->getBBox(),
+            currentFrustum->getTaper(),
+            currentFrustum->getDepth(),
+            affine.copy()
+        }};
+        mMap = StaticPtrCast<MapBase, NonlinearFrustumMap>(frustum);
     }
 
 }

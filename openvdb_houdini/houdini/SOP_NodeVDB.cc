@@ -32,8 +32,12 @@
 /// @author FX R&D OpenVDB team
 
 #include "SOP_NodeVDB.h"
-#include <houdini_utils/geometry.h>
 
+#include <houdini_utils/geometry.h>
+//#ifdef OPENVDB_ENABLE_POINTS
+#include <openvdb/points/PointDataGrid.h>
+#include "PointUtils.h"
+//#endif
 #include "Utils.h"
 #include "GEO_PrimVDB.h"
 #include "GU_PrimVDB.h"
@@ -50,6 +54,7 @@
 #endif
 
 #include <tbb/mutex.h>
+
 
 namespace openvdb_houdini {
 
@@ -97,7 +102,8 @@ struct LockedInfoTextRegistry
 static Mutex theInitInfoTextRegistryMutex;
 
 // Global function for accessing the regsitry
-static LockedInfoTextRegistry* getInfoTextRegistry()
+static LockedInfoTextRegistry*
+getInfoTextRegistry()
 {
     Lock lock(theInitInfoTextRegistryMutex);
 
@@ -116,7 +122,13 @@ __pragma(warning(default:1711))
     return registry;
 }
 
-void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
+
+void registerGridSpecificInfoText(const std::string&, ApplyGridSpecificInfoText);
+ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string&);
+
+
+void
+registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
     Lock lock(registry->mMutex);
@@ -131,7 +143,8 @@ void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecific
 ///        specific function has been registered for the given grid type.
 /// @note  The @c defaultNodeSpecificInfoText method is always returned
 ///        prior to Houdini 14.
-ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
+ApplyGridSpecificInfoText
+getGridSpecificInfoText(const std::string& gridType)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
     Lock lock(registry->mMutex);
@@ -162,6 +175,12 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     // Initialize the vdb library
     openvdb::initialize();
 #endif
+
+//#ifdef OPENVDB_ENABLE_POINTS
+    // Register grid-specific info text for Point Data Grids
+    node_info_text::registerGridSpecificInfoText<openvdb::points::PointDataGrid>(
+        &pointDataGridSpecificInfoText);
+//#endif
 
     // Set the flag to draw guide geometry
     mySopFlags.setNeedGuide1(true);
@@ -207,7 +226,11 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
 void
 SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
 {
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+    SOP_Node::fillInfoTreeNodeSpecific(tree, OP_NodeInfoTreeParms(time));
+#else
     SOP_Node::fillInfoTreeNodeSpecific(tree, time);
+#endif
 
     // Add the OpenVDB library version number to this node's
     // extended operator information.
@@ -245,9 +268,9 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 
         const openvdb::GridBase& grid = it->getGrid();
 
-        node_info_text::ApplyGridSpecificInfoText callback = node_info_text::getGridSpecificInfoText(grid.type());
+        node_info_text::ApplyGridSpecificInfoText callback =
+            node_info_text::getGridSpecificInfoText(grid.type());
         if (callback) {
-
             // Note, the output string stream for every new grid is initialized with
             // its index and houdini primitive name prior to executing the callback
             const UT_String gridName = it.getPrimitiveName();
@@ -338,9 +361,10 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 {
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     struct Local {
-        static inline OP_Node* nextStealableInput(const unsigned index, const fpreal now, const OP_Node* node)
+        static inline OP_Node* nextStealableInput(
+            const unsigned idx, const fpreal now, const OP_Node* node)
         {
-            OP_Node* input = node->getInput(index);
+            OP_Node* input = node->getInput(idx);
             while (input) {
                 OP_Node* passThrough = input->getPassThroughNode(now);
                 if (!passThrough) break;

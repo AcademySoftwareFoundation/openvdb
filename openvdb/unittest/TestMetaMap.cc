@@ -31,7 +31,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Metadata.h>
-#include <openvdb/metadata/MetaMap.h>
+#include <openvdb/MetaMap.h>
 
 class TestMetaMap: public CppUnit::TestCase
 {

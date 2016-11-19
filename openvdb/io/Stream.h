@@ -32,8 +32,8 @@
 #define OPENVDB_IO_STREAM_HAS_BEEN_INCLUDED
 
 #include "Archive.h"
-#include <boost/scoped_ptr.hpp>
 #include <iosfwd>
+#include <memory>
 
 
 namespace openvdb {
@@ -63,10 +63,10 @@ public:
     Stream(const Stream&);
     Stream& operator=(const Stream&);
 
-    virtual ~Stream();
+    ~Stream() override;
 
     /// @brief Return a copy of this archive.
-    virtual Archive::Ptr copy() const;
+    Archive::Ptr copy() const override;
 
     /// Return the file-level metadata in a newly created MetaMap.
     MetaMap::Ptr getMetadata() const;
@@ -76,7 +76,7 @@ public:
 
     /// @brief Write the grids in the given container to this archive's output stream.
     /// @throw ValueError if this archive was constructed without specifying an output stream.
-    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
 
     /// @brief Write the grids in the given container to this archive's output stream.
     /// @throw ValueError if this archive was constructed without specifying an output stream.
@@ -93,7 +93,7 @@ private:
 
 
     struct Impl;
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 };
 
 

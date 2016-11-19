@@ -31,11 +31,11 @@
 #ifndef OPENVDB_METADATA_METAMAP_HAS_BEEN_INCLUDED
 #define OPENVDB_METADATA_METAMAP_HAS_BEEN_INCLUDED
 
+#include "Metadata.h"
+#include "Types.h"
+#include "Exceptions.h"
 #include <iosfwd>
 #include <map>
-#include <openvdb/metadata/Metadata.h>
-#include <openvdb/Types.h>
-#include <openvdb/Exceptions.h>
 
 
 namespace openvdb {
@@ -46,12 +46,12 @@ namespace OPENVDB_VERSION_NAME {
 class OPENVDB_API MetaMap
 {
 public:
-    typedef boost::shared_ptr<MetaMap> Ptr;
-    typedef boost::shared_ptr<const MetaMap> ConstPtr;
+    using Ptr = SharedPtr<MetaMap>;
+    using ConstPtr = SharedPtr<const MetaMap>;
 
-    typedef std::map<Name, Metadata::Ptr> MetadataMap;
-    typedef MetadataMap::iterator MetaIterator;
-    typedef MetadataMap::const_iterator ConstMetaIterator;
+    using MetadataMap = std::map<Name, Metadata::Ptr>;
+    using MetaIterator = MetadataMap::iterator;
+    using ConstMetaIterator = MetadataMap::const_iterator;
         ///< @todo this should really iterate over a map of Metadata::ConstPtrs
 
     MetaMap() {}
@@ -160,48 +160,45 @@ MetaMap::operator[](const Name &name) const
 ////////////////////////////////////////
 
 
-template <typename T>
+template<typename T>
 inline typename T::Ptr
 MetaMap::getMetadata(const Name &name)
 {
     ConstMetaIterator iter = mMeta.find(name);
-    if(iter == mMeta.end()) {
-        return typename T::Ptr();
-    }
+    if (iter == mMeta.end()) return typename T::Ptr{};
 
     // To ensure that we get valid conversion if the metadata pointers cross dso
     // boundaries, we have to check the qualified typename and then do a static
     // cast. This is slower than doing a dynamic_pointer_cast, but is safer when
     // pointers cross dso boundaries.
     if (iter->second->typeName() == T::staticTypeName()) {
-        return boost::static_pointer_cast<T, Metadata>(iter->second);
+        return StaticPtrCast<T, Metadata>(iter->second);
     } // else
-    return typename T::Ptr();
+    return typename T::Ptr{};
 }
 
-template <typename T>
+template<typename T>
 inline typename T::ConstPtr
 MetaMap::getMetadata(const Name &name) const
 {
     ConstMetaIterator iter = mMeta.find(name);
-    if(iter == mMeta.end()) {
-        return typename T::ConstPtr();
-    }
+    if (iter == mMeta.end()) return typename T::ConstPtr{};
+
     // To ensure that we get valid conversion if the metadata pointers cross dso
     // boundaries, we have to check the qualified typename and then do a static
     // cast. This is slower than doing a dynamic_pointer_cast, but is safer when
     // pointers cross dso boundaries.
     if (iter->second->typeName() == T::staticTypeName()) {
-        return boost::static_pointer_cast<const T, const Metadata>(iter->second);
+        return StaticPtrCast<const T, const Metadata>(iter->second);
     } // else
-    return typename T::ConstPtr();
+    return typename T::ConstPtr{};
 }
 
 
 ////////////////////////////////////////
 
 
-template <typename T>
+template<typename T>
 inline typename TypedMetadata<T>::Ptr
 MetaMap::getValidTypedMetadata(const Name &name) const
 {
@@ -214,7 +211,7 @@ MetaMap::getValidTypedMetadata(const Name &name) const
     // pointers cross dso boundaries.
     typename TypedMetadata<T>::Ptr m;
     if (iter->second->typeName() == TypedMetadata<T>::staticTypeName()) {
-        m = boost::static_pointer_cast<TypedMetadata<T>, Metadata>(iter->second);
+        m = StaticPtrCast<TypedMetadata<T>, Metadata>(iter->second);
     }
     if (!m) OPENVDB_THROW(TypeError, "Invalid type for metadata " << name);
     return m;
@@ -224,7 +221,7 @@ MetaMap::getValidTypedMetadata(const Name &name) const
 ////////////////////////////////////////
 
 
-template <typename T>
+template<typename T>
 inline T&
 MetaMap::metaValue(const Name &name)
 {
@@ -233,7 +230,7 @@ MetaMap::metaValue(const Name &name)
 }
 
 
-template <typename T>
+template<typename T>
 inline const T&
 MetaMap::metaValue(const Name &name) const
 {

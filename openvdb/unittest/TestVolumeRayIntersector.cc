@@ -28,10 +28,9 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file unittest/TestVolumeRayIntersector.cc
 /// @author Ken Museth
 
-#include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
 #include <openvdb/Types.h>
@@ -39,16 +38,13 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/RayIntersector.h>
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <assert.h>
-#include <vector>
-#include <deque>
+#include <cppunit/extensions/HelperMacros.h>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+#include <cassert>
+#include <deque>
+#include <iostream>
+#include <vector>
+
 
 #define ASSERT_DOUBLES_APPROX_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1.e-6);

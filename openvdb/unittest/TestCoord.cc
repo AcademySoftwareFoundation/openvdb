@@ -58,6 +58,11 @@ TestCoord::testCoord()
 {
     using openvdb::Coord;
 
+    for (int i=0; i<3; ++i) {
+        CPPUNIT_ASSERT_EQUAL(Coord::min()[i], std::numeric_limits<Coord::Int32>::min());
+        CPPUNIT_ASSERT_EQUAL(Coord::max()[i], std::numeric_limits<Coord::Int32>::max());
+    }
+
     Coord xyz(-1, 2, 4);
     Coord xyz2 = -xyz;
     CPPUNIT_ASSERT_EQUAL(Coord(1, -2, -4), xyz2);

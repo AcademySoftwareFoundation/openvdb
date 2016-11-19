@@ -72,7 +72,10 @@ public:
     explicit BBox(const ElementType* xyz, bool sorted = true);
 
     /// @brief Copy constructor
-    BBox(const BBox& other);
+    BBox(const BBox&) = default;
+
+    /// @brief Assignment operator
+    BBox& operator=(const BBox&) = default;
 
     /// @brief Sort the min/max by x,y,z component.
     void sort();
@@ -217,14 +220,6 @@ BBox<Vec3T>::BBox(const ElementType* xyz, bool sorted):
     mMax(xyz[3], xyz[4], xyz[5])
 {
     if (!sorted) this->sort();
-}
-
-
-template<typename Vec3T>
-inline
-BBox<Vec3T>::BBox(const BBox& other):
-    mMin(other.mMin), mMax(other.mMax)
-{
 }
 
 

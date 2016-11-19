@@ -154,7 +154,7 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
 {
     if (data == NULL || menuEntries == NULL || spare == NULL) return;
 
-    SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
+    SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
 
     if (sop == NULL) {
         // terminate and quit

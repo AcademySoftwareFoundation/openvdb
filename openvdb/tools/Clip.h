@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file Clip.h
 ///
 /// @brief Functions to clip a grid against a bounding box or against
@@ -36,17 +36,14 @@
 #ifndef OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>// for ValueMask
 #include <openvdb/Grid.h>
-#include <openvdb/math/Math.h>// for isNegative
+#include <openvdb/math/Math.h> // for math::isNegative()
 #include <openvdb/tree/LeafManager.h>
-#include "GridTransformer.h" // for resampleToMatch()
-#include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/is_signed.hpp>
-#include <boost/utility/enable_if.hpp>
+#include "GridTransformer.h" // for tools::resampleToMatch()
+#include "Prune.h"
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
-#include "Prune.h"
+#include <type_traits> // for std::enable_if, std::is_same
 
 
 namespace openvdb {
@@ -56,15 +53,22 @@ namespace tools {
 
 /// @brief Clip the given grid against a world-space bounding box
 /// and return a new grid containing the result.
+/// @param grid          the grid to be clipped
+/// @param bbox          a world-space bounding box
+/// @param keepInterior  if true, discard voxels that lie outside the bounding box;
+///     if false, discard voxels that lie inside the bounding box
 /// @warning Clipping a level set will likely produce a grid that is
 /// no longer a valid level set.
 template<typename GridType> OPENVDB_STATIC_SPECIALIZATION
-inline typename GridType::Ptr clip(const GridType& grid, const BBoxd&);
+inline typename GridType::Ptr
+clip(const GridType& grid, const BBoxd& bbox, bool keepInterior = true);
 
 /// @brief Clip a grid against the active voxels of another grid
 /// and return a new grid containing the result.
-/// @param grid  the grid to be clipped
-/// @param mask  a grid whose active voxels form a boolean clipping mask
+/// @param grid          the grid to be clipped
+/// @param mask          a grid whose active voxels form a boolean clipping mask
+/// @param keepInterior  if true, discard voxels that do not intersect the mask;
+///     if false, discard voxels that intersect the mask
 /// @details The mask grid need not have the same transform as the source grid.
 /// Also, if the mask grid is a level set, consider using tools::sdfInteriorMask
 /// to construct a new mask comprising the interior (rather than the narrow band)
@@ -72,7 +76,8 @@ inline typename GridType::Ptr clip(const GridType& grid, const BBoxd&);
 /// @warning Clipping a level set will likely produce a grid that is
 /// no longer a valid level set.
 template<typename GridType, typename MaskTreeType> OPENVDB_STATIC_SPECIALIZATION
-inline typename GridType::Ptr clip(const GridType& grid, const Grid<MaskTreeType>& mask);
+inline typename GridType::Ptr
+clip(const GridType& grid, const Grid<MaskTreeType>& mask, bool keepInterior = true);
 
 
 ////////////////////////////////////////
@@ -80,27 +85,28 @@ inline typename GridType::Ptr clip(const GridType& grid, const Grid<MaskTreeType
 
 namespace clip_internal {
 
-
-////////////////////////////////////////
+// Use either MaskGrids or BoolGrids internally.
+// (MaskGrids have a somewhat lower memory footprint.)
+using MaskValueType = ValueMask;
+//using MaskValueType = bool;
 
 
 template<typename TreeT>
 class MaskInteriorVoxels
 {
 public:
-    typedef typename TreeT::ValueType ValueT;
-    typedef typename TreeT::LeafNodeType LeafNodeT;
+    using ValueT = typename TreeT::ValueType;
+    using LeafNodeT = typename TreeT::LeafNodeType;
 
     MaskInteriorVoxels(const TreeT& tree): mAcc(tree) {}
 
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t /*leafIndex*/) const
+    template<typename LeafNodeType>
+    void operator()(LeafNodeType& leaf, size_t /*leafIndex*/) const
     {
-        const LeafNodeT *refLeaf = mAcc.probeConstLeaf(leaf.origin());
+        const auto* refLeaf = mAcc.probeConstLeaf(leaf.origin());
         if (refLeaf) {
-            typename LeafNodeType::ValueOffIter iter = leaf.beginValueOff();
-            for ( ; iter; ++iter) {
-                const Index pos = iter.pos();
+            for (auto iter = leaf.beginValueOff(); iter; ++iter) {
+                const auto pos = iter.pos();
                 leaf.setActiveState(pos, math::isNegative(refLeaf->getValue(pos)));
             }
         }
@@ -118,10 +124,10 @@ template<typename TreeT>
 class CopyLeafNodes
 {
 public:
-    typedef typename TreeT::template ValueConverter<ValueMask>::Type MaskTreeT;
-    typedef tree::LeafManager<const MaskTreeT> MaskLeafManagerT;
+    using MaskTreeT = typename TreeT::template ValueConverter<MaskValueType>::Type;
+    using MaskLeafManagerT = tree::LeafManager<const MaskTreeT>;
 
-    CopyLeafNodes(const TreeT& tree, const MaskLeafManagerT& leafNodes);
+    CopyLeafNodes(const TreeT&, const MaskLeafManagerT&);
 
     void run(bool threaded = true);
 
@@ -170,23 +176,19 @@ template<typename TreeT>
 void
 CopyLeafNodes<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
 {
-    typedef typename TreeT::LeafNodeType LeafT;
-    typedef typename MaskTree::LeafNodeType MaskLeafT;
-    typename MaskLeafT::ValueOnCIter it;
-
     tree::ValueAccessor<TreeT> acc(*mNewTree);
     tree::ValueAccessor<const TreeT> refAcc(*mTree);
 
-    for (size_t n = range.begin(); n != range.end(); ++n) {
-        const MaskLeafT& maskLeaf = mLeafNodes->leaf(n);
-        const Coord& ijk = maskLeaf.origin();
-        const LeafT* refLeaf = refAcc.probeConstLeaf(ijk);
+    for (auto n = range.begin(); n != range.end(); ++n) {
+        const auto& maskLeaf = mLeafNodes->leaf(n);
+        const auto& ijk = maskLeaf.origin();
+        const auto* refLeaf = refAcc.probeConstLeaf(ijk);
 
-        LeafT* newLeaf = acc.touchLeaf(ijk);
+        auto* newLeaf = acc.touchLeaf(ijk);
 
         if (refLeaf) {
-            for (it = maskLeaf.cbeginValueOn(); it; ++it) {
-                const Index pos = it.pos();
+            for (auto it = maskLeaf.cbeginValueOn(); it; ++it) {
+                const auto pos = it.pos();
                 newLeaf->setValueOnly(pos, refLeaf->getValue(pos));
                 newLeaf->setActiveState(pos, refLeaf->isValueOn(pos));
             }
@@ -194,8 +196,8 @@ CopyLeafNodes<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
             typename TreeT::ValueType value;
             bool isActive = refAcc.probeValue(ijk, value);
 
-            for (it = maskLeaf.cbeginValueOn(); it; ++it) {
-                const Index pos = it.pos();
+            for (auto it = maskLeaf.cbeginValueOn(); it; ++it) {
+                const auto pos = it.pos();
                 newLeaf->setValueOnly(pos, value);
                 newLeaf->setActiveState(pos, isActive);
             }
@@ -234,9 +236,9 @@ struct BoolSampler
 template<typename FromGridT, typename ToGridT>
 struct ConvertGrid
 {
-    typedef typename FromGridT::Ptr FromGridPtrT;
-    typedef typename ToGridT::Ptr ToGridPtrT;
-    ToGridPtrT operator()(const FromGridPtrT& grid) { return ToGridPtrT(new ToGridT(*grid)); }
+    using FromGridCPtrT = typename FromGridT::ConstPtr;
+    using ToGridPtrT = typename ToGridT::Ptr;
+    ToGridPtrT operator()(const FromGridCPtrT& grid) { return ToGridPtrT(new ToGridT(*grid)); }
 };
 
 // Partial specialization that avoids copying when
@@ -244,34 +246,34 @@ struct ConvertGrid
 template<typename GridT>
 struct ConvertGrid<GridT, GridT>
 {
-    typedef typename GridT::Ptr GridPtrT;
-    GridPtrT operator()(const GridPtrT& grid) { return grid; }
+    using GridCPtrT = typename GridT::ConstPtr;
+    GridCPtrT operator()(const GridCPtrT& grid) { return grid; }
 };
 
 
 ////////////////////////////////////////
 
 
-// Convert a grid of arbitrary type to a mask grid and return a pointer to the new grid.
+// Convert a grid of arbitrary type to a mask grid with the same tree configuration
+// and return a pointer to the new grid.
+/// @private
 template<typename GridT>
-inline typename boost::disable_if<boost::is_same<ValueMask, typename GridT::BuildType>,
-    typename GridT::template ValueConverter<ValueMask>::Type::Ptr>::type
+inline typename std::enable_if<!std::is_same<MaskValueType, typename GridT::BuildType>::value,
+    typename GridT::template ValueConverter<MaskValueType>::Type::Ptr>::type
 convertToMaskGrid(const GridT& grid)
 {
-    typedef typename GridT::template ValueConverter<ValueMask>::Type MaskGridT;
-    typedef typename MaskGridT::Ptr MaskGridPtrT;
-
-    // Convert the input grid to a boolean mask grid (with the same tree configuration).
-    MaskGridPtrT mask = MaskGridT::create(/*background=*/false);
+    using MaskGridT = typename GridT::template ValueConverter<MaskValueType>::Type;
+    auto mask = MaskGridT::create(/*background=*/false);
     mask->topologyUnion(grid);
     mask->setTransform(grid.constTransform().copy());
     return mask;
 }
 
 // Overload that avoids any processing if the input grid is already a mask grid
+/// @private
 template<typename GridT>
-inline typename boost::enable_if<boost::is_same<ValueMask, typename GridT::BuildType>,
-                                 typename GridT::Ptr>::type
+inline typename std::enable_if<std::is_same<MaskValueType, typename GridT::BuildType>::value,
+    typename GridT::ConstPtr>::type
 convertToMaskGrid(const GridT& grid)
 {
     return grid.copy(); // shallow copy
@@ -281,26 +283,30 @@ convertToMaskGrid(const GridT& grid)
 ////////////////////////////////////////
 
 
+/// @private
 template<typename GridType>
 inline typename GridType::Ptr
-doClip(const GridType& grid, const typename GridType::template ValueConverter<ValueMask>::Type& aMask)
+doClip(
+    const GridType& grid,
+    const typename GridType::template ValueConverter<MaskValueType>::Type& clipMask,
+    bool keepInterior)
 {
-    typedef typename GridType::TreeType TreeT;
-    typedef typename GridType::TreeType::template ValueConverter<ValueMask>::Type MaskTreeT;
+    using TreeT = typename GridType::TreeType;
+    using MaskTreeT = typename GridType::TreeType::template ValueConverter<MaskValueType>::Type;
 
-    const GridClass gridClass = grid.getGridClass();
-    const TreeT& tree = grid.tree();
+    const auto gridClass = grid.getGridClass();
+    const auto& tree = grid.tree();
 
-    MaskTreeT mask(false);
-    mask.topologyUnion(tree);
+    MaskTreeT gridMask(false);
+    gridMask.topologyUnion(tree);
 
     if (gridClass == GRID_LEVEL_SET) {
-        tree::LeafManager<MaskTreeT> leafNodes(mask);
+        tree::LeafManager<MaskTreeT> leafNodes(gridMask);
         leafNodes.foreach(MaskInteriorVoxels<TreeT>(tree));
 
         tree::ValueAccessor<const TreeT> acc(tree);
 
-        typename MaskTreeT::ValueAllIter iter(mask);
+        typename MaskTreeT::ValueAllIter iter(gridMask);
         iter.setMaxDepth(MaskTreeT::ValueAllIter::LEAF_DEPTH - 1);
 
         for ( ; iter; ++iter) {
@@ -308,12 +314,16 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<Va
         }
     }
 
-    mask.topologyIntersection(aMask.constTree());
+    if (keepInterior) {
+        gridMask.topologyIntersection(clipMask.constTree());
+    } else {
+        gridMask.topologyDifference(clipMask.constTree());
+    }
 
     typename GridType::Ptr outGrid;
     {
         // Copy voxel values and states.
-        tree::LeafManager<const MaskTreeT> leafNodes(mask);
+        tree::LeafManager<const MaskTreeT> leafNodes(gridMask);
         CopyLeafNodes<TreeT> maskOp(tree, leafNodes);
         maskOp.run();
         outGrid = GridType::create(maskOp.tree());
@@ -321,7 +331,7 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<Va
     {
         // Copy tile values and states.
         tree::ValueAccessor<const TreeT> refAcc(tree);
-        tree::ValueAccessor<const MaskTreeT> maskAcc(mask);
+        tree::ValueAccessor<const MaskTreeT> maskAcc(gridMask);
 
         typename TreeT::ValueAllIter it(outGrid->tree());
         it.setMaxDepth(TreeT::ValueAllIter::LEAF_DEPTH - 1);
@@ -350,12 +360,14 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<Va
 ////////////////////////////////////////
 
 
+/// @private
 template<typename GridType>
 OPENVDB_STATIC_SPECIALIZATION
 inline typename GridType::Ptr
-clip(const GridType& grid, const BBoxd& bbox)
+clip(const GridType& grid, const BBoxd& bbox, bool keepInterior)
 {
-    typedef typename GridType::template ValueConverter<ValueMask>::Type MaskGridT;
+    using MaskValueT = clip_internal::MaskValueType;
+    using MaskGridT = typename GridType::template ValueConverter<MaskValueT>::Type;
 
     // Transform the world-space bounding box into the source grid's index space.
     Vec3d idxMin, idxMax;
@@ -366,40 +378,39 @@ clip(const GridType& grid, const BBoxd& bbox)
     MaskGridT clipMask(/*background=*/false);
     clipMask.fill(region, /*value=*/true, /*active=*/true);
 
-    return clip_internal::doClip(grid, clipMask);
+    return clip_internal::doClip(grid, clipMask, keepInterior);
 }
 
 
-template<typename GridType1, typename TreeType2>
+/// @private
+template<typename SrcGridType, typename ClipTreeType>
 OPENVDB_STATIC_SPECIALIZATION
-inline typename GridType1::Ptr
-clip(const GridType1& grid1, const Grid<TreeType2>& grid2)
+inline typename SrcGridType::Ptr
+clip(const SrcGridType& srcGrid, const Grid<ClipTreeType>& clipGrid, bool keepInterior)
 {
-    typedef typename GridType1::template ValueConverter<ValueMask>::Type MaskGridT1;
-    typedef typename MaskGridT1::Ptr MaskGridPtrT1;
+    using MaskValueT = clip_internal::MaskValueType;
+    using ClipGridType = Grid<ClipTreeType>;
+    using SrcMaskGridType = typename SrcGridType::template ValueConverter<MaskValueT>::Type;
+    using ClipMaskGridType = typename ClipGridType::template ValueConverter<MaskValueT>::Type;
 
-    typedef Grid<TreeType2> GridType2;
-    typedef typename GridType2::template ValueConverter<ValueMask>::Type MaskGridT2;
-    typedef typename MaskGridT2::Ptr MaskGridPtrT2;
+    // Convert the clipping grid to a boolean-valued mask grid with the same tree configuration.
+    auto maskGrid = clip_internal::convertToMaskGrid(clipGrid);
 
-    // Convert the mask grid to a boolean grid with the same tree configuration.
-    MaskGridPtrT2 maskGrid = clip_internal::convertToMaskGrid( grid2 );
-
-    // Resample the boolean mask grid into the source grid's index space.
-    if (grid1.constTransform() != maskGrid->constTransform()) {
-        MaskGridPtrT2 resampledMask = MaskGridT2::create(/*background=*/false);
-        resampledMask->setTransform(grid1.constTransform().copy());
+    // Resample the mask grid into the source grid's index space.
+    if (srcGrid.constTransform() != maskGrid->constTransform()) {
+        auto resampledMask = ClipMaskGridType::create(/*background=*/false);
+        resampledMask->setTransform(srcGrid.constTransform().copy());
         tools::resampleToMatch<clip_internal::BoolSampler>(*maskGrid, *resampledMask);
         tools::prune(resampledMask->tree());
         maskGrid = resampledMask;
     }
 
-    // Convert the bool mask grid to a bool grid of the same configuration as the source grid.
-    MaskGridPtrT1 clipMask =
-        clip_internal::ConvertGrid</*from=*/MaskGridT2, /*to=*/MaskGridT1>()( maskGrid );
+    // Convert the mask grid to a mask grid with the same tree configuration as the source grid.
+    auto clipMask = clip_internal::ConvertGrid<
+        /*from=*/ClipMaskGridType, /*to=*/SrcMaskGridType>()(maskGrid);
 
-    // Clip the source grid against the boolean mask grid.
-    return clip_internal::doClip(grid1, *clipMask);
+    // Clip the source grid against the mask grid.
+    return clip_internal::doClip(srcGrid, *clipMask, keepInterior);
 }
 
 } // namespace tools
