@@ -33,14 +33,12 @@ include ../Variables.mk
 .PHONY: build-maya-%
 build-maya-%:
 	@echo "building for Maya $*"
-	@cd openvdb_maya && \
-	pybuild2 --clean -DMAYA_VERSION=$* $(OPENVDB_PATH)&& \
+	@pybuild2 --clean -DMAYA_VERSION=$* $(OPENVDB_PATH)&& \
 	pybuild2 --install  -DMAYA_VERSION=$* $(OPENVDB_PATH) \
                  -DINSTALL_BASE=$(BUILD_ROOT)
 
 .PHONY: clean-maya
 clean-maya: 
 	@echo "cleaning build environment..."
-	@cd openvdb_maya && \
-	pybuild2 --clean -DMAYA_VERSION=$* $(OPENVDB_PATH)
+	@pybuild2 --clean -DMAYA_VERSION=$* $(OPENVDB_PATH)
 

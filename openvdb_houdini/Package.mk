@@ -45,7 +45,7 @@ build-houdini-%:
 	pushd $(DD_TOOLS_ROOT)/$(OS)/package/houdini/$* && \
 	source ./houdini_setup  && popd && \
 	pybuild2 --clean -DHOUDINI_VERSION=$* $(OPENVDB_PATH) && \
-	pybuild2 --install -DHOUDINI_VERSION=$* $(OPENVDB_PATH) \
+	pybuild2 -vv --install -DHOUDINI_VERSION=$* $(OPENVDB_PATH) \
 	         -DDESTDIR=$(BUILD_ROOT)/houdini/$*
 
 add-houdini-version-%: build-houdini-%
