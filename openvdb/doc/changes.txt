@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
+@htmlonly <a name="v3_3_0_changes"></a>@endhtmlonly
 @par
-<B>Version 4.0.0</B> - <I>November 15, 2016</I>
+<B>Version 3.3.0</B> - <I>November 15, 2016</I>
 @par
 Highlights:
 - Incorporated Double&nbsp;Negative&rsquo;s
@@ -13,15 +13,6 @@ Highlights:
 - Introduced some C++11 constructs.
   A&nbsp;C++11-compatible compiler is now required.
 - Blosc-compressed <TT>.vdb</TT> files are now as much as 20% smaller.
-- Vector-valued grids are now constructed and destroyed much faster.
-  <BLOCKQUOTE>
-  @b Note: This change and other changes in this release
-  (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
-  so that it is incompatible with earlier versions of the OpenVDB library,
-  such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
-  </BLOCKQUOTE>
 
 @par
 New features:
@@ -35,13 +26,9 @@ New features:
   Voxel data for grids with such leaf nodes will be written and read in
   multiple passes, allowing blocks of related data to be stored contiguously.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
-- Added @vdblink::tree::Tree::unallocatedLeafCount()
-  Tree::unallocatedLeafCount@endlink, which returns the number of leaf
-  nodes with unallocated data buffers (typically due to delayed loading).
 
 @par
 Improvements:
-- Vector-valued grids are now constructed and destroyed much faster.
 - Changed @vdblink::math::Coord Coord@endlink's data representation
   to facilitate C++11 uniform initialization.
 - Delayed loading from @vdblink::io::File io::Files@endlink is now faster
@@ -61,29 +48,12 @@ Bug fixes:
   and @vdblink::Grid::topologyDifference() difference@endlink) on
   @vdblink::MaskGrid MaskGrids@endlink to sometimes produce incorrect results.
   (MaskGrids are used internally in a number of tools.)
-- Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
-  @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
 - @vdblink::tools::fillWithSpheres() tools::fillWithSpheres@endlink now
   returns an empty list of spheres instead of crashing when the user selects
   an isosurface that lies outside the bounding volume&rsquo;s narrow band.
 - Fixed a null pointer dereference when copying grids that were loaded
   with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
-
-@anchor v4_0_0_ABI_changes
-@par
-ABI changes:
-- Added a @vdblink::tree::NodeUnion NodeUnion@endlink template specialization
-  for non-POD value types that significantly expedites construction and
-  destruction of vector-valued grids.
-- Changed @vdblink::math::Coord Coord@endlink&rsquo;s data representation
-  to facilitate C++11 uniform initialization.
-- Replaced occurrences of <TT>boost::shared_ptr</TT> with
-  <TT>std::shared_ptr</TT>.
-- Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
-  @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
-- Added virtual function @vdblink::tree::Tree::unallocatedLeafCount()
-  Tree::unallocatedLeafCount@endlink.
 
 @par
 API changes:
@@ -105,13 +75,6 @@ API changes:
 - @vdblink::tools::ClosestSurfacePoint::initialize()
   tools::ClosestSurfacePoint::initialize@endlink now returns a boolean
   indicating whether initialization was successful.
-- Dropped the @c CopyPolicy enum and added
-  @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
-  and @vdblink::Grid::copyWithNewTree() Grid::copyWithNewTree@endlink in order
-  to close const-correctness holes that allowed newly-constructed,
-  non-<TT>const</TT> grids to share their trees with existing
-  <TT>const</TT> grids.  (Where that behavior is still required, use a
-  @vdblink::ConstPtrCast ConstPtrCast@endlink.)
 
 @par
 Python:
@@ -120,12 +83,6 @@ Python:
 
 @par
 Houdini:
-- Certain changes in this release (see @ref v4_0_0_ABI_changes "ABI changes"
-  above) alter the grid&nbsp;ABI so that it is incompatible with earlier
-  versions of the OpenVDB library, such as the ones in Houdini&nbsp;15.0
-  and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
 - Introduced some C++11 constructs that are incompatible with
   versions of Houdini older than&nbsp;15.0.
 - Fixed a bug in the Rasterize Points SOP that caused vector-valued attributes

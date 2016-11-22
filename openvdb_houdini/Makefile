@@ -41,8 +41,6 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -156,10 +154,10 @@ HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
-ifeq (3,$(strip $(abi)))
+#ifeq (3,$(strip $(abi)))
     CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
     HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
-endif
+#endif
 ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
     # change to runtime resolution, like Linux.
