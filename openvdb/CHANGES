@@ -36,9 +36,8 @@ Version 3.3.0 - November 15, 2016
     - Fixed a bug that caused topology operations (union, intersection
       and difference) on MaskGrids to sometimes produce incorrect results.
       (MaskGrids are used internally in a number of tools.)
-    - tools::fillWithSpheres() now returns an empty list of spheres
-      instead of crashing when the user selects an isosurface that lies
-      outside the bounding volume's narrow band.
+    - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
+      handle isosurfaces outside the input volume's narrow band.
     - Fixed a null pointer dereference when copying grids that were loaded
       with io::File::readGridPartial().
       [Reported by Nick Avramoussis]
@@ -67,10 +66,11 @@ Version 3.3.0 - November 15, 2016
     - Fixed a bug in the Rasterize Points SOP that caused vector-valued
       attributes to be transferred as scalars.
       [Contributed by Double Negative]
+    - Fixed a crash in the Ray SOP when the user selected an isosurface
+      outside the target volume's narrow band.
     - Added a toggle to the Clip SOP to invert the clipping mask.
     - Added a slider to the Scatter SOP to specify how far each point
       may be displaced from the center of its host voxel or tile.
-      
 
 
 Version 3.2.0 - August 10, 2016

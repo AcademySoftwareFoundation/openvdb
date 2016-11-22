@@ -1087,6 +1087,7 @@ template <class TreeType>
 inline typename TreeType::template ValueConverter<bool>::Type::Ptr
 computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
 {
+    using ValueType = typename TreeType::ValueType;
     using LeafNodeType = typename TreeType::LeafNodeType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
@@ -1100,6 +1101,15 @@ computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
         typename boost::mpl::at<BoolNodeChainType, boost::mpl::int_<1>>::type;
 
     /////
+
+    // Clamp the isovalue to the level set's background value minus epsilon.
+    // (In a valid narrow-band level set, all voxels, including background voxels,
+    // have values less than or equal to the background value, so an isovalue
+    // greater than or equal to the background value would produce a mask with
+    // effectively infinite extent.)
+    iso = std::min(iso,
+        static_cast<ValueType>(tree.background() - math::Tolerance<ValueType>::value()));
+
     size_t numLeafNodes = 0, numInternalNodes = 0;
 
     std::vector<const LeafNodeType*> nodes;

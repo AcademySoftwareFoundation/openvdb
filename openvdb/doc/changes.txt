@@ -48,9 +48,10 @@ Bug fixes:
   and @vdblink::Grid::topologyDifference() difference@endlink) on
   @vdblink::MaskGrid MaskGrids@endlink to sometimes produce incorrect results.
   (MaskGrids are used internally in a number of tools.)
-- @vdblink::tools::fillWithSpheres() tools::fillWithSpheres@endlink now
-  returns an empty list of spheres instead of crashing when the user selects
-  an isosurface that lies outside the bounding volume&rsquo;s narrow band.
+- The @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink
+  and @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  tools now correctly handle isosurfaces outside the input volume&rsquo;s
+  narrow band.
 - Fixed a null pointer dereference when copying grids that were loaded
   with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
@@ -88,6 +89,8 @@ Houdini:
 - Fixed a bug in the Rasterize Points SOP that caused vector-valued attributes
   to be transferred as scalars.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Fixed a crash in the Ray&nbsp;SOP when the user selected an isosurface
+  outside the target volume's narrow band.
 - Added a toggle to the Clip SOP to invert the clipping mask.
 - Added a slider to the Scatter SOP to specify how far each point
   may be displaced from the center of its host voxel or tile.
