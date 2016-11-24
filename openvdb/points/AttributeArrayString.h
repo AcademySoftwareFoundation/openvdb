@@ -80,7 +80,7 @@ using StringAttributeArray = TypedAttributeArray<StringIndexType, StringCodec<fa
 ////////////////////////////////////////
 
 
-class StringMetaInserter
+class OPENVDB_API StringMetaInserter
 {
 public:
     StringMetaInserter(MetaMap& metadata);
@@ -131,7 +131,7 @@ inline bool isString(const AttributeArray& array)
 ////////////////////////////////////////
 
 
-class StringAttributeHandle
+class OPENVDB_API StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeHandle>;//SharedPtr<StringAttributeHandle>;
@@ -157,7 +157,7 @@ protected:
 ////////////////////////////////////////
 
 
-class StringAttributeWriteHandle : public StringAttributeHandle
+class OPENVDB_API StringAttributeWriteHandle : public StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeWriteHandle>;//SharedPtr<StringAttributeWriteHandle>;
