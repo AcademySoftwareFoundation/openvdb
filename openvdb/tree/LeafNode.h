@@ -33,9 +33,9 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/util/NodeMasks.h>
-#include <openvdb/tree/LeafBuffer.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include "Iterator.h"
+#include "LeafBuffer.h"
 #include <iostream>
 #include <memory>
 #include <type_traits>
@@ -1307,8 +1307,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     if (seekable) {
         // Seek over the value mask.
         mValueMask.seek(is);
-    }
-    else {
+    } else {
         // Read in the value mask.
         mValueMask.load(is);
     }

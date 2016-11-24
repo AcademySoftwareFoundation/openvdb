@@ -47,7 +47,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-
 /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
 /// the voxel values of a LeafNode
 template<typename T, Index Log2Dim>
@@ -85,36 +84,15 @@ public:
     bool empty() const { return (mData == nullptr); }
 #else
     /// Default constructor
-    LeafBuffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
+    inline LeafBuffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
     /// Construct a buffer populated with the specified value.
-    explicit LeafBuffer(const ValueType& val): mData(new ValueType[SIZE]), mOutOfCore(0)
-    {
-        this->fill(val);
-    }
+    explicit inline LeafBuffer(const ValueType&);
     /// Copy constructor
-    LeafBuffer(const LeafBuffer& other): mData(nullptr), mOutOfCore(other.mOutOfCore)
-    {
-        if (other.isOutOfCore()) {
-            mFileInfo = new FileInfo(*other.mFileInfo);
-        } else {
-            this->allocate();
-            ValueType* target = mData;
-            const ValueType* source = other.mData;
-            Index n = SIZE;
-            while (n--) *target++ = *source++;
-        }
-    }
+    inline LeafBuffer(const LeafBuffer&);
     /// Construct a buffer but don't allocate memory for the full array of values.
     LeafBuffer(PartialCreate, const ValueType&): mData(nullptr), mOutOfCore(0) {}
     /// Destructor
-    ~LeafBuffer()
-    {
-        if (this->isOutOfCore()) {
-            this->detachFromFile();
-        } else {
-            this->deallocate();
-        }
-    }
+    inline ~LeafBuffer();
 
     /// Return @c true if this buffer's values have not yet been read from disk.
     bool isOutOfCore() const { return bool(mOutOfCore); }
@@ -125,147 +103,45 @@ public:
     bool allocate() { if (mData == nullptr) mData = new ValueType[SIZE]; return true; }
 
     /// Populate this buffer with a constant value.
-    void fill(const ValueType& val)
-    {
-        this->detachFromFile();
-        if (mData != nullptr) {
-            ValueType* target = mData;
-            Index n = SIZE;
-            while (n--) *target++ = val;
-        }
-    }
+    inline void fill(const ValueType&);
 
     /// Return a const reference to the i'th element of this buffer.
     const ValueType& getValue(Index i) const { return this->at(i); }
     /// Return a const reference to the i'th element of this buffer.
     const ValueType& operator[](Index i) const { return this->at(i); }
     /// Set the i'th value of this buffer to the specified value.
-    void setValue(Index i, const ValueType& val)
-    {
-        assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        mData[i] = val;
-#else
-        this->loadValues();
-        if (mData) mData[i] = val;
-#endif
-    }
+    inline void setValue(Index i, const ValueType&);
 
     /// Copy the other buffer's values into this buffer.
-    LeafBuffer& operator=(const LeafBuffer& other)
-    {
-        if (&other != this) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            if (this->isOutOfCore()) {
-                this->detachFromFile();
-            } else {
-                if (other.isOutOfCore()) this->deallocate();
-            }
-            if (other.isOutOfCore()) {
-                mOutOfCore = other.mOutOfCore;
-                mFileInfo = new FileInfo(*other.mFileInfo);
-            } else {
-#endif
-                this->allocate();
-                ValueType* target = mData;
-                const ValueType* source = other.mData;
-                Index n = SIZE;
-                while (n--) *target++ = *source++;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            }
-#endif
-        }
-        return *this;
-    }
+    inline LeafBuffer& operator=(const LeafBuffer&);
 
     /// @brief Return @c true if the contents of the other buffer
     /// exactly equal the contents of this buffer.
-    bool operator==(const LeafBuffer& other) const
-    {
-        this->loadValues();
-        other.loadValues();
-        const ValueType *target = mData, *source = other.mData;
-        if (!target && !source) return true;
-        if (!target || !source) return false;
-        Index n = SIZE;
-        while (n && math::isExactlyEqual(*target++, *source++)) --n;
-        return n == 0;
-    }
+    inline bool operator==(const LeafBuffer&) const;
     /// @brief Return @c true if the contents of the other buffer
     /// are not exactly equal to the contents of this buffer.
-    bool operator!=(const LeafBuffer& other) const { return !(other == *this); }
+    inline bool operator!=(const LeafBuffer& other) const { return !(other == *this); }
 
     /// Exchange this buffer's values with the other buffer's values.
-    void swap(LeafBuffer& other)
-    {
-        std::swap(mData, other.mData);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        std::swap(mOutOfCore, other.mOutOfCore);
-#endif
-    }
+    inline void swap(LeafBuffer&);
 
     /// Return the memory footprint of this buffer in bytes.
-    Index memUsage() const
-    {
-        size_t n = sizeof(*this);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        if (mData) n += SIZE * sizeof(ValueType);
-#else
-        if (this->isOutOfCore()) n += sizeof(FileInfo);
-        else if (mData) n += SIZE * sizeof(ValueType);
-#endif
-        return static_cast<Index>(n);
-    }
+    inline Index memUsage() const;
     /// Return the number of values contained in this buffer.
     static Index size() { return SIZE; }
 
     /// @brief Return a const pointer to the array of voxel values.
     /// @details This method guarantees that the buffer is allocated and loaded.
     /// @warning This method should only be used by experts seeking low-level optimizations.
-    const ValueType* data() const
-    {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        this->loadValues();
-        if (mData == nullptr) {
-            LeafBuffer* self = const_cast<LeafBuffer*>(this);
-            // This lock will be contended at most once.
-            tbb::spin_mutex::scoped_lock lock(self->mMutex);
-            if (mData == nullptr) self->mData = new ValueType[SIZE];
-        }
-#endif
-        return mData;
-    }
-
+    const ValueType* data() const;
     /// @brief Return a pointer to the array of voxel values.
     /// @details This method guarantees that the buffer is allocated and loaded.
     /// @warning This method should only be used by experts seeking low-level optimizations.
-    ValueType* data()
-    {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        this->loadValues();
-        if (mData == nullptr) {
-            // This lock will be contended at most once.
-            tbb::spin_mutex::scoped_lock lock(mMutex);
-            if (mData == nullptr) mData = new ValueType[SIZE];
-        }
-#endif
-        return mData;
-    }
+    ValueType* data();
 
 private:
     /// If this buffer is empty, return zero, otherwise return the value at index @ i.
-    const ValueType& at(Index i) const
-    {
-        assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        return mData[i];
-#else
-        this->loadValues();
-        // We can't use the ternary operator here, otherwise Visual C++ returns
-        // a reference to a temporary.
-        if (mData) return mData[i]; else return sZero;
-#endif
-    }
+    inline const ValueType& at(Index i) const;
 
     /// @brief Return a non-const reference to the value at index @a i.
     /// @details This method is private since it makes assumptions about the
@@ -274,15 +150,7 @@ private:
     /// return non-const references to their values.
     ValueType& operator[](Index i) { return const_cast<ValueType&>(this->at(i)); }
 
-    bool deallocate()
-    {
-        if (mData != nullptr && !this->isOutOfCore()) {
-            delete[] mData;
-            mData = nullptr;
-            return true;
-        }
-        return false;
-    }
+    bool deallocate();
 
 #ifdef OPENVDB_2_ABI_COMPATIBLE
     void setOutOfCore(bool) {}
@@ -295,17 +163,9 @@ private:
     // the loading logic is split into a separate function, doLoad().
     inline void loadValues() const { if (this->isOutOfCore()) this->doLoad(); }
     inline void doLoad() const;
-    inline bool detachFromFile()
-    {
-        if (this->isOutOfCore()) {
-            delete mFileInfo;
-            mFileInfo = nullptr;
-            this->setOutOfCore(false);
-            return true;
-        }
-        return false;
-    }
+    inline bool detachFromFile();
 #endif
+
 
 #ifdef OPENVDB_2_ABI_COMPATIBLE
     ValueType* mData;
@@ -328,6 +188,9 @@ private:
 }; // class LeafBuffer
 
 
+////////////////////////////////////////
+
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
 template<typename T, Index Log2Dim>
 const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
@@ -335,6 +198,211 @@ const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
 
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
+
+template<typename T, Index Log2Dim>
+inline
+LeafBuffer<T, Log2Dim>::LeafBuffer(const ValueType& val)
+    : mData(new ValueType[SIZE])
+    , mOutOfCore(0)
+{
+    this->fill(val);
+}
+
+
+template<typename T, Index Log2Dim>
+inline
+LeafBuffer<T, Log2Dim>::~LeafBuffer()
+{
+    if (this->isOutOfCore()) {
+        this->detachFromFile();
+    } else {
+        this->deallocate();
+    }
+}
+
+
+template<typename T, Index Log2Dim>
+inline
+LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
+    : mData(nullptr)
+    , mOutOfCore(other.mOutOfCore)
+{
+    if (other.isOutOfCore()) {
+        mFileInfo = new FileInfo(*other.mFileInfo);
+    } else if (other.mData != nullptr) {
+        this->allocate();
+        ValueType* target = mData;
+        const ValueType* source = other.mData;
+        Index n = SIZE;
+        while (n--) *target++ = *source++;
+    }
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafBuffer<T, Log2Dim>::setValue(Index i, const ValueType& val)
+{
+    assert(i < SIZE);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+    mData[i] = val;
+#else
+    this->loadValues();
+    if (mData) mData[i] = val;
+#endif
+}
+
+
+template<typename T, Index Log2Dim>
+inline LeafBuffer<T, Log2Dim>&
+LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
+{
+    if (&other != this) {
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        if (other.mData != nullptr) {
+            this->allocate();
+            ValueType* target = mData;
+            const ValueType* source = other.mData;
+            Index n = SIZE;
+            while (n--) *target++ = *source++;
+        }
+#else // ! OPENVDB_2_ABI_COMPATIBLE
+        if (this->isOutOfCore()) {
+            this->detachFromFile();
+        } else {
+            if (other.isOutOfCore()) this->deallocate();
+        }
+        if (other.isOutOfCore()) {
+            mOutOfCore = other.mOutOfCore;
+            mFileInfo = new FileInfo(*other.mFileInfo);
+        } else if (other.mData != nullptr) {
+            this->allocate();
+            ValueType* target = mData;
+            const ValueType* source = other.mData;
+            Index n = SIZE;
+            while (n--) *target++ = *source++;
+        }
+#endif
+    }
+    return *this;
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafBuffer<T, Log2Dim>::fill(const ValueType& val)
+{
+    this->detachFromFile();
+    if (mData != nullptr) {
+        ValueType* target = mData;
+        Index n = SIZE;
+        while (n--) *target++ = val;
+    }
+}
+
+
+template<typename T, Index Log2Dim>
+inline bool
+LeafBuffer<T, Log2Dim>::operator==(const LeafBuffer& other) const
+{
+    this->loadValues();
+    other.loadValues();
+    const ValueType *target = mData, *source = other.mData;
+    if (!target && !source) return true;
+    if (!target || !source) return false;
+    Index n = SIZE;
+    while (n && math::isExactlyEqual(*target++, *source++)) --n;
+    return n == 0;
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
+{
+    std::swap(mData, other.mData);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    std::swap(mOutOfCore, other.mOutOfCore);
+#endif
+}
+
+
+template<typename T, Index Log2Dim>
+inline Index
+LeafBuffer<T, Log2Dim>::memUsage() const
+{
+    size_t n = sizeof(*this);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+    if (mData) n += SIZE * sizeof(ValueType);
+#else
+    if (this->isOutOfCore()) n += sizeof(FileInfo);
+    else if (mData) n += SIZE * sizeof(ValueType);
+#endif
+    return static_cast<Index>(n);
+}
+
+
+template<typename T, Index Log2Dim>
+inline const typename LeafBuffer<T, Log2Dim>::ValueType*
+LeafBuffer<T, Log2Dim>::data() const
+{
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    this->loadValues();
+    if (mData == nullptr) {
+        LeafBuffer* self = const_cast<LeafBuffer*>(this);
+        // This lock will be contended at most once.
+        tbb::spin_mutex::scoped_lock lock(self->mMutex);
+        if (mData == nullptr) self->mData = new ValueType[SIZE];
+    }
+#endif
+    return mData;
+}
+
+template<typename T, Index Log2Dim>
+inline typename LeafBuffer<T, Log2Dim>::ValueType*
+LeafBuffer<T, Log2Dim>::data()
+{
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    this->loadValues();
+    if (mData == nullptr) {
+        // This lock will be contended at most once.
+        tbb::spin_mutex::scoped_lock lock(mMutex);
+        if (mData == nullptr) mData = new ValueType[SIZE];
+    }
+#endif
+    return mData;
+}
+
+
+template<typename T, Index Log2Dim>
+inline const typename LeafBuffer<T, Log2Dim>::ValueType&
+LeafBuffer<T, Log2Dim>::at(Index i) const
+{
+    assert(i < SIZE);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+    return mData[i];
+#else
+    this->loadValues();
+    // We can't use the ternary operator here, otherwise Visual C++ returns
+    // a reference to a temporary.
+    if (mData) return mData[i]; else return sZero;
+#endif
+}
+
+
+template<typename T, Index Log2Dim>
+inline bool
+LeafBuffer<T, Log2Dim>::deallocate()
+{
+    if (mData != nullptr && !this->isOutOfCore()) {
+        delete[] mData;
+        mData = nullptr;
+        return true;
+    }
+    return false;
+}
+
+
 template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::doLoad() const
@@ -371,31 +439,49 @@ LeafBuffer<T, Log2Dim>::doLoad() const
 
     self->setOutOfCore(false);
 }
-#endif
 
 
+template<typename T, Index Log2Dim>
+inline bool
+LeafBuffer<T, Log2Dim>::detachFromFile()
+{
+    if (this->isOutOfCore()) {
+        delete mFileInfo;
+        mFileInfo = nullptr;
+        this->setOutOfCore(false);
+        return true;
+    }
+    return false;
+}
+
+#endif // OPENVDB_2_ABI_COMPATIBLE
+
+
+////////////////////////////////////////
+
+
+// Partial specialization for bool ValueType
 template<Index Log2Dim>
 class LeafBuffer<bool, Log2Dim>
 {
 public:
-
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using WordType = typename NodeMaskType::Word;
 
     static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
-    static const Index SIZE       = 1 << 3 * Log2Dim;
+    static const Index SIZE = 1 << 3 * Log2Dim;
 
     // These static declarations must be on separate lines to avoid VC9 compiler errors.
     static const bool sOn;
     static const bool sOff;
 
     LeafBuffer() {}
-    LeafBuffer(bool on) : mData(on) {}
+    LeafBuffer(bool on): mData(on) {}
     LeafBuffer(const NodeMaskType& other): mData(other) {}
     LeafBuffer(const LeafBuffer& other): mData(other.mData) {}
     ~LeafBuffer() {}
     void fill(bool val) { mData.set(val); }
-    LeafBuffer& operator=(const LeafBuffer& b) { if (&b != this) { mData = b.mData; } return *this; }
+    LeafBuffer& operator=(const LeafBuffer& b) { if (&b != this) { mData=b.mData; } return *this; }
 
     const bool& getValue(Index i) const
     {
@@ -416,29 +502,18 @@ public:
     Index memUsage() const { return sizeof(*this); }
     static Index size() { return SIZE; }
 
-    /// Return a point to the c-style array of words encoding the bits.
-    /// @warning This method should only be used by experts that
-    /// seek low-level optimizations.
-    WordType* data()
-    {
-        return &(mData.template getWord<WordType>(0));
-    }
-    /// Return a const point to the c-style array of words
-    /// encoding the bits.
-    /// @warning This method should only be used by experts that
-    /// seek low-level optimizations.
-    const WordType* data() const
-    {
-        return const_cast<LeafBuffer*>(this)->data();
-    }
+    /// @brief Return a pointer to the C-style array of words encoding the bits.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    WordType* data() { return &(mData.template getWord<WordType>(0)); }
+    /// @brief Return a const pointer to the C-style array of words encoding the bits.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const WordType* data() const { return const_cast<LeafBuffer*>(this)->data(); }
 
 private:
-
-    NodeMaskType mData;
-
     // Allow the parent LeafNode to access this buffer's data.
     template<typename, Index> friend class LeafNode;
 
+    NodeMaskType mData;
 }; // class LeafBuffer
 
 
@@ -452,7 +527,6 @@ template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
 
 #endif // OPENVDB_TREE_LEAFBUFFER_HAS_BEEN_INCLUDED
 

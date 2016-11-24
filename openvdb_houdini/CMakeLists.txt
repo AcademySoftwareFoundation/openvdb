@@ -84,6 +84,7 @@ ADD_LIBRARY ( openvdb_houdini SHARED
   houdini/GU_VDBPointTools.cc
   houdini/geometry.cc
   houdini/ParmFactory.cc
+  houdini/PointUtils.cc
   houdini/SOP_NodeVDB.cc
   houdini/UT_VDBUtils.cc
   houdini/Utils.cc
@@ -101,6 +102,7 @@ SET_TARGET_PROPERTIES(
   )
 
 SET ( OPENVDB_SOP_NAMES "" )
+LIST ( APPEND OPENVDB_SOP_NAMES "GR_PrimVDBPoints" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Advect" )
 LIST ( APPEND OPENVDB_SOP_NAMES "GEO_VDBTranslator" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Advect_Points" )
@@ -122,6 +124,8 @@ LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Morph_Level_Set" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Noise" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Occlusion_Mask" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Platonic" )
+LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Points_Convert" )
+LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Points_Group" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Prune" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Rasterize_Points" )
 LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Ray" )

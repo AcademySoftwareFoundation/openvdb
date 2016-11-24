@@ -120,7 +120,10 @@ public:
     void clip(const openvdb::CoordBBox&) {}
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     void clipUnallocatedNodes() override {}
+#ifndef OPENVDB_3_ABI_COMPATIBLE
+    openvdb::Index32 unallocatedLeafCount() const override { return 0; }
 #endif
+#endif    
 
     void getIndexRange(openvdb::CoordBBox&) const override {}
     bool evalLeafBoundingBox(openvdb::CoordBBox& bbox) const override

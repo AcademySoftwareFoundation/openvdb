@@ -125,6 +125,10 @@ public:
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
+#ifndef OPENVDB_3_ABI_COMPATIBLE
+    /// Return the total number of unallocated leaf nodes residing in this tree.
+    virtual Index32 unallocatedLeafCount() const = 0;
+#endif
 #endif
 
 
@@ -479,6 +483,10 @@ public:
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
     void clipUnallocatedNodes() override;
+#ifndef OPENVDB_3_ABI_COMPATIBLE
+    /// Return the total number of unallocated leaf nodes residing in this tree.
+    Index32 unallocatedLeafCount() const override;
+#endif
 #endif
 
     //@{
@@ -1791,6 +1799,17 @@ Tree<RootNodeType>::clipUnallocatedNodes()
         }
     }
 }
+
+#ifndef OPENVDB_3_ABI_COMPATIBLE
+template<typename RootNodeType>
+inline Index32
+Tree<RootNodeType>::unallocatedLeafCount() const
+{
+    Index32 sum = 0;
+    for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
+    return sum;
+}
+#endif
 #endif
 
 
@@ -2256,23 +2275,11 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     if (verboseLevel > 3) {
         // This forces loading of all non-resident nodes.
         this->evalMinMax(minVal, maxVal);
-    }
+    }    
 
     std::vector<Index64> nodeCount(dims.size());
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    Index64 unallocatedLeafCount = 0;
-#endif
-    for (NodeCIter it = cbeginNode(); it; ++it) {
-        ++(nodeCount[it.getDepth()]);
+    for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        if (it.getLevel() == 0) {
-            const LeafNodeType* leaf = nullptr;
-            it.getNode(leaf);
-            if (leaf && !leaf->isAllocated()) ++unallocatedLeafCount;
-        }
-#endif
-    }
     Index64 totalNodeCount = 0;
     for (size_t i = 0; i < nodeCount.size(); ++i) totalNodeCount += nodeCount[i];
 
@@ -2295,7 +2302,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         os << "  Max value: " << maxVal << "\n";
     }
 
-    const uint64_t
+    const Index64
         leafCount = *nodeCount.rbegin(),
         numActiveVoxels = this->activeVoxelCount(),
         numActiveLeafVoxels = this->activeLeafVoxelCount(),
@@ -2305,7 +2312,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     os << "  Number of active tiles:        " << util::formattedInt(numActiveTiles) << "\n";
 
     Coord dim(0, 0, 0);
-    uint64_t totalVoxels = 0;
+    Index64 totalVoxels = 0;
     if (numActiveVoxels) { // nonempty
         CoordBBox bbox;
         this->evalActiveVoxelBoundingBox(bbox);
@@ -2327,9 +2334,11 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (verboseLevel > 2) {
+            Index64 sum = 0;// count the number of unallocated leaf nodes
+            for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
             os << "  Number of unallocated nodes:   "
-                << util::formattedInt(unallocatedLeafCount) << " ("
-                << (100.0 * double(unallocatedLeafCount) / double(totalNodeCount)) << "%)\n";
+               << util::formattedInt(sum) << " ("
+               << (100.0 * double(sum) / double(totalNodeCount)) << "%)\n";
         }
 #endif
     } else {
@@ -2340,7 +2349,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     if (verboseLevel == 2) return;
 
     // Memory footprint in bytes
-    const uint64_t
+    const Index64
         actualMem = this->memUsage(),
         denseMem = sizeof(ValueType) * totalVoxels,
         voxelsMem = sizeof(ValueType) * numActiveLeafVoxels;

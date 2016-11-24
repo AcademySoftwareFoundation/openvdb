@@ -138,7 +138,7 @@ INCLDIRS := \
     -isystem $(MAYA_INCL_DIR) \
 #
 
-CXXFLAGS += -std=c++0x
+CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (3,$(strip $(abi)))

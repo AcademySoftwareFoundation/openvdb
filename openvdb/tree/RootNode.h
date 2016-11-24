@@ -523,6 +523,7 @@ public:
 
     bool isValueOn(const Coord& xyz) const;
 
+    /// Return @c true if this root node, or any of its child nodes, have active tiles.
     bool hasActiveTiles() const;
 
     const ValueType& getValue(const Coord& xyz) const;

@@ -777,6 +777,7 @@ WARN_LOGFILE           =
 INPUT                  = . \
                          io \
                          math \
+                         points \
                          python/pyopenvdb.h \
                          tools \
                          tree \

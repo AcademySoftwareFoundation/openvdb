@@ -290,7 +290,7 @@ makeSphere(GridType& grid, float radius, const openvdb::Vec3f& c)
 
     // Propagate the outside/inside sign information from the narrow band
     // throughout the grid.
-    grid.signedFloodFill();
+    openvdb::tools::signedFloodFill(grid.tree());
 }
 @endcode
 

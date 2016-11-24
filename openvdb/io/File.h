@@ -138,10 +138,9 @@ public:
     /// @brief Read a grid's metadata, topology, transform, etc., but not
     /// any of its leaf node data blocks.
     /// @return the grid pointer to the partially loaded grid.
-    /// @note This returns a @c const pointer, so that the grid can't be
-    /// changed before its data blocks have been loaded.  A non-<tt>const</tt>
-    /// pointer is only returned when readGrid() is called.
-    GridBase::ConstPtr readGridPartial(const Name&);
+    /// @deprecated Partially-loaded grids might not be compatible with all tools.
+    /// Use them with caution, and preferably use delayed loading instead.
+    OPENVDB_DEPRECATED GridBase::ConstPtr readGridPartial(const Name&);
 
     /// Read an entire grid, including all of its data blocks.
     GridBase::Ptr readGrid(const Name&);

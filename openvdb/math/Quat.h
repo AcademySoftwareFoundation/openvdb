@@ -642,6 +642,11 @@ typedef Quat<float> Quats;
 typedef Quat<double> Quatd;
 
 } // namespace math
+
+
+template<> inline math::Quats zeroVal<math::Quats >() { return math::Quats::zero(); }
+template<> inline math::Quatd zeroVal<math::Quatd >() { return math::Quatd::zero(); }
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
