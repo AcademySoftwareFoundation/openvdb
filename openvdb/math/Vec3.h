@@ -31,10 +31,12 @@
 #ifndef OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-#include <cmath>
 #include <openvdb/Exceptions.h>
 #include "Math.h"
 #include "Tuple.h"
+#include <cmath>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -53,7 +55,7 @@ public:
     /// Trivial constructor, the vector is NOT initialized
     Vec3() {}
 
-    /// Constructor with one argument, e.g.   Vec3f v(0);
+    /// @brief Construct a vector all of whose components have the given value.
     explicit Vec3(T val) { this->mm[0] = this->mm[1] = this->mm[2] = val; }
 
     /// Constructor with three arguments, e.g.   Vec3d v(1,2,3);
@@ -81,6 +83,16 @@ public:
         this->mm[0] = static_cast<T>(v[0]);
         this->mm[1] = static_cast<T>(v[1]);
         this->mm[2] = static_cast<T>(v[2]);
+    }
+
+    /// @brief Construct a vector all of whose components have the given value,
+    /// which may be of an arithmetic type different from this vector's value type.
+    /// @details Type conversion warnings are suppressed.
+    template<typename Other>
+    explicit Vec3(Other val,
+        typename std::enable_if<std::is_arithmetic<Other>::value, Conversion>::type = Conversion{})
+    {
+        this->mm[0] = this->mm[1] = this->mm[2] = static_cast<T>(val);
     }
 
     /// @brief Construct a Vec3 from another Vec3 with a possibly different value type.
@@ -328,7 +340,7 @@ public:
         return *this;
     }
 
-    /// Return a reference to itsef after the exponent has been
+    /// Return a reference to itself after the exponent has been
     /// applied to all the vector components.
     inline const Vec3<T>& exp()
     {
@@ -338,10 +350,26 @@ public:
         return *this;
     }
 
+    /// Return a reference to itself after log has been
+    /// applied to all the vector components.
+    inline const Vec3<T>& log()
+    {
+        this->mm[0] = std::log(this->mm[0]);
+        this->mm[1] = std::log(this->mm[1]);
+        this->mm[2] = std::log(this->mm[2]);
+        return *this;
+    }
+
     /// Return the sum of all the vector components.
     inline T sum() const
     {
         return this->mm[0] + this->mm[1] + this->mm[2];
+    }
+
+    /// Return the product of all the vector components.
+    inline T product() const
+    {
+        return this->mm[0] * this->mm[1] * this->mm[2];
     }
 
     /// this = normalized this
@@ -371,6 +399,13 @@ public:
             OPENVDB_THROW(ArithmeticError, "Normalizing null 3-vector");
         }
         return *this / len;
+    }
+
+    /// return normalized this, or (1, 0, 0) if this is null vector
+    Vec3<T> unitSafe() const
+    {
+        T l2 = lengthSqr();
+        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
     }
 
     // Number of cols, rows, elements
@@ -411,13 +446,13 @@ public:
             l = this->mm[0]*this->mm[0] + this->mm[2]*this->mm[2];
             l = static_cast<T>(T(1)/sqrt(double(l)));
             u.mm[0] = -this->mm[2]*l;
-            u.mm[1] = (T)0.0;
+            u.mm[1] = T(0);
             u.mm[2] = +this->mm[0]*l;
         } else {
             // W.y or W.z is the largest magnitude component, swap them
             l = this->mm[1]*this->mm[1] + this->mm[2]*this->mm[2];
             l = static_cast<T>(T(1)/sqrt(double(l)));
-            u.mm[0] = (T)0.0;
+            u.mm[0] = T(0);
             u.mm[1] = +this->mm[2]*l;
             u.mm[2] = -this->mm[1]*l;
         }
@@ -440,8 +475,25 @@ public:
         return finite(this->mm[0]) && finite(this->mm[1]) && finite(this->mm[2]);
     }
 
+    /// Return a vector with the components of this in ascending order
+    Vec3<T> sorted() const
+    {
+        Vec3<T> r(*this);
+        if( r.mm[0] > r.mm[1] ) std::swap(r.mm[0], r.mm[1]);
+        if( r.mm[1] > r.mm[2] ) std::swap(r.mm[1], r.mm[2]);
+        if( r.mm[0] > r.mm[1] ) std::swap(r.mm[0], r.mm[1]);
+        return r;
+    }
+
+    /// Return the vector (z, y, x)
+    Vec3<T> reversed() const
+    {
+        return Vec3<T>(this->mm[2], this->mm[1], this->mm[0]);
+    }
+
     /// Predefined constants, e.g.   Vec3d v = Vec3d::xNegAxis();
     static Vec3<T> zero() { return Vec3<T>(0, 0, 0); }
+    static Vec3<T> ones() { return Vec3<T>(1, 1, 1); }
 };
 
 
@@ -644,6 +696,11 @@ inline Vec3<T> maxComponent(const Vec3<T> &v1, const Vec3<T> &v2)
 /// the components of the input vector.
 template <typename T>
 inline Vec3<T> Exp(Vec3<T> v) { return v.exp(); }
+
+/// @brief Return a vector with log applied to each of
+/// the components of the input vector.
+template <typename T>
+inline Vec3<T> Log(Vec3<T> v) { return v.log(); }
 
 typedef Vec3<int32_t>   Vec3i;
 typedef Vec3<uint32_t>  Vec3ui;

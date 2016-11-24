@@ -44,6 +44,9 @@ clarified, changed, or added, please send a note to openvdb@gmail.com.
 
 @subsection sNamespaceConventions Namespaces
 -# Lowercase words, keep simple and short (e.g., @c tools, @c tree).
+-# Use @c internal (or @c detail) or <TT><I>module</I>_internal</TT>
+   for symbols such as templates that must be defined in header files
+   but that are implementation details not intended for public use.
 
 
 @subsection sClassConventions Classes and Structs
@@ -53,15 +56,17 @@ clarified, changed, or added, please send a note to openvdb@gmail.com.
 
 @subsection sClassMethods Class Methods
 -# Mixed case; first letter lowercase (e.g., <TT>getAccessor()</TT>, <TT>gridType()</TT>)
--# Accessors that return a member variable by reference or a primitive type
+-# Accessor methods that return a member variable by reference or a primitive type
 by value are just the variable name (e.g., <TT>Grid::tree()</TT>).
--# Accessors that involve construction of objects or other computations are
+-# Accessor methods that involve construction of objects or other computations are
 @c get + the variable name (e.g., <TT>Grid::getAccessor()</TT>).
 -# Simple mutators are @c set + the variable name (e.g., <TT>Grid::setTree(tree);</TT>).
 
 
 @subsection sClassInstanceVariables Class Instance Variables
 -# Mixed case; always prefixed by @c m (e.g., @c mTree, @c mTransform)
+-# The @c m prefix may be omitted for members of <TT>struct</TT>s
+   used in the public API (e.g., <TT>struct Color { float r, g, b; }</TT>).
 
 
 @subsection sClassStaticVariables Class Static Variables
@@ -69,14 +74,14 @@ by value are just the variable name (e.g., <TT>Grid::tree()</TT>).
 
 
 @subsection sLocalVariablesAndArguments Local Variables and Arguments
--# Use mixed case with an initial lower case (e.g., @c ijk, @c offset,
+-# Use mixed case with an initial lower case letter (e.g., @c ijk, @c offset,
 @c range, @c rhsValue).
 
 
 @subsection sConstants Constants
 -# All uppercase; words separated by underscores. If not in a namespace or
 local to a source file, then prefixed with the library name in all caps
-(e.g., @c HALF_FLOAT_TYPENAME_SUFFIX, @c ZIP_COMPRESSION_LEVEL).
+(e.g., @c HALF_FLOAT_TYPENAME_SUFFIX, @c ZIP_COMPRESSION_LEVEL)
 
 
 @subsection sEnumerationNames Enumeration Names
@@ -84,9 +89,10 @@ local to a source file, then prefixed with the library name in all caps
 
 
 @subsection sEnumerationValues Enumeration Values
--# Same as constants; all uppercase; words separated by underscores
+-# With @c enum, all uppercase with words separated by underscores
 (e.g., @c GRID_LEVEL_SET, @c VEC_INVARIANT) and with a common prefix
-(@c GRID_, @c VEC_, etc.)
+-# With <TT>enum class</TT>, mixed case with the first letter uppercase
+   (e.g., @c GridClass::Unknown, @c GridClass::LevelSet)
 
 
 @subsection sTypedefs Typedefs
@@ -114,8 +120,7 @@ condition (e.g., <TT>if (grid.empty())</TT>,
 
 
 @subsection sGeneral General
--# Code must compile without any warning messages.
-if closely related.
+-# Code must compile without any warning messages at the default warning level.
 -# Prefer the C++ Standard Library to the C Standard Library.
 -# Restrict variables to the smallest scopes possible, and avoid defining
 local variables before giving them values.  Prefer declarations inside
@@ -126,20 +131,18 @@ policy.
 
 
 @subsection sFormatting Formatting
--# Use Doxygen-style comments to document public code.
 -# Indentation is 4 spaces. Do not use tabs.
+-# Lines are no more than 100 characters long.
 -# Use Unix-style carriage returns ("\n") rather than Windows/DOS ones ("\r\n").
--# Don&rsquo;t put an @c else right after a @c return. It&rsquo;s unnecessary
-and increases indentation level.
--# Do not leave debug printfs or other debugging code lying around.
+-# Do not leave debug <TT>printf</TT>s or other debugging code lying around.
 -# Leave a blank line between a group of variable declarations and other code.
 -# Leave a space after the keywords @c if, @c switch, @c while, @c do, @c for,
 and @c return.
--# Leave a space on each side of binary operators such as +, -, *, /, &&,
-and ||. For clarity in mathematical situations, you may omit the spaces on
-either side of * and / operators to illustrate their precedence over + and -.
+-# Leave a space on each side of binary operators such as @c +, @c -, @c *, @c /, @c &&,
+and @c ||. For clarity in mathematical situations, you may omit the spaces on
+either side of @c * and @c / operators to emphasize their precedence over @c + and @c -.
 -# Do not leave a space between any dereferencing operator
-(such as *, &, [], ->, or .) and its operands.
+(such as @c *, @c &, @c [], @c ->, or @c .) and its operands.
 -# In parameter lists, leave a space after each comma.
 -# Do not leave a space after an opening parenthesis or before a closing
 parenthesis.
@@ -177,6 +180,7 @@ argument.
 explicitly as @c inline.
 -# Prefer forward declarations to @c \#include directives in headers.
 -# Do not take advantage of indirect inclusion of header files.
+-# Do not use anonymous namespaces in header files.
 
 
 @subsection sSourceFiles Source Files
@@ -184,8 +188,6 @@ explicitly as @c inline.
 -# Properly prototype all file static functions with usefully named arguments.
 -# Whenever possible, put variables and functions in an anonymous namespace.
 -# Avoid global variables.
--# For the main file of an executable, define @c main() at the top and then
-utility functions below it in a top-down fashion.
 
 
 @subsection sComments Comments
@@ -196,6 +198,24 @@ comments.
 single statement.
 -# Large blocks of code should be commented out with <TT>\#if 0</TT> and @c \#endif.
 -# Do not leave obsolete code fragments within comments as an historical trail.
+-# Document public code with Doxygen comments, formatted as follows:
+@verbatim
+/// @brief Create a new grid of type @c GridType classified as a "Level Set",
+/// i.e., a narrow-band level set.
+///
+/// @param voxelSize  the size of a voxel in world units
+/// @param halfWidth  the half width of the narrow band in voxel units
+///
+/// @details The voxel size and the narrow band half width define the grid's
+/// background value as halfWidth*voxelWidth.  The transform is linear
+/// with a uniform scaling only corresponding to the specified voxel size.
+///
+/// @note It is generally advisable to specify a half-width of the narrow band
+/// that is larger than one voxel unit, otherwise zero crossings are not guaranteed.
+template<typename GridType>
+typename GridType::Ptr createLevelSet(
+    Real voxelSize = 1.0, Real halfWidth = LEVEL_SET_HALF_WIDTH);
+@endverbatim
 
 
 @subsection sPrimitiveTypes Primitive Types
@@ -213,7 +233,6 @@ static constants are not guaranteed to be initialized in a thread-safe manner.)
 @subsection sClasses Classes
 -# Constructors that can be called with only one argument should be prefixed
 with the @c explicit keyword to avoid unintended type conversions.
--# Always list the destructor.
 -# Never call virtual methods from destructors.
 -# If you have a copy constructor, make sure you have an assignment operator.
 -# If you have an assignment operator, you probably need a copy constructor.
@@ -224,7 +243,7 @@ which do the right thing with that memory.
 it is empty.
 -# Check against self assignment and return <TT>*this</TT> in assignment
 operators.
--# Declare methods as const as much as possible.
+-# Declare methods as @c const wherever possible.
 -# Declare object-valued input arguments as const references wherever
 possible.  Primitives may be passed by value, however.
 -# Arithmetic, logical, bitwise, dereference, and address of operators should
@@ -275,6 +294,7 @@ but not exception specifications.
 -# Use C++ casts (<TT>static_cast&lt;int&gt;(x)</TT> or <TT>int(x)</TT>),
 not C casts (<TT>(int)x</TT>).
 -# Multiple variables of the same data type may be declared on the same line
+if closely related.
 -# Library code must never deliberately terminate the application in response
 to an error condition.
 -# Avoid using malloc/free when new/delete can be used instead.

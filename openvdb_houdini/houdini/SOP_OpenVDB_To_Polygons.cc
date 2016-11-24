@@ -117,7 +117,7 @@ protected:
 
     template <class GridType>
     void referenceMeshing(
-        std::list<openvdb::GridBase::Ptr>& grids,
+        std::list<openvdb::GridBase::ConstPtr>& grids,
         openvdb::tools::VolumeToMesh& mesher,
         const GU_Detail* refGeo,
         hvdb::Interrupter& boss,
@@ -344,6 +344,13 @@ SOP_OpenVDB_To_Polygons::updateParmsFlags()
 
 ////////////////////////////////////////
 
+
+void copyMesh(GU_Detail&, openvdb::tools::VolumeToMesh&, hvdb::Interrupter&,
+    const bool usePolygonSoup = true, const char* gridName = NULL,
+    GA_PrimitiveGroup* surfaceGroup = NULL, GA_PrimitiveGroup* interiorGroup = NULL,
+    GA_PrimitiveGroup* seamGroup = NULL, GA_PointGroup* seamPointGroup = NULL);
+
+
 void
 copyMesh(
     GU_Detail& detail,
@@ -353,12 +360,12 @@ copyMesh(
 #else
     hvdb::Interrupter&,
 #endif
-    const bool usePolygonSoup = true,
-    const char* gridName = NULL,
-    GA_PrimitiveGroup* surfaceGroup = NULL,
-    GA_PrimitiveGroup* interiorGroup = NULL,
-    GA_PrimitiveGroup* seamGroup = NULL,
-    GA_PointGroup* seamPointGroup = NULL)
+    const bool usePolygonSoup,
+    const char* gridName,
+    GA_PrimitiveGroup* surfaceGroup,
+    GA_PrimitiveGroup* interiorGroup,
+    GA_PrimitiveGroup* seamGroup,
+    GA_PointGroup* seamPointGroup)
 {
     const openvdb::tools::PointList& points = mesher.pointList();
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
@@ -437,7 +444,7 @@ copyMesh(
     const GA_Offset startpt = detail.appendPointBlock(npoints);
     UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
     GA_RWHandleV3 pthandle(detail.getP());
-    pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
+    pthandle.setBlock(startpt, npoints, reinterpret_cast<UT_Vector3*>(points.get()));
 
     // group fracture seam points
     if (seamPointGroup && GA_Size(mesher.pointFlags().size()) == npoints) {
@@ -703,7 +710,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
         if (refGeo) {
 
             // Collect all level set grids.
-            std::list<openvdb::GridBase::Ptr> grids;
+            std::list<openvdb::GridBase::ConstPtr> grids;
             std::vector<std::string> nonLevelSetList, nonLinearList;
             for (; vdbIt; ++vdbIt) {
                 if (boss.wasInterrupted()) break;
@@ -721,7 +728,8 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
 
                 // (We need a shallow copy to sync primitive & grid names).
                 grids.push_back(vdbIt->getGrid().copyGrid());
-                grids.back()->setName(vdbIt->getGridName());
+                openvdb::ConstPtrCast<openvdb::GridBase>(grids.back())->setName(
+                    vdbIt->getGridName());
             }
 
             if (!nonLevelSetList.empty()) {
@@ -796,7 +804,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
 template<class GridType>
 void
 SOP_OpenVDB_To_Polygons::referenceMeshing(
-    std::list<openvdb::GridBase::Ptr>& grids,
+    std::list<openvdb::GridBase::ConstPtr>& grids,
     openvdb::tools::VolumeToMesh& mesher,
     const GU_Detail* refGeo,
     hvdb::Interrupter& boss,
@@ -918,7 +926,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
     mesher.setRefGrid(refGrid, iadaptivity);
 
-    std::list<openvdb::GridBase::Ptr>::iterator it = grids.begin();
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;
 
     GA_PrimitiveGroup *surfaceGroup = NULL, *interiorGroup = NULL, *seamGroup = NULL;
@@ -951,8 +958,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
         }
     }
 
-
-    for (it = grids.begin(); it != grids.end(); ++it) {
+    for (auto it = grids.begin(); it != grids.end(); ++it) {
 
         if (boss.wasInterrupted()) break;
 

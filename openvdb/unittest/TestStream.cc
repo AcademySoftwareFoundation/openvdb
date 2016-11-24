@@ -28,7 +28,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/io/Stream.h>
 #include <openvdb/Metadata.h>
@@ -36,6 +35,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
+#include <cppunit/extensions/HelperMacros.h>
 #include <cstdio> // for remove()
 #include <fstream>
 
@@ -46,8 +46,8 @@
 class TestStream: public CppUnit::TestCase
 {
 public:
-    virtual void setUp();
-    virtual void tearDown();
+    void setUp() override;
+    void tearDown() override;
 
     CPPUNIT_TEST_SUITE(TestStream);
     CPPUNIT_TEST(testWrite);
@@ -154,8 +154,8 @@ TestStream::verifyTestGrids(openvdb::GridPtrVecPtr grids, openvdb::MetaMap::Ptr 
 {
     using namespace openvdb;
 
-    CPPUNIT_ASSERT(grids.get() != NULL);
-    CPPUNIT_ASSERT(meta.get() != NULL);
+    CPPUNIT_ASSERT(grids.get() != nullptr);
+    CPPUNIT_ASSERT(meta.get() != nullptr);
 
     // Verify the metadata.
     CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
@@ -166,22 +166,22 @@ TestStream::verifyTestGrids(openvdb::GridPtrVecPtr grids, openvdb::MetaMap::Ptr 
     CPPUNIT_ASSERT_EQUAL(3, int(grids->size()));
 
     GridBase::Ptr grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     Int32Tree::Ptr density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is an instance of (i.e., shares a tree with) "density".
     CPPUNIT_ASSERT_EQUAL(density, gridPtrCast<Int32Grid>(grid)->treePtr());
 
     grid.reset();
     grid = findGridByName(*grids, "temperature");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(5, density->getValue(Coord(0, 0, 0)));
     ASSERT_DOUBLES_EXACTLY_EQUAL(6, density->getValue(Coord(100, 0, 0)));
@@ -226,7 +226,7 @@ TestStream::testRead()
     GridPtrVecPtr grids = createTestGrids(meta);
     const char* filename = "something.vdb2";
     io::File(filename).write(*grids, *meta);
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Stream the grids back in.
     std::ifstream is(filename, std::ios_base::binary);
@@ -249,7 +249,7 @@ TestStream::testFileReadFromStream()
 
     // Create test grids and stream them to a file (and then close the file).
     const char* filename = "something.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
     {
         std::ofstream os(filename, std::ios_base::binary);
         grids = createTestGrids(meta);
@@ -266,8 +266,8 @@ TestStream::testFileReadFromStream()
     grids = file.getGrids();
 
     CPPUNIT_ASSERT(!file.inputHasGridOffsets());
-    CPPUNIT_ASSERT(meta.get() != NULL);
-    CPPUNIT_ASSERT(grids.get() != NULL);
+    CPPUNIT_ASSERT(meta.get() != nullptr);
+    CPPUNIT_ASSERT(grids.get() != nullptr);
     CPPUNIT_ASSERT(!grids->empty());
 
     verifyTestGrids(grids, meta);

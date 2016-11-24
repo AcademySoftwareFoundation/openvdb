@@ -131,15 +131,14 @@
 #endif
 
 
-/// Visual C++ does not have constants like M_PI unless this is defined.
-/// @note This is needed even though the core library is built with this but
-/// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
-#ifndef _USE_MATH_DEFINES
-    #define _USE_MATH_DEFINES
-#endif
-
-/// Visual C++ does not have round
 #ifdef _MSC_VER
+    /// Visual C++ does not have constants like M_PI unless this is defined.
+    /// @note This is needed even though the core library is built with this but
+    /// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
+    #ifndef _USE_MATH_DEFINES
+        #define _USE_MATH_DEFINES
+    #endif
+    /// Visual C++ does not have round
     #include <boost/math/special_functions/round.hpp>
     using boost::math::round;
 #endif

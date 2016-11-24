@@ -27,29 +27,116 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file NodeUnion.h
 ///
-/// @author Peter Cucka
-///
-/// NodeUnion is a templated helper class that controls access to either
+/// @details NodeUnion is a templated helper class that controls access to either
 /// the child node pointer or the value for a particular element of a root
-/// or internal node.  For space efficiency, the child pointer and the value
-/// are unioned, since the two are never in use simultaneously.
-/// Template specializations of NodeUnion allow for values of either POD
-/// (int, float, pointer, etc.) or class (std::string, math::Vec, etc.) types.
-/// (The latter cannot be stored directly in a union.)
+/// or internal node. For space efficiency, the child pointer and the value
+/// are unioned when possible, since the two are never in use simultaneously.
 
 #ifndef OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 
-#include <boost/type_traits/is_class.hpp>
 #include <openvdb/version.h>
+#include <cstring> // for std::memcpy()
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
+
+#ifndef OPENVDB_3_ABI_COMPATIBLE
+
+// Forward declaration of traits class
+template<typename T> struct CopyTraits;
+
+// Default implementation that stores the child pointer and the value separately
+// (i.e., not in a union)
+// This implementation is not used for POD, math::Vec or math::Coord value types.
+template<typename ValueT, typename ChildT, typename Enable = void>
+class NodeUnion
+{
+private:
+    ChildT* mChild;
+    ValueT  mValue;
+
+public:
+    NodeUnion(): mChild(nullptr), mValue() {}
+
+    ChildT* getChild() const { return mChild; }
+    void setChild(ChildT* child) { mChild = child; }
+
+    const ValueT& getValue() const { return mValue; }
+    ValueT& getValue() { return mValue; }
+    void setValue(const ValueT& val) { mValue = val; }
+};
+
+
+// Template specialization for values of POD types (int, float, pointer, etc.)
+template<typename ValueT, typename ChildT>
+class NodeUnion<ValueT, ChildT, typename std::enable_if<std::is_pod<ValueT>::value>::type>
+{
+private:
+    union { ChildT* mChild; ValueT mValue; };
+
+public:
+    NodeUnion(): mChild(nullptr) {}
+
+    ChildT* getChild() const { return mChild; }
+    void setChild(ChildT* child) { mChild = child; }
+
+    const ValueT& getValue() const { return mValue; }
+    ValueT& getValue() { return mValue; }
+    void setValue(const ValueT& val) { mValue = val; }
+};
+
+
+// Template specialization for values of types such as math::Vec3f and math::Coord
+// for which CopyTraits<T>::IsCopyable is true
+template<typename ValueT, typename ChildT>
+class NodeUnion<ValueT, ChildT, typename std::enable_if<CopyTraits<ValueT>::IsCopyable>::type>
+{
+private:
+    union { ChildT* mChild; ValueT mValue; };
+
+public:
+    NodeUnion(): mChild(nullptr) {}
+    NodeUnion(const NodeUnion& other): mChild(nullptr)
+        { std::memcpy(this, &other, sizeof(*this)); }
+    NodeUnion& operator=(const NodeUnion& rhs)
+        { std::memcpy(this, &rhs, sizeof(*this)); return *this; }
+
+    ChildT* getChild() const { return mChild; }
+    void setChild(ChildT* child) { mChild = child; }
+
+    const ValueT& getValue() const { return mValue; }
+    ValueT& getValue() { return mValue; }
+    void setValue(const ValueT& val) { mValue = val; }
+};
+
+
+/// @details A type T is copyable if
+/// # T stores member values by value (vs. by pointer or reference)
+///   and T's true byte size is given by sizeof(T).
+/// # T has a trivial destructor
+/// # T has a default constructor
+/// # T has an assignment operator
+template<typename T> struct CopyTraits { static const bool IsCopyable = false; };
+template<typename T> struct CopyTraits<math::Vec2<T>> { static const bool IsCopyable = true; };
+template<typename T> struct CopyTraits<math::Vec3<T>> { static const bool IsCopyable = true; };
+template<typename T> struct CopyTraits<math::Vec4<T>> { static const bool IsCopyable = true; };
+template<> struct CopyTraits<math::Coord> { static const bool IsCopyable = true; };
+
+
+////////////////////////////////////////
+
+
+#else // OPENVDB_3_ABI_COMPATIBLE
+
+// Prior to OpenVDB 4 and the introduction of C++11, values of non-POD types
+// were heap-allocated and stored by pointer due to C++98 restrictions on unions.
 
 // Internal implementation of a union of a child node pointer and a value
 template<bool ValueIsClass, class ValueT, class ChildT> class NodeUnionImpl;
@@ -64,12 +151,13 @@ private:
     union { ChildT* child; ValueT value; } mUnion;
 
 public:
-    NodeUnionImpl() { mUnion.child = NULL; }
+    NodeUnionImpl() { mUnion.child = nullptr; }
 
     ChildT* getChild() const { return mUnion.child; }
+    void setChild(ChildT* child) { mUnion.child = child; }
+
     const ValueT& getValue() const { return mUnion.value; }
     ValueT& getValue() { return mUnion.value; }
-    void setChild(ChildT* child) { mUnion.child = child; }
     void setValue(const ValueT& val) { mUnion.value = val; }
 };
 
@@ -84,7 +172,7 @@ private:
     bool mHasChild;
 
 public:
-    NodeUnionImpl() : mHasChild(true) { this->setChild(NULL); }
+    NodeUnionImpl() : mHasChild(true) { this->setChild(nullptr); }
     NodeUnionImpl(const NodeUnionImpl& other) : mHasChild(true)
     {
         if (other.mHasChild) {
@@ -102,9 +190,9 @@ public:
         }
         return *this;
     }
-    ~NodeUnionImpl() { this->setChild(NULL); }
+    ~NodeUnionImpl() { this->setChild(nullptr); }
 
-    ChildT* getChild() const { return mHasChild ? mUnion.child : NULL; }
+    ChildT* getChild() const { return mHasChild ? mUnion.child : nullptr; }
     void setChild(ChildT* child)
     {
         if (!mHasChild) delete mUnion.value;
@@ -116,8 +204,6 @@ public:
     ValueT& getValue() { return *mUnion.value; }
     void setValue(const ValueT& val)
     {
-        /// @todo To minimize storage across nodes, intern and
-        /// reuse common values, using, e.g., boost::flyweight.
         if (!mHasChild) delete mUnion.value;
         mUnion.value = new ValueT(val);
         mHasChild = false;
@@ -126,11 +212,12 @@ public:
 
 
 template<typename ValueT, typename ChildT>
-struct NodeUnion: public NodeUnionImpl<
-    boost::is_class<ValueT>::value, ValueT, ChildT>
+struct NodeUnion: public NodeUnionImpl<std::is_class<ValueT>::value, ValueT, ChildT>
 {
     NodeUnion() {}
 };
+
+#endif // OPENVDB_3_ABI_COMPATIBLE
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

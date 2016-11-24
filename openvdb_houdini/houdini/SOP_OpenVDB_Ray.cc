@@ -67,7 +67,7 @@ class SOP_OpenVDB_Ray: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Ray(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Ray() {};
+    virtual ~SOP_OpenVDB_Ray() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

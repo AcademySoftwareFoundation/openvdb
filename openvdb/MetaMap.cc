@@ -28,8 +28,9 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <openvdb/metadata/MetaMap.h>
-#include <openvdb/util/logging.h>
+#include "MetaMap.h"
+
+#include "util/logging.h"
 #include <sstream>
 
 
@@ -118,7 +119,7 @@ MetaMap::writeMeta(std::ostream &os) const
     // Write out the number of metadata items we have in the map. Note that we
     // save as Index32 to save a 32-bit number. Using size_t would be platform
     // dependent.
-    Index32 count = (Index32)metaCount();
+    Index32 count = static_cast<Index32>(metaCount());
     os.write(reinterpret_cast<char*>(&count), sizeof(Index32));
 
     // Iterate through each metadata and write it out.

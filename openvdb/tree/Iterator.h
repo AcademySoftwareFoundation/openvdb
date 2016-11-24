@@ -58,15 +58,10 @@ template<typename MaskIterT, typename NodeT>
 class IteratorBase
 {
 public:
-    IteratorBase(): mParentNode(NULL) {}
-    IteratorBase(const MaskIterT& iter, NodeT* parent):
-        mParentNode(parent), mMaskIter(iter) {}
-
-    void operator=(const IteratorBase& other)
-    {
-        mParentNode = other.mParentNode;
-        mMaskIter = other.mMaskIter;
-    }
+    IteratorBase(): mParentNode(nullptr) {}
+    IteratorBase(const MaskIterT& iter, NodeT* parent): mParentNode(parent), mMaskIter(iter) {}
+    IteratorBase(const IteratorBase&) = default;
+    IteratorBase& operator=(const IteratorBase&) = default;
 
     bool operator==(const IteratorBase& other) const
     {
@@ -238,10 +233,10 @@ struct DenseIteratorBase: public IteratorBase<MaskIterT, NodeT>
     bool isChildNode() const { return this->parent().isChildMaskOn(this->pos()); }
 
     /// @brief If this iterator is pointing to a child node, return a pointer to the node.
-    /// Otherwise, return NULL and, in @a value, the value to which this iterator is pointing.
+    /// Otherwise, return nullptr and, in @a value, the value to which this iterator is pointing.
     SetItemT* probeChild(NonConstValueType& value) const
     {
-        SetItemT* child = NULL;
+        SetItemT* child = nullptr;
         static_cast<const IterT*>(this)->getItem(this->pos(), child, value); // static polymorphism
         return child;
     }
@@ -251,14 +246,14 @@ struct DenseIteratorBase: public IteratorBase<MaskIterT, NodeT>
     bool probeChild(SetItemT*& child, NonConstValueType& value) const
     {
         child = probeChild(value);
-        return (child != NULL);
+        return (child != nullptr);
     }
 
     /// @brief Return @c true if this iterator is pointing to a value and return
     /// the value in @a value.  Otherwise, return @c false.
     bool probeValue(NonConstValueType& value) const
     {
-        SetItemT* child = NULL;
+        SetItemT* child = nullptr;
         const bool isChild = static_cast<const IterT*>(this)-> // static polymorphism
             getItem(this->pos(), child, value);
         return !isChild;

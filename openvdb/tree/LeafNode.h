@@ -31,19 +31,14 @@
 #ifndef OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <algorithm> // for std::swap
-#include <cstring> // for std::memcpy()
-#include <boost/shared_ptr.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/bind.hpp>
-#include <tbb/blocked_range.h>
-#include <tbb/spin_mutex.h>
-#include <tbb/parallel_for.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include "Iterator.h"
+#include "LeafBuffer.h"
+#include <iostream>
+#include <memory>
+#include <type_traits>
 
 
 class TestLeaf;
@@ -65,11 +60,12 @@ template<typename T, Index Log2Dim>
 class LeafNode
 {
 public:
-    typedef T                            BuildType; 
-    typedef T                            ValueType;
-    typedef LeafNode<ValueType, Log2Dim> LeafNodeType;
-    typedef boost::shared_ptr<LeafNode>  Ptr;
-    typedef util::NodeMask<Log2Dim>      NodeMaskType;
+    using BuildType = T;
+    using ValueType = T;
+    using Buffer = LeafBuffer<ValueType, Log2Dim>;
+    using LeafNodeType = LeafNode<ValueType, Log2Dim>;
+    using NodeMaskType = util::NodeMask<Log2Dim>;
+    using Ptr = SharedPtr<LeafNode>;
 
     static const Index
         LOG2DIM     = Log2Dim,      // needed by parent nodes
@@ -83,9 +79,7 @@ public:
     /// @brief ValueConverter<T>::Type is the type of a LeafNode having the same
     /// dimensions as this node but a different value type, T.
     template<typename OtherValueType>
-    struct ValueConverter {
-        typedef LeafNode<OtherValueType, Log2Dim> Type;
-    };
+    struct ValueConverter { using Type = LeafNode<OtherValueType, Log2Dim>; };
 
     /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if
     /// OtherNodeType is the type of a LeafNode with the same dimensions as this node.
@@ -93,281 +87,6 @@ public:
     struct SameConfiguration {
         static const bool value = SameLeafConfig<LOG2DIM, OtherNodeType>::value;
     };
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    struct FileInfo
-    {
-        FileInfo(): bufpos(0) , maskpos(0) {}
-        std::streamoff bufpos;
-        std::streamoff maskpos;
-        io::MappedFile::Ptr mapping;
-        boost::shared_ptr<io::StreamMetadata> meta;
-    };
-#endif
-
-    /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
-    /// the voxel values of a LeafNode
-    class Buffer
-    {
-    public:
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        /// Default constructor
-        Buffer(): mData(new ValueType[SIZE]) {}
-        /// Construct a buffer populated with the specified value.
-        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]) { this->fill(val); }
-        /// Copy constructor
-        Buffer(const Buffer& other): mData(new ValueType[SIZE]) { *this = other; }
-        /// Destructor
-        ~Buffer() { delete[] mData; }
-
-        /// Return @c true if this buffer's values have not yet been read from disk.
-        bool isOutOfCore() const { return false; }
-        /// Return @c true if memory for this buffer has not yet been allocated.
-        bool empty() const { return (mData == NULL); }
-#else
-        typedef ValueType WordType;
-        static const Index WORD_COUNT = SIZE;
-        /// Default constructor
-        Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
-        /// Construct a buffer populated with the specified value.
-        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]), mOutOfCore(0)
-        {
-            this->fill(val);
-        }
-        /// Copy constructor
-        Buffer(const Buffer& other): mData(NULL), mOutOfCore(other.mOutOfCore)
-        {
-            if (other.isOutOfCore()) {
-                mFileInfo = new FileInfo(*other.mFileInfo);
-            } else {
-                this->allocate();
-                ValueType* target = mData;
-                const ValueType* source = other.mData;
-                Index n = SIZE;
-                while (n--) *target++ = *source++;
-            }
-        }
-        /// Construct a buffer but don't allocate memory for the full array of values.
-        Buffer(PartialCreate, const ValueType&): mData(NULL), mOutOfCore(0) {}
-        /// Destructor
-        ~Buffer()
-        {
-            if (this->isOutOfCore()) {
-                this->detachFromFile();
-            } else {
-                this->deallocate();
-            }
-        }
-
-        /// Return @c true if this buffer's values have not yet been read from disk.
-        bool isOutOfCore() const { return bool(mOutOfCore); }
-        /// Return @c true if memory for this buffer has not yet been allocated.
-        bool empty() const { return !mData || this->isOutOfCore(); }
-#endif
-        /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return true; }
-
-        /// Populate this buffer with a constant value.
-        void fill(const ValueType& val)
-        {
-            this->detachFromFile();
-            if (mData != NULL) {
-                ValueType* target = mData;
-                Index n = SIZE;
-                while (n--) *target++ = val;
-            }
-        }
-
-        /// Return a const reference to the i'th element of this buffer.
-        const ValueType& getValue(Index i) const { return this->at(i); }
-        /// Return a const reference to the i'th element of this buffer.
-        const ValueType& operator[](Index i) const { return this->at(i); }
-        /// Set the i'th value of this buffer to the specified value.
-        void setValue(Index i, const ValueType& val)
-        {
-            assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            mData[i] = val;
-#else
-            this->loadValues();
-            if (mData) mData[i] = val;
-#endif
-        }
-
-        /// Copy the other buffer's values into this buffer.
-        Buffer& operator=(const Buffer& other)
-        {
-            if (&other != this) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-                if (this->isOutOfCore()) {
-                    this->detachFromFile();
-                } else {
-                    if (other.isOutOfCore()) this->deallocate();
-                }
-                if (other.isOutOfCore()) {
-                    mOutOfCore = other.mOutOfCore;
-                    mFileInfo = new FileInfo(*other.mFileInfo);
-                } else {
-#endif
-                    this->allocate();
-                    ValueType* target = mData;
-                    const ValueType* source = other.mData;
-                    Index n = SIZE;
-                    while (n--) *target++ = *source++;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-                }
-#endif
-            }
-            return *this;
-        }
-
-        /// @brief Return @c true if the contents of the other buffer
-        /// exactly equal the contents of this buffer.
-        bool operator==(const Buffer& other) const
-        {
-            this->loadValues();
-            other.loadValues();
-            const ValueType *target = mData, *source = other.mData;
-            if (!target && !source) return true;
-            if (!target || !source) return false;
-            Index n = SIZE;
-            while (n && math::isExactlyEqual(*target++, *source++)) --n;
-            return n == 0;
-        }
-        /// @brief Return @c true if the contents of the other buffer
-        /// are not exactly equal to the contents of this buffer.
-        bool operator!=(const Buffer& other) const { return !(other == *this); }
-
-        /// Exchange this buffer's values with the other buffer's values.
-        void swap(Buffer& other)
-        {
-            std::swap(mData, other.mData);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            std::swap(mOutOfCore, other.mOutOfCore);
-#endif
-        }
-
-        /// Return the memory footprint of this buffer in bytes.
-        Index memUsage() const
-        {
-            size_t n = sizeof(*this);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            if (mData) n += SIZE * sizeof(ValueType);
-#else
-            if (this->isOutOfCore()) n += sizeof(FileInfo);
-            else if (mData) n += SIZE * sizeof(ValueType);
-#endif
-            return static_cast<Index>(n);
-        }
-        /// Return the number of values contained in this buffer.
-        static Index size() { return SIZE; }
-
-        /// @brief Return a const pointer to the array of voxel values.
-        /// @details This method guarantees that the buffer is allocated and loaded.
-        /// @warning This method should only be used by experts seeking low-level optimizations.
-        const ValueType* data() const
-        {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            this->loadValues();
-            if (mData == NULL) {
-                Buffer* self = const_cast<Buffer*>(this);
-                // This lock will be contended at most once.
-                tbb::spin_mutex::scoped_lock lock(self->mMutex);
-                if (mData == NULL) self->mData = new ValueType[SIZE];
-            }
-#endif
-            return mData;
-        }
-
-        /// @brief Return a pointer to the array of voxel values.
-        /// @details This method guarantees that the buffer is allocated and loaded.
-        /// @warning This method should only be used by experts seeking low-level optimizations.
-        ValueType* data()
-        {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            this->loadValues();
-            if (mData == NULL) {
-                // This lock will be contended at most once.
-                tbb::spin_mutex::scoped_lock lock(mMutex);
-                if (mData == NULL) mData = new ValueType[SIZE];
-            }
-#endif
-            return mData;
-        }
-
-    private:
-        /// If this buffer is empty, return zero, otherwise return the value at index @ i.
-        const ValueType& at(Index i) const
-        {
-            assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            return mData[i];
-#else
-            this->loadValues();
-            // We can't use the ternary operator here, otherwise Visual C++ returns
-            // a reference to a temporary.
-            if (mData) return mData[i]; else return sZero;
-#endif
-        }
-
-        /// @brief Return a non-const reference to the value at index @a i.
-        /// @details This method is private since it makes assumptions about the
-        /// buffer's memory layout.  Buffers associated with custom leaf node types
-        /// (e.g., a bool buffer implemented as a bitmask) might not be able to
-        /// return non-const references to their values.
-        ValueType& operator[](Index i) { return const_cast<ValueType&>(this->at(i)); }
-
-        bool deallocate()
-        {
-            if (mData != NULL && !this->isOutOfCore()) {
-                delete[] mData;
-                mData = NULL;
-                return true;
-            }
-            return false;
-        }
-
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        void setOutOfCore(bool) {}
-        void loadValues() const {}
-        void doLoad() const {}
-        bool detachFromFile() { return false; }
-#else
-        inline void setOutOfCore(bool b) { mOutOfCore = b; }
-        // To facilitate inlining in the common case in which the buffer is in-core,
-        // the loading logic is split into a separate function, doLoad().
-        inline void loadValues() const { if (this->isOutOfCore()) this->doLoad(); }
-        inline void doLoad() const;
-        inline bool detachFromFile()
-        {
-            if (this->isOutOfCore()) {
-                delete mFileInfo;
-                mFileInfo = NULL;
-                this->setOutOfCore(false);
-                return true;
-            }
-            return false;
-        }
-#endif
-
-        friend class ::TestLeaf;
-        // Allow the parent LeafNode to access this buffer's data pointer.
-        friend class LeafNode;
-
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        ValueType* mData;
-#else
-        union {
-            ValueType* mData;
-            FileInfo*  mFileInfo;
-        };
-        Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
-        tbb::spin_mutex mMutex; // 1 byte
-        //int8_t mReserved[3]; // padding for alignment
-
-        static const ValueType sZero;
-#endif
-    }; // class Buffer
 
 
     /// Default constructor
@@ -396,6 +115,9 @@ public:
 
     /// Deep copy constructor
     LeafNode(const LeafNode&);
+
+    /// Deep assignment operator
+    LeafNode& operator=(const LeafNode&) = default;
 
     /// Value conversion copy constructor
     template<typename OtherValueType>
@@ -498,9 +220,9 @@ public:
     bool operator!=(const LeafNode& other) const { return !(other == *this); }
 
 protected:
-    typedef typename NodeMaskType::OnIterator    MaskOnIterator;
-    typedef typename NodeMaskType::OffIterator   MaskOffIterator;
-    typedef typename NodeMaskType::DenseIterator MaskDenseIterator;
+    using MaskOnIterator = typename NodeMaskType::OnIterator;
+    using MaskOffIterator = typename NodeMaskType::OffIterator;
+    using MaskDenseIterator = typename NodeMaskType::DenseIterator;
 
     // Type tags to disambiguate template instantiations
     struct ValueOn {}; struct ValueOff {}; struct ValueAll {};
@@ -513,7 +235,7 @@ protected:
         public SparseIteratorBase<
             MaskIterT, ValueIter<MaskIterT, NodeT, ValueT, TagT>, NodeT, ValueT>
     {
-        typedef SparseIteratorBase<MaskIterT, ValueIter, NodeT, ValueT> BaseT;
+        using BaseT = SparseIteratorBase<MaskIterT, ValueIter, NodeT, ValueT>;
 
         ValueIter() {}
         ValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
@@ -554,8 +276,8 @@ protected:
     struct DenseIter: public DenseIteratorBase<
         MaskDenseIterator, DenseIter<NodeT, ValueT, TagT>, NodeT, /*ChildT=*/void, ValueT>
     {
-        typedef DenseIteratorBase<MaskDenseIterator, DenseIter, NodeT, void, ValueT> BaseT;
-        typedef typename BaseT::NonConstValueType NonConstValueT;
+        using BaseT = DenseIteratorBase<MaskDenseIterator, DenseIter, NodeT, void, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
 
         DenseIter() {}
         DenseIter(const MaskDenseIterator& iter, NodeT* parent): BaseT(iter, parent) {}
@@ -563,7 +285,7 @@ protected:
         bool getItem(Index pos, void*& child, NonConstValueT& value) const
         {
             value = this->parent().getValue(pos);
-            child = NULL;
+            child = nullptr;
             return false; // no child
         }
 
@@ -578,18 +300,18 @@ protected:
     };
 
 public:
-    typedef ValueIter<MaskOnIterator, LeafNode, const ValueType, ValueOn>        ValueOnIter;
-    typedef ValueIter<MaskOnIterator, const LeafNode, const ValueType, ValueOn>  ValueOnCIter;
-    typedef ValueIter<MaskOffIterator, LeafNode, const ValueType, ValueOff>      ValueOffIter;
-    typedef ValueIter<MaskOffIterator,const LeafNode,const ValueType,ValueOff>   ValueOffCIter;
-    typedef ValueIter<MaskDenseIterator, LeafNode, const ValueType, ValueAll>    ValueAllIter;
-    typedef ValueIter<MaskDenseIterator,const LeafNode,const ValueType,ValueAll> ValueAllCIter;
-    typedef ChildIter<MaskOnIterator, LeafNode, ChildOn>                         ChildOnIter;
-    typedef ChildIter<MaskOnIterator, const LeafNode, ChildOn>                   ChildOnCIter;
-    typedef ChildIter<MaskOffIterator, LeafNode, ChildOff>                       ChildOffIter;
-    typedef ChildIter<MaskOffIterator, const LeafNode, ChildOff>                 ChildOffCIter;
-    typedef DenseIter<LeafNode, ValueType, ChildAll>                             ChildAllIter;
-    typedef DenseIter<const LeafNode, const ValueType, ChildAll>                 ChildAllCIter;
+    using ValueOnIter = ValueIter<MaskOnIterator, LeafNode, const ValueType, ValueOn>;
+    using ValueOnCIter = ValueIter<MaskOnIterator, const LeafNode, const ValueType, ValueOn>;
+    using ValueOffIter = ValueIter<MaskOffIterator, LeafNode, const ValueType, ValueOff>;
+    using ValueOffCIter = ValueIter<MaskOffIterator,const LeafNode,const ValueType,ValueOff>;
+    using ValueAllIter = ValueIter<MaskDenseIterator, LeafNode, const ValueType, ValueAll>;
+    using ValueAllCIter = ValueIter<MaskDenseIterator,const LeafNode,const ValueType,ValueAll>;
+    using ChildOnIter = ChildIter<MaskOnIterator, LeafNode, ChildOn>;
+    using ChildOnCIter = ChildIter<MaskOnIterator, const LeafNode, ChildOn>;
+    using ChildOffIter = ChildIter<MaskOffIterator, LeafNode, ChildOff>;
+    using ChildOffCIter = ChildIter<MaskOffIterator, const LeafNode, ChildOff>;
+    using ChildAllIter = DenseIter<LeafNode, ValueType, ChildAll>;
+    using ChildAllCIter = DenseIter<const LeafNode, const ValueType, ChildAll>;
 
     ValueOnCIter  cbeginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
     ValueOnCIter   beginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
@@ -1001,11 +723,11 @@ public:
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
     template<typename NodeT>
-    NodeT* stealNode(const Coord&, const ValueType&, bool) { return NULL; }
+    NodeT* stealNode(const Coord&, const ValueType&, bool) { return nullptr; }
     template<typename NodeT>
-    NodeT* probeNode(const Coord&) { return NULL; }
+    NodeT* probeNode(const Coord&) { return nullptr; }
     template<typename NodeT>
-    const NodeT* probeConstNode(const Coord&) const { return NULL; }
+    const NodeT* probeConstNode(const Coord&) const { return nullptr; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
     template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
@@ -1024,7 +746,7 @@ public:
     NodeT* probeNodeAndCache(const Coord&, AccessorT&)
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT, LeafNode>::value)) return nullptr;
         return reinterpret_cast<NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -1044,7 +766,7 @@ public:
     const NodeT* probeConstNodeAndCache(const Coord&, AccessorT&) const
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT, LeafNode>::value)) return nullptr;
         return reinterpret_cast<const NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -1075,7 +797,7 @@ public:
     ///                  approximatly constant.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
-    
+
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -1118,6 +840,8 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+    inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
 
@@ -1140,12 +864,6 @@ private:
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
 }; // end of LeafNode class
-
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-template<typename T, Index Log2Dim>
-const T LeafNode<T, Log2Dim>::Buffer::sZero = zeroVal<T>();
-#endif
 
 
 ////////////////////////////////////////
@@ -1198,7 +916,7 @@ LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType&
 
 template<typename T, Index Log2Dim>
 inline
-LeafNode<T, Log2Dim>::LeafNode(const LeafNode &other):
+LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other):
     mBuffer(other.mBuffer),
     mValueMask(other.valueMask()),
     mOrigin(other.mOrigin)
@@ -1471,7 +1189,7 @@ LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
     if (!this->isAllocated()) return;
 #endif
 
-    typedef typename DenseT::ValueType DenseValueType;
+    using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
@@ -1501,7 +1219,7 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
     if (!this->allocate()) return;
 #endif
 
-    typedef typename DenseT::ValueType DenseValueType;
+    using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
@@ -1550,47 +1268,21 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::Buffer::doLoad() const
+LeafNode<T,Log2Dim>::skipCompressedValues(bool seekable, std::istream& is, bool fromHalf)
 {
-    if (!this->isOutOfCore()) return;
-
-    Buffer* self = const_cast<Buffer*>(this);
-
-    // This lock will be contended at most once, after which this buffer
-    // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    if (!this->isOutOfCore()) return;
-
-    boost::scoped_ptr<FileInfo> info(self->mFileInfo);
-    assert(info.get() != NULL);
-    assert(info->mapping.get() != NULL);
-    assert(info->meta.get() != NULL);
-
-    /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
-    self->mData = NULL;
-    self->allocate();
-
-    boost::shared_ptr<std::streambuf> buf = info->mapping->createBuffer();
-    std::istream is(buf.get());
-
-    io::setStreamMetadataPtr(is, info->meta, /*transfer=*/true);
-
-    NodeMaskType mask;
-    is.seekg(info->maskpos);
-    mask.load(is);
-
-    is.seekg(info->bufpos);
-    io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
-
-    self->setOutOfCore(false);
+    if (seekable) {
+        // Seek over voxel values.
+        io::readCompressedValues<ValueType, NodeMaskType>(
+            is, nullptr, SIZE, mValueMask, fromHalf);
+    } else {
+        // Read and discard voxel values.
+        Buffer temp;
+        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+    }
 }
-#endif
-
-
-////////////////////////////////////////
 
 
 template<typename T, Index Log2Dim>
@@ -1605,12 +1297,20 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+    const bool seekable = meta && meta->seekable();
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     std::streamoff maskpos = is.tellg();
 #endif
 
-    // Read in the value mask.
-    mValueMask.load(is);
+    if (seekable) {
+        // Seek over the value mask.
+        mValueMask.seek(is);
+    } else {
+        // Read in the value mask.
+        mValueMask.load(is);
+    }
 
     int8_t numBuffers = 1;
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
@@ -1624,9 +1324,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {
         // This node lies completely outside the clipping region.
-        // Read and discard its voxel values.
-        Buffer temp;
-        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        skipCompressedValues(seekable, is, fromHalf);
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
@@ -1636,22 +1334,19 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         // is actually accessed.  (If this node requires clipping, its buffer
         // must be accessed and therefore must be loaded.)
         io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
-        const bool delayLoad = ((mappedFile.get() != NULL) && clipBBox.isInside(nodeBBox));
+        const bool delayLoad = ((mappedFile.get() != nullptr) && clipBBox.isInside(nodeBBox));
 
         if (delayLoad) {
             mBuffer.setOutOfCore(true);
-            mBuffer.mFileInfo = new FileInfo;
+            mBuffer.mFileInfo = new typename Buffer::FileInfo;
+            mBuffer.mFileInfo->meta = meta;
             mBuffer.mFileInfo->bufpos = is.tellg();
             mBuffer.mFileInfo->mapping = mappedFile;
             // Save the offset to the value mask, because the in-memory copy
             // might change before the value buffer gets read.
             mBuffer.mFileInfo->maskpos = maskpos;
-
-            mBuffer.mFileInfo->meta = io::getStreamMetadataPtr(is);
-
-            // Read and discard voxel values.
-            Buffer temp;
-            io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+            // Skip over voxel values.
+            skipCompressedValues(seekable, is, fromHalf);
         } else {
 #endif
             mBuffer.allocate();
@@ -2125,8 +1820,10 @@ inline void
 LeafNode<T, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
 {
     // Allow the two nodes to have different ValueTypes, but not different dimensions.
-    BOOST_STATIC_ASSERT(OtherNodeT::SIZE == NodeT::SIZE);
-    BOOST_STATIC_ASSERT(OtherNodeT::LEVEL == NodeT::LEVEL);
+    static_assert(OtherNodeT::SIZE == NodeT::SIZE,
+        "can't visit nodes of different sizes simultaneously");
+    static_assert(OtherNodeT::LEVEL == NodeT::LEVEL,
+        "can't visit nodes at different tree levels simultaneously");
 
     ChildAllIterT iter = self.beginChildAll();
     OtherChildAllIterT otherIter = other.beginChildAll();

@@ -75,7 +75,7 @@ public:
     /// @brief Main constructor from a grid
     /// @param grid The level set to be filtered.
     /// @param interrupt Optional interrupter.
-    LevelSetFilter(GridType& grid, InterruptT* interrupt = NULL)
+    LevelSetFilter(GridType& grid, InterruptT* interrupt = nullptr)
         : BaseType(grid, interrupt)
         , mMinMask(0)
         , mMaxMask(1)
@@ -114,14 +114,14 @@ public:
 
     /// @brief One iteration of mean-curvature flow of the level set.
     /// @param mask Optional alpha mask.
-    void meanCurvature(const MaskType* mask = NULL)
+    void meanCurvature(const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.meanCurvature();
     }
 
     /// @brief One iteration of Laplacian flow of the level set.
     /// @param mask Optional alpha mask.
-    void laplacian(const MaskType* mask = NULL)
+    void laplacian(const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.laplacian();
     }
@@ -132,7 +132,7 @@ public:
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
     /// which typically leads an approximation that's better than 95%!
-    void gaussian(int width = 1, const MaskType* mask = NULL)
+    void gaussian(int width = 1, const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.gaussian(width);
     }
@@ -140,7 +140,7 @@ public:
     /// @brief Offset the level set by the specified (world) distance.
     /// @param offset Value of the offset.
     /// @param mask Optional alpha mask.
-    void offset(ValueType offset, const MaskType* mask = NULL)
+    void offset(ValueType offset, const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.offset(offset);
     }
@@ -151,7 +151,7 @@ public:
     ///
     /// @warning This filter is not separable and is hence relatively
     /// slow!
-    void median(int width = 1, const MaskType* mask = NULL)
+    void median(int width = 1, const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.median(width);
     }
@@ -161,7 +161,7 @@ public:
     /// @param mask Optional alpha mask.
     ///
     /// @note This filter is separable so it's fast!
-    void mean(int width = 1, const MaskType* mask = NULL)
+    void mean(int width = 1, const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.mean(width);
     }
@@ -183,6 +183,7 @@ private:
         typedef tools::AlphaMask<GridT, MaskT>                   AlphaMaskT;
 
         Filter(LevelSetFilter* parent, const MaskType* mask) : mParent(parent), mMask(mask) {}
+        Filter(const Filter&) = default;
         virtual ~Filter() {}
 
         void box(int width);

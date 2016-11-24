@@ -218,7 +218,10 @@ public:
         return UT_Vector3(vdb_value[0], vdb_value[1], vdb_value[2]);
     }
     inline static UT_Vector3 translateValue(cvdb::Vec3d& vdb_value) {
-        return UT_Vector3((float)vdb_value[0], (float)vdb_value[1], (float)vdb_value[2]);
+        return UT_Vector3(
+            static_cast<float>(vdb_value[0]),
+            static_cast<float>(vdb_value[1]),
+            static_cast<float>(vdb_value[2]));
     }
 
 private:

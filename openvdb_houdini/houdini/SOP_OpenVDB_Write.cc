@@ -347,7 +347,7 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
 
         // Create a new grid that shares the primitive's tree and transform
         // and then transfer primitive attributes to the new grid as metadata.
-        hvdb::GridPtr grid = vdb->getGrid().copyGrid();
+        hvdb::GridPtr grid = openvdb::ConstPtrCast<hvdb::Grid>(vdb->getGrid().copyGrid());
         GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
         grid->removeMeta("is_vdb");
 

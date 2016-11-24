@@ -28,30 +28,24 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <cstdio> // for remove()
-#include <fstream>
-#include <sstream>
-#include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafManager.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <cppunit/extensions/HelperMacros.h>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 class TestLeafManager: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestLeafManager);
     CPPUNIT_TEST(test);
     CPPUNIT_TEST(testForeach);
     CPPUNIT_TEST(testReduce);
     CPPUNIT_TEST_SUITE_END();
-   
+
     void test();
     void testForeach();
     void testReduce();
@@ -59,7 +53,7 @@ public:
 
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafManager);
-  
+
 void
 TestLeafManager::test()
 {
@@ -238,7 +232,7 @@ TestLeafManager::testForeach()
     tree.fill( bbox1, -1.0f);
     tree.fill( bbox2,  1.0f);
     tree.voxelizeActiveTiles();
-    
+
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
         CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
     }
@@ -279,7 +273,7 @@ TestLeafManager::testReduce()
     tree.fill( bbox1, -1.0f);
     tree.fill( bbox2,  1.0f);
     tree.voxelizeActiveTiles();
-    
+
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
         CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
     }
@@ -300,7 +294,7 @@ TestLeafManager::testReduce()
     CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
     CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
 
-    Index n = 0; 
+    Index n = 0;
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
         ++n;
         CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));

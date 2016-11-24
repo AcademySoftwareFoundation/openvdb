@@ -27,10 +27,10 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
-/// @file PointsToMask.h
+/// @file tools/PointsToMask.h
 ///
 /// @brief This tool produces a grid where every voxel that contains a
 /// point is active. It employes thread-local storage for best performance.
@@ -60,9 +60,9 @@
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent = -1)  // return true to break computation
 /// };
 /// @endcode
 ///
@@ -70,20 +70,18 @@
 /// the util::NullInterrupter is used which implies that all
 /// interrupter calls are no-ops (i.e. incurs no computational overhead).
 
-#ifndef OPENVDB_TOOLS_POINT_MASK_GRID_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_POINT_MASK_GRID_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_POINTSTOMASK_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_POINTSTOMASK_HAS_BEEN_INCLUDED
 
-#include <tbb/tbb_thread.h>
-#include <tbb/task_scheduler_init.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-
-#include <openvdb/openvdb.h>
+#include <openvdb/openvdb.h> // for MaskGrid
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/NullInterrupter.h>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -102,7 +100,7 @@ template<typename PointListT, typename GridT>
 inline void
 maskPoints(const PointListT& points, GridT& grid)
 {
-    PointsToMask<GridT, util::NullInterrupter> tmp(grid, NULL);
+    PointsToMask<GridT, util::NullInterrupter> tmp(grid, nullptr);
     tmp.addPoints(points);
 }
 
@@ -136,7 +134,7 @@ public:
     ///
     /// @param grid        Grid whoes voxels will have their state activated by points.
     /// @param interrupter Optional interrupter to prematurely terminate execution.
-    explicit PointsToMask(GridT& grid, InterrupterT* interrupter = NULL)
+    explicit PointsToMask(GridT& grid, InterrupterT* interrupter = nullptr)
         : mGrid(&grid)
         , mInterrupter(interrupter)
     {
@@ -151,8 +149,12 @@ public:
     void addPoints(const PointListT& points, size_t grainSize = 1024)
     {
         if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
-        if (grainSize>0) {
-            typename GridT::Ptr examplar = mGrid->copy( CP_NEW );
+        if (grainSize > 0) {
+#ifdef OPENVDB_3_ABI_COMPATIBLE
+            typename GridT::Ptr examplar = mGrid->copy(CP_NEW);
+#else
+            typename GridT::Ptr examplar = mGrid->copyWithNewTree();
+#endif
             PoolType pool( *examplar );//thread local storage pool of grids
             AddPoints<PointListT> tmp(points, pool, grainSize, *this );
             if ( this->interrupt() ) return;
@@ -276,7 +278,7 @@ struct PointsToMask<GridT, InterrupterT>::ReducePool
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif //OPENVDB_TOOLS_POINT_MASK_GRID_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_POINTSTOMASK_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

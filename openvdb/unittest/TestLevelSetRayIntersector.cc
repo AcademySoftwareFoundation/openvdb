@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file unittest/TestLevelSetRayIntersector.cc
 /// @author Ken Museth
 
 // Uncomment to enable statistics of ray-intersections
@@ -49,9 +50,6 @@
 #include <iostream>
 #endif
 
-
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 #define ASSERT_DOUBLES_APPROX_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1.e-6);

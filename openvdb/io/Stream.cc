@@ -34,10 +34,10 @@
 #include "GridDescriptor.h"
 #include "TempFile.h"
 #include <openvdb/Exceptions.h>
-#include <boost/cstdint.hpp>
+#include <cstdint>
 #include <boost/iostreams/copy.hpp>
-#include <boost/bind.hpp>
 #include <cstdio> // for remove()
+#include <functional> // for std::bind()
 #include <iostream>
 #include <vector>
 
@@ -49,7 +49,7 @@ namespace io {
 
 struct Stream::Impl
 {
-    Impl(): mOutputStream(NULL) {}
+    Impl(): mOutputStream{nullptr} {}
     Impl(const Impl& other) { *this = other; }
     Impl& operator=(const Impl& other)
     {
@@ -65,7 +65,7 @@ struct Stream::Impl
     MetaMap::Ptr mMeta;
     GridPtrVecPtr mGrids;
     std::ostream* mOutputStream;
-    boost::scoped_ptr<File> mFile;
+    std::unique_ptr<File> mFile;
 };
 
 
@@ -97,7 +97,7 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
     if (delayLoad && Archive::isDelayedLoadingEnabled()) {
         // Copy the contents of the stream to a temporary private file
         // and open the file instead.
-        boost::scoped_ptr<TempFile> tempFile;
+        std::unique_ptr<TempFile> tempFile;
         try {
             tempFile.reset(new TempFile);
         } catch (std::exception& e) {
@@ -112,7 +112,8 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
             mImpl->mFile.reset(new File(filename));
             mImpl->mFile->setCopyMaxBytes(0); // don't make a copy of the temporary file
             /// @todo Need to pass auto-deletion flag to MappedFile.
-            mImpl->mFile->open(delayLoad, boost::bind(&removeTempFile, filename, _1));
+            mImpl->mFile->open(delayLoad,
+                std::bind(&removeTempFile, filename, std::placeholders::_1));
         }
     }
 
@@ -131,14 +132,14 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
         mImpl->mMeta->readMeta(is);
 
         // Read in the number of grids.
-        const boost::int32_t gridCount = readGridCount(is);
+        const int32_t gridCount = readGridCount(is);
 
         // Read in all grids and insert them into mGrids.
         mImpl->mGrids.reset(new GridPtrVec);
         std::vector<GridDescriptor> descriptors;
         descriptors.reserve(gridCount);
         Archive::NamedGridMap namedGrids;
-        for (boost::int32_t i = 0; i < gridCount; ++i) {
+        for (int32_t i = 0; i < gridCount; ++i) {
             GridDescriptor gd;
             gd.read(is);
             descriptors.push_back(gd);
@@ -186,10 +187,10 @@ Stream::operator=(const Stream& other)
 }
 
 
-boost::shared_ptr<Archive>
+SharedPtr<Archive>
 Stream::copy() const
 {
-    return boost::shared_ptr<Archive>(new Stream(*this));
+    return SharedPtr<Archive>(new Stream(*this));
 }
 
 
@@ -218,7 +219,7 @@ Stream::readGrid(const GridDescriptor& gd, std::istream& is) const
 void
 Stream::write(const GridCPtrVec& grids, const MetaMap& metadata) const
 {
-    if (mImpl->mOutputStream == NULL) {
+    if (mImpl->mOutputStream == nullptr) {
         OPENVDB_THROW(ValueError, "no output stream was specified");
     }
     this->writeGrids(*mImpl->mOutputStream, grids, metadata);

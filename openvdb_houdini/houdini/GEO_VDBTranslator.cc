@@ -72,9 +72,7 @@
 
 #if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 #include <FS/FS_IStreamDevice.h>
-
 #include <GA/GA_Stat.h>
-#endif
 
 #include <GU/GU_Detail.h>
 #include <SOP/SOP_Node.h>
@@ -82,7 +80,7 @@
 
 #include <openvdb/io/Stream.h>
 #include <openvdb/io/File.h>
-#include <openvdb/metadata/Metadata.h>
+#include <openvdb/Metadata.h>
 
 #include <stdio.h>
 #include <iostream>
@@ -113,11 +111,7 @@ public:
 				uint level);
 #endif
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
-#else
-    virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, int ate_magic);
-#endif
     virtual GA_Detail::IOStatus fileSave(const GEO_Detail *gdp, std::ostream &os);
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, const char *fname);
@@ -160,7 +154,7 @@ GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
 
 #if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 bool
-GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
+GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
 {
     stat.clear();
 
@@ -173,10 +167,11 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 	UT_BoundingBox	bbox;
 	bbox.makeInvalid();
 
-        // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter)
+	// Loop over all grids in the file.
+	for (openvdb::io::File::NameIterator nameIter = file.beginName();
+	    nameIter != file.endName(); ++nameIter)
 	{
-            const std::string& gridName = nameIter.gridName();
+	    const std::string& gridName = nameIter.gridName();
 
 	    // Read the grid metadata.
 	    auto grid = file.readGridMetadata(gridName);
@@ -216,10 +211,14 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 		bbox.enlargeBounds(worldbox);
 	    }
 
-	    if (voxelbox.isValid())
-		stat.appendVolume(nprim, gridName.c_str(), voxelbox.size().x(), voxelbox.size().y(), voxelbox.size().z());
-	    else
+	    if (voxelbox.isValid()) {
+		stat.appendVolume(nprim, gridName.c_str(),
+		    static_cast<int>(voxelbox.size().x()),
+		    static_cast<int>(voxelbox.size().y()),
+		    static_cast<int>(voxelbox.size().z()));
+	    } else {
 		stat.appendVolume(nprim, gridName.c_str(), 0, 0, 0);
+	    }
 	    nprim++;
 	}
 
@@ -231,15 +230,17 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 
 	file.close();
     } catch (std::exception &e) {
-        cerr << "Stat failure: " << e.what() << "\n";
-        return false;
+	cerr << "Stat failure: " << e.what() << "\n";
+	return false;
     }
 
     return true;
 }
 #endif
 
+
 #if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
 {
@@ -281,7 +282,9 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
 
     return ok;
 }
+
 #else
+
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
@@ -316,7 +319,9 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*
 #endif
 
         // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) {
+        for (openvdb::io::File::NameIterator nameIter = file.beginName();
+            nameIter != file.endName(); ++nameIter)
+        {
             const std::string& gridName = nameIter.gridName();
 
             if (GridPtr grid = file.readGrid(gridName)) {
@@ -354,6 +359,9 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*
 }
 #endif
 
+#endif // 16.0.0
+
+
 template <typename FileT, typename OutputT>
 bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
@@ -370,7 +378,7 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 
             // Create a new grid that shares the primitive's tree and transform
             // and then transfer primitive attributes to the new grid as metadata.
-            GridPtr grid = vdb->getGrid().copyGrid();
+            GridPtr grid = openvdb::ConstPtrCast<Grid>(vdb->getGrid().copyGrid());
             GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
             grid->removeMeta("is_vdb");
 
@@ -442,6 +450,9 @@ GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, std::ostream &,
 }
 
 } // unnamed namespace
+
+
+void new_VDBGeometryIO(void*);
 
 void
 new_VDBGeometryIO(void *)

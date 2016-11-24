@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file SOP_OpenVDB_Clip.cc
 ///
 /// @author FX R&D OpenVDB team
@@ -48,17 +48,16 @@ class SOP_OpenVDB_Clip: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Clip(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Clip() {}
+    ~SOP_OpenVDB_Clip() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual OP_ERROR cookMySop(OP_Context&);
+    bool updateParmsFlags() override;
+    OP_ERROR cookMySop(OP_Context&) override;
 };
-
 
 
 ////////////////////////////////////////
@@ -67,7 +66,7 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
@@ -85,6 +84,12 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setHelpText("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
         .setChoiceList(&hutil::PrimGroupMenuInput2));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "inside", "Keep Inside")
+        .setHelpText(
+            "If enabled, keep voxels that lie inside the clipping region.\n"
+            "If disabled, keep voxels that lie outside the clipping region.")
+        .setDefault(PRMoneDefaults));
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
@@ -138,39 +143,47 @@ struct LevelSetMaskOp
 
 struct BBoxClipOp
 {
-    BBoxClipOp(const openvdb::BBoxd& bbox_): bbox(bbox_) {}
+    BBoxClipOp(const openvdb::BBoxd& bbox_, bool inside_ = true):
+        bbox(bbox_), inside(inside_)
+    {}
 
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        outputGrid = openvdb::tools::clip(grid, bbox);
+        outputGrid = openvdb::tools::clip(grid, bbox, inside);
     }
 
     openvdb::BBoxd bbox;
     hvdb::GridPtr outputGrid;
+    bool inside = true;
 };
 
 
 template<typename GridType>
 struct MaskClipDispatchOp
 {
-    MaskClipDispatchOp(const GridType& grid_): grid(&grid_) {}
+    MaskClipDispatchOp(const GridType& grid_, bool inside_ = true):
+        grid(&grid_), inside(inside_)
+    {}
 
     template<typename MaskGridType>
     void operator()(const MaskGridType& mask)
     {
         outputGrid.reset();
-        if (grid) outputGrid = openvdb::tools::clip(*grid, mask);
+        if (grid) outputGrid = openvdb::tools::clip(*grid, mask, inside);
     }
 
     const GridType* grid;
     hvdb::GridPtr outputGrid;
+    bool inside = true;
 };
 
 
 struct MaskClipOp
 {
-    MaskClipOp(hvdb::GridCPtr mask_): mask(mask_) {}
+    MaskClipOp(hvdb::GridCPtr mask_, bool inside_ = true):
+        mask(mask_), inside(inside_)
+    {}
 
     template<typename GridType>
     void operator()(const GridType& grid)
@@ -178,7 +191,7 @@ struct MaskClipOp
         outputGrid.reset();
         if (mask) {
             // Dispatch on the mask grid type, now that the source grid type is resolved.
-            MaskClipDispatchOp<GridType> op(grid);
+            MaskClipDispatchOp<GridType> op(grid, inside);
             UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op);
             outputGrid = op.outputGrid;
         }
@@ -186,6 +199,7 @@ struct MaskClipOp
 
     hvdb::GridCPtr mask;
     hvdb::GridPtr outputGrid;
+    bool inside = true;
 };
 
 } // unnamed namespace
@@ -206,7 +220,9 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
 
         const GU_Detail* maskGeo = inputGeo(1);
 
-        const bool useMask = evalInt("usemask", 0, time);
+        const bool
+            useMask = evalInt("usemask", 0, time),
+            inside = evalInt("inside", 0, time);
 
         openvdb::BBoxd bbox;
         hvdb::GridCPtr maskGrid;
@@ -249,7 +265,7 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             }
         }
 
-        // Get the group of grids to surface.
+        // Get the group of grids to process.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
@@ -262,11 +278,11 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
 
             hvdb::GridPtr outGrid;
             if (maskGrid) {
-                MaskClipOp op(maskGrid);
+                MaskClipOp op(maskGrid, inside);
                 GEOvdbProcessTypedGridTopology(**it, op);
                 outGrid = op.outputGrid;
             } else {
-                BBoxClipOp op(bbox);
+                BBoxClipOp op(bbox, inside);
                 GEOvdbProcessTypedGridTopology(**it, op);
                 outGrid = op.outputGrid;
             }

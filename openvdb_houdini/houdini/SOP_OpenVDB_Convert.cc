@@ -623,7 +623,7 @@ copyMesh(
     const GA_Offset startpt = detail.appendPointBlock(npoints);
     UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
     GA_RWHandleV3 pthandle(detail.getP());
-    pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
+    pthandle.setBlock(startpt, npoints, reinterpret_cast<UT_Vector3*>(points.get()));
 
     // group fracture seam points
     if (seamPointGroup && GA_Size(mesher.pointFlags().size()) == npoints) {

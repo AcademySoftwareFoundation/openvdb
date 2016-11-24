@@ -152,11 +152,21 @@ public:
 
     /// Predefined constant for identity matrix
     static const Mat3<T>& identity() {
+        static const Mat3<T> sIdentity = Mat3<T>(
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        );
         return sIdentity;
     }
 
     /// Predefined constant for zero matrix
     static const Mat3<T>& zero() {
+        static const Mat3<T> sZero = Mat3<T>(
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0
+        );
         return sZero;
     }
 
@@ -241,7 +251,7 @@ public:
         MyBase::mm[7] = v3[1];
         MyBase::mm[8] = v3[2];
     } // setRows
-    
+
     /// Set the columns of "this" matrix to the vectors v1, v2, v3
     void setColumns(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
     {
@@ -478,7 +488,7 @@ public:
           MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
     }
 
-    /// returns adjoint of "this", i.e. the transpose of the cofactor of "this" 
+    /// returns adjoint of "this", i.e. the transpose of the cofactor of "this"
     Mat3 adjoint() const
     {
         return Mat3<T>(
@@ -491,9 +501,9 @@ public:
           MyBase::mm[3] * MyBase::mm[7] - MyBase::mm[4] * MyBase::mm[6],
           MyBase::mm[1] * MyBase::mm[6] - MyBase::mm[0] * MyBase::mm[7],
           MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
-        
+
     } // adjointTest
-    
+
     /// returns transpose of this
     Mat3 transpose() const
     {
@@ -577,22 +587,8 @@ public:
         ret.mm[8] *= diag(2);
         return ret;
     }
-
-private:
-    static const Mat3<T> sIdentity;
-    static const Mat3<T> sZero;
 }; // class Mat3
 
-
-template <typename T>
-const Mat3<T> Mat3<T>::sIdentity = Mat3<T>(1, 0, 0,
-                                           0, 1, 0,
-                                           0, 0, 1);
-
-template <typename T>
-const Mat3<T> Mat3<T>::sZero = Mat3<T>(0, 0, 0,
-                                       0, 0, 0,
-                                       0, 0, 0);
 
 /// @relates Mat3
 /// @brief Equality operator, does exact floating point comparisons
@@ -703,19 +699,14 @@ inline Vec3<T> &operator *= (Vec3<T> &_v, const Mat3<MT> &_m)
 template <typename T>
 Mat3<T> outerProduct(const Vec3<T>& v1, const Vec3<T>& v2)
 {
-    return Mat3<T>(v1[0]*v2[0], v1[0]*v2[1], v1[0]*v2[2], 
-                   v1[1]*v2[0], v1[1]*v2[1], v1[1]*v2[2], 
+    return Mat3<T>(v1[0]*v2[0], v1[0]*v2[1], v1[0]*v2[2],
+                   v1[1]*v2[0], v1[1]*v2[1], v1[1]*v2[2],
                    v1[2]*v2[0], v1[2]*v2[1], v1[2]*v2[2]);
 }// outerProduct
 
 typedef Mat3<float>  Mat3s;
 typedef Mat3<double> Mat3d;
-
-#if DWREAL_IS_DOUBLE == 1
-typedef Mat3d    Mat3f;
-#else
-typedef Mat3s    Mat3f;
-#endif // DWREAL_IS_DOUBLE
+typedef Mat3d        Mat3f;
 
 
 /// Interpolate the rotation between m1 and m2 using Mat::powSolve.

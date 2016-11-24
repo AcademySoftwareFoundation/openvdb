@@ -27,11 +27,10 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
-///
+
 /// @file MultiResGrid.h
 ///
-/// @brief Ken Museth
+/// @author Ken Museth
 ///
 /// @warning This class is fairly new and as such has not seen a lot of
 /// use in production. Please report any issues or request for new
@@ -46,7 +45,6 @@
 ///
 /// @note Prolongation means interpolation from coarse -> fine
 /// @note Restriction means interpolation (or remapping) from fine -> coarse
-///
 
 #ifndef OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
@@ -56,21 +54,18 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Stencils.h>
-#include <openvdb/metadata/StringMetadata.h>
-#include <openvdb/tools/Interpolation.h>
-#include <openvdb/tools/Morphology.h>
-#include <openvdb/tools/Prune.h>
-#include <openvdb/tools/SignedFloodFill.h>
-#include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/Metadata.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
+#include "Interpolation.h"
+#include "Morphology.h"
+#include "Prune.h"
+#include "SignedFloodFill.h"
+#include "ValueTransformer.h"
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/tbb_thread.h>
-
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -112,7 +107,7 @@ public:
     /// @param levels The number of trees in this MultiResGrid
     /// @param grid High-resolution input grid
     /// @param useInjection Use restriction by injection, vs
-    /// full-weighting. It defaults to false and should rarely to used.
+    /// full-weighting. It defaults to false and should rarely be used.
     /// @note This constructor will perform a deep copy of the input
     /// grid and use it as the highest level grid.
     MultiResGrid(size_t levels, const Grid<TreeType> &grid, bool useInjection = false);
@@ -122,7 +117,7 @@ public:
     /// @param levels The number of trees in this MultiResGrid
     /// @param grid High-resolution input grid
     /// @param useInjection Use restriction by injection, vs
-    /// full-weighting. It defaults to false and should rarely to used.
+    /// full-weighting. It defaults to false and should rarely be used.
     /// @note This constructor will steal the input input
     /// grid and use it as the highest level grid. On output the grid
     /// is empty.

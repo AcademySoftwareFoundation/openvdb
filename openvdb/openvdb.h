@@ -46,42 +46,42 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 /// Common tree types
-typedef tree::Tree4<ValueMask,   5, 4, 3>::Type  MaskTree;
-typedef tree::Tree4<bool,        5, 4, 3>::Type  BoolTree;
-typedef tree::Tree4<float,       5, 4, 3>::Type  FloatTree;
-typedef tree::Tree4<double,      5, 4, 3>::Type  DoubleTree;
-typedef tree::Tree4<int32_t,     5, 4, 3>::Type  Int32Tree;
-typedef tree::Tree4<uint32_t,    5, 4, 3>::Type  UInt32Tree;
-typedef tree::Tree4<int64_t,     5, 4, 3>::Type  Int64Tree;
-typedef tree::Tree4<Vec2i,       5, 4, 3>::Type  Vec2ITree;
-typedef tree::Tree4<Vec2s,       5, 4, 3>::Type  Vec2STree;
-typedef tree::Tree4<Vec2d,       5, 4, 3>::Type  Vec2DTree;
-typedef tree::Tree4<Vec3i,       5, 4, 3>::Type  Vec3ITree;
-typedef tree::Tree4<Vec3f,       5, 4, 3>::Type  Vec3STree;
-typedef tree::Tree4<Vec3d,       5, 4, 3>::Type  Vec3DTree;
-typedef tree::Tree4<std::string, 5, 4, 3>::Type  StringTree;
-typedef MaskTree  TopologyTree;    
-typedef Vec3STree Vec3fTree;
-typedef Vec3DTree Vec3dTree;
-typedef FloatTree ScalarTree;
-typedef Vec3fTree VectorTree;
+using BoolTree     = tree::Tree4<bool,        5, 4, 3>::Type;
+using DoubleTree   = tree::Tree4<double,      5, 4, 3>::Type;
+using FloatTree    = tree::Tree4<float,       5, 4, 3>::Type;
+using Int32Tree    = tree::Tree4<int32_t,     5, 4, 3>::Type;
+using Int64Tree    = tree::Tree4<int64_t,     5, 4, 3>::Type;
+using MaskTree     = tree::Tree4<ValueMask,   5, 4, 3>::Type;
+using StringTree   = tree::Tree4<std::string, 5, 4, 3>::Type;
+using UInt32Tree   = tree::Tree4<uint32_t,    5, 4, 3>::Type;
+using Vec2DTree    = tree::Tree4<Vec2d,       5, 4, 3>::Type;
+using Vec2ITree    = tree::Tree4<Vec2i,       5, 4, 3>::Type;
+using Vec2STree    = tree::Tree4<Vec2s,       5, 4, 3>::Type;
+using Vec3DTree    = tree::Tree4<Vec3d,       5, 4, 3>::Type;
+using Vec3ITree    = tree::Tree4<Vec3i,       5, 4, 3>::Type;
+using Vec3STree    = tree::Tree4<Vec3f,       5, 4, 3>::Type;
+using ScalarTree   = FloatTree;
+using TopologyTree = MaskTree;
+using Vec3dTree    = Vec3DTree;
+using Vec3fTree    = Vec3STree;
+using VectorTree   = Vec3fTree;
 
 /// Common grid types
-typedef Grid<MaskTree>      MaskGrid;
-typedef Grid<BoolTree>      BoolGrid;
-typedef Grid<FloatTree>     FloatGrid;
-typedef Grid<DoubleTree>    DoubleGrid;
-typedef Grid<Int32Tree>     Int32Grid;
-typedef Grid<Int64Tree>     Int64Grid;
-typedef Grid<Vec3ITree>     Vec3IGrid;
-typedef Grid<Vec3STree>     Vec3SGrid;
-typedef Grid<Vec3DTree>     Vec3DGrid;
-typedef Grid<StringTree>    StringGrid;
-typedef Vec3SGrid           Vec3fGrid;
-typedef Vec3DGrid           Vec3dGrid;
-typedef FloatGrid           ScalarGrid;
-typedef Vec3fGrid           VectorGrid;
-typedef MaskGrid            TopologyGrid;
+using BoolGrid     = Grid<BoolTree>;
+using DoubleGrid   = Grid<DoubleTree>;
+using FloatGrid    = Grid<FloatTree>;
+using Int32Grid    = Grid<Int32Tree>;
+using Int64Grid    = Grid<Int64Tree>;
+using MaskGrid     = Grid<MaskTree>;
+using StringGrid   = Grid<StringTree>;
+using Vec3DGrid    = Grid<Vec3DTree>;
+using Vec3IGrid    = Grid<Vec3ITree>;
+using Vec3SGrid    = Grid<Vec3STree>;
+using ScalarGrid   = FloatGrid;
+using TopologyGrid = MaskGrid;
+using Vec3dGrid    = Vec3DGrid;
+using Vec3fGrid    = Vec3SGrid;
+using VectorGrid   = Vec3fGrid;
 
 /// Global registration of basic types
 OPENVDB_API void initialize();

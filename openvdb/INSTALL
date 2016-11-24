@@ -3,13 +3,15 @@ Installing OpenVDB
 
 Requirements
 ------------
-- GNU GCC (gcc.gnu.org), version 4.1 or later
-  or Intel ICC (software.intel.com), version 11.1 or later
+- GNU GCC (gcc.gnu.org), version 4.8 or later,
+  Clang (clang.llvm.org), version 3.8 or later,
+  or Intel ICC (software.intel.com), version 14 or later
 
 - GNU gmake (www.gnu.org/software/make/), version 3.81 or later
 
-- Boost (www.boost.org), version 1.42.0 or later
-  (Linux: yum install boost-devel; OS X: port install boost +python26)
+- Boost (www.boost.org), version 1.53.0 or later; 1.57.0 or later
+  for the Python module
+  (Linux: yum install boost-devel; OS X: port install boost +python27)
 
 - libz (zlib.net)
   (Linux: yum install zlib-devel)
@@ -25,12 +27,12 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8.7 (www.stack.nl/~dimitri/doxygen/), for documentation
+- Doxygen 1.8.11 or later (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
 
-- Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
+- Houdini HDK (http://www.sidefx.com/get/download-houdini/), version 15.0
   or later
 
 - Blosc compression library (www.blosc.org), version 1.5.0 or later
@@ -191,8 +193,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.3.2.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.3.2.0
+    openvdb/libopenvdb.so.4.0.0         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.4.0.0
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -238,8 +240,8 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.3.2
-            libopenvdb.so.3.2.0
+            libopenvdb.so.4.0
+            libopenvdb.so.4.0.0
 
         python/
             include/
@@ -248,7 +250,7 @@ Installation
             lib/
                 python$(PYTHON_VERSION)/
                     pyopenvdb.so
-                    pyopenvdb.so.3.2
+                    pyopenvdb.so.4.0
 
         share/
             doc/

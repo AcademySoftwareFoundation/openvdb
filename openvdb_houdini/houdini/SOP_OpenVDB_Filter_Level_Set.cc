@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file SOP_OpenVDB_Filter_Level_Set.cc
 ///
 /// @author FX R&D OpenVDB team
@@ -314,7 +314,7 @@ struct FilterParms {
         , mMaxMask(1)
         , mInvertMask(false)
         , mAccuracy(ACCURACY_UPWIND_FIRST)
-        , mMaskInputNode(NULL)
+        , mMaskInputNode(nullptr)
     {
     }
 
@@ -369,27 +369,27 @@ private:
 
     template<typename FilterT>
     void offset(const FilterParms&, FilterT&, const float offset, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void mean(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void gaussian(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void median(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void meanCurvature(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void laplacian(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::MaskType* mask = NULL);
+        const typename FilterT::MaskType* mask = nullptr);
 
     template<typename FilterT>
     void renormalize(const FilterParms&, FilterT&, BossT&, bool verbose = false);
@@ -409,7 +409,7 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     for (int n = 0; n < NUM_OPERATOR_TYPES; ++n) {
 
@@ -1076,7 +1076,7 @@ SOP_OpenVDB_Filter_Level_Set::laplacian(const FilterParms& parms, FilterT& filte
 template<typename FilterT>
 inline void
 SOP_OpenVDB_Filter_Level_Set::renormalize(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose)
+    BossT&, bool verbose)
 {
     // We will restore the old state since it is important to level set tracking
     const typename FilterT::State s = filter.getState();

@@ -29,7 +29,10 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "openvdb.h"
-#include <openvdb/tools/PointIndexGrid.h>
+//#ifdef OPENVDB_ENABLE_POINTS
+#include "points/PointDataGrid.h"
+//#endif
+#include "tools/PointIndexGrid.h"
 #include <tbb/mutex.h>
 #ifdef OPENVDB_USE_LOG4CPLUS
 #include <log4cplus/configurator.h>
@@ -115,6 +118,11 @@ initialize()
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
     tools::PointIndexGrid::registerGrid();
+
+    // Register types associated with point data grids.
+//#ifdef OPENVDB_ENABLE_POINTS
+    points::initialize();
+//#endif
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();

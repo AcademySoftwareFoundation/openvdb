@@ -28,6 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBToPolygonsNode.cc
+///
 /// @author Fredrik Salomonsson (fredriks@d2.com)
 
 #include "OpenVDBPlugin.h"
@@ -63,8 +65,8 @@ namespace mvdb = openvdb_maya;
 
 struct OpenVDBToPolygonsNode : public MPxNode
 {
-    OpenVDBToPolygonsNode() {};
-    virtual ~OpenVDBToPolygonsNode() {};
+    OpenVDBToPolygonsNode() {}
+    virtual ~OpenVDBToPolygonsNode() {}
 
     virtual MStatus compute(const MPlug& plug, MDataBlock& data);
 
@@ -103,57 +105,12 @@ mvdb::NodeRegistry registerNode("OpenVDBToPolygons", OpenVDBToPolygonsNode::id,
 class VDBToMayaMesh
 {
 public:
-
     MObject mesh;
 
     VDBToMayaMesh(openvdb::tools::VolumeToMesh& mesher): mesh(), mMesher(&mesher) { }
 
     template<typename GridType>
-    void operator()(typename GridType::ConstPtr grid)
-    {
-        // extract polygonal surface
-        (*mMesher)(*grid);
-
-        // transfer quads and triangles
-        MIntArray polygonCounts, polygonConnects;
-        {
-            const size_t polygonPoolListSize = mMesher->polygonPoolListSize();
-            boost::scoped_array<uint32_t> numQuadsPrefix(new uint32_t[polygonPoolListSize]);
-            boost::scoped_array<uint32_t> numTrianglesPrefix(new uint32_t[polygonPoolListSize]);
-            uint32_t numQuads = 0, numTriangles = 0;
-
-            openvdb::tools::PolygonPoolList& polygonPoolList = mMesher->polygonPoolList();
-            for (size_t n = 0; n < polygonPoolListSize; ++n) {
-                numQuadsPrefix[n]     = numQuads;
-                numTrianglesPrefix[n] = numTriangles;
-                numQuads     += uint32_t(polygonPoolList[n].numQuads());
-                numTriangles += uint32_t(polygonPoolList[n].numTriangles());
-            }
-
-            polygonCounts.setLength(numQuads + numTriangles);
-            polygonConnects.setLength(4*numQuads + 3*numTriangles);
-
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, polygonPoolListSize),
-                FaceCopyOp(polygonConnects, polygonCounts,
-                    numQuadsPrefix, numTrianglesPrefix, polygonPoolList));
-
-            polygonPoolList.reset();  // delete polygons
-        }
-
-        // transfer points
-        const size_t numPoints = mMesher->pointListSize();
-        MFloatPointArray vertexArray(numPoints);
-
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, numPoints),
-            PointCopyOp(vertexArray, mMesher->pointList()));
-
-        mMesher->pointList().reset(); // delete points
-
-        mesh = MFnMeshData().create();
-
-        MFnMesh().create(vertexArray.length(), polygonCounts.length(),
-            vertexArray, polygonCounts, polygonConnects, mesh);
-    }
+    inline void operator()(typename GridType::ConstPtr);
 
 private:
     openvdb::tools::VolumeToMesh * const mMesher;
@@ -170,7 +127,7 @@ struct VDBToMayaMesh::PointCopyOp
     void operator()(const tbb::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(),  N = range.end(); n < N; ++n) {
             const openvdb::Vec3s& p_vdb = (*mVdbPoints)[n];
-            MFloatPoint& p_maya = (*mMayaPoints)[n];
+            MFloatPoint& p_maya = (*mMayaPoints)[static_cast<unsigned int>(n)];
             p_maya[0] = p_vdb[0];
             p_maya[1] = p_vdb[1];
             p_maya[2] = p_vdb[2];
@@ -239,6 +196,54 @@ private:
     openvdb::tools::PolygonPoolList const * const mPolygonPoolList;
 };
 
+
+template<typename GridType>
+inline void
+VDBToMayaMesh::operator()(typename GridType::ConstPtr grid)
+{
+    // extract polygonal surface
+    (*mMesher)(*grid);
+
+    // transfer quads and triangles
+    MIntArray polygonCounts, polygonConnects;
+    {
+        const size_t polygonPoolListSize = mMesher->polygonPoolListSize();
+        boost::scoped_array<uint32_t> numQuadsPrefix(new uint32_t[polygonPoolListSize]);
+        boost::scoped_array<uint32_t> numTrianglesPrefix(new uint32_t[polygonPoolListSize]);
+        uint32_t numQuads = 0, numTriangles = 0;
+
+        openvdb::tools::PolygonPoolList& polygonPoolList = mMesher->polygonPoolList();
+        for (size_t n = 0; n < polygonPoolListSize; ++n) {
+            numQuadsPrefix[n]     = numQuads;
+            numTrianglesPrefix[n] = numTriangles;
+            numQuads     += uint32_t(polygonPoolList[n].numQuads());
+            numTriangles += uint32_t(polygonPoolList[n].numTriangles());
+        }
+
+        polygonCounts.setLength(numQuads + numTriangles);
+        polygonConnects.setLength(4*numQuads + 3*numTriangles);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, polygonPoolListSize),
+            FaceCopyOp(polygonConnects, polygonCounts,
+                numQuadsPrefix, numTrianglesPrefix, polygonPoolList));
+
+        polygonPoolList.reset();  // delete polygons
+    }
+
+    // transfer points
+    const size_t numPoints = mMesher->pointListSize();
+    MFloatPointArray vertexArray(static_cast<unsigned int>(numPoints));
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, numPoints),
+        PointCopyOp(vertexArray, mMesher->pointList()));
+
+    mMesher->pointList().reset(); // delete points
+
+    mesh = MFnMeshData().create();
+
+    MFnMesh().create(vertexArray.length(), polygonCounts.length(),
+        vertexArray, polygonCounts, polygonConnects, mesh);
+}
 
 } // unnamed namespace
 
@@ -378,11 +383,11 @@ MStatus OpenVDBToPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
         MArrayDataHandle outArrayHandle = data.outputArrayValue(aMeshOutput, &status);
         if (status != MS::kSuccess) return status;
 
-        MArrayDataBuilder builder(aMeshOutput, grids.size(), &status);
+        MArrayDataBuilder builder(aMeshOutput, static_cast<unsigned int>(grids.size()), &status);
         for (size_t n = 0, N = grids.size(); n < N; ++n) {
             VDBToMayaMesh converter(mesher);
             if (mvdb::processTypedScalarGrid(grids[n], converter)) {
-                MDataHandle outHandle = builder.addElement(n);
+                MDataHandle outHandle = builder.addElement(static_cast<unsigned int>(n));
                 outHandle.set(converter.mesh);
             }
         }

@@ -28,34 +28,32 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <sstream>
-#include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <cppunit/extensions/HelperMacros.h>
+#include <sstream>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 class TestGradient: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestGradient);
-    CPPUNIT_TEST(testISGradient);                    // Gradient in Index Space
+    CPPUNIT_TEST(testISGradient);               // gradient in index space
     CPPUNIT_TEST(testISGradientStencil);
-    CPPUNIT_TEST(testWSGradient);                    // Gradient in World Space
+    CPPUNIT_TEST(testWSGradient);               // gradient in world space
     CPPUNIT_TEST(testWSGradientStencil);
     CPPUNIT_TEST(testWSGradientStencilFrustum);
-    CPPUNIT_TEST(testWSGradientNormSqr);             // Gradient Norm Sqr (world space only)
-    CPPUNIT_TEST(testWSGradientNormSqrStencil);      // Gradient Norm Sqr (world space only)
-    CPPUNIT_TEST(testGradientTool);                  // Gradient tool
-    CPPUNIT_TEST(testGradientMaskedTool);            // Gradient tool
-    CPPUNIT_TEST(testIntersectsIsoValue);          // zero-crossing
-    CPPUNIT_TEST(testOldStyleStencils);              // old stencil impl - deprecate
+    CPPUNIT_TEST(testWSGradientNormSqr);        // gradient norm sqr (world space only)
+    CPPUNIT_TEST(testWSGradientNormSqrStencil); // gradient norm sqr (world space only)
+    CPPUNIT_TEST(testGradientTool);             // gradient tool
+    CPPUNIT_TEST(testGradientMaskedTool);       // gradient tool
+    CPPUNIT_TEST(testIntersectsIsoValue);       // zero-crossing
+    CPPUNIT_TEST(testOldStyleStencils);         // old stencil impl - deprecate
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -80,7 +78,7 @@ TestGradient::testISGradient()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
+    using AccessorType = FloatGrid::ConstAccessor;
     FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
     FloatTree& tree = grid->tree();
 
@@ -197,7 +195,7 @@ TestGradient::testWSGradient()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
+    using AccessorType = FloatGrid::ConstAccessor;
 
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
@@ -228,7 +226,7 @@ TestGradient::testWSGradient()
         // verify the new map is an affine map
         CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
         math::AffineMap::Ptr affine_map =
-            boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+            StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
         // the gradient should have the same length even after rotation
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
             *affine_map, inAccessor, xyz);
@@ -290,7 +288,7 @@ TestGradient::testWSGradient()
             dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
         math::AffineMap::Ptr affine_map =
-            boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+            StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
         // math::ScaleMap map(voxel_sizes);
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
@@ -305,8 +303,7 @@ TestGradient::testWSGradient()
         // remake the sphere
         unittest_util::makeSphere<FloatGrid>(
             dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
-        math::ScaleMap::Ptr scale_map =
-            boost::static_pointer_cast<math::ScaleMap, math::MapBase>(base_map);
+        math::ScaleMap::Ptr scale_map = StaticPtrCast<math::ScaleMap, math::MapBase>(base_map);
 
         // math::ScaleMap map(voxel_sizes);
         result = math::Gradient<math::ScaleMap, math::CD_2ND>::result(*scale_map, inAccessor, xyz);
@@ -328,7 +325,7 @@ TestGradient::testWSGradientStencilFrustum()
 
     Vec3d trans(2,2,2);
     math::NonlinearFrustumMap::Ptr map =
-        boost::static_pointer_cast<math::NonlinearFrustumMap, math::MapBase>(
+        StaticPtrCast<math::NonlinearFrustumMap, math::MapBase>(
             frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
 
@@ -443,7 +440,7 @@ TestGradient::testWSGradientStencil()
         // verify the new map is an affine map
         CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
         math::AffineMap::Ptr affine_map =
-            boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+            StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
         // the gradient should have the same length even after rotation
 
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
@@ -503,7 +500,7 @@ TestGradient::testWSGradientStencil()
         unittest_util::makeSphere<FloatGrid>(
             dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
         math::AffineMap::Ptr affine_map =
-            boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
+            StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
         stencil.moveTo(xyz);
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(*affine_map, stencil);
@@ -532,7 +529,7 @@ TestGradient::testWSGradientNormSqr()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
+    using AccessorType = FloatGrid::ConstAccessor;
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(voxel_size));

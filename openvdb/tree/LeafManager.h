@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file LeafManager.h
 ///
 /// @brief A LeafManager manages a linear array of pointers to a given tree's
@@ -139,10 +139,8 @@ public:
             {
                 assert(this->isValid());
             }
-            Iterator& operator=(const Iterator& other)
-            {
-                mRange = other.mRange; mPos = other.mPos; return *this;
-            }
+            Iterator(const Iterator&) = default;
+            Iterator& operator=(const Iterator&) = default;
             /// Advance to the next leaf node.
             Iterator& operator++() { ++mPos; return *this; }
             /// Return a reference to the leaf node to which this iterator is pointing.
@@ -227,8 +225,8 @@ public:
         , mLeafCount(0)
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
-        , mLeafs(NULL)
-        , mAuxBuffers(NULL)
+        , mLeafs(nullptr)
+        , mAuxBuffers(nullptr)
         , mTask(0)
         , mIsMaster(true)
     {
@@ -245,7 +243,7 @@ public:
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
         , mLeafs(new LeafType*[mLeafCount])
-        , mAuxBuffers(NULL)
+        , mAuxBuffers(nullptr)
         , mTask(0)
         , mIsMaster(true)
     {
@@ -611,29 +609,27 @@ public:
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    /// @brief Generate a linear array of pre-fix sums of offsets into the
+    /// @brief Generate a linear array of prefix sums of offsets into the
     /// active voxels in the leafs. So @a offsets[n]+m is the offset to the
     /// mth active voxel in the nth leaf node (useful for
     /// user-managed value buffers, e.g. in tools/LevelSetAdvect.h).
     /// @return The total number of active values in the leaf nodes
-    /// @param offsets Array of pre-fix sums of offsets to active voxels
-    /// @param size      On input the size of @a offsets, and on ouput
-    ///                  the new size of @a offsets.
-    /// @param grainSize Optional parameter to specify the grainsize
-    ///                  for threading, one by default.
-    /// @details If @a offsets is NULL or @a size is smaller than the
+    /// @param offsets    array of prefix sums of offsets to active voxels
+    /// @param size       on input, the size of @a offsets; on output, its new size
+    /// @param grainSize  optional grain size for threading
+    /// @details If @a offsets is @c nullptr or @a size is smaller than the
     /// total number of active voxels (the return value) then @a offsets
-    /// is re-allocated and @a size equals the total number of active voxels.
-    size_t getPreFixSum(size_t*& offsets, size_t& size, size_t grainSize=1) const
+    /// is reallocated and @a size equals the total number of active voxels.
+    size_t getPrefixSum(size_t*& offsets, size_t& size, size_t grainSize=1) const
     {
-        if (offsets == NULL || size < mLeafCount) {
+        if (offsets == nullptr || size < mLeafCount) {
             delete [] offsets;
             offsets = new size_t[mLeafCount];
             size = mLeafCount;
         }
         size_t prefix = 0;
         if ( grainSize > 0 ) {
-            PreFixSum tmp(this->leafRange( grainSize ), offsets, prefix);
+            PrefixSum tmp(this->leafRange( grainSize ), offsets, prefix);
         } else {// serial
             for (size_t i=0; i<mLeafCount; ++i) {
                 offsets[i] = prefix;
@@ -670,7 +666,7 @@ public:
         const size_t leafCount = mTree->leafCount();
         if (leafCount != mLeafCount) {
             delete [] mLeafs;
-            mLeafs = (leafCount == 0) ? NULL : new LeafType*[leafCount];
+            mLeafs = (leafCount == 0) ? nullptr : new LeafType*[leafCount];
             mLeafCount = leafCount;
         }
         MyArray a(mLeafs);
@@ -682,7 +678,7 @@ public:
         const size_t auxBufferCount = mLeafCount * mAuxBuffersPerLeaf;
         if (auxBufferCount != mAuxBufferCount) {
             delete [] mAuxBuffers;
-            mAuxBuffers = (auxBufferCount == 0) ? NULL : new NonConstBufferType[auxBufferCount];
+            mAuxBuffers = (auxBufferCount == 0) ? nullptr : new NonConstBufferType[auxBufferCount];
             mAuxBufferCount = auxBufferCount;
         }
         this->syncAllBuffers(serial);
@@ -787,10 +783,10 @@ public:
         const bool mOwnsOp;
     };// LeafReducer
 
-    // Helper class to compute a pre-fix sum of offsets to active voxels
-    struct PreFixSum
+    // Helper class to compute a prefix sum of offsets to active voxels
+    struct PrefixSum
     {
-        PreFixSum(const LeafRange& r, size_t* offsets, size_t& prefix)
+        PrefixSum(const LeafRange& r, size_t* offsets, size_t& prefix)
             : mOffsets(offsets)
         {
             tbb::parallel_for( r, *this);
@@ -806,7 +802,7 @@ public:
             }
         }
         size_t* mOffsets;
-    };// PreFixSum
+    };// PrefixSum
 
     typedef typename boost::function<void (LeafManager*, const RangeType&)> FuncType;
 

@@ -137,13 +137,12 @@ TestMultiResGrid::testManualTopology()
     using namespace openvdb;
 
     typedef tools::MultiResGrid<DoubleTree> MultiResGridT;
-    typedef MultiResGridT::ValueType ValueT;
     const double background = -1.0;
     const size_t levels = 4;
 
     MultiResGridT::Ptr mrg(new MultiResGridT( levels, background));
 
-    CPPUNIT_ASSERT(mrg != NULL);
+    CPPUNIT_ASSERT(mrg != nullptr);
     CPPUNIT_ASSERT_EQUAL(levels  , mrg->numLevels());
     CPPUNIT_ASSERT_EQUAL(0UL,      mrg->finestLevel());
     CPPUNIT_ASSERT_EQUAL(levels-1, mrg->coarsestLevel());
@@ -154,8 +153,9 @@ TestMultiResGrid::testManualTopology()
 
     // First check all trees against the background value
     for (size_t level = 0; level < mrg->numLevels(); ++level) {
-        for (CoordBBox::Iterator<true> ijk(bbox>>level); ijk; ++ijk) {
-            CPPUNIT_ASSERT_DOUBLES_EQUAL( background, mrg->tree(level).getValue(*ijk), /*tot=*/0.0);
+        for (CoordBBox::Iterator<true> iter(bbox>>level); iter; ++iter) {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(background,
+                mrg->tree(level).getValue(*iter), /*tolerance=*/0.0);
         }
     }
 
@@ -164,8 +164,9 @@ TestMultiResGrid::testManualTopology()
         mrg->tree(level).fill( bbox>>level, double(level));
         mrg->tree(level).voxelizeActiveTiles();// avoid active tiles
         // Check values
-        for (CoordBBox::Iterator<true> ijk(bbox>>level); ijk; ++ijk) {
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(double(level), mrg->tree(level).getValue(*ijk), /*tot=*/0.0);
+        for (CoordBBox::Iterator<true> iter(bbox>>level); iter; ++iter) {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(double(level),
+                mrg->tree(level).getValue(*iter), /*tolerance=*/0.0);
         }
         //mrg->tree( level ).print(std::cerr, 2);
         // Check bounding box of active voxels
@@ -189,58 +190,59 @@ TestMultiResGrid::testManualTopology()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.25, mrg->sampleValue<1>(ijk, 2.25f), /*tolerance=*/ 0.001);
 
     // Value at a floating-point position close to ijk and a floating point level
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.25, mrg->sampleValue<1>(Vec3R(0.124), 2.25f), /*tolerance=*/ 0.001);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.25,
+        mrg->sampleValue<1>(Vec3R(0.124), 2.25f), /*tolerance=*/ 0.001);
 
     // prolongate at a given point at top level
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, mrg->prolongateVoxel(ijk, 0), /*tolerance=*/ 0.0);
 
     // First check the coarsest level (3)
-    for (CoordBBox::Iterator<true> ijk(bbox>>3UL); ijk; ++ijk) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(3).getValue(*ijk), /*tot=*/0.0);
+    for (CoordBBox::Iterator<true> iter(bbox>>3UL); iter; ++iter) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(3).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Prolongate from level 3 -> level 2 and check values
     mrg->prolongateActiveVoxels(2);
-    for (CoordBBox::Iterator<true> ijk(bbox>>2UL); ijk; ++ijk) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(2).getValue(*ijk), /*tot=*/0.0);
+    for (CoordBBox::Iterator<true> iter(bbox>>2UL); iter; ++iter) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(2).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Prolongate from level 2 -> level 1 and check values
     mrg->prolongateActiveVoxels(1);
-    for (CoordBBox::Iterator<true> ijk(bbox>>1UL); ijk; ++ijk) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(1).getValue(*ijk), /*tot=*/0.0);
+    for (CoordBBox::Iterator<true> iter(bbox>>1UL); iter; ++iter) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(1).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Prolongate from level 1 -> level 0 and check values
     mrg->prolongateActiveVoxels(0);
-    for (CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(0).getValue(*ijk), /*tot=*/0.0);
+    for (CoordBBox::Iterator<true> iter(bbox); iter; ++iter) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(0).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Redefine values at the finest level and check values
     mrg->finestTree().fill( bbox, 5.0 );
     mrg->finestTree().voxelizeActiveTiles();// avoid active tiles
-    for (CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(0).getValue(*ijk), /*tot=*/0.0);
+    for (CoordBBox::Iterator<true> iter(bbox); iter; ++iter) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(0).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // USE RESTRICTION BY INJECTION since it doesn't have boundary issues
     // // Restrict from level 0 -> level 1 and check values
     // mrg->restrictActiveVoxels(1);
-    // for (CoordBBox::Iterator<true> ijk((bbox>>1UL).expandBy(-1)); ijk; ++ijk) {
-    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(1).getValue(*ijk), /*tot=*/0.0);
+    // for (CoordBBox::Iterator<true> iter((bbox>>1UL).expandBy(-1)); iter; ++iter) {
+    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(1).getValue(*iter), /*tolerance=*/0.0);
     // }
 
     // // Restrict from level 1 -> level 2 and check values
     // mrg->restrictActiveVoxels(2);
-    // for (CoordBBox::Iterator<true> ijk(bbox>>2UL); ijk; ++ijk) {
-    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(2).getValue(*ijk), /*tot=*/0.0);
+    // for (CoordBBox::Iterator<true> iter(bbox>>2UL); iter; ++iter) {
+    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(2).getValue(*iter), /*tolerance=*/0.0);
     // }
 
     // // Restrict from level 2 -> level 3 and check values
     // mrg->restrictActiveVoxels(3);
-    // for (CoordBBox::Iterator<true> ijk(bbox>>3UL); ijk; ++ijk) {
-    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(3).getValue(*ijk), /*tot=*/0.0);
+    // for (CoordBBox::Iterator<true> iter(bbox>>3UL); iter; ++iter) {
+    //     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, mrg->tree(3).getValue(*iter), /*tolerance=*/0.0);
     // }
 }
 
@@ -258,7 +260,6 @@ TestMultiResGrid::testIO()
     ls->setName("LevelSetSphere");
 
     typedef tools::MultiResGrid<FloatTree> MultiResGridT;
-    typedef MultiResGridT::ValueType ValueT;
     const size_t levels = 4;
 
     // Generate LOD sequence
@@ -319,7 +320,8 @@ TestMultiResGrid::testModels()
     filenames.push_back("utahteapot.vdb");
     util::CpuTimer timer;
     for ( size_t i=0; i<filenames.size(); ++i) {
-        std::cerr << "\n=====================>\"" << filenames[i] << "\" =====================" << std::endl;
+        std::cerr << "\n=====================>\"" << filenames[i]
+            << "\" =====================" << std::endl;
         std::cerr << "Reading \"" << filenames[i] << "\" ...";
         io::File file( path + filenames[i] );
         file.open(false);//disable delayed loading

@@ -43,8 +43,8 @@
 #endif
 
 
-void
-usage(const char* progName, int status)
+inline void
+usage [[noreturn]] (const char* progName, int status)
 {
     (status == EXIT_SUCCESS ? std::cout : std::cerr) <<
 "Usage: " << progName << " file.vdb [file.vdb ...] [options]\n" <<

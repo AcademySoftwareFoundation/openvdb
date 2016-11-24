@@ -33,8 +33,8 @@
 ///
 /// @brief Collection of PointIndexGrid helpers for Houdini
 
-#ifndef __GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED__
-#define __GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED__
+#ifndef GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED
+#define GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED
 
 #if defined(SESI_OPENVDB)
     #include "GU_Detail.h"
@@ -204,7 +204,8 @@ struct IndexToOffsetOp {
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const {
         typename LeafT::IndexArray& indices = leaf.indices();
         for (size_t n = 0, N = indices.size(); n < N; ++n) {
-             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(GA_Index(indices[n])));
+             indices[n] = static_cast<typename LeafT::ValueType::IntType>(
+                 mPointList->offsetFromIndex(GA_Index{indices[n]}));
         }
     }
     PointArrayType const * const mPointList;
@@ -427,7 +428,7 @@ GUvdbCreatePointOffsetGrid(
 }
 
 
-#endif // __GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED__
+#endif // GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
 /// @file ParticlesToLevelSet.h
@@ -57,7 +57,7 @@
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
-///   size_t         size()          const;
+///   size_t size() const;
 ///
 ///   // Get the world space position of the nth particle.
 ///   // Required by ParticledToLevelSet::rasterizeSphere(*this,radius).
@@ -85,9 +85,9 @@
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 /// };
 /// @endcode
 ///
@@ -166,7 +166,7 @@ public:
     /// band level sets. Finally the default NullInterrupter should
     /// compile out interruption checks during optimization, thus
     /// incurring no run-time overhead.
-    explicit ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupt = NULL);
+    explicit ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupt = nullptr);
 
     /// Destructor
     ~ParticlesToLevelSet() { delete mBlindGrid; }
@@ -185,7 +185,7 @@ public:
     /// (optional) attribute.
     ///
     /// @warning If attribute transfer was disabled, i.e. AttributeT =
-    /// void, or finalize() was not called the pointer is NULL!
+    /// void, or finalize() was not called the pointer is nullptr!
     typename AttGridType::Ptr attributeGrid() { return mAttGrid; }
 
     /// @brief Return the size of a voxel in world units
@@ -273,7 +273,7 @@ template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 inline ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
     mSdfGrid(&grid),
-    mBlindGrid(NULL),
+    mBlindGrid(nullptr),
     mInterrupter(interrupter),
     mDx(grid.voxelSize()[0]),
     mHalfWidth(grid.background()/mDx),
@@ -345,7 +345,7 @@ template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 inline void
 ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
 {
-    if (mBlindGrid==NULL) {
+    if (mBlindGrid == nullptr) {
         if (prune) tools::pruneLevelSet(mSdfGrid->tree());
         return;
     } else {
@@ -794,12 +794,8 @@ public:
     BlindData() {}
     explicit BlindData(VisibleT v) : mVisible(v), mBlind(zeroVal<BlindType>()) {}
     BlindData(VisibleT v, BlindT b) : mVisible(v), mBlind(b) {}
-    BlindData& operator=(const BlindData& rhs)
-    {
-        mVisible = rhs.mVisible;
-        mBlind = rhs.mBlind;
-        return *this;
-    }
+    BlindData(const BlindData&) = default;
+    BlindData& operator=(const BlindData&) = default;
     const VisibleT& visible() const { return mVisible; }
     const BlindT&   blind()   const { return mBlind; }
     OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
@@ -845,4 +841,3 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-

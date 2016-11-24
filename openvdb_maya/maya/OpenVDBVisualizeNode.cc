@@ -28,6 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBVisualizeNode.cc
+///
 /// @author FX R&D OpenVDB team
 
 #include "OpenVDBPlugin.h"
@@ -580,8 +582,8 @@ OpenVDBVisualizeNode::draw(M3dView & view, const MDagPath& /*path*/,
 
         if ((isSelected || bbox) && MPlug(thisNode, aCachedBBox).asBool()) {
 
-            if (isSelected) glColor3f(0.9, 0.9, 0.3);
-            else glColor3f(0.045, 0.045, 0.045);
+            if (isSelected) glColor3f(0.9f, 0.9f, 0.3f);
+            else glColor3f(0.045f, 0.045f, 0.045f);
 
             for (size_t n = 0, N = mBBoxBuffers.size(); n < N; ++n) {
                 mBBoxBuffers[n].render();

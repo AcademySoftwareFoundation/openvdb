@@ -192,7 +192,7 @@ LevelSetFracture<GridType, InterruptType>::fracture(GridPtrList& grids, const Gr
 
 
         math::Transform::Ptr originalCutterTransform = cutter.transform().copy();
-        GridType cutterGrid(cutter, ShallowCopy());
+        GridType cutterGrid(*const_cast<GridType*>(&cutter), ShallowCopy());
 
         const bool hasInstanceRotations =
             points && rotations && points->size() == rotations->size();

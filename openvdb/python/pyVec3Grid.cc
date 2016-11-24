@@ -34,6 +34,9 @@
 #include "pyGrid.h"
 
 
+void exportVec3Grid();
+
+
 void
 exportVec3Grid()
 {

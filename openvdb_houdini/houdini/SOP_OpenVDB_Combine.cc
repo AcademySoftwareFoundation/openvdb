@@ -696,7 +696,11 @@ struct SOP_OpenVDB_Combine::CombineOp
             // For non-level set grids or if level set rebuild failed due to an unsupported
             // grid type, use the grid transformer tool to resample the source grid to match
             // the reference grid.
+#ifdef OPENVDB_3_ABI_COMPATIBLE
             dest = src.copy(openvdb::CP_NEW);
+#else
+            dest = src.copyWithNewTree();
+#endif
             dest->setTransform(refXform.copy());
             using namespace openvdb;
             switch (order) {
@@ -917,7 +921,11 @@ struct SOP_OpenVDB_Combine::CombineOp
                 const Blend1<ValueT> comp(aMult, bMult);
                 ValueT bg;
                 comp(aGrid->background(), ZERO, bg);
+#ifdef OPENVDB_3_ABI_COMPATIBLE
                 resultGrid = aGrid->copy(/*tree=*/openvdb::CP_NEW);
+#else
+                resultGrid = aGrid->copyWithNewTree();
+#endif
                 openvdb::tools::changeBackground(resultGrid->tree(), bg);
                 resultGrid->tree().combine2(aGrid->tree(), bGrid->tree(), comp, /*prune=*/false);
                 break;
@@ -927,7 +935,11 @@ struct SOP_OpenVDB_Combine::CombineOp
                 const Blend2<ValueT> comp(aMult, bMult);
                 ValueT bg;
                 comp(aGrid->background(), ZERO, bg);
+#ifdef OPENVDB_3_ABI_COMPATIBLE
                 resultGrid = aGrid->copy(/*tree=*/openvdb::CP_NEW);
+#else
+                resultGrid = aGrid->copyWithNewTree();
+#endif
                 openvdb::tools::changeBackground(resultGrid->tree(), bg);
                 resultGrid->tree().combine2(aGrid->tree(), bGrid->tree(), comp, /*prune=*/false);
                 break;

@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file Queue.cc
 /// @author Peter Cucka
 
@@ -37,7 +37,6 @@
 #include "Stream.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
-#include <boost/bind.hpp>
 #include <tbb/atomic.h>
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/mutex.h>
@@ -56,8 +55,8 @@ namespace io {
 
 namespace {
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
+using Mutex = tbb::mutex;
+using Lock = Mutex::scoped_lock;
 
 
 // Abstract base class for queuable TBB tasks that adds a task completion callback
@@ -65,7 +64,7 @@ class Task: public tbb::task
 {
 public:
     Task(Queue::Id id): mId(id) {}
-    virtual ~Task() {}
+    ~Task() override {}
 
     Queue::Id id() const { return mId; }
 
@@ -92,7 +91,7 @@ public:
         , mMetadata(metadata)
     {}
 
-    virtual tbb::task* execute()
+    tbb::task* execute() override
     {
         Queue::Status status = Queue::FAILED;
         try {
@@ -105,12 +104,12 @@ public:
         } catch (...) {
         }
         this->notify(status);
-        return NULL; // no successor to this task
+        return nullptr; // no successor to this task
     }
 
 private:
     GridCPtrVec mGrids;
-    boost::shared_ptr<Archive> mArchive;
+    SharedPtr<Archive> mArchive;
     MetaMap mMetadata;
 };
 
@@ -123,9 +122,9 @@ private:
 // Private implementation details of a Queue
 struct Queue::Impl
 {
-    typedef std::map<Queue::Id, Queue::Notifier> NotifierMap;
+    using NotifierMap = std::map<Queue::Id, Queue::Notifier>;
     /// @todo Provide more information than just "succeeded" or "failed"?
-    typedef tbb::concurrent_hash_map<Queue::Id, Queue::Status> StatusMap;
+    using StatusMap = tbb::concurrent_hash_map<Queue::Id, Queue::Status>;
 
 
     Impl()
@@ -202,7 +201,8 @@ struct Queue::Impl
                     "unable to queue I/O task; " << mTimeout << "-second time limit expired");
             }
         }
-        Queue::Notifier notify = boost::bind(&Impl::setStatusWithNotification, this, _1, _2);
+        Queue::Notifier notify = std::bind(&Impl::setStatusWithNotification, this,
+            std::placeholders::_1, std::placeholders::_2);
         task.setNotifier(notify);
         this->setStatus(task.id(), Queue::PENDING);
         tbb::task::enqueue(task);
@@ -321,9 +321,10 @@ Queue::writeGrid(GridBase::ConstPtr grid, const Archive& archive, const MetaMap&
 Queue::Id
 Queue::writeGridVec(const GridCPtrVec& grids, const Archive& archive, const MetaMap& metadata)
 {
+    const Queue::Id taskId = mImpl->mNextId++;
     // From the "GUI Thread" chapter in the TBB Design Patterns guide
-    const Queue::Id task_id = mImpl->mNextId++;
-    OutputTask* task = new(tbb::task::allocate_root()) OutputTask(task_id, grids, archive, metadata);
+    OutputTask* task =
+        new(tbb::task::allocate_root()) OutputTask(taskId, grids, archive, metadata);
     try {
         mImpl->enqueue(*task);
     } catch (openvdb::RuntimeError&) {
@@ -331,7 +332,7 @@ Queue::writeGridVec(const GridCPtrVec& grids, const Archive& archive, const Meta
         tbb::task::destroy(*task);
         throw;
     }
-    return task_id;
+    return taskId;
 }
 
 } // namespace io

@@ -51,18 +51,18 @@
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 
-typedef float                                            ValueType;
-typedef openvdb::tree::LeafNode<ValueType,3>             LeafNodeType;
-typedef openvdb::tree::InternalNode<LeafNodeType,4>      InternalNodeType1;
-typedef openvdb::tree::InternalNode<InternalNodeType1,5> InternalNodeType2;
-typedef openvdb::tree::RootNode<InternalNodeType2>       RootNodeType;
+using ValueType = float;
+using LeafNodeType = openvdb::tree::LeafNode<ValueType,3>;
+using InternalNodeType1 = openvdb::tree::InternalNode<LeafNodeType,4>;
+using InternalNodeType2 = openvdb::tree::InternalNode<InternalNodeType1,5>;
+using RootNodeType = openvdb::tree::RootNode<InternalNodeType2>;
 
 
 class TestTree: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestTree);
     CPPUNIT_TEST(testChangeBackground);
@@ -129,8 +129,9 @@ public:
     void testStealNode();
 
 private:
-    template<class TreeType> void testWriteHalf();
-    template<class TreeType> void doTestMerge(openvdb::MergePolicy);
+    template<typename TreeType> void testWriteHalf();
+    template<typename TreeType> void doTestMerge(openvdb::MergePolicy);
+    template<typename TreeTypeA, typename TreeTypeB> void doTestTopologyDifference();
 };
 
 
@@ -146,7 +147,7 @@ TestTree::testChangeBackground()
         voxelSize = 1.0f / (dim-1),
         halfWidth = 4,
         gamma = halfWidth * voxelSize;
-    typedef openvdb::FloatGrid GridT;
+    using GridT = openvdb::FloatGrid;
     const openvdb::Coord inside(int(center[0]*dim), int(center[1]*dim), int(center[2]*dim));
     const openvdb::Coord outside(dim);
 
@@ -215,8 +216,8 @@ template<class TreeType>
 void
 TestTree::testWriteHalf()
 {
-    typedef openvdb::Grid<TreeType> GridType;
-    typedef typename TreeType::ValueType ValueT;
+    using GridType = openvdb::Grid<TreeType>;
+    using ValueT = typename TreeType::ValueType;
     ValueT background(5);
     GridType grid(background);
 
@@ -477,7 +478,7 @@ template<typename TreeT>
 void
 evalMinMaxTest()
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     struct Local {
         static bool isEqual(const ValueT& a, const ValueT& b) {
@@ -601,7 +602,7 @@ template<>
 void
 evalMinMaxTest<openvdb::Coord>()
 {
-    typedef openvdb::tree::Tree4<openvdb::Coord,5,4,3>::Type  CoordTree;
+    using CoordTree = openvdb::tree::Tree4<openvdb::Coord,5,4,3>::Type;
     const openvdb::Coord backg(5,4,-6), a(5,4,-7), b(5,5,-6);
 
     CoordTree tree(backg);
@@ -627,7 +628,7 @@ evalMinMaxTest<openvdb::Coord>()
     tree.evalMinMax(minVal, maxVal);
     CPPUNIT_ASSERT_EQUAL(a, minVal);
     CPPUNIT_ASSERT_EQUAL(b, maxVal);
-}    
+}
 
 } // unnamed namespace
 
@@ -917,7 +918,7 @@ void
 TestTree::testIO()
 {
     const char* filename = "testIO.dbg";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
     {
         ValueType background=5.0f;
         RootNodeType root_node(background);
@@ -1152,8 +1153,8 @@ TestTree::doTestMerge(openvdb::MergePolicy policy)
 
     TreeType treeA, treeB;
 
-    typedef typename TreeType::RootNodeType RootT;
-    typedef typename TreeType::LeafNodeType LeafT;
+    using RootT = typename TreeType::RootNodeType;
+    using LeafT = typename TreeType::LeafNodeType;
 
     const typename TreeType::ValueType val(1);
     const int
@@ -1229,7 +1230,7 @@ TestTree::testVoxelizeActiveTiles()
     using openvdb::Coord;
     // Use a small custom tree so we don't run out of memory when
     // tiles are converted to dense leafs :)
-    typedef openvdb::tree::Tree4<float,2, 2, 2>::Type MyTree;
+    using MyTree = openvdb::tree::Tree4<float,2, 2, 2>::Type;
     float background=5.0f;
     const Coord xyz[] = {Coord(-1,-2,-3),Coord( 1, 2, 3)};
     //check two leaf nodes and two tiles at each level 1, 2 and 3
@@ -2012,16 +2013,20 @@ TestTree::testTopologyDifference()
             ASSERT_DOUBLES_EXACTLY_EQUAL(*iter, tree0_copy.getValue(p));
         }
     }
-}// testTopologyDifference
+} // testTopologyDifference
+
+
+////////////////////////////////////////
+
 
 void
 TestTree::testFill()
 {
     // Use a custom tree configuration to ensure we flood-fill at all levels!
-    typedef openvdb::tree::LeafNode<float,2>     LeafT;//4^3
-    typedef openvdb::tree::InternalNode<LeafT,2> InternalT;//4^3
-    typedef openvdb::tree::RootNode<InternalT>   RootT;// child nodes are 16^3
-    typedef openvdb::tree::Tree<RootT>           TreeT;
+    using LeafT = openvdb::tree::LeafNode<float,2>;//4^3
+    using InternalT = openvdb::tree::InternalNode<LeafT,2>;//4^3
+    using RootT = openvdb::tree::RootNode<InternalT>;// child nodes are 16^3
+    using TreeT = openvdb::tree::Tree<RootT>;
 
     const float outside = 2.0f, inside = -outside;
     const openvdb::CoordBBox bbox(openvdb::Coord(-3,-50,30), openvdb::Coord(13,11,323));
@@ -2030,13 +2035,13 @@ TestTree::testFill()
          openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
          TreeT& tree = grid->tree();
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
          tree.sparseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
           for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
          }
@@ -2045,13 +2050,13 @@ TestTree::testFill()
          openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
          TreeT& tree = grid->tree();
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
          tree.denseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
          }
@@ -2063,10 +2068,10 @@ void
 TestTree::testSignedFloodFill()
 {
     // Use a custom tree configuration to ensure we flood-fill at all levels!
-    typedef openvdb::tree::LeafNode<float,2>     LeafT;//4^3
-    typedef openvdb::tree::InternalNode<LeafT,2> InternalT;//4^3
-    typedef openvdb::tree::RootNode<InternalT>   RootT;// child nodes are 16^3
-    typedef openvdb::tree::Tree<RootT>           TreeT;
+    using LeafT = openvdb::tree::LeafNode<float,2>;//4^3
+    using InternalT = openvdb::tree::InternalNode<LeafT,2>;//4^3
+    using RootT = openvdb::tree::RootNode<InternalT>;// child nodes are 16^3
+    using TreeT = openvdb::tree::Tree<RootT>;
 
     const float outside = 2.0f, inside = -outside, radius = 20.0f;
 
@@ -2278,7 +2283,7 @@ TestTree::testPruneLevelSet()
 
     // This version is fast since it only visits voxel and avoids
     // random access to set the voxels off.
-    typedef openvdb::FloatTree::LeafNodeType::ValueOnIter VoxelOnIter;
+    using VoxelOnIter = openvdb::FloatTree::LeafNodeType::ValueOnIter;
     for (openvdb::FloatTree::LeafIter lIter = tree.beginLeaf(); lIter; ++lIter) {
         for (VoxelOnIter vIter = lIter->beginValueOn(); vIter; ++vIter) {
             if (fabs(*vIter)<new_width) continue;
@@ -2340,7 +2345,7 @@ TestTree::testTouchLeaf()
         openvdb::FloatTree::Ptr tree(new openvdb::FloatTree(background));
         CPPUNIT_ASSERT_EQUAL(-1, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
-        CPPUNIT_ASSERT(tree->touchLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(tree->touchLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
         CPPUNIT_ASSERT(!tree->isValueOn(xyz));
@@ -2351,7 +2356,7 @@ TestTree::testTouchLeaf()
         openvdb::tree::ValueAccessor<openvdb::FloatTree> acc(*tree);
         CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
-        CPPUNIT_ASSERT(acc.touchLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(acc.touchLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
         CPPUNIT_ASSERT(!acc.isValueOn(xyz));
@@ -2369,13 +2374,13 @@ TestTree::testProbeLeaf()
         openvdb::FloatTree::Ptr tree(new openvdb::FloatTree(background));
         CPPUNIT_ASSERT_EQUAL(-1, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
-        CPPUNIT_ASSERT(tree->probeLeaf(xyz)==NULL);
+        CPPUNIT_ASSERT(tree->probeLeaf(xyz) == nullptr);
         CPPUNIT_ASSERT_EQUAL(-1, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
         tree->setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL( 3, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
-        CPPUNIT_ASSERT(tree->probeLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(tree->probeLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, tree->getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
         CPPUNIT_ASSERT(tree->isValueOn(xyz));
@@ -2385,7 +2390,7 @@ TestTree::testProbeLeaf()
         const openvdb::FloatTree tree1(background);
         CPPUNIT_ASSERT_EQUAL(-1, tree1.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree1.leafCount()));
-        CPPUNIT_ASSERT(tree1.probeConstLeaf(xyz)==NULL);
+        CPPUNIT_ASSERT(tree1.probeConstLeaf(xyz) == nullptr);
         CPPUNIT_ASSERT_EQUAL(-1, tree1.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree1.leafCount()));
         openvdb::FloatTree tmp(tree1);
@@ -2393,7 +2398,7 @@ TestTree::testProbeLeaf()
         const openvdb::FloatTree tree2(tmp);
         CPPUNIT_ASSERT_EQUAL( 3, tree2.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree2.leafCount()));
-        CPPUNIT_ASSERT(tree2.probeConstLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(tree2.probeConstLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, tree2.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree2.leafCount()));
         CPPUNIT_ASSERT(tree2.isValueOn(xyz));
@@ -2404,13 +2409,13 @@ TestTree::testProbeLeaf()
         openvdb::tree::ValueAccessor<openvdb::FloatTree> acc(*tree);
         CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
-        CPPUNIT_ASSERT(acc.probeLeaf(xyz)==NULL);
+        CPPUNIT_ASSERT(acc.probeLeaf(xyz) == nullptr);
         CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree->leafCount()));
         acc.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL( 3, acc.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
-        CPPUNIT_ASSERT(acc.probeLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(acc.probeLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, acc.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree->leafCount()));
         CPPUNIT_ASSERT(acc.isValueOn(xyz));
@@ -2421,7 +2426,7 @@ TestTree::testProbeLeaf()
         openvdb::tree::ValueAccessor<const openvdb::FloatTree> acc1(tree1);
         CPPUNIT_ASSERT_EQUAL(-1, acc1.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree1.leafCount()));
-        CPPUNIT_ASSERT(acc1.probeConstLeaf(xyz)==NULL);
+        CPPUNIT_ASSERT(acc1.probeConstLeaf(xyz) == nullptr);
         CPPUNIT_ASSERT_EQUAL(-1, acc1.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 0, int(tree1.leafCount()));
         openvdb::FloatTree tmp(tree1);
@@ -2430,7 +2435,7 @@ TestTree::testProbeLeaf()
         openvdb::tree::ValueAccessor<const openvdb::FloatTree> acc2(tree2);
         CPPUNIT_ASSERT_EQUAL( 3, acc2.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree2.leafCount()));
-        CPPUNIT_ASSERT(acc2.probeConstLeaf(xyz)!=NULL);
+        CPPUNIT_ASSERT(acc2.probeConstLeaf(xyz) != nullptr);
         CPPUNIT_ASSERT_EQUAL( 3, acc2.getValueDepth(xyz));
         CPPUNIT_ASSERT_EQUAL( 1, int(tree2.leafCount()));
         CPPUNIT_ASSERT(acc2.isValueOn(xyz));
@@ -2444,7 +2449,7 @@ TestTree::testAddLeaf()
 {
     using namespace openvdb;
 
-    typedef FloatTree::LeafNodeType LeafT;
+    using LeafT = FloatTree::LeafNodeType;
 
     const Coord ijk(100);
     FloatGrid grid;
@@ -2452,7 +2457,7 @@ TestTree::testAddLeaf()
 
     tree.setValue(ijk, 5.0);
     const LeafT* oldLeaf = tree.probeLeaf(ijk);
-    CPPUNIT_ASSERT(oldLeaf != NULL);
+    CPPUNIT_ASSERT(oldLeaf != nullptr);
     ASSERT_DOUBLES_EXACTLY_EQUAL(5.0, oldLeaf->getValue(ijk));
 
     LeafT* newLeaf = new LeafT;
@@ -2475,7 +2480,7 @@ TestTree::testAddTile()
     FloatTree& tree = grid.tree();
 
     tree.setValue(ijk, 5.0);
-    CPPUNIT_ASSERT(tree.probeLeaf(ijk) != NULL);
+    CPPUNIT_ASSERT(tree.probeLeaf(ijk) != nullptr);
 
     const Index lvl = FloatTree::DEPTH >> 1;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
@@ -2483,7 +2488,7 @@ TestTree::testAddTile()
     else tree.addTile(1,ijk, 3.0, /*active=*/true);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 
-    CPPUNIT_ASSERT(tree.probeLeaf(ijk) == NULL);
+    CPPUNIT_ASSERT(tree.probeLeaf(ijk) == nullptr);
     ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
 }
 
@@ -2646,12 +2651,12 @@ TestTree::testGetNodes()
     }
     /*
     {//testing Tree::getNodes() with std::deque<T*> where T is not part of the tree configuration
-        typedef openvdb::tree::LeafNode<float, 5> NodeT;
+        using NodeT = openvdb::tree::LeafNode<float, 5>;
         std::deque<const NodeT*> array;
         tree.getNodes(array);//should NOT compile since NodeT is not part of the FloatTree configuration
     }
     {//testing Tree::getNodes() const with std::deque<T*> where T is not part of the tree configuration
-        typedef openvdb::tree::LeafNode<float, 5> NodeT;
+        using NodeT = openvdb::tree::LeafNode<float, 5>;
         std::deque<const NodeT*> array;
         const FloatTree& tmp = tree;
         tmp.getNodes(array);//should NOT compile since NodeT is not part of the FloatTree configuration
@@ -2772,7 +2777,7 @@ TestTree::testStealNodes()
     /*
     {//testing Tree::stealNodes() with std::deque<T*> where T is not part of the tree configuration
         FloatTree tree2 = tree;
-        typedef openvdb::tree::LeafNode<float, 5> NodeT;
+        using NodeT = openvdb::tree::LeafNode<float, 5>;
         std::deque<const NodeT*> array;
         //should NOT compile since NodeT is not part of the FloatTree configuration
         tree2.stealNodes(array, 0.0f, true);
@@ -2790,14 +2795,14 @@ TestTree::testStealNode()
     const openvdb::Coord xyz(-23,42,70);
 
     {// stal a LeafNode
-        typedef FloatTree::LeafNodeType NodeT;
+        using NodeT = FloatTree::LeafNodeType;
         CPPUNIT_ASSERT_EQUAL(Index(0), NodeT::getLevel());
 
         FloatTree tree(background);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
@@ -2805,24 +2810,24 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
-        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT(node != nullptr);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
         CPPUNIT_ASSERT(node->isValueOn(xyz));
         delete node;
     }
     {// steal a bottom InternalNode
-        typedef FloatTree::RootNodeType::ChildNodeType::ChildNodeType NodeT;
+        using NodeT = FloatTree::RootNodeType::ChildNodeType::ChildNodeType;
         CPPUNIT_ASSERT_EQUAL(Index(1), NodeT::getLevel());
 
         FloatTree tree(background);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
@@ -2830,24 +2835,24 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
-        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT(node != nullptr);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
         CPPUNIT_ASSERT(node->isValueOn(xyz));
         delete node;
     }
     {// steal a top InternalNode
-        typedef FloatTree::RootNodeType::ChildNodeType NodeT;
+        using NodeT = FloatTree::RootNodeType::ChildNodeType;
         CPPUNIT_ASSERT_EQUAL(Index(2), NodeT::getLevel());
 
         FloatTree tree(background);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
@@ -2855,11 +2860,11 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
-        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT(node != nullptr);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
-        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
         CPPUNIT_ASSERT(node->isValueOn(xyz));
         delete node;

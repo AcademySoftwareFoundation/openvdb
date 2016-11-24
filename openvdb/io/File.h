@@ -38,8 +38,8 @@
 #include "GridDescriptor.h"
 #include <iosfwd>
 #include <map>
+#include <memory>
 #include <string>
-#include <boost/scoped_ptr.hpp>
 
 
 class TestFile;
@@ -54,11 +54,11 @@ namespace io {
 class OPENVDB_API File: public Archive
 {
 public:
-    typedef std::multimap<Name, GridDescriptor> NameMap;
-    typedef NameMap::const_iterator NameMapCIter;
+    using NameMap = std::multimap<Name, GridDescriptor>;
+    using NameMapCIter = NameMap::const_iterator;
 
     explicit File(const std::string& filename);
-    virtual ~File();
+    ~File() override;
 
     /// @brief Copy constructor
     /// @details The copy will be closed and will not reference the same
@@ -72,7 +72,7 @@ public:
     /// @brief Return a copy of this archive.
     /// @details The copy will be closed and will not reference the same
     /// file descriptor as the original.
-    virtual boost::shared_ptr<Archive> copy() const;
+    SharedPtr<Archive> copy() const override;
 
     /// @brief Return the name of the file with which this archive is associated.
     /// @details The file does not necessarily exist on disk yet.
@@ -138,10 +138,9 @@ public:
     /// @brief Read a grid's metadata, topology, transform, etc., but not
     /// any of its leaf node data blocks.
     /// @return the grid pointer to the partially loaded grid.
-    /// @note This returns a @c const pointer, so that the grid can't be
-    /// changed before its data blocks have been loaded.  A non-<tt>const</tt>
-    /// pointer is only returned when readGrid() is called.
-    GridBase::ConstPtr readGridPartial(const Name&);
+    /// @deprecated Partially-loaded grids might not be compatible with all tools.
+    /// Use them with caution, and preferably use delayed loading instead.
+    OPENVDB_DEPRECATED GridBase::ConstPtr readGridPartial(const Name&);
 
     /// Read an entire grid, including all of its data blocks.
     GridBase::Ptr readGrid(const Name&);
@@ -156,7 +155,7 @@ public:
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
-    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
@@ -169,6 +168,7 @@ public:
     {
     public:
         NameIterator(const NameMapCIter& iter): mIter(iter) {}
+        NameIterator(const NameIterator&) = default;
         ~NameIterator() {}
 
         NameIterator& operator++() { mIter++; return *this; }
@@ -242,7 +242,7 @@ private:
     friend class ::TestStream;
 
     struct Impl;
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 };
 
 

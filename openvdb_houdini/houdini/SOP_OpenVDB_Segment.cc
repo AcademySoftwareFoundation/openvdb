@@ -78,9 +78,8 @@ namespace
 
 struct SegmentActiveVoxels
 {
-    SegmentActiveVoxels(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter& boss)
+    SegmentActiveVoxels(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter&)
         : mGeoPt(&geo)
-        , mBossPt(&boss)
         , mVisualize(visualize)
         , mAppendNumber(appendNumber)
     {
@@ -125,7 +124,6 @@ struct SegmentActiveVoxels
 
 private:
     GU_Detail         * const mGeoPt;
-    hvdb::Interrupter * const mBossPt;
     bool                const mVisualize;
     bool                const mAppendNumber;
 }; // struct SegmentActiveVoxels
@@ -133,9 +131,8 @@ private:
 
 struct SegmentSDF
 {
-    SegmentSDF(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter& boss)
+    SegmentSDF(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter&)
         : mGeoPt(&geo)
-        , mBossPt(&boss)
         , mVisualize(visualize)
         , mAppendNumber(appendNumber)
     {
@@ -181,7 +178,6 @@ struct SegmentSDF
 
 private:
     GU_Detail         * const mGeoPt;
-    hvdb::Interrupter * const mBossPt;
     bool                const mVisualize;
     bool                const mAppendNumber;
 }; // struct SegmentSDF

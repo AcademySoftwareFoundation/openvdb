@@ -31,18 +31,17 @@
 #ifndef OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
+#include "Compression.h" // for COMPRESS_ZIP, etc.
+#include <openvdb/Grid.h>
+#include <openvdb/MetaMap.h>
 #include <openvdb/Platform.h>
+#include <openvdb/version.h> // for VersionId
+#include <boost/uuid/uuid.hpp>
+#include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <memory>
 #include <string>
-#include <boost/uuid/uuid.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <openvdb/Grid.h>
-#include <openvdb/metadata/MetaMap.h>
-#include <openvdb/version.h> // for VersionId
-#include "Compression.h" // for COMPRESS_ZIP, etc.
 
 
 class TestFile;
@@ -59,12 +58,14 @@ class GridDescriptor;
 class OPENVDB_API Archive
 {
 public:
-    typedef boost::shared_ptr<Archive> Ptr;
-    typedef boost::shared_ptr<const Archive> ConstPtr;
+    using Ptr = SharedPtr<Archive>;
+    using ConstPtr = SharedPtr<const Archive>;
 
     static const uint32_t DEFAULT_COMPRESSION_FLAGS;
 
     Archive();
+    Archive(const Archive&) = default;
+    Archive& operator=(const Archive&) = default;
     virtual ~Archive();
 
     /// @brief Return a copy of this archive.

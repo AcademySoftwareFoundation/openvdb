@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-///
+
 /// @file RayTracer.h
 ///
 /// @author Ken Museth
@@ -51,11 +51,12 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/Interpolation.h>
-#include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
-#include <fstream>
-#include <vector>
 #include <deque>
+#include <fstream>
+#include <memory>
+#include <type_traits>
+#include <vector>
 
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
 #include <OpenEXR/ImfPixelType.h>
@@ -102,9 +103,9 @@ template<typename GridT, typename IntersectorT = tools::LevelSetRayIntersector<G
 class LevelSetRayTracer
 {
 public:
-    typedef GridT                           GridType;
-    typedef typename IntersectorT::Vec3Type Vec3Type;
-    typedef typename IntersectorT::RayType  RayType;
+    using GridType = GridT;
+    using Vec3Type = typename IntersectorT::Vec3Type;
+    using RayType = typename IntersectorT::RayType;
 
     /// @brief Constructor based on an instance of the grid to be rendered.
     LevelSetRayTracer(const GridT& grid,
@@ -163,7 +164,7 @@ private:
     const bool                          mIsMaster;
     double*                             mRand;
     IntersectorT                        mInter;
-    boost::scoped_ptr<const BaseShader> mShader;
+    std::unique_ptr<const BaseShader>   mShader;
     BaseCamera*                         mCamera;
     size_t                              mSubPixels;
 };// LevelSetRayTracer
@@ -180,12 +181,13 @@ class VolumeRender
 {
 public:
 
-    typedef typename IntersectorT::GridType  GridType;
-    typedef typename IntersectorT::RayType   RayType;
-    typedef typename GridType::ValueType     ValueType;
-    typedef typename GridType::ConstAccessor AccessorType;
-    typedef tools::GridSampler<AccessorType, SamplerT> SamplerType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    using GridType = typename IntersectorT::GridType;
+    using RayType = typename IntersectorT::RayType;
+    using ValueType = typename GridType::ValueType;
+    using AccessorType = typename GridType::ConstAccessor;
+    using SamplerType = tools::GridSampler<AccessorType, SamplerT>;
+    static_assert(std::is_floating_point<ValueType>::value,
+        "VolumeRender requires a floating-point-valued grid");
 
     /// @brief Constructor taking an intersector and a base camera.
     VolumeRender(const IntersectorT& inter, BaseCamera& camera);
@@ -243,7 +245,7 @@ private:
 
     AccessorType mAccessor;
     BaseCamera*  mCamera;
-    boost::scoped_ptr<IntersectorT> mPrimary, mShadow;
+    std::unique_ptr<IntersectorT> mPrimary, mShadow;
     Real  mPrimaryStep, mShadowStep, mCutOff, mLightGain;
     Vec3R mLightDir, mLightColor, mAbsorption, mScattering;
 };//VolumeRender
@@ -259,12 +261,18 @@ public:
     /// @details This is our preferred representation for color processing.
     struct RGBA
     {
-        typedef float ValueT;
+        using ValueT = float;
 
         RGBA() : r(0), g(0), b(0), a(1) {}
         explicit RGBA(ValueT intensity) : r(intensity), g(intensity), b(intensity), a(1) {}
         RGBA(ValueT _r, ValueT _g, ValueT _b, ValueT _a = static_cast<ValueT>(1.0)):
             r(_r), g(_g), b(_b), a(_a)
+        {}
+        RGBA(double _r, double _g, double _b, double _a = 1.0)
+            : r(static_cast<ValueT>(_r))
+            , g(static_cast<ValueT>(_g))
+            , b(static_cast<ValueT>(_b))
+            , a(static_cast<ValueT>(_a))
         {}
 
         RGBA  operator* (ValueT scale)  const { return RGBA(r*scale, g*scale, b*scale);}
@@ -342,7 +350,7 @@ public:
         }
 
         os << "P6\n" << mWidth << " " << mHeight << "\n255\n";
-        os.write((const char *)&(*tmp), 3*mSize*sizeof(unsigned char));
+        os.write(reinterpret_cast<const char*>(&(*tmp)), 3 * mSize * sizeof(unsigned char));
     }
 
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
@@ -487,13 +495,13 @@ class PerspectiveCamera: public BaseCamera
     {
     }
 
-    virtual ~PerspectiveCamera() {}
+    ~PerspectiveCamera() override = default;
 
     /// @brief Return a Ray in world space given the pixel indices and
     /// optional offsets in the range [0,1]. An offset of 0.5 corresponds
     /// to the center of the pixel.
-    virtual math::Ray<double> getRay(
-        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const
+    math::Ray<double> getRay(
+        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const override
     {
         math::Ray<double> ray(mRay);
         Vec3R dir = BaseCamera::rasterToScreen(Real(i) + iOffset, Real(j) + jOffset, -1.0);
@@ -543,10 +551,10 @@ public:
         : BaseCamera(film, rotation, translation, 0.5*frameWidth, nearPlane, farPlane)
     {
     }
-    virtual ~OrthographicCamera() {}
+    ~OrthographicCamera() override = default;
 
-    virtual math::Ray<double> getRay(
-        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const
+    math::Ray<double> getRay(
+        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const override
     {
         math::Ray<double> ray(mRay);
         Vec3R eye = BaseCamera::rasterToScreen(Real(i) + iOffset, Real(j) + jOffset, 0.0);
@@ -563,9 +571,10 @@ public:
 class BaseShader
 {
 public:
-    typedef math::Ray<Real> RayT;
+    using RayT = math::Ray<Real>;
     BaseShader() {}
-    virtual ~BaseShader() {}
+    BaseShader(const BaseShader&) = default;
+    virtual ~BaseShader() = default;
     /// @brief Defines the interface of the virtual function that returns a RGB color.
     /// @param xyz World position of the intersection point.
     /// @param nml Normal in world space at the intersection point.
@@ -581,40 +590,40 @@ public:
 /// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
-template <typename GridT = Film::RGBA,
-          typename SamplerType = tools::PointSampler>
+template<typename GridT = Film::RGBA,
+         typename SamplerType = tools::PointSampler>
 class MatteShader: public BaseShader
 {
 public:
     MatteShader(const GridT& grid) : mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
-    virtual ~MatteShader() {}
-    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const
+    MatteShader(const MatteShader&) = default;
+    ~MatteShader() override = default;
+    Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
-        return Film::RGBA(
-            static_cast<Film::RGBA::ValueT>(v[0]),
-            static_cast<Film::RGBA::ValueT>(v[1]),
-            static_cast<Film::RGBA::ValueT>(v[2]));
+        return Film::RGBA(v[0], v[1], v[2]);
     }
-    virtual BaseShader* copy() const { return new MatteShader<GridT, SamplerType>(*this); }
+    BaseShader* copy() const override { return new MatteShader<GridT, SamplerType>(*this); }
 
 private:
     typename GridT::ConstAccessor mAcc;
     const math::Transform* mXform;
 };
+
 // Template specialization using a constant color of the material.
-template <typename SamplerType>
+template<typename SamplerType>
 class MatteShader<Film::RGBA, SamplerType>: public BaseShader
 {
 public:
     MatteShader(const Film::RGBA& c = Film::RGBA(1.0f)): mRGBA(c) {}
-    virtual ~MatteShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R&, const Vec3R&) const
+    MatteShader(const MatteShader&) = default;
+    ~MatteShader() override = default;
+    Film::RGBA operator()(const Vec3R&, const Vec3R&, const Vec3R&) const override
     {
         return mRGBA;
     }
-    virtual BaseShader* copy() const { return new MatteShader<Film::RGBA, SamplerType>(*this); }
+    BaseShader* copy() const override { return new MatteShader<Film::RGBA, SamplerType>(*this); }
 
 private:
     const Film::RGBA mRGBA;
@@ -628,37 +637,40 @@ private:
 /// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
-template <typename GridT = Film::RGBA,
-          typename SamplerType = tools::PointSampler>
+template<typename GridT = Film::RGBA,
+         typename SamplerType = tools::PointSampler>
 class NormalShader: public BaseShader
 {
 public:
     NormalShader(const GridT& grid) : mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
-    virtual ~NormalShader() {}
-    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R&) const
+    NormalShader(const NormalShader&) = default;
+    ~NormalShader() override = default;
+    Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
-        return Film::RGBA(v[0]*(normal[0]+1.0f), v[1]*(normal[1]+1.0f), v[2]*(normal[2]+1.0f));
+        return Film::RGBA(v[0]*(normal[0]+1.0), v[1]*(normal[1]+1.0), v[2]*(normal[2]+1.0));
     }
-    virtual BaseShader* copy() const { return new NormalShader<GridT, SamplerType>(*this); }
+    BaseShader* copy() const override { return new NormalShader<GridT, SamplerType>(*this); }
 
 private:
     typename GridT::ConstAccessor mAcc;
     const math::Transform* mXform;
 };
+
 // Template specialization using a constant color of the material.
-template <typename SamplerType>
+template<typename SamplerType>
 class NormalShader<Film::RGBA, SamplerType>: public BaseShader
 {
 public:
     NormalShader(const Film::RGBA& c = Film::RGBA(1.0f)) : mRGBA(c*0.5f) {}
-    virtual ~NormalShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R&) const
+    NormalShader(const NormalShader&) = default;
+    ~NormalShader() override = default;
+    Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R&) const override
     {
-        return mRGBA*Film::RGBA(normal[0]+1.0f, normal[1]+1.0f, normal[2]+1.0f);
+        return mRGBA * Film::RGBA(normal[0] + 1.0, normal[1] + 1.0, normal[2] + 1.0);
     }
-    virtual BaseShader* copy() const { return new NormalShader<Film::RGBA, SamplerType>(*this); }
+    BaseShader* copy() const override { return new NormalShader<Film::RGBA, SamplerType>(*this); }
 
 private:
     const Film::RGBA mRGBA;
@@ -672,8 +684,8 @@ private:
 /// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
-template <typename GridT = Film::RGBA,
-          typename SamplerType = tools::PointSampler>
+template<typename GridT = Film::RGBA,
+         typename SamplerType = tools::PointSampler>
 class PositionShader: public BaseShader
 {
 public:
@@ -684,40 +696,44 @@ public:
         , mXform(&grid.transform())
     {
     }
-    virtual ~PositionShader() {}
-    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const
+    PositionShader(const PositionShader&) = default;
+    ~PositionShader() override = default;
+    Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
-        const Vec3R rgb = (xyz - mMin)*mInvDim;
+        const Vec3R rgb = (xyz - mMin) * mInvDim;
         return Film::RGBA(v[0],v[1],v[2]) * Film::RGBA(rgb[0], rgb[1], rgb[2]);
     }
-    virtual BaseShader* copy() const { return new PositionShader<GridT, SamplerType>(*this); }
+    BaseShader* copy() const override { return new PositionShader<GridT, SamplerType>(*this); }
 
 private:
     const Vec3R mMin, mInvDim;
     typename GridT::ConstAccessor mAcc;
     const math::Transform* mXform;
 };
+
 // Template specialization using a constant color of the material.
-template <typename SamplerType>
+template<typename SamplerType>
 class PositionShader<Film::RGBA, SamplerType>: public BaseShader
 {
 public:
     PositionShader(const math::BBox<Vec3R>& bbox, const Film::RGBA& c = Film::RGBA(1.0f))
         : mMin(bbox.min()), mInvDim(1.0/bbox.extents()), mRGBA(c) {}
-    virtual ~PositionShader() {}
-    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const
+    PositionShader(const PositionShader&) = default;
+    ~PositionShader() override = default;
+    Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         const Vec3R rgb = (xyz - mMin)*mInvDim;
         return mRGBA*Film::RGBA(rgb[0], rgb[1], rgb[2]);
     }
-    virtual BaseShader* copy() const { return new PositionShader<Film::RGBA, SamplerType>(*this); }
+    BaseShader* copy() const override { return new PositionShader<Film::RGBA, SamplerType>(*this); }
 
 private:
     const Vec3R mMin, mInvDim;
     const Film::RGBA mRGBA;
 };
+
 
 /// @brief Simple diffuse Lambertian surface shader.
 ///
@@ -728,35 +744,39 @@ private:
 /// surface normal and the direction of the light source. Use
 /// SamplerType to define the order of interpolation (default is
 /// zero order, i.e. closes-point).
-template <typename GridT = Film::RGBA,
-          typename SamplerType = tools::PointSampler>
+template<typename GridT = Film::RGBA,
+         typename SamplerType = tools::PointSampler>
 class DiffuseShader: public BaseShader
 {
 public:
     DiffuseShader(const GridT& grid): mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
-    virtual ~DiffuseShader() {}
-    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R& rayDir) const
+    DiffuseShader(const DiffuseShader&) = default;
+    ~DiffuseShader() override = default;
+    Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R& rayDir) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         // We take the abs of the dot product corresponding to having
         // light sources at +/- rayDir, i.e., two-sided shading.
-        return Film::RGBA(v[0],v[1],v[2]) * math::Abs(normal.dot(rayDir));
+        return Film::RGBA(v[0],v[1],v[2])
+            * static_cast<Film::RGBA::ValueT>(math::Abs(normal.dot(rayDir)));
     }
-    virtual BaseShader* copy() const { return new DiffuseShader<GridT, SamplerType>(*this); }
+    BaseShader* copy() const override { return new DiffuseShader<GridT, SamplerType>(*this); }
 
 private:
     typename GridT::ConstAccessor mAcc;
     const math::Transform* mXform;
 };
+
 // Template specialization using a constant color of the material.
 template <typename SamplerType>
 class DiffuseShader<Film::RGBA, SamplerType>: public BaseShader
 {
 public:
     DiffuseShader(const Film::RGBA& d = Film::RGBA(1.0f)): mRGBA(d) {}
-    virtual ~DiffuseShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R& rayDir) const
+    DiffuseShader(const DiffuseShader&) = default;
+    ~DiffuseShader() override = default;
+    Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R& rayDir) const override
     {
         // We assume a single directional light source at the camera,
         // so the cosine of the angle between the surface normal and the
@@ -767,13 +787,14 @@ public:
 
         // We take the abs of the dot product corresponding to having
         // light sources at +/- rayDir, i.e., two-sided shading.
-        return mRGBA * math::Abs(normal.dot(rayDir));
+        return mRGBA * static_cast<Film::RGBA::ValueT>(math::Abs(normal.dot(rayDir)));
     }
-    virtual BaseShader* copy() const { return new DiffuseShader<Film::RGBA, SamplerType>(*this); }
+    BaseShader* copy() const override { return new DiffuseShader<Film::RGBA, SamplerType>(*this); }
 
 private:
     const Film::RGBA mRGBA;
 };
+
 
 //////////////////////////////////////// RAYTRACER ////////////////////////////////////////
 
@@ -816,7 +837,7 @@ LevelSetRayTracer(const GridT& grid,
                   size_t pixelSamples,
                   unsigned int seed)
     : mIsMaster(true),
-      mRand(NULL),
+      mRand(nullptr),
       mInter(grid),
       mShader(shader.copy()),
       mCamera(&camera)
@@ -832,7 +853,7 @@ LevelSetRayTracer(const IntersectorT& inter,
                   size_t pixelSamples,
                   unsigned int seed)
     : mIsMaster(true),
-      mRand(NULL),
+      mRand(nullptr),
       mInter(inter),
       mShader(shader.copy()),
       mCamera(&camera)
@@ -906,7 +927,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
         math::Rand01<double> rand(seed);//offsets for anti-aliaing by jittered super-sampling
         for (size_t i=0; i<16; ++i) mRand[i] = rand();
     } else {
-        mRand = NULL;
+        mRand = nullptr;
     }
 }
 

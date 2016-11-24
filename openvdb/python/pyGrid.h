@@ -67,7 +67,18 @@
 #include <sstream>
 
 namespace py = boost::python;
+
+#ifdef __clang__
+// This is a private header, so it's OK to include a "using namespace" directive.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wheader-hygiene"
+#endif
+
 using namespace openvdb::OPENVDB_VERSION_NAME;
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 
 namespace pyopenvdb {
@@ -214,7 +225,7 @@ extractValueArg(
 
 template<typename GridType>
 inline typename GridType::Ptr
-copyGrid(const GridType& grid)
+copyGrid(GridType& grid)
 {
     return grid.copy();
 }
@@ -774,6 +785,18 @@ template<> struct CppToNumPy<Index64>  { enum { typenum = NPY_UINT64 }; };
 #endif
 
 
+inline py::object
+copyNumPyArray(PyArrayObject* arrayObj, NPY_ORDER order = NPY_CORDER)
+{
+#ifdef __GNUC__
+    // Silence GCC "casting between pointer-to-function and pointer-to-object" warnings.
+    __extension__
+#endif
+    auto obj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, order));
+    return obj;
+}
+
+
 // Abstract base class for helper classes that copy data between
 // NumPy arrays of various types and grids of various types
 template<typename GridType>
@@ -1253,7 +1276,7 @@ volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
         {
             // Create a deep copy of the array (because the point vector will be
             // destroyed when this function returns).
-            pointArrayObj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, NPY_CORDER));
+            pointArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
         }
     }
 
@@ -1264,7 +1287,7 @@ volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
             PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &quads[0])))
         {
-            quadArrayObj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, NPY_CORDER));
+            quadArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
         }
     }
 
@@ -1297,7 +1320,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
         {
             // Create a deep copy of the array (because the point vector will be
             // destroyed when this function returns).
-            pointArrayObj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, NPY_CORDER));
+            pointArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
         }
     }
 
@@ -1308,7 +1331,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
             PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &triangles[0])))
         {
-            triangleArrayObj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, NPY_CORDER));
+            triangleArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
         }
     }
 
@@ -1319,7 +1342,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
             PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &quads[0])))
         {
-            quadArrayObj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, NPY_CORDER));
+            quadArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
         }
     }
 
