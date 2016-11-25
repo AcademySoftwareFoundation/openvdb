@@ -99,7 +99,7 @@ using namespace openvdb::points;
 
 
 /// Primitive Render Hook for VDB Points
-class OPENVDB_HOUDINI_API GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
+class GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
 {
 public:
     GUI_PrimVDBPointsHook() : GUI_PrimitiveHook("VDB Points") { }
@@ -119,7 +119,7 @@ public:
 /// VDB Points primitive is found. This object can be persistent between
 /// renders, though display flag changes or navigating though SOPs can cause
 /// it to be deleted and recreated later.
-class OPENVDB_HOUDINI_API GR_PrimVDBPoints : public GR_Primitive
+class GR_PrimVDBPoints : public GR_Primitive
 {
 public:
     GR_PrimVDBPoints(const GR_RenderInfo *info,
@@ -284,7 +284,11 @@ void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
         // move the version up to the top of the file
 
         vertexSource.substitute("#version ", "// #version");
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+        vertexSource.insert(0, "#version 330\n");
+#else
         vertexSource.insert(0, "#version 150\n");
+#endif
 
         // remove the existing shader and add the patched one
 
