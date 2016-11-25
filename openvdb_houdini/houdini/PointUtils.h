@@ -564,7 +564,7 @@ struct HoudiniGroup
     }
 
     void finalize() {
-	for (openvdb::Index64 i, n = mTotal; i < n; i++)
+	for (openvdb::Index64 i = 0, n = mTotal; i < n; i++)
 	{
 	    if (mBackingArray[i])
 		mGroup.addOffset( GA_Offset(i + mStartOffset) );
