@@ -529,7 +529,7 @@ struct HoudiniReadAttribute
 
     size_t size() const
     {
-        return mOffsets ? mOffsets->size() : mAttribute.getIndexMap().indexSize();
+        return mOffsets ? mOffsets->size() : size_t(mAttribute.getIndexMap().indexSize());
     }
 
 private:
