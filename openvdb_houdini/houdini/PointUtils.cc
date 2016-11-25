@@ -224,7 +224,7 @@ openvdb_houdini::convertPointDataGridToHoudini(
 
         const openvdb::points::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
 
-        HoudiniGroup group(*pointGroup);
+        HoudiniGroup group(*pointGroup, startOffset, total);
         convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups, inCoreOnly);
     }
 }
