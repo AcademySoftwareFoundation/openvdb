@@ -53,7 +53,7 @@ namespace points {
 namespace point_attribute_internal {
 
 template <typename ValueType>
-struct DefaultValue;
+inline ValueType defaultValue() { return zeroVal<ValueType>(); }
 
 } // namespace point_attribute_internal
 
@@ -66,7 +66,7 @@ struct DefaultValue;
 /// @param type               the type of the attibute.
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename PointDataTree>
@@ -75,7 +75,7 @@ inline void appendAttribute(PointDataTree& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -86,17 +86,17 @@ inline void appendAttribute(PointDataTree& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType, typename CodecType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::DefaultValue<ValueType>::value(),
+                                point_attribute_internal::defaultValue<ValueType>(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -107,17 +107,17 @@ inline void appendAttribute(PointDataTree& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::DefaultValue<ValueType>::value(),
+                                point_attribute_internal::defaultValue<ValueType>(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -130,7 +130,7 @@ template <typename ValueType, typename PointDataTree>
 inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const ValueType& uniformValue =
-                                    point_attribute_internal::DefaultValue<ValueType>::value());
+                                    point_attribute_internal::defaultValue<ValueType>());
 
 /// @brief Drops attributes from the VDB tree.
 ///
@@ -418,23 +418,6 @@ struct AttributeTypeConversion<Name, CodecType>
 ////////////////////////////////////////
 
 
-template <typename ValueType>
-struct DefaultValue
-{
-    static constexpr ValueType value() { return zeroVal<ValueType>(); }
-};
-
-
-template <>
-struct DefaultValue<Name>
-{
-    static Name value() { return ""; }
-};
-
-
-////////////////////////////////////////
-
-
 template <typename PointDataTree, typename ValueType>
 struct MetadataStorage
 {
@@ -480,7 +463,7 @@ inline void appendAttribute(PointDataTree& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
@@ -507,8 +490,8 @@ inline void appendAttribute(PointDataTree& tree,
 
     // store the attribute default value in the descriptor metadata
 
-    if (defaultValue) {
-        newDescriptor->setDefaultValue(name, *defaultValue);
+    if (metaDefaultValue) {
+        newDescriptor->setDefaultValue(name, *metaDefaultValue);
     }
 
     // extract new pos
@@ -533,20 +516,20 @@ inline void appendAttribute(PointDataTree& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
     static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
 
     using point_attribute_internal::AttributeTypeConversion;
-    using point_attribute_internal::DefaultValue;
+    using point_attribute_internal::defaultValue;
     using point_attribute_internal::MetadataStorage;
 
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
-                    strideOrTotalSize, constantStride, defaultValue, hidden, transient);
+                    strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
 
-    if (!math::isExactlyEqual(uniformValue, DefaultValue<ValueType>::value())) {
+    if (!math::isExactlyEqual(uniformValue, defaultValue<ValueType>())) {
         MetadataStorage<PointDataTree, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
@@ -562,14 +545,14 @@ inline void appendAttribute(PointDataTree& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
     static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
 
     appendAttribute<ValueType, NullCodec>(tree, name, uniformValue, strideOrTotalSize,
-                                          constantStride, defaultValue, hidden, transient);
+                                          constantStride, metaDefaultValue, hidden, transient);
 }
 
 

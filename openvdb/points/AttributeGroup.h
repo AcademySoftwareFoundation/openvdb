@@ -98,7 +98,7 @@ inline bool isGroup(const AttributeArray& array)
 ////////////////////////////////////////
 
 
-class GroupHandle
+class OPENVDB_API GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupHandle>;
@@ -125,7 +125,7 @@ protected:
 ////////////////////////////////////////
 
 
-class GroupWriteHandle : public GroupHandle
+class OPENVDB_API GroupWriteHandle : public GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupWriteHandle>;

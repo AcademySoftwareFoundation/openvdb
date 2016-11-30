@@ -59,7 +59,7 @@ namespace points {
 
 
 /// Ordered collection of uniquely-named attribute arrays
-class AttributeSet
+class OPENVDB_API AttributeSet
 {
 public:
     enum { INVALID_POS = std::numeric_limits<size_t>::max() };
@@ -269,7 +269,7 @@ private:
 ///         for a constant collection of attribute arrays.
 /// @note   The attribute name is actually mutable, but the attribute type
 ///         and position can not be changed after creation.
-class AttributeSet::Descriptor
+class OPENVDB_API AttributeSet::Descriptor
 {
 public:
     using Ptr               = std::shared_ptr<Descriptor>;
