@@ -631,6 +631,12 @@ TestAttributeSet::testAttributeSet()
         Descriptor::Ptr descrB =
             attrSetB.descriptor().duplicateAppend("test", AttributeS::attributeType());
 
+        // should throw if we attempt to add the same attribute name but a different type
+        CPPUNIT_ASSERT_THROW(descrB->insert("test", AttributeI::attributeType()), openvdb::KeyError);
+
+        // shouldn't throw if we attempt to add the same attribute name and type
+        CPPUNIT_ASSERT_NO_THROW(descrB->insert("test", AttributeS::attributeType()));
+
         openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
 
         // add a default value of the wrong type
