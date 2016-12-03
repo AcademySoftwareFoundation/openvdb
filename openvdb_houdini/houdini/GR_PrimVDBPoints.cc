@@ -70,6 +70,9 @@
 
 ////////////////////////////////////////
 
+static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
+static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
+static RE_ShaderHandle theVelocityDecorShader("decor/GL32/point_normal.prog");
 
 namespace {
 
@@ -255,52 +258,155 @@ GUI_PrimVDBPointsHook::createPrimitive(
 
 namespace {
 
-void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
+using StringPair = std::pair<std::string, std::string>;
+
+void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
+                 const std::vector<StringPair>& stringReplacements,
+                 const std::vector<std::string>& stringInsertions = {})
 {
     // check if the point shader has already been patched
 
     r->pushShader();
     r->bindShader(shader);
 
-    RE_ShaderStage* patchedVertexShader = shader->getShader("pointOffset", RE_SHADER_VERTEX);
+    RE_ShaderStage* patchedShader = shader->getShader("pointOffset", type);
 
-    if (patchedVertexShader) {
+    if (patchedShader) {
         r->popShader();
     }
     else {
 
-        // retrieve the vertex shader source
+        // retrieve the shader source
 
-        UT_String vertexSource;
-        shader->getShaderSource(r, vertexSource, RE_SHADER_VERTEX);
+        UT_String source;
+        shader->getShaderSource(r, source, type);
 
         r->popShader();
 
-        // patch the shader to add a uniform offset to the position
+        // patch the shader to replace the strings
 
-        vertexSource.substitute("void main()", "uniform vec3 offset;\n\nvoid main()", /*all=*/false);
-        vertexSource.substitute("vec4(P, 1.0)", "vec4(P + offset, 1.0)", /*all=*/false);
+        for (const auto& stringPair : stringReplacements) {
+            source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
+        }
+
+        // patch the shader to insert the strings
+
+        for (const auto& str: stringInsertions) {
+            source.insert(0, str.c_str());
+        }
 
         // move the version up to the top of the file
 
-        vertexSource.substitute("#version ", "// #version");
-        vertexSource.insert(0, "#version 150\n");
+        source.substitute("#version ", "// #version");
+        source.insert(0, "#version 150\n");
 
         // remove the existing shader and add the patched one
 
-        shader->clearShaders(r, RE_SHADER_VERTEX);
+        shader->clearShaders(r, type);
 
         UT_String message;
 
-        const bool success = shader->addShader(r, RE_SHADER_VERTEX, vertexSource, "pointOffset", 150, &message);
+        const bool success = shader->addShader(r, type, source, "pointOffset", 150, &message);
 
         if (!success) {
-            std::cerr << message.toStdString() << std::endl;
+            if (type == RE_SHADER_VERTEX)           std::cerr << "Vertex Shader (";
+            else if (type == RE_SHADER_GEOMETRY)    std::cerr << "Geometry Shader (";
+            else if (type == RE_SHADER_FRAGMENT)    std::cerr << "Fragment Shader (";
+            std::cerr << shader->getName();
+            std::cerr << ") Compile Failure: " << message.toStdString() << std::endl;
         }
 
         assert(success);
     }
 }
+
+void patchShaderVertexOffset(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to add a uniform offset to the position
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
+    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
+
+    patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
+}
+
+void patchShaderVertexOffsetVelocity(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to add a uniform offset to the position and swap "N" for "v"
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
+    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("N)", "v)"));
+    stringReplacements.push_back(StringPair("in vec3 N;", "in vec3 v;"));
+    stringReplacements.push_back(StringPair("normalize(", "-0.04 * normalize("));
+
+    patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
+}
+
+void patchShaderGeomDecorationScale(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to rename decoration scale
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
+
+    patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements);
+}
+
+void patchShaderGeomDecorationScaleNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to rename decoration scale
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
+    stringReplacements.push_back(StringPair("\t", " "));
+    stringReplacements.push_back(StringPair("  ", " "));
+    stringReplacements.push_back(StringPair("  ", " "));
+    stringReplacements.push_back(StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"));
+    stringReplacements.push_back(StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize"));
+
+    std::vector<std::string> stringInsertions;
+    stringInsertions.push_back("uniform vec2 glH_DepthProject;");
+    stringInsertions.push_back("uniform vec2 glH_ScreenSize;");
+
+    patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements, stringInsertions);
+}
+
+void patchShaderFragmentBlue(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to hard-code the color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("col.rgb", "vec3(0,0,1)"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
+void patchShaderFragmentTurqoise(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to hard-code the color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("col.rgb", "vec3(0.2,0.55,0.55)"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
+void patchShaderFragmentBlueDiscard(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to discard pixels with alpha < 0.25 and hard-code color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("color = vec4(fsIn.color.rgb * d, d);",
+                                            "if (d < 0.25) discard;\ncolor = vec4(vec3(0,0,1) * d, d);"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
 
 } // namespace
 
@@ -915,11 +1021,26 @@ GR_PrimVDBPoints::update(RE_Render *r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
-    // patch the shaders at run-time to add an offset (does nothing if already patched)
+    // patch the point shaders at run-time to add an offset (does nothing if already patched)
 
-    patchVertexShader(r, theLineShader);
-    patchVertexShader(r, thePixelShader);
-    patchVertexShader(r, thePointShader);
+    patchShaderVertexOffset(r, theLineShader);
+    patchShaderVertexOffset(r, thePixelShader);
+    patchShaderVertexOffset(r, thePointShader);
+
+    // patch the decor shaders at run-time to add an offset, change color, etc (does nothing if already patched)
+
+    patchShaderVertexOffset(r, theNormalDecorShader);
+    patchShaderGeomDecorationScale(r, theNormalDecorShader);
+    patchShaderFragmentBlue(r, theNormalDecorShader);
+
+    patchShaderVertexOffset(r, theMarkerDecorShader);
+    patchShaderGeomDecorationScaleNoRedeclarations(r, theMarkerDecorShader);
+    patchShaderFragmentBlueDiscard(r, theMarkerDecorShader);
+
+    patchShaderVertexOffsetVelocity(r, theVelocityDecorShader);
+    patchShaderGeomDecorationScale(r, theVelocityDecorShader);
+    patchShaderFragmentTurqoise(r, theVelocityDecorShader);
+
 
     const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
 
@@ -1245,22 +1366,9 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         return;
     }
 
+    const GR_CommonDispOption& commonOpts = p.opts->common();
+
     const RE_CacheVersion version = myGeo->getAttribute("P")->getCacheVersion();
-
-    // update point number buffer
-
-    GR_Decoration numberMarkers[2] = {GR_POINT_NUMBER, GR_NO_DECORATION};
-    const bool numberMarkerChanged = standardMarkersChanged(*p.opts, numberMarkers, false);
-
-    if (numberMarkerChanged)
-    {
-        if (p.opts->drawPointNums()) {
-            updateIdBuffer(r, "pointID", version);
-        }
-        else {
-            removeBuffer("pointID");
-        }
-    }
 
     // update normal buffer
 
@@ -1269,12 +1377,8 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     if (normalMarkerChanged)
     {
-        if (p.opts->drawPointNmls()) {
-            updateVec3Buffer(r, "N", version);
-        }
-        else {
-            removeBuffer("N");
-        }
+        if (p.opts->drawPointNmls())        updateVec3Buffer(r, "N", version);
+        else                                removeBuffer("N");
     }
 
     // update velocity buffer
@@ -1284,28 +1388,58 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     if (velocityMarkerChanged)
     {
-        if (p.opts->drawPointVelocity()) {
-            updateVec3Buffer(r, "v", version);
-        }
-        else {
-            removeBuffer("v");
-        }
+        if (p.opts->drawPointVelocity())    updateVec3Buffer(r, "v", version);
+        else                                removeBuffer("v");
     }
 
-    // render markers
+    // setup shader and scale
 
-    if (decor == GR_POINT_NUMBER ||
-        decor == GR_POINT_MARKER ||
-        decor == GR_POINT_NORMAL ||
-        decor == GR_POINT_POSITION ||
-        decor == GR_POINT_VELOCITY)
-    {
-        drawDecorationForGeo(r, myGeo.get(), decor, p.opts, p.render_flags,
-                 p.overlay, p.override_vis, p.instance_group,
-                 GR_SELECT_NONE);
+    RE_ShaderHandle* shader = nullptr;
+    float scale = 1.0f;
+
+    if (decor == GR_POINT_MARKER) {
+        shader = &theMarkerDecorShader;
+        scale = commonOpts.markerSize();
+    }
+    else if (decor == GR_POINT_NORMAL) {
+        shader = &theNormalDecorShader;
+        scale = commonOpts.normalScale();
+    }
+    else if (decor == GR_POINT_VELOCITY) {
+        shader = &theVelocityDecorShader;
+        scale = commonOpts.vectorScale();
+    }
+    else if (decor == GR_POINT_NUMBER ||
+             decor == GR_POINT_POSITION) {
+        // not currently supported
+        return;
     }
 
-    GR_Primitive::renderDecoration(r, decor, p);
+    if (shader) {
+        // bind the shader
+
+        r->pushShader();
+        r->bindShader(*shader);
+
+        // bind the position offset and decoration scale
+
+        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
+        (*shader)->bindVector(r, "offset", positionOffset);
+
+        fpreal32 decorationScale(scale);
+        (*shader)->bindFloat(r, "decorationScale", decorationScale);
+
+        // render and pop the shader
+
+        myGeo->draw(r, RE_GEO_WIRE_IDX);
+
+        r->popShader();
+    }
+    else {
+        // fall back on default rendering
+
+        GR_Primitive::renderDecoration(r, decor, p);
+    }
 }
 #endif
 
