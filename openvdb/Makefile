@@ -87,8 +87,6 @@
 #
 
 ifeq ($(use_houdini_libs),yes)
-  # Need to build with gcc 4.8.5 for 15 and above for now.
-  include ../if_houdini_ge_15.mk
   -include houdini.mk
 endif
 

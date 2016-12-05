@@ -46,6 +46,6 @@ Requires:
   - openvdb-0.0.0
 
 Supports:
-  - houdini-15.0.466            
-  - houdini-15.5.599
-#  - houdini-16.0.380
+  - houdini-15.0.466
+  - houdini-15.5.675
+  - houdini-16.0.445

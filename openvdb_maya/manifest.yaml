@@ -54,7 +54,7 @@ Requires:
   - openvdb-0.0.0
   - boost-1.55.0
   - openexr-2.2.0
-  - python-2.6.7
+  - python-2.7.12
 
 # List of software / versions this package supports.
 
@@ -67,3 +67,4 @@ Supports:
   - maya-2015.5
   - maya-2016
   - maya-2016.5x2
+  - maya-2017
