@@ -13,14 +13,19 @@ include ../Version.mk
 
 .PHONY: build-openvdb
 build-openvdb:
-	@echo "building stand alone library..."
 	@pybuild2 --install -DINSTALL_BASE=$(BUILD_ROOT) 
 
 .PHONY: strip-rpath
 strip-rpath:
-	@echo "stripping rpath from libs..."
+	# stripping rpath from libs
 	@cd $(BUILD_ROOT)/lib && \
-	find -name "*.so" -exec patchelf --set-rpath '' {} \;
+	find -name "*.so*" -exec patchelf --set-rpath '' {} \;
+	# Fixing executables
+	@cd $(BUILD_ROOT)/bin && \
+	find -name "vdb_*" -exec patchelf --set-rpath '$$ORIGIN/../lib' {} \;
+	# Fixing python libs
+	@cd $(BUILD_ROOT)/python/lib && \
+	find -name "*.so*" -exec patchelf --set-rpath '$$ORIGIN/../../../lib' {} \;
 
 .PHONY: clean-openvdb
 clean-openvdb:

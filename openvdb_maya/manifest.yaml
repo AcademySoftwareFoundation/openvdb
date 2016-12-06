@@ -20,13 +20,17 @@ Version: 0.0.0
 # This information MUST be provided.
 Type: package
 
+# The organization that owns and supports the product. When left
+# blank, it defaults to 'Digital Domain'.
+Vendor: DreamWorks Animation
+
 # A short description of what solution(s) this software provides 
 # regarding what problem(s).  This information MUST be specified.
 Description: OpenVDB plugins for maya
 
 # An URL to the repository where the source code for this software
 # can be found.
-Url: http://dd-git.d2.com/fredriks/openvdb_private/
+Url: http://dd-git.d2.com/fredriks/openvdb/
 
 # A relative path or URL pointing to the documentation for this
 # software.
@@ -50,11 +54,13 @@ Os: cent6_64
 # are more limiting and may resolve in unexpected behavior. Note that
 # these requirements are only for the core and maya library. For
 # houdini it uses the versions included in the houdini toolkit.
+
+# Note: For maya <2017 use openvdb-4.0.0_tbb43
 Requires:
-  - openvdb-0.0.0
+  - openvdb-0.0.0   # For maya 2017+
   - boost-1.55.0
   - openexr-2.2.0
-  - python-2.7.12
+  - python-2.7.3
 
 # List of software / versions this package supports.
 

@@ -20,13 +20,17 @@ Version: 0.0.0
 # This information MUST be provided.
 Type: package
 
+# The organization that owns and supports the product. When left
+# blank, it defaults to 'Digital Domain'.
+Vendor: DreamWorks Animation
+
 # A short description of what solution(s) this software provides 
 # regarding what problem(s).  This information MUST be specified.
 Description: Open source C++ library, for storing and manipulating volume data.
 
 # An URL to the repository where the source code for this software
 # can be found.
-Url: http://dd-git.d2.com/fredriks/openvdb_private/
+Url: http://dd-git.d2.com/fredriks/openvdb/
 
 # A relative path or URL pointing to the documentation for this
 # software.
@@ -52,9 +56,9 @@ Os: cent6_64
 # houdini it uses the versions included in the houdini toolkit.
 Requires:
   - boost-1.55.0
-  - tbb-4.3.5
+  - tbb-4.4.6
   - openexr-2.2.0
   - cppunit-1.12.1
   - glfw-2.7.6
-  - python-2.7.12
+  - python-2.7.3
   - blosc-1.5.0
