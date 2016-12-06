@@ -46,7 +46,7 @@ Sites: all
 # given if installation should be performed for all knowns platforms.
 Os: cent6_64
 
-# Note: For houdini <16 use openvdb-4.0.0_tbb43
+# Note: For houdini <16 use openvdb-0.0.0_tbb43
 Requires:
   - openvdb-0.0.0         # For houdini 16+
 

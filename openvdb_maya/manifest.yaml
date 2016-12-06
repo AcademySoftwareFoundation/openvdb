@@ -55,7 +55,7 @@ Os: cent6_64
 # these requirements are only for the core and maya library. For
 # houdini it uses the versions included in the houdini toolkit.
 
-# Note: For maya <2017 use openvdb-4.0.0_tbb43
+# Note: For maya <2017 use openvdb-0.0.0_tbb43
 Requires:
   - openvdb-0.0.0   # For maya 2017+
   - boost-1.55.0

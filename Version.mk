@@ -50,7 +50,7 @@ NO_TAG := yes
 include $(DD_TOOLS_ROOT)/etc/Makefile.tdpackage
 
 # Version for openvdb, overrides the dummy version in the manifests.
-override PACKAGE_VERSION := 4.0.0
+override PACKAGE_VERSION := 4.0.0_tbb43
 
 .PHONY: set-version
 set-version:
