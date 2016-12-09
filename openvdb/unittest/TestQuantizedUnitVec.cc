@@ -154,11 +154,11 @@ TestQuantizedUnitVec::testQuantization()
             n0[1] = float(std::sin(theta)*std::sin(phi));
             n0[2] = float(std::cos(theta));
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(n0.length(), 1.0, 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, n0.length(), 1e-6);
 
             n1 = QuantizedUnitVec::unpack(QuantizedUnitVec::pack(n0));
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(n1.length(), 1.0, 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, n1.length(), 1e-6);
 
             CPPUNIT_ASSERT_DOUBLES_EQUAL(n0[0], n1[0], tol);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(n0[1], n1[1], tol);

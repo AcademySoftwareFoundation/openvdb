@@ -278,7 +278,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -311,7 +311,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -333,7 +333,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 

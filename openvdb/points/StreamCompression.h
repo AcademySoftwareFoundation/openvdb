@@ -70,12 +70,12 @@ static const int BLOSC_PAD_BYTES = 128;
 
 
 /// @brief Returns true if compression is available
-bool bloscCanCompress();
+OPENVDB_API bool bloscCanCompress();
 
 /// @brief Retrieves the uncompressed size of buffer when uncompressed
 ///
 /// @param buffer the compressed buffer
-size_t bloscUncompressedSize(const char* buffer);
+OPENVDB_API size_t bloscUncompressedSize(const char* buffer);
 
 /// @brief Compress into the supplied buffer.
 ///
@@ -84,8 +84,8 @@ size_t bloscUncompressedSize(const char* buffer);
 /// @param bufferBytes          the number of bytes in compressedBuffer available to be filled
 /// @param uncompressedBuffer   the uncompressed buffer to compress
 /// @param uncompressedBytes    number of uncompressed bytes
-void bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t bufferBytes,
-    const char* uncompressedBuffer, const size_t uncompressedBytes);
+OPENVDB_API void bloscCompress(char* compressedBuffer, size_t& compressedBytes,
+    const size_t bufferBytes, const char* uncompressedBuffer, const size_t uncompressedBytes);
 
 /// @brief Compress and return the heap-allocated compressed buffer.
 ///
@@ -95,14 +95,14 @@ void bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t
 /// @param resize               the compressed buffer will be exactly resized to remove the
 ///                             portion used for Blosc overhead, for efficiency this can be
 ///                             skipped if it is known that the resulting buffer is temporary
-std::unique_ptr<char[]> bloscCompress(  const char* buffer, const size_t uncompressedBytes,
-                                        size_t& compressedBytes, const bool resize = true);
+OPENVDB_API std::unique_ptr<char[]> bloscCompress(const char* buffer,
+    const size_t uncompressedBytes, size_t& compressedBytes, const bool resize = true);
 
 /// @brief Convenience wrapper to retrieve the compressed size of buffer when compressed
 ///
 /// @param buffer the uncompressed buffer
 /// @param uncompressedBytes number of uncompressed bytes
-size_t bloscCompressedSize(const char* buffer, const size_t uncompressedBytes);
+OPENVDB_API size_t bloscCompressedSize(const char* buffer, const size_t uncompressedBytes);
 
 /// @brief Decompress into the supplied buffer. Will throw if decompression fails or
 ///        uncompressed buffer has insufficient space in which to decompress.
@@ -111,8 +111,8 @@ size_t bloscCompressedSize(const char* buffer, const size_t uncompressedBytes);
 /// @param expectedBytes the number of bytes expected once the buffer is decompressed
 /// @param bufferBytes the number of bytes in uncompressedBuffer available to be filled
 /// @param compressedBuffer the compressed buffer to decompress
-void bloscDecompress(   char* uncompressedBuffer, const size_t expectedBytes,
-                        const size_t bufferBytes, const char* compressedBuffer);
+OPENVDB_API void bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes,
+    const size_t bufferBytes, const char* compressedBuffer);
 
 /// @brief Decompress and return the the heap-allocated uncompressed buffer.
 ///
@@ -121,8 +121,8 @@ void bloscDecompress(   char* uncompressedBuffer, const size_t expectedBytes,
 /// @param resize               the compressed buffer will be exactly resized to remove the
 ///                             portion used for Blosc overhead, for efficiency this can be
 ///                             skipped if it is known that the resulting buffer is temporary
-std::unique_ptr<char[]> bloscDecompress(const char* buffer, const size_t expectedBytes,
-                                        const bool resize = true);
+OPENVDB_API std::unique_ptr<char[]> bloscDecompress(const char* buffer,
+    const size_t expectedBytes, const bool resize = true);
 
 
 ////////////////////////////////////////
@@ -135,7 +135,7 @@ static const int PageSize = 1024 * 1024;
 /// @brief Stores a variable-size, compressed, delayed-load Page of data
 /// that is loaded into memory when accessed. Access to the Page is
 /// thread-safe as loading and decompressing the data is protected by a mutex.
-class Page
+class OPENVDB_API Page
 {
 private:
     struct Info
@@ -191,7 +191,7 @@ private:
 
 /// @brief A PageHandle holds a shared ptr to a Page and a specific stream
 /// pointer to a point within the decompressed Page buffer
-class PageHandle
+class OPENVDB_API PageHandle
 {
 public:
     using Ptr = std::shared_ptr<PageHandle>;
@@ -222,7 +222,7 @@ private:
 /// @brief A Paging wrapper to std::istream that is responsible for reading
 /// from a given input stream and creating Page objects and PageHandles that
 /// reference those pages for delayed reading.
-class PagedInputStream
+class OPENVDB_API PagedInputStream
 {
 public:
     using Ptr = std::shared_ptr<PagedInputStream>;
@@ -259,7 +259,7 @@ private:
 /// @brief A Paging wrapper to std::ostream that is responsible for writing
 /// from a given output stream at intervals set by the PageSize. As Pages are
 /// variable in size, they are flushed to disk as soon as sufficiently large.
-class PagedOutputStream
+class OPENVDB_API PagedOutputStream
 {
 public:
     using Ptr = std::shared_ptr<PagedOutputStream>;

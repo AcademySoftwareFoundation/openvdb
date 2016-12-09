@@ -28,27 +28,26 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file tools/VolumeToSpheres.h
+///
+/// @brief Fill a closed level set or fog volume with adaptively-sized spheres.
+
 #ifndef OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 
-#include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include <openvdb/tools/Morphology.h> // for erodeVoxels()
-
-#include <openvdb/tools/PointScatter.h>
-#include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/VolumeToMesh.h>
+#include "Morphology.h" // for erodeVoxels()
+#include "PointScatter.h"
+#include "LevelSetUtil.h"
+#include "VolumeToMesh.h"
 
 #include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <vector>
 #include <limits> // std::numeric_limits
-
-//////////
+#include <vector>
 
 
 namespace openvdb {
@@ -56,36 +55,26 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-
-/// @brief  Threaded method to fill a closed level set or fog volume
-///         with adaptively sized spheres.
+/// @brief Fill a closed level set or fog volume with adaptively-sized spheres.
 ///
-/// @param grid             a scalar grid that will be filled with spheres.
-///
-/// @param spheres          a @c Vec4 array representing the spheres that returned by this
-///                         method. The first three components specify the sphere center
-///                         and the fourth is the radius. The spheres in this array are
-///                         ordered by radius, biggest to smallest.
-///
-/// @param maxSphereCount   no more than this number of spheres are generated.
-///
+/// @param grid             a scalar grid that defines the surface to be filled with spheres
+/// @param spheres          an output array of 4-tuples representing the fitted spheres<BR>
+///                         The first three components of each tuple specify the sphere center,
+///                         and the fourth specifies the radius.
+///                         The spheres are ordered by radius, from largest to smallest.
+/// @param maxSphereCount   no more than this number of spheres are generated
 /// @param overlapping      toggle to allow spheres to overlap/intersect
-///
-/// @param minRadius        determines the smallest sphere size in voxel units.
-///
-/// @param maxRadius        determines the largest sphere size in voxel units.
-///
-/// @param isovalue         the crossing point of the volume values that is considered
-///                         the surface. The zero default value works for signed distance
-///                         fields while fog volumes require a larger positive value,
-///                         0.5 is a good initial guess.
-///
-/// @param instanceCount    how many interior points to consider for the sphere placement,
-///                         increasing this count increases the chances of finding optimal
+/// @param minRadius        the smallest allowable sphere size, in voxel units
+/// @param maxRadius        the largest allowable sphere size, in voxel units
+/// @param isovalue         the voxel value that determines the surface of the volume<BR>
+///                         The default value of zero works for signed distance fields,
+///                         while fog volumes require a larger positive value
+///                         (0.5 is a good initial guess).
+/// @param instanceCount    the number of interior points to consider for the sphere placement<BR>
+///                         Increasing this count increases the chances of finding optimal
 ///                         sphere sizes.
-///
-/// @param interrupter      a pointer adhering to the util::NullInterrupter interface   
-template<typename GridT, typename InterrupterT>
+/// @param interrupter      pointer to an object adhering to the util::NullInterrupter interface
+template<typename GridT, typename InterrupterT = util::NullInterrupter>
 inline void
 fillWithSpheres(
     const GridT& grid,
@@ -99,96 +88,54 @@ fillWithSpheres(
     InterrupterT* interrupter = nullptr);
 
 
-/// @brief  @c fillWithSpheres method variant that automatically infers
-///         the util::NullInterrupter.
-template<typename GridT>
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
-    bool overlapping = false,
-    float minRadius = 1.0,
-    float maxRadius = std::numeric_limits<float>::max(),
-    float isovalue = 0.0,
-    int instanceCount = 10000)
-{
-    fillWithSpheres<GridT, util::NullInterrupter>(grid, spheres,
-        maxSphereCount, overlapping, minRadius, maxRadius, isovalue, instanceCount);
-}
-
-
 ////////////////////////////////////////
 
 
-/// @brief  Accelerated closest surface point queries for narrow band level sets.
-///         Supports queries that originate at arbitrary world-space locations, is
-///         not confined to the narrow band region of the input volume geometry.
+/// @brief  Accelerated closest surface point queries for narrow band level sets
+/// @details Supports queries that originate at arbitrary world-space locations,
+/// is not confined to the narrow band region of the input volume geometry.
 template<typename GridT>
 class ClosestSurfacePoint
 {
 public:
-    typedef typename GridT::TreeType TreeT;
-    typedef typename TreeT::template ValueConverter<bool>::Type     BoolTreeT;
-    typedef typename TreeT::template ValueConverter<Index32>::Type  Index32TreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type    Int16TreeT;
-
+    using TreeT = typename GridT::TreeType;
+    using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
+    using Index32TreeT = typename TreeT::template ValueConverter<Index32>::Type;
+    using Int16TreeT = typename TreeT::template ValueConverter<Int16>::Type;
 
     ClosestSurfacePoint();
 
-
-    /// @brief  Extracts the surface points and constructs a spatial acceleration structure.
+    /// @brief Extract surface points and construct a spatial acceleration structure.
     ///
-    /// @return false if the initialization failed, either because the
-    /// grid type is unsupported (i.e. not a level set or a fog volume)
-    /// or because the iso-value is out of bounds given the grid type.    
+    /// @return @c false if the initialization fails for any reason.
     ///
-    /// @param grid             a scalar gird, level set or fog volume.
-    ///
-    /// @param isovalue         the crossing point of the volume values that is considered
-    ///                         the surface. The zero default value works for signed distance
-    ///                         fields while fog volumes require a larger positive value,
-    ///                         0.5 is a good initial guess.
-    ///
-    /// @param interrupter      a pointer adhering to the util::NullInterrupter interface.
-    ///
-    template<typename InterrupterT>
+    /// @param grid         a scalar level set or fog volume
+    /// @param isovalue     the voxel value that determines the surface of the volume
+    ///                     The default value of zero works for signed distance fields,
+    ///                     while fog volumes require a larger positive value
+    ///                     (0.5 is a good initial guess).
+    /// @param interrupter  pointer to an object adhering to the util::NullInterrupter interface.
+    template<typename InterrupterT = util::NullInterrupter>
     bool initialize(const GridT& grid, float isovalue = 0.0, InterrupterT* interrupter = nullptr);
 
-
-    /// @brief  @c initialize method variant that automatically infers the util::NullInterrupter.
-    bool initialize(const GridT& grid, float isovalue = 0.0);
-
-
-
-    /// @brief Computes distance to closest surface.
-    ///
-    /// @param points       search locations in world space.
-    ///
-    /// @param distances    list of closest surface point distances, populated by this method.
-    ///
+    /// @brief Compute the distance from each input point to its closest surface point.
+    /// @param points       input list of points in world space
+    /// @param distances    output list of closest surface point distances
     bool search(const std::vector<Vec3R>& points, std::vector<float>& distances);
 
-
-    /// @brief Performs closest point searches.
-    ///
-    /// @param points       search locations in world space to be replaced by their closest
-    ///                     surface point.
-    ///
-    /// @param distances    list of closest surface point distances, populated by this method.
-    ///
+    /// @brief Overwrite each input point with its closest surface point.
+    /// @param points       input/output list of points in world space
+    /// @param distances    output list of closest surface point distances
     bool searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
 
-
-    /// @{
-    /// @brief Tree accessors
+    /// @brief Tree accessor
     const Index32TreeT& indexTree() const { return *mIdxTreePt; }
+    /// @brief Tree accessor
     const Int16TreeT& signTree() const { return *mSignTreePt; }
-    /// @}
 
 private:
-    typedef typename Index32TreeT::LeafNodeType Index32LeafT;
-    typedef std::pair<size_t, size_t> IndexRange;
+    using Index32LeafT = typename Index32TreeT::LeafNodeType;
+    using IndexRange = std::pair<size_t, size_t>;
 
     bool mIsInitialized;
     std::vector<Vec4R> mLeafBoundingSpheres, mNodeBoundingSpheres;
@@ -207,10 +154,7 @@ private:
 ////////////////////////////////////////
 
 
-
-
 // Internal utility methods
-
 
 namespace internal {
 
@@ -317,7 +261,7 @@ LeafOp<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
 class NodeOp
 {
 public:
-    typedef std::pair<size_t, size_t> IndexRange;
+    using IndexRange = std::pair<size_t, size_t>;
 
     NodeOp(std::vector<Vec4R>& nodeBoundingSpheres,
         const std::vector<IndexRange>& leafRanges,
@@ -396,7 +340,6 @@ NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
 }
 
 
-
 ////////////////////////////////////////
 
 
@@ -404,7 +347,7 @@ template<typename Index32LeafT>
 class ClosestPointDist
 {
 public:
-    typedef std::pair<size_t, size_t> IndexRange;
+    using IndexRange = std::pair<size_t, size_t>;
 
     ClosestPointDist(
         std::vector<Vec3R>& instancePoints,
@@ -508,6 +451,8 @@ template<typename Index32LeafT>
 void
 ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 {
+    if (nodeIndex >= mLeafRanges.size()) return;
+
     const Vec3R& pos = mInstancePoints[pointIndex];
     float minDist = mInstanceDistances[pointIndex];
     size_t minDistIdx = 0;
@@ -720,26 +665,39 @@ fillWithSpheres(
     const bool addNBPoints = grid.activeVoxelCount() < 10000;
     int instances = std::max(instanceCount, maxSphereCount);
 
-    typedef typename GridT::TreeType TreeT;
-    typedef typename GridT::ValueType ValueT;
+    using TreeT = typename GridT::TreeType;
+    using ValueT = typename GridT::ValueType;
 
-    typedef typename TreeT::template ValueConverter<bool>::Type     BoolTreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type    Int16TreeT;
+    using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
+    using Int16TreeT = typename TreeT::template ValueConverter<Int16>::Type;
 
-    typedef boost::mt11213b RandGen;
+    using RandGen = boost::mt11213b;
     RandGen mtRand(/*seed=*/0);
 
     const TreeT& tree = grid.tree();
     const math::Transform& transform = grid.transform();
 
     std::vector<Vec3R> instancePoints;
-
-    { // Scatter candidate sphere centroids (instancePoints)
+    {
+        // Compute a mask of the voxels enclosed by the isosurface.
         typename Grid<BoolTreeT>::Ptr interiorMaskPtr;
-
         if (grid.getGridClass() == GRID_LEVEL_SET) {
+            // Clamp the isovalue to the level set's background value minus epsilon.
+            // (In a valid narrow-band level set, all voxels, including background voxels,
+            // have values less than or equal to the background value, so an isovalue
+            // greater than or equal to the background value would produce a mask with
+            // effectively infinite extent.)
+            isovalue = std::min(isovalue,
+                static_cast<float>(tree.background() - math::Tolerance<ValueT>::value()));
             interiorMaskPtr = sdfInteriorMask(grid, ValueT(isovalue));
         } else {
+            if (grid.getGridClass() == GRID_FOG_VOLUME) {
+                // Clamp the isovalue of a fog volume between epsilon and one,
+                // again to avoid a mask with infinite extent.  (Recall that
+                // fog volume voxel values vary from zero outside to one inside.)
+                isovalue = math::Clamp(isovalue, math::Tolerance<float>::value(), 1.f);
+            }
+            // For non-level-set grids, the interior mask comprises the active voxels.
             interiorMaskPtr = typename Grid<BoolTreeT>::Ptr(Grid<BoolTreeT>::create(false));
             interiorMaskPtr->setTransform(transform.copy());
             interiorMaskPtr->tree().topologyUnion(tree);
@@ -749,6 +707,7 @@ fillWithSpheres(
 
         erodeVoxels(interiorMaskPtr->tree(), 1);
 
+        // Scatter candidate sphere centroids (instancePoints)
         instancePoints.reserve(instances);
         internal::PointAccessor ptnAcc(instancePoints);
 
@@ -760,27 +719,20 @@ fillWithSpheres(
 
     if (interrupter && interrupter->wasInterrupted()) return;
 
-    std::vector<float> instanceRadius;
-    
     ClosestSurfacePoint<GridT> csp;
     if (!csp.initialize(grid, isovalue, interrupter)) return;
-    
-    // add extra instance points in the interior narrow band.
+
+    // Add extra instance points in the interior narrow band.
     if (instancePoints.size() < size_t(instances)) {
         const Int16TreeT& signTree = csp.signTree();
-        typename Int16TreeT::LeafNodeType::ValueOnCIter it;
-        typename Int16TreeT::LeafCIter leafIt = signTree.cbeginLeaf();
-
-        for (; leafIt; ++leafIt) {
-            for (it = leafIt->cbeginValueOn(); it; ++it) {
-
+        for (auto leafIt = signTree.cbeginLeaf(); leafIt; ++leafIt) {
+            for (auto it = leafIt->cbeginValueOn(); it; ++it) {
                 const int flags = int(it.getValue());
                 if (!(volume_to_mesh_internal::EDGES & flags)
                     && (volume_to_mesh_internal::INSIDE & flags))
                 {
                     instancePoints.push_back(transform.indexToWorld(it.getCoord()));
                 }
-
                 if (instancePoints.size() == size_t(instances)) break;
             }
             if (instancePoints.size() == size_t(instances)) break;
@@ -788,7 +740,8 @@ fillWithSpheres(
     }
 
     if (interrupter && interrupter->wasInterrupted()) return;
-    
+
+    std::vector<float> instanceRadius;
     if (!csp.search(instancePoints, instanceRadius)) return;
 
     std::vector<unsigned char> instanceMask(instancePoints.size(), 0);
@@ -830,7 +783,8 @@ fillWithSpheres(
         largestRadius = op.radius();
         largestRadiusIdx = op.index();
     }
-}// fillWithSpheres
+} // fillWithSpheres
+
 
 ////////////////////////////////////////
 
@@ -838,23 +792,11 @@ fillWithSpheres(
 template<typename GridT>
 ClosestSurfacePoint<GridT>::ClosestSurfacePoint()
     : mIsInitialized(false)
-    , mLeafBoundingSpheres(0)
-    , mNodeBoundingSpheres(0)
-    , mLeafRanges(0)
-    , mLeafNodes(0)
-    , mSurfacePointList()
     , mPointListSize(0)
     , mMaxNodeLeafs(0)
     , mMaxRadiusSqr(0.0)
     , mIdxTreePt()
 {
-}
-
-template<typename GridT>
-bool
-ClosestSurfacePoint<GridT>::initialize(const GridT& grid, float isovalue)
-{
-    return this->initialize<GridT, util::NullInterrupter>(grid, isovalue, nullptr);
 }
 
 
@@ -865,18 +807,8 @@ ClosestSurfacePoint<GridT>::initialize(
     const GridT& grid, float isovalue, InterrupterT* interrupter)
 {
     mIsInitialized = false;
-    typedef tree::LeafManager<Index32TreeT> Index32LeafManagerT;
-    typedef typename GridT::ValueType       ValueT;
-
-    {// check iso-value
-        if (grid.getGridClass() == GRID_LEVEL_SET) {
-            if (math::Abs(isovalue) >= grid.background()) return false;
-        } else if (grid.getGridClass() ==  GRID_FOG_VOLUME){
-            if (isovalue <= 0.0f || isovalue >= 1.0f) return false;
-        } else {
-            return false;//not a level set or a fog volume!
-        }
-    }
+    using Index32LeafManagerT = tree::LeafManager<Index32TreeT>;
+    using ValueT = typename GridT::ValueType;
 
     const TreeT& tree = grid.tree();
     const math::Transform& transform = grid.transform();
@@ -885,11 +817,11 @@ ClosestSurfacePoint<GridT>::initialize(
 
         BoolTreeT mask(false);
         volume_to_mesh_internal::identifySurfaceIntersectingVoxels(mask, tree, ValueT(isovalue));
-            
+
         mSignTreePt.reset(new Int16TreeT(0));
         mIdxTreePt.reset(new Index32TreeT(boost::integer_traits<Index32>::const_max));
 
-        
+
         volume_to_mesh_internal::computeAuxiliaryData(
             *mSignTreePt, *mIdxTreePt, mask, tree, ValueT(isovalue));
 
@@ -897,8 +829,8 @@ ClosestSurfacePoint<GridT>::initialize(
 
         // count unique points
 
-        typedef typename Int16TreeT::LeafNodeType   Int16LeafNodeType;
-        typedef typename Index32TreeT::LeafNodeType Index32LeafNodeType;
+        using Int16LeafNodeType = typename Int16TreeT::LeafNodeType;
+        using Index32LeafNodeType = typename Index32TreeT::LeafNodeType;
 
         std::vector<Int16LeafNodeType*> signFlagsLeafNodes;
         mSignTreePt->getNodes(signFlagsLeafNodes);
@@ -951,11 +883,11 @@ ClosestSurfacePoint<GridT>::initialize(
 
     Index32LeafManagerT idxLeafs(*mIdxTreePt);
 
-    typedef typename Index32TreeT::RootNodeType Index32RootNodeT;
-    typedef typename Index32RootNodeT::NodeChainType Index32NodeChainT;
+    using Index32RootNodeT = typename Index32TreeT::RootNodeType;
+    using Index32NodeChainT = typename Index32RootNodeT::NodeChainType;
     BOOST_STATIC_ASSERT(boost::mpl::size<Index32NodeChainT>::value > 1);
-    typedef typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type
-        Index32InternalNodeT;
+    using Index32InternalNodeT =
+        typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type;
 
     typename Index32TreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
     nIt.setMinDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
@@ -1007,7 +939,7 @@ ClosestSurfacePoint<GridT>::initialize(
     nodeBS.run();
     mIsInitialized = true;
     return true;
-}// ClosestSurfacePoint::initialize
+} // ClosestSurfacePoint::initialize
 
 
 template<typename GridT>
@@ -1023,7 +955,7 @@ ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
     internal::ClosestPointDist<Index32LeafT> cpd(points, distances, mSurfacePointList,
         mLeafNodes, mLeafRanges, mLeafBoundingSpheres, mNodeBoundingSpheres,
         mMaxNodeLeafs, transformPoints);
-    
+
     cpd.run();
 
     return true;
@@ -1045,7 +977,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 {
     return search(points, distances, true);
 }
-
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

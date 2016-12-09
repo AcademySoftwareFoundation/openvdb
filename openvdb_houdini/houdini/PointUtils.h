@@ -529,7 +529,7 @@ struct HoudiniReadAttribute
 
     size_t size() const
     {
-        return mOffsets ? mOffsets->size() : mAttribute.getIndexMap().indexSize();
+        return mOffsets ? mOffsets->size() : size_t(mAttribute.getIndexMap().indexSize());
     }
 
 private:
@@ -548,19 +548,35 @@ private:
 
 struct HoudiniGroup
 {
-    explicit HoudiniGroup(GA_PointGroup& group)
-        : mGroup(group) { }
-
-    void setOffsetOn(openvdb::Index index) {
-        mGroup.addOffset(index);
+    explicit HoudiniGroup(GA_PointGroup& group,
+        openvdb::Index64 startOffset, openvdb::Index64 total)
+        : mGroup(group)
+        , mStartOffset(startOffset)
+        , mTotal(total)
+    {
+        mBackingArray.resize(total, 0);
     }
 
+    HoudiniGroup(const HoudiniGroup &) = delete;
+    HoudiniGroup& operator=(const HoudiniGroup &) = delete;
+
+    void setOffsetOn(openvdb::Index index) { mBackingArray[index - mStartOffset] = 1; }
+
     void finalize() {
-        mGroup.invalidateGroupEntries();
+        for (openvdb::Index64 i = 0, n = mTotal; i < n; i++) {
+            if (mBackingArray[i]) {
+                mGroup.addOffset(GA_Offset(i + mStartOffset));
+            }
+        }
     }
 
 private:
     GA_PointGroup& mGroup;
+    openvdb::Index64 mStartOffset;
+    openvdb::Index64 mTotal;
+
+    // This is not a bit field as we need to allow threadsafe updates:
+    std::vector<unsigned char> mBackingArray;
 }; // HoudiniGroup
 
 

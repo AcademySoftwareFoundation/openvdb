@@ -1,6 +1,37 @@
 OpenVDB Version History
 =======================
 
+Version 4.0.1 - In development
+
+    New features:
+    - Added functions to util/logging.h to simplify configuration of the
+      logging system (via command-line arguments, in particular).
+
+    Bug fixes:
+    - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
+      handle isosurfaces outside the input volume's narrow band.
+    - tools::MultiResGrid now supports all standard grid types, including
+      BoolGrid and MaskGrid.
+    - Fixed a bug that caused tools::copyToDense() to only partially populate
+      the output array when delayed loading was in effect.
+      [Reported by Stuart Levy]
+    - Fixed a thread race condition in math::QuantizedUnitVec that could
+      cause it to produce incorrect results.
+      [Contributed by Jeff Lait]
+
+    Python:
+    - Added functions getLoggingLevel(), setLoggingLevel(), and
+      setProgramName(), to allow configuration of the logging system.
+
+    Houdini:
+    - Fixed a crash in the Ray SOP when the user selected an isosurface
+      outside the target volume's narrow band.
+    - The LOD SOP now supports all standard grid types, including
+      boolean grids.
+    - Made various small changes for Houdini 16 compatibility.
+      [Contributed by SideFX]
+
+
 Version 4.0.0 - November 15, 2016
 
     Highlights:
@@ -51,7 +82,6 @@ Version 4.0.0 - November 15, 2016
     - tools::fillWithSpheres() now returns an empty list of spheres
       instead of crashing when the user selects an isosurface that lies
       outside the bounding volume's narrow band.
-      A more comprehensive fix will appear in the next release.
     - Fixed a null pointer dereference when copying grids that were loaded
       with io::File::readGridPartial().
       [Reported by Nick Avramoussis]
@@ -103,7 +133,6 @@ Version 4.0.0 - November 15, 2016
     - Added a toggle to the Clip SOP to invert the clipping mask.
     - Added a slider to the Scatter SOP to specify how far each point
       may be displaced from the center of its host voxel or tile.
-      
 
 
 Version 3.2.0 - August 10, 2016

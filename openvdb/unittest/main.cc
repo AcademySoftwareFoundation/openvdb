@@ -35,11 +35,8 @@
 
 #else
 
-#include <cstdlib> // for EXIT_SUCCESS
-#include <cstring> // for strrchr()
-#include <iostream>
-#include <string>
-#include <vector>
+#include <openvdb/openvdb.h>
+#include <openvdb/util/logging.h>
 #include <cppunit/BriefTestProgressListener.h>
 #include <cppunit/CompilerOutputter.h>
 #include <cppunit/TestResult.h>
@@ -47,12 +44,14 @@
 #include <cppunit/TextTestProgressListener.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
-#ifdef OPENVDB_USE_LOG4CPLUS
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-#include <log4cplus/configurator.h>
-#endif
+#include <cstdlib> // for EXIT_SUCCESS
+#include <cstring> // for strrchr()
+#include <iostream>
+#include <string>
+#include <vector>
 
+
+namespace {
 
 void
 usage(const char* progName)
@@ -75,10 +74,10 @@ usage(const char* progName)
 }
 
 
-static void
+void
 dump(CppUnit::Test* test)
 {
-    if (test == NULL) {
+    if (test == nullptr) {
         std::cerr << "Error: no tests found\n";
         return;
     }
@@ -158,6 +157,9 @@ run(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 }
+
+} // anonymous namespace
+
 #endif
 
 
@@ -187,27 +189,9 @@ main(int argc, char *argv[])
 
 #else // ifndef DWA_OPENVDB
 
-#ifndef OPENVDB_USE_LOG4CPLUS
+    openvdb::logging::initialize(argc, argv);
+
     return run(argc, argv);
-#else
-    log4cplus::BasicConfigurator::doConfigure();
-
-    std::vector<char*> args;
-    args.push_back(argv[0]);
-
-    log4cplus::Logger log = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("main"));
-    log.setLogLevel(log4cplus::FATAL_LOG_LEVEL);
-    for (int i = 1; i < argc; ++i) {
-        char* arg = argv[i];
-        if (std::string("-info") == arg)       log.setLogLevel(log4cplus::INFO_LOG_LEVEL);
-        else if (std::string("-warn") == arg)  log.setLogLevel(log4cplus::WARN_LOG_LEVEL);
-        else if (std::string("-error") == arg) log.setLogLevel(log4cplus::ERROR_LOG_LEVEL);
-        else if (std::string("-debug") == arg) log.setLogLevel(log4cplus::DEBUG_LOG_LEVEL);
-        else args.push_back(arg);
-    }
-
-    return run(int(args.size()), &args[0]);
-#endif // OPENVDB_USE_LOG4CPLUS
 
 #endif // DWA_OPENVDB
 }

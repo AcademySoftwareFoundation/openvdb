@@ -1186,7 +1186,7 @@ inline void
 LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
-    if (!this->isAllocated()) return;
+    mBuffer.loadValues();
 #endif
 
     using DenseValueType = typename DenseT::ValueType;
