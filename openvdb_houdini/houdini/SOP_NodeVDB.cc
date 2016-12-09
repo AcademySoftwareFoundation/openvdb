@@ -223,14 +223,11 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
 ////////////////////////////////////////
 
 
+#if (UT_MAJOR_VERSION_INT < 16)
 void
 SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
 {
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
-    SOP_Node::fillInfoTreeNodeSpecific(tree, OP_NodeInfoTreeParms(time));
-#else
     SOP_Node::fillInfoTreeNodeSpecific(tree, time);
-#endif
 
     // Add the OpenVDB library version number to this node's
     // extended operator information.
@@ -239,6 +236,20 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
         child->addProperties(openvdb::getLibraryVersionString());
     }
 }
+#else
+void
+SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreeParms& parms)
+{
+    SOP_Node::fillInfoTreeNodeSpecific(tree, parms);
+
+    // Add the OpenVDB library version number to this node's
+    // extended operator information.
+    if (UT_InfoTree* child = tree.addChildBranch("OpenVDB")) {
+        child->addColumnHeading("version");
+        child->addProperties(openvdb::getLibraryVersionString());
+    }
+}
+#endif
 
 
 void

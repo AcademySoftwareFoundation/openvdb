@@ -846,31 +846,34 @@ struct MultiResGrid<TreeType>::FractionOp
     const TreeType *mTree0, *mTree1;
 };// FractionOp
 
+
 template<typename TreeType>
 template<typename OperatorType>
 struct MultiResGrid<TreeType>::CookOp
 {
-  typedef tree::LeafManager<TreeType>  ManagerT;
-  typedef typename ManagerT::LeafRange RangeT;
-  CookOp(const TreeType& srcTree, TreeType& dstTree, size_t grainSize) : acc( srcTree )
-  {
-      ManagerT leafs( dstTree );
-      tbb::parallel_for( leafs.leafRange( grainSize ), *this );
-  }
-  CookOp(const CookOp &other) : acc( other.acc.tree() ) {}
-  void operator()(const RangeT& range) const
-  {
-      typedef typename RangeT::Iterator LeafIterT;
-      typedef typename ManagerT::LeafNodeType::ValueOnIter VoxelIterT;
-      for (LeafIterT leaf = range.begin(); leaf; ++leaf) {
-          ValueType* phi = leaf.buffer(0).data();// avoids small overhead of out-of-core
-          for (VoxelIterT voxel = leaf->beginValueOn(); voxel; ++voxel) {
-              phi[ voxel.pos() ] = OperatorType::run(voxel.getCoord(), acc);
-          }
-      }
-  }
-  const ConstAccessor acc;
+    typedef tree::LeafManager<TreeType>  ManagerT;
+    typedef typename ManagerT::LeafRange RangeT;
+
+    CookOp(const TreeType& srcTree, TreeType& dstTree, size_t grainSize): acc(srcTree)
+    {
+        ManagerT leafs(dstTree);
+        tbb::parallel_for(leafs.leafRange(grainSize), *this);
+    }
+    CookOp(const CookOp &other): acc(other.acc.tree()) {}
+
+    void operator()(const RangeT& range) const
+    {
+        for (auto leafIt = range.begin(); leafIt; ++leafIt) {
+            auto& phi = leafIt.buffer(0);
+            for (auto voxelIt = leafIt->beginValueOn(); voxelIt; ++voxelIt) {
+                phi.setValue(voxelIt.pos(), OperatorType::run(voxelIt.getCoord(), acc));
+            }
+        }
+    }
+
+    const ConstAccessor acc;
 };// CookOp
+
 
 template<typename TreeType>
 struct MultiResGrid<TreeType>::RestrictOp

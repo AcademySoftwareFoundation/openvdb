@@ -115,7 +115,7 @@ fixedPointToFloatingPoint(const math::Vec3<IntegerT>& v)
 
 
 /// Base class for storing attribute data
-class AttributeArray
+class OPENVDB_API AttributeArray
 {
 protected:
     struct AccessorBase;

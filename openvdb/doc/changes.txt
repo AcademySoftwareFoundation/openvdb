@@ -5,6 +5,7 @@
 @htmlonly <a name="v3_3_0_changes"></a>@endhtmlonly
 @par
 <B>Version 3.3.0</B> - <I>November 15, 2016</I>
+
 @par
 Highlights:
 - Incorporated Double&nbsp;Negative&rsquo;s
@@ -55,6 +56,17 @@ Bug fixes:
 - Fixed a null pointer dereference when copying grids that were loaded
   with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- The @vdblink::tools::MultiResGrid MultiResGrid@endlink tool
+  now supports all standard grid types, including
+  @vdblink::BoolGrid BoolGrid@endlink and @vdblink::MaskGrid MaskGrid@endlink.
+- Fixed a bug that caused @vdblink::tools::copyToDense()
+  tools::copyToDense@endlink to only partially populate the output array
+  when delayed loading was in effect.
+  <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed a thread race condition in
+  @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
+  that could cause it to produce incorrect results.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
 
 @par
 API changes:
@@ -94,6 +106,9 @@ Houdini:
 - Added a toggle to the Clip SOP to invert the clipping mask.
 - Added a slider to the Scatter SOP to specify how far each point
   may be displaced from the center of its host voxel or tile.
+- The LOD SOP now supports all standard grid types, including boolean grids.
+- Made various small changes for Houdini&nbsp;16 compatibility.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
 
 
 @htmlonly <a name="v3_2_0_changes"></a>@endhtmlonly

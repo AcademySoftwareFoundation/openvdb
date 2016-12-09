@@ -797,8 +797,10 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     size_t pos = INVALID_POS;
     auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
-        if (it->first != typeName.first) {
-            OPENVDB_THROW(KeyError, "Cannot insert into a Descriptor with a duplicate name, but different type.")
+        assert(it->second < mTypes.size());
+        if (mTypes[it->second] != typeName) {
+            OPENVDB_THROW(KeyError,
+                "Cannot insert into a Descriptor with a duplicate name, but different type.")
         }
         pos = it->second;
     } else {

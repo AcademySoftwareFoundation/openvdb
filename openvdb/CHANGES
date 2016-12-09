@@ -41,6 +41,15 @@ Version 3.3.0 - November 15, 2016
     - Fixed a null pointer dereference when copying grids that were loaded
       with io::File::readGridPartial().
       [Reported by Nick Avramoussis]
+    - tools::MultiResGrid now supports all standard grid types, including
+      BoolGrid and MaskGrid.
+    - Fixed a bug that caused tools::copyToDense() to only partially populate
+      the output array when delayed loading was in effect.
+      [Reported by Stuart Levy]
+    - Fixed a thread race condition in math::QuantizedUnitVec that could
+      cause it to produce incorrect results.
+      [Contributed by Jeff Lait]
+
 
     API changes:
     - Introduced some C++11 constructs.  A C++11-compatible compiler
@@ -71,6 +80,10 @@ Version 3.3.0 - November 15, 2016
     - Added a toggle to the Clip SOP to invert the clipping mask.
     - Added a slider to the Scatter SOP to specify how far each point
       may be displaced from the center of its host voxel or tile.
+    - The LOD SOP now supports all standard grid types, including
+      boolean grids.
+    - Made various small changes for Houdini 16 compatibility.
+      [Contributed by SideFX]
 
 
 Version 3.2.0 - August 10, 2016
