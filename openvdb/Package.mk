@@ -13,7 +13,7 @@ include ../Version.mk
 
 .PHONY: build-openvdb
 build-openvdb:
-	@pybuild2 --install -DINSTALL_BASE=$(BUILD_ROOT) 
+	@pybuild2 --install -DINSTALL_BASE=$(BUILD_ROOT) -Dabi=3
 
 .PHONY: strip-rpath
 strip-rpath:
