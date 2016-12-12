@@ -465,7 +465,7 @@ private:
 template<typename ParticleArrayType, typename PointIndexLeafNodeType>
 struct RemapIndices {
 
-    RemapIndices(const ParticleArrayType& particles, std::vector<PointIndexLeafNodeType*> nodes)
+    RemapIndices(const ParticleArrayType& particles, std::vector<PointIndexLeafNodeType*>& nodes)
         : mParticles(&particles)
         , mNodes(nodes.empty() ? nullptr : &nodes.front())
     {
