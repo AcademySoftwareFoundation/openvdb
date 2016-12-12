@@ -44,7 +44,7 @@ Optional:
 - pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
   in PDF format
 
-- log4cplus (log4cplus.sourceforge.net), version 1.0 or later,
+- log4cplus (log4cplus.sourceforge.net), version 1.1.2 or later,
   for error logging
 
 - GLFW 2.7 (www.glfw.org), for the OpenVDB viewer

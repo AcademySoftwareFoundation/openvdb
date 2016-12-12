@@ -341,8 +341,23 @@ public:
     /// Return true if the attribute has a default value
     bool hasDefaultValue(const Name& name) const;
     /// Get a default value for an existing attribute
-    template <typename ValueType>
-    ValueType getDefaultValue(const Name& name) const;
+    template<typename ValueType>
+    ValueType getDefaultValue(const Name& name) const
+    {
+        const size_t pos = find(name);
+        if (pos == INVALID_POS) {
+            OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
+        }
+
+        std::stringstream ss;
+        ss << "default:" << name;
+
+        auto metadata = mMetadata.getMetadata<TypedMetadata<ValueType>>(ss.str());
+
+        if (metadata)   return metadata->value();
+
+        return zeroVal<ValueType>();
+    }
     /// Set a default value for an existing attribute
     void setDefaultValue(const Name& name, const Metadata& defaultValue);
     // Remove the default value if it exists
@@ -407,27 +422,6 @@ private:
     MetaMap                     mMetadata;
     int64_t                     mReserved[8];       // for future use
 }; // class Descriptor
-
-
-template <typename ValueType>
-ValueType
-AttributeSet::Descriptor::getDefaultValue(const Name& name) const
-{
-    const size_t pos = find(name);
-    if (pos == INVALID_POS) {
-        OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
-    }
-
-    std::stringstream ss;
-    ss << "default:" << name;
-
-    auto metadata = mMetadata.getMetadata<TypedMetadata<ValueType>>(ss.str());
-
-    if (metadata)   return metadata->value();
-
-    return zeroVal<ValueType>();
-}
-
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME

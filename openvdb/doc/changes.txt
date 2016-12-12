@@ -2,6 +2,46 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 4.0.1</B> - <I>In development</I>
+@par
+New features:
+- Added functions to util/logging.h to simplify configuration of the
+  logging system (via command-line arguments, in particular).
+
+@par
+Bug fixes:
+- The @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink
+  and @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  tools now correctly handle isosurfaces outside the input volume&rsquo;s
+  narrow band.
+- The @vdblink::tools::MultiResGrid MultiResGrid@endlink tool
+  now supports all standard grid types, including
+  @vdblink::BoolGrid BoolGrid@endlink and @vdblink::MaskGrid MaskGrid@endlink.
+- Fixed a bug that caused @vdblink::tools::copyToDense()
+  tools::copyToDense@endlink to only partially populate the output array
+  when delayed loading was in effect.
+  <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed a thread race condition in
+  @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
+  that could cause it to produce incorrect results.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+
+@par
+Python:
+- Added functions @c getLoggingLevel, @c setLoggingLevel, and
+  @c setProgramName, to allow configuration of the logging system.
+
+@par
+Houdini:
+- Fixed a crash in the Ray SOP when the user selected an isosurface
+  outside the target volume&rsquo;s narrow band.
+- The LOD SOP now supports all standard grid types, including boolean grids.
+- Made various small changes for Houdini&nbsp;16 compatibility.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+
+
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.0</B> - <I>November 15, 2016</I>

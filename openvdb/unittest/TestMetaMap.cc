@@ -30,6 +30,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/logging.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
 
@@ -168,6 +169,8 @@ void
 TestMetaMap::testIO()
 {
     using namespace openvdb;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     Metadata::clearRegistry();
 

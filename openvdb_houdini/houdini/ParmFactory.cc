@@ -497,15 +497,20 @@ public:
         const char* english,
         OP_Constructor construct,
         PRM_Template* multiparms,
-	const char *operatortablename,
+#if (UT_MAJOR_VERSION_INT >= 16)
+        const char* operatorTableName,
+#endif
         unsigned minSources,
         unsigned maxSources,
         CH_LocalVariable* variables,
         unsigned flags,
         const char** inputlabels,
         const std::string& helpUrl):
-        OP_Operator(name, english, construct, multiparms, operatortablename,
-	    minSources, maxSources, variables, flags, inputlabels),
+        OP_Operator(name, english, construct, multiparms,
+#if (UT_MAJOR_VERSION_INT >= 16)
+            operatorTableName,
+#endif
+            minSources, maxSources, variables, flags, inputlabels),
         mHelpUrl(helpUrl)
     {
     }
@@ -574,11 +579,11 @@ struct OpFactory::Impl
         mInputLabels.push_back(NULL);
 
         OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
-            mConstruct, mParms, 
+            mConstruct, mParms,
 #if (UT_MAJOR_VERSION_INT >= 16)
-	    UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
+            UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
 #endif
-	    minSources, mMaxSources, mVariables, mFlags,
+            minSources, mMaxSources, mVariables, mFlags,
             const_cast<const char**>(&mInputLabels[0]), mHelpUrl);
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
@@ -752,19 +757,22 @@ OpFactory::setLocalVariables(CH_LocalVariable* v) { mImpl->mVariables = v; retur
 OpFactory&
 OpFactory::setFlags(unsigned f) { mImpl->mFlags = f; return *this; }
 
-OpFactory&
-OpFactory::setInternalName(const std::string &name) 
-{ 
-    mImpl->mName = name;
-    return *this; 
-}
 
 OpFactory&
-OpFactory::setOperatorTable(const std::string &name) 
-{ 
-    mImpl->mOperatorTableName = name;
-    return *this; 
+OpFactory::setInternalName(const std::string& name)
+{
+    mImpl->mName = name;
+    return *this;
 }
+
+
+OpFactory&
+OpFactory::setOperatorTable(const std::string& name)
+{
+    mImpl->mOperatorTableName = name;
+    return *this;
+}
+
 
 ////////////////////////////////////////
 

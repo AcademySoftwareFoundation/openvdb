@@ -314,7 +314,10 @@ class AttributeDetailBase
 public:
     typedef boost::shared_ptr<AttributeDetailBase> Ptr;
 
-    virtual ~AttributeDetailBase() {}
+    virtual ~AttributeDetailBase() = default;
+
+    AttributeDetailBase(const AttributeDetailBase&) = default;
+    AttributeDetailBase& operator=(const AttributeDetailBase&) = default;
 
     virtual void set(const openvdb::Coord& ijk, const GA_Offset (&offsets)[3],
         const openvdb::Vec3d& weights) = 0;

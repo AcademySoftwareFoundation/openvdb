@@ -359,8 +359,8 @@ public:
     /// Add one or more local variables to this operator.
     OpFactory& setLocalVariables(CH_LocalVariable*);
     OpFactory& setFlags(unsigned);
-    OpFactory& setInternalName(const std::string &name);
-    OpFactory& setOperatorTable(const std::string &name);
+    OpFactory& setInternalName(const std::string& name);
+    OpFactory& setOperatorTable(const std::string& name);
 
 private:
     OpFactory(const OpFactory&);

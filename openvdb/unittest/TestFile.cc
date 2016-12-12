@@ -36,6 +36,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
+#include <openvdb/util/logging.h>
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
@@ -821,6 +822,8 @@ TestFile::testGridNaming()
 
     // Register data types.
     openvdb::initialize();
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     // Create several grids that share a single tree.
     TreeType::Ptr tree(new TreeType(1));

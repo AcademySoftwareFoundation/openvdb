@@ -222,10 +222,12 @@ openvdb_houdini::convertPointDataGridToHoudini(
         GA_PointGroup* pointGroup = detail.findPointGroup(name.c_str());
         if (!pointGroup) pointGroup = detail.newPointGroup(name.c_str());
 
-        const openvdb::points::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
+        const openvdb::points::AttributeSet::Descriptor::GroupIndex index =
+            attributeSet.groupIndex(name);
 
         HoudiniGroup group(*pointGroup, startOffset, total);
-        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups, inCoreOnly);
+        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index,
+            includeGroups, excludeGroups, inCoreOnly);
     }
 }
 

@@ -741,8 +741,6 @@ struct Vector<T>::InfNormOp
         return maxValue;
     }
 
-    static T join(T max1, T max2) { return Max(max1, max2); }
-
     const T* data;
 };
 
@@ -753,7 +751,7 @@ Vector<T>::infNorm() const
 {
     // Parallelize over the elements of this vector.
     T result = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/zeroVal<T>(),
-        InfNormOp(this->data()), InfNormOp::join);
+        InfNormOp(this->data()), /*join=*/[](T max1, T max2) { return Max(max1, max2); });
     return result;
 }
 
@@ -773,8 +771,6 @@ struct Vector<T>::IsFiniteOp
         return finite;
     }
 
-    static bool join(bool finite1, bool finite2) { return (finite1 && finite2); }
-
     const T* data;
 };
 
@@ -785,7 +781,8 @@ Vector<T>::isFinite() const
 {
     // Parallelize over the elements of this vector.
     bool finite = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
-        IsFiniteOp(this->data()), IsFiniteOp::join);
+        IsFiniteOp(this->data()),
+        /*join=*/[](bool finite1, bool finite2) { return (finite1 && finite2); });
     return finite;
 }
 
@@ -806,8 +803,6 @@ struct Vector<T>::EqOp
         return equal;
     }
 
-    static bool join(bool eq1, bool eq2) { return (eq1 && eq2); }
-
     const T* a;
     const OtherValueType* b;
     const T eps;
@@ -821,7 +816,8 @@ Vector<T>::eq(const Vector<OtherValueType>& other, ValueType eps) const
 {
     if (this->size() != other.size()) return false;
     bool equal = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
-        EqOp<OtherValueType>(this->data(), other.data(), eps), EqOp<OtherValueType>::join);
+        EqOp<OtherValueType>(this->data(), other.data(), eps),
+        /*join=*/[](bool eq1, bool eq2) { return (eq1 && eq2); });
     return equal;
 }
 
@@ -1030,8 +1026,6 @@ struct SparseStencilMatrix<ValueType, STENCIL_SIZE>::EqOp
         return equal;
     }
 
-    static bool join(bool eq1, bool eq2) { return (eq1 && eq2); }
-
     const SparseStencilMatrix* a;
     const SparseStencilMatrix<OtherValueType, STENCIL_SIZE>* b;
     const ValueType eps;
@@ -1046,7 +1040,8 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::eq(
 {
     if (this->numRows() != other.numRows()) return false;
     bool equal = tbb::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
-        EqOp<OtherValueType>(*this, other, eps), EqOp<OtherValueType>::join);
+        EqOp<OtherValueType>(*this, other, eps),
+        /*join=*/[](bool eq1, bool eq2) { return (eq1 && eq2); });
     return equal;
 }
 
@@ -1069,8 +1064,6 @@ struct SparseStencilMatrix<ValueType, STENCIL_SIZE>::IsFiniteOp
         return finite;
     }
 
-    static bool join(bool finite1, bool finite2) { return (finite1 && finite2); }
-
     const SparseStencilMatrix* mat;
 };
 
@@ -1081,7 +1074,7 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::isFinite() const
 {
     // Parallelize over the rows of this matrix.
     bool finite = tbb::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
-        IsFiniteOp(*this), IsFiniteOp::join);
+        IsFiniteOp(*this), /*join=*/[](bool finite1, bool finite2) { return (finite1&&finite2); });
     return finite;
 }
 

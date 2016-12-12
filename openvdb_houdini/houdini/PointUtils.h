@@ -548,27 +548,26 @@ private:
 
 struct HoudiniGroup
 {
-    explicit HoudiniGroup(GA_PointGroup& group, openvdb::Index64 startOffset, openvdb::Index64 total )
+    explicit HoudiniGroup(GA_PointGroup& group,
+        openvdb::Index64 startOffset, openvdb::Index64 total)
         : mGroup(group)
-	, mStartOffset(startOffset)
-	, mTotal(total)
+        , mStartOffset(startOffset)
+        , mTotal(total)
     {
-	mBackingArray.resize(total, (unsigned char) 0);
+        mBackingArray.resize(total, 0);
     }
 
     HoudiniGroup(const HoudiniGroup &) = delete;
     HoudiniGroup& operator=(const HoudiniGroup &) = delete;
 
-    void setOffsetOn(openvdb::Index index) {
-	mBackingArray[index - mStartOffset] = 1;
-    }
+    void setOffsetOn(openvdb::Index index) { mBackingArray[index - mStartOffset] = 1; }
 
     void finalize() {
-	for (openvdb::Index64 i = 0, n = mTotal; i < n; i++)
-	{
-	    if (mBackingArray[i])
-		mGroup.addOffset( GA_Offset(i + mStartOffset) );
-	}
+        for (openvdb::Index64 i = 0, n = mTotal; i < n; i++) {
+            if (mBackingArray[i]) {
+                mGroup.addOffset(GA_Offset(i + mStartOffset));
+            }
+        }
     }
 
 private:

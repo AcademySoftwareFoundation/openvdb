@@ -3240,7 +3240,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
 #if (UT_VERSION_INT >= 0x10000000) // later than 16.0.0
-	.setOperatorTable(VOP_TABLE_NAME)
+        .setOperatorTable(VOP_TABLE_NAME)
 #endif
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
         .addInput("Points to rasterize")

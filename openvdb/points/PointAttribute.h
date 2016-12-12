@@ -233,8 +233,8 @@ struct AppendAttributeOp {
         for (auto leaf = range.begin(); leaf; ++leaf) {
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos,
-                                                                  mStrideOrTotalSize, mConstantStride);
+            AttributeArray::Ptr attribute = leaf->appendAttribute(
+                expected, mDescriptor, mPos, mStrideOrTotalSize, mConstantStride);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -404,7 +404,9 @@ struct BloscCompressAttributesOp {
 template <typename ValueType, typename CodecType>
 struct AttributeTypeConversion
 {
-    static const NamePair& type() { return TypedAttributeArray<ValueType, CodecType>::attributeType(); }
+    static const NamePair& type() {
+        return TypedAttributeArray<ValueType, CodecType>::attributeType();
+    }
 };
 
 
@@ -481,7 +483,8 @@ inline void appendAttribute(PointDataTree& tree,
     const size_t index = descriptor.find(name);
 
     if (index != AttributeSet::INVALID_POS) {
-        OPENVDB_THROW(KeyError, "Cannot append an attribute with a non-unique name - " << name << ".");
+        OPENVDB_THROW(KeyError,
+            "Cannot append an attribute with a non-unique name - " << name << ".");
     }
 
     // create a new attribute descriptor
@@ -520,14 +523,15 @@ inline void appendAttribute(PointDataTree& tree,
                             const bool hidden,
                             const bool transient)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     using point_attribute_internal::AttributeTypeConversion;
     using point_attribute_internal::defaultValue;
     using point_attribute_internal::MetadataStorage;
 
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
-                    strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
+        strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
 
     if (!math::isExactlyEqual(uniformValue, defaultValue<ValueType>())) {
         MetadataStorage<PointDataTree, ValueType>::add(tree, uniformValue);
@@ -549,10 +553,11 @@ inline void appendAttribute(PointDataTree& tree,
                             const bool hidden,
                             const bool transient)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     appendAttribute<ValueType, NullCodec>(tree, name, uniformValue, strideOrTotalSize,
-                                          constantStride, metaDefaultValue, hidden, transient);
+        constantStride, metaDefaultValue, hidden, transient);
 }
 
 
@@ -564,7 +569,8 @@ inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const ValueType& uniformValue)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
     using Descriptor    = AttributeSet::Descriptor;
@@ -586,7 +592,8 @@ inline void collapseAttribute(  PointDataTree& tree,
     }
 
     LeafManagerT leafManager(tree);
-    tbb::parallel_for(leafManager.leafRange(), CollapseAttributeOp<ValueType, PointDataTree>(index, uniformValue));
+    tbb::parallel_for(leafManager.leafRange(),
+        CollapseAttributeOp<ValueType, PointDataTree>(index, uniformValue));
 }
 
 
@@ -619,7 +626,8 @@ inline void dropAttributes( PointDataTree& tree,
     // insert attributes using the new descriptor
 
     Descriptor::Ptr newDescriptor = descriptor.duplicateDrop(indices);
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), DropAttributesOp<PointDataTree>(indices, newDescriptor));
+    tbb::parallel_for(LeafManagerT(tree).leafRange(),
+        DropAttributesOp<PointDataTree>(indices, newDescriptor));
 }
 
 
@@ -644,7 +652,8 @@ inline void dropAttributes( PointDataTree& tree,
 
         // do not attempt to drop an attribute that does not exist
         if (index == AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(KeyError, "Cannot drop an attribute that does not exist - " << name << ".");
+            OPENVDB_THROW(KeyError,
+                "Cannot drop an attribute that does not exist - " << name << ".");
         }
 
         indices.push_back(index);
@@ -705,7 +714,8 @@ inline void renameAttributes(   PointDataTree& tree,
 
         const Name& newName = newNames[i];
         if (descriptor.find(newName) != AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(KeyError, "Cannot rename attribute as new name already exists - " << newName << ".");
+            OPENVDB_THROW(KeyError,
+                "Cannot rename attribute as new name already exists - " << newName << ".");
         }
 
         const AttributeArray* array = attributeSet.getConst(oldName);
@@ -779,7 +789,8 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 
     std::vector<size_t> indices{index};
 
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), BloscCompressAttributesOp<PointDataTree>(indices));
+    tbb::parallel_for(LeafManagerT(tree).leafRange(),
+        BloscCompressAttributesOp<PointDataTree>(indices));
 }
 
 ////////////////////////////////////////

@@ -84,8 +84,8 @@ OPENVDB_API size_t bloscUncompressedSize(const char* buffer);
 /// @param bufferBytes          the number of bytes in compressedBuffer available to be filled
 /// @param uncompressedBuffer   the uncompressed buffer to compress
 /// @param uncompressedBytes    number of uncompressed bytes
-OPENVDB_API void bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t bufferBytes,
-    const char* uncompressedBuffer, const size_t uncompressedBytes);
+OPENVDB_API void bloscCompress(char* compressedBuffer, size_t& compressedBytes,
+    const size_t bufferBytes, const char* uncompressedBuffer, const size_t uncompressedBytes);
 
 /// @brief Compress and return the heap-allocated compressed buffer.
 ///
@@ -95,8 +95,8 @@ OPENVDB_API void bloscCompress(char* compressedBuffer, size_t& compressedBytes, 
 /// @param resize               the compressed buffer will be exactly resized to remove the
 ///                             portion used for Blosc overhead, for efficiency this can be
 ///                             skipped if it is known that the resulting buffer is temporary
-OPENVDB_API std::unique_ptr<char[]> bloscCompress(  const char* buffer, const size_t uncompressedBytes,
-                                        size_t& compressedBytes, const bool resize = true);
+OPENVDB_API std::unique_ptr<char[]> bloscCompress(const char* buffer,
+    const size_t uncompressedBytes, size_t& compressedBytes, const bool resize = true);
 
 /// @brief Convenience wrapper to retrieve the compressed size of buffer when compressed
 ///
@@ -111,8 +111,8 @@ OPENVDB_API size_t bloscCompressedSize(const char* buffer, const size_t uncompre
 /// @param expectedBytes the number of bytes expected once the buffer is decompressed
 /// @param bufferBytes the number of bytes in uncompressedBuffer available to be filled
 /// @param compressedBuffer the compressed buffer to decompress
-OPENVDB_API void bloscDecompress(   char* uncompressedBuffer, const size_t expectedBytes,
-                        const size_t bufferBytes, const char* compressedBuffer);
+OPENVDB_API void bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes,
+    const size_t bufferBytes, const char* compressedBuffer);
 
 /// @brief Decompress and return the the heap-allocated uncompressed buffer.
 ///
@@ -121,8 +121,8 @@ OPENVDB_API void bloscDecompress(   char* uncompressedBuffer, const size_t expec
 /// @param resize               the compressed buffer will be exactly resized to remove the
 ///                             portion used for Blosc overhead, for efficiency this can be
 ///                             skipped if it is known that the resulting buffer is temporary
-OPENVDB_API std::unique_ptr<char[]> bloscDecompress(const char* buffer, const size_t expectedBytes,
-                                        const bool resize = true);
+OPENVDB_API std::unique_ptr<char[]> bloscDecompress(const char* buffer,
+    const size_t expectedBytes, const bool resize = true);
 
 
 ////////////////////////////////////////
