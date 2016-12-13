@@ -1131,9 +1131,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed1";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1489,9 +1488,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out uniform attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed2";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1550,9 +1548,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out strided attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed3";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1599,9 +1596,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out compressed attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed4";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 

@@ -464,8 +464,7 @@ TestStreamCompression::testPagedStreams()
         io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
         { // ascending values up to 10 million written in blocks of PageSize/3
-            std::ofstream fileout;
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
 
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, openvdb::io::COMPRESS_BLOSC);
