@@ -86,10 +86,24 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
+#ifdef _MSC_VER
+	    using namespace boost::interprocess::detail;
+	    using namespace boost::interprocess::ipcdetail;
+	    using openvdb::Index64;
+
+	    if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
+		FILETIME mtime;
+		if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
+		    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
+		}
+		close_file(fh);
+	    }
+#else
             struct stat info;
             if (0 == ::stat(regionFilename, &info)) {
                 mLastWriteTime = openvdb::Index64(info.st_mtime);
             }
+#endif
         }
 
         using Notifier = std::function<void(std::string /*filename*/)>;
