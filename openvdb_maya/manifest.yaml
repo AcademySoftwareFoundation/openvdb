@@ -60,6 +60,7 @@ Requires:
   - openvdb-0.0.0   # For maya 2017+
   - boost-1.55.0
   - openexr-2.2.0
+  - blosc-1.5.0
   - python-2.7.3
 
 # List of software / versions this package supports.
