@@ -55,11 +55,10 @@
 
 #ifdef _MSC_VER
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
 // Ensure that both namespaces exist.
 namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#include <windows.h>
 #else
 #include <sys/types.h> // for struct stat
 #include <sys/stat.h> // for stat()
@@ -87,10 +86,24 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
+#ifdef _MSC_VER
+	    using namespace boost::interprocess::detail;
+	    using namespace boost::interprocess::ipcdetail;
+	    using openvdb::Index64;
+
+	    if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
+		FILETIME mtime;
+		if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
+		    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
+		}
+		close_file(fh);
+	    }
+#else
             struct stat info;
             if (0 == ::stat(regionFilename, &info)) {
                 mLastWriteTime = openvdb::Index64(info.st_mtime);
             }
+#endif
         }
 
         using Notifier = std::function<void(std::string /*filename*/)>;
@@ -449,15 +462,23 @@ TestStreamCompression::testPagedStreams()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#if _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     {
         std::string filename = tempDir + "/openvdb_page1";
         io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
         { // ascending values up to 10 million written in blocks of PageSize/3
-            std::ofstream fileout;
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
 
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, openvdb::io::COMPRESS_BLOSC);

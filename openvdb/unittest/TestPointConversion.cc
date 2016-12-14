@@ -36,6 +36,10 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointGroup.h>
 
+#ifdef _MSC_VER
+#include <windows.h>
+#endif
+
 using namespace openvdb;
 using namespace openvdb::points;
 
@@ -240,7 +244,7 @@ TestPointConversion::testPointConversion()
 
     // generate points
 
-    const unsigned long count(1000000);
+    const size_t count(1000000);
 
     AttributeWrapper<Vec3f> position(1);
     AttributeWrapper<int> xyz(1);
@@ -305,8 +309,16 @@ TestPointConversion::testPointConversion()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#if _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
-
+#endif
 
     std::string filename = tempDir + "/openvdb_test_point_conversion";
 
@@ -407,7 +419,7 @@ TestPointConversion::testPointConversion()
 
     // convert based on even group
 
-    const unsigned long halfCount = count / 2;
+    const size_t halfCount = count / 2;
 
     outputPosition.resize(startOffset + halfCount);
     outputId.resize(startOffset + halfCount);
@@ -480,7 +492,7 @@ TestPointConversion::testStride()
 
     // generate points
 
-    const unsigned long count(40000);
+    const size_t count(40000);
 
     AttributeWrapper<Vec3f> position(1);
     AttributeWrapper<int> xyz(3);
@@ -904,7 +916,7 @@ TestPointConversion::testComputeVoxelSize()
     // Generate a sphere
     // NOTE: The sphere does NOT provide uniform distribution
 
-    const unsigned long count(40000);
+    const size_t count(40000);
 
     position.resize(0);
 

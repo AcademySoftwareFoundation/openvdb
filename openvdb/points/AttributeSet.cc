@@ -284,7 +284,8 @@ AttributeSet::groupIndex(const size_t offset) const
 
     // adjust relative offset to find offset into the array vector
 
-    return Util::GroupIndex(groups[offset / GROUP_BITS], offset % GROUP_BITS);
+    return Util::GroupIndex(groups[offset / GROUP_BITS],
+			    static_cast<uint8_t>(offset % GROUP_BITS));
 }
 
 
