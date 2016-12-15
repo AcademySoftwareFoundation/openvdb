@@ -11,6 +11,12 @@ New features:
   logging system (via command-line arguments, in particular).
 
 @par
+Improvements:
+- Added a @vdblink::Metadata::str() Metadata::str@endlink specialization
+  for @vdblink::StringMetadata StringMetadata@endlink that eliminates the overhead
+  of writing to a string stream.
+
+@par
 Bug fixes:
 - The @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink
   and @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
@@ -27,6 +33,9 @@ Bug fixes:
   @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
   that could cause it to produce incorrect results.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a dangling pointer bug in the
+  @vdblink::tools::ParticleAtlas particle atlas@endlink tool.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
 
 @par
 Python:
@@ -40,6 +49,10 @@ Houdini:
 - The LOD SOP now supports all standard grid types, including boolean grids.
 - Made various small changes for Houdini&nbsp;16 compatibility.
   <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+- The Create SOP now supports matching the new grids&rsquo; transform,
+  voxel size, and topology to a reference grid.
+  If the topology is being matched, it can optionally be resampled
+  to a different voxel size.
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly

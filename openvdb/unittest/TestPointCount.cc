@@ -37,6 +37,10 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#ifdef _MSC_VER
+#include <windows.h>
+#endif
+
 using namespace openvdb;
 using namespace openvdb::points;
 
@@ -222,7 +226,16 @@ TestPointCount::testGroup()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     std::string filename;
 
@@ -535,7 +548,16 @@ TestPointCount::testOffsets()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     std::string filename;
 
