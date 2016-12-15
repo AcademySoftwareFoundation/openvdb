@@ -281,6 +281,8 @@ void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
         UT_String source;
         shader->getShaderSource(r, source, type);
 
+        const int version = shader->getCodeVersion();
+
         r->popShader();
 
         // patch the shader to replace the strings
@@ -298,7 +300,10 @@ void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
         // move the version up to the top of the file
 
         source.substitute("#version ", "// #version");
-        source.insert(0, "#version 150\n");
+
+        std::stringstream ss;
+        ss << "#version " << version << "\n";
+        source.insert(0, ss.str().c_str());
 
         // remove the existing shader and add the patched one
 
@@ -306,7 +311,7 @@ void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
 
         UT_String message;
 
-        const bool success = shader->addShader(r, type, source, "pointOffset", 150, &message);
+        const bool success = shader->addShader(r, type, source, "pointOffset", version, &message);
 
         if (!success) {
             if (type == RE_SHADER_VERTEX)           std::cerr << "Vertex Shader (";
@@ -1408,6 +1413,13 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
     else if (decor == GR_POINT_VELOCITY) {
         shader = &theVelocityDecorShader;
         scale = commonOpts.vectorScale();
+
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+        // use the explicit attribute mapping
+
+        (*shader)->useDefaultAttribMap(false);
+        (*shader)->useExplicitAttribMap(true);
+#endif
     }
     else if (decor == GR_POINT_NUMBER ||
              decor == GR_POINT_POSITION) {
