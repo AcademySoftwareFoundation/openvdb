@@ -46,9 +46,14 @@ Version 3.3.0 - November 15, 2016
     - Fixed a bug that caused tools::copyToDense() to only partially populate
       the output array when delayed loading was in effect.
       [Reported by Stuart Levy]
+    - Fixed an issue with duplicate registration of PointDataGrid
+      attribute types.
+      [Reported by SideFX]
     - Fixed a thread race condition in math::QuantizedUnitVec that could
       cause it to produce incorrect results.
       [Contributed by Jeff Lait]
+    - Fixed a dangling pointer bug in tools::ParticleAtlas.
+      [Contributed by SideFX]
 
 
     API changes:

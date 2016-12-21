@@ -63,10 +63,16 @@ Bug fixes:
   tools::copyToDense@endlink to only partially populate the output array
   when delayed loading was in effect.
   <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed an issue with duplicate registration of
+  @link points/PointDataGrid.h PointDataGrid@endlink attribute types.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
 - Fixed a thread race condition in
   @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
   that could cause it to produce incorrect results.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a dangling pointer bug in the
+  @vdblink::tools::ParticleAtlas particle atlas@endlink tool.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
 
 @par
 API changes:
