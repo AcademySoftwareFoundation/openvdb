@@ -47,6 +47,15 @@ Version 4.0.1 - In development
     - The Create SOP now supports matching the new grids' transform,
       voxel size, and topology to a reference grid.  If the topology is
       being matched, it can optionally be resampled to a different voxel size.
+    - Added some support for point data grids to the Clip,
+      Topology To Level Set and Visualize SOPs.
+      [Contributed by Double Negative]
+    - Compression is no longer enabled by default in the Points Convert SOP
+      for normals and colors, because they are not guaranteed to have a
+      [0, 1] range.
+      [Contributed by Double Negative]
+    - Added a 16-bit truncation compression option to the Points Convert SOP.
+      [Contributed by Double Negative]
 
 
 Version 4.0.0 - November 15, 2016

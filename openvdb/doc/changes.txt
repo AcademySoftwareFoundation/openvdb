@@ -63,6 +63,16 @@ Houdini:
   voxel size, and topology to a reference grid.
   If the topology is being matched, it can optionally be resampled
   to a different voxel size.
+- Added some support for point data grids to the Clip,
+  Topology&nbsp;To&nbsp;Level&nbsp;Set and Visualize SOPs.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Compression is no longer enabled by default in the
+  Points&nbsp;Convert&nbsp;SOP for normals and colors, because they are
+  not guaranteed to have a [0,&nbsp;1] range.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added a 16-bit truncation compression option to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly

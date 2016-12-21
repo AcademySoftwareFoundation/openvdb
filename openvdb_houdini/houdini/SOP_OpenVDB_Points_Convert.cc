@@ -830,8 +830,8 @@ newSopOperator(OP_OperatorTable* table)
 
     {
         const char* items[] = {
-            "vdb", "Houdini points to VDB points",
-            "hdk", "VDB points to Houdini points",
+            "vdb", "Houdini Points to VDB Points",
+            "hdk", "VDB Points to Houdini Points",
             nullptr
         };
 
@@ -901,8 +901,8 @@ newSopOperator(OP_OperatorTable* table)
     {
         const char* items[] = {
             "none", "None",
-            "int16", "16-bit fixed point",
-            "int8", "8-bit fixed point",
+            "int16", "16-bit Fixed Point",
+            "int8", "8-bit Fixed Point",
             nullptr
         };
 
