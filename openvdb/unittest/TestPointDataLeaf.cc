@@ -496,12 +496,8 @@ TestPointDataLeaf::testMonotonicity()
 void
 TestPointDataLeaf::testAttributes()
 {
-    // Define and register some common attribute types
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
     using AttributeI        = TypedAttributeArray<int32_t>;
-
-    AttributeVec3s::registerType();
-    AttributeI::registerType();
 
     // create a descriptor
 
@@ -719,15 +715,9 @@ TestPointDataLeaf::testTopologyCopy()
 void
 TestPointDataLeaf::testEquivalence()
 {
-    // Define and register some common attribute types
-
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
     using AttributeI        = TypedAttributeArray<int32_t>;
-
-    AttributeVec3s::registerType();
-    AttributeF::registerType();
-    AttributeI::registerType();
 
     // create a descriptor
 
@@ -799,13 +789,8 @@ TestPointDataLeaf::testEquivalence()
 void
 TestPointDataLeaf::testIterators()
 {
-    // Define and register some common attribute types
-
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
-
-    AttributeVec3s::registerType();
-    AttributeF::registerType();
 
     // create a descriptor
 
@@ -1032,13 +1017,8 @@ TestPointDataLeaf::testReadWriteCompression()
 void
 TestPointDataLeaf::testIO()
 {
-    // Define and register some common attribute types
-
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
-
-    AttributeVec3s::registerType();
-    AttributeF::registerType();
 
     // create a descriptor
 
@@ -1187,14 +1167,9 @@ TestPointDataLeaf::testIO()
 void
 TestPointDataLeaf::testSwap()
 {
-    // Define and register some common attribute types
-
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
     using AttributeI        = TypedAttributeArray<int>;
-
-    AttributeVec3s::registerType();
-    AttributeF::registerType();
 
     // create a descriptor
 
@@ -1254,13 +1229,8 @@ TestPointDataLeaf::testSwap()
 void
 TestPointDataLeaf::testCopyOnWrite()
 {
-    // Define and register some common attribute types
-
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
-
-    AttributeVec3s::registerType();
-    AttributeF::registerType();
 
     // create a descriptor
 
@@ -1327,12 +1297,8 @@ TestPointDataLeaf::testCopyOnWrite()
 void
 TestPointDataLeaf::testCopyDescriptor()
 {
-    // Define and register some common attribute types
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
     using AttributeS        = TypedAttributeArray<float>;
-
-    AttributeVec3s::registerType();
-    AttributeS::registerType();
 
     using LeafNode = PointDataTree::LeafNodeType;
 

@@ -437,6 +437,7 @@ SRC_NAMES := \
     points/AttributeArrayString.cc \
     points/AttributeGroup.cc \
     points/AttributeSet.cc \
+    points/points.cc \
     points/StreamCompression.cc \
     util/Formats.cc \
     util/Util.cc \

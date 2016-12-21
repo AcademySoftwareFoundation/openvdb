@@ -9,12 +9,19 @@
 New features:
 - Added functions to util/logging.h to simplify configuration of the
   logging system (via command-line arguments, in particular).
+- Added @vdblink::tree::LeafManager::activeLeafVoxelCount()
+  LeafManager::activeLeafVoxelCount@endlink, a faster, threaded
+  alternative to @vdblink::tree::Tree::activeLeafVoxelCount()
+  Tree::activeLeafVoxelCount@endlink.
+- Added a <TT>-shuffle</TT> option that causes <TT>vdb_test</TT>
+  to run unit tests in random order, which can help to identify
+  unintended dependencies between tests.
 
 @par
 Improvements:
 - Added a @vdblink::Metadata::str() Metadata::str@endlink specialization
-  for @vdblink::StringMetadata StringMetadata@endlink that eliminates the overhead
-  of writing to a string stream.
+  for @vdblink::StringMetadata StringMetadata@endlink that eliminates
+  the overhead of writing to a string stream.
 
 @par
 Bug fixes:
@@ -29,6 +36,9 @@ Bug fixes:
   tools::copyToDense@endlink to only partially populate the output array
   when delayed loading was in effect.
   <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed an issue with duplicate registration of
+  @link points/PointDataGrid.h PointDataGrid@endlink attribute types.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
 - Fixed a thread race condition in
   @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
   that could cause it to produce incorrect results.
