@@ -7,6 +7,10 @@ Version 4.0.1 - In development
     - Added functions to util/logging.h to simplify configuration of the
       logging system (via command-line arguments, in particular).
 
+    Improvements:
+    - Added a Metadata::str() specialization for StringMetadata that
+      eliminates the overhead of writing to a string stream.
+
     Bug fixes:
     - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
       handle isosurfaces outside the input volume's narrow band.
@@ -18,6 +22,8 @@ Version 4.0.1 - In development
     - Fixed a thread race condition in math::QuantizedUnitVec that could
       cause it to produce incorrect results.
       [Contributed by Jeff Lait]
+    - Fixed a dangling pointer bug in tools::ParticleAtlas.
+      [Contributed by SideFX]
 
     Python:
     - Added functions getLoggingLevel(), setLoggingLevel(), and
@@ -30,6 +36,9 @@ Version 4.0.1 - In development
       boolean grids.
     - Made various small changes for Houdini 16 compatibility.
       [Contributed by SideFX]
+    - The Create SOP now supports matching the new grids' transform,
+      voxel size, and topology to a reference grid.  If the topology is
+      being matched, it can optionally be resampled to a different voxel size.
 
 
 Version 4.0.0 - November 15, 2016

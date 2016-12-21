@@ -443,13 +443,13 @@ TestPointGroup::testSet()
 
         std::string tempDir;
         if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#if _MSC_VER
-	if (tempDir.empty()) {
-	    char tempDirBuffer[MAX_PATH+1];
-	    int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
-	    CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
-	    tempDir = tempDirBuffer;
-	}
+#ifdef _MSC_VER
+        if (tempDir.empty()) {
+            char tempDirBuffer[MAX_PATH+1];
+            int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+            CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+            tempDir = tempDirBuffer;
+        }
 #else
         if (tempDir.empty()) tempDir = P_tmpdir;
 #endif

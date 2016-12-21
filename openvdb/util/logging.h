@@ -203,16 +203,6 @@ setLevel(int& argc, char* argv[])
 }
 
 
-/// @brief A LevelScope object sets the logging level to a given level
-/// and restores it to the current level when the object goes out of scope.
-struct LevelScope
-{
-    Level level;
-    LevelScope(Level newLevel): level(getLevel()) { setLevel(newLevel); }
-    ~LevelScope() { setLevel(level); }
-};
-
-
 /// @brief Specify a program name to be displayed in log messages.
 inline void
 setProgramName(const std::string& progName, bool useColor = true)
@@ -326,13 +316,30 @@ inline void setProgramName(const std::string&, bool = true) {}
 inline void initialize() {}
 inline void initialize(int&, char*[], bool = true) {}
 
-struct LevelScope {};
-
 } // namespace logging
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_USE_LOG4CPLUS
+
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace logging {
+
+/// @brief A LevelScope object sets the logging level to a given level
+/// and restores it to the current level when the object goes out of scope.
+struct LevelScope
+{
+    Level level;
+    explicit LevelScope(Level newLevel): level(getLevel()) { setLevel(newLevel); }
+    ~LevelScope() { setLevel(level); }
+};
+
+} // namespace logging
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_UTIL_LOGGING_HAS_BEEN_INCLUDED
 

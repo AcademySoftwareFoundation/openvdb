@@ -34,8 +34,9 @@
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/GeometryUtil.h>
-#include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb_houdini/UT_VDBTools.h> // for GridTransformOp, et al.
+#include <openvdb_houdini/Utils.h>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <UT/UT_Interrupt.h>
@@ -140,7 +141,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i == 0); }
+    virtual int isRefInput(unsigned) const { return true; }
 
     int updateNearFar(float time);
     int updateFarPlane(float time);
@@ -161,11 +162,16 @@ private:
         const UT_String& gridNameStr,
         const typename GridType::ValueType& background,
         const cvdb::math::Transform::Ptr&,
+        const cvdb::MaskGrid::ConstPtr& maskGrid = NULL,
         GA_PrimitiveGroup* group = NULL,
         int gridClass = 0,
         int vecType = -1);
 
-    OP_ERROR buildTransform(OP_Context&, openvdb::math::Transform::Ptr&);
+    OP_ERROR buildTransform(OP_Context&, openvdb::math::Transform::Ptr&, const GU_PrimVDB*);
+    const GU_PrimVDB* getReferenceVdb(OP_Context &context);
+    cvdb::MaskGrid::Ptr createMaskGrid(const GU_PrimVDB*, const openvdb::math::Transform::Ptr&);
+
+    bool mNeedsResampling;
 };
 
 
@@ -292,6 +298,7 @@ newSopOperator(OP_OperatorTable *table)
         const char* items[] = {
             "linear",  "Linear",
             "frustum", "Frustum",
+            "refVDB", "Reference VDB",
             NULL
         };
 
@@ -304,7 +311,7 @@ newSopOperator(OP_OperatorTable *table)
         .setDefault(PRMoneDefaults));
 
     // Uniform voxel size
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "Voxel size")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "Voxel Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
         .setHelpText("Uniform voxel size in world units.\n(Ignored by frustum-aligned grids.)"));
@@ -324,7 +331,7 @@ newSopOperator(OP_OperatorTable *table)
         .setCallbackFunc(&updateNearFarCallback)
         .setSpareData(&PRM_SpareData::objCameraPath));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J | PRM_TYPE_JOIN_NEXT, "nearPlane", "Near/far planes")
+    parms.add(hutil::ParmFactory(PRM_FLT_J | PRM_TYPE_JOIN_NEXT, "nearPlane", "Near/far Planes")
         .setHelpText("Near plane distance, should always be <= farPlane - voxelDepthSize\n"
             "Far plane distance, should always be >= nearPlane + voxelDepthSize")
         .setDefault(PRMzeroDefaults)
@@ -338,17 +345,17 @@ newSopOperator(OP_OperatorTable *table)
         .setCallbackFunc(&updateFarPlaneCallback)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 20));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel count")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel Count")
         .setDefault(PRM100Defaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 200)
         .setHelpText("Horizontal voxel count for the near plane."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel depth size")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel Depth Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
         .setHelpText("The voxel depth (uniform z-size) in world units."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "cameraOffset", "Camera offset")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "cameraOffset", "Camera Offset")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 20.0)
         .setHelpText("Adds padding to the view frustum without changing \n"
@@ -356,6 +363,25 @@ newSopOperator(OP_OperatorTable *table)
         "in the reversed view direction."));
 
     // }
+
+    // Matching settings
+    parms.add(hutil::ParmFactory(PRM_STRING, "reference", "Reference")
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setHelpText("Select the grid to be used as reference.\n"
+            "If multiple grids are selected, then the first one will be used."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT,
+               "matchVoxelSize", "Match Voxel Size")
+        .setDefault(PRMoneDefaults));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSizeRef", "Voxel Size")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
+        .setHelpText("Uniform voxel size in world units."));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT,
+               "matchTopology", "Match Topology")
+        .setDefault(PRMoneDefaults));
+    parms.add(hutil::ParmFactory(PRM_STRING, "matchTopologyPlaceholder", ""));
 
     // Grids Heading
     parms.add(hutil::ParmFactory(PRM_HEADING, "gridsHeading", ""));
@@ -372,7 +398,7 @@ newSopOperator(OP_OperatorTable *table)
                 items.push_back(openvdb::GridBase::gridClassToMenuName(cls)); // label
             }
 
-            gridParms.add(hutil::ParmFactory(PRM_STRING, "gridClass#", "Grid class")
+            gridParms.add(hutil::ParmFactory(PRM_STRING, "gridClass#", "Grid Class")
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
 
@@ -388,7 +414,7 @@ newSopOperator(OP_OperatorTable *table)
         }
 
         // Optional grid name string
-        gridParms.add(hutil::ParmFactory(PRM_STRING, "gridName#", "Grid name")
+        gridParms.add(hutil::ParmFactory(PRM_STRING, "gridName#", "Grid Name")
             .setHelpText("Specify a name for this grid."));
 
         // Default background values
@@ -397,22 +423,22 @@ newSopOperator(OP_OperatorTable *table)
             "The background value is a unique value that is\n"
             "returned when accessing any location in space\n"
             "that does not resolve to either a tile or a voxel.";
-        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgFloat#", "Background value")
+        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgFloat#", "Background Value")
             .setHelpText(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgInt#", "Background value")
+        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgInt#", "Background Value")
             .setDefault(PRMoneDefaults)
             .setHelpText(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgBool#", "Background value")
+        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgBool#", "Background Value")
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 1)
             .setDefault(PRMoneDefaults)
             .setHelpText(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgVec3f#", "Background value")
+        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgVec3f#", "Background Value")
             .setVectorSize(3)
             .setHelpText(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgVec3i#", "Background value")
+        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgVec3i#", "Background Value")
             .setVectorSize(3)
             .setHelpText(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "width#", "Half voxel width")
+        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "width#", "Half Voxel Width")
             .setDefault(PRMthreeDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1.0, PRM_RANGE_UI, 10)
             .setHelpText("Half the width of the narrow band in voxel units, "
@@ -427,7 +453,7 @@ newSopOperator(OP_OperatorTable *table)
                 items.push_back(openvdb::GridBase::vecTypeExamples(openvdb::VecType(i)));
             }
 
-            gridParms.add(hutil::ParmFactory(PRM_ORD, "vecType#", "Vector type")
+            gridParms.add(hutil::ParmFactory(PRM_ORD, "vecType#", "Vector Type")
                 .setDefault(PRMzeroDefaults)
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
@@ -441,14 +467,15 @@ newSopOperator(OP_OperatorTable *table)
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING,
-        "propertiesHeading", "Shared grid properties"));
-    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "frustumHeading", "Frustum grid settings"));
+        "propertiesHeading", "Shared Grid Properties"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "frustumHeading", "Frustum Grid Settings"));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "padding", "Padding"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Create", SOP_OpenVDB_Create::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addOptionalInput("Optional input to merge with");
+        .addOptionalInput("Optional Input to Merge With")
+        .addOptionalInput("Optional Reference VDB");
 }
 
 
@@ -462,9 +489,9 @@ SOP_OpenVDB_Create::factory(OP_Network *net, const char *name, OP_Operator *op)
 }
 
 
-SOP_OpenVDB_Create::SOP_OpenVDB_Create(OP_Network *net,
-    const char *name, OP_Operator *op):
-    hvdb::SOP_NodeVDB(net, name, op)
+SOP_OpenVDB_Create::SOP_OpenVDB_Create(OP_Network *net, const char *name, OP_Operator *op)
+    : hvdb::SOP_NodeVDB(net, name, op)
+    , mNeedsResampling(false)
 {
 }
 
@@ -478,7 +505,10 @@ SOP_OpenVDB_Create::updateParmsFlags()
     bool changed = false;
     UT_String tmpStr;
 
-    bool frustum = evalInt("transform", 0, 0) == 1;
+    const int transformParm = evalInt("transform", 0, 0);
+    const bool linear = transformParm == 0;
+    const bool frustum = transformParm == 1;
+    const bool matching = transformParm == 2;
 
     for (int i = 1, N = evalInt("gridList", 0, 0); i <= N; ++i) {
 
@@ -523,19 +553,19 @@ SOP_OpenVDB_Create::updateParmsFlags()
         changed |= setVisibleStateInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
     }
 
-    // linear transform
-    changed |= enableParm("voxelSize", !frustum);
-    changed |= enableParm("rotation", !frustum);
+    // linear transform and voxel size
+    changed |= enableParm("voxelSize", linear);
+    changed |= enableParm("rotation", linear);
 
-    changed |= setVisibleState("voxelSize", !frustum);
-    changed |= setVisibleState("rotation", !frustum);
+    changed |= setVisibleState("voxelSize", linear);
+    changed |= setVisibleState("rotation", linear);
 
     // frustum transform
     UT_String cameraPath;
     evalString(cameraPath, "camera", 0, 0);
     cameraPath.harden();
 
-    bool enableFrustumSettings = cameraPath.isstring() &&
+    const bool enableFrustumSettings = cameraPath.isstring() &&
         findOBJNode(cameraPath) != NULL;
 
     changed |= enableParm("camera", frustum);
@@ -556,6 +586,21 @@ SOP_OpenVDB_Create::updateParmsFlags()
     changed |= setVisibleState("cameraOffset", frustum);
     changed |= setVisibleState("previewFrustum", frustum);
 
+    // matching
+
+    const bool matchVoxelSize = evalInt("matchVoxelSize", 0, 0);
+
+    changed |= enableParm("reference", matching);
+    changed |= enableParm("matchVoxelSize", matching);
+    changed |= enableParm("voxelSizeRef", matching && !matchVoxelSize);
+    changed |= enableParm("matchTopology", matching);
+
+    changed |= setVisibleState("reference", matching);
+    changed |= setVisibleState("matchVoxelSize", matching);
+    changed |= setVisibleState("voxelSizeRef", matching);
+    changed |= setVisibleState("matchTopology", matching);
+    changed |= setVisibleState("matchTopologyPlaceholder", false);
+
     return changed;
 }
 
@@ -569,12 +614,20 @@ SOP_OpenVDB_Create::createNewGrid(
     const UT_String& gridNameStr,
     const typename GridType::ValueType& background,
     const cvdb::math::Transform::Ptr& transform,
+    const cvdb::MaskGrid::ConstPtr& maskGrid,
     GA_PrimitiveGroup* group,
     int gridClass,
     int vecType)
 {
+    using Tree = typename GridType::TreeType;
     // Create a grid of a pre-registered type and assign it a transform.
-    hvdb::GridPtr newGrid = GridType::create(background);
+    hvdb::GridPtr newGrid;
+    if (maskGrid) {
+        newGrid = GridType::create(
+            typename Tree::Ptr(new Tree(maskGrid->tree(), background, cvdb::TopologyCopy())));
+    } else {
+        newGrid = GridType::create(background);
+    }
     newGrid->setTransform(transform);
 
     newGrid->setGridClass(openvdb::GridClass(gridClass));
@@ -600,7 +653,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
         hutil::ScopedInputLock lock(*this, context);
 
         gdp->clearAndDestroy();
-        if (nInputs() == 1) duplicateSource(0, context);
+        if (getInput(0)) duplicateSource(0, context);
 
         fpreal time = context.getTime();
 
@@ -612,10 +665,19 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
             group = gdp->newPrimitiveGroup(groupStr.buffer());
         }
 
+        // Get reference VDB, if exists
+        const int transformParm = evalInt("transform", 0, time);
+        const bool matchTransfom = transformParm == 2;
+        const GU_PrimVDB* refVdb = (matchTransfom ? getReferenceVdb(context) : NULL);
+
         // Create a shared transform
         cvdb::math::Transform::Ptr transform;
-        if (buildTransform(context, transform) >= UT_ERROR_ABORT) return error();
+        if (buildTransform(context, transform, refVdb) >= UT_ERROR_ABORT) return error();
 
+        cvdb::MaskGrid::Ptr maskGrid;
+        const bool matchTopology = evalInt("matchTopology", 0, time);
+        if (matchTransfom && matchTopology)
+            maskGrid = createMaskGrid(refVdb, transform);
 
         // Create the grids
         UT_String gridNameStr, tmpStr;
@@ -652,28 +714,28 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                     }
 
                     createNewGrid<cvdb::FloatGrid>(gridNameStr, background,
-                                                   transform, group, gridClass);
+                                                   transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_DOUBLE:
                 {
                     double background = double(evalFloatInst("bgFloat#", &i, 0, time));
                     createNewGrid<cvdb::DoubleGrid>(gridNameStr, background,
-                                                   transform, group, gridClass);
+                                                   transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_INT:
                 {
                     int background = evalIntInst("bgInt#", &i, 0, time);
                     createNewGrid<cvdb::Int32Grid>(gridNameStr, background,
-                                                   transform, group, gridClass);
+                                                   transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_BOOL:
                 {
                     bool background = evalIntInst("bgBool#", &i, 0, time);
                     createNewGrid<cvdb::BoolGrid>(gridNameStr, background,
-                                                  transform, group, gridClass);
+                                                  transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_VEC3S:
@@ -685,7 +747,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                     int vecType = evalIntInst("vecType#", &i, 0, time);
 
                     createNewGrid<cvdb::Vec3SGrid>(gridNameStr, background,
-                                                   transform, group, gridClass, vecType);
+                                                   transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3D:
@@ -697,7 +759,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                     int vecType = evalIntInst("vecType#", &i, 0, time);
 
                     createNewGrid<cvdb::Vec3DGrid>(gridNameStr, background,
-                                                   transform, group, gridClass, vecType);
+                                                   transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3I:
@@ -707,7 +769,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                                            evalIntInst("bgVec3i#", &i, 2, time));
                     int vecType = evalIntInst("vecType#", &i, 0, time);
                     createNewGrid<cvdb::Vec3IGrid>(gridNameStr, background,
-                                                   transform, group, gridClass, vecType);
+                                                   transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
             } // eType switch
@@ -725,10 +787,13 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
 
 
 OP_ERROR
-SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform::Ptr& transform)
+SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform::Ptr& transform,
+        const GU_PrimVDB* refVdb)
 {
     fpreal time = context.getTime();
-    bool frustum = evalInt("transform", 0, time) == 1;
+    const int transformParm = evalInt("transform", 0, time);
+    const bool linear = transformParm == 0;
+    const bool frustum = transformParm == 1;
 
     if (frustum) { // nonlinear frustum transform
 
@@ -772,7 +837,7 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
                 &boxColor, &tickColor, /*shaded*/true);
         }
 
-    } else { // linear affine transform
+    } else if (linear) { // linear affine transform
 
         const double voxelSize = double(evalFloat("voxelSize", 0, time));
 
@@ -795,9 +860,98 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
 
             transform = openvdb::math::Transform::createLinearTransform(xform);
         }
+    } else { // match reference
+        if (refVdb == NULL) {
+            addError(SOP_MESSAGE, "Missing reference grid");
+            return error();
+        }
+        transform = refVdb->getGrid().transform().copy();
+        const bool matchVoxelSize = evalInt("matchVoxelSize", 0, time);
+        if (!matchVoxelSize) { // NOT matching the reference's voxel size
+            if (!transform->isLinear()) {
+                addError(SOP_MESSAGE, "Cannot change voxel size on a non-linear transform");
+                return error();
+            }
+            const double voxelSize = double(evalFloat("voxelSizeRef", 0, time));
+            openvdb::Vec3d relativeVoxelScale = voxelSize / refVdb->getGrid().voxelSize();
+            // If the user is changing the voxel size to the original,
+            // then there is no need to do anything
+            if (!isApproxEqual(openvdb::Vec3d::ones(), relativeVoxelScale)) {
+                mNeedsResampling = true;
+                transform->preScale(relativeVoxelScale);
+            }
+        }
     }
 
     return error();
+}
+
+
+////////////////////////////////////////
+
+
+const GU_PrimVDB*
+SOP_OpenVDB_Create::getReferenceVdb(OP_Context &context)
+{
+    const GU_Detail* refGdp = inputGeo(1, context);
+    if (!refGdp) return NULL;
+
+    UT_String refGroupStr;
+    evalString(refGroupStr, "reference", 0, context.getTime());
+    const GA_PrimitiveGroup* refGroup =
+        matchGroup(const_cast<GU_Detail&>(*refGdp), refGroupStr.toStdString());
+
+    hvdb::VdbPrimCIterator vdbIter(refGdp, refGroup);
+    const GU_PrimVDB* refVdb = *vdbIter;
+    if (++vdbIter) {
+        addWarning(SOP_MESSAGE, "Multiple reference grids were found.\n"
+           "Using the first one for reference.");
+    }
+    return refVdb;
+}
+
+
+////////////////////////////////////////
+
+
+class GridConvertToMask {
+public:
+    GridConvertToMask(cvdb::MaskGrid::Ptr& maskGrid) : outGrid(maskGrid) {}
+
+    template<typename GridType>
+    void operator()(const GridType& inGrid)
+    {
+        using MaskTree = cvdb::MaskGrid::TreeType;
+        outGrid = cvdb::MaskGrid::create(
+                MaskTree::Ptr(new MaskTree(inGrid.tree(), 0, cvdb::TopologyCopy())));
+    }
+private:
+    cvdb::MaskGrid::Ptr& outGrid;
+};
+
+cvdb::MaskGrid::Ptr
+SOP_OpenVDB_Create::createMaskGrid(const GU_PrimVDB* refVdb,
+        const openvdb::math::Transform::Ptr& transform)
+{
+    if (refVdb == NULL)
+        throw std::runtime_error("Missing reference grid");
+
+    cvdb::MaskGrid::Ptr maskGrid;
+    GridConvertToMask op(maskGrid);
+    GEOvdbProcessTypedGridTopology(*refVdb, op);
+    maskGrid->setTransform(refVdb->getGrid().transform().copy());
+
+    if (!mNeedsResampling)
+        return maskGrid;
+
+    cvdb::MaskGrid::Ptr resampledMaskGrid = cvdb::MaskGrid::create();
+    resampledMaskGrid->setTransform(transform);
+
+    hvdb::Interrupter interrupter;
+    cvdb::tools::resampleToMatch<cvdb::tools::PointSampler>(*maskGrid, *resampledMaskGrid,
+            interrupter);
+
+    return resampledMaskGrid;
 }
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC

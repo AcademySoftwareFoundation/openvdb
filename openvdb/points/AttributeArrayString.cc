@@ -283,7 +283,7 @@ void StringAttributeWriteHandle::resetCache()
         // ensure the metadata is StringMetadata and key starts "string:"
         if (!isStringMeta(key, meta))   continue;
 
-        auto stringMeta = dynamic_cast<StringMetadata*>(meta.get());
+        const auto* stringMeta = static_cast<StringMetadata*>(meta.get());
         assert(stringMeta);
 
         // remove "string:"

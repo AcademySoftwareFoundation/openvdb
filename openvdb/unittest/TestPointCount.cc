@@ -37,7 +37,7 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
-#if _MSC_VER
+#ifdef _MSC_VER
 #include <windows.h>
 #endif
 
@@ -226,7 +226,7 @@ TestPointCount::testGroup()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#if _MSC_VER
+#ifdef _MSC_VER
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
@@ -548,7 +548,7 @@ TestPointCount::testOffsets()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#if _MSC_VER
+#ifdef _MSC_VER
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
