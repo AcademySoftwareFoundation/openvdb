@@ -81,7 +81,7 @@ public:
         mT0 = startTime;
         mT1 = maxTime;
         const Vec3T &pos = ray(mT0), &dir = ray.dir(), &inv = ray.invDir();
-        mVoxel = Coord::floor(pos) & (~(DIM-1));
+        mVoxel = Coord::round(pos) & (~(DIM-1));
         for (int axis = 0; axis < 3; ++axis) {
             if (math::isZero(dir[axis])) {//handles dir = +/- 0
                 mStep[axis]  = 0;//dummy value
