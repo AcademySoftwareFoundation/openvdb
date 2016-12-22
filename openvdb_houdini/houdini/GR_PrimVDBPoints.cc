@@ -1071,22 +1071,28 @@ GR_PrimVDBPoints::update(RE_Render *r,
     patchShaderGeomDecorationScale(r, theVelocityDecorShader);
     patchShaderFragmentTurqoise(r, theVelocityDecorShader);
 
+    // geometry itself changed. GR_GEO_TOPOLOGY changed indicates a large
+    // change, such as changes in the point, primitive or vertex counts
+    // GR_GEO_CHANGED indicates that some attribute data may have changed.
 
-    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
+    if (p.reason & (GR_GEO_CHANGED | GR_GEO_TOPOLOGY_CHANGED))
+    {
+        const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
 
-    const openvdb::GridBase* grid =
-        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+        const openvdb::GridBase* grid =
+            const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    using PointDataGrid = openvdb::points::PointDataGrid;
+        using PointDataGrid = openvdb::points::PointDataGrid;
 
-    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+        const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
-    computeCentroid(pointDataGrid);
-    computeBbox(pointDataGrid);
-    updatePosBuffer(r, pointDataGrid, p.geo_version);
-    updateWireBuffer(r, pointDataGrid, p.geo_version);
+        computeCentroid(pointDataGrid);
+        computeBbox(pointDataGrid);
+        updatePosBuffer(r, pointDataGrid, p.geo_version);
+        updateWireBuffer(r, pointDataGrid, p.geo_version);
 
-    mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+        mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+    }
 }
 
 bool
