@@ -6,6 +6,11 @@ Version 4.0.1 - In development
     New features:
     - Added functions to util/logging.h to simplify configuration of the
       logging system (via command-line arguments, in particular).
+    - Added LeafManager::activeLeafVoxelCount(), a faster, threaded
+      alternative to Tree::activeLeafVoxelCount().
+    - Added a -shuffle option that causes vdb_test to run unit tests
+      in random order, which can help to identify unintended dependencies
+      between tests.
 
     Improvements:
     - Added a Metadata::str() specialization for StringMetadata that
@@ -19,6 +24,9 @@ Version 4.0.1 - In development
     - Fixed a bug that caused tools::copyToDense() to only partially populate
       the output array when delayed loading was in effect.
       [Reported by Stuart Levy]
+    - Fixed an issue with duplicate registration of PointDataGrid
+      attribute types.
+      [Reported by SideFX]
     - Fixed a thread race condition in math::QuantizedUnitVec that could
       cause it to produce incorrect results.
       [Contributed by Jeff Lait]
@@ -39,6 +47,15 @@ Version 4.0.1 - In development
     - The Create SOP now supports matching the new grids' transform,
       voxel size, and topology to a reference grid.  If the topology is
       being matched, it can optionally be resampled to a different voxel size.
+    - Added some support for point data grids to the Clip,
+      Topology To Level Set and Visualize SOPs.
+      [Contributed by Double Negative]
+    - Compression is no longer enabled by default in the Points Convert SOP
+      for normals and colors, because they are not guaranteed to have a
+      [0, 1] range.
+      [Contributed by Double Negative]
+    - Added a 16-bit truncation compression option to the Points Convert SOP.
+      [Contributed by Double Negative]
 
 
 Version 4.0.0 - November 15, 2016

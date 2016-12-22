@@ -167,6 +167,9 @@ using namespace openvdb::points;
 class TestAttributeArray: public CppUnit::TestCase
 {
 public:
+    void setUp() override { AttributeArray::clearRegistry(); }
+    void tearDown() override { AttributeArray::clearRegistry(); }
+
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testRegistry);

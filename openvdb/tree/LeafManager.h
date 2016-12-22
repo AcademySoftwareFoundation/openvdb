@@ -324,13 +324,25 @@ public:
         this->initLeafArray();
     }
 
-    /// Return the total number of allocated auxiliary buffers.
+    /// @brief Return the total number of allocated auxiliary buffers.
     size_t auxBufferCount() const { return mAuxBufferCount; }
-    /// Return the number of auxiliary buffers per leaf node.
+    /// @brief Return the number of auxiliary buffers per leaf node.
     size_t auxBuffersPerLeaf() const { return mAuxBuffersPerLeaf; }
 
-    /// Return the number of leaf nodes.
+    /// @brief Return the number of leaf nodes.
     size_t leafCount() const { return mLeafCount; }
+
+    /// @brief Return the number of active voxels in the leaf nodes.
+    /// @note Multi-threaded for better performance than Tree::activeLeafVoxelCount
+    Index64 activeLeafVoxelCount() const
+    {
+        return tbb::parallel_reduce(this->leafRange(), Index64(0),
+            [] (const LeafRange& range, Index64 sum) -> Index64 {
+                for (const auto& leaf: range) { sum += leaf.onVoxelCount(); }
+                return sum;
+            },
+            [] (Index64 n, Index64 m) -> Index64 { return n + m; });
+    }
 
     /// Return a const reference to tree associated with this manager.
     const TreeType& tree() const { return *mTree; }

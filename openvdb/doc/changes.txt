@@ -9,12 +9,19 @@
 New features:
 - Added functions to util/logging.h to simplify configuration of the
   logging system (via command-line arguments, in particular).
+- Added @vdblink::tree::LeafManager::activeLeafVoxelCount()
+  LeafManager::activeLeafVoxelCount@endlink, a faster, threaded
+  alternative to @vdblink::tree::Tree::activeLeafVoxelCount()
+  Tree::activeLeafVoxelCount@endlink.
+- Added a <TT>-shuffle</TT> option that causes <TT>vdb_test</TT>
+  to run unit tests in random order, which can help to identify
+  unintended dependencies between tests.
 
 @par
 Improvements:
 - Added a @vdblink::Metadata::str() Metadata::str@endlink specialization
-  for @vdblink::StringMetadata StringMetadata@endlink that eliminates the overhead
-  of writing to a string stream.
+  for @vdblink::StringMetadata StringMetadata@endlink that eliminates
+  the overhead of writing to a string stream.
 
 @par
 Bug fixes:
@@ -29,6 +36,9 @@ Bug fixes:
   tools::copyToDense@endlink to only partially populate the output array
   when delayed loading was in effect.
   <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed an issue with duplicate registration of
+  @link points/PointDataGrid.h PointDataGrid@endlink attribute types.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
 - Fixed a thread race condition in
   @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
   that could cause it to produce incorrect results.
@@ -53,6 +63,16 @@ Houdini:
   voxel size, and topology to a reference grid.
   If the topology is being matched, it can optionally be resampled
   to a different voxel size.
+- Added some support for point data grids to the Clip,
+  Topology&nbsp;To&nbsp;Level&nbsp;Set and Visualize SOPs.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Compression is no longer enabled by default in the
+  Points&nbsp;Convert&nbsp;SOP for normals and colors, because they are
+  not guaranteed to have a [0,&nbsp;1] range.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added a 16-bit truncation compression option to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly

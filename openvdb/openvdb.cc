@@ -154,6 +154,10 @@ __pragma(warning(default:1711))
     GridBase::clearRegistry();
     math::MapRegistry::clear();
 
+//#ifdef OPENVDB_ENABLE_POINTS
+    points::uninitialize();
+//#endif
+
 #ifdef OPENVDB_USE_BLOSC
     // We don't want to destroy Blosc, because it might have been
     // initialized by some other library.
