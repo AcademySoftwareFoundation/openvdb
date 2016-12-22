@@ -89,6 +89,9 @@ Version 3.3.0 - November 15, 2016
       boolean grids.
     - Made various small changes for Houdini 16 compatibility.
       [Contributed by SideFX]
+    - Added some support for point data grids to the Clip,
+      Topology To Level Set and Visualize SOPs.
+      [Contributed by Double Negative]
 
 
 Version 3.2.0 - August 10, 2016

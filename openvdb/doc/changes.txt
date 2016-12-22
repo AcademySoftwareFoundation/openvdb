@@ -115,6 +115,9 @@ Houdini:
 - The LOD SOP now supports all standard grid types, including boolean grids.
 - Made various small changes for Houdini&nbsp;16 compatibility.
   <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+- Added some support for point data grids to the Clip,
+  Topology&nbsp;To&nbsp;Level&nbsp;Set and Visualize SOPs.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 
 @htmlonly <a name="v3_2_0_changes"></a>@endhtmlonly
