@@ -1141,23 +1141,51 @@ TestPointDataLeaf::testIO()
             file.close();
         }
 
-        // read grids from file (using delayed loading)
+        { // read grids from file (using delayed loading)
+            PointDataGrid::Ptr gridFromDisk;
 
-        PointDataGrid::Ptr gridFromDisk;
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
 
-        {
-            io::File file("leaf.vdb");
-            file.open();
-            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-            file.close();
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
 
-            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            CPPUNIT_ASSERT(leaf == *leafFromDisk);
         }
 
-        LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-        CPPUNIT_ASSERT(leafFromDisk);
+        { // read grids from file and pre-fetch
+            PointDataGrid::Ptr gridFromDisk;
 
-        CPPUNIT_ASSERT(leaf == *leafFromDisk);
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            const AttributeF& attribute(AttributeF::cast(leafFromDisk->constAttributeArray("density")));
+
+            CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
+            CPPUNIT_ASSERT(attribute.isOutOfCore());
+
+            prefetch(gridFromDisk->tree());
+
+            // ensure out-of-core data is now in-core after pre-fetching
+
+            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
+            CPPUNIT_ASSERT(!attribute.isOutOfCore());
+        }
 
         remove("leaf.vdb");
     }

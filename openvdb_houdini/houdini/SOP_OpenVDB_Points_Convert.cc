@@ -1129,6 +1129,17 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
 
+                // if all point data is being converted, sequentially pre-fetch any out-of-core
+                // data for faster performance when using delayed-loading
+
+                const bool allData =    emptyNameVector.empty() &&
+                                        includeGroups.empty() &&
+                                        excludeGroups.empty();
+
+                if (allData) {
+                    prefetch(grid.tree());
+                }
+
                 // perform conversion
 
                 hvdb::convertPointDataGridToHoudini(
