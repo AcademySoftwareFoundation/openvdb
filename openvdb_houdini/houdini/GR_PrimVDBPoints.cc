@@ -869,9 +869,6 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
     {
         using gr_primitive_internal::FillGPUBuffersPosition;
 
-        // map() returns a pointer to the GL buffer
-        UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
-
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
@@ -880,14 +877,26 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(),
                         includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-        PositionAttribute positionAttribute(pdata, mCentroid, static_cast<Index>(stride));
+        std::unique_ptr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
+
+        PositionAttribute positionAttribute(pdata.get(), mCentroid, static_cast<Index>(stride));
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
                                     /*startOffset=*/ 0, includeGroups, excludeGroups,
                                     /*inCoreOnly=*/true);
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const size_t maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
 
-        posGeo->unmap(r);
+        if (numPoints < maxVertexSize) {
+            posGeo->setArray(r, pdata.get(), /*offset = */ 0, /*sublen = */ int(numPoints));
+        }
+        else {
+            for (size_t offset = 0; offset < numPoints; offset += maxVertexSize) {
+                const size_t sublength = (offset + maxVertexSize) > numPoints ? numPoints - offset : maxVertexSize;
+
+                posGeo->setArray(r, pdata.get()+offset, /*offset = */ offset, /*sublen = */ sublength);
+            }
+        }
+
         posGeo->setCacheVersion(version);
     }
 
@@ -951,7 +960,8 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
     // Initialize the number of points for the wireframe box per leaf.
 
-    myWire->setNumPoints(int(outOfCoreLeaves*8*3));
+    int numPoints = static_cast<int>(outOfCoreLeaves*8*3);
+    myWire->setNumPoints(numPoints);
 
     // fetch wireframe position, if its cache version matches, no upload is required.
 
@@ -967,7 +977,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
         // fill the wire data
 
-        UT_Vector3H *data = static_cast<UT_Vector3H*>(posWire->map(r));
+        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<openvdb::Coord> coords;
 
@@ -980,13 +990,18 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
             coords.push_back(leaf.origin());
         }
 
-        FillGPUBuffersLeafBoxes fill(data, coords, grid.transform(), mCentroid);
+        FillGPUBuffersLeafBoxes fill(data.get(), coords, grid.transform(), mCentroid);
         const tbb::blocked_range<size_t> range(0, coords.size());
         tbb::parallel_for(range, fill);
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const size_t maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
+        for (size_t offset = 0; offset < numPoints; offset += maxVertexSize) {
+            const size_t sublength = (offset + maxVertexSize) > numPoints ?
+                                                numPoints - offset : maxVertexSize;
 
-        posWire->unmap(r);
+            posWire->setArray(r, data.get()+offset, offset, sublength);
+        }
+
         posWire->setCacheVersion(version);
     }
 
@@ -1107,7 +1122,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         }
         const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
 
-        UT_Vector3H *data = static_cast<UT_Vector3H*>(bufferGeo->map(r));
+        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
@@ -1117,15 +1132,20 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(), includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
         if (type == "vec3s") {
-            VectorAttribute<Vec3f> typedAttribute(data);
+            VectorAttribute<Vec3f> typedAttribute(data.get());
             convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets,
                 /*startOffset=*/ 0, static_cast<unsigned>(index), /*stride=*/1,
                 includeGroups, excludeGroups, /*inCoreOnly=*/true);
         }
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const size_t maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
+        for (size_t offset = 0; offset < numPoints; offset += maxVertexSize) {
+            const size_t sublength = (offset + maxVertexSize) > numPoints ?
+                                                numPoints - offset : maxVertexSize;
 
-        bufferGeo->unmap(r);
+            bufferGeo->setArray(r, data.get()+offset, offset, sublength);
+        }
+
         bufferGeo->setCacheVersion(version);
     }
 
