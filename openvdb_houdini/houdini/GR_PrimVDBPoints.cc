@@ -186,13 +186,6 @@ protected:
 
     bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
 
-    bool updateIdBuffer(    RE_Render* r,
-                            const openvdb::points::PointDataGrid& grid,
-                            const std::string& name,
-                            const RE_CacheVersion& version);
-
-    bool updateIdBuffer(    RE_Render* r, const std::string& name, const RE_CacheVersion& version);
-
     void removeBuffer(const std::string& name);
 
 private:
@@ -1151,120 +1144,6 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateVec3Buffer(r, pointDataGrid, name, version);
-}
-
-bool
-GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
-                                    const openvdb::points::PointDataGrid& grid,
-                                    const std::string& name,
-                                    const RE_CacheVersion& version)
-{
-    // Initialize the geometry with the proper name for the GL cache
-    if (!myGeo)     return false;
-
-    using GridType = openvdb::points::PointDataGrid;
-    using TreeType = GridType::TreeType;
-    using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::points::AttributeSet;
-
-    const TreeType& tree = grid.tree();
-
-    if (tree.leafCount() == 0)  return false;
-
-    const size_t numPoints = myGeo->getNumPoints();
-
-    if (numPoints == 0)         return false;
-
-    auto iter = tree.cbeginLeaf();
-
-    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-
-    const size_t index = descriptor.find("id");
-
-    // early exit if id does not exist
-
-    if (index == AttributeSet::INVALID_POS)     return false;
-
-    const openvdb::Name type = descriptor.type(index).first;
-
-    // fetch id, if its cache version matches, no upload is required.
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
-#else
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
-#endif
-
-    if (bufferGeo->getCacheVersion() != version)
-    {
-        // build cumulative leaf offset array
-
-        using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
-
-        LeafOffsets offsets;
-
-        openvdb::Index64 cumulativeOffset = 0;
-
-        for (; iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            // skip out-of-core leaf nodes (used when delay loading VDBs)
-            if (leaf.buffer().isOutOfCore())    continue;
-
-            const openvdb::Index64 count = leaf.pointCount();
-
-            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
-
-            cumulativeOffset += count;
-        }
-
-        using gr_primitive_internal::FillGPUBuffersId;
-
-        int32_t *data = static_cast<int32_t*>(bufferGeo->map(r));
-
-        if (type == "int16") {
-            FillGPUBuffersId<TreeType, int16_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-        else if (type == "int32") {
-            FillGPUBuffersId<TreeType, int32_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-        else if (type == "int64") {
-            FillGPUBuffersId<TreeType, int64_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-
-        // unmap the buffer so it can be used by GL and set the cache version
-
-        bufferGeo->unmap(r);
-        bufferGeo->setCacheVersion(version);
-    }
-
-    return true;
-}
-
-bool
-GR_PrimVDBPoints::updateIdBuffer(RE_Render* r, const std::string& name, const RE_CacheVersion& version)
-{
-    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*getCachedGTPrimitive());
-
-    const openvdb::GridBase* grid =
-        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
-
-    using PointDataGrid = openvdb::points::PointDataGrid;
-    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
-
-    return updateIdBuffer(r, pointDataGrid, name, version);
 }
 
 void
