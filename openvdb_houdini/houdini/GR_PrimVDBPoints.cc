@@ -56,6 +56,7 @@
 #include <DM/DM_RenderTable.h>
 #include <GEO/GEO_PrimVDB.h>
 #include <GR/GR_Primitive.h>
+#include <GR/GR_Utils.h> // inViewFrustum
 #include <GT/GT_PrimitiveTypes.h>
 #include <GT/GT_PrimVDB.h>
 #include <GUI/GUI_PrimitiveHook.h>
@@ -145,6 +146,10 @@ public:
     /// (such as level of detail).
     void update(RE_Render*, const GT_PrimitiveHandle&, const GR_UpdateParms&) override;
 
+    /// return true if the primitive is in or overlaps the view frustum.
+    /// always returning true will effectively disable frustum culling.
+    bool inViewFrustum(const UT_Matrix4D &objviewproj) override;
+
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
     /// It also may be called outside of a viewport redraw to do picking of the
@@ -170,6 +175,7 @@ public:
 
 protected:
     void computeCentroid(const openvdb::points::PointDataGrid& grid);
+    void computeBbox(const openvdb::points::PointDataGrid& grid);
 
     void updatePosBuffer(  RE_Render* r,
                         const openvdb::points::PointDataGrid& grid,
@@ -193,6 +199,7 @@ private:
     std::unique_ptr<RE_Geometry> myWire;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
+    openvdb::BBoxd mBbox;
 };
 
 
@@ -739,6 +746,16 @@ GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
     mCentroid = openvdb::Vec3f{grid.transform().indexToWorld(coordBBox.getCenter())};
 }
 
+void
+GR_PrimVDBPoints::computeBbox(const openvdb::points::PointDataGrid& grid)
+{
+    // compute and store the world-space bounding box of the grid
+
+    const CoordBBox bbox = grid.evalActiveVoxelBoundingBox();
+    const BBoxd bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+    mBbox = bboxIndex.applyMap(*(grid.transform().baseMap()));
+}
+
 struct PositionAttribute
 {
     using ValueType = Vec3f;
@@ -1065,10 +1082,19 @@ GR_PrimVDBPoints::update(RE_Render *r,
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     computeCentroid(pointDataGrid);
+    computeBbox(pointDataGrid);
     updatePosBuffer(r, pointDataGrid, p.geo_version);
     updateWireBuffer(r, pointDataGrid, p.geo_version);
 
     mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+}
+
+bool
+GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj)
+{
+    const UT_BoundingBoxD bbox( mBbox.min().x(), mBbox.min().y(), mBbox.min().z(),
+                                mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
+    return GR_Utils::inViewFrustum(bbox, objviewproj);
 }
 
 bool
