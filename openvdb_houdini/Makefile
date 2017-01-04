@@ -308,7 +308,7 @@ else
     # Encode the path to libopenvdb.so into plugins, and because some
     # plugins might depend on Houdini libraries that are not linked into
     # hython (among other tools), encode the Houdini library path as well.
-    HCUSTOM_EXTRA_LDFLAGS += -Wl,-rpath,$(HDSO) -Wl,-rpath,$(OPENVDB_LIB_DIR)
+    HCUSTOM_EXTRA_LDFLAGS += -Wl,-rpath,$(OPENVDB_LIB_DIR) -Wl,-rpath,$(HDSO)
 endif # shared
 
 # Environment variables to pass to hcustom
