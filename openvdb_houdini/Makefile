@@ -35,6 +35,7 @@
 #   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DESTDIR)
 #
 #   all                 [default target] all of the above
+#   install_lib         install houdinilib into subdirectories of DESTDIR
 #   install             install houdinilib into subdirectories of DESTDIR,
 #                       and the SOPs into HOUDINI_DESTDIR
 #   clean               delete generated files from the local directory
@@ -306,27 +307,21 @@ ifeq (no,$(strip $(shared)))
     LIBHOUDINI := $(LIBHOUDINI_STATIC)
 else
     LIBHOUDINI := $(LIBHOUDINI_SHARED)
-
-    # For debugging, pass "rpath=yes" (the default setting) to encode
-    # the path to libopenvdb.so into SOPs.  With "rpath=no", the directory
-    # containing libopenvdb.so will need to be added to LD_LIBRARY_PATH.
-    ifeq (no,$(strip $(rpath)))
-        LIBOPENVDB_RPATH :=
-    else
-        LIBOPENVDB_RPATH := -Wl,-rpath,$(OPENVDB_LIB_DIR)
-    endif # rpath
-    HCUSTOM_EXTRA_LDFLAGS += $(LIBOPENVDB_RPATH)
+    # Encode the path to libopenvdb.so into plugins, and because some
+    # plugins might depend on Houdini libraries that are not linked into
+    # hython (among other tools), encode the Houdini library path as well.
+    HCUSTOM_EXTRA_LDFLAGS += -Wl,-rpath,$(OPENVDB_LIB_DIR) -Wl,-rpath,$(HDSO)
 endif # shared
 
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
 ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
-	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-		HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
-	endif
-	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-		HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
-	endif
+    ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+        HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+    endif
+    ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+        HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+    endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);
@@ -346,7 +341,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops houdinilib install
+.PHONY: all clean depend houdinisops houdinilib install_lib install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -394,6 +389,8 @@ endif
 # The .o isn't dependent on $(LIBHOUDINI), but the .so is.
 $(HOUDINI_SOP_OBJ_NAMES): $(LIBHOUDINI)
 
+houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
+
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
@@ -422,7 +419,7 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_Ope
 	fi
 	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
-install: houdinilib houdinisops
+install_lib: houdinilib
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
@@ -443,6 +440,8 @@ install: houdinilib houdinisops
 	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
+
+install: install_lib houdinisops
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
