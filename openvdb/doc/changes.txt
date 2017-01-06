@@ -22,6 +22,8 @@ Improvements:
 - Added a @vdblink::Metadata::str() Metadata::str@endlink specialization
   for @vdblink::StringMetadata StringMetadata@endlink that eliminates
   the overhead of writing to a string stream.
+- Made various minor improvements to @vdblink::util::PagedArray
+  util::PagedArray@endlink.
 
 @par
 Bug fixes:
@@ -73,6 +75,10 @@ Houdini:
 - Added a 16-bit truncation compression option to the
   Points&nbsp;Convert&nbsp;SOP.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Fixed a build issue with the GR_PrimVDBPoints render hook plugin
+  that could cause @c hython to report a DSO error.
+  <I>[Reported&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added an @c install_lib build target to the Makefile.
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly

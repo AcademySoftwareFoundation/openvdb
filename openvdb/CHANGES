@@ -15,6 +15,7 @@ Version 4.0.1 - In development
     Improvements:
     - Added a Metadata::str() specialization for StringMetadata that
       eliminates the overhead of writing to a string stream.
+    - Made various minor improvements to util::PagedArray.
 
     Bug fixes:
     - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
@@ -56,6 +57,10 @@ Version 4.0.1 - In development
       [Contributed by Double Negative]
     - Added a 16-bit truncation compression option to the Points Convert SOP.
       [Contributed by Double Negative]
+    - Fixed a build issue with the GR_PrimVDBPoints render hook plugin
+      that could cause hython to report a DSO error.
+      [Reported by Double Negative]
+    - Added an install_lib build target to the Makefile.
 
 
 Version 4.0.0 - November 15, 2016
