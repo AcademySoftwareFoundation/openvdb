@@ -52,19 +52,21 @@ OPTION ( OPENEXR_NAMESPACE_VERSIONING "Namespace versioning of libraries" ON )
 
 IF ( OPENEXR_FOUND )
 
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR ")
-  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MAJOR" "" _openexr_version_major_unstrip "${_openexr_version_major_string}")
-  STRING ( STRIP ${_openexr_version_major_unstrip} OPENEXR_VERSION_MAJOR )
-
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
-  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" "" _openexr_version_minor_unstrip "${_openexr_version_minor_string}")
-  STRING ( STRIP ${_openexr_version_minor_unstrip} OPENEXR_VERSION_MINOR )
-  
-  MESSAGE ( STATUS "Found OpenEXR v${OPENEXR_VERSION_MAJOR}.${OPENEXR_VERSION_MINOR} at ${OPENEXR_LOCATION}" )
-
   IF ( OPENEXR_NAMESPACE_VERSIONING )
+	FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR ")
+	STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MAJOR" "" _openexr_version_major_unstrip "${_openexr_version_major_string}")
+	STRING ( STRIP ${_openexr_version_major_unstrip} OPENEXR_VERSION_MAJOR )
+
+	FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
+	STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" "" _openexr_version_minor_unstrip "${_openexr_version_minor_string}")
+	STRING ( STRIP ${_openexr_version_minor_unstrip} OPENEXR_VERSION_MINOR )
+  
+	MESSAGE ( STATUS "Found OpenEXR v${OPENEXR_VERSION_MAJOR}.${OPENEXR_VERSION_MINOR} at ${OPENEXR_LOCATION}" )
+
 	SET ( ILMIMF_LIBRARY_NAME IlmImf-${OPENEXR_VERSION_MAJOR}_${OPENEXR_VERSION_MINOR} )
   ELSE ( OPENEXR_NAMESPACE_VERSIONING )
+	MESSAGE ( STATUS "Found OpenEXR at ${OPENEXR_LOCATION}" )
+
 	SET ( ILMIMF_LIBRARY_NAME IlmImf )
   ENDIF ( OPENEXR_NAMESPACE_VERSIONING )
 	
