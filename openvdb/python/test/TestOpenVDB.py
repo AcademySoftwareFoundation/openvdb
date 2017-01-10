@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2017 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -793,6 +793,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2017 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

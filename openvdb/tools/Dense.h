@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -605,6 +605,6 @@ copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
 
 #endif // OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

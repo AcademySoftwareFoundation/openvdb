@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2017 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,6 +35,7 @@
 #   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DESTDIR)
 #
 #   all                 [default target] all of the above
+#   install_lib         install houdinilib into subdirectories of DESTDIR
 #   install             install houdinilib into subdirectories of DESTDIR,
 #                       and the SOPs into HOUDINI_DESTDIR
 #   clean               delete generated files from the local directory
@@ -403,15 +404,10 @@ else ifdef WINDOWS_NT
 else
     LIBHOUDINI := $(LIBHOUDINI_SHARED_VERSIONED)
 
-    # For debugging, pass "rpath=yes" (the default setting) to encode
-    # the path to libopenvdb.so into SOPs.  With "rpath=no", the directory
-    # containing libopenvdb.so will need to be added to LD_LIBRARY_PATH.
-    ifeq (no,$(strip $(rpath)))
-        LIBOPENVDB_RPATH :=
-    else
-        LIBOPENVDB_RPATH := -Wl,-rpath,$(OPENVDB_LIB_DIR)
-    endif # rpath
-    HCUSTOM_EXTRA_LDFLAGS += $(LIBOPENVDB_RPATH)
+    # Encode the path to libopenvdb.so into plugins, and because some
+    # plugins might depend on Houdini libraries that are not linked into
+    # hython (among other tools), encode the Houdini library path as well.
+    HCUSTOM_EXTRA_LDFLAGS += -Wl,-rpath,$(OPENVDB_LIB_DIR) -Wl,-rpath,$(HDSO)
 endif # shared
 
 ifdef WINDOWS_NT
@@ -422,12 +418,12 @@ endif
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
 ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
-	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-		HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
-	endif
-	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-		HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
-	endif
+    ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+        HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+    endif
+    ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+        HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+    endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);
@@ -448,7 +444,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops houdinilib install
+.PHONY: all clean depend houdinisops houdinilib install_lib install
 
 .cc.o:
 	$(call CompileCXX)
@@ -503,6 +499,10 @@ else
 HCUSTOM_LIBDEPS := -L . -l $(LIBHOUDINI_IMPORT) -L $(OPENVDB_LIB_DIR) -l $(OPENVDB_LIB)
 endif
 
+ifdef LINUX
+houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
+endif
+
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
@@ -531,7 +531,7 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_Ope
 	fi
 	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
-install: houdinilib houdinisops
+install_lib: houdinilib
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
@@ -552,6 +552,8 @@ install: houdinilib houdinisops
 	        $(LN) $(LIBHOUDINI_SHARED_VERSIONED) $(LIBHOUDINI_SHARED); fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
+
+install: install_lib houdinisops
 
 ifdef WINDOWS_NT
 HFS_DSOLIB := $(HFS)/bin
@@ -606,6 +608,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2017 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1385,6 +1385,6 @@ template<> inline math::Mat4d zeroVal<math::Mat4d>() { return math::Mat4d::ident
 
 #endif // OPENVDB_UTIL_MAT4_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

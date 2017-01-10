@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -829,6 +829,6 @@ inline bool GEOvdbProcessTypedGridVec3(GEO_PrimVDB &vdb, OpT &op, bool makeUniqu
 
 #endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
