@@ -44,6 +44,7 @@
 #   vdb_test            unit tests for the OpenVDB library
 #
 #   all                 [default target] all of the above
+#   install_lib         install the lib and the headers
 #   install             install all of the above except vdb_test
 #                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
@@ -865,20 +866,13 @@ test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
 endif
 
-install: lib python vdb_print vdb_render vdb_view doc pydoc
+install_lib: lib
 	mkdir -p $(DESTDIR)/include/openvdb
 	@echo "Created $(DESTDIR)/include/openvdb"
 	pushd $(DESTDIR)/include/openvdb > /dev/null; \
 	    mkdir -p $(HEADER_SUBDIRS); popd > /dev/null
 	for f in $(INCLUDE_NAMES); \
 	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
-	@#
-	if [ -f $(LIBVIEWER) ]; \
-	then \
-	    mkdir -p $(DESTDIR)/include/openvdb_viewer; \
-	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
-	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
-	fi
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
 	mkdir -p $(DESTDIR)/lib
@@ -891,6 +885,15 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	    fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
+
+install: install_lib python vdb_print vdb_render vdb_view doc pydoc
+	if [ -f $(LIBVIEWER) ]; \
+	then \
+	    mkdir -p $(DESTDIR)/include/openvdb_viewer; \
+	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
+	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
+	fi
+	@echo "Copied vdb_view header files to $(DESTDIR)/include"
 	@#
 	if [ -f $(LIBVIEWER) ]; \
 	then \
