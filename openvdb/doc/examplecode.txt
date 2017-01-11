@@ -53,7 +53,7 @@ int main()
     // once per program and may safely be called multiple times.
     openvdb::initialize();
 
-    // Create an empty floating-point grid with background value 0. 
+    // Create an empty floating-point grid with background value 0.
     openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create();
 
     std::cout << "Testing random access:" << std::endl;
@@ -63,20 +63,20 @@ int main()
 
     // Define a coordinate with large signed indices.
     openvdb::Coord xyz(1000, -200000000, 30000000);
-        
+
     // Set the voxel value at (1000, -200000000, 30000000) to 1.
     accessor.setValue(xyz, 1.0);
-        
+
     // Verify that the voxel value at (1000, -200000000, 30000000) is 1.
     std::cout << "Grid" << xyz << " = " << accessor.getValue(xyz) << std::endl;
-        
+
     // Reset the coordinates to those of a different voxel.
     xyz.reset(1000, 200000000, -30000000);
-        
+
     // Verify that the voxel value at (1000, 200000000, -30000000) is
     // the background value, 0.
     std::cout << "Grid" << xyz << " = " << accessor.getValue(xyz) << std::endl;
-        
+
     // Set the voxel value at (1000, 200000000, -30000000) to 2.
     accessor.setValue(xyz, 2.0);
 
@@ -585,7 +585,7 @@ for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
             iter.getBoundingBox(bbox);
             std::cout << bbox << std::endl;
         }
-    } 
+    }
 }
 
 // Iterate over and normalize all inactive values.
@@ -614,7 +614,7 @@ There is some overhead to splitting, since grid and tree iterators are not
 random-access, but the overhead should typically be negligible compared with
 the amount of work done per subrange.
 
-The following is a complete program that uses 
+The following is a complete program that uses
 @vdblink::tree::IteratorRange tree::IteratorRange@endlink.
 The program iterates in parallel over the leaf nodes of a tree (by splitting
 the iteration range of a
@@ -701,7 +701,7 @@ In most cases, GridSampler is the preferred interface for interpolation,
 but note that when a fixed transform is to be applied to all values in a grid
 (that is, the grid is to be resampled), it is both easier and more efficient to
 use the multithreaded @vdblink::tools::GridTransformer GridTransformer@endlink
-class, introduced in @ref sXformTools.   
+class, introduced in @ref sXformTools.
 
 
 @subsection sSamplers Index-space samplers
@@ -732,7 +732,7 @@ GridType::ValueType v1 = openvdb::tools::BoxSampler::sample(grid.tree(), ijk);
 
 // Compute the value via triquadratic (second-order) interpolation.
 GridType::ValueType v2 = openvdb::tools::QuadraticSampler::sample(grid.tree(), ijk);
-@endcode 
+@endcode
 
 These examples invoke the @vdblink::tree::Tree::getValue() getValue@endlink
 method on the grid&rsquo;s tree to fetch sample values in the neighborhood
@@ -747,7 +747,7 @@ GridType::ConstAccessor accessor = grid.getConstAccessor();
 GridType::ValueType v0 = openvdb::tools::PointSampler::sample(accessor, ijk);
 GridType::ValueType v1 = openvdb::tools::BoxSampler::sample(accessor, ijk);
 GridType::ValueType v2 = openvdb::tools::QuadraticSampler::sample(accessor, ijk);
-@endcode 
+@endcode
 
 Another issue with these low-level interpolators is that they operate only
 in index space.
@@ -791,7 +791,7 @@ indexValue = fastSampler.isSample(openvdb::Vec3R(10.5, -100.2, 50.3));
 
 // Compute the value of the grid at a location in world space.
 worldValue = fastSampler.wsSample(openvdb::Vec3R(0.25, 1.4, -1.1));
-@endcode 
+@endcode
 Note that when constructing a GridSampler with either a tree or a
 value accessor, you must also supply an index-to-world transform.
 When constructing a GridSampler with a grid, the grid's transform is used
@@ -840,7 +840,7 @@ openvdb::tools::DualGridSampler<GridType::ConstAccessor, openvdb::tools::BoxSamp
 // Compute the value of the source grid at a location in the
 // target grid's index space.
 value = fastSampler(openvdb::Coord(-23, -50, 202));
-@endcode 
+@endcode
 Note that interpolation is done by invoking a DualGridSampler as a functor,
 in contrast to the more general-purpose GridSampler.
 
