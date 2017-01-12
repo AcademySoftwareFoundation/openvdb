@@ -158,6 +158,9 @@ PYCONFIG_INCL_DIR := $(PYTHON_INCL_DIR)
 # The directory containing libpython
 PYTHON_LIB_DIR := $(HFS)/python/lib
 PYTHON_LIB := -lpython$(PYTHON_VERSION)
+# The Directory to install the python module and includes to.
+PYTHON_INSTALL_INCL_DIR := $(DESTDIR)/python/include/python$(PYTHON_VERSION)
+PYTHON_INSTALL_LIB_DIR := $(DESTDIR)/python/lib/python$(PYTHON_VERSION)
 # The directory containing libboost_python
 BOOST_PYTHON_LIB_DIR := /rel/depot/third_party_build/boost/rhel6-1.46.1-0/lib
 BOOST_PYTHON_LIB := -lboost_python-gcc41-mt-python26-1_46_1
@@ -904,19 +907,17 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
 	then \
-	    installdir=$(DESTDIR)/python/include/python$(PYTHON_VERSION); \
-	    mkdir -p $${installdir}; \
-	    echo "Created $${installdir}"; \
-	    cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
-	    echo "Copied Python header files to $${installdir}"; \
-	    installdir=$(DESTDIR)/python/lib/python$(PYTHON_VERSION); \
-	    mkdir -p $${installdir}; \
-	    echo "Created $${installdir}"; \
-	    cp -f $(PYTHON_MODULE) $${installdir}/; \
-	    pushd $${installdir} > /dev/null; \
+	    mkdir -p $(PYTHON_INSTALL_INCL_DIR); \
+	    echo "Created $(PYTHON_INSTALL_INCL_DIR)"; \
+	    cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $(PYTHON_INSTALL_INCL_DIR)/; \
+	    echo "Copied Python header files to $(PYTHON_INSTALL_INCL_DIR)"; \
+	    mkdir -p $(PYTHON_INSTALL_LIB_DIR); \
+	    echo "Created $(PYTHON_INSTALL_LIB_DIR)"; \
+	    cp -f $(PYTHON_MODULE) $(PYTHON_INSTALL_LIB_DIR)/; \
+	    pushd $(PYTHON_INSTALL_LIB_DIR) > /dev/null; \
 	    ln -f -s $(PYTHON_MODULE) $(PYTHON_SONAME); \
 	    popd > /dev/null; \
-	    echo "Copied Python module to $${installdir}"; \
+	    echo "Copied Python module to $(PYTHON_INSTALL_LIB_DIR)"; \
 	fi
 	@#
 	mkdir -p $(DESTDIR)/bin
