@@ -29,6 +29,8 @@ See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
 
 See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
 
+See @subpage points "OpenVDB Points" for storing point data using @b OpenVDB.
+
 See @subpage python "Using OpenVDB in Python" to get started with the @b OpenVDB
 Python module.
 
