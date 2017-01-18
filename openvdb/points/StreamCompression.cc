@@ -142,11 +142,13 @@ void bloscCompress( char* compressedBuffer, size_t& compressedBytes, const size_
 
 std::unique_ptr<char[]> bloscCompress(const char* buffer, const size_t uncompressedBytes, size_t& compressedBytes, const bool resize)
 {
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    size_t tempBytes = uncompressedBytes;
     // increase temporary buffer for padding if necessary
     if (tempBytes >= BLOSC_MINIMUM_BYTES && tempBytes < BLOSC_PAD_BYTES) {
-        tempBytes += BLOSC_PAD_BYTES + BLOSC_MAX_OVERHEAD;
+        tempBytes += BLOSC_PAD_BYTES;
     }
+    // increase by Blosc max overhead
+    tempBytes += BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     std::unique_ptr<char[]> outBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 

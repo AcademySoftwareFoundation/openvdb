@@ -220,29 +220,46 @@ TestStreamCompression::testBlosc()
     }
 
     { // padded buffer
-        const int paddedCount = 16;
+        std::unique_ptr<char[]> largeBuffer(new char[2048]);
 
-        std::unique_ptr<int[]> newTest(new int[paddedCount]);
-        for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = i;
+        for (int paddedCount = 1; paddedCount < 256; paddedCount++) {
 
-#ifdef OPENVDB_USE_BLOSC
-        size_t compressedBytes;
-        std::unique_ptr<char[]> compressedBuffer = bloscCompress(
-            reinterpret_cast<char*>(newTest.get()), paddedCount*sizeof(int), compressedBytes);
+            std::unique_ptr<char[]> newTest(new char[paddedCount]);
+            for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = char(0);
 
-        CPPUNIT_ASSERT(compressedBuffer);
+    #ifdef OPENVDB_USE_BLOSC
+            size_t compressedBytes;
+            std::unique_ptr<char[]> compressedBuffer = bloscCompress(
+                newTest.get(), paddedCount, compressedBytes);
 
-        CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount*sizeof(int)));
+            // compress into a large buffer to check for any padding issues
+            size_t compressedSizeBytes;
+            bloscCompress(largeBuffer.get(), compressedSizeBytes, size_t(2048),
+                newTest.get(), paddedCount);
 
-        std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
-            reinterpret_cast<char*>(compressedBuffer.get()), paddedCount*sizeof(int));
+            // regardless of compression, these numbers should always match
+            CPPUNIT_ASSERT_EQUAL(compressedSizeBytes, compressedBytes);
 
-        CPPUNIT_ASSERT(uncompressedBuffer);
+            // no compression performed due to buffer being too small
+            if (paddedCount <= BLOSC_MINIMUM_BYTES) {
+                CPPUNIT_ASSERT(!compressedBuffer);
+            }
+            else {
+                CPPUNIT_ASSERT(compressedBuffer);
 
-        for (int i = 0; i < paddedCount; i++) {
-            CPPUNIT_ASSERT_EQUAL((reinterpret_cast<int*>(uncompressedBuffer.get()))[i], newTest[i]);
+                CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount));
+
+                std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
+                    compressedBuffer.get(), paddedCount);
+
+                CPPUNIT_ASSERT(uncompressedBuffer);
+
+                for (int i = 0; i < paddedCount; i++) {
+                    CPPUNIT_ASSERT_EQUAL((uncompressedBuffer.get())[i], newTest[i]);
+                }
+            }
+    #endif
         }
-#endif
     }
 
     { // invalid buffer (out of range)
