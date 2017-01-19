@@ -790,6 +790,7 @@ INPUT                  = . \
                          doc/codingstyle.txt \
                          doc/api_0_98_0.txt \
                          doc/examplecode.txt \
+                         doc/points.txt \
                          doc/python.txt
 
 # This tag can be used to specify the character encoding of the source files
