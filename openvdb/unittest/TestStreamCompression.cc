@@ -220,29 +220,46 @@ TestStreamCompression::testBlosc()
     }
 
     { // padded buffer
-        const int paddedCount = 16;
+        std::unique_ptr<char[]> largeBuffer(new char[2048]);
 
-        std::unique_ptr<int[]> newTest(new int[paddedCount]);
-        for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = i;
+        for (int paddedCount = 1; paddedCount < 256; paddedCount++) {
+
+            std::unique_ptr<char[]> newTest(new char[paddedCount]);
+            for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = char(0);
 
 #ifdef OPENVDB_USE_BLOSC
-        size_t compressedBytes;
-        std::unique_ptr<char[]> compressedBuffer = bloscCompress(
-            reinterpret_cast<char*>(newTest.get()), paddedCount*sizeof(int), compressedBytes);
+            size_t compressedBytes;
+            std::unique_ptr<char[]> compressedBuffer = bloscCompress(
+                newTest.get(), paddedCount, compressedBytes);
 
-        CPPUNIT_ASSERT(compressedBuffer);
+            // compress into a large buffer to check for any padding issues
+            size_t compressedSizeBytes;
+            bloscCompress(largeBuffer.get(), compressedSizeBytes, size_t(2048),
+                newTest.get(), paddedCount);
 
-        CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount*sizeof(int)));
+            // regardless of compression, these numbers should always match
+            CPPUNIT_ASSERT_EQUAL(compressedSizeBytes, compressedBytes);
 
-        std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
-            reinterpret_cast<char*>(compressedBuffer.get()), paddedCount*sizeof(int));
+            // no compression performed due to buffer being too small
+            if (paddedCount <= BLOSC_MINIMUM_BYTES) {
+                CPPUNIT_ASSERT(!compressedBuffer);
+            }
+            else {
+                CPPUNIT_ASSERT(compressedBuffer);
+                CPPUNIT_ASSERT(compressedBytes > 0);
+                CPPUNIT_ASSERT(int(compressedBytes) < paddedCount);
 
-        CPPUNIT_ASSERT(uncompressedBuffer);
+                std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
+                    compressedBuffer.get(), paddedCount);
 
-        for (int i = 0; i < paddedCount; i++) {
-            CPPUNIT_ASSERT_EQUAL((reinterpret_cast<int*>(uncompressedBuffer.get()))[i], newTest[i]);
-        }
+                CPPUNIT_ASSERT(uncompressedBuffer);
+
+                for (int i = 0; i < paddedCount; i++) {
+                    CPPUNIT_ASSERT_EQUAL((uncompressedBuffer.get())[i], newTest[i]);
+                }
+            }
 #endif
+        }
     }
 
     { // invalid buffer (out of range)
@@ -507,11 +524,11 @@ TestStreamCompression::testPagedStreams()
             }
             ostreamSizeOnly.flush();
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             int pages = static_cast<int>(fileout.tellp() / (sizeof(int)*2));
-    #else
+#else
             int pages = static_cast<int>(fileout.tellp() / (sizeof(int)));
-    #endif
+#endif
 
             CPPUNIT_ASSERT_EQUAL(pages, 10);
 
@@ -530,11 +547,11 @@ TestStreamCompression::testPagedStreams()
 
             ostream.flush();
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
-    #else
+#else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
-    #endif
+#endif
 
             // abuse File being a friend of MappedFile to get around the private constructor
             ProxyMappedFile* proxy = new ProxyMappedFile(filename);
@@ -562,13 +579,13 @@ TestStreamCompression::testPagedStreams()
                 }
             }
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             // two integers - compressed size and uncompressed size
             CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)*2));
-    #else
+#else
             // one integer - uncompressed size
             CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)));
-    #endif
+#endif
 
             PagedInputStream istream(filein);
 
@@ -605,7 +622,8 @@ TestStreamCompression::testPagedStreams()
 
             CPPUNIT_ASSERT_EQUAL(page.use_count(), long(4));
 
-            // on reading from the first handle, all pages referenced in the first three handles are in-core
+            // on reading from the first handle, all pages referenced
+            // in the first three handles are in-core
 
             CPPUNIT_ASSERT(!page0.isOutOfCore());
             CPPUNIT_ASSERT(!page1.isOutOfCore());
@@ -622,7 +640,8 @@ TestStreamCompression::testPagedStreams()
             handles.erase(handles.begin());
             handles.erase(handles.begin());
 
-            // after all three handles have been read, page should have just one use count (itself)
+            // after all three handles have been read,
+            // page should have just one use count (itself)
 
             CPPUNIT_ASSERT_EQUAL(page.use_count(), long(1));
         }
