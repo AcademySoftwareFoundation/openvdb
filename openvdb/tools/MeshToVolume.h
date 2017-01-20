@@ -3046,6 +3046,7 @@ traceExteriorBoundaries(FloatTreeT& tree)
     boost::scoped_array<bool> changedVoxelMask(new bool[numVoxels]);
 
     memset(changedNodeMaskA.get(), 1, sizeof(bool) * numLeafNodes);
+    memset(changedNodeMaskB.get(), 0, sizeof(bool) * numLeafNodes);
     mesh_to_volume_internal::fillArray(changedVoxelMask.get(), false, numVoxels);
 
     const tbb::blocked_range<size_t> nodeRange(0, numLeafNodes);
