@@ -66,6 +66,9 @@ Bug fixes:
 - Fixed an issue with duplicate registration of
   @link points/PointDataGrid.h PointDataGrid@endlink attribute types.
   <I>[Reported&nbsp;by&nbsp;SideFX]</I>
+- Fixed an uninitialized memory bug in the
+  @vdblink::tools::meshToVolume() mesh to volume@endlink converter.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
 - Fixed a thread race condition in
   @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
   that could cause it to produce incorrect results.

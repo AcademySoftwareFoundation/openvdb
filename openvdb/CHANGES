@@ -49,6 +49,8 @@ Version 3.3.0 - November 15, 2016
     - Fixed an issue with duplicate registration of PointDataGrid
       attribute types.
       [Reported by SideFX]
+    - Fixed an uninitialized memory bug in tools::meshToVolume().
+      [Reported by SideFX]
     - Fixed a thread race condition in math::QuantizedUnitVec that could
       cause it to produce incorrect results.
       [Contributed by Jeff Lait]
