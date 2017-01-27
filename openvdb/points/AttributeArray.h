@@ -1569,13 +1569,16 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
 {
     if (!outputTransient && this->isTransient())    return;
 
-    uint8_t flags(mFlags);
-    uint8_t serializationFlags(mSerializationFlags);
+    uint8_t flags(mFlags & uint8_t(~OUTOFCORE));
+    uint8_t serializationFlags(0);
     Index size(mSize);
     Index stride(mStrideOrTotalSize);
     bool strideOfOne(this->stride() == 1);
 
     bool bloscCompression = io::getDataCompression(os) & io::COMPRESS_BLOSC;
+
+    // any compressed data needs to be loaded if out-of-core
+    if (bloscCompression || this->isCompressed())    this->doLoad();
 
     size_t compressedBytes = 0;
 
@@ -1605,8 +1608,6 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     }
     else if (bloscCompression)
     {
-        this->doLoad();
-
         const char* charBuffer = reinterpret_cast<const char*>(mData.get());
         const size_t inBytes = this->arrayMemUsage();
         compressedBytes = compression::bloscCompressedSize(charBuffer, inBytes);
