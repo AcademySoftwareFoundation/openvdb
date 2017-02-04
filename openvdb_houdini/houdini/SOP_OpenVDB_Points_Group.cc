@@ -385,42 +385,42 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
             // only process if grid is a PointDataGrid with leaves
             if(!openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
-            auto pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(
-                vdbPrim->getConstGridPtr());
-            auto leafIter = pointDataGrid->tree().cbeginLeaf();
+            auto&& pointDataGrid = UTvdbGridCast<PointDataGrid>(
+		vdbPrim->getConstGrid());
+            auto leafIter = pointDataGrid.tree().cbeginLeaf();
             if (!leafIter) continue;
 
             // Set viewport metadata if no group being created
             // (copy grid first to ensure metadata is deep copied)
             if (!parms.mEnable) {
                 if (parms.mEnableViewport) {
-                    auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(
-                        vdbPrim->getGrid().copyGrid());
+                    auto&& outputGrid = UTvdbGridCast<PointDataGrid>(
+			vdbPrim->getGrid());
                     if (parms.mAddViewport) {
-                        setViewportMetadata(*outputGrid, parms);
+                        setViewportMetadata(outputGrid, parms);
                     } else {
-                        removeViewportMetadata(*outputGrid);
+                        removeViewportMetadata(outputGrid);
                     }
                 }
                 continue;
             }
 
             // Evaluate grid-specific UI parameters
-            if (evalGridGroupParms(*pointDataGrid, context, parms) >= UT_ERROR_ABORT)
+            if (evalGridGroupParms(pointDataGrid, context, parms) >= UT_ERROR_ABORT)
                 return error();
 
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();
 
-            auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
+            auto&& outputGrid = UTvdbGridCast<PointDataGrid>(vdbPrim->getGrid());
 
             // filter and create the point group in the grid
-            performGroupFiltering(*outputGrid, parms);
+            performGroupFiltering(outputGrid, parms);
 
             // attach group viewport metadata to the grid
             if (parms.mEnableViewport) {
-                if (parms.mAddViewport)     setViewportMetadata(*outputGrid, parms);
-                else                        removeViewportMetadata(*outputGrid);
+                if (parms.mAddViewport)     setViewportMetadata(outputGrid, parms);
+                else                        removeViewportMetadata(outputGrid);
             }
         }
 
