@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
+#
+# All rights reserved. This software is distributed under the
+# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+#
+# Redistributions of source code must retain the above copyright
+# and license notice and the following restrictions and disclaimer.
+#
+# *     Neither the name of DreamWorks Animation nor the names of
+# its contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+# LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+#
+#
+# Travis build script
+#
+# Builds OpenVDB and all dependent libraries on a Travis VM for a specific build combination
+#
+# TASK (install/script):
+#        * install (downloading and building all dependent libraries)
+#        * script (building OpenVDB and executing unit tests)
+# ABI (3/4) - the ABI version of OpenVDB
+# BLOSC (yes/no) - to build with Blosc support
+# RELEASE (yes/no) - to build in release or debug mode
+# HOUDINI_MAJOR (Houdini15/Houdini15.5) - the major version of Houdini
+# HOUDINI_BUILD (houdini-xxx) - to match the name of the Houdini build in SideFX' ftp
+#
+# (Note Travis instances allow only 7.5GB of memory per VM, so limit concurrent builds to 4)
+#
+# Author: Dan Bailey
+
+set -x
+
+TASK="$1"
+ABI="$2"
+BLOSC="$3"
+RELEASE="$4"
+HOUDINI_MAJOR="$5"
+HOUDINI_BUILD="$6"
+
+# Disable Doxygen, Log4CPlus, Python and GLFW for now
+COMMON_ARGS="   DESTDIR=/tmp/OpenVDB\
+                CONCURRENT_MALLOC_LIB=\
+                DOXYGEN=\
+                LOG4CPLUS_INCL_DIR=\
+                PYTHON_INCL_DIR=\
+                GLFW_INCL_DIR="
+
+# Boost, OpenEXR and TBB
+STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
+                    EXR_INCL_DIR=/usr/include/OpenEXR\
+                    EXR_LIB_DIR=/usr/local/lib\
+                    TBB_LIB_DIR=/usr/lib"
+HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
+                    BOOST_LIB_DIR=/test/hou/dsolib\
+                    TBB_LIB_DIR=/test/hou/dsolib\
+                    EXR_INCL_DIR=/test/hou/toolkit/include\
+                    EXR_LIB_DIR=/test/hou/dsolib"
+
+# Blosc
+STANDALONE_BLOSC_ARGS=" BLOSC_INCL_DIR=/test/blosc/include\
+                        BLOSC_LIB_DIR=/test/blosc/lib"
+HOUDINI_BLOSC_ARGS="    BLOSC_INCL_DIR=/test/hou/toolkit/include\
+                        BLOSC_LIB_DIR=/test/hou/dsolib"
+NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
+                        BLOSC_LIB_DIR="
+
+if [ "$TASK" = "install" ]; then
+    # update OS
+    sudo apt-get update
+    # sym-link to reduce command word lengths
+    sudo ln -s $PWD /test
+    cd /test
+    # install OpenVDB pre-requisites when built without Houdini
+    if [ "$HOUDINI_BUILD" = "none" ]; then
+        sudo apt-get install -y libboost-all-dev
+        sudo apt-get install -y libtbb-dev
+        sudo apt-get install -y libcppunit-dev
+        # download and build Blosc 1.5.0  if required
+        if [ "$BLOSC" = "yes" ]; then
+            wget https://github.com/Blosc/c-blosc/archive/v1.5.0.zip
+            unzip v1.5.0.zip
+            cd c-blosc-1.5.0
+            mkdir -p /test/blosc
+            cmake -DCMAKE_INSTALL_PREFIX=/test/blosc
+            make
+            make install
+            cd -
+        fi
+    else
+        # install houdini pre-requisites
+        sudo apt-get install -y libxi-dev
+        sudo apt-get install -y csh
+        # download and unpack houdini headers and libraries from public FTP
+        wget ftp://ftp.sidefx.com/indie/$HOUDINI_MAJOR/$HOUDINI_BUILD.tar.gz
+        tar -xzf $HOUDINI_BUILD.tar.gz
+        ln -s $HOUDINI_BUILD hou
+        cd hou
+        tar -xzf houdini.tar.gz
+        cd -
+    fi
+elif [ "$TASK" = "script" ]; then
+    if [ "$HOUDINI_BUILD" = "none" ]; then
+        # release mode - build and run OpenVDB unit tests
+        # debug mode - build OpenVDB unit tests
+        if [ "$ABI" = "3" ]; then
+            if [ "$BLOSC" = "yes" ]; then
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi=3 -j4
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi=3 debug=yes -j4
+                fi
+            else
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi=3 -j4
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi=3 debug=yes -j4
+                fi
+            fi
+        else
+            if [ "$BLOSC" = "yes" ]; then
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test -j4
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install debug=yes -j4
+                fi
+            else
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test -j4
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install debug=yes -j4
+                fi
+            fi
+        fi
+    else
+        # source houdini_setup
+        cd hou
+        source houdini_setup
+        cd -
+        # build OpenVDB core library and OpenVDB houdini library
+        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi=3 -j4
+        # manually install OpenVDB houdini headers and lib
+        mkdir houdini_utils
+        cp openvdb_houdini/houdini/*.h openvdb_houdini
+        cp openvdb_houdini/houdini/*.h houdini_utils
+        cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
+        # build OpenVDB Houdini SOPs
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS all abi=3 -j4
+    fi
+fi
