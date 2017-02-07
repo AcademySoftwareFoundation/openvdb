@@ -12,24 +12,24 @@ class Openvdb_maya(Context):
         self.environ["OPENVDB_MAYA_VERSION"] = self.version
 
         self.environ["OPENVDB_MAYA_INCLUDE_PATH"] = self.expandPaths(
-            self.package_root + '/maya/$MAYA_VERSION_MAJOR/include'
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/include'
         )
         self.environ["OPENVDB_MAYA_LIBRARY_PATH"] = self.expandPaths(
-            self.package_root + '/maya/$MAYA_VERSION_MAJOR/lib'
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/lib'
         )
 
         # LD_LIBRARY path
         self.environ[ 'LD_LIBRARY_PATH' ] = self.expandPaths(
-            self.package_root + '/maya/$MAYA_VERSION_MAJOR/lib',
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/lib',
             '$LD_LIBRARY_PATH'
         )
             
         self.environ[ 'MAYA_PLUG_IN_PATH'] = self.expandPaths(
-            self.package_root + '/maya/$MAYA_VERSION_MAJOR/plugins',
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/plugins',
             '$MAYA_PLUG_IN_PATH'
         )
 
         self.environ[ 'MAYA_SCRIPT_PATH'] = self.expandPaths(
-            self.package_root + '/maya/$MAYA_VERSION_MAJOR/scripts',
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/scripts',
             '$MAYA_SCRIPT_PATH'          
         )

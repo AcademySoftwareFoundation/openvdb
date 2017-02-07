@@ -19,7 +19,7 @@ class Openvdb(Context):
         )
         # LD_LIBRARY path
         self.environ[ 'LD_LIBRARY_PATH' ] = self.expandPaths(
-            self.package_root + '/lib',
+          '$OPENVDB_PACKAGE_ROOT/lib',
             '$LD_LIBRARY_PATH'
         )
             

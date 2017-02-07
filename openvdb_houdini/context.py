@@ -24,16 +24,16 @@ class Openvdb_houdini(Context):
                 '$OPENVDB_HOUDINI_PACKAGE_ROOT/houdini/$DD_HOUD_MAJ_VERSION'
             )
         
-        self.environ['OPENVDB_HOUDINI_INCLUDE_PATH'] = '%/include'%path
-        self.environ['OPENVDB_HOUDINI_LIBRARY_PATH'] = '%/lib'%path
+        self.environ['OPENVDB_HOUDINI_INCLUDE_PATH'] = '%s/include'%path
+        self.environ['OPENVDB_HOUDINI_LIBRARY_PATH'] = '%s/lib'%path
 
         self.environ[ 'HOUDINI_SCRIPT_PATH' ] = self.expandPaths(
-            '%/scripts'%path,
+            '%s/scripts'%path,
             '$HOUDINI_SCRIPT_PATH'
         )
         
         self.environ[ 'HOUDINI_DSO_PATH' ] = self.expandPaths(
-            '%/dso'%path,
+            '%s/dso'%path,
             '$HOUDINI_DSO_PATH'
         )
         
