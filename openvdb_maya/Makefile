@@ -29,7 +29,8 @@
 
 # Targets:
 #   all                 [default target] all Maya plugins
-#   install             install plugins, scripts, etc. into MAYA_DESTDIR
+#   install_lib         install plugins into MAYA_DESTDIR
+#   install             install all plugins, scripts, etc. into MAYA_DESTDIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
 #
@@ -273,11 +274,13 @@ $(MAYA_SO_NAME): $(MAYA_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -fPIC -Wl,-Bsymbolic -shared -o $@ $^ $(LIBS)
 
-install: $(MAYA_SO_NAME)
+install_lib: $(MAYA_SO_NAME)
 	mkdir -p $(MAYA_DESTDIR)/plugins
 	@echo "Created $(MAYA_DESTDIR)/plugins"
 	cp -f $(MAYA_SO_NAME) $(MAYA_DESTDIR)/plugins/
 	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_DESTDIR)/plugins/"
+
+install: install_lib
 	mkdir -p $(MAYA_DESTDIR)/scripts
 	@echo "Created $(MAYA_DESTDIR)/scripts"
 	cp -f $(MAYA_SCRIPTS) $(MAYA_DESTDIR)/scripts/
