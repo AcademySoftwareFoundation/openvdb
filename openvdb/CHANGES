@@ -11,11 +11,15 @@ Version 4.0.1 - In development
     - Added a -shuffle option that causes vdb_test to run unit tests
       in random order, which can help to identify unintended dependencies
       between tests.
+    - Added vdb_lod, a command-line tool to generate volume mipmaps
+      for level-of-detail effects.
 
     Improvements:
     - Added a Metadata::str() specialization for StringMetadata that
       eliminates the overhead of writing to a string stream.
     - Made various minor improvements to util::PagedArray.
+    - Added documentation and Cookbook examples for OpenVDB Points.
+      [Contributed by Double Negative]
 
     Bug fixes:
     - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
@@ -35,6 +39,8 @@ Version 4.0.1 - In development
       [Contributed by Jeff Lait]
     - Fixed a dangling pointer bug in tools::ParticleAtlas.
       [Contributed by SideFX]
+    - Grid operators (divergence, gradient, etc.) now produce correct results
+      even for grids with active tile values.
 
     Python:
     - Added functions getLoggingLevel(), setLoggingLevel(), and
@@ -63,6 +69,11 @@ Version 4.0.1 - In development
       that could cause hython to report a DSO error.
       [Reported by Double Negative]
     - Added an install_lib build target to the Makefile.
+    - Rewrote the Remove Divergence SOP to actually remove divergence from
+      vector fields on collocated grids, and added support for stationary
+      and moving obstacles and an option to output a pressure field.
+    - The Analysis SOP now produces correct results for grids with active
+      tile values.
 
 
 Version 4.0.0 - November 15, 2016

@@ -20,6 +20,9 @@ and was developed primarily by
 - Mihai Ald&eacute;n
 - David Hill
 
+See the @subpage changes "Release Notes" for what&rsquo;s new in this version
+of @b OpenVDB.
+
 See the @subpage overview "Overview" for an introduction to the library.
 
 See @subpage transformsAndMaps "Transforms and Maps" for more
@@ -29,13 +32,10 @@ See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
 
 See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
 
-See @subpage points "OpenVDB Points" for storing point data using @b OpenVDB.
+See @subpage points "OpenVDB Points" to store point data using @b OpenVDB.
 
-See @subpage python "Using OpenVDB in Python" to get started with the @b OpenVDB
-Python module.
-
-See the @subpage changes "Release Notes" for what's new in this version
-of @b OpenVDB.
+See @subpage python "Using OpenVDB in Python" to get started with the
+@b OpenVDB Python module.
 
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".

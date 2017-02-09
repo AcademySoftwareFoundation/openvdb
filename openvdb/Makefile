@@ -38,6 +38,7 @@
 #   pytest              unit tests for the Python module
 #   pydoc               HTML documentation for the Python module
 #                       (doc/html/python/index.html)
+#   vdb_lod             command-line tool to generate volume mipmaps
 #   vdb_print           command-line tool to inspect OpenVDB files
 #   vdb_render          command-line tool to ray-trace OpenVDB files
 #   vdb_view            command-line tool to view OpenVDB files
@@ -691,6 +692,7 @@ list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 
 ALL_PRODUCTS := \
     $(LIBOPENVDB) \
     vdb_test \
+    vdb_lod \
     vdb_print \
     vdb_render \
     vdb_view \
@@ -708,7 +710,7 @@ ALL_PRODUCTS := \
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: lib python vdb_print vdb_render vdb_test depend
+all: lib python vdb_lod vdb_print vdb_render vdb_test depend
 
 $(OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
@@ -761,6 +763,12 @@ doc:
 pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
+
+vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod/main.cc
+	@echo "Building $@ because of $(list_deps)"
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod/main.cc -I . \
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
 vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
 	@echo "Building $@ because of $(list_deps)"
@@ -865,7 +873,7 @@ test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
 endif
 
-install: lib python vdb_print vdb_render vdb_view doc pydoc
+install: lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	mkdir -p $(DESTDIR)/include/openvdb
 	@echo "Created $(DESTDIR)/include/openvdb"
 	pushd $(DESTDIR)/include/openvdb > /dev/null; \
@@ -921,6 +929,8 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	@#
 	mkdir -p $(DESTDIR)/bin
 	@echo "Created $(DESTDIR)/bin/"
+	cp -f vdb_lod $(DESTDIR)/bin
+	@echo "Copied vdb_lod to $(DESTDIR)/bin/"
 	cp -f vdb_print $(DESTDIR)/bin
 	@echo "Copied vdb_print to $(DESTDIR)/bin/"
 	cp -f vdb_render $(DESTDIR)/bin

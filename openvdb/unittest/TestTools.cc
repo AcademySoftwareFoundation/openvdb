@@ -1755,79 +1755,131 @@ TestTools::testLevelSetMeasure()
 void
 TestTools::testMagnitude()
 {
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(/*background=*/5.0);
-    openvdb::FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    using namespace openvdb;
+    {
+        FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
+        FloatTree& tree = grid->tree();
+        CPPUNIT_ASSERT(tree.empty());
 
-    const openvdb::Coord dim(64,64,64);
-    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
-    const float radius=0.0f;
-    unittest_util::makeSphere<openvdb::FloatGrid>(dim,center,radius,*grid,
-                                                  unittest_util::SPHERE_DENSE);
+        const Coord dim(64,64,64);
+        const Vec3f center(35.0f, 30.0f, 40.0f);
+        const float radius=0.0f;
+        unittest_util::makeSphere(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+        CPPUNIT_ASSERT(!tree.empty());
+        CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
-    openvdb::VectorGrid::Ptr gradGrid = openvdb::tools::gradient(*grid);
-    CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
+        VectorGrid::Ptr gradGrid = tools::gradient(*grid);
+        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
 
-    openvdb::FloatGrid::Ptr mag = openvdb::tools::magnitude(*gradGrid);
-    CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(mag->activeVoxelCount()));
+        FloatGrid::Ptr mag = tools::magnitude(*gradGrid);
+        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(mag->activeVoxelCount()));
 
-    openvdb::FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
+        FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
 
-    openvdb::Coord xyz(35,30,30);
-    float v = accessor.getValue(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        Coord xyz(35,30,30);
+        float v = accessor.getValue(xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
 
-    xyz.reset(35,10,40);
-    v = accessor.getValue(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        xyz.reset(35,10,40);
+        v = accessor.getValue(xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+    }
+    {
+        // Test on a grid with (only) tile values.
+
+        Vec3fGrid grid;
+        Vec3fTree& tree = grid.tree();
+        CPPUNIT_ASSERT(tree.empty());
+
+        const Vec3f v(1.f, 2.f, 2.f);
+        const float expectedLength = v.length();
+
+        tree.addTile(/*level=*/1, Coord(-100), v, /*active=*/true);
+        tree.addTile(/*level=*/1, Coord(100), v, /*active=*/true);
+
+        CPPUNIT_ASSERT(!tree.empty());
+
+        FloatGrid::Ptr length = tools::magnitude(grid);
+
+        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(length->activeVoxelCount()));
+
+        for (auto it = length->cbeginValueOn(); it; ++it) {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedLength, *it, 1.0e-6);
+        }
+    }
 }
 
 
 void
 TestTools::testMaskedMagnitude()
 {
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(/*background=*/5.0);
-    openvdb::FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    using namespace openvdb;
+    {
+        FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
+        FloatTree& tree = grid->tree();
+        CPPUNIT_ASSERT(tree.empty());
 
-    const openvdb::Coord dim(64,64,64);
-    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
-    const float radius=0.0f;
-    unittest_util::makeSphere<openvdb::FloatGrid>(dim,center,radius,*grid,
-                                                  unittest_util::SPHERE_DENSE);
+        const Coord dim(64,64,64);
+        const Vec3f center(35.0f, 30.0f, 40.0f);
+        const float radius=0.0f;
+        unittest_util::makeSphere(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+        CPPUNIT_ASSERT(!tree.empty());
+        CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
-    openvdb::VectorGrid::Ptr gradGrid = openvdb::tools::gradient(*grid);
-    CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
+        VectorGrid::Ptr gradGrid = tools::gradient(*grid);
+        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
 
+        // create a masking grid
+        const CoordBBox maskbbox(Coord(35, 30, 30), Coord(41, 41, 41));
+        BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+        maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
 
-    // create a masking grid
+        // compute the magnitude in masked region
+        FloatGrid::Ptr mag = tools::magnitude(*gradGrid, *maskGrid);
 
-    const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
-    openvdb::BoolGrid::Ptr maskGrid = openvdb::BoolGrid::create(false);
-    maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
+        FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
 
-    // compute the magnitude in masked region
-    openvdb::FloatGrid::Ptr mag = openvdb::tools::magnitude(*gradGrid, *maskGrid);
+        // test in the masked region
+        Coord xyz(35,30,30);
+        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
+        float v = accessor.getValue(xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
 
-    openvdb::FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
+        // test outside the masked region
+        xyz.reset(35,10,40);
+        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+        v = accessor.getValue(xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, v, 0.01);
+    }
+    {
+        // Test on a grid with (only) tile values.
 
-    // test in the masked region
-    openvdb::Coord xyz(35,30,30);
-    CPPUNIT_ASSERT(maskbbox.isInside(xyz));
-    float v = accessor.getValue(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        Vec3fGrid grid;
+        Vec3fTree& tree = grid.tree();
+        CPPUNIT_ASSERT(tree.empty());
 
-    // test outside the masked region
-    xyz.reset(35,10,40);
-    CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
-    v = accessor.getValue(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, v, 0.01);
+        const Vec3f v(1.f, 2.f, 2.f);
+        const float expectedLength = v.length();
+
+        tree.addTile(/*level=*/1, Coord(100), v, /*active=*/true);
+        const int expectedActiveVoxelCount = int(tree.activeVoxelCount());
+        tree.addTile(/*level=*/1, Coord(-100), v, /*active=*/true);
+
+        CPPUNIT_ASSERT(!tree.empty());
+
+        BoolGrid mask;
+        mask.fill(CoordBBox(Coord(90), Coord(200)), true, true);
+
+        FloatGrid::Ptr length = tools::magnitude(grid, mask);
+
+        CPPUNIT_ASSERT_EQUAL(expectedActiveVoxelCount, int(length->activeVoxelCount()));
+
+        for (auto it = length->cbeginValueOn(); it; ++it) {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedLength, *it, 1.0e-6);
+        }
+    }
 }
 
 

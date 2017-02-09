@@ -116,7 +116,7 @@ VdbPrimCIterator::getPrimitive() const
 UT_String
 VdbPrimCIterator::getPrimitiveName(const UT_String& defaultName) const
 {
-    // We must have always deep enabled on returned UT_String objects to avoid
+    // We must have ALWAYS_DEEP enabled on returned UT_String objects to avoid
     // having it deleted before the caller has a chance to use it.
     UT_String name(UT_String::ALWAYS_DEEP);
 
@@ -134,6 +134,24 @@ VdbPrimCIterator::getPrimitiveNameOrIndex() const
     UT_String name;
     name.itoa(this->getIndex());
     return this->getPrimitiveName(/*defaultName=*/name);
+}
+
+
+UT_String
+VdbPrimCIterator::getPrimitiveIndexAndName(bool keepEmptyName) const
+{
+    // We must have ALWAYS_DEEP enabled on returned UT_String objects to avoid
+    // having it deleted before the caller has a chance to use it.
+    UT_String result(UT_String::ALWAYS_DEEP);
+
+    if (const GU_PrimVDB* vdb = getPrimitive()) {
+        result.itoa(this->getIndex());
+        UT_String name = vdb->getGridName();
+        if (keepEmptyName || name.isstring()) {
+            result += (" (" + name.toStdString() + ")").c_str();
+        }
+    }
+    return result;
 }
 
 

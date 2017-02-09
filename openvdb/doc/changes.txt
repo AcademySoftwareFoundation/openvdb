@@ -16,6 +16,8 @@ New features:
 - Added a <TT>-shuffle</TT> option that causes <TT>vdb_test</TT>
   to run unit tests in random order, which can help to identify
   unintended dependencies between tests.
+- Added @c vdb_lod, a command-line tool to generate volume mipmaps
+  for level-of-detail effects.
 
 @par
 Improvements:
@@ -24,6 +26,9 @@ Improvements:
   the overhead of writing to a string stream.
 - Made various minor improvements to @vdblink::util::PagedArray
   util::PagedArray@endlink.
+- Added @subpage points "documentation" and Cookbook
+  @ref openvdbPointsHelloWorld "examples" for OpenVDB&nbsp;Points.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 @par
 Bug fixes:
@@ -51,6 +56,9 @@ Bug fixes:
 - Fixed a dangling pointer bug in the
   @vdblink::tools::ParticleAtlas particle atlas@endlink tool.
   <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+- Grid operators (@vdblink::tools::divergence() divergence@endlink,
+  @vdblink::tools::gradient() gradient@endlink, etc.) now produce
+  correct results even for grids with active tile values.
 
 @par
 Python:
@@ -82,6 +90,11 @@ Houdini:
   that could cause @c hython to report a DSO error.
   <I>[Reported&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Added an @c install_lib build target to the Makefile.
+- Rewrote the Remove&nbsp;Divergence SOP to actually remove divergence from
+  vector fields on collocated grids, and added support for stationary
+  and moving obstacles and an option to output a pressure field.
+- The Analysis&nbsp;SOP now produces correct results for grids with active
+  tile values.
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly

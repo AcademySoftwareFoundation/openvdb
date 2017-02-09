@@ -47,7 +47,7 @@ illustrate how to use OpenVDB and how to perform common tasks.
   - @ref sConstantStride
 
 
-@section sHelloWorld "Hello, World" for OpenVDB
+@section sHelloWorld &ldquo;Hello, World&rdquo; for OpenVDB
 This is a very simple example showing how to create a grid and access
 its voxels.  OpenVDB supports both random access to voxels by coordinates
 and sequential access by means of iterators.  This example illustrates both
@@ -1271,9 +1271,11 @@ for (openvdb::GridPtrVecIter iter = myGrids->begin();
 }
 @endcode
 
+
+
 @anchor openvdbPointsHelloWorld
 
-@section sPointsHelloWorld "Hello, World" for OpenVDB Points
+@section sPointsHelloWorld &ldquo;Hello, World&rdquo; for OpenVDB Points
 This is a simple example showing how to convert a few points,
 perform I/O and iterate over them to extract their world-space positions.
 
@@ -1405,7 +1407,7 @@ Leaf[0, 0, 0]
 @endcode
 
 @section sPointsConversion Converting Point Attributes
-This example is the same as the @ref sPointsHelloWorld example, however
+This example is the same as the @ref sPointsHelloWorld example, however it
 demonstrates converting radius in addition to position. It uses a tailored
 attribute compression for the radius to demonstrate how to reduce memory.
 

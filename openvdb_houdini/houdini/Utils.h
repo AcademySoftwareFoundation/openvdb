@@ -120,6 +120,14 @@ public:
     /// or, if the name is empty, the primitive's index (as a UT_String).
     UT_String getPrimitiveNameOrIndex() const;
 
+    /// @brief Return a string of the form "N (NAME)", where @e N is
+    /// the current VDB primitive's index and @e NAME is the value
+    /// of the primitive's @c name attribute.
+    /// @param keepEmptyName  if the current primitive has no @c name attribute
+    ///     or its name is empty, then if this flag is @c true, return a string
+    ///     "N ()", otherwise return a string "N" omitting the empty name
+    UT_String getPrimitiveIndexAndName(bool keepEmptyName = true) const;
+
 protected:
     /// Allow primitives to be deleted during iteration.
     VdbPrimCIterator(const GEO_Detail*, GA_Range::safedeletions,

@@ -2,27 +2,27 @@
 @page points OpenVDB Points
 
 
-@section Contents
-- @ref secOverview
-- @ref secCompression
-- @ref secLocality
-- @ref secAttributes
-  - @ref secTypedAttributeArray
-  - @ref secAttributeHandle
-  - @ref secAttributePerformance
-  - @ref secAttributeSet
-- @ref secPointTree
-  - @ref secPointIndexTree
-  - @ref secPointDataTree
-- @ref secSparsity
-  - @ref secBackground
-  - @ref secActiveValues
-  - @ref secIndexIterators
-  - @ref secIndexFilters
-- @ref secSpaceAndTrans
+@section secPtContents Contents
+- @ref secPtOverview
+- @ref secPtCompression
+- @ref secPtLocality
+- @ref secPtAttributes
+  - @ref secPtTypedAttributeArray
+  - @ref secPtAttributeHandle
+  - @ref secPtAttributePerformance
+  - @ref secPtAttributeSet
+- @ref secPtPointTree
+  - @ref secPtPointIndexTree
+  - @ref secPtPointDataTree
+- @ref secPtSparsity
+  - @ref secPtBackground
+  - @ref secPtActiveValues
+  - @ref secPtIndexIterators
+  - @ref secPtIndexFilters
+- @ref secPtSpaceAndTrans
 
 
-@section secOverview Introduction
+@section secPtOverview Introduction
 @anchor openvdbPointsOverview
 
 The @b OpenVDB library can store point data within an OpenVDB hierarchy in two
@@ -37,7 +37,7 @@ arrays.
 See the @ref openvdbPointsHelloWorld "Cookbook" for code examples to get started
 using @b OpenVDB @b Points.
 
-@section secCompression Compression
+@section secPtCompression Compression
 
 A key motivation behind the library is to increase data compression and thus
 reduce the memory and disk space requirements of the point set.
@@ -68,7 +68,7 @@ In addition, other attributes such as velocity can benefit from value
 compression. For example, a unit vector scheme can compress a 3 x float vector
 (12 bytes) into just 2 bytes.
 
-@section secLocality Locality
+@section secPtLocality Locality
 
 Data compression isn't the only area to benefit from a spatially organised data
 set. Due to the effects of L1 and L2 caching in modern CPUs, improved cache
@@ -80,12 +80,12 @@ organised data with randomly organised linear data when dereferenced using a
 spatial acceleration structure consistently resulted in a performance
 improvement of between 2x and 3x.
 
-@section secAttributes Attributes
+@section secPtAttributes Attributes
 
 Attribute storage is provided as an independent toolset within the library to
 allow for use outside of OpenVDB grids.
 
-@subsection secTypedAttributeArray TypedAttributeArray
+@subsection secPtTypedAttributeArray TypedAttributeArray
 
 The TypedAttributeArray stores array data with a specified value type and
 compression codec, which form the template signature.
@@ -105,7 +105,7 @@ codec to reduce the footprint from 32-bit to 16-bit:
 openvdb::points::TypedAttributeArray<float, openvdb::points::TruncateCodec>
 @endcode
 
-@subsection secAttributeHandle AttributeHandle
+@subsection secPtAttributeHandle AttributeHandle
 
 AttributeHandle and AttributeWriteHandle classes provide access to the array
 data without requiring knowledge of the codec. This is important as it can allow
@@ -129,7 +129,7 @@ auto handle = AttributeHandle<float>::create(leaf->constAttributeArray("attribut
 Note that ensuring const access to the attribute array will prevent redundant
 copying when using a read-only handle.
 
-@subsection secAttributePerformance TypedAttributeArray vs AttributeHandle
+@subsection secPtAttributePerformance TypedAttributeArray vs AttributeHandle
 
 One key benefit of AttributeHandles is that they ensure the data being accessed
 has been uncompressed and is in-core on creation of the handle to avoid the need
@@ -137,7 +137,7 @@ to perform these checks when the data is being accessed and modified for
 improved performance. An AttributeHandle may also be provided a specific codec
 if known to eliminate the indirection cost.
 
-@subsection secAttributeSet AttributeSet and Descriptor
+@subsection secPtAttributeSet AttributeSet and Descriptor
 
 The AttributeSet stores a collection of attribute arrays along with a Descriptor
 that tracks the type of each of the attribute arrays.
@@ -150,9 +150,9 @@ use-case for this might be to reduce precision of an attribute further from a
 camera where accuracy is deemed less important and can be traded for a reduced
 memory or disk footprint.
 
-@section secPointTree The Point Tree
+@section secPtPointTree The Point Tree
 
-@subsection secPointIndexTree Point Index Tree
+@subsection secPtPointIndexTree Point Index Tree
 
 As mentioned in the introduction, the PointIndexTree is a structure in OpenVDB
 that stores an array of offset indices to a linear point array in the leaf
@@ -165,7 +165,7 @@ The PointIndexTree has this tree configuration:
 typedef tree::Tree4<PointIdx32, 5, 4, 3>::Type PointIndexTree;
 @endcode
 
-@subsection secPointDataTree Point Data Tree
+@subsection secPtPointDataTree Point Data Tree
 
 The PointDataTree has this tree configuration:
 
@@ -180,14 +180,14 @@ other components within the Tree or Grid hierarchy change. It is for this reason
 that many of the existing features of OpenVDB such as serialization work without
 requiring additional functionality in OpenVDB.
 
-@section secSparsity Voxel Values
+@section secPtSparsity Voxel Values
 
 For the PointDataTree, the voxel values represent the end position in the linear
 attribute arrays attached to each LeafNode. Using the value of the previous
 voxel (zero for the first voxel), the offset for the start position can be
 deduced.
 
-@subsection secBackground Background and Tile Values
+@subsection secPtBackground Background and Tile Values
 
 There are three distinct ways of storing data in an OpenVDB tree:
 <B>voxel values</B>, <B>tile values</B>, and a <B>background value</B>.
@@ -198,7 +198,7 @@ contains points which is neither an efficient storage mechanism nor particularly
 common. For this reason, the LeafNode constructor may take a background value
 but it is internally overriden to be zero on construction.
 
-@subsection secActiveValues Active Values
+@subsection secPtActiveValues Active Values
 
 Any voxel or tile can be classified as either @b active or @b inactive. The
 interpretation of this state is application-specific, however there are some
@@ -208,7 +208,7 @@ voxel as active if it contains points and inactive otherwise. This allows
 iteration over the points in a LeafNode to be accelerated to only iterate over
 voxels that contain points.
 
-@subsection secIndexIterators Index Iterators
+@subsection secPtIndexIterators Index Iterators
 @anchor openvdbPointsIterators
 
 An index iterator contains a value iterator and an index filter, however the
@@ -240,7 +240,7 @@ user meaning it is only necessary to iterate over the indices within the leaf.
 It is also possible to retrieve the voxel coordinate from the index iterator
 directly.
 
-@subsection secIndexFilters Index Filters
+@subsection secPtIndexFilters Index Filters
 
 Index filters provide an easy way of only iterating over indices that match a
 set criteria. One such index filter provided by the library is to iterate over
@@ -255,7 +255,7 @@ As the index iterator is templated on the filter, it's possible to construct
 filters that do relatively complicated operations provided they meet the basic
 interface requirements of an IndexFilter.
 
-@section secSpaceAndTrans Voxel Space, Index Space, World Space
+@section secPtSpaceAndTrans Voxel Space, Index Space, World Space
 
 Points are stored in @b voxel @b space, meaning all point positions lie between
 (-0.5, -0.5, -0.5) and (0.5, 0.5, 0.5) with the center of the voxel being

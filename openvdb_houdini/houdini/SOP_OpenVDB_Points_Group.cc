@@ -385,8 +385,7 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
             // only process if grid is a PointDataGrid with leaves
             if(!openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
-            auto&& pointDataGrid = UTvdbGridCast<PointDataGrid>(
-		vdbPrim->getConstGrid());
+            auto&& pointDataGrid = UTvdbGridCast<PointDataGrid>(vdbPrim->getConstGrid());
             auto leafIter = pointDataGrid.tree().cbeginLeaf();
             if (!leafIter) continue;
 
@@ -394,8 +393,7 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
             // (copy grid first to ensure metadata is deep copied)
             if (!parms.mEnable) {
                 if (parms.mEnableViewport) {
-                    auto&& outputGrid = UTvdbGridCast<PointDataGrid>(
-			vdbPrim->getGrid());
+                    auto&& outputGrid = UTvdbGridCast<PointDataGrid>(vdbPrim->getGrid());
                     if (parms.mAddViewport) {
                         setViewportMetadata(outputGrid, parms);
                     } else {
