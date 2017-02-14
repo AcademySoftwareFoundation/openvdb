@@ -34,8 +34,6 @@ COMPILE_DIRS :=
 
 BUILD_ROOT ?= $(BUILD_DIR)
 
-BUILD_POST_TARGETS += set-version
-
 # If your package does not have any operating-system-dependent components (such
 # as compiled plugins), you may set this variable to a space-separated list of
 # operating systems you want to install to by default.  If you don't set this
@@ -48,14 +46,4 @@ NO_TAG := yes
 # account your settings, above. Do not remove this line unless you really
 # know what you are doing.
 include $(DD_TOOLS_ROOT)/etc/Makefile.tdpackage
-
-# Version for openvdb, overrides the dummy version in the manifests.
-override PACKAGE_VERSION := 4.0.0
-
-.PHONY: set-version
-set-version:
-	@echo "updating the version in the manifest..."
-	@sed -Ei 's/(^Version:).*/\1 $(PACKAGE_VERSION)/' $(BUILD_ROOT)/manifest && \
-	sed -Ei 's/(- openvdb-).*/\1$(PACKAGE_VERSION)/' $(BUILD_ROOT)/manifest && \
-	sed -i '/^# NOTE: version/d' $(BUILD_ROOT)/manifest
 

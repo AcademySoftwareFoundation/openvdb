@@ -26,7 +26,7 @@ BUILD_POST_TARGETS += $(houdini_link_targets)
 ################################################################################
 # Include the bulk of the makefiles
 PACKAGE_ROOT := $(PWD)
-include ../Version.mk
+include ../Header.mk
 
 ################################################################################
 # Strip rpaths
@@ -36,7 +36,7 @@ include ../Strip.mk
 ################################################################################
 # Build the houdini libraries
 
-# Defines OPENVDB_PATH
+# Defines OPENVDB_PATH and OPENVDB_VERSION
 include ../Variables.mk
 
 .PHONY:build-houdini-%

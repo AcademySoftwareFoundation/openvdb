@@ -17,7 +17,7 @@ BUILD_POST_TARGETS += $(openvdb_maya_targets) $(strip_rpath_targets)
 ################################################################################
 # Include the bulk of the makefiles
 PACKAGE_ROOT := $(PWD)
-include ../Version.mk
+include ../Header.mk
 
 ################################################################################
 # Strip rpath from libs

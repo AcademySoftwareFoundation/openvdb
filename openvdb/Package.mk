@@ -9,7 +9,7 @@ CLEAN_TARGETS += clean-openvdb
 
 # Set the package root to this path and not the one above.
 PACKAGE_ROOT := $(PWD)
-include ../Version.mk
+include ../Header.mk
 
 .PHONY: build-openvdb
 build-openvdb:
