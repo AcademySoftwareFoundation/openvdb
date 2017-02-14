@@ -26,6 +26,8 @@ Improvements:
   the overhead of writing to a string stream.
 - Made various minor improvements to @vdblink::util::PagedArray
   util::PagedArray@endlink.
+- Added an @c install_lib build target to the Makefile.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Added @subpage points "documentation" and Cookbook
   @ref openvdbPointsHelloWorld "examples" for OpenVDB&nbsp;Points.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
@@ -114,8 +116,9 @@ Highlights:
   (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
   so that it is incompatible with earlier versions of the OpenVDB library,
   such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
+  To disable these changes and preserve ABI compatibility, define
+  the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  or any code that depends on OpenVDB.
   </BLOCKQUOTE>
 
 @par
@@ -219,8 +222,9 @@ Houdini:
   above) alter the grid&nbsp;ABI so that it is incompatible with earlier
   versions of the OpenVDB library, such as the ones in Houdini&nbsp;15.0
   and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
+  To disable these changes and preserve ABI compatibility, define
+  the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  or any code that depends on OpenVDB.
 - Introduced some C++11 constructs that are incompatible with
   versions of Houdini older than&nbsp;15.0.
 - Fixed a bug in the Rasterize Points SOP that caused vector-valued attributes

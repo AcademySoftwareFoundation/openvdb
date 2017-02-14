@@ -18,6 +18,8 @@ Version 4.0.1 - In development
     - Added a Metadata::str() specialization for StringMetadata that
       eliminates the overhead of writing to a string stream.
     - Made various minor improvements to util::PagedArray.
+    - Added an install_lib build target to the Makefile.
+      [Contributed by Double Negative]
     - Added documentation and Cookbook examples for OpenVDB Points.
       [Contributed by Double Negative]
 
@@ -89,8 +91,9 @@ Version 4.0.0 - November 15, 2016
       This change and other changes in this release (see "ABI changes" below)
       alter the grid ABI so that it is incompatible with earlier versions
       of the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
-      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-      to disable these changes and preserve ABI compatibility.
+      To disable these changes and preserve ABI compatibility, define
+      the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      or any code that depends on OpenVDB.
 
     New features:
     - Added an option to the point scattering tools to specify how far
@@ -167,8 +170,9 @@ Version 4.0.0 - November 15, 2016
     - Certain changes in this release (see "ABI changes" above) alter
       the grid ABI so that it is incompatible with earlier versions of
       the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
-      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-      to disable these changes and preserve ABI compatibility.
+      To disable these changes and preserve ABI compatibility, define
+      the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      or any code that depends on OpenVDB.
     - Introduced some C++11 constructs that are incompatible with
       versions of Houdini older than 15.0.
     - Fixed a bug in the Rasterize Points SOP that caused vector-valued
