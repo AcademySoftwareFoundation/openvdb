@@ -237,6 +237,15 @@ inline void
 setStreamingMode(PointDataTreeT& tree, bool on = true);
 
 
+/// @brief  Sequentially pre-fetch all delayed-load voxel and attribute data from disk in order
+///         to accelerate subsequent random access.
+///
+/// @param  tree the PointDataTree.
+template <typename PointDataTreeT>
+inline void
+prefetch(PointDataTreeT& tree);
+
+
 ////////////////////////////////////////
 
 
@@ -1570,6 +1579,34 @@ setStreamingMode(PointDataTreeT& tree, bool on)
     for (; leafIter; ++leafIter) {
         for (size_t i = 0; i < leafIter->attributeSet().size(); i++) {
             leafIter->attributeArray(i).setStreaming(on);
+        }
+    }
+}
+
+
+template <typename PointDataTreeT>
+inline void
+prefetch(PointDataTreeT& tree)
+{
+    // sequential pre-fetch of out-of-core data for faster performance
+
+    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    if (leafIter) {
+        const size_t attributes = leafIter->attributeSet().size();
+        // load voxel buffer data
+        for ( ; leafIter; ++leafIter) {
+            const PointDataTree::LeafNodeType::Buffer& buffer = leafIter->buffer();
+            buffer.data();
+        }
+        // load attribute data
+        for (size_t pos = 0; pos < attributes; pos++) {
+            leafIter = tree.cbeginLeaf();
+            for ( ; leafIter; ++leafIter) {
+                if (leafIter->hasAttribute(pos)) {
+                    const AttributeArray& array = leafIter->constAttributeArray(pos);
+                    array.loadData();
+                }
+            }
         }
     }
 }
