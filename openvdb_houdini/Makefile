@@ -187,13 +187,13 @@ ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
 endif
 
 LIBS := \
-    -ldl -lm -lz \
+    -ldl -lm -lz -lHoudiniAPPS3 \
     -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
     -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
 LIBS_RPATH := \
-    -ldl -lm -lz \
+    -ldl -lm -lz -lHoudiniAPPS3 \
     -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
