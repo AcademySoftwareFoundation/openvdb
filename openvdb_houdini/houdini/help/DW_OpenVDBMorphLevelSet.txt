@@ -1,0 +1,77 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBMorphLevelSet
+#icon: COMMON/openvdb
+
+#tags: model
+
+= OpenVDB Morph Level Set =
+
+"""Blends between source and target level set VDBs."""
+
+
+The OpenVDB Morph Level Set operation will advect a source narrow band signed distance field towards a target narrow band signed distance field.
+
+[Include:volume_types]
+
+@parameters
+
+Source Level Set:
+    The source VDB primitive to blend. It must be an narrow band signed distance field from the first input.
+
+Target Level Set:
+    The target VDB primitive to blend. It must be an narrow band signed distance field from the second input.
+
+Alpha Mask:
+    If enabled, it will use the third input's VDB for alpha masking. Assumes
+    voxel values are between 0 to 1 inclusive.
+
+== Morphing ==
+
+These control how the SDF is moved from the source to the target.
+
+Time Step:
+    Number of seconds of movement to apply to the input points.
+    The default is `1/$FPS` (one frame's worth of time).
+
+    TIP:
+        This parameter can be animated through time using the `$T`
+        expression. To control how fast the morphing is done, multiply `$T`
+        by a scale factor. For example, to animate it twice as fast, use
+        the expression, `$T*2`.
+
+Spatial Scheme:
+    How accurately the gradients of the signed distance field are computed.
+    The later choices are more accurate but take more time.
+
+Temporal Scheme:
+    How accurately time is evolved within the timestep.  Later choices are
+    more accurate but take more time.
+
+== Renormalization ==
+
+After morphing the signed distance field, it will often no longer be a proper signed distance field.  A number of renormalizaton passes can be performed to convert it back into a proper field.
+
+Steps:
+        The number of times to renormalize between every substep.
+Spatial Scheme:
+        How accurately the gradients of the signed distance field are computed. The later choices are more accurate but take more time.
+Temporal Scheme:
+        How accurately time is evolved within the renormalizaton stage.  Later choices are more accurate but take more time.
+
+== Alpha Mask ==
+
+[Include:vdbsmooth#invert]
+
+[Include:vdbsmooth#minmask]
+
+[Include:vdbsmooth#maxmask]
+
+@related
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBAdvect]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

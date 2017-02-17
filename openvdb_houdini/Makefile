@@ -224,6 +224,53 @@ LIBHOUDINI_SRC_NAMES := \
 HOUDINI_SOP_SCRIPT_NAMES := \
     houdini/DW_OpenVDBRasterizePoints.cmd \
 #
+HOUDINI_SOP_HELP_NAMES := \
+    houdini/help/DW_OpenVDBAdvect.txt \
+    houdini/help/DW_OpenVDBAdvectPoints.txt \
+    houdini/help/DW_OpenVDBAnalysis.txt \
+    houdini/help/DW_OpenVDBClip.txt \
+    houdini/help/DW_OpenVDBCombine.txt \
+    houdini/help/DW_OpenVDBConvert.txt \
+    houdini/help/DW_OpenVDBCreate.txt \
+    houdini/help/DW_OpenVDBDiagnostics.txt \
+    houdini/help/DW_OpenVDBFill.txt \
+    houdini/help/DW_OpenVDBFilter.txt \
+    houdini/help/DW_OpenVDBFracture.txt \
+    houdini/help/DW_OpenVDBFromParticles.txt \
+    houdini/help/DW_OpenVDBFromPolygons.txt \
+    houdini/help/DW_OpenVDBLOD.txt \
+    houdini/help/DW_OpenVDBMetadata.txt \
+    houdini/help/DW_OpenVDBMorphLevelSet.txt \
+    houdini/help/DW_OpenVDBNoise.txt \
+    houdini/help/DW_OpenVDBOcclusionMask.txt \
+    houdini/help/DW_OpenVDBOffsetLevelSet.txt \
+    houdini/help/DW_OpenVDBPlatonic.txt \
+    houdini/help/DW_OpenVDBPointsConvert.txt \
+    houdini/help/DW_OpenVDBPointsGroup.txt \
+    houdini/help/DW_OpenVDBPrune.txt \
+    houdini/help/DW_OpenVDBRasterizePoints.txt \
+    houdini/help/DW_OpenVDBRay.txt \
+    houdini/help/DW_OpenVDBRead.txt \
+    houdini/help/DW_OpenVDBRebuildLevelSet.txt \
+    houdini/help/DW_OpenVDBRemap.txt \
+    houdini/help/DW_OpenVDBRemoveDivergence.txt \
+    houdini/help/DW_OpenVDBRenormalizeLevelSet.txt \
+    houdini/help/DW_OpenVDBResample.txt \
+    houdini/help/DW_OpenVDBResizeNarrowBand.txt \
+    houdini/help/DW_OpenVDBSamplePoints.txt \
+    houdini/help/DW_OpenVDBScatter.txt \
+    houdini/help/DW_OpenVDBSegment.txt \
+    houdini/help/DW_OpenVDBSmoothLevelSet.txt \
+    houdini/help/DW_OpenVDBSortPoints.txt \
+    houdini/help/DW_OpenVDBToPolygons.txt \
+    houdini/help/DW_OpenVDBToSpheres.txt \
+    houdini/help/DW_OpenVDBTopologyToLevelSet.txt \
+    houdini/help/DW_OpenVDBTransform.txt \
+    houdini/help/DW_OpenVDBVectorMerge.txt \
+    houdini/help/DW_OpenVDBVectorSplit.txt \
+    houdini/help/DW_OpenVDBVisualize.txt \
+    houdini/help/DW_OpenVDBWrite.txt \
+#
 HOUDINI_SOP_SRC_NAMES := \
     houdini/GR_PrimVDBPoints.cc \
     houdini/SOP_OpenVDB_Advect.cc \
@@ -419,6 +466,14 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_Ope
 	fi
 	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
+houdinihelp: $(HOUDINI_SOP_HELP_NAMES)
+	if [ ! -d "$(HOUDINI_DESTDIR)/../help/nodes/sop" ]; \
+	then \
+	    mkdir -p $(HOUDINI_DESTDIR)/..//help/nodes/sop; \
+	    echo "Created $(HOUDINI_DESTDIR)/../help/nodes/sop"; \
+	fi
+	cp -f $(HOUDINI_SOP_HELP_NAMES) $(HOUDINI_DESTDIR)/../help/nodes/sop/
+
 install_lib: houdinilib
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
@@ -441,7 +496,7 @@ install_lib: houdinilib
 	    popd > /dev/null
 	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
 
-install: install_lib houdinisops
+install: install_lib houdinisops houdinihelp
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
@@ -466,6 +521,8 @@ clean:
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
 	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
+	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../../help/nodes/sop/,\
+	    $(notdir $(HOUDINI_SOP_HELP_NAMES)))
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)

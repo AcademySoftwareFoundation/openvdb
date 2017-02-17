@@ -1,0 +1,62 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBLOD
+#icon:     SOP/vdblod
+
+= OpenVDB LOD =
+
+"""Build an LOD Pyramid from a VDB."""
+
+The OpenVDB LOD SOP can build multiple filtered versions of a VDB grid,
+providing different levels of detail.  This allows making a MIPMAP-like
+representation.  The low resolution versions both can be used as thumbnails
+for fast processing, but also can speed up filtered lookups by providing
+large volume averages in constant time.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+
+LOD Mode:
+    #id: lod
+
+    How to build the LOD pyramid.
+
+    Single Level:
+	Build a single filtered VDB.
+
+    Level Range:
+	Build a series of VDBs of successive refinement within a provided range.
+
+    LOD Pyramid:
+	Build a standard pyramid of VDBs of decreasing resolution.
+
+
+Level:
+    #id: level
+
+    Specify which level to produce.   Level 0 is the highest-resolution level.
+
+Range:
+    #id: range
+
+    Specify the inclusive range `[start, end, step]`
+
+Count:
+    #id: count
+    Number of levels to generate.  Each level is half the resolution of the previous level.
+
+
+Preserve Grid Names:
+    #id: reuse
+
+    Reuse the name of the input VDB grid.  Only available when a single Level is generated.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,38 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBRemap
+#icon:     COMMON/openvdb
+
+= OpenVDB Remap =
+
+"""Perform a remapping of the voxel values in a VDB grid."""
+
+The OpenVDB Remap SOP remaps voxel values to a new range and optionally applies a user-specified ramp.
+
+@parameters
+
+Group:
+	Specify a subset of the input VDB grids to be remapped.
+
+Below Maximum:
+	Specify how to handle input values below the input range minimum: either by clamping to the output minimum (Clamp), leaving out-of-range values intact (Preserve), or extrapolating linearly from the output minimum (Extrapolate).
+
+Above Maximum:
+	Specify how to handle output values above the output range maximum: either by clamping to the output maximum (Clamp), leaving out-of-range values intact (Preserve), or extrapolating linearly from the output maximum (Extrapolate).
+
+Input Range:
+	Input min/max value range.
+
+Output Range:
+	Output min/max value range.
+
+Transfer Function:
+	Apply a transfer function using a ramp where X Axis: 0 = input range minimum, 1 = input range maximum. Y Axis: 0 = output range minimum, 1 = output range maximum.
+
+Deactivate Background Voxels:
+	Deactivate voxels with values equal to the remapped background value.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

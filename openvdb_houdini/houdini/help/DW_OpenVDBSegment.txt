@@ -1,0 +1,34 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBSegment
+#icon:     COMMON/openvdb
+
+= OpenVDB Segment =
+
+"""Splits SDF VDBs into connected components."""
+
+A single SDF VDB may represent multiple disjoint objects.  This SOP attempts to detect disjoint components and create a VDB for each connected component.
+
+@parameters
+
+Group:
+    #id: group
+
+    The VDBs to examine for connectivity.
+
+
+Color Segments:
+    #id: colorsegments
+
+    Generated segments will be assigned random colors, allowing quick visual identification of segments.
+
+
+Append Segment Number to Grid Name:
+    #id: appendnumber
+
+    The generated VDBs will have their segment number appended to their grid name, letting them be identified.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

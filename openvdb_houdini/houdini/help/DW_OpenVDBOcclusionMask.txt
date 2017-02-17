@@ -1,0 +1,50 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBOcclusionMask
+#icon: COMMON/openvdb
+
+#tags: vdbs
+
+= OpenVDB Occlusion Mask =
+
+"""Create a mask of the voxels in shadow from a camera for VDB primitives."""
+
+This node creates a mask of the voxels inside a camera frustum that are
+occluded by the objects in the input VDB primitives.
+
+@parameters
+
+Group:
+    Name(s) of the VDB primitives to operate on. If empty, all VDBs are
+    used. See [specifying volumes|/model/volumes#group].
+
+Camera:
+    Path of the camera object to use as the frustum (ie /obj/cam1).
+
+Voxel Count:
+    Horizontal voxel count on the camera's near plane.
+
+Voxel Depth Size:
+    Voxel depth (uniform z-size) in Houdini units.
+
+Mask Depth:
+    Depth in Houdini units from the near plane to for the created mask.
+
+Erode:
+    Number of iterations to shrink the resulting mask.
+
+Z Offset:
+    Number of voxels to offset the near plane from which shadow voxels are
+    created.
+
+Clip to Frustum:
+	Clip the occlusion mask to the frustum during generation, resulting in a smaller memory footprint and faster performance.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

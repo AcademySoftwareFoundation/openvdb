@@ -1,0 +1,151 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBPointsGroup
+#icon:     COMMON/openvdb
+
+= OpenVDB Points Group =
+
+"""Manipulates the Internal Groups of a VDB Points Primitive."""
+
+The OpenVDB Points Group SOP acts as a Group SOP for the points inside
+of a VDB Points primitive.  It can create an manipulate these internal
+groups.  The generated group can then be used to selectively unpack
+a subset of the points in a later [OpenVDB Points Convert|Node:sop/DW_OpenVDBPointsConvert].
+
+@parameters
+
+Group:
+    #id: group
+
+    VDB Points primitives to alter the groups within.
+
+
+VDB Points Group:
+    #id: vdbpointsgroup
+
+    Specify an existing internal group in the VDB Points primitive to
+    use as a starting point for creating a new group.
+
+== Create ==
+
+Enable:
+    #id: enablecreate
+
+    Enable creation of the group.
+
+
+Group Name:
+    #id: groupname
+
+    The name of the internal group to create.
+
+
+=== Number ===
+
+Enable:
+    #id: enablenumber
+
+    Enable filtering by number.
+
+
+Mode:
+    #id: numbermode
+
+    How to filter out a subset of the points inside the VDB Points.
+
+Percent:
+    #id: pointpercent
+
+    What percentage of points to include in the group.
+
+
+Count:
+    #id: pointcount
+
+    The total number of points to include in the group.
+
+Attribute Seed:
+    #id: percentattribute
+
+    Point attribute to use as a seed for percent filtering.
+
+=== Bounding ===
+
+Enable:
+    #id: enableboundingbox
+
+    Enable filtering by a bounding box.
+
+Mode:
+    #id: boundingmode
+
+    Whether to filter by a box or an object.
+
+Name:
+    #id: boundingname
+
+    Name of the bounding geometry.
+
+
+Size:
+    #id: size
+
+    Size of the bounding box.
+
+
+Center:
+    #id: center
+
+    Center of the bounding box.
+
+=== Level Set ===
+
+Enable:
+    #id: enablesdf
+
+    Enable filtering by level set.
+
+Name:
+    #id: sdfname
+
+    The name of the level set to filter by.
+
+
+SDF Minimum:
+    #id: sdfmin
+
+    SDF Minimum value.
+
+SDF Maximum:
+    #id: sdfmax
+
+    SDF Maximum value.
+
+Invert:
+    #id: sdfinvert
+
+    Invert the sense of the SDF.
+
+== Viewport ==
+
+Specify a viewport group where only points in the viewport group are displayed in the viewport. This is useful to be able to create a group with just 1% of points for example, so to minimize the data transfer to the viewport without removing the data.
+
+NOTE:
+    Only one group can be tagged as a viewport group.
+
+Enable:
+    Enable the viewport group options.
+
+Operation:
+    Specify whether to add or remove the viewport group.
+
+Name:
+    Specify the name of the viewport group. Defaults to the name of the group in the first tab.
+
+@related
+- [Node:sop/DW_OpenVDBConvertPoints]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

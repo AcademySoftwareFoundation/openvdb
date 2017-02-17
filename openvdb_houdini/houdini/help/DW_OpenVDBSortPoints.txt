@@ -1,0 +1,25 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBSortPoints
+#icon:     COMMON/openvdb
+
+= OpenVDB Sort Points =
+
+"""Re-order points into spatially-organised bins."""
+
+The OpenVDB Sort Points SOP re-organises Houdini points so that they are ordered to correspond with three-dimensional spatial bins. This is done to improve performance of algorithms that rely on neighboring access (such as rasterization) where random access into an un-organized linear array would otherwise result in lower performance due to CPU cache effects.
+
+@parameters
+
+Point Group:
+    #id: group
+
+    Specify a subset of the input VDB grids to be sorted.
+
+Bin Size:
+    The size (length of a side) of the cubic bin, in world units.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

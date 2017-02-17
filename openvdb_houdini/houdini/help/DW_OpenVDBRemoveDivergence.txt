@@ -1,0 +1,35 @@
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBRemoveDivergence
+#icon:     COMMON/openvdb
+
+= OpenVDB Remove Divergence =
+
+"""Removes divergence from a Vector VDB."""
+
+A Vector VDB can represent a velocity field.  When you trace particles through the field, they may either expand from a voxel or collapse into a voxel.  These sink/source behaviors represent divergence in the field.
+
+This SOP computes a new vector field that is close to the input, but has no divergence.  This can be used to fix flow fields to limit particle creation, creating more realistic flows.  Combined with
+the [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints], a simple FLIP solver can be built using the [Solver SOP|Node:sop/solver] for feedback.
+
+@parameters
+
+Group:
+    #id: group
+
+    The group of vector VDBs to remove the divergence on.
+
+
+Iterations:
+    #id: iterations
+
+    The maximum number of iterations to attempt.  If it takes longer
+    than this to converge, a warning is created and the partial result
+    reported.  A sensible maximum would be three times the longest
+    distance between two connected voxels, as measured in voxels.
+
+    Or, put more simply, three times the resolution.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

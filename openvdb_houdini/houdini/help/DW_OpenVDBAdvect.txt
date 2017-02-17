@@ -1,0 +1,91 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBAdvect
+#icon: COMMON/openvdb
+
+#tags: model
+
+= OpenVDB Advect Points =
+
+"""Moves VDBs in the input geometry along a VDB velocity field."""
+
+[Include:volume_types]
+
+== Overview ==
+
+The OpenVDB Advect operation will advect fields according to a velocity field defined in a vector VDB.
+
+== Animating advection ==
+
+*This node is not a feedback loop*.
+
+It moves the fields it finds in the input geometry.
+It _cannot_ modify the fields over time.
+(That is, if you hook this node up to do advection, and press play, the fields will not animate.)
+
+To set up a feedback loop, where the advection at each frame affects the advected field from the previous frame, do one of the following:
+
+* Do the advection inside a [SOP Solver|Node:sop/solver].
+
+* Set the __Time Step__ to $T
+  This will cause the node to recalculate, _at every frame_, the path of every particle through _every previous frame_ to get the current one.
+  This is obviously not very practical.
+
+@parameters
+
+Group:
+    A subset of VDBs in the first input to move using the velocity field.
+
+Velocity VDB:
+    The name of a VDB primitive in the second input to use as the velocity field.
+
+    This must be a vector-valued VDB primitive.  You can use the VDB Vector Merge SOP to turn a `vel.[xyz]` triple into a single primitive.
+
+Respect Grid Class:
+    When disabled, all VDBs will use a general numerical advection scheme, otherwise level set VDBs will be advected using a spatial finite-difference scheme.
+
+Time Step:
+    Number of seconds of movement to apply to the input points.
+    The default is `1/$FPS` (one frame's worth of time).
+    You can use negative values to move the points backwards through the velocity field.
+
+General Advection:
+    These control how VDBs that are not level sets are moved through the velocity field. If the grid class is not being respected, all grids will be advected using general advection regardless of whether they are level sets or not.
+
+    Sub-steps:
+        The number of substeps per integration step. The only reason to increase it above its default value of one is to reduce the memory-footprint from dilations - likely at the cost of more smoothing!
+
+    Advection Scheme:
+        Set the numerical advection scheme.
+
+    Limiter Scheme:
+        Set the limiter scheme used to stabilize the 2nd order MacCormack and BFECC schemes.
+
+Level Set Advection:
+    These control how level set VDBs are moved through the velocity field. If the grid class is not being respected, these options are not used.
+
+    Spatial Scheme:
+	   How accurately the gradients of the signed distance field are computed. The later choices are more accurate but take more time.
+
+    Temporal Scheme:
+        How accurately time is evolved within the timestep.  Later choices are more accurate but take more time.
+
+    Renormalization Steps:
+        After moving the signed distance field, it will often no longer be a proper signed distance field.  A number of renormalizaton passes can be performed between every substep to convert it back into a proper field.
+
+    Spatial Renormalization:
+        How accurately the gradients of the signed distance field are computed. The later choices are more accurate but take more time.
+
+    Temporal Renormalization:
+        How accurately time is evolved within the renormalizaton stage.  Later choices are more accurate but take more time.
+
+@related
+    - [Node:sop/DW_OpenVDBCreate]
+    - [Node:sop/DW_OpenVDBFromParticles]
+    - [Node:sop/DW_OpenVDBAdvectPoints]
+    - [Node:sop/DW_OpenVDBMorphSDF]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

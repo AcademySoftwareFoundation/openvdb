@@ -1,0 +1,73 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBOffsetLevelSet
+#icon: SOP/vdbreshapesdf
+
+#tags: vdb, merge
+
+= OpenVDB Offset Level Set =
+
+"""Offsets signed distance fields in VDB volume primitives."""
+
+[Include:volume_types]
+
+This node changes the shape of a level set by moving the surface in or out along its normals.
+Unlike just adding an offset to a signed distance field, this node properly updates the "active" voxels to account for the transformation.
+
+@parameters
+
+Group:
+    The name of VDB primitive(s) in the input to be offset.
+    See [specifying volumes|/model/volumes#group] for more information.
+
+Alpha Mask:
+    If enabled, it will use the second input's VDB for alpha masking.
+    Assumes voxel values are between 0 to 1 inclusive.
+    See [specifying volumes|/model/volumes#group] for more information.
+
+Operation:
+    What sort of offset process to apply to the SDF.
+
+    Dilate:
+        Expands the surface outwards along its normal.
+
+    Erode:
+        Shrinks the surface inwards along its normal.
+
+    Open:
+        First shrink the surface inwards, then expand it outwards by the
+        same amount.  This causes isolated hills and islands to be erased.
+
+    Close:
+        First expand the surface outwards, then shrink it inwards by the
+        same amount.  This causes holes and valleys to be filled.
+
+Use World Space Units:
+    Sets whether the `Offset` amount is specified in Houdini units. When this
+    option is off, the amount is interpreted as voxels.
+
+Offset:
+    Amount to move the surface in or out. This amount is assumed to be in
+    voxels if `Use World Space for Offset` is off.
+
+[Include:vdbrenormalizesdf#accuracy]
+
+[Include:vdbsmooth#invert]
+
+[Include:vdbsmooth#minmask]
+
+[Include:vdbsmooth#maxmask]
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+- [Node:sop/DW_OpenVDBOffsetLevelSet]
+- [Node:sop/DW_OpenVDBRenormalizeLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,184 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBConvert
+#icon: SOP/convertvdb
+
+#tags: convert, tesselate, volumes
+
+= OpenVDB Convert =
+
+"""Converts sparse volumes."""
+
+This node converts sparse volumes, or VDBs, into other types.
+
+It provides some extra options not available through the [Convert SOP|Node:sop/convert].
+
+This also allows the conversion of volumes into VDBs.
+
+For converting to polygons, the second and third inputs can be optionally
+supplied. The second input provides a reference polygon surface for converting
+the volume, which is useful for converting fractured VDBs back to polygons.
+The third provides additional VDB fields which can be used for
+masking (which voxels to convert to polygons), and/or for specifying an
+adaptivity multiplier.
+
+@parameters
+
+Group:
+    Subset of primitives to convert.
+
+Convert To:
+    What form of conversion to perform.
+
+    Volume:
+        The VDB is converted to a dense volume.  This allows legacy tools
+        to understand the primitive.  VDBs with effective resolutions over
+        1000^3 will have difficulties being efficiently represented.
+
+    VDB:
+        Convert into a VDB.
+
+        If the input is a Volume Primitive, it is converted into
+        a VDB.  The resulting VDB will be the same class as the input,
+        so a fog volume becomes a fog VDB, and a SDF volume an SDF VDB.
+
+    Polygons:
+        The VDB is surfaced along the specified iso value.  Polygons
+        are created.
+
+    Polygon Soup:
+        The VDB is surfaced, but a polygon soup is created.  While polygon
+        soups do not support most editing operations, they are a more
+        compact way of storing dense meshes.
+
+Split Disjoint Volumes:
+    When converting VDB to dense volumes, create multiple volume primitives per
+    VDB for unconnected regions where possible. This allows very large and
+    sparse VDBs to be converted with less memory usage.
+
+VDB Class:
+    If after converting the VDB, it is still a VDB, it is compared against
+    this class.  If it differs, it will be converted to the specified type.
+
+    To change the class of the VDB without changing voxel values, use the Primitive SOP.
+
+    No Change:
+        The VDB is left in its original class.  When converting from
+        volumes, this will be the detected class of the source volume.
+
+    Convert Fog to SDF:
+        Fog VDBs will be surfaced along the iso value and then converted to
+        an SDF VDB.  This is equivalent to a Convert To Polygons followed
+        by a VDB From Mesh.
+
+    Convert SDF to Fog:
+        SDF VDBs will be set to 1 in their interior and 0 on their
+        exterior.  The band in between will blend between these two values.
+
+Isovalue:
+    The crossing point of the VDB values that is considered
+    the surface when converting to polygons.
+
+Fog Isovalue:
+    The crossing point of the VDB values that is considered
+    the surface when converting to level sets from fog volumes.
+
+Prune Tolerance:
+    After building the VDB grid there may be undetected constant tiles.
+    This tolerance is used to detect constant regions and collapse them.
+    Such areas that are within the background value will also be marked
+    inactive.
+
+Signed-Flood Fill Output:
+    Tests areas of inactive background values to determine if they
+    are inside or outside of an SDF, and hence whether they should
+    have negative or positive sign. This toggle has no effect for non-SDF
+    volumes.
+
+    NOTE:
+            This is ignored when converting native fog volumes to VDB.
+
+Activate Inside Voxels:
+    Mark all voxels active inside an SDF, even if they match the negative background
+    value.  This option is useful if processing the resulting VDB with VEX, which
+    only runs over active voxels of a VDB.  However, disabling this option will retain only
+    the narrow active internal band of an incoming SDF if it has one, saving memory
+    and downstream processing.  This toggle has no effect for non-SDF
+    volumes, or if __Signed-Flood Fill Output__ is disabled.
+
+Adaptivity:
+    How closely to match the surface when converting to polygons.
+    Higher adaptivities will allow more variation in polygon size,
+    using fewer polygons to express the surface.
+
+Compute Vertex Normals:
+    Compute vertex normals when converting to polygons. This uses the
+    optional second input to help eliminate seams if available.
+
+Automatic Partitions:
+    Subdivide volume and mesh into disjoint parts.
+
+Active Part:
+    Specific partition to mesh.
+
+Internal Adaptivity:
+    When converting to polygons with a second input, this is the adaptivity
+    threshold for regions that are inside the reference surface.
+
+Transfer Surface Attributes:
+    When converting to polygons with a second input, this transfers all
+    attributes (primitive, vertex and point) from the reference surface.
+    It will override computed vertex normals for primitives in the surface
+    group.
+
+Sharpen Features:
+    Sharpen edges and corners.
+
+Edge Tolerance:
+    Controls the edge adaptivity mask.
+
+Surface Group:
+    When converting to polygons with a second input, this specifies a group
+    for all polygons that are coincident with the reference surface.
+    This group is useful for transferring attributes such as uv
+    coordinates, normals, etc. from the reference surface.
+
+Interior Group:
+    When converting to polygons with a second input, this specifies a group
+    for all polygons that are inside the reference surface.
+    These group is useful for creating projected UV coordinates, or for
+    assigning a different material.
+
+Seam Line Group:
+    When converting to polygons with a second input, this parameter specifies a group
+    for all polygons that are near the seam lines. This can be used to drive secondary elements such as debris and dust.
+
+Seam Points:
+    When converting to polygons with a second input, this parameter specifies a group
+    of the fracture seam points. This can be used to drive local pre-fracture dynamics, such as local surface buckling.
+
+Surface Mask:
+    If enabled, specifies the name of the VDB field from the third input to
+    be used for masking.  The field's interior defines the region for
+    converting to polygons.
+
+Mask Offset:
+    Iso value used to offset the interior region of the surface mask.
+
+Invert Surface Mask:
+    Causes the complement of the surface mask to be converted instead.
+
+Adaptivity Field:
+    If enabled, specifies the name of the VDB field from the third input for controlling adaptivity. The voxel values are multiplied with the __Adaptivity__ parameter value.
+
+@related
+
+- [Node:sop/convert]
+- [Node:sop/convertvolume]
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBFromParticles]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

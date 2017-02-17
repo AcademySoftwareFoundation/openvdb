@@ -1,0 +1,40 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBVectorSplit
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Vector Split =
+
+"""Splits a vector VDB primitive into three scalar VDB primitives."""
+
+[Include:volume_types]
+
+This node will create three new scalar primitives named `<<input>>.x`, `<<input>>.y`, and `<<input>>.z`.
+
+TIP:
+    To reverse the split (merge three scalar VDBs into a vector VDB), use [OpenVDB Vector Merge node|Node:sop/DW_OpenVDBVectorMerge] and set the groups to `@name=*.x`, `@name=*.y`, and `@name=*.z`.
+
+@parameters
+
+Group:
+    The name of a vector VDB primitive to split.
+    See [specifying volumes|/model/volumes#group].
+
+Remove Source VDBs:
+    Removes the split vector VDB from the output.
+
+Copy Inactive Values:
+    If enabled, split the values of both active and inactive voxels.
+    If disabled, split the values of active voxels only.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBVectorMerge]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

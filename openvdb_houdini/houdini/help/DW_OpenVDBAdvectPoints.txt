@@ -1,0 +1,125 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBAdvectPoints
+#icon: COMMON/openvdb
+
+#tags: create, model
+
+= OpenVDB Advect Points =
+
+"""Moves points in the input geometry along a VDB velocity field."""
+
+[Include:volume_types]
+
+== Overview ==
+
+This node has different functions based on the value of the __Operation__ parameter.
+
+* Move geometry points according to a VDB velocity field.
+
+* Move points onto a surface using a VDB field storing the nearest surface point at each voxel.
+
+    # Convert the "sticky" surface to a VDB SDF using the [OpenVDB from Polygons node|Node:sop/DW_OpenVDBFromPolygons].
+
+    # Generate a "nearest point" VDB using the [OpenVDB Analysis node|Node:sop/DW_OpenVDBAnalysis].
+
+    # Connect the points you want to stick, and the "nearest point" field, into this node.
+
+* Move geometry points according to a VDB velocity field _and_ stick them to a surface using a "nearest point" field (combine the first two operations). This lets you advect points through a velocity field while keeping them stuck to a surface.
+
+NOTE:
+    The `traillen` float attribute can be used to control how far particles
+    move on a per-particle basis.
+
+== Animating advection ==
+
+*This node is not a feedback loop*.
+It moves the points it finds in the input geometry.
+It _cannot_ modify the point locations over time.
+(That is, if you hook this node up to do advection, and press play, the points will not animate.)
+
+To set up a feedback loop, where the advection at each frame affects the advected point positions from the previous frame, do one of the following:
+
+* Do the advection inside a [SOP Solver|Node:sop/solver].
+
+* Set __Substeps__ to `$F` and the __Time Step__ to `$T`
+  This will cause the node to recalculate, _at every frame_, the path of every particle through _every previous frame_ to get the current one.
+  This is obviously not very practical, however the calculations are fast so it may be useful as a quick "hack" to animate the advection for small numbers of particles.
+
+@parameters
+
+Group:
+    A subset of points in the first input to move using the velocity field.
+
+Velocity VDB:
+    The name of a VDB primitive in the second input to use as the velocity field.
+
+    This must be a vector-valued VDB primitive.  You can use the VDB Vector Merge SOP to turn a `vel.[xyz]` triple into a single primitive.
+
+    See [specifying volumes|/model/volumes#group].
+
+Closest Point VDB:
+    The name of a VDB primitive in the third input to use for the closest point values.
+    See [specifying volumes|/model/volumes#group].
+
+Operation:
+    How to use the velocity field to move the points.
+
+    Advection:
+        Move each point along the velocity field.
+
+    Projection:
+        Move each point to the nearest surface point using the closest point
+        field
+
+    Constrained Advection:
+        Move the along the velocity field, and then project using the
+        closest point field.
+        This forces the particles to remain on a surface.
+
+Integration:
+    Algorithm to use to move the points.
+    Later options in the list are slower but better follow the velocity field.
+
+Iterations:
+    Number of times to try projecting to the nearest point on the surface.
+    Projecting might not move exactly to the surface on the first try.
+    More iterations are slower but give more accurate projection.
+
+Time Step:
+    Number of seconds of movement to apply to the input points.
+    The default is `1/$FPS` (one frame's worth of time).
+    You can use negative values to move the points backwards through the velocity field.
+
+    If the attribute `traillen` is pressent, it is multiplied by this timestep allowing per-particle variation in trail length.
+
+Substeps:
+    How many times to repeat the advection step.  This will produce a more
+    accurate motion, especially if large timesteps or high velocities are
+    present.
+
+Output Streamlines:
+    Generate polylines instead of moving points. This is useful for visualizing the effect of the node. It may also be useful for special effects (see also the [Trail SOP|Node:sop/trail]).
+
+@inputs
+
+Points to Advect:
+    The points to advect are copied from this input.
+
+Velocity VDB:
+    The VDB that stores the velocity at each location.
+
+Closest Point VDB:
+    The VDB that stores the closest point to each location.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBAdvect]
+- [Node:sop/DW_OpenVDBFromParticles]
+- [Node:sop/isooffset]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
