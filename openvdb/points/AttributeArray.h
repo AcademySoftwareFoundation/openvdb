@@ -1427,6 +1427,16 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
     is.read(reinterpret_cast<char*>(&size), sizeof(Index));
     mSize = size;
 
+    // warn if an unknown flag has been set
+    if (mFlags >= 0x20) {
+        OPENVDB_LOG_WARN("Unknown attribute flags for VDB file format.");
+    }
+    // error if an unknown serialization flag has been set,
+    // as this will adjust the layout of the data and corrupt the ability to read
+    if (mSerializationFlags >= 0x10) {
+        OPENVDB_THROW(IoError, "Unknown attribute serialization flags for VDB file format.");
+    }
+
     // read uniform and compressed state
 
     mIsUniform = mSerializationFlags & WRITEUNIFORM;

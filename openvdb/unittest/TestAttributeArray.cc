@@ -1851,6 +1851,48 @@ TestAttributeArray::testDelayedLoad()
         }
 #endif
 
+        // Clean up temp files.
+        std::remove(mappedFile->filename().c_str());
+        std::remove(filename.c_str());
+
+        // write out invalid serialization flags as metadata to a temp file
+        {
+            filename = tempDir + "/openvdb_delayed5";
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
+            io::setStreamMetadataPtr(fileout, streamMetadata);
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            // write out unknown serialization flags to check forwards-compatibility
+
+            Index64 bytes(0);
+            uint8_t flags(0);
+            uint8_t serializationFlags(Int16(0x10));
+            Index size(0);
+
+            fileout.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
+            fileout.write(reinterpret_cast<const char*>(&flags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&serializationFlags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&size), sizeof(Index));
+
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+
+        // read in using delayed load and check metadata fail due to serialization flags
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            CPPUNIT_ASSERT_THROW(attrB.readMetadata(filein), openvdb::IoError);
+        }
+
         // cleanup temp files
 
         std::remove(mappedFile->filename().c_str());
