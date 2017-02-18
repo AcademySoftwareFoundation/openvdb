@@ -75,11 +75,6 @@ initialize()
 
     // Register attribute arrays with unit vector compression
     TypedAttributeArray<math::Vec3<float>, UnitVecCodec>::registerType();
-
-    // Register types associated with point data grids.
-    Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
-    Metadata::registerType(typeNameAsString<PointDataIndex64>(), Int64Metadata::createMetadata);
-    PointDataGrid::registerGrid();
 }
 
 

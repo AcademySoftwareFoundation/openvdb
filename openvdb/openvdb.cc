@@ -106,8 +106,13 @@ initialize()
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
     tools::PointIndexGrid::registerGrid();
 
-    // Register types associated with point data grids.
 //#ifdef OPENVDB_ENABLE_POINTS
+    // Register types associated with point data grids.
+    Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
+    Metadata::registerType(typeNameAsString<PointDataIndex64>(), Int64Metadata::createMetadata);
+    points::PointDataGrid::registerGrid();
+
+    // Register point attribute types.
     points::initialize();
 //#endif
 
