@@ -1335,6 +1335,96 @@ TestPointDataLeaf::testIO()
 
         remove("leaf.vdb");
     }
+
+    { // test multi-buffer IO with varying attribute storage per-leaf
+        // create a new grid with three leaf nodes
+
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+
+        Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
+
+        // create leaf nodes and initialize attributes using this descriptor
+
+        const size_t size = LeafType::NUM_VOXELS;
+
+        LeafType leaf0(openvdb::Coord(0, 0, 0));
+        LeafType leaf1(openvdb::Coord(0, 8, 0));
+        LeafType leaf2(openvdb::Coord(0, 0, 8));
+
+        leaf0.initializeAttributes(descrA, /*arrayLength=*/2);
+        leaf1.initializeAttributes(descrA, /*arrayLength=*/2);
+        leaf2.initializeAttributes(descrA, /*arrayLength=*/2);
+
+        descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+        size_t index = descrA->find("density");
+
+        // append density attribute to leaf 0 and leaf 2 (not leaf 1)
+
+        leaf0.appendAttribute(leaf0.attributeSet().descriptor(), descrA, index);
+        leaf2.appendAttribute(leaf2.attributeSet().descriptor(), descrA, index);
+
+        // manually change some values in the density array for leaf 0 and leaf 2
+
+        TypedAttributeArray<float>& attr0 = TypedAttributeArray<float>::cast(leaf0.attributeArray("density"));
+
+        attr0.set(0, 2.0f);
+        attr0.set(1, 2.0f);
+
+        attr0.compact();
+
+        // compact only the attribute array in the second leaf
+
+        TypedAttributeArray<float>& attr2 = TypedAttributeArray<float>::cast(leaf2.attributeArray("density"));
+
+        attr2.set(0, 5.0f);
+        attr2.set(1, 5.0f);
+
+        attr2.compact();
+
+        CPPUNIT_ASSERT(attr0.isUniform());
+        CPPUNIT_ASSERT(attr2.isUniform());
+
+        grid->tree().addLeaf(new LeafType(leaf0));
+        grid->tree().addLeaf(new LeafType(leaf1));
+        grid->tree().addLeaf(new LeafType(leaf2));
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        { // write to file
+            io::File file("leaf.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        { // read grids from file (using delayed loading)
+            PointDataGrid::Ptr gridFromDisk;
+
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf0 == *leafFromDisk);
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 8, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf1 == *leafFromDisk);
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 8));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf2 == *leafFromDisk);
+        }
+
+        remove("leaf.vdb");
+    }
 }
 
 
