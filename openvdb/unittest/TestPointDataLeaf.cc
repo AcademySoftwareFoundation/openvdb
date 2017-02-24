@@ -1313,10 +1313,8 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(leafFromDisk);
             CPPUNIT_ASSERT(leaf2 == *leafFromDisk);
 
-            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
-
-            const AttributeF& attribute(AttributeF::cast(leafFromDisk->constAttributeArray("density")));
+            const AttributeF& attribute(AttributeF::cast(
+                leafFromDisk->constAttributeArray("density")));
 
             CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
 
