@@ -1312,25 +1312,6 @@ TestPointDataLeaf::testIO()
             leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 8));
             CPPUNIT_ASSERT(leafFromDisk);
             CPPUNIT_ASSERT(leaf2 == *leafFromDisk);
-
-            const AttributeF& attribute(AttributeF::cast(
-                leafFromDisk->constAttributeArray("density")));
-
-            CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
-
-#if OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attribute.isOutOfCore());
-#else
-            // delayed-loading is only available on attribute arrays when using Blosc
-            CPPUNIT_ASSERT(!attribute.isOutOfCore());
-#endif
-
-            prefetch(gridFromDisk->tree());
-
-            // ensure out-of-core data is now in-core after pre-fetching
-
-            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
-            CPPUNIT_ASSERT(!attribute.isOutOfCore());
         }
 
         remove("leaf.vdb");
