@@ -13,6 +13,8 @@ Version 4.0.1 - In development
       between tests.
     - Added vdb_lod, a command-line tool to generate volume mipmaps
       for level-of-detail effects.
+    - Added methods to compute the median value of active, inactive or all
+      voxels in leaf nodes.
 
     Improvements:
     - Added a Metadata::str() specialization for StringMetadata that
@@ -22,6 +24,15 @@ Version 4.0.1 - In development
       [Contributed by Double Negative]
     - Added documentation and Cookbook examples for OpenVDB Points.
       [Contributed by Double Negative]
+    - Registration of OpenVDB Points grid and attribute types is now handled
+      in openvdb::initialize(), and openvdb::points::initialize() and
+      openvdb::points::uninitialize() are therefore deprecated.
+    - Extended multi-pass I/O to handle a variable number of passes
+      per leaf node.
+      [Contributed by Double Negative]
+    - Addressed a name conflict between macros in util/NodeMasks.h
+      and symbols in the Eigen library.
+      [Reported by Trevor Thomson]
 
     Bug fixes:
     - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
@@ -43,6 +54,9 @@ Version 4.0.1 - In development
       [Contributed by SideFX]
     - Grid operators (divergence, gradient, etc.) now produce correct results
       even for grids with active tile values.
+    - Fixed a bug when writing an out-of-core points::AttributeArray
+      that could cause corruption of the metadata associated with the array.
+      [Contributed by Double Negative]
 
     Python:
     - Added functions getLoggingLevel(), setLoggingLevel(), and
@@ -53,6 +67,8 @@ Version 4.0.1 - In development
       outside the target volume's narrow band.
     - The LOD SOP now supports all standard grid types, including
       boolean grids.
+    - Added houdini_utils::ParmFactory::setGroupChoiceList(), a convenience
+      method for the creation of menus of primitive groups.
     - Made various small changes for Houdini 16 compatibility.
       [Contributed by SideFX]
     - The Create SOP now supports matching the new grids' transform,
@@ -364,7 +380,7 @@ Version 3.2.0 - August 10, 2016
     - Fixed a bug in the Ray SOP whereby the distance attribute was created
       with the wrong data type.
       [Contributed by Nick Avramoussis]
-    - The From Polygon SOP now allows the user to either specify the voxel 
+    - The From Polygon SOP now allows the user to either specify the voxel
       count along an axis or the voxel size in world units (the only option
       in the past).
 

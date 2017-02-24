@@ -38,7 +38,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 void
-initialize()
+internal::initialize()
 {
     // Register attribute arrays with no compression
     TypedAttributeArray<bool>::registerType();
@@ -84,10 +84,13 @@ initialize()
 
 
 void
-uninitialize()
+internal::uninitialize()
 {
     AttributeArray::clearRegistry();
 }
+
+void initialize() { internal::initialize(); }
+void uninitialize() { internal::uninitialize(); }
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME

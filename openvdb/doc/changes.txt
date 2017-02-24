@@ -18,6 +18,10 @@ New features:
   unintended dependencies between tests.
 - Added @c vdb_lod, a command-line tool to generate volume mipmaps
   for level-of-detail effects.
+- Added methods to compute the median value of
+  @vdblink::tree::LeafNode::medianOn() active@endlink,
+  @vdblink::tree::LeafNode::medianOff() inactive@endlink
+  or @vdblink::tree::LeafNode::medianAll() all@endlink voxels in leaf nodes.
 
 @par
 Improvements:
@@ -31,6 +35,17 @@ Improvements:
 - Added @subpage points "documentation" and Cookbook
   @ref openvdbPointsHelloWorld "examples" for OpenVDB&nbsp;Points.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Registration of OpenVDB&nbsp;Points grid and attribute types is now
+  handled in @vdblink::initialize() openvdb::initialize@endlink,
+  and @vdblink::points::initialize() points::initialize@endlink
+  and @vdblink::points::uninitialize() points::uninitialize@endlink
+  are therefore deprecated.
+- Extended multi-pass I/O to handle a variable number of passes per leaf node.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Addressed a name conflict between macros in util/NodeMasks.h and symbols in
+  the <A HREF="http://eigen.tuxfamily.org/index.php?title=Main_Page">Eigen</A>
+  library.
+  <I>[Reported&nbsp;by&nbsp;Trevor&nbsp;Thomson]</I>
 
 @par
 Bug fixes:
@@ -61,6 +76,10 @@ Bug fixes:
 - Grid operators (@vdblink::tools::divergence() divergence@endlink,
   @vdblink::tools::gradient() gradient@endlink, etc.) now produce
   correct results even for grids with active tile values.
+- Fixed a bug when writing an out-of-core
+  @vdblink::points::AttributeArray points::AttributeArray@endlink
+  that could cause corruption of the metadata associated with the array.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 @par
 Python:
@@ -72,6 +91,8 @@ Houdini:
 - Fixed a crash in the Ray SOP when the user selected an isosurface
   outside the target volume&rsquo;s narrow band.
 - The LOD SOP now supports all standard grid types, including boolean grids.
+- Added @c houdini_utils::ParmFactory::setGroupChoiceList, a convenience
+  method for the creation of menus of primitive groups.
 - Made various small changes for Houdini&nbsp;16 compatibility.
   <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
 - The Create SOP now supports matching the new grids&rsquo; transform,
@@ -300,7 +321,7 @@ New features:
   class.
 - New component wise constructor for the @vdblink::math::CoordBBox
   CoordBBox@endlink class as well as the method
-  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink. 
+  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink.
 - Added a new @vdblink::tree::LeafManager LeafManager@endlink constructor to
   create the structure from an existing array of leafnodes.
 - Added active tile count to @vdblink::tree::Tree::print Tree::print@endlink.
@@ -465,7 +486,7 @@ Houdini:
   <I>[Contributed by Fredrik&nbsp;Salomonsson]</I>
 - Fixed a bug in the Ray SOP whereby the distance attribute was created
   with the wrong data type. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
-- The From Polygon SOP now allows the user to either specify the voxel 
+- The From Polygon SOP now allows the user to either specify the voxel
   count along an axis or the voxel size in world units (the only option
   in the past).
 

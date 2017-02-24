@@ -48,6 +48,7 @@ public:
     CPPUNIT_TEST(testIteratorGetCoord);
     CPPUNIT_TEST(testNegativeIndexing);
     CPPUNIT_TEST(testIsConstant);
+    CPPUNIT_TEST(testMedian);
     CPPUNIT_TEST_SUITE_END();
 
     void testBuffer();
@@ -61,6 +62,7 @@ public:
     void testIteratorGetCoord();
     void testNegativeIndexing();
     void testIsConstant();
+    void testMedian();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeaf);
@@ -435,6 +437,93 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(math::isApproxEqual(min, vmin));
         CPPUNIT_ASSERT(math::isApproxEqual(max, vmax));
     }
+}
+
+void
+TestLeaf::testMedian()
+{
+    using namespace openvdb;
+    const Coord origin(-9, -2, -8);
+    std::vector<float> v{5, 6, 4, 3, 2, 6, 7, 9, 3};
+    tree::LeafNode<float, 3> leaf(origin, 1.0f, false);
+
+    float val = 0.0f;
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(0.0f, val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(0,0,0), v[0]);
+    CPPUNIT_ASSERT_EQUAL(Index(1), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-1, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(0,0,1), v[1]);
+    CPPUNIT_ASSERT_EQUAL(Index(2), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-2, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(0,2,1), v[2]);
+    CPPUNIT_ASSERT_EQUAL(Index(3), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-3, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(1,2,1), v[3]);
+    CPPUNIT_ASSERT_EQUAL(Index(4), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[2], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-4, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(1,2,3), v[4]);
+    CPPUNIT_ASSERT_EQUAL(Index(5), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[2], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-5, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(2,2,1), v[5]);
+    CPPUNIT_ASSERT_EQUAL(Index(6), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[2], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-6, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+    
+    leaf.setValue(Coord(2,4,1), v[6]);
+    CPPUNIT_ASSERT_EQUAL(Index(7), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-7, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(2,6,1), v[7]);
+    CPPUNIT_ASSERT_EQUAL(Index(8), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-8, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.setValue(Coord(7,2,1), v[8]);
+    CPPUNIT_ASSERT_EQUAL(Index(9), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(v[0], val);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-9, leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(1.0f, val);
+    CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
+
+    leaf.fill(2.0f, true);
+
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOn(val));
+    CPPUNIT_ASSERT_EQUAL(2.0f, val);
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOff(val));
+    CPPUNIT_ASSERT_EQUAL(2.0f, val);
+    CPPUNIT_ASSERT_EQUAL(2.0f, leaf.medianAll());
 }
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC

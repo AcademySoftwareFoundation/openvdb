@@ -1460,7 +1460,8 @@ Grid<TreeT>::readBuffers(std::istream& is)
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
         assert(bool(meta));
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().readBuffers(is, saveFloatAsHalf());
         }
@@ -1483,7 +1484,8 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
         assert(bool(meta));
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().readBuffers(is, saveFloatAsHalf());
         }
@@ -1523,7 +1525,8 @@ Grid<TreeT>::writeBuffers(std::ostream& os) const
         meta->setCountingPasses(false);
 
         // Save out the data blocks of the grid.
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().writeBuffers(os, saveFloatAsHalf());
         }

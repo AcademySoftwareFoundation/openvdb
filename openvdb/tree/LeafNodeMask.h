@@ -427,6 +427,33 @@ public:
     /// and are equal to within the given tolerance, and return the value in
     /// @a constValue and the active state in @a state.
     bool isConstant(bool& constValue, bool& state, bool tolerance = 0) const;
+
+    /// @brief Computes the median value of all the active and inactive voxels in this node.
+    /// @return The median value.
+    ///
+    /// @details The median for boolean values is defined as the mode
+    /// of the values, i.e. the value that occurs most often.
+    bool medianAll() const;
+    
+    /// @brief Computes the median value of all the active voxels in this node.
+    /// @return The number of active voxels.
+    ///
+    /// @param value Updated with the median value of all the active voxels. 
+    ///
+    /// @note Since the value and state are shared for this
+    ///       specialization of the LeafNode the @a value will always be true!
+    Index medianOn(ValueType &value) const;
+
+    /// @brief Computes the median value of all the inactive voxels in this node.
+    /// @return The number of inactive voxels.
+    ///
+    /// @param value Updated with the median value of all the inactive
+    /// voxels.
+    ///
+    /// @note Since the value and state are shared for this
+    ///       specialization of the LeafNode the @a value will always be false!
+    Index medianOff(ValueType &value) const;
+    
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mBuffer.mData.isOff(); }
 
@@ -1028,6 +1055,35 @@ LeafNode<ValueMask, Log2Dim>::isConstant(bool& constValue, bool& state, bool) co
 
     constValue = state;
     return true;
+}
+
+
+////////////////////////////////////////
+
+template<Index Log2Dim>
+inline bool
+LeafNode<ValueMask, Log2Dim>::medianAll() const
+{
+    const Index countTrue = mBuffer.mData.countOn();
+    return countTrue > (NUM_VALUES >> 1);
+}
+
+template<Index Log2Dim>
+inline Index
+LeafNode<ValueMask, Log2Dim>::medianOn(bool& state) const
+{
+    const Index countTrueOn = mBuffer.mData.countOn(); 
+    state = true;//since value and state are the same for this specialization of the leaf node 
+    return countTrueOn;
+}
+
+template<Index Log2Dim>
+inline Index
+LeafNode<ValueMask, Log2Dim>::medianOff(bool& state) const
+{
+    const Index countFalseOff = mBuffer.mData.countOff();
+    state = false;//since value and state are the same for this specialization of the leaf node 
+    return countFalseOff;
 }
 
 

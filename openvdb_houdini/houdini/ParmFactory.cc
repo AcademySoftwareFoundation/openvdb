@@ -217,7 +217,17 @@ struct ParmFactory::Impl
     PRM_Type                   type;
     PRM_TypeExtended           typeExtended;
     int                        vectorSize;
+
+    static PRM_SpareData* const sSOPInputSpareData[4];
 };
+
+
+PRM_SpareData* const ParmFactory::Impl::sSOPInputSpareData[4] = {
+        &SOP_Node::theFirstInput, &SOP_Node::theSecondInput,
+        &SOP_Node::theThirdInput, &SOP_Node::theFourthInput};
+
+
+////////////////////////////////////////
 
 
 ParmFactory::ParmFactory(PRM_Type type, const std::string& token, const std::string& label):
@@ -251,6 +261,9 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
     } else if (c == &PrimGroupMenuInput3) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
             NULL, 2, &SOP_Node::theThirdInput));
+    } else if (c == &PrimGroupMenuInput4) {
+        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
+            NULL, 3, &SOP_Node::theFourthInput));
     }
 #else
     if (c == &PrimGroupMenuInput1) {
@@ -259,6 +272,8 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
         setSpareData(&SOP_Node::theSecondInput);
     } else if (c == &PrimGroupMenuInput3) {
         setSpareData(&SOP_Node::theThirdInput);
+    } else if (c == &PrimGroupMenuInput4) {
+        setSpareData(&SOP_Node::theFourthInput);
     }
 #endif
 
@@ -344,6 +359,21 @@ ParmFactory&
 ParmFactory::setChoiceListItems(PRM_ChoiceListType typ, const std::vector<std::string>& items)
 {
     return doSetChoiceList(typ, items, /*paired=*/true);
+}
+
+ParmFactory&
+ParmFactory::setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ)
+{
+    if (0 <= inputIndex && inputIndex < 4) {
+        mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+#if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
+        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
+            NULL, inputIndex, Impl::sSOPInputSpareData[inputIndex]));
+#else
+        setSpareData(Impl::sSOPInputSpareData[inputIndex]);
+#endif
+    }
+    return *this;
 }
 
 ParmFactory&
@@ -825,6 +855,7 @@ DWAOpPolicy::getHelpURL(const OpFactory& factory)
 const PRM_ChoiceList PrimGroupMenuInput1 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput2 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput3 = SOP_Node::primGroupMenu;
+const PRM_ChoiceList PrimGroupMenuInput4 = SOP_Node::primGroupMenu;
 
 const PRM_ChoiceList PrimGroupMenu = SOP_Node::primGroupMenu;
 
@@ -1001,6 +1032,8 @@ OPENVDB_HOUDINI_API const PRM_ChoiceList
 PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 OPENVDB_HOUDINI_API const PRM_ChoiceList
 PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 OPENVDB_HOUDINI_API const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
@@ -1012,6 +1045,8 @@ const PRM_ChoiceList
 PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 const PRM_ChoiceList
 PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
+const PRM_ChoiceList
+PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 

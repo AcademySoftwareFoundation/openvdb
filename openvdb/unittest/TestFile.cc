@@ -1919,7 +1919,9 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
             OPENVDB_THROW(openvdb::IoError,
                 "Cannot write out a MultiBufferLeaf without StreamMetadata.");
         }
-        const uint32_t pass = meta->pass();
+
+        // clamp pass to 16-bit integer
+        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
 
         // Read in the stored pass number.
         uint32_t readPass;
@@ -1943,7 +1945,9 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
             OPENVDB_THROW(openvdb::IoError,
                 "Cannot read in a MultiBufferLeaf without StreamMetadata.");
         }
-        const uint32_t pass = meta->pass();
+
+        // clamp pass to 16-bit integer
+        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
 
         // Leaf traversal analysis deduces the number of passes to perform for this leaf
         // then updates the leaf traversal value to ensure all passes will be written.
