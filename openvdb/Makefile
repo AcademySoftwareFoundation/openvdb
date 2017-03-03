@@ -806,9 +806,9 @@ $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
-	    -I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
-	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB)
+	    -I . $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
+	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB)
 endif
 
 
@@ -861,9 +861,9 @@ ifneq (,$(strip $(CPPUNIT_INCL_DIR)))
 vdb_test: $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ $(UNITTEST_OBJ_NAMES) \
-	    -Wl,-rpath,$(CPPUNIT_LIB_DIR) -L$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+	    -Wl,-rpath,$(CPPUNIT_LIB_DIR) -L$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
 
 test: lib vdb_test
 	@echo "Testing $(LIBOPENVDB_NAME)"

@@ -39,6 +39,10 @@ Version 4.0.1 - In development
       handle isosurfaces outside the input volume's narrow band.
     - tools::MultiResGrid now supports all standard grid types, including
       BoolGrid and MaskGrid.
+    - LeafNode::fill() now correctly clips the fill region to the node's
+      bounding box.
+    - Grid::denseFill() no longer densifies all existing active tiles,
+      and it now correctly handles both active and inactive fill values.
     - Fixed a bug that caused tools::copyToDense() to only partially populate
       the output array when delayed loading was in effect.
       [Reported by Stuart Levy]
@@ -92,6 +96,12 @@ Version 4.0.1 - In development
       and moving obstacles and an option to output a pressure field.
     - The Analysis SOP now produces correct results for grids with active
       tile values.
+    - Added a sparse/dense toggle to the Fill SOP.
+    - Added openvdb_houdini::startLogForwarding(), stopLogForwarding()
+      and isLogForwarding(), which control the forwarding of log messages
+      to Houdini's error manager.  Forwarding of library warnings and
+      error messages is now enabled by default for SOPs when OpenVDB
+      is built with log4cplus.
 
 
 Version 4.0.0 - November 15, 2016
@@ -105,8 +115,8 @@ Version 4.0.0 - November 15, 2016
     - Vector-valued grids are now constructed and destroyed much faster.
 
       This change and other changes in this release (see "ABI changes" below)
-      alter the grid ABI so that it is incompatible with earlier versions
-      of the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
+      alter the grid ABI so that it is incompatible with earlier versions of
+      the OpenVDB library, such as the ones in Houdini 15, 15.5 and 16.
       To disable these changes and preserve ABI compatibility, define
       the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
       or any code that depends on OpenVDB.
@@ -184,8 +194,8 @@ Version 4.0.0 - November 15, 2016
 
     Houdini:
     - Certain changes in this release (see "ABI changes" above) alter
-      the grid ABI so that it is incompatible with earlier versions of
-      the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
+      the grid ABI so that it is incompatible with earlier versions of the
+      OpenVDB library, such as the ones built into Houdini 15, 15.5 and 16.
       To disable these changes and preserve ABI compatibility, define
       the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
       or any code that depends on OpenVDB.

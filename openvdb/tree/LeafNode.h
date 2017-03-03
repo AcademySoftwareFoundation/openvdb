@@ -497,6 +497,11 @@ public:
 
     /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
+    /// Set all voxels within an axis-aligned box to the specified value and active state.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->fill(bbox, value, active);
+    }
 
     /// Set all voxels to the specified value but don't change their active states.
     void fill(const ValueType& value);
@@ -799,12 +804,12 @@ public:
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
 
-    
+
     /// @brief Computes the median value of all the active AND inactive voxels in this node.
     /// @return The median value of all values in this node.
     ///
     /// @param tmp Optional temporary storage that can hold at least NUM_VALUES values
-    ///            Use of this temporary storage can improve performance 
+    ///            Use of this temporary storage can improve performance
     ///            when this method is called multiple times.
     ///
     /// @note If tmp = this->buffer().data() then the median
@@ -824,7 +829,7 @@ public:
     ///
     /// @param tmp Optional temporary storage that can hold at least
     ///            as many values as there are active voxels in this node.
-    ///            Use of this temporary storage can improve performance 
+    ///            Use of this temporary storage can improve performance
     ///            when this method is called multiple times.
     ///
     /// @warning If tmp != nullptr then it is the responsibility of
@@ -840,7 +845,7 @@ public:
     ///
     /// @param tmp Optional temporary storage that can hold at least
     ///            as many values as there are inactive voxels in this node.
-    ///            Use of this temporary storage can improve performance 
+    ///            Use of this temporary storage can improve performance
     ///            when this method is called multiple times.
     ///
     /// @warning If tmp != nullptr then it is the responsibility of
@@ -1198,11 +1203,15 @@ LeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool a
     if (!this->allocate()) return;
 #endif
 
-    for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    for (Int32 x = clippedBBox.min().x(); x <= clippedBBox.max().x(); ++x) {
         const Index offsetX = (x & (DIM-1u)) << 2*Log2Dim;
-        for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+        for (Int32 y = clippedBBox.min().y(); y <= clippedBBox.max().y(); ++y) {
             const Index offsetXY = offsetX + ((y & (DIM-1u)) << Log2Dim);
-            for (Int32 z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+            for (Int32 z = clippedBBox.min().z(); z <= clippedBBox.max().z(); ++z) {
                 const Index offset = offsetXY + (z & (DIM-1u));
                 mBuffer[offset] = value;
                 mValueMask.set(offset, active);

@@ -306,8 +306,10 @@ public:
     /// Set all voxels that lie outside the given axis-aligned box to the background.
     void clip(const CoordBBox&, bool background);
 
-    /// Set all voxels within an axis-aligned box to the specified value and active state.
-    void fill(const CoordBBox& bbox, bool value, bool dummy = false);
+    /// Set all voxels within an axis-aligned box to the specified value.
+    void fill(const CoordBBox& bbox, bool value, bool = false);
+    /// Set all voxels within an axis-aligned box to the specified value.
+    void denseFill(const CoordBBox& bbox, bool value, bool = false) { this->fill(bbox, value); }
 
     /// Set the state of all voxels to the specified active state.
     void fill(const bool& value, bool dummy = false);
@@ -434,11 +436,11 @@ public:
     /// @details The median for boolean values is defined as the mode
     /// of the values, i.e. the value that occurs most often.
     bool medianAll() const;
-    
+
     /// @brief Computes the median value of all the active voxels in this node.
     /// @return The number of active voxels.
     ///
-    /// @param value Updated with the median value of all the active voxels. 
+    /// @param value Updated with the median value of all the active voxels.
     ///
     /// @note Since the value and state are shared for this
     ///       specialization of the LeafNode the @a value will always be true!
@@ -453,7 +455,7 @@ public:
     /// @note Since the value and state are shared for this
     ///       specialization of the LeafNode the @a value will always be false!
     Index medianOff(ValueType &value) const;
-    
+
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mBuffer.mData.isOff(); }
 
@@ -1072,8 +1074,8 @@ template<Index Log2Dim>
 inline Index
 LeafNode<ValueMask, Log2Dim>::medianOn(bool& state) const
 {
-    const Index countTrueOn = mBuffer.mData.countOn(); 
-    state = true;//since value and state are the same for this specialization of the leaf node 
+    const Index countTrueOn = mBuffer.mData.countOn();
+    state = true;//since value and state are the same for this specialization of the leaf node
     return countTrueOn;
 }
 
@@ -1082,7 +1084,7 @@ inline Index
 LeafNode<ValueMask, Log2Dim>::medianOff(bool& state) const
 {
     const Index countFalseOff = mBuffer.mData.countOff();
-    state = false;//since value and state are the same for this specialization of the leaf node 
+    state = false;//since value and state are the same for this specialization of the leaf node
     return countFalseOff;
 }
 
@@ -1335,11 +1337,15 @@ template<Index Log2Dim>
 inline void
 LeafNode<ValueMask, Log2Dim>::fill(const CoordBBox& bbox, bool value, bool)
 {
-    for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    for (Int32 x = clippedBBox.min().x(); x <= clippedBBox.max().x(); ++x) {
         const Index offsetX = (x & (DIM-1u))<<2*Log2Dim;
-        for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+        for (Int32 y = clippedBBox.min().y(); y <= clippedBBox.max().y(); ++y) {
             const Index offsetXY = offsetX + ((y & (DIM-1u))<<  Log2Dim);
-            for (Int32 z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+            for (Int32 z = clippedBBox.min().z(); z <= clippedBBox.max().z(); ++z) {
                 const Index offset = offsetXY + (z & (DIM-1u));
                 mBuffer.mData.set(offset, value);
             }

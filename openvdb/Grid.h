@@ -692,14 +692,12 @@ public:
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
     //@}
 
-    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
     /// @param value   the value to which to set voxels within the box.
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive.
-    /// @note This operation generates a dense representation of the filled box.
-    /// This implies that active tiles are voxelized, i.e., only active voxels
-    /// are generated from this fill operation.
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// Reduce the memory footprint of this grid by increasing its sparseness.

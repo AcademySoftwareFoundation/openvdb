@@ -56,6 +56,11 @@ Bug fixes:
 - The @vdblink::tools::MultiResGrid MultiResGrid@endlink tool
   now supports all standard grid types, including
   @vdblink::BoolGrid BoolGrid@endlink and @vdblink::MaskGrid MaskGrid@endlink.
+- @vdblink::tree::LeafNode::fill() LeafNode::fill@endlink now correctly clips
+  the fill region to the node&rsquo;s bounding box.
+- @vdblink::Grid::denseFill() Grid::denseFill@endlink no longer densifies
+  all existing active tiles, and it now correctly handles both active
+  and inactive fill values.
 - Fixed a bug that caused @vdblink::tools::copyToDense()
   tools::copyToDense@endlink to only partially populate the output array
   when delayed loading was in effect.
@@ -118,6 +123,14 @@ Houdini:
   and moving obstacles and an option to output a pressure field.
 - The Analysis&nbsp;SOP now produces correct results for grids with active
   tile values.
+- Added a sparse/dense toggle to the Fill&nbsp;SOP.
+- Added @c openvdb_houdini::startLogForwarding,
+  @c openvdb_houdini::stopLogForwarding
+  and @c openvdb_houdini::isLogForwarding, which control the forwarding
+  of log messages to Houdini&rsquo;s error manager.
+  Forwarding of library warnings and error messages is now enabled
+  by default for SOPs when OpenVDB is built with
+  <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
 
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
@@ -136,7 +149,7 @@ Highlights:
   @b Note: This change and other changes in this release
   (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
   so that it is incompatible with earlier versions of the OpenVDB library,
-  such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
+  such as the ones built into Houdini&nbsp;15, 15.5 and&nbsp;16.
   To disable these changes and preserve ABI compatibility, define
   the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
   or any code that depends on OpenVDB.
@@ -161,7 +174,7 @@ New features:
 @par
 Improvements:
 - Vector-valued grids are now constructed and destroyed much faster.
-- Changed @vdblink::math::Coord Coord@endlink's data representation
+- Changed @vdblink::math::Coord Coord@endlink&rsquo;s data representation
   to facilitate C++11 uniform initialization.
 - Delayed loading from @vdblink::io::File io::Files@endlink is now faster
   due to the use of seeks instead of reads.
@@ -241,8 +254,8 @@ Python:
 Houdini:
 - Certain changes in this release (see @ref v4_0_0_ABI_changes "ABI changes"
   above) alter the grid&nbsp;ABI so that it is incompatible with earlier
-  versions of the OpenVDB library, such as the ones in Houdini&nbsp;15.0
-  and&nbsp;15.5.
+  versions of the OpenVDB library, such as the ones built into
+  Houdini&nbsp;15, 15.5 and&nbsp;16.
   To disable these changes and preserve ABI compatibility, define
   the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
   or any code that depends on OpenVDB.

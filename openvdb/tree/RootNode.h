@@ -569,16 +569,24 @@ public:
     }
     //@}
 
-    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
     /// @param value   the value to which to set voxels within the box.
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive.
-    ///
-    /// @note This operation generates a dense representation of the
-    ///       filled box. This implies that active tiles are voxelized, i.e. only active
-    ///       voxels are generated from this fill operation.
+    /// @sa voxelizeActiveTiles()
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    ///
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    ///
+    /// @warning This method can explode the tree's memory footprint, especially if it
+    /// contains active tiles at the upper levels (in particular the root level)!
+    ///
+    /// @sa denseFill()
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Copy into a dense grid the values of all voxels, both active and inactive,
     /// that intersect a given bounding box.
@@ -829,14 +837,6 @@ public:
     template<typename ArrayT>
     void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
-
-    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
-    ///
-    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
-    ///
-    /// @warning This method can explode the tree's memory footprint, especially if it
-    /// contains active tiles at the upper levels, e.g. root level!
-    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Efficiently merge another tree into this tree using one of several schemes.
     /// @details This operation is primarily intended to combine trees that are mostly
@@ -2077,12 +2077,15 @@ RootNode<ChildT>::probeValueAndCache(const Coord& xyz, ValueType& value, Accesso
 
 ////////////////////////////////////////
 
+
 template<typename ChildT>
 inline void
 RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     if (bbox.empty()) return;
 
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
     Coord xyz, tileMax;
     for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
         xyz.setX(x);
@@ -2107,7 +2110,7 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
                         child = new ChildT(xyz, mBackground);
                         mTable[tileMin] = NodeStruct(*child);
                     } else if (isTile(iter)) {
-                        // Replace the tile with a newly-created child that is initialized
+                        // Replace the tile with a newly-created child that is filled
                         // with the tile's value and active state.
                         const Tile& tile = getTile(iter);
                         child = new ChildT(xyz, tile.value, tile.active);
@@ -2132,13 +2135,81 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
     }
 }
 
+
 template<typename ChildT>
 inline void
 RootNode<ChildT>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-    this->sparseFill(bbox, value, active);
-    this->voxelizeActiveTiles(true);//multi-threaded
+    if (bbox.empty()) return;
+
+    if (active && mTable.empty()) {
+        // If this tree is empty, then a sparse fill followed by (threaded)
+        // densification of active tiles is the more efficient approach.
+        sparseFill(bbox, value, active);
+        voxelizeActiveTiles(/*threaded=*/true);
+        return;
+    }
+
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
+    Coord xyz, tileMin, tileMax;
+    for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
+        xyz.setX(x);
+        for (int y = bbox.min().y(); y <= bbox.max().y(); y = tileMax.y() + 1) {
+            xyz.setY(y);
+            for (int z = bbox.min().z(); z <= bbox.max().z(); z = tileMax.z() + 1) {
+                xyz.setZ(z);
+
+                // Get the bounds of the tile that contains voxel (x, y, z).
+                tileMin = coordToKey(xyz);
+                tileMax = tileMin.offsetBy(ChildT::DIM - 1);
+
+                // Retrieve the table entry for the tile that contains xyz,
+                // or, if there is no table entry, add a background tile.
+                const auto iter = findOrAddCoord(tileMin);
+
+                if (isTile(iter)) {
+                    // If the table entry is a tile, replace it with a child node
+                    // that is filled with the tile's value and active state.
+                    const auto& tile = getTile(iter);
+                    auto* child = new ChildT{tileMin, tile.value, tile.active};
+                    setChild(iter, *child);
+                }
+                // Forward the fill request to the child.
+                getChild(iter).denseFill(bbox, value, active);
+            }
+        }
+    }
 }
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT>
+inline void
+RootNode<ChildT>::voxelizeActiveTiles(bool threaded)
+{
+    // There is little point in threading over the root table since each tile
+    // spans a huge index space (by default 4096^3) and hence we expect few
+    // active tiles if any at all.  In fact, you're very likely to run out of
+    // memory if this method is called on a tree with root-level active tiles!
+    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (this->isTileOff(i)) continue;
+        ChildT* child = i->second.child;
+        if (child == nullptr) {
+            // If this table entry is an active tile (i.e., not off and not a child node),
+            // replace it with a child node filled with active tiles of the same value.
+            child = new ChildT{i->first, this->getTile(i).value, true};
+            i->second.child = child;
+        }
+        child->voxelizeActiveTiles(threaded);
+    }
+}
+
+
+////////////////////////////////////////
+
 
 template<typename ChildT>
 template<typename DenseT>
@@ -2857,30 +2928,6 @@ RootNode<ChildT>::stealNodes(ArrayT& array, const ValueType& value, bool state)
             }
             OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
         }
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::voxelizeActiveTiles(bool threaded)
-{
-    // These is little point in multi-threaded over the root table since
-    // each tile spans a huge index space (by default 4096^3) and hence we
-    // expect few if any at all. In fact, you're very likeky to run out
-    // of memory if this method is called on a tree with root-level
-    // active tiles!
-    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (this->isTileOff(i)) continue;
-        ChildT* child = i->second.child;
-        if (child == nullptr) {
-            child = new ChildT(i->first, this->getTile(i).value, true);
-            i->second.child = child;
-        }
-        child->voxelizeActiveTiles(threaded);
     }
 }
 

@@ -5,7 +5,7 @@ Requirements
 ------------
 - GNU GCC (gcc.gnu.org), version 4.8 or later,
   Clang (clang.llvm.org), version 3.8 or later,
-  or Intel ICC (software.intel.com), version 14 or later
+  or Intel ICC (software.intel.com), version 15 or later
 
 - GNU gmake (www.gnu.org/software/make/), version 3.81 or later
 
@@ -131,7 +131,7 @@ Installation
                         (e.g., -llog4cplus)
 
     PYTHON_VERSION      the version of Python for which to build the OpenVDB
-                        module (e.g., 2.6)
+                        module (e.g., 2.7)
                         (leave blank if Python is unavailable)
     PYTHON_INCL_DIR     the directory containing the Python.h header file
                         (on OS X, this is usually /System/Library/Frameworks/
@@ -142,7 +142,7 @@ Installation
                         (on OS X, this is usually /System/Library/Frameworks/
                         Python.framework/Versions/$(PYTHON_VERSION)/lib)
     PYTHON_LIB          linker flags for the Python library
-                        (e.g., -lpython2.6)
+                        (e.g., -lpython2.7)
     BOOST_PYTHON_LIB_DIR
                         the directory containing the Boost.Python library
     BOOST_PYTHON_LIB    linker flags for the Boost.Python library
@@ -170,21 +170,21 @@ Installation
     $HDSO, $HFS and $HT.  Source the houdini_setup script provided with
     your Houdini installation to set those environment variables.
 
-    Also note that certain new features in OpenVDB 3 (see the CHANGES file
+    Also note that certain new features in OpenVDB 4 (see the CHANGES file
     for details) necessitated changes to the ABI of the Grid class,
-    rendering it incompatible with earlier versions of the library,
-    such as the ones in Houdini 12.5 and 13.  Passing grids between native
-    VDB nodes in a scene graph and nodes built against the new ABI
-    will lead to crashes, so if you must use OpenVDB 3 with those versions
-    of Houdini, set abi=2 to compile with the incompatible features disabled.
+    rendering it incompatible with earlier versions of the library, such as
+    the ones built into Houdini 15, 15.5 and 16.  Passing grids between
+    native VDB nodes in a scene graph and nodes built against the new ABI
+    will lead to crashes, so to use OpenVDB 4 with those versions of Houdini,
+    set abi=3 to compile with the incompatible features disabled.
 
-    To build the OpenVDB Python module, you will need local installations of
-    Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
-    includes versions 2.5 and 2.6 of Python as well as Boost.Python headers.
-    Unfortunately, it includes neither the libboost_python library nor NumPy,
-    so both Boost.Python and NumPy have to be built separately.
-    Point the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
-    $(NUMPY_INCL_DIR) to your local installations of those libraries.
+    To build the OpenVDB Python module, you will need local installations
+    of Python, Boost.Python, and optionally NumPy.  Houdini ships with
+    Python 2 as well as Boost.Python headers, but unfortunately it includes
+    neither the libboost_python library nor NumPy, so both Boost.Python
+    and NumPy have to be built separately.  Point the variables
+    $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and $(NUMPY_INCL_DIR)
+    to your local installations of those libraries.
 
 2.  From the top-level openvdb/ directory, type "make" (or "make -s" for
     less verbose output) to locally build the library and commands.
@@ -193,8 +193,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.4.0.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.4.0.0
+    openvdb/libopenvdb.so.4.0.1         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.4.0.1
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -241,7 +241,7 @@ Installation
         lib/
             libopenvdb.so
             libopenvdb.so.4.0
-            libopenvdb.so.4.0.0
+            libopenvdb.so.4.0.1
 
         python/
             include/

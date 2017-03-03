@@ -31,7 +31,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/tree/LeafNode.h>
-#include <openvdb/math/Math.h>// for Random01
+#include <openvdb/math/Math.h>// for math::Random01(), math::Pow3()
 
 class TestLeaf: public CppUnit::TestCase
 {
@@ -49,6 +49,7 @@ public:
     CPPUNIT_TEST(testNegativeIndexing);
     CPPUNIT_TEST(testIsConstant);
     CPPUNIT_TEST(testMedian);
+    CPPUNIT_TEST(testFill);
     CPPUNIT_TEST_SUITE_END();
 
     void testBuffer();
@@ -63,6 +64,7 @@ public:
     void testNegativeIndexing();
     void testIsConstant();
     void testMedian();
+    void testFill();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeaf);
@@ -328,13 +330,13 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
         CPPUNIT_ASSERT(stat);
         CPPUNIT_ASSERT_EQUAL(val, v);
-        
+
         leaf.setValueOff(0);
         CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
 
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
-        
+
         leaf.setValueOn(0, val + 0.99f*tol);
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
         CPPUNIT_ASSERT(stat);
@@ -352,13 +354,13 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
         CPPUNIT_ASSERT(stat);
         CPPUNIT_ASSERT_EQUAL(val, v);
-        
+
         leaf.setValueOff(0);
         CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
 
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
-        
+
         leaf.setValueOn(0, val + 0.99*tol);
         CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
         CPPUNIT_ASSERT(stat);
@@ -373,15 +375,15 @@ TestLeaf::testIsConstant()
         tree::LeafNode<float, 3> leaf(origin, val, true);
         float vmin = 0.0f, vmax = 0.0f;
         bool stat = false;
-        
+
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT(stat);
         CPPUNIT_ASSERT_EQUAL(val, vmin);
         CPPUNIT_ASSERT_EQUAL(val, vmax);
-        
+
         leaf.setValueOff(0);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
-        
+
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
 
@@ -389,7 +391,7 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT_EQUAL(val, vmin);
         CPPUNIT_ASSERT_EQUAL(val + tol, vmax);
-        
+
         leaf.setValueOn(0, val + 1.01f*tol);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
     }
@@ -403,10 +405,10 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(stat);
         CPPUNIT_ASSERT_EQUAL(val, vmin);
         CPPUNIT_ASSERT_EQUAL(val, vmax);
-        
+
         leaf.setValueOff(0);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
-        
+
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
 
@@ -414,7 +416,7 @@ TestLeaf::testIsConstant()
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT_EQUAL(val, vmin);
         CPPUNIT_ASSERT_EQUAL(val + tol, vmax);
-        
+
         leaf.setValueOn(0, val + 1.01*tol);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
     }
@@ -495,7 +497,7 @@ TestLeaf::testMedian()
     CPPUNIT_ASSERT_EQUAL(leaf.numValues()-6, leaf.medianOff(val));
     CPPUNIT_ASSERT_EQUAL(1.0f, val);
     CPPUNIT_ASSERT_EQUAL(1.0f, leaf.medianAll());
-    
+
     leaf.setValue(Coord(2,4,1), v[6]);
     CPPUNIT_ASSERT_EQUAL(Index(7), leaf.medianOn(val));
     CPPUNIT_ASSERT_EQUAL(v[0], val);
@@ -524,6 +526,39 @@ TestLeaf::testMedian()
     CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOff(val));
     CPPUNIT_ASSERT_EQUAL(2.0f, val);
     CPPUNIT_ASSERT_EQUAL(2.0f, leaf.medianAll());
+}
+
+void
+TestLeaf::testFill()
+{
+    using namespace openvdb;
+    const Coord origin(-9, -2, -8);
+
+    const float bg = 0.0f, fg = 1.0f;
+    tree::LeafNode<float, 3> leaf(origin, bg, false);
+
+    const int bboxDim = 1 + int(leaf.dim() >> 1);
+    auto bbox = CoordBBox::createCube(leaf.origin(), bboxDim);
+    CPPUNIT_ASSERT_EQUAL(math::Pow3(bboxDim), int(bbox.volume()));
+
+    bbox = leaf.getNodeBoundingBox();
+    leaf.fill(bbox, bg, false);
+    CPPUNIT_ASSERT(leaf.isEmpty());
+    leaf.fill(bbox, fg, true);
+    CPPUNIT_ASSERT(leaf.isDense());
+
+    leaf.fill(bbox, bg, false);
+    CPPUNIT_ASSERT(leaf.isEmpty());
+
+    // Fill a region that is larger than the node but that doesn't completely enclose it.
+    bbox.max() = bbox.min() + (bbox.dim() >> 1);
+    bbox.expand(bbox.min() - Coord{10});
+    leaf.fill(bbox, fg, true);
+
+    // Verify that fill() correctly clips the fill region to the node.
+    auto clippedBBox = leaf.getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    CPPUNIT_ASSERT_EQUAL(int(clippedBBox.volume()), int(leaf.onVoxelCount()));
 }
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC

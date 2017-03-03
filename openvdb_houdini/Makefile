@@ -100,6 +100,13 @@ TBB_INCL_DIR := $(HT)/include
 TBB_LIB_DIR := $(HDSO)
 TBB_LIB := -ltbb
 
+# The parent directory of the log4cplus/ header directory
+# (leave blank if log4cplus is unavailable)
+LOG4CPLUS_INCL_DIR :=
+# The directory containing liblog4cplus
+LOG4CPLUS_LIB_DIR :=
+LOG4CPLUS_LIB := -llog4cplus
+
 
 #
 # Ideally, users shouldn't need to change anything below this line.
@@ -151,12 +158,24 @@ else
     QUIET := > /dev/null
 endif
 
+has_log4cplus := no
+ifneq (,$(and $(LOG4CPLUS_LIB_DIR),$(LOG4CPLUS_INCL_DIR),$(LOG4CPLUS_LIB)))
+    has_log4cplus := yes
+endif
+
 INCLDIRS := -I . -I .. -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
+ifeq (yes,$(has_log4cplus))
+    INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
+endif
 HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
 CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
+ifeq (yes,$(has_log4cplus))
+    CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
+    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_USE_LOG4CPLUS
+endif
 ifeq (3,$(strip $(abi)))
     CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
     HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
@@ -184,6 +203,10 @@ LIBS_RPATH := \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
+ifeq (yes,$(has_log4cplus))
+    LIBS += -L$(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_LIB)
+    LIBS_RPATH += -Wl,-rpath,$(LOG4CPLUS_LIB_DIR) -L$(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_LIB)
+endif
 ifdef LINUX
     LIBS += -lrt
     LIBS_RPATH += -lrt

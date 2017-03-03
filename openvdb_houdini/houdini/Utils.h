@@ -36,6 +36,7 @@
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
 #include "GU_PrimVDB.h"
+#include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
 #include <boost/function.hpp>
@@ -263,6 +264,41 @@ bool evalGridBBox(GridCRef grid, UT_Vector3 corners[8], bool expandHalfVoxel = f
 /// Construct an index-space CoordBBox from a UT_BoundingBox.
 OPENVDB_HOUDINI_API
 openvdb::CoordBBox makeCoordBBox(const UT_BoundingBox&, const openvdb::math::Transform&);
+
+
+/// @{
+/// @brief Start forwarding OpenVDB log messages to the Houdini error manager
+/// for all operators of the given type.
+/// @details Typically, log forwarding is enabled for specific operator types
+/// during initialization of the openvdb_houdini library, and there's no need
+/// for client code to call this function.
+/// @details This function has no effect unless OpenVDB was built with
+/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+/// @note OpenVDB messages are typically logged to the console as well.
+/// This function has no effect on console logging.
+/// @sa stopLogForwarding(), isLogForwarding()
+OPENVDB_HOUDINI_API
+void startLogForwarding(OP_OpTypeId);
+
+/// @brief Stop forwarding OpenVDB log messages to the Houdini error manager
+/// for all operators of the given type.
+/// @details Typically, log forwarding is enabled for specific operator types
+/// during initialization of the openvdb_houdini library, and there's no need
+/// for client code to disable it.
+/// @details This function has no effect unless OpenVDB was built with
+/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+/// @note OpenVDB messages are typically logged to the console as well.
+/// This function has no effect on console logging.
+/// @sa startLogForwarding(), isLogForwarding()
+OPENVDB_HOUDINI_API
+void stopLogForwarding(OP_OpTypeId);
+
+/// @brief Return @c true if OpenVDB messages logged by operators
+/// of the given type are forwarded to the Houdini error manager.
+/// @sa startLogForwarding(), stopLogForwarding()
+OPENVDB_HOUDINI_API
+bool isLogForwarding(OP_OpTypeId);
+/// @}
 
 
 ////////////////////////////////////////
