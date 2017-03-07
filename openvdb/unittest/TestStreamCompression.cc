@@ -68,6 +68,14 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <fstream>
 #include <numeric> // for std::iota()
 
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+// A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
+// HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
+#if BLOSC_VERSION_MAJOR > 0 && BLOSC_VERSION_MINOR > 10
+#define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+#endif
+#endif
 
 /// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
 class ProxyMappedFile
@@ -438,7 +446,11 @@ TestStreamCompression::testPagedStreams()
         ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4422));
+#else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4452));
+#endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(PageSize+sizeof(int)));
 #endif
@@ -463,7 +475,11 @@ TestStreamCompression::testPagedStreams()
         istream.read(handle, values.size(), false);
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4422));
+#else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4452));
+#endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(PageSize+sizeof(int)));
 #endif
@@ -548,7 +564,11 @@ TestStreamCompression::testPagedStreams()
             ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42424));
+#else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
+#endif
 #else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
 #endif
