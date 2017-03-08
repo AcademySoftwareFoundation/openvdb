@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 4.0.1 - In development
+Version 4.0.1 - March 8, 2017
 
     New features:
     - Added functions to util/logging.h to simplify configuration of the

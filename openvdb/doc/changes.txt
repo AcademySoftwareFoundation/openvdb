@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 4.0.1</B> - <I>In development</I>
+<B>Version 4.0.1</B> - <I>March 8, 2017</I>
 @par
 New features:
 - Added functions to util/logging.h to simplify configuration of the
