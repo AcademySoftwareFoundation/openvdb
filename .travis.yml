@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2017 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,27 +45,28 @@ compiler: clang
 # Setup environment variables for different concurrent builds
 env:
   # Build and run unit tests for ABI=3 and ABI=4
-  - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
 
-  # Build Houdini plug-ins for H15 and H15.5
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=Houdini15.5 HOUDINI_BUILD=houdini-15.5.619-linux_x86_64_gcc4.8
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=Houdini15 HOUDINI_BUILD=houdini-15.0.459-linux_x86_64_gcc4.8
+  # Build Houdini plug-ins for H15.0, H15.5, H16.0
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.0
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.5
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.0
 
   # Build and run unit tests for ABI=3 and ABI=4 with Blosc disabled
-  - ABI=4 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
-  - ABI=3 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=4 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
+  - ABI=3 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
 
   # Build (but don't run) unit tests in debug mode for ABI=3 and ABI=4 with and without Blosc
-  - ABI=4 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
-  - ABI=3 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
-  - ABI=4 BLOSC=no RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
-  - ABI=3 BLOSC=no RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=4 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none
+  - ABI=3 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none
+  - ABI=4 BLOSC=no RELEASE=no HOUDINI_MAJOR=none
+  - ABI=3 BLOSC=no RELEASE=no HOUDINI_MAJOR=none
 
 # Build and install all library dependencies for OpenVDB
 # (build will error if this stage does not succeed)
-install: bash .travis.run install $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $HOUDINI_BUILD
+install: bash travis/travis.run install $ABI $BLOSC $RELEASE $HOUDINI_MAJOR
 
 # Build OpenVDB and OpenVDB Houdini and run unit tests
 # (build will fail if this stage does not succeed)
-script: bash .travis.run script $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $HOUDINI_BUILD
+script: bash travis/travis.run script $ABI $BLOSC $RELEASE $HOUDINI_MAJOR
