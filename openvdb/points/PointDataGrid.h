@@ -1180,6 +1180,16 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
 {
     struct Local
     {
+        static void destroyPagedStream(const io::StreamMetadata::AuxDataMap& auxData, const Index index)
+        {
+            // if paged stream exists, delete it
+            std::string key("paged:" + std::to_string(index));
+            auto it = auxData.find(key);
+            if (it != auxData.end()) {
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
+            }
+        }
+
         static compression::PagedInputStream& getOrInsertPagedStream(   const io::StreamMetadata::AuxDataMap& auxData,
                                                                         const Index index)
         {
@@ -1308,6 +1318,15 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             pagedStream.setSizeOnly(false);
             array->readPagedBuffers(pagedStream);
         }
+        // cleanup paged stream reference in auxiliary metadata
+        if (pass > attributes + 3) {
+            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+        }
+    }
+    else if (pass < buffers()) {
+        // pass 2n+3 - cleanup last paged stream
+        const Index attributeIndex = pass - attributes - 4;
+        Local::destroyPagedStream(meta->auxData(), attributeIndex);
     }
 }
 
