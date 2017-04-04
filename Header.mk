@@ -8,40 +8,14 @@
 # your package in the future.
 
 # The version number of the facility's Makefile this package is making use of.
-USE_MAKEFILE_VERSION = 3
+USE_MAKEFILE_VERSION = 4
 
-# By default, all the directories under src, except "wrappers" and "python",
-# whose contents are handled specially, will be copied to your package build
-# directory private/build.  You can override this by giving a list of specific
-# directories from src to copy to the build directory...
-# SRC_DIRS += src/bin
-# SRC_DIRS += src/maya
-SRC_DIRS := 
-# By default, src and all of its subdirectories will be searched for PyQT .ui
-# files from which to create Python code.  You can give specific directories
-# in which to look for .ui files here...
-# UI_DIRS += src/foo/UI
+# Openvdb's docs are online
+NO_DOCS=true
 
-# By default, src and all of its subdirectories will be searched for Makefiles
-# to run.  You can give specific directories in which to run Makefiles here...
-# COMPILE_DIRS += src/maya/plugins
-# COMPILE_DIRS += src/foo
-COMPILE_DIRS :=
-# By default, all the files in src/wrappers will be installed as tool wrappers.
-# You can override this by listing specific wrapper files here...
-# WRAPPERS += src/wrappers/myTool1
-# WRAPPERS += src/wrappers/myTool2
+# No support for git so disabling it
+NO_TAG=true
 
-BUILD_ROOT ?= $(BUILD_DIR)
-
-# If your package does not have any operating-system-dependent components (such
-# as compiled plugins), you may set this variable to a space-separated list of
-# operating systems you want to install to by default.  If you don't set this
-# variable, the install will be for the operating system of the machine you are
-# on when you call 'make install'.
-# PLATFORMS = cent5_64 cent6_64 xp_32 xp_64 win7_64
-
-NO_TAG := yes
 # This Makefile defines various build targets and variables, taking into
 # account your settings, above. Do not remove this line unless you really
 # know what you are doing.
