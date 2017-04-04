@@ -14,7 +14,7 @@ Schema: '1.0'
 # versioning.
 Name: openvdb
 
-Version: 4.0.0
+Version: 4.0.0_dd01
 
 # The type of installation that will be performed for this software.
 # This information MUST be provided.
