@@ -37,4 +37,4 @@ openvdb_houdini/houdini_utils
 openvdb_houdini/openvdb_houdini
 openvdb_maya/maya_deps
 openvdb_maya/openvdb_maya
-private
+private*
