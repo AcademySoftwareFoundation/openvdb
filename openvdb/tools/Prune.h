@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -217,7 +217,7 @@ public:
     typedef typename TreeT::LeafNodeType LeafT;
     BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
 
-    TolerancePruneOp(TreeT& tree, const ValueT& t) : mTolerance(t)
+    TolerancePruneOp(TreeT& tree, const ValueT& tol) : mTolerance(tol)
     {
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
@@ -251,30 +251,17 @@ public:
 
 private:
 
-    template<typename NodeT>
-    struct CompareOp {
-        CompareOp() {}        
-        typedef typename NodeT::UnionType T;
-        inline bool operator()(const T& a, const T& b) const {return a.getValue() < b.getValue();}
-    };// CompareOp
-
     // Private method specialized for leaf nodes
-    inline ValueT median(LeafT& leaf) const
-    {
-        ValueT* data = leaf.buffer().data();
-        static const size_t midpoint = (LeafT::NUM_VALUES - 1) >> 1;
-        std::nth_element(data, data + midpoint, data + LeafT::NUM_VALUES);
-        return data[midpoint];
-    }
+    inline ValueT median(LeafT& leaf) const {return leaf.medianAll(leaf.buffer().data());}
 
     // Private method for internal nodes
     template<typename NodeT>
     inline typename NodeT::ValueType median(NodeT& node) const
     {
-        typedef typename NodeT::UnionType UnionT;
+        using UnionT = typename NodeT::UnionType;
         UnionT* data = const_cast<UnionT*>(node.getTable());//never do this at home kids :)
         static const size_t midpoint = (NodeT::NUM_VALUES - 1) >> 1;
-        CompareOp<NodeT> op;
+        auto op = [](const UnionT& a, const UnionT& b){return a.getValue() < b.getValue();};
         std::nth_element(data, data + midpoint, data + NodeT::NUM_VALUES, op);
         return data[midpoint].getValue();
     }
@@ -439,6 +426,6 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 #endif // OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -217,7 +217,17 @@ struct ParmFactory::Impl
     PRM_Type                   type;
     PRM_TypeExtended           typeExtended;
     int                        vectorSize;
+
+    static PRM_SpareData* const sSOPInputSpareData[4];
 };
+
+
+PRM_SpareData* const ParmFactory::Impl::sSOPInputSpareData[4] = {
+        &SOP_Node::theFirstInput, &SOP_Node::theSecondInput,
+        &SOP_Node::theThirdInput, &SOP_Node::theFourthInput};
+
+
+////////////////////////////////////////
 
 
 ParmFactory::ParmFactory(PRM_Type type, const std::string& token, const std::string& label):
@@ -251,6 +261,9 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
     } else if (c == &PrimGroupMenuInput3) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
             NULL, 2, &SOP_Node::theThirdInput));
+    } else if (c == &PrimGroupMenuInput4) {
+        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
+            NULL, 3, &SOP_Node::theFourthInput));
     }
 #else
     if (c == &PrimGroupMenuInput1) {
@@ -259,6 +272,8 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
         setSpareData(&SOP_Node::theSecondInput);
     } else if (c == &PrimGroupMenuInput3) {
         setSpareData(&SOP_Node::theThirdInput);
+    } else if (c == &PrimGroupMenuInput4) {
+        setSpareData(&SOP_Node::theFourthInput);
     }
 #endif
 
@@ -344,6 +359,21 @@ ParmFactory&
 ParmFactory::setChoiceListItems(PRM_ChoiceListType typ, const std::vector<std::string>& items)
 {
     return doSetChoiceList(typ, items, /*paired=*/true);
+}
+
+ParmFactory&
+ParmFactory::setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ)
+{
+    if (0 <= inputIndex && inputIndex < 4) {
+        mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+#if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
+        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
+            NULL, inputIndex, Impl::sSOPInputSpareData[inputIndex]));
+#else
+        setSpareData(Impl::sSOPInputSpareData[inputIndex]);
+#endif
+    }
+    return *this;
 }
 
 ParmFactory&
@@ -497,14 +527,20 @@ public:
         const char* english,
         OP_Constructor construct,
         PRM_Template* multiparms,
+#if (UT_MAJOR_VERSION_INT >= 16)
+        const char* operatorTableName,
+#endif
         unsigned minSources,
         unsigned maxSources,
         CH_LocalVariable* variables,
         unsigned flags,
         const char** inputlabels,
         const std::string& helpUrl):
-        OP_Operator(name, english, construct, multiparms, minSources,
-            maxSources, variables, flags, inputlabels),
+        OP_Operator(name, english, construct, multiparms,
+#if (UT_MAJOR_VERSION_INT >= 16)
+            operatorTableName,
+#endif
+            minSources, maxSources, variables, flags, inputlabels),
         mHelpUrl(helpUrl)
     {
     }
@@ -572,7 +608,11 @@ struct OpFactory::Impl
         mInputLabels.push_back(NULL);
 
         OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
-            mConstruct, mParms, minSources, mMaxSources, mVariables, mFlags,
+            mConstruct, mParms,
+#if (UT_MAJOR_VERSION_INT >= 16)
+            UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
+#endif
+            minSources, mMaxSources, mVariables, mFlags,
             const_cast<const char**>(&mInputLabels[0]), mHelpUrl);
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
@@ -584,7 +624,7 @@ struct OpFactory::Impl
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mIconName, mHelpUrl;
+    std::string mEnglish, mName, mIconName, mHelpUrl, mOperatorTableName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -747,6 +787,22 @@ OpFactory&
 OpFactory::setFlags(unsigned f) { mImpl->mFlags = f; return *this; }
 
 
+OpFactory&
+OpFactory::setInternalName(const std::string& name)
+{
+    mImpl->mName = name;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setOperatorTable(const std::string& name)
+{
+    mImpl->mOperatorTableName = name;
+    return *this;
+}
+
+
 ////////////////////////////////////////
 
 
@@ -799,6 +855,7 @@ DWAOpPolicy::getHelpURL(const OpFactory& factory)
 const PRM_ChoiceList PrimGroupMenuInput1 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput2 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput3 = SOP_Node::primGroupMenu;
+const PRM_ChoiceList PrimGroupMenuInput4 = SOP_Node::primGroupMenu;
 
 const PRM_ChoiceList PrimGroupMenu = SOP_Node::primGroupMenu;
 
@@ -975,6 +1032,8 @@ OPENVDB_HOUDINI_API const PRM_ChoiceList
 PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 OPENVDB_HOUDINI_API const PRM_ChoiceList
 PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 OPENVDB_HOUDINI_API const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
@@ -986,6 +1045,8 @@ const PRM_ChoiceList
 PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 const PRM_ChoiceList
 PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
+const PRM_ChoiceList
+PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
@@ -996,6 +1057,6 @@ const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 } // namespace houdini_utils
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

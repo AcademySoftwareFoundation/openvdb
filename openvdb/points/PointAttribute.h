@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -53,7 +53,7 @@ namespace points {
 namespace point_attribute_internal {
 
 template <typename ValueType>
-struct DefaultValue;
+inline ValueType defaultValue() { return zeroVal<ValueType>(); }
 
 } // namespace point_attribute_internal
 
@@ -66,7 +66,7 @@ struct DefaultValue;
 /// @param type               the type of the attibute.
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename PointDataTree>
@@ -75,7 +75,7 @@ inline void appendAttribute(PointDataTree& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -86,17 +86,17 @@ inline void appendAttribute(PointDataTree& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType, typename CodecType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::DefaultValue<ValueType>::value(),
+                                point_attribute_internal::defaultValue<ValueType>(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -107,17 +107,17 @@ inline void appendAttribute(PointDataTree& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param defaultValue       metadata default attribute value
+/// @param metaDefaultValue   metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::DefaultValue<ValueType>::value(),
+                                point_attribute_internal::defaultValue<ValueType>(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr defaultValue = Metadata::Ptr(),
+                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -130,7 +130,7 @@ template <typename ValueType, typename PointDataTree>
 inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const ValueType& uniformValue =
-                                    point_attribute_internal::DefaultValue<ValueType>::value());
+                                    point_attribute_internal::defaultValue<ValueType>());
 
 /// @brief Drops attributes from the VDB tree.
 ///
@@ -233,8 +233,8 @@ struct AppendAttributeOp {
         for (auto leaf = range.begin(); leaf; ++leaf) {
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos,
-                                                                  mStrideOrTotalSize, mConstantStride);
+            AttributeArray::Ptr attribute = leaf->appendAttribute(
+                expected, mDescriptor, mPos, mStrideOrTotalSize, mConstantStride);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -404,7 +404,9 @@ struct BloscCompressAttributesOp {
 template <typename ValueType, typename CodecType>
 struct AttributeTypeConversion
 {
-    static const NamePair& type() { return TypedAttributeArray<ValueType, CodecType>::attributeType(); }
+    static const NamePair& type() {
+        return TypedAttributeArray<ValueType, CodecType>::attributeType();
+    }
 };
 
 
@@ -412,23 +414,6 @@ template <typename CodecType>
 struct AttributeTypeConversion<Name, CodecType>
 {
     static const NamePair& type() { return StringAttributeArray::attributeType(); }
-};
-
-
-////////////////////////////////////////
-
-
-template <typename ValueType>
-struct DefaultValue
-{
-    static constexpr ValueType value() { return zeroVal<ValueType>(); }
-};
-
-
-template <>
-struct DefaultValue<Name>
-{
-    static Name value() { return ""; }
 };
 
 
@@ -480,7 +465,7 @@ inline void appendAttribute(PointDataTree& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
@@ -498,7 +483,8 @@ inline void appendAttribute(PointDataTree& tree,
     const size_t index = descriptor.find(name);
 
     if (index != AttributeSet::INVALID_POS) {
-        OPENVDB_THROW(KeyError, "Cannot append an attribute with a non-unique name - " << name << ".");
+        OPENVDB_THROW(KeyError,
+            "Cannot append an attribute with a non-unique name - " << name << ".");
     }
 
     // create a new attribute descriptor
@@ -507,8 +493,8 @@ inline void appendAttribute(PointDataTree& tree,
 
     // store the attribute default value in the descriptor metadata
 
-    if (defaultValue) {
-        newDescriptor->setDefaultValue(name, *defaultValue);
+    if (metaDefaultValue) {
+        newDescriptor->setDefaultValue(name, *metaDefaultValue);
     }
 
     // extract new pos
@@ -533,20 +519,21 @@ inline void appendAttribute(PointDataTree& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     using point_attribute_internal::AttributeTypeConversion;
-    using point_attribute_internal::DefaultValue;
+    using point_attribute_internal::defaultValue;
     using point_attribute_internal::MetadataStorage;
 
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
-                    strideOrTotalSize, constantStride, defaultValue, hidden, transient);
+        strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
 
-    if (!math::isExactlyEqual(uniformValue, DefaultValue<ValueType>::value())) {
+    if (!math::isExactlyEqual(uniformValue, defaultValue<ValueType>())) {
         MetadataStorage<PointDataTree, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
@@ -562,14 +549,15 @@ inline void appendAttribute(PointDataTree& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr defaultValue,
+                            Metadata::Ptr metaDefaultValue,
                             const bool hidden,
                             const bool transient)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     appendAttribute<ValueType, NullCodec>(tree, name, uniformValue, strideOrTotalSize,
-                                          constantStride, defaultValue, hidden, transient);
+        constantStride, metaDefaultValue, hidden, transient);
 }
 
 
@@ -581,7 +569,8 @@ inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const ValueType& uniformValue)
 {
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
+    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
+        "ValueType must not be derived from AttributeArray");
 
     using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
     using Descriptor    = AttributeSet::Descriptor;
@@ -603,7 +592,8 @@ inline void collapseAttribute(  PointDataTree& tree,
     }
 
     LeafManagerT leafManager(tree);
-    tbb::parallel_for(leafManager.leafRange(), CollapseAttributeOp<ValueType, PointDataTree>(index, uniformValue));
+    tbb::parallel_for(leafManager.leafRange(),
+        CollapseAttributeOp<ValueType, PointDataTree>(index, uniformValue));
 }
 
 
@@ -636,7 +626,8 @@ inline void dropAttributes( PointDataTree& tree,
     // insert attributes using the new descriptor
 
     Descriptor::Ptr newDescriptor = descriptor.duplicateDrop(indices);
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), DropAttributesOp<PointDataTree>(indices, newDescriptor));
+    tbb::parallel_for(LeafManagerT(tree).leafRange(),
+        DropAttributesOp<PointDataTree>(indices, newDescriptor));
 }
 
 
@@ -661,7 +652,8 @@ inline void dropAttributes( PointDataTree& tree,
 
         // do not attempt to drop an attribute that does not exist
         if (index == AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(KeyError, "Cannot drop an attribute that does not exist - " << name << ".");
+            OPENVDB_THROW(KeyError,
+                "Cannot drop an attribute that does not exist - " << name << ".");
         }
 
         indices.push_back(index);
@@ -722,7 +714,8 @@ inline void renameAttributes(   PointDataTree& tree,
 
         const Name& newName = newNames[i];
         if (descriptor.find(newName) != AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(KeyError, "Cannot rename attribute as new name already exists - " << newName << ".");
+            OPENVDB_THROW(KeyError,
+                "Cannot rename attribute as new name already exists - " << newName << ".");
         }
 
         const AttributeArray* array = attributeSet.getConst(oldName);
@@ -796,7 +789,8 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 
     std::vector<size_t> indices{index};
 
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), BloscCompressAttributesOp<PointDataTree>(indices));
+    tbb::parallel_for(LeafManagerT(tree).leafRange(),
+        BloscCompressAttributesOp<PointDataTree>(indices));
 }
 
 ////////////////////////////////////////
@@ -808,6 +802,6 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 
 #endif // OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

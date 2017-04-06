@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,7 +38,6 @@
 #include <vector>
 #include <exception>
 #ifdef DWA_OPENVDB
-#include <logging_base/logging.h>
 #include <usagetrack.h>
 #endif
 
@@ -89,7 +88,6 @@ main(int argc, char *argv[])
 {
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-    logging_base::configure(argc, argv);
 #endif
 
     const char* progName = argv[0];
@@ -99,6 +97,7 @@ main(int argc, char *argv[])
 
     try {
         openvdb::initialize();
+        openvdb::logging::initialize(argc, argv);
 
         bool printInfo = false, printGLInfo = false, printVersionInfo = false;
 
@@ -193,15 +192,15 @@ main(int argc, char *argv[])
         openvdb_viewer::exit();
 
     } catch (const char* s) {
-        OPENVDB_LOG_ERROR(progName << ": " << s);
+        OPENVDB_LOG_ERROR(s);
         status = EXIT_FAILURE;
     } catch (std::exception& e) {
-        OPENVDB_LOG_ERROR(progName << ": " << e.what());
+        OPENVDB_LOG_ERROR(e.what());
         status = EXIT_FAILURE;
     }
     return status;
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -144,7 +144,7 @@ TestMultiResGrid::testManualTopology()
 
     CPPUNIT_ASSERT(mrg != nullptr);
     CPPUNIT_ASSERT_EQUAL(levels  , mrg->numLevels());
-    CPPUNIT_ASSERT_EQUAL(0UL,      mrg->finestLevel());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), mrg->finestLevel());
     CPPUNIT_ASSERT_EQUAL(levels-1, mrg->coarsestLevel());
 
     // Define grid domain so they exactly overlap!
@@ -197,19 +197,19 @@ TestMultiResGrid::testManualTopology()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, mrg->prolongateVoxel(ijk, 0), /*tolerance=*/ 0.0);
 
     // First check the coarsest level (3)
-    for (CoordBBox::Iterator<true> iter(bbox>>3UL); iter; ++iter) {
+    for (CoordBBox::Iterator<true> iter(bbox>>size_t(3)); iter; ++iter) {
         CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(3).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Prolongate from level 3 -> level 2 and check values
     mrg->prolongateActiveVoxels(2);
-    for (CoordBBox::Iterator<true> iter(bbox>>2UL); iter; ++iter) {
+    for (CoordBBox::Iterator<true> iter(bbox>>size_t(2)); iter; ++iter) {
         CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(2).getValue(*iter), /*tolerance=*/0.0);
     }
 
     // Prolongate from level 2 -> level 1 and check values
     mrg->prolongateActiveVoxels(1);
-    for (CoordBBox::Iterator<true> iter(bbox>>1UL); iter; ++iter) {
+    for (CoordBBox::Iterator<true> iter(bbox>>size_t(1)); iter; ++iter) {
         CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, mrg->tree(1).getValue(*iter), /*tolerance=*/0.0);
     }
 
@@ -267,7 +267,7 @@ TestMultiResGrid::testIO()
     //mrg.print( std::cout, 3 );
 
     CPPUNIT_ASSERT_EQUAL(levels  , mrg.numLevels());
-    CPPUNIT_ASSERT_EQUAL(0UL     , mrg.finestLevel());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), mrg.finestLevel());
     CPPUNIT_ASSERT_EQUAL(levels-1, mrg.coarsestLevel());
 
     // Check inside and outside values
@@ -367,6 +367,6 @@ TestMultiResGrid::testModels()
 #endif
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

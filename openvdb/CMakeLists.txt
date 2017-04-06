@@ -167,6 +167,7 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   points/AttributeGroup.cc
   points/AttributeSet.cc
   points/StreamCompression.cc
+  points/points.cc
   openvdb.cc
   util/Formats.cc
   util/Util.cc
@@ -442,14 +443,16 @@ IF (OPENVDB_BUILD_DOCS)
   FILE ( READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config DOXYGEN_CONFIG_CONTENT )
   FILE ( WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT} )
   FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/cmake-doxygen-config "OUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/doc\n" )
-  
-  ADD_CUSTOM_TARGET ( doc ALL
+
+  ADD_CUSTOM_TARGET ( doc
     ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/cmake-doxygen-config
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Generating API documentation with Doxygen" VERBATIM
     )
-  
-  INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html/ DESTINATION doc)
+
+  INSTALL ( CODE "EXECUTE_PROCESS(COMMAND \"${CMAKE_COMMAND}\" --build  \"${PROJECT_BINARY_DIR}\" --target doc)")
+  INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html DESTINATION docs)
+
 ENDIF ()
 
 # Installation

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1087,6 +1087,7 @@ template <class TreeType>
 inline typename TreeType::template ValueConverter<bool>::Type::Ptr
 computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
 {
+    using ValueType = typename TreeType::ValueType;
     using LeafNodeType = typename TreeType::LeafNodeType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
@@ -1100,6 +1101,15 @@ computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
         typename boost::mpl::at<BoolNodeChainType, boost::mpl::int_<1>>::type;
 
     /////
+
+    // Clamp the isovalue to the level set's background value minus epsilon.
+    // (In a valid narrow-band level set, all voxels, including background voxels,
+    // have values less than or equal to the background value, so an isovalue
+    // greater than or equal to the background value would produce a mask with
+    // effectively infinite extent.)
+    iso = std::min(iso,
+        static_cast<ValueType>(tree.background() - math::Tolerance<ValueType>::value()));
+
     size_t numLeafNodes = 0, numInternalNodes = 0;
 
     std::vector<const LeafNodeType*> nodes;
@@ -1459,7 +1469,17 @@ struct ConnectNodeMaskSegments
                 if (!node->isValueOn(pos)) continue;
 
                 ijk = NodeType::offsetToLocalCoord(pos);
+
+#ifdef _MSC_FULL_VER
+  #if _MSC_FULL_VER >= 190000000 && _MSC_FULL_VER < 190024210
+                // Visual Studio 2015 had a codegen bug that wasn't fixed until Update 3
+                volatile Index npos = 0;
+  #else
                 Index npos = 0;
+  #endif
+#else
+                Index npos = 0;
+#endif
 
                 if (ijk[2] == 0) {
                     npos = pos + (NodeType::DIM - 1);
@@ -2591,6 +2611,6 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

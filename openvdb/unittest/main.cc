@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,18 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifdef DWA_OPENVDB
-
-#include <pdevunit/pdevunit.h>
-#include <logging_base/logging.h>
-
-#else
-
-#include <cstdlib> // for EXIT_SUCCESS
-#include <cstring> // for strrchr()
-#include <iostream>
-#include <string>
-#include <vector>
+#include <openvdb/openvdb.h>
+#include <openvdb/util/logging.h>
 #include <cppunit/BriefTestProgressListener.h>
 #include <cppunit/CompilerOutputter.h>
 #include <cppunit/TestResult.h>
@@ -47,45 +37,56 @@
 #include <cppunit/TextTestProgressListener.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
-#ifdef OPENVDB_USE_LOG4CPLUS
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-#include <log4cplus/configurator.h>
-#endif
+#include <algorithm> // for std::shuffle()
+#include <cstdlib> // for EXIT_SUCCESS
+#include <cstring> // for strrchr()
+#include <exception>
+#include <iostream>
+#include <random>
+#include <string>
+#include <vector>
+
+
+namespace {
+
+using StringVec = std::vector<std::string>;
 
 
 void
-usage(const char* progName)
+usage(const char* progName, std::ostream& ostrm)
 {
-    std::cerr <<
-        "Usage: " << progName << " [options]\n" <<
-        "Which: runs OpenVDB library unit tests\n" <<
-        "Options:\n" <<
-        "    -l       list all available tests\n" <<
-        "    -t test  specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
-        "             or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
-        "    -v       verbose output\n";
+    ostrm <<
+"Usage: " << progName << " [options]\n" <<
+"Which: runs OpenVDB library unit tests\n" <<
+"Options:\n" <<
+"    -l        list all available tests\n" <<
+"    -t test   specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
+"              or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
+"    -shuffle  run tests in random order\n" <<
+"    -v        verbose output\n";
 #ifdef OPENVDB_USE_LOG4CPLUS
-    std::cerr << "\n" <<
-        "    -error   log fatal and non-fatal errors (default: log only fatal errors)\n" <<
-        "    -warn    log warnings and errors\n" <<
-        "    -info    log info messages, warnings and errors\n" <<
-        "    -debug   log debugging messages, info messages, warnings and errors\n";
+    ostrm <<
+"\n" <<
+"    -error    log fatal and non-fatal errors (default: log only fatal errors)\n" <<
+"    -warn     log warnings and errors\n" <<
+"    -info     log info messages, warnings and errors\n" <<
+"    -debug    log debugging messages, info messages, warnings and errors\n";
 #endif
 }
 
 
-static void
-dump(CppUnit::Test* test)
+void
+getTestNames(StringVec& nameVec, const CppUnit::Test* test)
 {
-    if (test == NULL) {
-        std::cerr << "Error: no tests found\n";
-        return;
-    }
-
-    std::cout << test->getName() << std::endl;
-    for (int i = 0; i < test->getChildTestCount(); i++) {
-        dump(test->getChildTestAt(i));
+    if (test) {
+        const int numChildren = test->getChildTestCount();
+        if (numChildren == 0) {
+            nameVec.push_back(test->getName());
+        } else {
+            for (int i = 0; i < test->getChildTestCount(); ++i) {
+                getTestNames(nameVec, test->getChildTestAt(i));
+            }
+        }
     }
 }
 
@@ -96,13 +97,18 @@ run(int argc, char* argv[])
     const char* progName = argv[0];
     if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
 
-    bool verbose = false;
-    std::vector<std::string> tests;
+    bool shuffle = false, verbose = false;
+    StringVec tests;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "-l") {
-            dump(CppUnit::TestFactoryRegistry::getRegistry().makeTest());
+            StringVec allTests;
+            getTestNames(allTests,
+                CppUnit::TestFactoryRegistry::getRegistry().makeTest());
+            for (const auto& name: allTests) { std::cout << name << "\n"; }
             return EXIT_SUCCESS;
+        } else if (arg == "-shuffle") {
+            shuffle = true;
         } else if (arg == "-v") {
             verbose = true;
         } else if (arg == "-t") {
@@ -110,26 +116,51 @@ run(int argc, char* argv[])
                 ++i;
                 tests.push_back(argv[i]);
             } else {
-                usage(progName);
+                OPENVDB_LOG_FATAL("missing test name after \"-t\"");
+                usage(progName, std::cerr);
                 return EXIT_FAILURE;
             }
         } else if (arg == "-h" || arg == "-help" || arg == "--help") {
-            usage(progName);
+            usage(progName, std::cout);
             return EXIT_SUCCESS;
         } else {
-            std::cerr << progName << ": unrecognized option '" << arg << "'\n";
-            usage(progName);
+            OPENVDB_LOG_FATAL("unrecognized option \"" << arg << "\"");
+            usage(progName, std::cerr);
             return EXIT_FAILURE;
         }
     }
-    if (tests.empty()) tests.push_back(""); // run all tests
 
     try {
         CppUnit::TestFactoryRegistry& registry =
             CppUnit::TestFactoryRegistry::getRegistry();
 
+        auto* root = registry.makeTest();
+        if (!root) {
+            throw std::runtime_error(
+                "CppUnit test registry was not initialized properly");
+        }
+
+        if (!shuffle) {
+            if (tests.empty()) tests.push_back("");
+        } else {
+            // Get the names of all selected tests and their children.
+            StringVec allTests;
+            if (tests.empty()) {
+                getTestNames(allTests, root);
+            } else {
+                for (const auto& name: tests) {
+                    getTestNames(allTests, root->findTest(name));
+                }
+            }
+            // Randomly shuffle the list of names.
+            std::random_device randDev;
+            std::mt19937 generator(randDev());
+            std::shuffle(allTests.begin(), allTests.end(), generator);
+            tests.swap(allTests);
+        }
+
         CppUnit::TestRunner runner;
-        runner.addTest(registry.makeTest());
+        runner.addTest(root);
 
         CppUnit::TestResult controller;
 
@@ -154,64 +185,22 @@ run(int argc, char* argv[])
         return result.wasSuccessful() ? EXIT_SUCCESS : EXIT_FAILURE;
 
     } catch (std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        OPENVDB_LOG_FATAL(e.what());
         return EXIT_FAILURE;
     }
 }
-#endif
+
+} // anonymous namespace
 
 
 int
 main(int argc, char *argv[])
 {
-#ifdef DWA_OPENVDB
+    openvdb::logging::initialize(argc, argv);
 
-    // Disable logging by default ("-quiet") unless overridden
-    // with "-debug" or "-info".
-    bool quiet = false;
-    {
-        std::vector<char*> args(argv, argv + argc);
-        int numArgs = int(args.size());
-        logging_base::Config config(numArgs, &args[0]);
-        quiet = (!config.useInfo() && !config.useDebug());
-    }
-    const std::string quietArg("-quiet");
-    std::vector<const char*> args(argv, argv + argc);
-    if (quiet) args.insert(++args.begin(), quietArg.c_str());
-    int numArgs = int(args.size());
-
-    logging_base::Config config(numArgs, &args[0]);
-    logging_base::configure(config);
-
-    return pdevunit::run(numArgs, const_cast<char**>(&args[0]));
-
-#else // ifndef DWA_OPENVDB
-
-#ifndef OPENVDB_USE_LOG4CPLUS
     return run(argc, argv);
-#else
-    log4cplus::BasicConfigurator::doConfigure();
-
-    std::vector<char*> args;
-    args.push_back(argv[0]);
-
-    log4cplus::Logger log = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("main"));
-    log.setLogLevel(log4cplus::FATAL_LOG_LEVEL);
-    for (int i = 1; i < argc; ++i) {
-        char* arg = argv[i];
-        if (std::string("-info") == arg)       log.setLogLevel(log4cplus::INFO_LOG_LEVEL);
-        else if (std::string("-warn") == arg)  log.setLogLevel(log4cplus::WARN_LOG_LEVEL);
-        else if (std::string("-error") == arg) log.setLogLevel(log4cplus::ERROR_LOG_LEVEL);
-        else if (std::string("-debug") == arg) log.setLogLevel(log4cplus::DEBUG_LOG_LEVEL);
-        else args.push_back(arg);
-    }
-
-    return run(int(args.size()), &args[0]);
-#endif // OPENVDB_USE_LOG4CPLUS
-
-#endif // DWA_OPENVDB
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

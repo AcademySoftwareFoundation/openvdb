@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,8 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_METADATA_METADATA_HAS_BEEN_INCLUDED
-#define OPENVDB_METADATA_METADATA_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_METADATA_HAS_BEEN_INCLUDED
+#define OPENVDB_METADATA_HAS_BEEN_INCLUDED
 
 #include "Exceptions.h"
 #include "Types.h"
@@ -400,6 +400,14 @@ StringMetadata::size() const
 
 
 template<>
+inline std::string
+StringMetadata::str() const
+{
+    return mValue;
+}
+
+
+template<>
 inline void
 StringMetadata::readValue(std::istream& is, Index32 size)
 {
@@ -417,8 +425,8 @@ StringMetadata::writeValue(std::ostream& os) const
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_METADATA_METADATA_HAS_BEEN_INCLUDED
+#endif // OPENVDB_METADATA_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

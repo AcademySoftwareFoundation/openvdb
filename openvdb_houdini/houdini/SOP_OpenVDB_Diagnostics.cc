@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -162,17 +162,23 @@ struct GradientNorm {
 
     template<typename T>
     inline T
-    gradientNorm(const openvdb::Coord ijk, const T scale) {
+    gradientNorm(const openvdb::Coord& ijk, const T scale) {
         return scale * T(std::sqrt(double(
             openvdb::math::ISGradientNormSqrd<openvdb::math::FIRST_BIAS>::result(mAcc, ijk))));
     }
 
+    /// @{
+    // The gradient magnitude test is applied only to scalar, floating-point grids,
+    // but this class needs to compile for all grid types.
+
     template<typename T>
     inline openvdb::math::Vec3<T>
-    gradientNorm(const openvdb::Coord, const openvdb::math::Vec3<T>) {
+    gradientNorm(const openvdb::Coord&, const openvdb::math::Vec3<T>) {
         return openvdb::math::Vec3<T>(0);
     }
 
+    inline bool gradientNorm(const openvdb::Coord&, bool) { return false; }
+    /// @}
 
 private:
     GradientNorm& operator=(const GradientNorm&); // disable assignment
@@ -1918,6 +1924,6 @@ SOP_OpenVDB_Diagnostics::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

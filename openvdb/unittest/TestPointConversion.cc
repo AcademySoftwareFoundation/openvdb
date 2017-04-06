@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,14 +36,18 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointGroup.h>
 
+#ifdef _MSC_VER
+#include <windows.h>
+#endif
+
 using namespace openvdb;
 using namespace openvdb::points;
 
 class TestPointConversion: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointConversion);
     CPPUNIT_TEST(testPointConversion);
@@ -229,18 +233,9 @@ genPoints(const int numPoints, const double scale, const bool stride,
 void
 TestPointConversion::testPointConversion()
 {
-    // Define and register some common attribute types
-    using AttributeI        = TypedAttributeArray<int32_t>;
-    using AttributeF        = TypedAttributeArray<float>;
-    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
-
-    AttributeI::registerType();
-    AttributeF::registerType();
-    AttributeVec3s::registerType();
-
     // generate points
 
-    const unsigned long count(1000000);
+    const size_t count(1000000);
 
     AttributeWrapper<Vec3f> position(1);
     AttributeWrapper<int> xyz(1);
@@ -305,8 +300,16 @@ TestPointConversion::testPointConversion()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
-
+#endif
 
     std::string filename = tempDir + "/openvdb_test_point_conversion";
 
@@ -407,7 +410,7 @@ TestPointConversion::testPointConversion()
 
     // convert based on even group
 
-    const unsigned long halfCount = count / 2;
+    const size_t halfCount = count / 2;
 
     outputPosition.resize(startOffset + halfCount);
     outputId.resize(startOffset + halfCount);
@@ -469,18 +472,9 @@ TestPointConversion::testPointConversion()
 void
 TestPointConversion::testStride()
 {
-    // Define and register some common attribute types
-    using AttributeI        = TypedAttributeArray<int32_t>;
-    using AttributeF        = TypedAttributeArray<float>;
-    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
-
-    AttributeI::registerType();
-    AttributeF::registerType();
-    AttributeVec3s::registerType();
-
     // generate points
 
-    const unsigned long count(40000);
+    const size_t count(40000);
 
     AttributeWrapper<Vec3f> position(1);
     AttributeWrapper<int> xyz(3);
@@ -904,7 +898,7 @@ TestPointConversion::testComputeVoxelSize()
     // Generate a sphere
     // NOTE: The sphere does NOT provide uniform distribution
 
-    const unsigned long count(40000);
+    const size_t count(40000);
 
     position.resize(0);
 
@@ -980,6 +974,6 @@ TestPointConversion::testComputeVoxelSize()
     }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

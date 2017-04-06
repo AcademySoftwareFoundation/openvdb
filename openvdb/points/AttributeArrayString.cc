@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -283,7 +283,7 @@ void StringAttributeWriteHandle::resetCache()
         // ensure the metadata is StringMetadata and key starts "string:"
         if (!isStringMeta(key, meta))   continue;
 
-        auto stringMeta = dynamic_cast<StringMetadata*>(meta.get());
+        const auto* stringMeta = static_cast<StringMetadata*>(meta.get());
         assert(stringMeta);
 
         // remove "string:"
@@ -317,6 +317,6 @@ Index StringAttributeWriteHandle::getIndex(const Name& name)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -3239,6 +3239,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
+#if (UT_VERSION_INT >= 0x10000000) // later than 16.0.0
+        .setOperatorTable(VOP_TABLE_NAME)
+#endif
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
         .addInput("Points to rasterize")
         .addOptionalInput("Optional VDB grid that defines the output transform.")
@@ -3297,8 +3300,6 @@ SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
     , mInitialParmNum(this->getParmList()->getEntries())
 {
 #if (UT_VERSION_INT < 0x10000000) // earlier than 16.0.0
-    /// @todo According to OP_Network.h, "all OP_Network sub-class constructors
-    /// should do this".  But setOperatorTable() is private as of Houdini 16.
     setOperatorTable(getOperatorTable(VOP_TABLE_NAME));
 #endif
 }
@@ -3490,6 +3491,6 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

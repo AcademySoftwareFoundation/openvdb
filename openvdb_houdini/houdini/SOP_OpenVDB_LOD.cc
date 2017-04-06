@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -278,7 +278,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -311,7 +311,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -333,7 +333,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGrid(**it, op);
+                GEOvdbProcessTypedGridTopology(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -360,6 +360,6 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

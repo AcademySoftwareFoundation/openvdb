@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,13 +46,15 @@ namespace compression {
 #ifdef OPENVDB_USE_BLOSC
 
 
-bool bloscCanCompress()
+bool
+bloscCanCompress()
 {
     return true;
 }
 
 
-size_t bloscUncompressedSize(const char* buffer)
+size_t
+bloscUncompressedSize(const char* buffer)
 {
     size_t bytes, _1, _2;
     blosc_cbuffer_sizes(buffer, &bytes, &_1, &_2);
@@ -60,8 +62,9 @@ size_t bloscUncompressedSize(const char* buffer)
 }
 
 
-void bloscCompress( char* compressedBuffer, size_t& compressedBytes, const size_t bufferBytes,
-                    const char* uncompressedBuffer, const size_t uncompressedBytes)
+void
+bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t bufferBytes,
+    const char* uncompressedBuffer, const size_t uncompressedBytes)
 {
     if (bufferBytes > BLOSC_MAX_BUFFERSIZE) {
         OPENVDB_LOG_DEBUG("Blosc compress failed due to exceeding maximum buffer size.");
@@ -84,7 +87,8 @@ void bloscCompress( char* compressedBuffer, size_t& compressedBytes, const size_
     }
 
     if (uncompressedBytes < BLOSC_PAD_BYTES && bufferBytes < BLOSC_PAD_BYTES + BLOSC_MAX_OVERHEAD) {
-        OPENVDB_LOG_DEBUG("Blosc compress failed due to insufficient space in compressed buffer for padding.");
+        OPENVDB_LOG_DEBUG(
+            "Blosc compress failed due to insufficient space in compressed buffer for padding.");
         compressedBytes = 0;
         compressedBuffer = nullptr;
         return;
@@ -120,7 +124,8 @@ void bloscCompress( char* compressedBuffer, size_t& compressedBytes, const size_
 
     if (_compressedBytes <= 0) {
         std::ostringstream ostr;
-        ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
+        ostr << "Blosc failed to compress " << uncompressedBytes << " byte"
+            << (uncompressedBytes == 1 ? "" : "s");
         if (_compressedBytes < 0) ostr << " (internal error " << _compressedBytes << ")";
         OPENVDB_LOG_DEBUG(ostr.str());
         compressedBytes = 0;
@@ -140,13 +145,17 @@ void bloscCompress( char* compressedBuffer, size_t& compressedBytes, const size_
 }
 
 
-std::unique_ptr<char[]> bloscCompress(const char* buffer, const size_t uncompressedBytes, size_t& compressedBytes, const bool resize)
+std::unique_ptr<char[]>
+bloscCompress(const char* buffer, const size_t uncompressedBytes, size_t& compressedBytes,
+    const bool resize)
 {
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    size_t tempBytes = uncompressedBytes;
     // increase temporary buffer for padding if necessary
     if (tempBytes >= BLOSC_MINIMUM_BYTES && tempBytes < BLOSC_PAD_BYTES) {
-        tempBytes += BLOSC_PAD_BYTES + BLOSC_MAX_OVERHEAD;
+        tempBytes += BLOSC_PAD_BYTES;
     }
+    // increase by Blosc max overhead
+    tempBytes += BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     std::unique_ptr<char[]> outBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 
@@ -169,7 +178,8 @@ std::unique_ptr<char[]> bloscCompress(const char* buffer, const size_t uncompres
 }
 
 
-size_t bloscCompressedSize( const char* buffer, const size_t uncompressedBytes)
+size_t
+bloscCompressedSize( const char* buffer, const size_t uncompressedBytes)
 {
     size_t compressedBytes;
     bloscCompress(buffer, uncompressedBytes, compressedBytes, /*resize=*/false);
@@ -177,15 +187,19 @@ size_t bloscCompressedSize( const char* buffer, const size_t uncompressedBytes)
 }
 
 
-void bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes, const size_t bufferBytes, const char* compressedBuffer)
+void
+bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes,
+    const size_t bufferBytes, const char* compressedBuffer)
 {
     size_t uncompressedBytes = bloscUncompressedSize(compressedBuffer);
 
     if (bufferBytes > BLOSC_MAX_BUFFERSIZE) {
-        OPENVDB_THROW(RuntimeError, "Blosc decompress failed due to exceeding maximum buffer size.");
+        OPENVDB_THROW(RuntimeError,
+            "Blosc decompress failed due to exceeding maximum buffer size.");
     }
     if (bufferBytes < uncompressedBytes + BLOSC_MAX_OVERHEAD) {
-        OPENVDB_THROW(RuntimeError, "Blosc decompress failed due to insufficient space in uncompressed buffer.");
+        OPENVDB_THROW(RuntimeError,
+            "Blosc decompress failed due to insufficient space in uncompressed buffer.");
     }
 
     uncompressedBytes = blosc_decompress_ctx(   /*src=*/compressedBuffer,
@@ -208,7 +222,8 @@ void bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes, const
 }
 
 
-std::unique_ptr<char[]> bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resize)
+std::unique_ptr<char[]>
+bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resize)
 {
     size_t uncompressedBytes = bloscUncompressedSize(buffer);
     size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
@@ -234,28 +249,31 @@ std::unique_ptr<char[]> bloscDecompress(const char* buffer, const size_t expecte
 #else
 
 
-bool bloscCanCompress()
+bool
+bloscCanCompress()
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return false;
 }
 
 
-size_t bloscUncompressedSize(const char*)
+size_t
+bloscUncompressedSize(const char*)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
 
 
-void bloscCompress( char*, size_t& compressedBytes, const size_t,
-                    const char*, const size_t)
+void
+bloscCompress(char*, size_t& compressedBytes, const size_t, const char*, const size_t)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     compressedBytes = 0;
 }
 
 
-std::unique_ptr<char[]> bloscCompress(const char*, const size_t, size_t& compressedBytes, const bool)
+std::unique_ptr<char[]>
+bloscCompress(const char*, const size_t, size_t& compressedBytes, const bool)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     compressedBytes = 0;
@@ -263,20 +281,23 @@ std::unique_ptr<char[]> bloscCompress(const char*, const size_t, size_t& compres
 }
 
 
-size_t bloscCompressedSize(const char*, const size_t)
+size_t
+bloscCompressedSize(const char*, const size_t)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return 0;
 }
 
 
-void bloscDecompress(char*, const size_t, const size_t, const char*)
+void
+bloscDecompress(char*, const size_t, const size_t, const char*)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
 
 
-std::unique_ptr<char[]> bloscDecompress(const char*, const size_t, const bool)
+std::unique_ptr<char[]>
+bloscDecompress(const char*, const size_t, const bool)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
@@ -288,20 +309,23 @@ std::unique_ptr<char[]> bloscDecompress(const char*, const size_t, const bool)
 ////////////////////////////////////////
 
 
-void Page::load() const
+void
+Page::load() const
 {
     this->doLoad();
 }
 
 
-long Page::uncompressedBytes() const
+long
+Page::uncompressedBytes() const
 {
     assert(mInfo);
     return mInfo->uncompressedBytes;
 }
 
 
-const char* Page::buffer(const int index) const
+const char*
+Page::buffer(const int index) const
 {
     if (this->isOutOfCore())   this->load();
 
@@ -309,7 +333,8 @@ const char* Page::buffer(const int index) const
 }
 
 
-void Page::readHeader(std::istream& is)
+void
+Page::readHeader(std::istream& is)
 {
     assert(mInfo);
 
@@ -330,7 +355,8 @@ void Page::readHeader(std::istream& is)
 }
 
 
-void Page::readBuffers(std::istream&is, bool delayed)
+void
+Page::readBuffers(std::istream&is, bool delayed)
 {
     assert(mInfo);
 
@@ -345,7 +371,8 @@ void Page::readBuffers(std::istream&is, bool delayed)
         std::streamoff filepos = is.tellg();
 
         // seek over the page
-        is.seekg((isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes), std::ios_base::cur);
+        is.seekg((isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes),
+            std::ios_base::cur);
 
         mInfo->mappedFile = mappedFile;
         mInfo->meta = meta;
@@ -354,7 +381,8 @@ void Page::readBuffers(std::istream&is, bool delayed)
         assert(mInfo->mappedFile);
     }
     else {
-        std::unique_ptr<char[]> buffer(new char[(isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
+        std::unique_ptr<char[]> buffer(new char[
+            (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
         is.read(buffer.get(), (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes));
 
         if (mInfo->compressedBytes > 0) {
@@ -367,20 +395,23 @@ void Page::readBuffers(std::istream&is, bool delayed)
 }
 
 
-bool Page::isOutOfCore() const
+bool
+Page::isOutOfCore() const
 {
     return bool(mInfo);
 }
 
 
-void Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
+void
+Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
 {
     mData.reset(new char[pageSize]);
     std::memcpy(mData.get(), temp.get(), pageSize);
 }
 
 
-void Page::decompress(const std::unique_ptr<char[]>& temp)
+void
+Page::decompress(const std::unique_ptr<char[]>& temp)
 {
     size_t uncompressedBytes = bloscUncompressedSize(temp.get());
     size_t tempBytes = uncompressedBytes;
@@ -393,7 +424,8 @@ void Page::decompress(const std::unique_ptr<char[]>& temp)
 }
 
 
-void Page::doLoad() const
+void
+Page::doLoad() const
 {
     if (!this->isOutOfCore())  return;
 
@@ -442,14 +474,16 @@ PageHandle::PageHandle( const Page::Ptr& page, const int index, const int size)
 }
 
 
-Page& PageHandle::page()
+Page&
+PageHandle::page()
 {
     assert(mPage);
     return *mPage;
 }
 
 
-std::unique_ptr<char[]> PageHandle::read()
+std::unique_ptr<char[]>
+PageHandle::read()
 {
     assert(mIndex >= 0);
     assert(mSize > 0);
@@ -468,7 +502,8 @@ PagedInputStream::PagedInputStream(std::istream& is)
 }
 
 
-PageHandle::Ptr PagedInputStream::createHandle(std::streamsize n)
+PageHandle::Ptr
+PagedInputStream::createHandle(std::streamsize n)
 {
     assert(mByteIndex <= mUncompressedBytes);
 
@@ -488,7 +523,8 @@ PageHandle::Ptr PagedInputStream::createHandle(std::streamsize n)
 }
 
 
-void PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed)
+void
+PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed)
 {
     assert(mByteIndex <= mUncompressedBytes);
 
@@ -524,7 +560,8 @@ PagedOutputStream::PagedOutputStream(std::ostream& os)
 }
 
 
-PagedOutputStream& PagedOutputStream::write(const char* str, std::streamsize n)
+PagedOutputStream&
+PagedOutputStream::write(const char* str, std::streamsize n)
 {
     if (n > PageSize) {
         this->flush();
@@ -546,14 +583,16 @@ PagedOutputStream& PagedOutputStream::write(const char* str, std::streamsize n)
 }
 
 
-void PagedOutputStream::flush()
+void
+PagedOutputStream::flush()
 {
     this->compressAndWrite(mData.get(), mBytes);
     mBytes = 0;
 }
 
 
-void PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
+void
+PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
 {
     if (size == 0)  return;
 
@@ -598,7 +637,8 @@ void PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
 }
 
 
-void PagedOutputStream::resize(size_t size)
+void
+PagedOutputStream::resize(size_t size)
 {
     // grow the capacity if not sufficient space
     size_t requiredSize = size;
@@ -618,6 +658,6 @@ void PagedOutputStream::resize(size_t size)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

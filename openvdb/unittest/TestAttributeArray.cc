@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -55,11 +55,10 @@
 
 #ifdef _MSC_VER
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
 // Ensure that both namespaces exist.
 namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#include <windows.h>
 #else
 #include <sys/types.h> // for struct stat
 #include <sys/stat.h> // for stat()
@@ -82,10 +81,24 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
+#ifdef _MSC_VER
+            using namespace boost::interprocess::detail;
+            using namespace boost::interprocess::ipcdetail;
+            using openvdb::Index64;
+
+            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
+                FILETIME mtime;
+                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
+                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
+                }
+                close_file(fh);
+            }
+#else
             struct stat info;
             if (0 == ::stat(regionFilename, &info)) {
                 mLastWriteTime = openvdb::Index64(info.st_mtime);
             }
+#endif
         }
 
         using Notifier = std::function<void(std::string /*filename*/)>;
@@ -154,6 +167,9 @@ using namespace openvdb::points;
 class TestAttributeArray: public CppUnit::TestCase
 {
 public:
+    void setUp() override { AttributeArray::clearRegistry(); }
+    void tearDown() override { AttributeArray::clearRegistry(); }
+
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testRegistry);
@@ -1107,7 +1123,16 @@ TestAttributeArray::testDelayedLoad()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     { // IO
         const Index count = 50;
@@ -1123,9 +1148,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed1";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1473,6 +1497,62 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrB.get(0), 0);
         }
 
+        // read in and write out using delayed load to check writing out-of-core attributes
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.readMetadata(filein);
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrB.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrB.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            std::string filename2 = tempDir + "/openvdb_delayed5";
+            std::ofstream fileout2(filename2.c_str(), std::ios_base::binary);
+            io::setStreamMetadataPtr(fileout2, streamMetadata);
+            io::setDataCompression(fileout2, io::COMPRESS_BLOSC);
+
+            attrB.writeMetadata(fileout2, false, /*paged=*/true);
+            compression::PagedOutputStream outputStreamSize(fileout2);
+            outputStreamSize.setSizeOnly(true);
+            attrB.writePagedBuffers(outputStreamSize, false);
+            outputStreamSize.flush();
+            compression::PagedOutputStream outputStream(fileout2);
+            outputStream.setSizeOnly(false);
+            attrB.writePagedBuffers(outputStream, false);
+            outputStream.flush();
+
+            fileout2.close();
+
+            AttributeArrayI attrB2;
+
+            std::ifstream filein2(filename2.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein2, streamMetadata);
+            io::setMappedFilePtr(filein2, mappedFile);
+
+            attrB2.readMetadata(filein2);
+            compression::PagedInputStream inputStream2(filein2);
+            inputStream2.setSizeOnly(true);
+            attrB2.readPagedBuffers(inputStream2);
+            inputStream2.setSizeOnly(false);
+            attrB2.readPagedBuffers(inputStream2);
+
+            CPPUNIT_ASSERT(attrB2.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrB.get(i), attrB2.get(i));
+            }
+
+            filein2.close();
+        }
+
         // Clean up temp files.
         std::remove(mappedFile->filename().c_str());
         std::remove(filename.c_str());
@@ -1481,9 +1561,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out uniform attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed2";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1542,9 +1621,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out strided attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed3";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1591,9 +1669,8 @@ TestAttributeArray::testDelayedLoad()
 
         // write out compressed attribute array to a temp file
         {
-            std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed4";
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
@@ -1773,6 +1850,48 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isCompressed());
         }
 #endif
+
+        // Clean up temp files.
+        std::remove(mappedFile->filename().c_str());
+        std::remove(filename.c_str());
+
+        // write out invalid serialization flags as metadata to a temp file
+        {
+            filename = tempDir + "/openvdb_delayed5";
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
+            io::setStreamMetadataPtr(fileout, streamMetadata);
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            // write out unknown serialization flags to check forwards-compatibility
+
+            Index64 bytes(0);
+            uint8_t flags(0);
+            uint8_t serializationFlags(Int16(0x10));
+            Index size(0);
+
+            fileout.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
+            fileout.write(reinterpret_cast<const char*>(&flags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&serializationFlags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&size), sizeof(Index));
+
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+
+        // read in using delayed load and check metadata fail due to serialization flags
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            CPPUNIT_ASSERT_THROW(attrB.readMetadata(filein), openvdb::IoError);
+        }
 
         // cleanup temp files
 
@@ -2032,6 +2151,6 @@ TestAttributeArray::testProfile()
     }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

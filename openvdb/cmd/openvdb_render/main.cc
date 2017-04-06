@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,12 +37,12 @@
 
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <OpenEXR/ImfChannelList.h>
 #include <OpenEXR/ImfFrameBuffer.h>
 #include <OpenEXR/ImfHeader.h>
@@ -54,7 +54,6 @@
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/RayTracer.h>
 #ifdef DWA_OPENVDB
-#include <logging_base/logging.h>
 #include <usagetrack.h>
 #endif
 
@@ -257,7 +256,7 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 void
 saveEXR(const std::string& fname, const openvdb::tools::Film& film, const RenderOpts& opts)
 {
-    typedef openvdb::tools::Film::RGBA RGBA;
+    using RGBA = openvdb::tools::Film::RGBA;
 
     std::string filename = fname;
     if (!boost::iends_with(filename, ".exr")) filename += ".exr";
@@ -322,7 +321,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
 
     tools::Film film(opts.width, opts.height);
 
-    boost::scoped_ptr<tools::BaseCamera> camera;
+    std::unique_ptr<tools::BaseCamera> camera;
     if (boost::starts_with(opts.camera, "persp")) {
         camera.reset(new tools::PerspectiveCamera(film, opts.rotate, opts.translate,
             opts.focal, opts.aperture, opts.znear, opts.zfar));
@@ -336,7 +335,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     if (opts.lookat) camera->lookAt(opts.target, opts.up);
 
     // Define the shader for level set rendering.  The default shader is a diffuse shader.
-    boost::scoped_ptr<tools::BaseShader> shader;
+    std::unique_ptr<tools::BaseShader> shader;
     if (opts.shader == "matte") {
         if (opts.colorgrid) {
             shader.reset(new tools::MatteShader<openvdb::Vec3SGrid>(*opts.colorgrid));
@@ -380,7 +379,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         tools::rayTrace(grid, intersector, *shader, *camera, opts.samples,
             /*seed=*/0, (opts.threads != 1));
     } else {
-        typedef tools::VolumeRayIntersector<GridType> IntersectorType;
+        using IntersectorType = tools::VolumeRayIntersector<GridType>;
         IntersectorType intersector(grid);
 
         tools::VolumeRender<IntersectorType> renderer(intersector, *camera);
@@ -467,8 +466,8 @@ struct OptParse
     {
         if (argv[idx] == name) {
             if (idx + numArgs >= argc) {
-                std::cerr << gProgName << ": option " << name << " requires "
-                    << numArgs << " argument" << (numArgs == 1 ? "" : "s") << "\n";
+                OPENVDB_LOG_FATAL("option " << name << " requires "
+                    << numArgs << " argument" << (numArgs == 1 ? "" : "s"));
                 usage();
             }
             return true;
@@ -485,7 +484,6 @@ main(int argc, char *argv[])
 {
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-    logging_base::configure(argc, argv);
 #endif
 
     OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -496,6 +494,8 @@ main(int argc, char *argv[])
     int retcode = EXIT_SUCCESS;
 
     if (argc == 1) usage();
+
+    openvdb::logging::initialize(argc, argv);
 
     std::string vdbFilename, imgFilename, gridName;
     RenderOpts opts;
@@ -601,7 +601,7 @@ main(int argc, char *argv[])
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
                 usage(EXIT_SUCCESS);
             } else {
-                std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
+                OPENVDB_LOG_FATAL("\"" << arg << "\" is not a valid option");
                 usage();
             }
         } else if (vdbFilename.empty()) {
@@ -721,6 +721,6 @@ main(int argc, char *argv[])
     return retcode;
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

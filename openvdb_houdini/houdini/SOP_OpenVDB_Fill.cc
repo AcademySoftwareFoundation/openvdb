@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -116,10 +116,16 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText(
             "The value with which to fill voxels\n"
             "(y and z are ignored when filling scalar grids)"));
+
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "active", "Active")
         .setDefault(PRMoneDefaults)
         .setHelpText(
             "If enabled, activate voxels in the fill region, otherwise deactivate them."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "sparse", "Sparse")
+        .setDefault(PRMoneDefaults)
+        .setHelpText(
+            "If enabled, represent the filled region sparsely (if possible)."));
 
 
     hutil::ParmList obsoleteParms;
@@ -269,14 +275,14 @@ struct FillOp
     const openvdb::CoordBBox indexBBox;
     const openvdb::BBoxd worldBBox;
     const openvdb::Vec3R value;
-    const bool active;
+    const bool active, sparse;
 
-    FillOp(const openvdb::CoordBBox& b, const openvdb::Vec3R& val, bool on):
-        indexBBox(b), value(val), active(on)
+    FillOp(const openvdb::CoordBBox& b, const openvdb::Vec3R& val, bool on, bool sparse_):
+        indexBBox(b), value(val), active(on), sparse(sparse_)
     {}
 
-    FillOp(const openvdb::BBoxd& b, const openvdb::Vec3R& val, bool on):
-        worldBBox(b), value(val), active(on)
+    FillOp(const openvdb::BBoxd& b, const openvdb::Vec3R& val, bool on, bool sparse_):
+        worldBBox(b), value(val), active(on), sparse(sparse_)
     {}
 
     template<typename GridT>
@@ -290,7 +296,11 @@ struct FillOp
             bbox.reset(openvdb::Coord::floor(imin), openvdb::Coord::ceil(imax));
         }
         typedef typename GridT::ValueType ValueT;
-        grid.fill(bbox, convertValue<ValueT>(value), active);
+        if (sparse) {
+            grid.sparseFill(bbox, convertValue<ValueT>(value), active);
+        } else {
+            grid.denseFill(bbox, convertValue<ValueT>(value), active);
+        }
     }
 };
 
@@ -312,7 +322,9 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
         const openvdb::Vec3R value = SOP_NodeVDB::evalVec3R("val", t);
-        const bool active = evalInt("active", 0, t);
+        const bool
+            active = evalInt("active", 0, t),
+            sparse = evalInt("sparse", 0, t);
 
         boost::scoped_ptr<const FillOp> fillOp;
         switch (getMode(t)) {
@@ -323,7 +335,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
                         evalInt("min", 0, t), evalInt("min", 1, t), evalInt("min", 2, t)),
                     openvdb::Coord(
                         evalInt("max", 0, t), evalInt("max", 1, t), evalInt("max", 2, t)));
-                fillOp.reset(new FillOp(bbox, value, active));
+                fillOp.reset(new FillOp(bbox, value, active, sparse));
                 break;
             }
             case MODE_WORLD:
@@ -337,7 +349,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
                         evalFloat("worldmax", 0, t),
                         evalFloat("worldmax", 1, t),
                         evalFloat("worldmax", 2, t)));
-                fillOp.reset(new FillOp(bbox, value, active));
+                fillOp.reset(new FillOp(bbox, value, active, sparse));
                 break;
             }
             case MODE_GEOM:
@@ -358,7 +370,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
                 } else {
                     throw std::runtime_error("reference input is unconnected");
                 }
-                fillOp.reset(new FillOp(bbox, value, active));
+                fillOp.reset(new FillOp(bbox, value, active, sparse));
                 break;
             }
         }
@@ -379,6 +391,6 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

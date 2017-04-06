@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,6 +57,7 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testMerge);
     CPPUNIT_TEST(testCombine);
+    CPPUNIT_TEST(testMedian);
     CPPUNIT_TEST(testTopologyTree);
     //CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST_SUITE_END();
@@ -73,6 +74,7 @@ public:
     void testTopologyCopy();
     void testMerge();
     void testCombine();
+    void testMedian();
     void testTopologyTree();
     //void testFilter();
 };
@@ -537,6 +539,68 @@ TestLeafMask::testTopologyTree()
     CPPUNIT_ASSERT(boolTreeMem * 10 <= floatTreeMem);
 }
 
+void
+TestLeafMask::testMedian()
+{
+    using namespace openvdb;
+    LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+    bool state = false;
+    
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(state));
+    CPPUNIT_ASSERT(state == true);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(state));
+    CPPUNIT_ASSERT(state == false);
+    CPPUNIT_ASSERT(!leaf.medianAll());
+
+    leaf.setValue(Coord(0,0,0), true);
+    CPPUNIT_ASSERT_EQUAL(Index(1), leaf.medianOn(state));
+    CPPUNIT_ASSERT(state == true);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-1, leaf.medianOff(state));
+    CPPUNIT_ASSERT(state == false);
+    CPPUNIT_ASSERT(!leaf.medianAll());
+    
+
+    leaf.setValue(Coord(0,0,1), true);
+    CPPUNIT_ASSERT_EQUAL(Index(2), leaf.medianOn(state));
+    CPPUNIT_ASSERT(state == true);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-2, leaf.medianOff(state));
+    CPPUNIT_ASSERT(state == false);
+    CPPUNIT_ASSERT(!leaf.medianAll());
+    
+    
+    leaf.setValue(Coord(5,0,1), true);
+    CPPUNIT_ASSERT_EQUAL(Index(3), leaf.medianOn(state));
+    CPPUNIT_ASSERT(state == true);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-3, leaf.medianOff(state));
+    CPPUNIT_ASSERT(state == false);
+    CPPUNIT_ASSERT(!leaf.medianAll());
+    
+
+    leaf.fill(false, false);
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(state));
+    CPPUNIT_ASSERT(state == true);
+    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(state));
+    CPPUNIT_ASSERT(state == false);
+    CPPUNIT_ASSERT(!leaf.medianAll());
+    
+
+    for (Index i=0; i<leaf.numValues()/2; ++i) {
+        leaf.setValueOn(i, true);
+        CPPUNIT_ASSERT(!leaf.medianAll());
+        CPPUNIT_ASSERT_EQUAL(Index(i+1), leaf.medianOn(state));
+        CPPUNIT_ASSERT(state == true);
+        CPPUNIT_ASSERT_EQUAL(leaf.numValues()-i-1, leaf.medianOff(state));
+        CPPUNIT_ASSERT(state == false);
+    }
+    for (Index i=leaf.numValues()/2; i<leaf.numValues(); ++i) {
+        leaf.setValueOn(i, true);
+        CPPUNIT_ASSERT(leaf.medianAll());
+        CPPUNIT_ASSERT_EQUAL(Index(i+1), leaf.medianOn(state));
+        CPPUNIT_ASSERT(state == true);
+        CPPUNIT_ASSERT_EQUAL(leaf.numValues()-i-1, leaf.medianOff(state));
+        CPPUNIT_ASSERT(state == false);
+    }
+}
 
 // void
 // TestLeafMask::testFilter()
@@ -575,6 +639,6 @@ TestLeafMask::testTopologyTree()
 //     CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
 // }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

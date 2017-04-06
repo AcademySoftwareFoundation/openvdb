@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -284,7 +284,8 @@ AttributeSet::groupIndex(const size_t offset) const
 
     // adjust relative offset to find offset into the array vector
 
-    return Util::GroupIndex(groups[offset / GROUP_BITS], offset % GROUP_BITS);
+    return Util::GroupIndex(groups[offset / GROUP_BITS],
+			    static_cast<uint8_t>(offset % GROUP_BITS));
 }
 
 
@@ -797,8 +798,10 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     size_t pos = INVALID_POS;
     auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
-        if (it->first != typeName.first) {
-            OPENVDB_THROW(KeyError, "Cannot insert into a Descriptor with a duplicate name, but different type.")
+        assert(it->second < mTypes.size());
+        if (mTypes[it->second] != typeName) {
+            OPENVDB_THROW(KeyError,
+                "Cannot insert into a Descriptor with a duplicate name, but different type.")
         }
         pos = it->second;
     } else {
@@ -1042,6 +1045,6 @@ AttributeSet::Descriptor::read(std::istream& is)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

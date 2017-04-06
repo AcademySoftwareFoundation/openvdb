@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,6 +46,9 @@ using namespace openvdb::points;
 class TestIndexFilter: public CppUnit::TestCase
 {
 public:
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
+
     CPPUNIT_TEST_SUITE(TestIndexFilter);
     CPPUNIT_TEST(testMultiGroupFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
@@ -169,11 +172,6 @@ TestIndexFilter::testMultiGroupFilter()
 {
     using LeafNode          = PointDataTree::LeafNodeType;
     using AttributeVec3f    = TypedAttributeArray<Vec3f>;
-    using AttributeS        = TypedAttributeArray<float>;
-
-    AttributeVec3f::registerType();
-    AttributeS::registerType();
-    GroupAttributeArray::registerType();
 
     PointDataTree tree;
     LeafNode* leaf = tree.touchLeaf(openvdb::Coord(0, 0, 0));
@@ -440,12 +438,6 @@ setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
 void
 TestIndexFilter::testAttributeHashFilter()
 {
-    using AttributeVec3s    = TypedAttributeArray<Vec3s>;
-    using AttributeI        = TypedAttributeArray<int>;
-
-    AttributeVec3s::registerType();
-    AttributeI::registerType();
-
     std::vector<Vec3s> positions{{1, 1, 1}, {2, 2, 2}, {11, 11, 11}, {12, 12, 12}};
 
     const float voxelSize(1.0);
@@ -581,10 +573,6 @@ TestIndexFilter::testAttributeHashFilter()
 void
 TestIndexFilter::testLevelSetFilter()
 {
-    using AttributeVec3s = TypedAttributeArray<Vec3s>;
-
-    AttributeVec3s::registerType();
-
     // create a point grid
 
     PointDataGrid::Ptr points;
@@ -746,10 +734,6 @@ TestIndexFilter::testLevelSetFilter()
 void
 TestIndexFilter::testBBoxFilter()
 {
-    using AttributeVec3s = TypedAttributeArray<Vec3s>;
-
-    AttributeVec3s::registerType();
-
     std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1f, 10, 1}};
 
     const float voxelSize(0.5);
@@ -948,6 +932,6 @@ TestIndexFilter::testBinaryFilter()
     }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

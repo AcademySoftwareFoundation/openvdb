@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -56,6 +56,7 @@
 #include <DM/DM_RenderTable.h>
 #include <GEO/GEO_PrimVDB.h>
 #include <GR/GR_Primitive.h>
+#include <GR/GR_Utils.h> // inViewFrustum
 #include <GT/GT_PrimitiveTypes.h>
 #include <GT/GT_PrimVDB.h>
 #include <GUI/GUI_PrimitiveHook.h>
@@ -70,6 +71,9 @@
 
 ////////////////////////////////////////
 
+static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
+static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
+static RE_ShaderHandle theVelocityDecorShader("decor/GL32/point_normal.prog");
 
 namespace {
 
@@ -142,6 +146,10 @@ public:
     /// (such as level of detail).
     void update(RE_Render*, const GT_PrimitiveHandle&, const GR_UpdateParms&) override;
 
+    /// return true if the primitive is in or overlaps the view frustum.
+    /// always returning true will effectively disable frustum culling.
+    bool inViewFrustum(const UT_Matrix4D &objviewproj) override;
+
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
     /// It also may be called outside of a viewport redraw to do picking of the
@@ -167,6 +175,7 @@ public:
 
 protected:
     void computeCentroid(const openvdb::points::PointDataGrid& grid);
+    void computeBbox(const openvdb::points::PointDataGrid& grid);
 
     void updatePosBuffer(  RE_Render* r,
                         const openvdb::points::PointDataGrid& grid,
@@ -183,13 +192,6 @@ protected:
 
     bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
 
-    bool updateIdBuffer(    RE_Render* r,
-                            const openvdb::points::PointDataGrid& grid,
-                            const std::string& name,
-                            const RE_CacheVersion& version);
-
-    bool updateIdBuffer(    RE_Render* r, const std::string& name, const RE_CacheVersion& version);
-
     void removeBuffer(const std::string& name);
 
 private:
@@ -197,6 +199,7 @@ private:
     std::unique_ptr<RE_Geometry> myWire;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
+    openvdb::BBoxd mBbox;
 };
 
 
@@ -255,52 +258,160 @@ GUI_PrimVDBPointsHook::createPrimitive(
 
 namespace {
 
-void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
+using StringPair = std::pair<std::string, std::string>;
+
+void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
+                 const std::vector<StringPair>& stringReplacements,
+                 const std::vector<std::string>& stringInsertions = {})
 {
     // check if the point shader has already been patched
 
     r->pushShader();
     r->bindShader(shader);
 
-    RE_ShaderStage* patchedVertexShader = shader->getShader("pointOffset", RE_SHADER_VERTEX);
+    RE_ShaderStage* patchedShader = shader->getShader("pointOffset", type);
 
-    if (patchedVertexShader) {
+    if (patchedShader) {
         r->popShader();
     }
     else {
 
-        // retrieve the vertex shader source
+        // retrieve the shader source
 
-        UT_String vertexSource;
-        shader->getShaderSource(r, vertexSource, RE_SHADER_VERTEX);
+        UT_String source;
+        shader->getShaderSource(r, source, type);
+
+        const int version = shader->getCodeVersion();
 
         r->popShader();
 
-        // patch the shader to add a uniform offset to the position
+        // patch the shader to replace the strings
 
-        vertexSource.substitute("void main()", "uniform vec3 offset;\n\nvoid main()", /*all=*/false);
-        vertexSource.substitute("vec4(P, 1.0)", "vec4(P + offset, 1.0)", /*all=*/false);
+        for (const auto& stringPair : stringReplacements) {
+            source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
+        }
+
+        // patch the shader to insert the strings
+
+        for (const auto& str: stringInsertions) {
+            source.insert(0, str.c_str());
+        }
 
         // move the version up to the top of the file
 
-        vertexSource.substitute("#version ", "// #version");
-        vertexSource.insert(0, "#version 150\n");
+        source.substitute("#version ", "// #version");
+
+        std::stringstream ss;
+        ss << "#version " << version << "\n";
+        source.insert(0, ss.str().c_str());
 
         // remove the existing shader and add the patched one
 
-        shader->clearShaders(r, RE_SHADER_VERTEX);
+        shader->clearShaders(r, type);
 
         UT_String message;
 
-        const bool success = shader->addShader(r, RE_SHADER_VERTEX, vertexSource, "pointOffset", 150, &message);
+        const bool success = shader->addShader(r, type, source, "pointOffset", version, &message);
 
         if (!success) {
-            std::cerr << message.toStdString() << std::endl;
+            if (type == RE_SHADER_VERTEX)           std::cerr << "Vertex Shader (";
+            else if (type == RE_SHADER_GEOMETRY)    std::cerr << "Geometry Shader (";
+            else if (type == RE_SHADER_FRAGMENT)    std::cerr << "Fragment Shader (";
+            std::cerr << shader->getName();
+            std::cerr << ") Compile Failure: " << message.toStdString() << std::endl;
         }
 
         assert(success);
     }
 }
+
+void patchShaderVertexOffset(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to add a uniform offset to the position
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
+    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
+
+    patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
+}
+
+void patchShaderVertexOffsetVelocity(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to add a uniform offset to the position and swap "N" for "v"
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
+    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
+    stringReplacements.push_back(StringPair("N)", "v)"));
+    stringReplacements.push_back(StringPair("in vec3 N;", "in vec3 v;"));
+    stringReplacements.push_back(StringPair("normalize(", "-0.04 * normalize("));
+
+    patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
+}
+
+void patchShaderGeomDecorationScale(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to rename decoration scale
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
+
+    patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements);
+}
+
+void patchShaderGeomDecorationScaleNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to rename decoration scale
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
+    stringReplacements.push_back(StringPair("\t", " "));
+    stringReplacements.push_back(StringPair("  ", " "));
+    stringReplacements.push_back(StringPair("  ", " "));
+    stringReplacements.push_back(StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"));
+    stringReplacements.push_back(StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize"));
+
+    std::vector<std::string> stringInsertions;
+    stringInsertions.push_back("uniform vec2 glH_DepthProject;");
+    stringInsertions.push_back("uniform vec2 glH_ScreenSize;");
+
+    patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements, stringInsertions);
+}
+
+void patchShaderFragmentBlue(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to hard-code the color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("col.rgb", "vec3(0,0,1)"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
+void patchShaderFragmentTurqoise(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to hard-code the color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("col.rgb", "vec3(0.2,0.55,0.55)"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
+void patchShaderFragmentBlueDiscard(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // patch the shader to discard pixels with alpha < 0.25 and hard-code color to blue
+
+    std::vector<StringPair> stringReplacements;
+    stringReplacements.push_back(StringPair("color = vec4(fsIn.color.rgb * d, d);",
+                                            "if (d < 0.25) discard;\ncolor = vec4(vec3(0,0,1) * d, d);"));
+
+    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
+}
+
 
 } // namespace
 
@@ -635,6 +746,16 @@ GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
     mCentroid = openvdb::Vec3f{grid.transform().indexToWorld(coordBBox.getCenter())};
 }
 
+void
+GR_PrimVDBPoints::computeBbox(const openvdb::points::PointDataGrid& grid)
+{
+    // compute and store the world-space bounding box of the grid
+
+    const CoordBBox bbox = grid.evalActiveVoxelBoundingBox();
+    const BBoxd bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+    mBbox = bboxIndex.applyMap(*(grid.transform().baseMap()));
+}
+
 struct PositionAttribute
 {
     using ValueType = Vec3f;
@@ -735,7 +856,9 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     // count up total points ignoring any leaf nodes that are out of core
 
-    size_t numPoints = useGroup ? groupPointCount(tree, groupName, /*inCoreOnly=*/true) : pointCount(tree, /*inCoreOnly=*/true);
+    int numPoints = static_cast<int>(useGroup ?
+        groupPointCount(tree, groupName, /*inCoreOnly=*/true) :
+        pointCount(tree, /*inCoreOnly=*/true));
 
     if (numPoints == 0)    return;
 
@@ -765,9 +888,6 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
     {
         using gr_primitive_internal::FillGPUBuffersPosition;
 
-        // map() returns a pointer to the GL buffer
-        UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
-
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
@@ -776,14 +896,27 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(),
                         includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-        PositionAttribute positionAttribute(pdata, mCentroid, static_cast<Index>(stride));
+        std::unique_ptr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
+
+        PositionAttribute positionAttribute(pdata.get(), mCentroid, static_cast<Index>(stride));
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
                                     /*startOffset=*/ 0, includeGroups, excludeGroups,
                                     /*inCoreOnly=*/true);
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
 
-        posGeo->unmap(r);
+        if (numPoints < maxVertexSize) {
+            posGeo->setArray(r, pdata.get(), /*offset = */ 0, /*sublen = */ int(numPoints));
+        }
+        else {
+            for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
+                const int sublength = (offset + maxVertexSize) > numPoints ?
+                    numPoints - offset : maxVertexSize;
+
+                posGeo->setArray(r, pdata.get()+offset, /*offset=*/ offset, /*sublen=*/ sublength);
+            }
+        }
+
         posGeo->setCacheVersion(version);
     }
 
@@ -847,7 +980,8 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
     // Initialize the number of points for the wireframe box per leaf.
 
-    myWire->setNumPoints(int(outOfCoreLeaves*8*3));
+    int numPoints = static_cast<int>(outOfCoreLeaves*8*3);
+    myWire->setNumPoints(numPoints);
 
     // fetch wireframe position, if its cache version matches, no upload is required.
 
@@ -863,7 +997,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
         // fill the wire data
 
-        UT_Vector3H *data = static_cast<UT_Vector3H*>(posWire->map(r));
+        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<openvdb::Coord> coords;
 
@@ -876,13 +1010,18 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
             coords.push_back(leaf.origin());
         }
 
-        FillGPUBuffersLeafBoxes fill(data, coords, grid.transform(), mCentroid);
+        FillGPUBuffersLeafBoxes fill(data.get(), coords, grid.transform(), mCentroid);
         const tbb::blocked_range<size_t> range(0, coords.size());
         tbb::parallel_for(range, fill);
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
+        for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
+            const int sublength = (offset + maxVertexSize) > numPoints ?
+                                                numPoints - offset : maxVertexSize;
 
-        posWire->unmap(r);
+            posWire->setArray(r, data.get()+offset, offset, sublength);
+        }
+
         posWire->setCacheVersion(version);
     }
 
@@ -915,26 +1054,56 @@ GR_PrimVDBPoints::update(RE_Render *r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
-    // patch the shaders at run-time to add an offset (does nothing if already patched)
+    // patch the point shaders at run-time to add an offset (does nothing if already patched)
 
-    patchVertexShader(r, theLineShader);
-    patchVertexShader(r, thePixelShader);
-    patchVertexShader(r, thePointShader);
+    patchShaderVertexOffset(r, theLineShader);
+    patchShaderVertexOffset(r, thePixelShader);
+    patchShaderVertexOffset(r, thePointShader);
 
-    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
+    // patch the decor shaders at run-time to add an offset, change color, etc (does nothing if already patched)
 
-    const openvdb::GridBase* grid =
-        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+    patchShaderVertexOffset(r, theNormalDecorShader);
+    patchShaderGeomDecorationScale(r, theNormalDecorShader);
+    patchShaderFragmentBlue(r, theNormalDecorShader);
 
-    using PointDataGrid = openvdb::points::PointDataGrid;
+    patchShaderVertexOffset(r, theMarkerDecorShader);
+    patchShaderGeomDecorationScaleNoRedeclarations(r, theMarkerDecorShader);
+    patchShaderFragmentBlueDiscard(r, theMarkerDecorShader);
 
-    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+    patchShaderVertexOffsetVelocity(r, theVelocityDecorShader);
+    patchShaderGeomDecorationScale(r, theVelocityDecorShader);
+    patchShaderFragmentTurqoise(r, theVelocityDecorShader);
 
-    computeCentroid(pointDataGrid);
-    updatePosBuffer(r, pointDataGrid, p.geo_version);
-    updateWireBuffer(r, pointDataGrid, p.geo_version);
+    // geometry itself changed. GR_GEO_TOPOLOGY changed indicates a large
+    // change, such as changes in the point, primitive or vertex counts
+    // GR_GEO_CHANGED indicates that some attribute data may have changed.
 
-    mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+    if (p.reason & (GR_GEO_CHANGED | GR_GEO_TOPOLOGY_CHANGED))
+    {
+        const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
+
+        const openvdb::GridBase* grid =
+            const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+
+        using PointDataGrid = openvdb::points::PointDataGrid;
+
+        const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+
+        computeCentroid(pointDataGrid);
+        computeBbox(pointDataGrid);
+        updatePosBuffer(r, pointDataGrid, p.geo_version);
+        updateWireBuffer(r, pointDataGrid, p.geo_version);
+
+        mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+    }
+}
+
+bool
+GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj)
+{
+    const UT_BoundingBoxD bbox( mBbox.min().x(), mBbox.min().y(), mBbox.min().z(),
+                                mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
+    return GR_Utils::inViewFrustum(bbox, objviewproj);
 }
 
 bool
@@ -954,7 +1123,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
 
     if (tree.leafCount() == 0)  return false;
 
-    const size_t numPoints = myGeo->getNumPoints();
+    const int numPoints = myGeo->getNumPoints();
 
     if (numPoints == 0)         return false;
 
@@ -988,7 +1157,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         }
         const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
 
-        UT_Vector3H *data = static_cast<UT_Vector3H*>(bufferGeo->map(r));
+        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
@@ -998,15 +1167,20 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(), includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
         if (type == "vec3s") {
-            VectorAttribute<Vec3f> typedAttribute(data);
+            VectorAttribute<Vec3f> typedAttribute(data.get());
             convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets,
                 /*startOffset=*/ 0, static_cast<unsigned>(index), /*stride=*/1,
                 includeGroups, excludeGroups, /*inCoreOnly=*/true);
         }
 
-        // unmap the buffer so it can be used by GL and set the cache version
+        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
+        for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
+            const int sublength = (offset + maxVertexSize) > numPoints ?
+                                                numPoints - offset : maxVertexSize;
 
-        bufferGeo->unmap(r);
+            bufferGeo->setArray(r, data.get()+offset, offset, sublength);
+        }
+
         bufferGeo->setCacheVersion(version);
     }
 
@@ -1025,120 +1199,6 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateVec3Buffer(r, pointDataGrid, name, version);
-}
-
-bool
-GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
-                                    const openvdb::points::PointDataGrid& grid,
-                                    const std::string& name,
-                                    const RE_CacheVersion& version)
-{
-    // Initialize the geometry with the proper name for the GL cache
-    if (!myGeo)     return false;
-
-    using GridType = openvdb::points::PointDataGrid;
-    using TreeType = GridType::TreeType;
-    using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::points::AttributeSet;
-
-    const TreeType& tree = grid.tree();
-
-    if (tree.leafCount() == 0)  return false;
-
-    const size_t numPoints = myGeo->getNumPoints();
-
-    if (numPoints == 0)         return false;
-
-    auto iter = tree.cbeginLeaf();
-
-    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-
-    const size_t index = descriptor.find("id");
-
-    // early exit if id does not exist
-
-    if (index == AttributeSet::INVALID_POS)     return false;
-
-    const openvdb::Name type = descriptor.type(index).first;
-
-    // fetch id, if its cache version matches, no upload is required.
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
-#else
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
-#endif
-
-    if (bufferGeo->getCacheVersion() != version)
-    {
-        // build cumulative leaf offset array
-
-        using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
-
-        LeafOffsets offsets;
-
-        openvdb::Index64 cumulativeOffset = 0;
-
-        for (; iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            // skip out-of-core leaf nodes (used when delay loading VDBs)
-            if (leaf.buffer().isOutOfCore())    continue;
-
-            const openvdb::Index64 count = leaf.pointCount();
-
-            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
-
-            cumulativeOffset += count;
-        }
-
-        using gr_primitive_internal::FillGPUBuffersId;
-
-        int32_t *data = static_cast<int32_t*>(bufferGeo->map(r));
-
-        if (type == "int16") {
-            FillGPUBuffersId<TreeType, int16_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-        else if (type == "int32") {
-            FillGPUBuffersId<TreeType, int32_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-        else if (type == "int64") {
-            FillGPUBuffersId<TreeType, int64_t, int32_t> fill{
-                data, offsets, grid.tree(), static_cast<unsigned>(index)};
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-
-        // unmap the buffer so it can be used by GL and set the cache version
-
-        bufferGeo->unmap(r);
-        bufferGeo->setCacheVersion(version);
-    }
-
-    return true;
-}
-
-bool
-GR_PrimVDBPoints::updateIdBuffer(RE_Render* r, const std::string& name, const RE_CacheVersion& version)
-{
-    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*getCachedGTPrimitive());
-
-    const openvdb::GridBase* grid =
-        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
-
-    using PointDataGrid = openvdb::points::PointDataGrid;
-    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
-
-    return updateIdBuffer(r, pointDataGrid, name, version);
 }
 
 void
@@ -1245,22 +1305,9 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         return;
     }
 
+    const GR_CommonDispOption& commonOpts = p.opts->common();
+
     const RE_CacheVersion version = myGeo->getAttribute("P")->getCacheVersion();
-
-    // update point number buffer
-
-    GR_Decoration numberMarkers[2] = {GR_POINT_NUMBER, GR_NO_DECORATION};
-    const bool numberMarkerChanged = standardMarkersChanged(*p.opts, numberMarkers, false);
-
-    if (numberMarkerChanged)
-    {
-        if (p.opts->drawPointNums()) {
-            updateIdBuffer(r, "pointID", version);
-        }
-        else {
-            removeBuffer("pointID");
-        }
-    }
 
     // update normal buffer
 
@@ -1269,12 +1316,8 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     if (normalMarkerChanged)
     {
-        if (p.opts->drawPointNmls()) {
-            updateVec3Buffer(r, "N", version);
-        }
-        else {
-            removeBuffer("N");
-        }
+        if (p.opts->drawPointNmls())        updateVec3Buffer(r, "N", version);
+        else                                removeBuffer("N");
     }
 
     // update velocity buffer
@@ -1284,28 +1327,65 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     if (velocityMarkerChanged)
     {
-        if (p.opts->drawPointVelocity()) {
-            updateVec3Buffer(r, "v", version);
-        }
-        else {
-            removeBuffer("v");
-        }
+        if (p.opts->drawPointVelocity())    updateVec3Buffer(r, "v", version);
+        else                                removeBuffer("v");
     }
 
-    // render markers
+    // setup shader and scale
 
-    if (decor == GR_POINT_NUMBER ||
-        decor == GR_POINT_MARKER ||
-        decor == GR_POINT_NORMAL ||
-        decor == GR_POINT_POSITION ||
-        decor == GR_POINT_VELOCITY)
-    {
-        drawDecorationForGeo(r, myGeo.get(), decor, p.opts, p.render_flags,
-                 p.overlay, p.override_vis, p.instance_group,
-                 GR_SELECT_NONE);
+    RE_ShaderHandle* shader = nullptr;
+    float scale = 1.0f;
+
+    if (decor == GR_POINT_MARKER) {
+        shader = &theMarkerDecorShader;
+        scale = static_cast<float>(commonOpts.markerSize());
+    }
+    else if (decor == GR_POINT_NORMAL) {
+        shader = &theNormalDecorShader;
+        scale = commonOpts.normalScale();
+    }
+    else if (decor == GR_POINT_VELOCITY) {
+        shader = &theVelocityDecorShader;
+        scale = static_cast<float>(commonOpts.vectorScale());
+
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+        // use the explicit attribute mapping
+
+        (*shader)->useDefaultAttribMap(false);
+        (*shader)->useExplicitAttribMap(true);
+#endif
+    }
+    else if (decor == GR_POINT_NUMBER ||
+             decor == GR_POINT_POSITION) {
+        // not currently supported
+        return;
     }
 
-    GR_Primitive::renderDecoration(r, decor, p);
+    if (shader) {
+        // bind the shader
+
+        r->pushShader();
+        r->bindShader(*shader);
+
+        // bind the position offset and decoration scale
+
+        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
+        (*shader)->bindVector(r, "offset", positionOffset);
+
+        fpreal32 decorationScale(scale);
+        (*shader)->bindFloat(r, "decorationScale", decorationScale);
+
+        // render and pop the shader
+
+        myGeo->draw(r, RE_GEO_WIRE_IDX);
+
+        r->popShader();
+    }
+    else {
+        // fall back on default rendering
+
+        GR_Primitive::renderDecoration(r, decor, p);
+    }
 }
 #endif
 
@@ -1315,6 +1395,6 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
 #endif // 13.0.0 or later
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

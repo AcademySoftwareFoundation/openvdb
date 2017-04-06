@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,7 +32,6 @@
 ///
 /// @author FX R&D OpenVDB team
 
-
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -40,6 +39,7 @@
 
 #include <openvdb/tools/TopologyToLevelSet.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_Handle.h>
@@ -48,8 +48,11 @@
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 
+
+namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+
 
 class SOP_OpenVDB_Topology_To_Level_Set: public hvdb::SOP_NodeVDB
 {
@@ -69,8 +72,7 @@ protected:
 ////////////////////////////////////////
 
 
-namespace
-{
+namespace {
 
 struct Converter
 {
@@ -116,9 +118,7 @@ private:
     hvdb::Interrupter * const mBossPt;
 }; // struct Converter
 
-
 } // unnamed namespace
-
 
 
 void
@@ -189,6 +189,7 @@ newSopOperator(OP_OperatorTable* table)
         .addAlias("OpenVDB From Mask")
         .addInput("VDB Grids");
 }
+
 
 ////////////////////////////////////////
 
@@ -265,7 +266,8 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
 
         // Process VDB primitives
 
-        const GA_PrimitiveGroup* group = matchGroup(const_cast<GU_Detail&>(*inputGeoPt), groupStr.toStdString());
+        const GA_PrimitiveGroup* group =
+            matchGroup(const_cast<GU_Detail&>(*inputGeoPt), groupStr.toStdString());
 
         hvdb::VdbPrimCIterator vdbIt(inputGeoPt, group);
 
@@ -280,18 +282,19 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
 
             const GU_PrimVDB *vdb = *vdbIt;
 
-            if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) { // all hdk supported grid types
-
-                // check grid types that are not natively supported by Houdini
-
-                if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) { // point index grid
-                    openvdb::tools::PointIndexGrid::ConstPtr grid =
-                        openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(vdb->getGridPtr());
+            if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) {
+                // Handle grid types that are not natively supported by Houdini.
+                if (vdb->getGrid().isType<cvdb::tools::PointIndexGrid>()) {
+                    cvdb::tools::PointIndexGrid::ConstPtr grid =
+                        cvdb::gridConstPtrCast<cvdb::tools::PointIndexGrid>(vdb->getGridPtr());
                     converter(*grid);
-
-                } else if (vdb->getGrid().type() == openvdb::MaskGrid::gridType()) { // mask grid
-                    openvdb::MaskGrid::ConstPtr grid =
-                        openvdb::gridConstPtrCast<openvdb::MaskGrid>(vdb->getGridPtr());
+                } else if (vdb->getGrid().isType<cvdb::points::PointDataGrid>()) {
+                    cvdb::points::PointDataGrid::ConstPtr grid =
+                        cvdb::gridConstPtrCast<cvdb::points::PointDataGrid>(vdb->getGridPtr());
+                    converter(*grid);
+                } else if (vdb->getGrid().isType<cvdb::MaskGrid>()) {
+                    cvdb::MaskGrid::ConstPtr grid =
+                        cvdb::gridConstPtrCast<cvdb::MaskGrid>(vdb->getGridPtr());
                     converter(*grid);
                 }
             }
@@ -304,6 +307,6 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

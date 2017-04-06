@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -59,7 +59,7 @@ namespace points {
 
 
 /// Ordered collection of uniquely-named attribute arrays
-class AttributeSet
+class OPENVDB_API AttributeSet
 {
 public:
     enum { INVALID_POS = std::numeric_limits<size_t>::max() };
@@ -269,7 +269,7 @@ private:
 ///         for a constant collection of attribute arrays.
 /// @note   The attribute name is actually mutable, but the attribute type
 ///         and position can not be changed after creation.
-class AttributeSet::Descriptor
+class OPENVDB_API AttributeSet::Descriptor
 {
 public:
     using Ptr               = std::shared_ptr<Descriptor>;
@@ -341,8 +341,23 @@ public:
     /// Return true if the attribute has a default value
     bool hasDefaultValue(const Name& name) const;
     /// Get a default value for an existing attribute
-    template <typename ValueType>
-    ValueType getDefaultValue(const Name& name) const;
+    template<typename ValueType>
+    ValueType getDefaultValue(const Name& name) const
+    {
+        const size_t pos = find(name);
+        if (pos == INVALID_POS) {
+            OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
+        }
+
+        std::stringstream ss;
+        ss << "default:" << name;
+
+        auto metadata = mMetadata.getMetadata<TypedMetadata<ValueType>>(ss.str());
+
+        if (metadata)   return metadata->value();
+
+        return zeroVal<ValueType>();
+    }
     /// Set a default value for an existing attribute
     void setDefaultValue(const Name& name, const Metadata& defaultValue);
     // Remove the default value if it exists
@@ -408,33 +423,12 @@ private:
     int64_t                     mReserved[8];       // for future use
 }; // class Descriptor
 
-
-template <typename ValueType>
-ValueType
-AttributeSet::Descriptor::getDefaultValue(const Name& name) const
-{
-    const size_t pos = find(name);
-    if (pos == INVALID_POS) {
-        OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
-    }
-
-    std::stringstream ss;
-    ss << "default:" << name;
-
-    auto metadata = mMetadata.getMetadata<TypedMetadata<ValueType>>(ss.str());
-
-    if (metadata)   return metadata->value();
-
-    return zeroVal<ValueType>();
-}
-
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

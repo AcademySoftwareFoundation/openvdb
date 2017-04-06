@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -60,7 +60,7 @@
 ///           | |      | | dP/dx = 0
 /// dP/dx = 0 | +------|-+
 ///           |/       |/
-///  (0,-N,0) +--------+ (N,-N,N)
+///  (0,-N,0) +--------+ (N,-N,0)
 ///           dP/dy = -1
 /// </pre>
 /// @code
@@ -69,7 +69,6 @@
 /// // Activate voxels to indicate that they contain liquid.
 /// source.fill(CoordBBox(Coord(0, -N, 0), Coord(N, 0, N)), /*value=*/0.0);
 ///
-/// // C++11
 /// auto boundary = [](const openvdb::Coord& ijk, const openvdb::Coord& neighbor,
 ///     double& source, double& diagonal)
 /// {
@@ -94,9 +93,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
-
 #include "Morphology.h" // for erodeVoxels
-
 #include <boost/scoped_array.hpp>
 
 
@@ -109,7 +106,7 @@ namespace poisson {
 // This type should be at least as wide as math::pcg::SizeType.
 typedef Int32 VIndex;
 
-/// The type of a matrix used to represent a three-dimensional Laplacian operator
+/// The type of a matrix used to represent a three-dimensional %Laplacian operator
 typedef math::pcg::SparseStencilMatrix<double, 7> LaplacianMatrix;
 
 
@@ -128,11 +125,11 @@ typedef math::pcg::SparseStencilMatrix<double, 7> LaplacianMatrix;
 /// @sa solveWithBoundaryConditions
 template<typename TreeType>
 inline typename TreeType::Ptr
-solve(const TreeType&, math::pcg::State&);
+solve(const TreeType&, math::pcg::State&, bool staggered = false);
 
 template<typename TreeType, typename Interrupter>
 inline typename TreeType::Ptr
-solve(const TreeType&, math::pcg::State&, Interrupter&);
+solve(const TreeType&, math::pcg::State&, Interrupter&, bool staggered = false);
 //@}
 
 
@@ -169,17 +166,40 @@ solve(const TreeType&, math::pcg::State&, Interrupter&);
 /// @sa solve
 template<typename TreeType, typename BoundaryOp, typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditions(const TreeType&, const BoundaryOp&, math::pcg::State&, Interrupter&);
+solveWithBoundaryConditions(
+    const TreeType&,
+    const BoundaryOp&,
+    math::pcg::State&,
+    Interrupter&,
+    bool staggered = false);
 
-template<typename PreconditionerType, typename TreeType, typename BoundaryOp, typename Interrupter>
+template<
+    typename PreconditionerType,
+    typename TreeType,
+    typename BoundaryOp,
+    typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const BoundaryOp&,
-                                             math::pcg::State&, Interrupter&);
+solveWithBoundaryConditionsAndPreconditioner(
+    const TreeType&,
+    const BoundaryOp&,
+    math::pcg::State&,
+    Interrupter&,
+    bool staggered = false);
 
-template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
+template<
+    typename PreconditionerType,
+    typename TreeType,
+    typename DomainTreeType,
+    typename BoundaryOp,
+    typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&,
-                                             math::pcg::State&, Interrupter&);
+solveWithBoundaryConditionsAndPreconditioner(
+    const TreeType&,
+    const DomainTreeType&,
+    const BoundaryOp&,
+    math::pcg::State&,
+    Interrupter&,
+    bool staggered = false);
 //@}
 
 
@@ -228,7 +248,7 @@ createTreeFromVector(
     const TreeValueType& background);
 
 
-/// @brief Generate a sparse matrix of the index-space (&Delta;<i>x</i> = 1) Laplacian operator
+/// @brief Generate a sparse matrix of the index-space (&Delta;<i>x</i> = 1) %Laplacian operator
 /// using second-order finite differences.
 /// @details This construction assumes homogeneous Dirichlet boundary conditions
 /// (exterior grid points are zero).
@@ -236,10 +256,11 @@ template<typename BoolTreeType>
 inline LaplacianMatrix::Ptr
 createISLaplacian(
     const typename BoolTreeType::template ValueConverter<VIndex>::Type& vectorIndexTree,
-    const BoolTreeType& interiorMask);
+    const BoolTreeType& interiorMask,
+    bool staggered = false);
 
 
-/// @brief Generate a sparse matrix of the index-space (&Delta;<i>x</i> = 1) Laplacian operator
+/// @brief Generate a sparse matrix of the index-space (&Delta;<i>x</i> = 1) %Laplacian operator
 /// with user-specified boundary conditions using second-order finite differences.
 /// @details Each thread gets its own copy of @a boundaryOp, which should be
 /// a functor of the form
@@ -257,14 +278,28 @@ createISLaplacian(
 /// The functor is called for each of the exterior neighbors of each boundary voxel @ijk,
 /// and it must specify a boundary condition for @ijk by modifying one or both of two
 /// provided values: an entry in the given @a source vector corresponding to @ijk and
-/// the weighting coefficient for @ijk in the Laplacian matrix.
+/// the weighting coefficient for @ijk in the %Laplacian matrix.
 template<typename BoolTreeType, typename BoundaryOp>
 inline LaplacianMatrix::Ptr
 createISLaplacianWithBoundaryConditions(
     const typename BoolTreeType::template ValueConverter<VIndex>::Type& vectorIndexTree,
     const BoolTreeType& interiorMask,
     const BoundaryOp& boundaryOp,
-    typename math::pcg::Vector<LaplacianMatrix::ValueType>& source);
+    typename math::pcg::Vector<LaplacianMatrix::ValueType>& source,
+    bool staggered = false);
+
+
+/// @brief Dirichlet boundary condition functor
+/// @details This is useful in describing fluid/air interfaces, where the pressure
+/// of the air is assumed to be zero.
+template<typename ValueType>
+struct DirichletBoundaryOp {
+    inline void operator()(const Coord&, const Coord&, ValueType&, ValueType& diag) const {
+        // Exterior neighbors are empty, so decrement the weighting coefficient
+        // as for interior neighbors but leave the source vector unchanged.
+        diag -= 1;
+    }
+};
 
 //@}
 
@@ -316,7 +351,7 @@ populateIndexTree(VIndexTreeType& result)
     LeafMgrT leafManager(result);
     const size_t leafCount = leafManager.leafCount();
 
-    if(leafCount == 0) return;
+    if (leafCount == 0) return;
 
     // Count the number of active voxels in each leaf node.
     boost::scoped_array<VIndex> perLeafCount(new VIndex[leafCount]);
@@ -487,17 +522,9 @@ createTreeFromVector(
 
 namespace internal {
 
-/// Constant boundary condition functor
-template<typename ValueType>
-struct DirichletOp {
-    inline void operator()(
-        const Coord&, const Coord&, ValueType&, ValueType& diag) const { diag -= 1; }
-};
-
-
-/// Functor for use with LeafManager::foreach() to populate a sparse Laplacian matrix
+/// Functor for use with LeafManager::foreach() to populate a sparse %Laplacian matrix
 template<typename BoolTreeType, typename BoundaryOp>
-struct ISLaplacianOp
+struct ISStaggeredLaplacianOp
 {
     typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef typename VIdxTreeT::LeafNodeType   VIdxLeafT;
@@ -510,7 +537,7 @@ struct ISLaplacianOp
     const BoundaryOp boundaryOp;
     VectorT* source;
 
-    ISLaplacianOp(LaplacianMatrix& m, const VIdxTreeT& idx,
+    ISStaggeredLaplacianOp(LaplacianMatrix& m, const VIdxTreeT& idx,
         const BoolTreeType& mask, const BoundaryOp& op, VectorT& src):
         laplacian(&m), idxTree(&idx), interiorMask(&mask), boundaryOp(op), source(&src) {}
 
@@ -606,19 +633,95 @@ struct ISLaplacianOp
     }
 };
 
+
+// Stencil 1 is the correct stencil, but stencil 2 requires
+// half as many comparisons and produces smoother results at boundaries.
+//#define OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL 1
+#define OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL 2
+
+/// Functor for use with LeafManager::foreach() to populate a sparse %Laplacian matrix
+template<typename VIdxTreeT, typename BoundaryOp>
+struct ISLaplacianOp
+{
+    typedef typename VIdxTreeT::LeafNodeType   VIdxLeafT;
+    typedef LaplacianMatrix::ValueType         ValueT;
+    typedef typename math::pcg::Vector<ValueT> VectorT;
+
+    LaplacianMatrix* laplacian;
+    const VIdxTreeT* idxTree;
+    const BoundaryOp boundaryOp;
+    VectorT* source;
+
+    ISLaplacianOp(LaplacianMatrix& m, const VIdxTreeT& idx, const BoundaryOp& op, VectorT& src):
+        laplacian(&m), idxTree(&idx), boundaryOp(op), source(&src) {}
+
+    void operator()(const VIdxLeafT& idxLeaf, size_t /*leafIdx*/) const
+    {
+        typename tree::ValueAccessor<const VIdxTreeT> vectorIdx(*idxTree);
+
+        const int kNumOffsets = 6;
+        const Coord ijkOffset[kNumOffsets] = {
+#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
+            Coord(-1,0,0), Coord(1,0,0), Coord(0,-1,0), Coord(0,1,0), Coord(0,0,-1), Coord(0,0,1)
+#else
+            Coord(-2,0,0), Coord(2,0,0), Coord(0,-2,0), Coord(0,2,0), Coord(0,0,-2), Coord(0,0,2)
+#endif
+        };
+
+        // For each active voxel in this leaf...
+        for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
+            assert(it.getValue() > -1);
+
+            const Coord ijk = it.getCoord();
+            const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());
+
+            LaplacianMatrix::RowEditor row = laplacian->getRowEditor(rowNum);
+
+            ValueT modifiedDiagonal = 0.f;
+
+            // For each of the neighbors of the voxel at (i,j,k)...
+            for (int dir = 0; dir < kNumOffsets; ++dir) {
+                const Coord neighbor = ijk + ijkOffset[dir];
+                VIndex column;
+                // For collocated vector grids, the central differencing stencil requires
+                // access to neighbors at a distance of two voxels in each direction
+                // (-x, +x, -y, +y, -z, +z).
+#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
+                const bool ijkIsInterior = (vectorIdx.probeValue(neighbor + ijkOffset[dir], column)
+                    && vectorIdx.isValueOn(neighbor));
+#else
+                const bool ijkIsInterior = vectorIdx.probeValue(neighbor, column);
+#endif
+                if (ijkIsInterior) {
+                    // If (i,j,k) is sufficiently far away from the exterior,
+                    // set its weight to one and adjust the center weight accordingly.
+                    row.setValue(column, 1.f);
+                    modifiedDiagonal -= 1.f;
+                } else {
+                    // If (i,j,k) is adjacent to or one voxel away from the exterior,
+                    // invoke the boundary condition functor.
+                    boundaryOp(ijk, neighbor, source->at(rowNum), modifiedDiagonal);
+                }
+            }
+            // Set the (possibly modified) weight for the voxel at (i,j,k).
+            row.setValue(rowNum, modifiedDiagonal);
+        }
+    }
+};
+
 } // namespace internal
 
 
 template<typename BoolTreeType>
 inline LaplacianMatrix::Ptr
 createISLaplacian(const typename BoolTreeType::template ValueConverter<VIndex>::Type& idxTree,
-    const BoolTreeType& interiorMask)
+    const BoolTreeType& interiorMask, bool staggered)
 {
     typedef LaplacianMatrix::ValueType ValueT;
     math::pcg::Vector<ValueT> unused(
         static_cast<math::pcg::SizeType>(idxTree.activeVoxelCount()));
-    internal::DirichletOp<ValueT> op;
-    return createISLaplacianWithBoundaryConditions(idxTree, interiorMask, op, unused);
+    DirichletBoundaryOp<ValueT> op;
+    return createISLaplacianWithBoundaryConditions(idxTree, interiorMask, op, unused, staggered);
 }
 
 
@@ -628,7 +731,8 @@ createISLaplacianWithBoundaryConditions(
     const typename BoolTreeType::template ValueConverter<VIndex>::Type& idxTree,
     const BoolTreeType& interiorMask,
     const BoundaryOp& boundaryOp,
-    typename math::pcg::Vector<LaplacianMatrix::ValueType>& source)
+    typename math::pcg::Vector<LaplacianMatrix::ValueType>& source,
+    bool staggered)
 {
     typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef typename tree::LeafManager<const VIdxTreeT>  VIdxLeafMgrT;
@@ -643,8 +747,13 @@ createISLaplacianWithBoundaryConditions(
 
     // Populate the matrix using a second-order, 7-point CD stencil.
     VIdxLeafMgrT idxLeafManager(idxTree);
-    idxLeafManager.foreach(internal::ISLaplacianOp<BoolTreeType, BoundaryOp>(
-        laplacian, idxTree, interiorMask, boundaryOp, source));
+    if (staggered) {
+        idxLeafManager.foreach(internal::ISStaggeredLaplacianOp<BoolTreeType, BoundaryOp>(
+            laplacian, idxTree, interiorMask, boundaryOp, source));
+    } else {
+        idxLeafManager.foreach(internal::ISLaplacianOp<VIdxTreeT, BoundaryOp>(
+            laplacian, idxTree, boundaryOp, source));
+    }
 
     return laplacianPtr;
 }
@@ -655,51 +764,65 @@ createISLaplacianWithBoundaryConditions(
 
 template<typename TreeType>
 inline typename TreeType::Ptr
-solve(const TreeType& inTree, math::pcg::State& state)
+solve(const TreeType& inTree, math::pcg::State& state, bool staggered)
 {
     util::NullInterrupter interrupter;
-    return solve(inTree, state, interrupter);
+    return solve(inTree, state, interrupter, staggered);
 }
 
 
 template<typename TreeType, typename Interrupter>
 inline typename TreeType::Ptr
-solve(const TreeType& inTree, math::pcg::State& state, Interrupter& interrupter)
+solve(const TreeType& inTree, math::pcg::State& state, Interrupter& interrupter, bool staggered)
 {
-    internal::DirichletOp<LaplacianMatrix::ValueType> boundaryOp;
-    return solveWithBoundaryConditions(inTree, boundaryOp, state, interrupter);
+    DirichletBoundaryOp<LaplacianMatrix::ValueType> boundaryOp;
+    return solveWithBoundaryConditions(inTree, boundaryOp, state, interrupter, staggered);
 }
 
 
 template<typename TreeType, typename BoundaryOp, typename Interrupter>
 inline typename TreeType::Ptr
 solveWithBoundaryConditions(const TreeType& inTree, const BoundaryOp& boundaryOp,
-    math::pcg::State& state, Interrupter& interrupter)
+    math::pcg::State& state, Interrupter& interrupter, bool staggered)
 {
     typedef math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix> DefaultPrecondT;
     return solveWithBoundaryConditionsAndPreconditioner<DefaultPrecondT>(
-        inTree, boundaryOp, state, interrupter);
+        inTree, boundaryOp, state, interrupter, staggered);
 }
 
 
-template<typename PreconditionerType, typename TreeType, typename BoundaryOp, typename Interrupter>
+template<
+    typename PreconditionerType,
+    typename TreeType,
+    typename BoundaryOp,
+    typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
-    const BoundaryOp& boundaryOp, math::pcg::State& state, Interrupter& interrupter)
+solveWithBoundaryConditionsAndPreconditioner(
+    const TreeType& inTree,
+    const BoundaryOp& boundaryOp,
+    math::pcg::State& state,
+    Interrupter& interrupter,
+    bool staggered)
 {
-
-    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/,
-                                                                            boundaryOp, state, interrupter);
+    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(
+        /*source=*/inTree, /*domain mask=*/inTree, boundaryOp, state, interrupter, staggered);
 }
 
-template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
+template<
+    typename PreconditionerType,
+    typename TreeType,
+    typename DomainTreeType,
+    typename BoundaryOp,
+    typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
-                                             const DomainTreeType& domainMask,
-                                             const BoundaryOp& boundaryOp,
-                                             math::pcg::State& state, Interrupter& interrupter)
+solveWithBoundaryConditionsAndPreconditioner(
+    const TreeType& inTree,
+    const DomainTreeType& domainMask,
+    const BoundaryOp& boundaryOp,
+    math::pcg::State& state,
+    Interrupter& interrupter,
+    bool staggered)
 {
-
     typedef typename TreeType::ValueType           TreeValueT;
     typedef LaplacianMatrix::ValueType             VecValueT;
     typedef typename math::pcg::Vector<VecValueT>  VectorT;
@@ -713,13 +836,14 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
     typename VectorT::Ptr b = createVectorFromTree<VecValueT>(inTree, *idxTree);
 
     // 3. Create a mask of the interior voxels of the input tree (from the densified index tree).
+    /// @todo Is this really needed?
     typename MaskTreeT::Ptr interiorMask(
         new MaskTreeT(*idxTree, /*background=*/false, TopologyCopy()));
     tools::erodeVoxels(*interiorMask, /*iterations=*/1, tools::NN_FACE);
 
     // 4. Create the Laplacian matrix.
     LaplacianMatrix::Ptr laplacian = createISLaplacianWithBoundaryConditions(
-        *idxTree, *interiorMask, boundaryOp, *b);
+        *idxTree, *interiorMask, boundaryOp, *b, staggered);
 
     // 5. Solve the Poisson equation.
     laplacian->scale(-1.0); // matrix is negative-definite; solve -M x = -b
@@ -747,7 +871,7 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
 
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

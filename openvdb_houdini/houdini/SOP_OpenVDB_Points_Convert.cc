@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -830,8 +830,8 @@ newSopOperator(OP_OperatorTable* table)
 
     {
         const char* items[] = {
-            "vdb", "Houdini points to VDB points",
-            "hdk", "VDB points to Houdini points",
+            "vdb", "Houdini Points to VDB Points",
+            "hdk", "VDB Points to Houdini Points",
             nullptr
         };
 
@@ -901,8 +901,8 @@ newSopOperator(OP_OperatorTable* table)
     {
         const char* items[] = {
             "none", "None",
-            "int16", "16-bit fixed point",
-            "int8", "8-bit fixed point",
+            "int16", "16-bit Fixed Point",
+            "int8", "8-bit Fixed Point",
             nullptr
         };
 
@@ -912,7 +912,7 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute transfer"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute Transfer"));
 
      // Mode. Either convert all or convert specifc attributes
 
@@ -971,11 +971,12 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "none", "None",
             UnitVecCodec::name(), "Unit Vector",
+            "truncate", "16-bit Truncate",
             nullptr
     };
 
     parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("All normal attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -985,11 +986,12 @@ newSopOperator(OP_OperatorTable* table)
             "none", "None",
             FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
             FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
+            "truncate", "16-bit Truncate",
             nullptr
     };
 
     parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
-        .setDefault(PRMtwoDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("All color attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -1126,6 +1128,17 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 if (!baseGrid.isType<PointDataGrid>()) continue;
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
+
+                // if all point data is being converted, sequentially pre-fetch any out-of-core
+                // data for faster performance when using delayed-loading
+
+                const bool allData =    emptyNameVector.empty() &&
+                                        includeGroups.empty() &&
+                                        excludeGroups.empty();
+
+                if (allData) {
+                    prefetch(grid.tree());
+                }
 
                 // perform conversion
 
@@ -1378,13 +1391,16 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                     int valueCompression = NONE;
 
-                    if (isNormal && normalCompression == 1) {
-                        valueCompression = UNIT_VECTOR;
-                    } else if (isColor && colorCompression == 1) {
-                        valueCompression = UNIT_FIXED_POINT_16;
-                    } else if (isColor && colorCompression == 2) {
-                        valueCompression = UNIT_FIXED_POINT_8;
+                    if (isNormal) {
+                        if (normalCompression == 1)             valueCompression = UNIT_VECTOR;
+                        else if (normalCompression == 2)        valueCompression = TRUNCATE;
                     }
+                    else if (isColor) {
+                        if (colorCompression == 1)              valueCompression = UNIT_FIXED_POINT_16;
+                        else if (colorCompression == 2)         valueCompression = UNIT_FIXED_POINT_8;
+                        else if (colorCompression == 3)         valueCompression = TRUNCATE;
+                    }
+
                     // when converting all attributes apply no compression
                     attributes[attributeName] = std::pair<int, bool>(valueCompression, false);
                 }
@@ -1511,6 +1527,6 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

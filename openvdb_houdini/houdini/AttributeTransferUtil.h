@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -314,7 +314,10 @@ class AttributeDetailBase
 public:
     typedef boost::shared_ptr<AttributeDetailBase> Ptr;
 
-    virtual ~AttributeDetailBase() {}
+    virtual ~AttributeDetailBase() = default;
+
+    AttributeDetailBase(const AttributeDetailBase&) = default;
+    AttributeDetailBase& operator=(const AttributeDetailBase&) = default;
 
     virtual void set(const openvdb::Coord& ijk, const GA_Offset (&offsets)[3],
         const openvdb::Vec3d& weights) = 0;
@@ -1490,6 +1493,6 @@ transferPrimitiveAttributes(
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

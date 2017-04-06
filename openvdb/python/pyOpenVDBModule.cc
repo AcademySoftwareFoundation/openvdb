@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -514,6 +514,63 @@ writeToFile(const std::string& filename, py::object gridOrSeqObj, py::object dic
 ////////////////////////////////////////
 
 
+std::string
+getLoggingLevel()
+{
+    switch (logging::getLevel()) {
+        case logging::Level::Debug: return "debug";
+        case logging::Level::Info:  return "info";
+        case logging::Level::Warn:  return "warn";
+        case logging::Level::Error: return "error";
+        case logging::Level::Fatal: break;
+    }
+    return "fatal";
+}
+
+
+void
+setLoggingLevel(py::object pyLevelObj)
+{
+    std::string levelStr;
+    if (!py::extract<py::str>(pyLevelObj).check()) {
+        levelStr = py::extract<std::string>(pyLevelObj.attr("__str__")());
+    } else {
+        const py::str pyLevelStr =
+            py::extract<py::str>(pyLevelObj.attr("lower")().attr("lstrip")("-"));
+        levelStr = py::extract<std::string>(pyLevelStr);
+        if (levelStr == "debug") { logging::setLevel(logging::Level::Debug); return; }
+        else if (levelStr == "info") { logging::setLevel(logging::Level::Info); return; }
+        else if (levelStr == "warn") { logging::setLevel(logging::Level::Warn); return; }
+        else if (levelStr == "error") { logging::setLevel(logging::Level::Error); return; }
+        else if (levelStr == "fatal") { logging::setLevel(logging::Level::Fatal); return; }
+    }
+    PyErr_Format(PyExc_ValueError,
+        "expected logging level \"debug\", \"info\", \"warn\", \"error\", or \"fatal\","
+        " got \"%s\"", levelStr.c_str());
+    py::throw_error_already_set();
+}
+
+
+void
+setProgramName(py::object nameObj, bool color)
+{
+    if (py::extract<std::string>(nameObj).check()) {
+        logging::setProgramName(py::extract<std::string>(nameObj), color);
+    } else {
+        const std::string
+            str = py::extract<std::string>(nameObj.attr("__str__")()),
+            typ = pyutil::className(nameObj).c_str();
+        PyErr_Format(PyExc_TypeError,
+            "expected string as program name, got \"%s\" of type %s",
+            str.c_str(), typ.c_str());
+        py::throw_error_already_set();
+    }
+}
+
+
+////////////////////////////////////////
+
+
 // Descriptor for the openvdb::GridClass enum (for use with pyutil::StringEnum)
 struct GridClassDescr
 {
@@ -699,6 +756,22 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
         "Write a grid or a sequence of grids and, optionally, a dict\n"
         "of (name, value) metadata pairs to a .vdb file.");
 
+    py::def("getLoggingLevel", &_openvdbmodule::getLoggingLevel,
+        "getLoggingLevel() -> str\n\n"
+        "Return the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
+        "or \"fatal\") for error messages.");
+    py::def("setLoggingLevel", &_openvdbmodule::setLoggingLevel,
+        (py::arg("level")),
+        "setLoggingLevel(level)\n\n"
+        "Specify the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
+        "or \"fatal\") for error messages.  Messages of lower severity\n"
+        "will be suppressed.");
+    py::def("setProgramName", &_openvdbmodule::setProgramName,
+        (py::arg("name"), py::arg("color") = true),
+        "setProgramName(name, color=True)\n\n"
+        "Specify the program name to be displayed in error messages,\n"
+        "and optionally specify whether to print error messages in color.");
+
     // Add some useful module-level constants.
     py::scope().attr("LIBRARY_VERSION") = py::make_tuple(
         openvdb::OPENVDB_LIBRARY_MAJOR_VERSION,
@@ -714,6 +787,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
 } // BOOST_PYTHON_MODULE
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

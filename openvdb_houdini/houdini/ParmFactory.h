@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -118,7 +118,7 @@ private:
 /// @brief Helper class to simplify construction of PRM_Templates and
 /// dynamic user interfaces.
 ///
-/// Usage example:
+/// @par Example
 /// @code
 /// houdini_utils::ParmList parms;
 ///
@@ -152,6 +152,29 @@ public:
     /// @param items   a list of token, label, token, label,... string pairs
     /// @note The @a items array must be null-terminated.
     ParmFactory& setChoiceListItems(PRM_ChoiceListType typ, const char* const* items);
+    /// @brief Specify a menu that is populated with the primitive groups of the selected input.
+    /// @param inputIndex   specifies the zero based index of the input that should be used to get
+    /// the items from, must be in the range of [0..3], inclusive
+    /// @param typ          specifies the menu behavior (toggle, replace, etc.)
+    /// @details This method provides a more flexible alternative to 
+    /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput1),
+    /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput2), etc. 
+    ///
+    /// Calling this with a single input index is equivalent to calling
+    /// @c setChoiceList with the corresponding @c houdini_utils::PrimGroupMenuInput1, etc.
+    ///
+    /// @par Example
+    /// To limit the choice from the menu to a single primitive, replace
+    /// @code
+    /// parms.add(houdini_utils::ParmFactory(PRM_STRING, "reference", "Reference")
+    ///     .setChoiceList(&houdini_utils::PrimGroupMenuInput2);
+    /// @endcode
+    /// with
+    /// @code
+    /// parms.add(houdini_utils::ParmFactory(PRM_STRING, "reference", "Reference")
+    ///     .setGroupChoiceList(1, PRM_CHOICELIST_REPLACE); // input index is zero based
+    /// @endcode
+    ParmFactory& setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ = PRM_CHOICELIST_TOGGLE);
 
 
 #if defined(GCC3)
@@ -260,7 +283,7 @@ typedef boost::shared_ptr<OpPolicy> OpPolicyPtr;
 
 /// @brief Helper class to simplify operator registration
 ///
-/// Usage example:
+/// @par Example
 /// @code
 /// void
 /// newPopOperator(OP_OperatorTable* table)
@@ -359,6 +382,8 @@ public:
     /// Add one or more local variables to this operator.
     OpFactory& setLocalVariables(CH_LocalVariable*);
     OpFactory& setFlags(unsigned);
+    OpFactory& setInternalName(const std::string& name);
+    OpFactory& setOperatorTable(const std::string& name);
 
 private:
     OpFactory(const OpFactory&);
@@ -471,8 +496,9 @@ private:
 OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput1;
 OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput2;
 OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput3;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput4;
 
-/// @note   Use this if you have more than 3 inputs, otherwise use
+/// @note   Use this if you have more than 4 inputs, otherwise use
 ///         the input specific menus instead which automatically
 ///         handle the appropriate spare data settings.
 OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenu;
@@ -482,6 +508,6 @@ OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenu;
 
 #endif // HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

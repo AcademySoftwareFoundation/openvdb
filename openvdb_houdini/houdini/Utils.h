@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,7 @@
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
 #include "GU_PrimVDB.h"
+#include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
 #include <boost/function.hpp>
@@ -119,6 +120,14 @@ public:
     /// @brief Return the value of the current VDB primitive's @c name attribute
     /// or, if the name is empty, the primitive's index (as a UT_String).
     UT_String getPrimitiveNameOrIndex() const;
+
+    /// @brief Return a string of the form "N (NAME)", where @e N is
+    /// the current VDB primitive's index and @e NAME is the value
+    /// of the primitive's @c name attribute.
+    /// @param keepEmptyName  if the current primitive has no @c name attribute
+    ///     or its name is empty, then if this flag is @c true, return a string
+    ///     "N ()", otherwise return a string "N" omitting the empty name
+    UT_String getPrimitiveIndexAndName(bool keepEmptyName = true) const;
 
 protected:
     /// Allow primitives to be deleted during iteration.
@@ -255,6 +264,41 @@ bool evalGridBBox(GridCRef grid, UT_Vector3 corners[8], bool expandHalfVoxel = f
 /// Construct an index-space CoordBBox from a UT_BoundingBox.
 OPENVDB_HOUDINI_API
 openvdb::CoordBBox makeCoordBBox(const UT_BoundingBox&, const openvdb::math::Transform&);
+
+
+/// @{
+/// @brief Start forwarding OpenVDB log messages to the Houdini error manager
+/// for all operators of the given type.
+/// @details Typically, log forwarding is enabled for specific operator types
+/// during initialization of the openvdb_houdini library, and there's no need
+/// for client code to call this function.
+/// @details This function has no effect unless OpenVDB was built with
+/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+/// @note OpenVDB messages are typically logged to the console as well.
+/// This function has no effect on console logging.
+/// @sa stopLogForwarding(), isLogForwarding()
+OPENVDB_HOUDINI_API
+void startLogForwarding(OP_OpTypeId);
+
+/// @brief Stop forwarding OpenVDB log messages to the Houdini error manager
+/// for all operators of the given type.
+/// @details Typically, log forwarding is enabled for specific operator types
+/// during initialization of the openvdb_houdini library, and there's no need
+/// for client code to disable it.
+/// @details This function has no effect unless OpenVDB was built with
+/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+/// @note OpenVDB messages are typically logged to the console as well.
+/// This function has no effect on console logging.
+/// @sa startLogForwarding(), isLogForwarding()
+OPENVDB_HOUDINI_API
+void stopLogForwarding(OP_OpTypeId);
+
+/// @brief Return @c true if OpenVDB messages logged by operators
+/// of the given type are forwarded to the Houdini error manager.
+/// @sa startLogForwarding(), stopLogForwarding()
+OPENVDB_HOUDINI_API
+bool isLogForwarding(OP_OpTypeId);
+/// @}
 
 
 ////////////////////////////////////////
@@ -418,6 +462,6 @@ processTypedScalarGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

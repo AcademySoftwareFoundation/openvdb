@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,17 +31,18 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <openvdb/openvdb.h> // for FloatGrid
-#include <openvdb/tools/LevelSetSphere.h>// for createLevelSetSphere
-#include <openvdb/tools/LevelSetUtil.h>// for sdfToFogVolume
-#include <openvdb/tools/VolumeToSpheres.h>// for fillWithSpheres
+#include <openvdb/tools/LevelSetSphere.h> // for createLevelSetSphere
+#include <openvdb/tools/LevelSetUtil.h> // for sdfToFogVolume
+#include <openvdb/tools/VolumeToSpheres.h> // for fillWithSpheres
 #include <openvdb/Exceptions.h>
 
 #include <vector>
 
-class TestVolumeToSphere: public CppUnit::TestCase
+
+class TestVolumeToSpheres: public CppUnit::TestCase
 {
 public:
-    CPPUNIT_TEST_SUITE(TestVolumeToSphere);
+    CPPUNIT_TEST_SUITE(TestVolumeToSpheres);
     CPPUNIT_TEST(testFromLevelSet);
     CPPUNIT_TEST(testFromFog);
     CPPUNIT_TEST_SUITE_END();
@@ -50,97 +51,116 @@ public:
     void testFromFog();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToSphere);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToSpheres);
 
 
 ////////////////////////////////////////
 
 
 void
-TestVolumeToSphere::testFromLevelSet()
+TestVolumeToSpheres::testFromLevelSet()
 {
-    const float radius = 20.0f, voxelSize = 1.0f, halfWidth = 3.0f;
+    const float
+        radius = 20.0f,
+        voxelSize = 1.0f,
+        halfWidth = 3.0f;
     const openvdb::Vec3f center(15.0f, 13.0f, 16.0f);
 
-    openvdb::FloatGrid::ConstPtr grid =
-        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center,
-                                                                 voxelSize, halfWidth);
+    openvdb::FloatGrid::ConstPtr grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+        radius, center, voxelSize, halfWidth);
 
-    std::vector<openvdb::Vec4s> spheres;
-    const int maxSphereCount = 100, instanceCount = 10000;
+    const int
+        maxSphereCount = 100,
+        instanceCount = 10000;
     const bool overlapping = false;
-    const float minRadius = 5.0, maxRadius = std::numeric_limits<float>::max(), isovalue = 0.0;
+    const float
+        isovalue = 0.0,
+        minRadius = 5.0,
+        maxRadius = std::numeric_limits<float>::max();
 
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+    {
+        std::vector<openvdb::Vec4s> spheres;
 
-    openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
-                                    minRadius, maxRadius, isovalue, instanceCount);
+        openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
+            minRadius, maxRadius, isovalue, instanceCount);
 
-    CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
+        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
 
-    //for (size_t i=0; i< spheres.size(); ++i) {
-    //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
-    //}
+        //for (size_t i=0; i< spheres.size(); ++i) {
+        //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
+        //}
 
-    const auto tolerance = 2.0 * voxelSize;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
-
-    spheres.clear();
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
-
-    // Now pick an iso-value that is outside of the narrow band (this used to crash!)
-    openvdb::tools::fillWithSpheres(*grid, spheres,maxSphereCount,
-                                    overlapping,minRadius, maxRadius, 1.5*halfWidth, instanceCount);
-
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+        const auto tolerance = 2.0 * voxelSize;
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
+    }
+    {
+        // Verify that an isovalue outside the narrow band still produces a valid sphere.
+        std::vector<openvdb::Vec4s> spheres;
+        openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount,
+            overlapping, minRadius, maxRadius, 1.5 * halfWidth, instanceCount);
+        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
+    }
+    {
+        // Verify that an isovalue inside the narrow band produces no spheres.
+        std::vector<openvdb::Vec4s> spheres;
+        openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount,
+            overlapping, minRadius, maxRadius, -1.5 * halfWidth, instanceCount);
+        CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+    }
 }
+
 
 void
-TestVolumeToSphere::testFromFog()
+TestVolumeToSpheres::testFromFog()
 {
-    const float radius = 20.0f, voxelSize = 1.0f, halfWidth = 3.0f;
+    const float
+        radius = 20.0f,
+        voxelSize = 1.0f,
+        halfWidth = 3.0f;
     const openvdb::Vec3f center(15.0f, 13.0f, 16.0f);
 
-    openvdb::FloatGrid::Ptr grid =
-        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center,
-                                                                 voxelSize, halfWidth);
+    auto grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+        radius, center, voxelSize, halfWidth);
     openvdb::tools::sdfToFogVolume(*grid);
 
-    std::vector<openvdb::Vec4s> spheres;
-    const int maxSphereCount = 100, instanceCount = 10000;
+    const int
+        maxSphereCount = 100,
+        instanceCount = 10000;
     const bool overlapping = false;
-    const float minRadius = 5.0, maxRadius = std::numeric_limits<float>::max(), isovalue = 0.01f;
+    const float
+        isovalue = 0.01f,
+        minRadius = 5.0,
+        maxRadius = std::numeric_limits<float>::max();
 
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+    {
+        std::vector<openvdb::Vec4s> spheres;
+        openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
+            minRadius, maxRadius, isovalue, instanceCount);
 
-    openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
-                                    minRadius, maxRadius, isovalue, instanceCount);
+        //for (size_t i=0; i< spheres.size(); ++i) {
+        //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
+        //}
 
-    //for (size_t i=0; i< spheres.size(); ++i) {
-    //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
-    //}
+        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
 
-    CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
-
-    const auto tolerance = 2.0 * voxelSize;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
-
-    spheres.clear();
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
-
-    // Now pick an iso-value that is outside of the narrow band (this used tocrash!)
-    openvdb::tools::fillWithSpheres(*grid, spheres,maxSphereCount,
-                                    overlapping,minRadius, maxRadius, 0.0f, instanceCount);
-
-    CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+        const auto tolerance = 2.0 * voxelSize;
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
+    }
+    {
+        // Verify that an isovalue outside the narrow band still produces valid spheres.
+        std::vector<openvdb::Vec4s> spheres;
+        openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
+            minRadius, maxRadius, 10.0f, instanceCount);
+        CPPUNIT_ASSERT(!spheres.empty());
+    }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

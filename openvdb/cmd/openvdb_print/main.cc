@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,15 +33,15 @@
 #include <string>
 #include <vector>
 #include <openvdb/openvdb.h>
+#include <openvdb/util/logging.h>
 #ifdef DWA_OPENVDB
-#include <logging_base/logging.h>
 #include <usagetrack.h>
 #endif
 
 
 namespace {
 
-typedef std::vector<std::string> StringVec;
+using StringVec = std::vector<std::string>;
 
 const char* INDENT = "   ";
 const char* gProgName = "";
@@ -264,7 +264,6 @@ main(int argc, char *argv[])
 {
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-    logging_base::configure(argc, argv);
 #endif
 
     OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -275,6 +274,8 @@ main(int argc, char *argv[])
     int exitStatus = EXIT_SUCCESS;
 
     if (argc == 1) usage();
+
+    openvdb::logging::initialize(argc, argv);
 
     bool stats = false, metadata = false, version = false;
     StringVec filenames;
@@ -290,7 +291,7 @@ main(int argc, char *argv[])
             } else if (arg == "-version" || arg == "--version") {
                 version = true;
             } else {
-                std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
+                OPENVDB_LOG_FATAL("\"" << arg << "\" is not a valid option");
                 usage();
             }
         } else if (!arg.empty()) {
@@ -307,7 +308,7 @@ main(int argc, char *argv[])
     }
 
     if (filenames.empty()) {
-        std::cerr << gProgName << ": expected one or more OpenVDB files\n";
+        OPENVDB_LOG_FATAL("expected one or more OpenVDB files");
         usage();
     }
 
@@ -345,6 +346,6 @@ main(int argc, char *argv[])
     return exitStatus;
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

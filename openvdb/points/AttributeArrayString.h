@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -80,7 +80,7 @@ using StringAttributeArray = TypedAttributeArray<StringIndexType, StringCodec<fa
 ////////////////////////////////////////
 
 
-class StringMetaInserter
+class OPENVDB_API StringMetaInserter
 {
 public:
     StringMetaInserter(MetaMap& metadata);
@@ -131,7 +131,7 @@ inline bool isString(const AttributeArray& array)
 ////////////////////////////////////////
 
 
-class StringAttributeHandle
+class OPENVDB_API StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeHandle>;//SharedPtr<StringAttributeHandle>;
@@ -157,7 +157,7 @@ protected:
 ////////////////////////////////////////
 
 
-class StringAttributeWriteHandle : public StringAttributeHandle
+class OPENVDB_API StringAttributeWriteHandle : public StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeWriteHandle>;//SharedPtr<StringAttributeWriteHandle>;
@@ -213,7 +213,7 @@ private:
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_STRING_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
 

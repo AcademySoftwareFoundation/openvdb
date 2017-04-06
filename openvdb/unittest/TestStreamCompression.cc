@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -55,11 +55,10 @@
 
 #ifdef _MSC_VER
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
 // Ensure that both namespaces exist.
 namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#include <windows.h>
 #else
 #include <sys/types.h> // for struct stat
 #include <sys/stat.h> // for stat()
@@ -69,6 +68,14 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <fstream>
 #include <numeric> // for std::iota()
 
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+// A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
+// HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
+#if BLOSC_VERSION_MAJOR > 0 && BLOSC_VERSION_MINOR > 10
+#define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+#endif
+#endif
 
 /// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
 class ProxyMappedFile
@@ -87,10 +94,24 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
+#ifdef _MSC_VER
+            using namespace boost::interprocess::detail;
+            using namespace boost::interprocess::ipcdetail;
+            using openvdb::Index64;
+
+            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
+                FILETIME mtime;
+                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
+                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
+                }
+                close_file(fh);
+            }
+#else
             struct stat info;
             if (0 == ::stat(regionFilename, &info)) {
                 mLastWriteTime = openvdb::Index64(info.st_mtime);
             }
+#endif
         }
 
         using Notifier = std::function<void(std::string /*filename*/)>;
@@ -207,29 +228,46 @@ TestStreamCompression::testBlosc()
     }
 
     { // padded buffer
-        const int paddedCount = 16;
+        std::unique_ptr<char[]> largeBuffer(new char[2048]);
 
-        std::unique_ptr<int[]> newTest(new int[paddedCount]);
-        for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = i;
+        for (int paddedCount = 1; paddedCount < 256; paddedCount++) {
+
+            std::unique_ptr<char[]> newTest(new char[paddedCount]);
+            for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = char(0);
 
 #ifdef OPENVDB_USE_BLOSC
-        size_t compressedBytes;
-        std::unique_ptr<char[]> compressedBuffer = bloscCompress(
-            reinterpret_cast<char*>(newTest.get()), paddedCount*sizeof(int), compressedBytes);
+            size_t compressedBytes;
+            std::unique_ptr<char[]> compressedBuffer = bloscCompress(
+                newTest.get(), paddedCount, compressedBytes);
 
-        CPPUNIT_ASSERT(compressedBuffer);
+            // compress into a large buffer to check for any padding issues
+            size_t compressedSizeBytes;
+            bloscCompress(largeBuffer.get(), compressedSizeBytes, size_t(2048),
+                newTest.get(), paddedCount);
 
-        CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount*sizeof(int)));
+            // regardless of compression, these numbers should always match
+            CPPUNIT_ASSERT_EQUAL(compressedSizeBytes, compressedBytes);
 
-        std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
-            reinterpret_cast<char*>(compressedBuffer.get()), paddedCount*sizeof(int));
+            // no compression performed due to buffer being too small
+            if (paddedCount <= BLOSC_MINIMUM_BYTES) {
+                CPPUNIT_ASSERT(!compressedBuffer);
+            }
+            else {
+                CPPUNIT_ASSERT(compressedBuffer);
+                CPPUNIT_ASSERT(compressedBytes > 0);
+                CPPUNIT_ASSERT(int(compressedBytes) < paddedCount);
 
-        CPPUNIT_ASSERT(uncompressedBuffer);
+                std::unique_ptr<char[]> uncompressedBuffer = bloscDecompress(
+                    compressedBuffer.get(), paddedCount);
 
-        for (int i = 0; i < paddedCount; i++) {
-            CPPUNIT_ASSERT_EQUAL((reinterpret_cast<int*>(uncompressedBuffer.get()))[i], newTest[i]);
-        }
+                CPPUNIT_ASSERT(uncompressedBuffer);
+
+                for (int i = 0; i < paddedCount; i++) {
+                    CPPUNIT_ASSERT_EQUAL((uncompressedBuffer.get())[i], newTest[i]);
+                }
+            }
 #endif
+        }
     }
 
     { // invalid buffer (out of range)
@@ -408,7 +446,11 @@ TestStreamCompression::testPagedStreams()
         ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4422));
+#else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4452));
+#endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(PageSize+sizeof(int)));
 #endif
@@ -433,7 +475,11 @@ TestStreamCompression::testPagedStreams()
         istream.read(handle, values.size(), false);
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4422));
+#else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4452));
+#endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(PageSize+sizeof(int)));
 #endif
@@ -449,15 +495,23 @@ TestStreamCompression::testPagedStreams()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     {
         std::string filename = tempDir + "/openvdb_page1";
         io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
         { // ascending values up to 10 million written in blocks of PageSize/3
-            std::ofstream fileout;
-            fileout.open(filename.c_str());
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
 
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, openvdb::io::COMPRESS_BLOSC);
@@ -486,11 +540,11 @@ TestStreamCompression::testPagedStreams()
             }
             ostreamSizeOnly.flush();
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             int pages = static_cast<int>(fileout.tellp() / (sizeof(int)*2));
-    #else
+#else
             int pages = static_cast<int>(fileout.tellp() / (sizeof(int)));
-    #endif
+#endif
 
             CPPUNIT_ASSERT_EQUAL(pages, 10);
 
@@ -509,11 +563,15 @@ TestStreamCompression::testPagedStreams()
 
             ostream.flush();
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42424));
+#else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
-    #else
+#endif
+#else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
-    #endif
+#endif
 
             // abuse File being a friend of MappedFile to get around the private constructor
             ProxyMappedFile* proxy = new ProxyMappedFile(filename);
@@ -541,13 +599,13 @@ TestStreamCompression::testPagedStreams()
                 }
             }
 
-    #ifdef OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             // two integers - compressed size and uncompressed size
             CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)*2));
-    #else
+#else
             // one integer - uncompressed size
             CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)));
-    #endif
+#endif
 
             PagedInputStream istream(filein);
 
@@ -584,7 +642,8 @@ TestStreamCompression::testPagedStreams()
 
             CPPUNIT_ASSERT_EQUAL(page.use_count(), long(4));
 
-            // on reading from the first handle, all pages referenced in the first three handles are in-core
+            // on reading from the first handle, all pages referenced
+            // in the first three handles are in-core
 
             CPPUNIT_ASSERT(!page0.isOutOfCore());
             CPPUNIT_ASSERT(!page1.isOutOfCore());
@@ -601,7 +660,8 @@ TestStreamCompression::testPagedStreams()
             handles.erase(handles.begin());
             handles.erase(handles.begin());
 
-            // after all three handles have been read, page should have just one use count (itself)
+            // after all three handles have been read,
+            // page should have just one use count (itself)
 
             CPPUNIT_ASSERT_EQUAL(page.use_count(), long(1));
         }
@@ -609,6 +669,6 @@ TestStreamCompression::testPagedStreams()
     }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

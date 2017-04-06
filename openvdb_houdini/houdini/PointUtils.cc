@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -222,10 +222,12 @@ openvdb_houdini::convertPointDataGridToHoudini(
         GA_PointGroup* pointGroup = detail.findPointGroup(name.c_str());
         if (!pointGroup) pointGroup = detail.newPointGroup(name.c_str());
 
-        const openvdb::points::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
+        const openvdb::points::AttributeSet::Descriptor::GroupIndex index =
+            attributeSet.groupIndex(name);
 
-        HoudiniGroup group(*pointGroup);
-        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups, inCoreOnly);
+        HoudiniGroup group(*pointGroup, startOffset, total);
+        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index,
+            includeGroups, excludeGroups, inCoreOnly);
     }
 }
 
@@ -389,3 +391,6 @@ openvdb_houdini::pointDataGridSpecificInfoText(std::ostream& infoStr, const open
     }
 }
 
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

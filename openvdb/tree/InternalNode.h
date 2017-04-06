@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,8 +73,8 @@ public:
 
     static const Index
         LOG2DIM      = Log2Dim,// Log2 of tile count in one dimension
-        TOTAL        = Log2Dim + ChildNodeType::TOTAL,// Log2 of voxel count in one dimension 
-        DIM          = 1 << TOTAL,// Total voxel count in one dimension 
+        TOTAL        = Log2Dim + ChildNodeType::TOTAL,// Log2 of voxel count in one dimension
+        DIM          = 1 << TOTAL,// Total voxel count in one dimension
         NUM_VALUES   = 1 << (3 * Log2Dim),// Total voxels count represented by this node
         LEVEL        = 1 + ChildNodeType::LEVEL; // level 0 = leaf
     static const Index64
@@ -329,7 +329,7 @@ public:
     /// and the same constant value to within the given tolerance,
     /// and return that value in @a firstValue and the active state in @a state.
     ///
-    /// @note This method also returns @c false if this node contains any child nodes. 
+    /// @note This method also returns @c false if this node contains any child nodes.
     bool isConstant(ValueType& firstValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
 
@@ -349,7 +349,7 @@ public:
     /// @note This method also returns @c false if this node contains any child nodes.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
-    
+
     /// Return @c true if this node has no children and only contains inactive values.
     bool isInactive() const { return this->isChildMaskOff() && this->isValueMaskOff(); }
 
@@ -486,7 +486,10 @@ public:
     //
     // Aux methods
     //
-    
+
+    /// Change the sign of all the values represented in this node and its child nodes.
+    void negate();
+
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
@@ -497,12 +500,18 @@ public:
     /// operation for optimal sparseness.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
-    /// Change the sign of all the values represented in this node and
-    /// its child nodes.
-    void negate();
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    /// @sa voxelizeActiveTiles()
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
     /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    /// @sa denseFill()
     void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Copy into a dense grid the values of the voxels that lie within
@@ -718,7 +727,7 @@ public:
     template<typename ArrayT>
     void getNodes(ArrayT& array) const;
     //@}
-    
+
     /// @brief Steals all nodes of a certain type from the tree and
     /// adds them to a container with the following API:
     /// @code
@@ -827,7 +836,7 @@ protected:
     template<typename OtherInternalNode> struct TopologyDifference;
     template<typename OtherInternalNode> struct TopologyIntersection;
     ///@}
-   
+
     UnionType mNodes[NUM_VALUES];
     NodeMaskType mChildMask, mValueMask;
     /// Global grid index coordinates (x,y,z) of the local origin of this node
@@ -955,7 +964,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyCopy1
     }
     const OtherInternalNode* s;
     InternalNode* t;
-    const ValueType &b; 
+    const ValueType &b;
 };// TopologyCopy1
 
 template<typename ChildT, Index Log2Dim>
@@ -991,7 +1000,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyCopy2
     }
     const OtherInternalNode* s;
     InternalNode* t;
-    const ValueType &offV, &onV; 
+    const ValueType &offV, &onV;
  };// TopologyCopy2
 
 template<typename ChildT, Index Log2Dim>
@@ -1487,7 +1496,7 @@ InternalNode<ChildT, Log2Dim>::isConstant(ValueType& firstValue, bool& state,
                                           const ValueType& tolerance) const
 {
     if (!mChildMask.isOff() || !mValueMask.isConstant(state)) return false;// early termination
-    
+
     firstValue = mNodes[0].getValue();
     for (Index i = 1; i < NUM_VALUES; ++i) {
         if ( !math::isApproxEqual(mNodes[i].getValue(), firstValue, tolerance) ) return false;// early termination
@@ -2017,12 +2026,18 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
     Coord xyz, tileMin, tileMax;
-    for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
+    for (int x = clippedBBox.min().x(); x <= clippedBBox.max().x(); x = tileMax.x() + 1) {
         xyz.setX(x);
-        for (int y = bbox.min().y(); y <= bbox.max().y(); y = tileMax.y() + 1) {
+        for (int y = clippedBBox.min().y(); y <= clippedBBox.max().y(); y = tileMax.y() + 1) {
             xyz.setY(y);
-            for (int z = bbox.min().z(); z <= bbox.max().z(); z = tileMax.z() + 1) {
+            for (int z = clippedBBox.min().z(); z <= clippedBBox.max().z(); z = tileMax.z() + 1) {
                 xyz.setZ(z);
 
                 // Get the bounds of the tile that contains voxel (x, y, z).
@@ -2030,15 +2045,15 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
                 tileMin = this->offsetToGlobalCoord(n);
                 tileMax = tileMin.offsetBy(ChildT::DIM - 1);
 
-                if (xyz != tileMin || Coord::lessThan(bbox.max(), tileMax)) {
-                    // If the box defined by (xyz, bbox.max()) doesn't completely enclose
+                if (xyz != tileMin || Coord::lessThan(clippedBBox.max(), tileMax)) {
+                    // If the box defined by (xyz, clippedBBox.max()) doesn't completely enclose
                     // the tile to which xyz belongs, create a child node (or retrieve
                     // the existing one).
                     ChildT* child = NULL;
                     if (this->isChildMaskOff(n)) {
                         // Replace the tile with a newly-created child that is initialized
                         // with the tile's value and active state.
-                        child = new ChildT(xyz, mNodes[n].getValue(), this->isValueMaskOn(n));
+                        child = new ChildT{xyz, mNodes[n].getValue(), this->isValueMaskOn(n)};
                         this->setChildNode(n, child);
                     } else {
                         child = mNodes[n].getChild();
@@ -2046,17 +2061,61 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
 
                     // Forward the fill request to the child.
                     if (child) {
-                        const Coord tmp = Coord::minComponent(bbox.max(), tileMax);
+                        const Coord tmp = Coord::minComponent(clippedBBox.max(), tileMax);
                         child->fill(CoordBBox(xyz, tmp), value, active);
                     }
 
                 } else {
-                    // If the box given by (xyz, bbox.max()) completely encloses
+                    // If the box given by (xyz, clippedBBox.max()) completely encloses
                     // the tile to which xyz belongs, create the tile (if it
                     // doesn't already exist) and give it the fill value.
                     this->makeChildNodeEmpty(n, value);
                     mValueMask.set(n, active);
                 }
+            }
+        }
+    }
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
+    Coord xyz, tileMin, tileMax;
+    for (int x = clippedBBox.min().x(); x <= clippedBBox.max().x(); x = tileMax.x() + 1) {
+        xyz.setX(x);
+        for (int y = clippedBBox.min().y(); y <= clippedBBox.max().y(); y = tileMax.y() + 1) {
+            xyz.setY(y);
+            for (int z = clippedBBox.min().z(); z <= clippedBBox.max().z(); z = tileMax.z() + 1) {
+                xyz.setZ(z);
+
+                // Get the table index of the tile that contains voxel (x, y, z).
+                const auto n = this->coordToOffset(xyz);
+
+                // Retrieve the child node at index n, or replace the tile at index n with a child.
+                ChildT* child = nullptr;
+                if (this->isChildMaskOn(n)) {
+                    child = mNodes[n].getChild();
+                } else {
+                    // Replace the tile with a newly-created child that is filled
+                    // with the tile's value and active state.
+                    child = new ChildT{xyz, mNodes[n].getValue(), this->isValueMaskOn(n)};
+                    this->setChildNode(n, child);
+                }
+
+                // Get the bounds of the tile that contains voxel (x, y, z).
+                tileMin = this->offsetToGlobalCoord(n);
+                tileMax = tileMin.offsetBy(ChildT::DIM - 1);
+
+                // Forward the fill request to the child.
+                child->denseFill(CoordBBox{xyz, clippedBBox.max()}, value, active);
             }
         }
     }
@@ -2250,14 +2309,14 @@ struct InternalNode<ChildT, Log2Dim>::VoxelizeActiveTiles
         node.mValueMask.setOff();
     }
     void operator()(const tbb::blocked_range<Index> &r) const
-    {    
+    {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
             if (mNode->mChildMask.isOn(i)) {// Loop over node's child nodes
-                mNode->mNodes[i].getChild()->voxelizeActiveTiles(true);    
+                mNode->mNodes[i].getChild()->voxelizeActiveTiles(true);
             } else if (mNode->mValueMask.isOn(i)) {// Loop over node's active tiles
                 const Coord &ijk = mNode->offsetToGlobalCoord(i);
                 ChildNodeType *child = new ChildNodeType(ijk, mNode->mNodes[i].getValue(), true);
-                child->voxelizeActiveTiles(true); 
+                child->voxelizeActiveTiles(true);
                 mNode->mNodes[i].setChild(child);
             }
         }
@@ -2484,7 +2543,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyIntersection
         // Bit processing is done in a single thread!
         A op;
         t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op);
-        
+
         t->mValueMask &= s->mValueMask;
         assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles and child nodes
     }
@@ -2538,7 +2597,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyDifference
         const NodeMaskType oldChildMask(t->mChildMask);//important to avoid cross pollution
         A op1;
         t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op1);
-        
+
         B op2;
         t->mValueMask.foreach(t->mChildMask, s->mValueMask, oldChildMask, op2);
         assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles and child nodes
@@ -3094,7 +3153,7 @@ InternalNode<ChildT, Log2Dim>::stealNodes(ArrayT& array, const ValueType& value,
     BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
     typedef typename boost::mpl::if_<boost::is_const<typename boost::remove_pointer<T>::type>,
                                      const ChildT, ChildT>::type ArrayChildT;
-    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN 
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
         const Index n = iter.pos();
         if (boost::is_same<T, ArrayChildT*>::value) {
@@ -3105,7 +3164,7 @@ InternalNode<ChildT, Log2Dim>::stealNodes(ArrayT& array, const ValueType& value,
             iter->stealNodes(array, value, state);//descent
         }
     }
-    if (boost::is_same<T, ArrayChildT*>::value) mChildMask.setOff();     
+    if (boost::is_same<T, ArrayChildT*>::value) mChildMask.setOff();
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
@@ -3217,6 +3276,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,109 @@
 OpenVDB Version History
 =======================
 
+Version 4.0.1 - March 8, 2017
+
+    New features:
+    - Added functions to util/logging.h to simplify configuration of the
+      logging system (via command-line arguments, in particular).
+    - Added LeafManager::activeLeafVoxelCount(), a faster, threaded
+      alternative to Tree::activeLeafVoxelCount().
+    - Added a -shuffle option that causes vdb_test to run unit tests
+      in random order, which can help to identify unintended dependencies
+      between tests.
+    - Added vdb_lod, a command-line tool to generate volume mipmaps
+      for level-of-detail effects.
+    - Added methods to compute the median value of active, inactive or all
+      voxels in leaf nodes.
+
+    Improvements:
+    - Added a Metadata::str() specialization for StringMetadata that
+      eliminates the overhead of writing to a string stream.
+    - Made various minor improvements to util::PagedArray.
+    - Added an install_lib build target to the Makefile.
+      [Contributed by Double Negative]
+    - Added documentation and Cookbook examples for OpenVDB Points.
+      [Contributed by Double Negative]
+    - Registration of OpenVDB Points grid and attribute types is now handled
+      in openvdb::initialize(), and openvdb::points::initialize() and
+      openvdb::points::uninitialize() are therefore deprecated.
+    - Extended multi-pass I/O to handle a variable number of passes
+      per leaf node.
+      [Contributed by Double Negative]
+    - Addressed a name conflict between macros in util/NodeMasks.h
+      and symbols in the Eigen library.
+      [Reported by Trevor Thomson]
+
+    Bug fixes:
+    - tools::fillWithSpheres() and tools::ClosestSurfacePoint now correctly
+      handle isosurfaces outside the input volume's narrow band.
+    - tools::MultiResGrid now supports all standard grid types, including
+      BoolGrid and MaskGrid.
+    - LeafNode::fill() now correctly clips the fill region to the node's
+      bounding box.
+    - Grid::denseFill() no longer densifies all existing active tiles,
+      and it now correctly handles both active and inactive fill values.
+    - Fixed a bug that caused tools::copyToDense() to only partially populate
+      the output array when delayed loading was in effect.
+      [Reported by Stuart Levy]
+    - Fixed an issue with duplicate registration of PointDataGrid
+      attribute types.
+      [Reported by SideFX]
+    - Fixed an uninitialized memory bug in tools::meshToVolume().
+      [Reported by SideFX]
+    - Fixed a thread race condition in math::QuantizedUnitVec that could
+      cause it to produce incorrect results.
+      [Contributed by Jeff Lait]
+    - Fixed a dangling pointer bug in tools::ParticleAtlas.
+      [Contributed by SideFX]
+    - Grid operators (divergence, gradient, etc.) now produce correct results
+      even for grids with active tile values.
+    - Fixed a bug when writing an out-of-core points::AttributeArray
+      that could cause corruption of the metadata associated with the array.
+      [Contributed by Double Negative]
+
+    Python:
+    - Added functions getLoggingLevel(), setLoggingLevel(), and
+      setProgramName(), to allow configuration of the logging system.
+
+    Houdini:
+    - Fixed a crash in the Ray SOP when the user selected an isosurface
+      outside the target volume's narrow band.
+    - The LOD SOP now supports all standard grid types, including
+      boolean grids.
+    - Added houdini_utils::ParmFactory::setGroupChoiceList(), a convenience
+      method for the creation of menus of primitive groups.
+    - Made various small changes for Houdini 16 compatibility.
+      [Contributed by SideFX]
+    - The Create SOP now supports matching the new grids' transform,
+      voxel size, and topology to a reference grid.  If the topology is
+      being matched, it can optionally be resampled to a different voxel size.
+    - Added some support for point data grids to the Clip,
+      Topology To Level Set and Visualize SOPs.
+      [Contributed by Double Negative]
+    - Compression is no longer enabled by default in the Points Convert SOP
+      for normals and colors, because they are not guaranteed to have a
+      [0, 1] range.
+      [Contributed by Double Negative]
+    - Added a 16-bit truncation compression option to the Points Convert SOP.
+      [Contributed by Double Negative]
+    - Fixed a build issue with the GR_PrimVDBPoints render hook plugin
+      that could cause hython to report a DSO error.
+      [Reported by Double Negative]
+    - Added an install_lib build target to the Makefile.
+    - Rewrote the Remove Divergence SOP to actually remove divergence from
+      vector fields on collocated grids, and added support for stationary
+      and moving obstacles and an option to output a pressure field.
+    - The Analysis SOP now produces correct results for grids with active
+      tile values.
+    - Added a sparse/dense toggle to the Fill SOP.
+    - Added openvdb_houdini::startLogForwarding(), stopLogForwarding()
+      and isLogForwarding(), which control the forwarding of log messages
+      to Houdini's error manager.  Forwarding of library warnings and
+      error messages is now enabled by default for SOPs when OpenVDB
+      is built with log4cplus.
+
+
 Version 4.0.0 - November 15, 2016
 
     Highlights:
@@ -12,10 +115,11 @@ Version 4.0.0 - November 15, 2016
     - Vector-valued grids are now constructed and destroyed much faster.
 
       This change and other changes in this release (see "ABI changes" below)
-      alter the grid ABI so that it is incompatible with earlier versions
-      of the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
-      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-      to disable these changes and preserve ABI compatibility.
+      alter the grid ABI so that it is incompatible with earlier versions of
+      the OpenVDB library, such as the ones in Houdini 15, 15.5 and 16.
+      To disable these changes and preserve ABI compatibility, define
+      the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      or any code that depends on OpenVDB.
 
     New features:
     - Added an option to the point scattering tools to specify how far
@@ -51,7 +155,6 @@ Version 4.0.0 - November 15, 2016
     - tools::fillWithSpheres() now returns an empty list of spheres
       instead of crashing when the user selects an isosurface that lies
       outside the bounding volume's narrow band.
-      A more comprehensive fix will appear in the next release.
     - Fixed a null pointer dereference when copying grids that were loaded
       with io::File::readGridPartial().
       [Reported by Nick Avramoussis]
@@ -91,10 +194,11 @@ Version 4.0.0 - November 15, 2016
 
     Houdini:
     - Certain changes in this release (see "ABI changes" above) alter
-      the grid ABI so that it is incompatible with earlier versions of
-      the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
-      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-      to disable these changes and preserve ABI compatibility.
+      the grid ABI so that it is incompatible with earlier versions of the
+      OpenVDB library, such as the ones built into Houdini 15, 15.5 and 16.
+      To disable these changes and preserve ABI compatibility, define
+      the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      or any code that depends on OpenVDB.
     - Introduced some C++11 constructs that are incompatible with
       versions of Houdini older than 15.0.
     - Fixed a bug in the Rasterize Points SOP that caused vector-valued
@@ -103,7 +207,6 @@ Version 4.0.0 - November 15, 2016
     - Added a toggle to the Clip SOP to invert the clipping mask.
     - Added a slider to the Scatter SOP to specify how far each point
       may be displaced from the center of its host voxel or tile.
-      
 
 
 Version 3.2.0 - August 10, 2016
@@ -287,7 +390,7 @@ Version 3.2.0 - August 10, 2016
     - Fixed a bug in the Ray SOP whereby the distance attribute was created
       with the wrong data type.
       [Contributed by Nick Avramoussis]
-    - The From Polygon SOP now allows the user to either specify the voxel 
+    - The From Polygon SOP now allows the user to either specify the voxel
       count along an axis or the voxel size in world units (the only option
       in the past).
 

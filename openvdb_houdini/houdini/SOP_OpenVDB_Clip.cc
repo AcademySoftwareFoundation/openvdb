@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,6 +39,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/Clip.h> // for tools::clip()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
+#include <openvdb/points/PointDataGrid.h>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -279,12 +280,25 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             hvdb::GridPtr outGrid;
             if (maskGrid) {
                 MaskClipOp op(maskGrid, inside);
-                GEOvdbProcessTypedGridTopology(**it, op);
-                outGrid = op.outputGrid;
+                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                    outGrid = op.outputGrid;
+                } else if (it->getConstGrid().isType<openvdb::points::PointDataGrid>()) {
+                    addWarning(SOP_MESSAGE,
+                        "only bounding box clipping is currently supported for point data grids");
+                }
             } else {
                 BBoxClipOp op(bbox, inside);
-                GEOvdbProcessTypedGridTopology(**it, op);
-                outGrid = op.outputGrid;
+                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                    outGrid = op.outputGrid;
+                } else if (it->getConstGrid().isType<openvdb::points::PointDataGrid>()) {
+                    if (inside) {
+                        outGrid = it->getConstGrid().deepCopyGrid();
+                        outGrid->clipGrid(bbox);
+                    } else {
+                        addWarning(SOP_MESSAGE,
+                            "only Keep Inside mode is currently supported for point data grids");
+                    }
+                }
             }
 
             // Replace the original VDB primitive with a new primitive that contains
@@ -309,6 +323,6 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

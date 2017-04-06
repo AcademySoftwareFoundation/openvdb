@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -334,9 +334,9 @@ TestCoord::testCoordBBox()
     {// bit-wise operations
         const openvdb::Coord min(-1,-2,3), max(2,3,5);
         const openvdb::CoordBBox b(min, max);
-        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>1,max>>1), b>>1UL);
-        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>3,max>>3), b>>3UL);
-        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min<<1,max<<1), b<<1UL);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>1,max>>1), b>>size_t(1));
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>3,max>>3), b>>size_t(3));
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min<<1,max<<1), b<<size_t(1));
         CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min&1,max&1), b&1);
         CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min|1,max|1), b|1);
     }
@@ -360,6 +360,6 @@ TestCoord::testCoordBBox()
     }
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

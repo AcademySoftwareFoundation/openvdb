@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,10 @@
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
+
+#ifdef _MSC_VER
+#include <windows.h>
+#endif
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -222,7 +226,16 @@ TestPointCount::testGroup()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     std::string filename;
 
@@ -535,7 +548,16 @@ TestPointCount::testOffsets()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
+#ifdef _MSC_VER
+    if (tempDir.empty()) {
+        char tempDirBuffer[MAX_PATH+1];
+        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
+        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        tempDir = tempDirBuffer;
+    }
+#else
     if (tempDir.empty()) tempDir = P_tmpdir;
+#endif
 
     std::string filename;
 
@@ -606,6 +628,6 @@ TestPointCount::testOffsets()
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointCount);
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

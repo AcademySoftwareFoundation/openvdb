@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -3045,7 +3045,8 @@ traceExteriorBoundaries(FloatTreeT& tree)
     boost::scoped_array<bool> changedNodeMaskB(new bool[numLeafNodes]);
     boost::scoped_array<bool> changedVoxelMask(new bool[numVoxels]);
 
-    memset(changedNodeMaskA.get(), 1, sizeof(bool) * numLeafNodes);
+    mesh_to_volume_internal::fillArray(changedNodeMaskA.get(), true, numLeafNodes);
+    mesh_to_volume_internal::fillArray(changedNodeMaskB.get(), false, numLeafNodes);
     mesh_to_volume_internal::fillArray(changedVoxelMask.get(), false, numVoxels);
 
     const tbb::blocked_range<size_t> nodeRange(0, numLeafNodes);
@@ -4195,6 +4196,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

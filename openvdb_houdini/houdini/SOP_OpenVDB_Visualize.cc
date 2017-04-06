@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,6 +40,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #ifdef DWA_OPENVDB
 #include <openvdb_houdini/DW_VDBUtils.h>
@@ -64,6 +65,8 @@
 namespace boost {
 template<> struct is_integral<openvdb::PointIndex32>: public boost::true_type {};
 template<> struct is_integral<openvdb::PointIndex64>: public boost::true_type {};
+template<> struct is_integral<openvdb::PointDataIndex32>: public boost::true_type {};
+template<> struct is_integral<openvdb::PointDataIndex64>: public boost::true_type {};
 }
 
 namespace hvdb = openvdb_houdini;
@@ -1141,10 +1144,15 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
                     TreeVisualizer draw(*gdp, treeParms, &boss);
 
                     if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
-
-                        if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) {
+                        // Handle grid types that are not natively supported by Houdini.
+                        if (vdb->getGrid().isType<openvdb::tools::PointIndexGrid>()) {
                             openvdb::tools::PointIndexGrid::ConstPtr grid =
                                  openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(
+                                     vdb->getGridPtr());
+                            draw(*grid);
+                        } else if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
+                            openvdb::points::PointDataGrid::ConstPtr grid =
+                                 openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(
                                      vdb->getGridPtr());
                             draw(*grid);
                         }
@@ -1192,6 +1200,6 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

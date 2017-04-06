@@ -2,6 +2,137 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 4.0.1</B> - <I>March 8, 2017</I>
+@par
+New features:
+- Added functions to util/logging.h to simplify configuration of the
+  logging system (via command-line arguments, in particular).
+- Added @vdblink::tree::LeafManager::activeLeafVoxelCount()
+  LeafManager::activeLeafVoxelCount@endlink, a faster, threaded
+  alternative to @vdblink::tree::Tree::activeLeafVoxelCount()
+  Tree::activeLeafVoxelCount@endlink.
+- Added a <TT>-shuffle</TT> option that causes <TT>vdb_test</TT>
+  to run unit tests in random order, which can help to identify
+  unintended dependencies between tests.
+- Added @c vdb_lod, a command-line tool to generate volume mipmaps
+  for level-of-detail effects.
+- Added methods to compute the median value of
+  @vdblink::tree::LeafNode::medianOn() active@endlink,
+  @vdblink::tree::LeafNode::medianOff() inactive@endlink
+  or @vdblink::tree::LeafNode::medianAll() all@endlink voxels in leaf nodes.
+
+@par
+Improvements:
+- Added a @vdblink::Metadata::str() Metadata::str@endlink specialization
+  for @vdblink::StringMetadata StringMetadata@endlink that eliminates
+  the overhead of writing to a string stream.
+- Made various minor improvements to @vdblink::util::PagedArray
+  util::PagedArray@endlink.
+- Added an @c install_lib build target to the Makefile.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @subpage points "documentation" and Cookbook
+  @ref openvdbPointsHelloWorld "examples" for OpenVDB&nbsp;Points.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Registration of OpenVDB&nbsp;Points grid and attribute types is now
+  handled in @vdblink::initialize() openvdb::initialize@endlink,
+  and @vdblink::points::initialize() points::initialize@endlink
+  and @vdblink::points::uninitialize() points::uninitialize@endlink
+  are therefore deprecated.
+- Extended multi-pass I/O to handle a variable number of passes per leaf node.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Addressed a name conflict between macros in util/NodeMasks.h and symbols in
+  the <A HREF="http://eigen.tuxfamily.org/index.php?title=Main_Page">Eigen</A>
+  library.
+  <I>[Reported&nbsp;by&nbsp;Trevor&nbsp;Thomson]</I>
+
+@par
+Bug fixes:
+- The @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink
+  and @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  tools now correctly handle isosurfaces outside the input volume&rsquo;s
+  narrow band.
+- The @vdblink::tools::MultiResGrid MultiResGrid@endlink tool
+  now supports all standard grid types, including
+  @vdblink::BoolGrid BoolGrid@endlink and @vdblink::MaskGrid MaskGrid@endlink.
+- @vdblink::tree::LeafNode::fill() LeafNode::fill@endlink now correctly clips
+  the fill region to the node&rsquo;s bounding box.
+- @vdblink::Grid::denseFill() Grid::denseFill@endlink no longer densifies
+  all existing active tiles, and it now correctly handles both active
+  and inactive fill values.
+- Fixed a bug that caused @vdblink::tools::copyToDense()
+  tools::copyToDense@endlink to only partially populate the output array
+  when delayed loading was in effect.
+  <I>[Reported&nbsp;by&nbsp;Stuart&nbsp;Levy]</I>
+- Fixed an issue with duplicate registration of
+  @link points/PointDataGrid.h PointDataGrid@endlink attribute types.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
+- Fixed an uninitialized memory bug in the
+  @vdblink::tools::meshToVolume() mesh to volume@endlink converter.
+  <I>[Reported&nbsp;by&nbsp;SideFX]</I>
+- Fixed a thread race condition in
+  @vdblink::math::QuantizedUnitVec QuantizedUnitVec@endlink
+  that could cause it to produce incorrect results.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a dangling pointer bug in the
+  @vdblink::tools::ParticleAtlas particle atlas@endlink tool.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+- Grid operators (@vdblink::tools::divergence() divergence@endlink,
+  @vdblink::tools::gradient() gradient@endlink, etc.) now produce
+  correct results even for grids with active tile values.
+- Fixed a bug when writing an out-of-core
+  @vdblink::points::AttributeArray points::AttributeArray@endlink
+  that could cause corruption of the metadata associated with the array.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Python:
+- Added functions @c getLoggingLevel, @c setLoggingLevel, and
+  @c setProgramName, to allow configuration of the logging system.
+
+@par
+Houdini:
+- Fixed a crash in the Ray SOP when the user selected an isosurface
+  outside the target volume&rsquo;s narrow band.
+- The LOD SOP now supports all standard grid types, including boolean grids.
+- Added @c houdini_utils::ParmFactory::setGroupChoiceList, a convenience
+  method for the creation of menus of primitive groups.
+- Made various small changes for Houdini&nbsp;16 compatibility.
+  <I>[Contributed&nbsp;by&nbsp;SideFX]</I>
+- The Create SOP now supports matching the new grids&rsquo; transform,
+  voxel size, and topology to a reference grid.
+  If the topology is being matched, it can optionally be resampled
+  to a different voxel size.
+- Added some support for point data grids to the Clip,
+  Topology&nbsp;To&nbsp;Level&nbsp;Set and Visualize SOPs.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Compression is no longer enabled by default in the
+  Points&nbsp;Convert&nbsp;SOP for normals and colors, because they are
+  not guaranteed to have a [0,&nbsp;1] range.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added a 16-bit truncation compression option to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Fixed a build issue with the GR_PrimVDBPoints render hook plugin
+  that could cause @c hython to report a DSO error.
+  <I>[Reported&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added an @c install_lib build target to the Makefile.
+- Rewrote the Remove&nbsp;Divergence SOP to actually remove divergence from
+  vector fields on collocated grids, and added support for stationary
+  and moving obstacles and an option to output a pressure field.
+- The Analysis&nbsp;SOP now produces correct results for grids with active
+  tile values.
+- Added a sparse/dense toggle to the Fill&nbsp;SOP.
+- Added @c openvdb_houdini::startLogForwarding,
+  @c openvdb_houdini::stopLogForwarding
+  and @c openvdb_houdini::isLogForwarding, which control the forwarding
+  of log messages to Houdini&rsquo;s error manager.
+  Forwarding of library warnings and error messages is now enabled
+  by default for SOPs when OpenVDB is built with
+  <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+
+
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.0</B> - <I>November 15, 2016</I>
@@ -18,9 +149,10 @@ Highlights:
   @b Note: This change and other changes in this release
   (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
   so that it is incompatible with earlier versions of the OpenVDB library,
-  such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
+  such as the ones built into Houdini&nbsp;15, 15.5 and&nbsp;16.
+  To disable these changes and preserve ABI compatibility, define
+  the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  or any code that depends on OpenVDB.
   </BLOCKQUOTE>
 
 @par
@@ -42,7 +174,7 @@ New features:
 @par
 Improvements:
 - Vector-valued grids are now constructed and destroyed much faster.
-- Changed @vdblink::math::Coord Coord@endlink's data representation
+- Changed @vdblink::math::Coord Coord@endlink&rsquo;s data representation
   to facilitate C++11 uniform initialization.
 - Delayed loading from @vdblink::io::File io::Files@endlink is now faster
   due to the use of seeks instead of reads.
@@ -122,10 +254,11 @@ Python:
 Houdini:
 - Certain changes in this release (see @ref v4_0_0_ABI_changes "ABI changes"
   above) alter the grid&nbsp;ABI so that it is incompatible with earlier
-  versions of the OpenVDB library, such as the ones in Houdini&nbsp;15.0
-  and&nbsp;15.5.
-  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.
+  versions of the OpenVDB library, such as the ones built into
+  Houdini&nbsp;15, 15.5 and&nbsp;16.
+  To disable these changes and preserve ABI compatibility, define
+  the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  or any code that depends on OpenVDB.
 - Introduced some C++11 constructs that are incompatible with
   versions of Houdini older than&nbsp;15.0.
 - Fixed a bug in the Rasterize Points SOP that caused vector-valued attributes
@@ -201,7 +334,7 @@ New features:
   class.
 - New component wise constructor for the @vdblink::math::CoordBBox
   CoordBBox@endlink class as well as the method
-  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink. 
+  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink.
 - Added a new @vdblink::tree::LeafManager LeafManager@endlink constructor to
   create the structure from an existing array of leafnodes.
 - Added active tile count to @vdblink::tree::Tree::print Tree::print@endlink.
@@ -366,7 +499,7 @@ Houdini:
   <I>[Contributed by Fredrik&nbsp;Salomonsson]</I>
 - Fixed a bug in the Ray SOP whereby the distance attribute was created
   with the wrong data type. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
-- The From Polygon SOP now allows the user to either specify the voxel 
+- The From Polygon SOP now allows the user to either specify the voxel
   count along an axis or the voxel size in world units (the only option
   in the past).
 

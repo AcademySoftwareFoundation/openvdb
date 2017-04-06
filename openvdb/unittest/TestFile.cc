@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
+#include <openvdb/util/logging.h>
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
@@ -821,6 +822,8 @@ TestFile::testGridNaming()
 
     // Register data types.
     openvdb::initialize();
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     // Create several grids that share a single tree.
     TreeType::Ptr tree(new TreeType(1));
@@ -1916,7 +1919,9 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
             OPENVDB_THROW(openvdb::IoError,
                 "Cannot write out a MultiBufferLeaf without StreamMetadata.");
         }
-        const uint32_t pass = meta->pass();
+
+        // clamp pass to 16-bit integer
+        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
 
         // Read in the stored pass number.
         uint32_t readPass;
@@ -1940,7 +1945,9 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
             OPENVDB_THROW(openvdb::IoError,
                 "Cannot read in a MultiBufferLeaf without StreamMetadata.");
         }
-        const uint32_t pass = meta->pass();
+
+        // clamp pass to 16-bit integer
+        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
 
         // Leaf traversal analysis deduces the number of passes to perform for this leaf
         // then updates the leaf traversal value to ensure all passes will be written.
@@ -2693,6 +2700,6 @@ TestFile::testBlosc()
 }
 #endif
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

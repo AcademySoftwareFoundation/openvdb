@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,8 +38,8 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
 
-#include <openvdb/tools/VolumeToSpheres.h>
 #include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/VolumeToSpheres.h> // for ClosestSurfacePoint
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_ParallelUtil.h>
@@ -52,6 +52,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -323,7 +324,7 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
     const bool transformPoints = (positions != NULL);
 
     openvdb::tools::ClosestSurfacePoint<GridT> closestPoint;
-    closestPoint.initialize(grid, isovalue, &boss);
+    if (!closestPoint.initialize(grid, isovalue, &boss)) return;
 
     if (transformPoints) closestPoint.searchAndReplace(tmpPoints, tmpDistances);
     else closestPoint.search(tmpPoints, tmpDistances);
@@ -458,16 +459,13 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         const double limit = std::numeric_limits<double>::max();
         UT_FloatArray distances;
-        distances.appendMultiple(float((keepMaxDist && rayIntersection) ? -limit : limit), numPoints);
-
-
+        distances.appendMultiple(
+            float((keepMaxDist && rayIntersection) ? -limit : limit), numPoints);
 
         std::vector<std::string> skippedGrids;
 
         for (; vdbIt; ++vdbIt) {
             if (boss.wasInterrupted()) break;
-
-            std::vector<openvdb::Vec4s> spheres;
 
             if (vdbIt->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET &&
                 vdbIt->getGrid().type() == openvdb::FloatGrid::gridType()) {
@@ -489,7 +487,6 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
                 continue;
             }
         }
-
 
         if (bool(evalInt("dotrans", 0, time))) { // update point positions
 
@@ -547,6 +544,6 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2016 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
