@@ -45,6 +45,9 @@
 ///
 /// @note Prolongation means interpolation from coarse -> fine
 /// @note Restriction means interpolation (or remapping) from fine -> coarse
+///
+/// @todo Add option to define the level of the input grid (currenlty
+/// 0) so as to allow for super-sampling.
 
 #ifndef OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
@@ -118,9 +121,8 @@ public:
     /// @param grid High-resolution input grid
     /// @param useInjection Use restriction by injection, vs
     /// full-weighting. It defaults to false and should rarely be used.
-    /// @note This constructor will steal the input input
-    /// grid and use it as the highest level grid. On output the grid
-    /// is empty.
+    /// @note This constructor will steal the input grid and use it
+    /// as the highest level grid. On output the grid is empty.
     MultiResGrid(size_t levels, GridPtr grid, bool useInjection = false);
 
     //////////////////////////////////////////////////////////////////////

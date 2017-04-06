@@ -34,8 +34,10 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
+#include <tbb/atomic.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
+#include <cstddef> // for offsetof()
 #include <iostream>
 #include <type_traits>
 
@@ -46,6 +48,39 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
+
+namespace {
+
+/// @internal For delayed loading to be threadsafe, LeafBuffer::mOutOfCore must be
+/// memory-fenced when it is set in LeafBuffer::doLoad(), otherwise that operation
+/// could be reordered ahead of others in doLoad(), with the possible result that
+/// other threads could see the buffer as in-core before it has been fully loaded.
+/// Making mOutOfCore a TBB atomic solves the problem, since TBB atomics are release-fenced
+/// by default (unlike STL atomics, which are not even guaranteed to be lock-free).
+/// However, TBB atomics have stricter alignment requirements than their underlying value_types,
+/// so a LeafBuffer with an atomic mOutOfCore is potentially ABI-incompatible with
+/// its non-atomic counterpart.
+/// This helper class conditionally declares mOutOfCore as an atomic only if doing so
+/// doesn't break ABI compatibility.
+/// @todo Remove this for ABI 5.
+template<typename T>
+struct LeafBufferFlags
+{
+    // These structs need to have the same data members as LeafBuffer.
+    struct Atomic { union { T* data; void* ptr; }; tbb::atomic<Index32> i; tbb::spin_mutex mutex; };
+    struct NonAtomic { union { T* data; void* ptr; }; Index32 i; tbb::spin_mutex mutex; };
+
+    /// @c true if LeafBuffer::mOutOfCore is atomic, @c false otherwise
+    static constexpr bool IsAtomic = ((sizeof(Atomic) == sizeof(NonAtomic))
+         && (offsetof(Atomic, i) == offsetof(NonAtomic, i)));
+    /// The size of a LeafBuffer when LeafBuffer::mOutOfCore is atomic
+    static constexpr size_t size = sizeof(Atomic);
+    /// The type of LeafBuffer::mOutOfCore
+    using type = typename std::conditional<IsAtomic, tbb::atomic<Index32>, Index32>::type;
+};
+
+} // unnamed namespace
+
 
 /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
 /// the voxel values of a LeafNode
@@ -170,11 +205,13 @@ private:
 #ifdef OPENVDB_2_ABI_COMPATIBLE
     ValueType* mData;
 #else
+    using FlagsType = typename LeafBufferFlags<ValueType>::type;
+
     union {
         ValueType* mData;
         FileInfo*  mFileInfo;
     };
-    Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
+    FlagsType mOutOfCore; // interpreted as bool; extra bits reserved for future use
     tbb::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
 
@@ -184,7 +221,6 @@ private:
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
     template<typename, Index> friend class LeafNode;
-
 }; // class LeafBuffer
 
 
