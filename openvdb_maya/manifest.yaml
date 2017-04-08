@@ -65,16 +65,14 @@ Requires:
 
 # List of software / versions this package supports.
 
-# Supports:
-#   - maya-2012.5
-#   - maya-2013
-#   - maya-2013.5
-#   - maya-2014.5
-#   - maya-2015
-#   - maya-2015.5
-#   - maya-2016
-#   - maya-2016.5x2
-#   - maya-2017
-
 Supports:
+  - maya-2012.5
+  - maya-2013
+  - maya-2013.5
+  - maya-2014.5
+  - maya-2015
+  - maya-2015.5
+  - maya-2016
+  - maya-2016.5x2
   - maya-2017
+

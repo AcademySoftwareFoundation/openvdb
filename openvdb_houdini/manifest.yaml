@@ -50,10 +50,6 @@ Os: cent6_64
 Requires:
   - openvdb-4.0.0_abi3  # For houdini 16+
 
-
-# Supports:
-#   - houdini-15.5.675
-#   - houdini-16.0.565
-
 Supports:
+  - houdini-15.5.675
   - houdini-16.0.565
