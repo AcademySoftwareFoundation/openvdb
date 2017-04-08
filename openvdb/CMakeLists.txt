@@ -30,14 +30,14 @@ IF ( USE_GLFW3 )
   FIND_PACKAGE ( GLFW3 REQUIRED )
   SET ( OPENVDB_USE_GLFW_FLAG "-DOPENVDB_USE_GLFW_3" )
   IF ( UNIX AND NOT APPLE )
-	SET ( GLFW_DEPENDENT_LIBRARIES "Xi;Xrandr;Xinerama;Xcursor" )
+    SET ( GLFW_DEPENDENT_LIBRARIES "Xi;Xrandr;Xinerama;Xcursor" )
   ENDIF ( UNIX AND NOT APPLE )
   SET ( GLFW_LINK_LIBRARY ${GLFW3_glfw_LIBRARY} )
   SET ( GLFW_INCLUDE_DIRECTORY  ${GLFW3_INCLUDE_DIR} CACHE STRING "GLFW3 include directory")
 ELSE ()
   FIND_PACKAGE ( GLFW REQUIRED )
   IF ( UNIX AND NOT APPLE )
-	SET ( GLFW_DEPENDENT_LIBRARIES "Xi;Xrandr;Xinerama;Xcursor" )
+    SET ( GLFW_DEPENDENT_LIBRARIES "Xi;Xrandr;Xinerama;Xcursor" )
   ENDIF ()
   SET ( GLFW_LINK_LIBRARY ${GLFW_glfw_LIBRARY} )
   SET ( GLFW_INCLUDE_DIRECTORY  ${GLFW_INCLUDE_DIR} CACHE STRING "GLFW include directory")
@@ -55,29 +55,29 @@ SET ( OPENVDB_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.h )
 
 FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_major_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*")
 FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_minor_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*")
-FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_build_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_patch_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
 
 STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
   _openvdb_major_version_number "${openvdb_major_version_str}")
 STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
   _openvdb_minor_version_number "${openvdb_minor_version_str}")
 STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-  _openvdb_build_version_number "${openvdb_build_version_str}")
+  _openvdb_patch_version_number "${openvdb_patch_version_str}")
 
 SET ( OPENVDB_MAJOR_VERSION_NUMBER ${_openvdb_major_version_number} CACHE STRING "OpenVDB major version number" )
 SET ( OPENVDB_MINOR_VERSION_NUMBER ${_openvdb_minor_version_number} CACHE STRING "OpenVDB minor version number" )
-SET ( OPENVDB_BUILD_VERSION_NUMBER ${_openvdb_build_version_number} CACHE STRING "OpenVDB build version number" )
+SET ( OPENVDB_PATCH_VERSION_NUMBER ${_openvdb_patch_version_number} CACHE STRING "OpenVDB build version number" )
 
 # MESSAGE ( "OPENVDB_VERSION_FILE = ${OPENVDB_VERSION_FILE}")
 # MESSAGE ( "OPENVDB_MAJOR_VERSION_NUMBER = ${OPENVDB_MAJOR_VERSION_NUMBER}" )
 # MESSAGE ( "OPENVDB_MINOR_VERSION_NUMBER = ${OPENVDB_MINOR_VERSION_NUMBER}" )
-# MESSAGE ( "OPENVDB_BUILD_VERSION_NUMBER = ${OPENVDB_BUILD_VERSION_NUMBER}" )
+# MESSAGE ( "OPENVDB_PATCH_VERSION_NUMBER = ${OPENVDB_PATCH_VERSION_NUMBER}" )
 
 IF (OPENVDB_BUILD_PYTHON_MODULE)
   FIND_PACKAGE ( PythonInterp REQUIRED )
   FIND_PACKAGE ( PythonLibs REQUIRED )
   SET ( OPENVDB_BOOST_PYTHON_LIBRARY_COMPONENT_NAME python )
-  INCLUDE_DIRECTORIES ( ${PYTHON_INCLUDE_DIR} )
+  INCLUDE_DIRECTORIES ( SYSTEM ${PYTHON_INCLUDE_DIR} )
   # MESSAGE ( "PYTHONLIBS_VERSION_STRING = ${PYTHONLIBS_VERSION_STRING}" )
 
   STRING(REPLACE "." ";" VERSION_LIST ${PYTHONLIBS_VERSION_STRING})
@@ -113,27 +113,27 @@ ENDIF ()
 IF ( NOT OPENVDB_BUILD_HOUDINI_SOPS )
   # If we are building OpenVDB Houdini SOP, we need to use the headers
   # shipped with Houdini to ensure version compatibility
-  INCLUDE_DIRECTORIES ( ${Boost_INCLUDE_DIR} )
-  INCLUDE_DIRECTORIES ( ${TBB_INCLUDE_DIR} )
+  INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
+  INCLUDE_DIRECTORIES ( SYSTEM ${TBB_INCLUDE_DIR} )
   # INCLUDE_DIRECTORIES ( ${OPENGL_INCLUDE_DIR} )
-  INCLUDE_DIRECTORIES ( ${ZLIB_INCLUDE_DIR} )
+  INCLUDE_DIRECTORIES ( SYSTEM ${ZLIB_INCLUDE_DIR} )
 ENDIF ()
-INCLUDE_DIRECTORIES ( ${ILMBASE_INCLUDE_DIRS} )
-INCLUDE_DIRECTORIES ( ${OPENEXR_INCLUDE_DIRS} )
-INCLUDE_DIRECTORIES ( ${GLFW_INCLUDE_DIRECTORY} )
+INCLUDE_DIRECTORIES ( SYSTEM ${ILMBASE_INCLUDE_DIRS} )
+INCLUDE_DIRECTORIES ( SYSTEM ${OPENEXR_INCLUDE_DIRS} )
+INCLUDE_DIRECTORIES ( SYSTEM ${GLFW_INCLUDE_DIRECTORY} )
 IF (WIN32)
-  INCLUDE_DIRECTORIES ( ${GLEW_INCLUDE_DIR} )
+  INCLUDE_DIRECTORIES ( SYSTEM ${GLEW_INCLUDE_DIR} )
 ENDIF ()
 
 INCLUDE_DIRECTORIES ( . ) # So they can simulate referencing installed headers
 
 IF (WIN32)
   # Because of implicit linking!
-  LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
+  LINK_DIRECTORIES ( SYSTEM ${Boost_LIBRARY_DIR} )
 ENDIF ()
 
-INCLUDE_DIRECTORIES ( ${BLOSC_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( ${CPPUNIT_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( SYSTEM ${BLOSC_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( SYSTEM ${CPPUNIT_INCLUDE_DIR} )
 
 IF (WIN32)
   ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DHALF_EXPORTS -DOPENVDB_DLL )
@@ -177,7 +177,7 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
 SET_SOURCE_FILES_PROPERTIES ( ${OPENVDB_LIBRARY_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-)
+  )
 
 ADD_LIBRARY ( openvdb_static STATIC
   ${OPENVDB_LIBRARY_SOURCE_FILES}
@@ -212,14 +212,14 @@ SET_TARGET_PROPERTIES(
   PROPERTIES
   OUTPUT_NAME openvdb
   SOVERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}
-  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_BUILD_VERSION_NUMBER}
+  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
   )
 
 SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print/main.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_PRINT_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-)
+  )
 
 ADD_EXECUTABLE ( vdb_print
   ${VDB_PRINT_SOURCE_FILES}
@@ -233,7 +233,7 @@ SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render/main.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_RENDER_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-)
+  )
 ADD_EXECUTABLE ( vdb_render
   ${VDB_RENDER_SOURCE_FILES}
   )
@@ -252,119 +252,119 @@ SET ( VDB_VIEW_SOURCE_FILES
   viewer/Font.cc
   viewer/RenderModules.cc
   viewer/Viewer.cc
- )
+  )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_VIEW_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG} -DGL_GLEXT_PROTOTYPES=1"
   )
 IF (NOT WIN32)
   ADD_EXECUTABLE ( vdb_view
-	${VDB_VIEW_SOURCE_FILES}
-	)
+    ${VDB_VIEW_SOURCE_FILES}
+    )
 
-TARGET_LINK_LIBRARIES ( vdb_view
-  openvdb_static
-  ${Boost_THREAD_LIBRARY}
-  ${OPENGL_gl_LIBRARY}
-  ${OPENGL_glu_LIBRARY}
-  ${COCOA_LIBRARY}
-  ${IOKIT_LIBRARY}
-  ${COREVIDEO_LIBRARY}
-  ${GLFW_LINK_LIBRARY}
-  ${GLFW_DEPENDENT_LIBRARIES}
-  ${GLEW_GLEW_LIBRARY}
-  )
+  TARGET_LINK_LIBRARIES ( vdb_view
+    openvdb_static
+    ${Boost_THREAD_LIBRARY}
+    ${OPENGL_gl_LIBRARY}
+    ${OPENGL_glu_LIBRARY}
+    ${COCOA_LIBRARY}
+    ${IOKIT_LIBRARY}
+    ${COREVIDEO_LIBRARY}
+    ${GLFW_LINK_LIBRARY}
+    ${GLFW_DEPENDENT_LIBRARIES}
+    ${GLEW_GLEW_LIBRARY}
+    )
 ENDIF ()
 
 SET ( UNITTEST_SOURCE_FILES
-	unittest/main.cc
-	unittest/TestAttributeArray.cc
-	unittest/TestAttributeArrayString.cc
-	unittest/TestAttributeGroup.cc
-	unittest/TestAttributeSet.cc
-	unittest/TestBBox.cc
-	unittest/TestConjGradient.cc
-	unittest/TestCoord.cc
-	unittest/TestCpt.cc
-	unittest/TestCurl.cc
-	unittest/TestDense.cc
-	unittest/TestDenseSparseTools.cc
-	unittest/TestDiagnostics.cc
-	unittest/TestDivergence.cc
-	unittest/TestDoubleMetadata.cc
-	unittest/TestExceptions.cc
-	unittest/TestFile.cc
-	unittest/TestFloatMetadata.cc
-	unittest/TestGradient.cc
-	unittest/TestGrid.cc
-	unittest/TestGridBbox.cc
-	unittest/TestGridDescriptor.cc
-	unittest/TestGridIO.cc
-	unittest/TestGridTransformer.cc
-	unittest/TestIndexFilter.cc
-	unittest/TestIndexIterator.cc
-	unittest/TestInit.cc
-	unittest/TestInt32Metadata.cc
-	unittest/TestInt64Metadata.cc
-	unittest/TestInternalOrigin.cc
-	unittest/TestLaplacian.cc
-	unittest/TestLeaf.cc
-	unittest/TestLeafBool.cc
-	unittest/TestLeafManager.cc
-	unittest/TestLeafMask.cc
-	unittest/TestLeafIO.cc
-	unittest/TestLeafOrigin.cc
-	unittest/TestLevelSetRayIntersector.cc
-	unittest/TestLevelSetUtil.cc
-	unittest/TestLinearInterp.cc
-	unittest/TestMaps.cc
-	unittest/TestMat4Metadata.cc
-	unittest/TestMath.cc
-	unittest/TestMeanCurvature.cc
-	unittest/TestMeshToVolume.cc
-	unittest/TestMetadata.cc
-	unittest/TestMetadataIO.cc
-	unittest/TestMetaMap.cc
-	unittest/TestMultiResGrid.cc
-	unittest/TestName.cc
-	unittest/TestNodeIterator.cc
-	unittest/TestNodeManager.cc
-	unittest/TestNodeMask.cc
-	unittest/TestParticleAtlas.cc
-	unittest/TestParticlesToLevelSet.cc
-	unittest/TestPointAttribute.cc
-	unittest/TestPointConversion.cc
-	unittest/TestPointCount.cc
-	unittest/TestPointDataLeaf.cc
-	unittest/TestPointGroup.cc
-	unittest/TestPointIndexGrid.cc
-	unittest/TestPointPartitioner.cc
-	unittest/TestPointsToMask.cc
-	unittest/TestPoissonSolver.cc
-	unittest/TestPrePostAPI.cc
-	unittest/TestQuadraticInterp.cc
-	unittest/TestQuantizedUnitVec.cc
-	unittest/TestQuat.cc
-	unittest/TestRay.cc
-	unittest/TestStats.cc
-	unittest/TestStream.cc
-	unittest/TestStreamCompression.cc
-	unittest/TestStringMetadata.cc
-	unittest/TestTools.cc
-	unittest/TestTopologyToLevelSet.cc
-	unittest/TestTransform.cc
-	unittest/TestTree.cc
-	unittest/TestTreeCombine.cc
-	unittest/TestTreeGetSetValues.cc
-	unittest/TestTreeIterators.cc
-	unittest/TestTreeVisitor.cc
-	unittest/TestUtil.cc
-	unittest/TestValueAccessor.cc
-	unittest/TestVec2Metadata.cc
-	unittest/TestVec3Metadata.cc
-	unittest/TestVolumeRayIntersector.cc
-	unittest/TestVolumeToMesh.cc
-	)
+  unittest/main.cc
+  unittest/TestAttributeArray.cc
+  unittest/TestAttributeArrayString.cc
+  unittest/TestAttributeGroup.cc
+  unittest/TestAttributeSet.cc
+  unittest/TestBBox.cc
+  unittest/TestConjGradient.cc
+  unittest/TestCoord.cc
+  unittest/TestCpt.cc
+  unittest/TestCurl.cc
+  unittest/TestDense.cc
+  unittest/TestDenseSparseTools.cc
+  unittest/TestDiagnostics.cc
+  unittest/TestDivergence.cc
+  unittest/TestDoubleMetadata.cc
+  unittest/TestExceptions.cc
+  unittest/TestFile.cc
+  unittest/TestFloatMetadata.cc
+  unittest/TestGradient.cc
+  unittest/TestGrid.cc
+  unittest/TestGridBbox.cc
+  unittest/TestGridDescriptor.cc
+  unittest/TestGridIO.cc
+  unittest/TestGridTransformer.cc
+  unittest/TestIndexFilter.cc
+  unittest/TestIndexIterator.cc
+  unittest/TestInit.cc
+  unittest/TestInt32Metadata.cc
+  unittest/TestInt64Metadata.cc
+  unittest/TestInternalOrigin.cc
+  unittest/TestLaplacian.cc
+  unittest/TestLeaf.cc
+  unittest/TestLeafBool.cc
+  unittest/TestLeafManager.cc
+  unittest/TestLeafMask.cc
+  unittest/TestLeafIO.cc
+  unittest/TestLeafOrigin.cc
+  unittest/TestLevelSetRayIntersector.cc
+  unittest/TestLevelSetUtil.cc
+  unittest/TestLinearInterp.cc
+  unittest/TestMaps.cc
+  unittest/TestMat4Metadata.cc
+  unittest/TestMath.cc
+  unittest/TestMeanCurvature.cc
+  unittest/TestMeshToVolume.cc
+  unittest/TestMetadata.cc
+  unittest/TestMetadataIO.cc
+  unittest/TestMetaMap.cc
+  unittest/TestMultiResGrid.cc
+  unittest/TestName.cc
+  unittest/TestNodeIterator.cc
+  unittest/TestNodeManager.cc
+  unittest/TestNodeMask.cc
+  unittest/TestParticleAtlas.cc
+  unittest/TestParticlesToLevelSet.cc
+  unittest/TestPointAttribute.cc
+  unittest/TestPointConversion.cc
+  unittest/TestPointCount.cc
+  unittest/TestPointDataLeaf.cc
+  unittest/TestPointGroup.cc
+  unittest/TestPointIndexGrid.cc
+  unittest/TestPointPartitioner.cc
+  unittest/TestPointsToMask.cc
+  unittest/TestPoissonSolver.cc
+  unittest/TestPrePostAPI.cc
+  unittest/TestQuadraticInterp.cc
+  unittest/TestQuantizedUnitVec.cc
+  unittest/TestQuat.cc
+  unittest/TestRay.cc
+  unittest/TestStats.cc
+  unittest/TestStream.cc
+  unittest/TestStreamCompression.cc
+  unittest/TestStringMetadata.cc
+  unittest/TestTools.cc
+  unittest/TestTopologyToLevelSet.cc
+  unittest/TestTransform.cc
+  unittest/TestTree.cc
+  unittest/TestTreeCombine.cc
+  unittest/TestTreeGetSetValues.cc
+  unittest/TestTreeIterators.cc
+  unittest/TestTreeVisitor.cc
+  unittest/TestUtil.cc
+  unittest/TestValueAccessor.cc
+  unittest/TestVec2Metadata.cc
+  unittest/TestVec3Metadata.cc
+  unittest/TestVolumeRayIntersector.cc
+  unittest/TestVolumeToMesh.cc
+  )
 
 SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_SOURCE_FILES}
   PROPERTIES
@@ -374,13 +374,13 @@ SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_SOURCE_FILES}
 IF ( OPENVDB_BUILD_UNITTESTS )
 
   ADD_EXECUTABLE ( vdb_test
-  ${UNITTEST_SOURCE_FILES}
-  )
+    ${UNITTEST_SOURCE_FILES}
+    )
 
-TARGET_LINK_LIBRARIES ( vdb_test
-	${CPPUnit_cppunit_LIBRARY}
-	openvdb_static
-	)
+  TARGET_LINK_LIBRARIES ( vdb_test
+    ${CPPUnit_cppunit_LIBRARY}
+    openvdb_static
+    )
 
   ADD_TEST ( vdb_unit_test vdb_test )
 
@@ -388,37 +388,37 @@ ENDIF (OPENVDB_BUILD_UNITTESTS)
 
 IF ( OPENVDB_BUILD_PYTHON_MODULE )
 
- SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
+  SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
     python/pyFloatGrid.cc
     python/pyIntGrid.cc
     python/pyMetadata.cc
     python/pyOpenVDBModule.cc
     python/pyTransform.cc
     python/pyVec3Grid.cc
-	)
+    )
 
   SET_SOURCE_FILES_PROPERTIES ( ${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
-	PROPERTIES
-	COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-	)
+    PROPERTIES
+    COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
+    )
 
   ADD_LIBRARY ( pyopenvdb SHARED
-	${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
-	)
+    ${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
+    )
 
   TARGET_LINK_LIBRARIES ( pyopenvdb
-	openvdb_static
-	${OPENGL_gl_LIBRARY}
-	${OPENGL_glu_LIBRARY}
-	${COCOA_LIBRARY}
-	${IOKIT_LIBRARY}
-	${COREVIDEO_LIBRARY}
-	${GLFW_LINK_LIBRARY}
-	${GLFW_DEPENDENT_LIBRARIES}
-	${GLEW_GLEW_LIBRARY}
-	${Boost_PYTHON_LIBRARY}
-	${PYTHON_LIBRARY}
-	)
+    openvdb_static
+    ${OPENGL_gl_LIBRARY}
+    ${OPENGL_glu_LIBRARY}
+    ${COCOA_LIBRARY}
+    ${IOKIT_LIBRARY}
+    ${COREVIDEO_LIBRARY}
+    ${GLFW_LINK_LIBRARY}
+    ${GLFW_DEPENDENT_LIBRARIES}
+    ${GLEW_GLEW_LIBRARY}
+    ${Boost_PYTHON_LIBRARY}
+    ${PYTHON_LIBRARY}
+    )
 
   SET_TARGET_PROPERTIES ( pyopenvdb PROPERTIES
     PREFIX ""
@@ -427,11 +427,16 @@ IF ( OPENVDB_BUILD_PYTHON_MODULE )
   ADD_TEST ( pytest ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test/TestOpenVDB.py )
   SET_TESTS_PROPERTIES ( pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}")
 
+  SET ( PYOPENVDB_INSTALL_DIRECTORY
+    lib/python${OPENVDB_PYTHON_VERSION_MAJOR}.${OPENVDB_PYTHON_VERSION_MINOR}
+    CACHE STRING "The directory to install the pyopenvdb.so module."
+    )
+
   INSTALL ( TARGETS
-	pyopenvdb
-	DESTINATION
-	lib/python${OPENVDB_PYTHON_VERSION_MAJOR}.${OPENVDB_PYTHON_VERSION_MINOR}
-	)
+    pyopenvdb
+    DESTINATION
+    ${PYOPENVDB_INSTALL_DIRECTORY}
+    )
 
 ENDIF ( OPENVDB_BUILD_PYTHON_MODULE )
 
@@ -456,10 +461,10 @@ ENDIF ()
 # Installation
 IF ( NOT WIN32 )
   INSTALL ( TARGETS
-	vdb_view
-	DESTINATION
-	bin
-	)
+    vdb_view
+    DESTINATION
+    bin
+    )
 ENDIF ()
 INSTALL ( TARGETS
   vdb_print
@@ -476,4 +481,4 @@ INSTALL ( TARGETS
   )
 
 INSTALL ( DIRECTORY ${PROJECT_SOURCE_DIR} DESTINATION include
-          FILES_MATCHING PATTERN "*.h")
+  FILES_MATCHING PATTERN "*.h")

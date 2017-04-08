@@ -1,5 +1,0 @@
-# -*- python -*-
-
-Project(
-  includes = ['BUILD.conf','^openvdb/BUILD.conf'],
-)
