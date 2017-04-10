@@ -14,7 +14,7 @@ Schema: '1.0'
 # versioning.
 Name: openvdb
 
-Version: 4.0.1_abi3
+Version: 4.0.1_boost1.61
 
 # The type of installation that will be performed for this software.
 # This information MUST be provided.
@@ -55,7 +55,7 @@ Os: cent6_64
 # these requirements are only for the core and maya library. For
 # houdini it uses the versions included in the houdini toolkit.
 Requires:
-  - boost-1.55.0
+  - boost-1.61.0
   - tbb-4.4.6
   - openexr-2.2.0
   - cppunit-1.12.1

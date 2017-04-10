@@ -51,4 +51,5 @@ Requires:
   - openvdb-4.0.0_abi3  # For houdini 16+
 
 Supports:
+  - houdini-16.0.535
   - houdini-16.0.565
