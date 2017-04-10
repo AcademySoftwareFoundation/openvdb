@@ -1,9 +1,0 @@
-# -*- python -*-
-
-VirtualProject(
-  dependencies = [
-    'openvdb',
-    'openvdb_houdini',
-    'openvdb_maya',
-  ]
-)
