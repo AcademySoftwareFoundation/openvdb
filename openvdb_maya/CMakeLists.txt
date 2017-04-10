@@ -26,8 +26,7 @@
 #
 PROJECT ( OpenVDBMaya )
 
-OPTION ( OPENVDB_MAYA_SUBDIR "Install plugins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF)
-OPTION ( OPENVDB_MAYA_HYPHEN_PLUGINS "Use the name plug-ins instead of plugins for the plugin directory" ON )
+OPTION ( OPENVDB_MAYA_SUBDIR "Install plug-ins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF)
 OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
 
 FIND_PACKAGE ( Maya REQUIRED )
@@ -118,7 +117,7 @@ SET( OPENVDB_MAYA_INSTALL_BASE_DIR
 INSTALL ( TARGETS
   openvdb_maya
   DESTINATION
-  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/plug$<$<BOOL:${OPENVDB_MAYA_HYPHEN_PLUGINS}>:->ins
+  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/plug-ins
   )
 
 INSTALL ( FILES

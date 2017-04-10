@@ -25,7 +25,7 @@ class Openvdb_maya(Context):
         )
             
         self.environ[ 'MAYA_PLUG_IN_PATH'] = self.expandPaths(
-            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/plugins',
+            '$OPENVDB_MAYA_PACKAGE_ROOT/maya/$MAYA_VERSION_MAJOR/plug-ins',
             '$MAYA_PLUG_IN_PATH'
         )
 
