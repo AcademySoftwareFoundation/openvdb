@@ -1,6 +1,3 @@
-CMAKE_VERSION=3.6.2
-GCC_VERSION=4.8.3
-
 # Function for extracting version from the output of pk manifest --field
 _get_version = $(patsubst $(strip $1)-%,%,$(filter $(strip $1)-%,$2))
 #_get_version = $(filter $(strip $1)-%,$2)
