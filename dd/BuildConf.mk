@@ -23,6 +23,7 @@ OPENEXR_VERSION = $(call _get_version, openexr, $(requires_field))
 OPENVDB_VERSION = $(call _get_version, openvdb, $(requires_field))
 PYTHON_VERSION = $(call _get_version, python, $(requires_field))
 TBB_VERSION = $(call _get_version, tbb, $(requires_field))
+ZLIB_VERSION = $(call _get_version, zlib, $(requires_field))
 
 # Set the rest here
 CMAKE_VERSION ?= 3.6.2
@@ -53,3 +54,4 @@ OPENEXR_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/openexr/$(OPENEXR_VERSION)
 OPENVDB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/openvdb/$(BLOSC_VERSION)
 PYTHON_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/python/$(PYTHON_VERSION)
 TBB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/tbb/$(TBB_VERSION)
+ZLIB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/zlib/$(ZLIB_VERSION)
