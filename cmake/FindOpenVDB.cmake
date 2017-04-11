@@ -42,9 +42,6 @@
 # This module read hints about search locations from variables::
 #
 # OPENVDB_ROOT                  Preferred installtion prefix
-#
-# TODO: Add static and python lib. At the moment it just sets the
-# openvdb shared library.
 
 FIND_PACKAGE( PackageHandleStandardArgs )
 
