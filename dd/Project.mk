@@ -10,8 +10,8 @@
 # The version number of the facility's Makefile this package is making use of.
 USE_MAKEFILE_VERSION = 4
 
-# Openvdb's docs are online
-NO_DOCS=true
+# # Openvdb's docs are online
+# NO_DOCS=true
 
 # No support for git so disabling it
 NO_TAG=true
