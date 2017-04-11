@@ -30,11 +30,7 @@ Description: Open source C++ library, for storing and manipulating volume data.
 
 # An URL to the repository where the source code for this software
 # can be found.
-Url: http://dd-git.d2.com/fredriks/openvdb/
-
-# A relative path or URL pointing to the documentation for this
-# software.
-Docs: http://www.openvdb.org/documentation/
+Url: https://github.com/digitaldomain/openvdb
 
 # A list of location names this software will be installed at.  It
 # defaults to 'all', a special value indicating that 
