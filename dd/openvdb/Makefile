@@ -25,7 +25,7 @@ ARGS += -DOPENVDB_BUILD_PYTHON_MODULE=OFF
 
 # Disable abi 3 compatibility when the flavor tag _abi3 is not used.
 ifeq ($(filter abi3,$(subst _, ,$(PACKAGE_VERSION))),)
-  ARGS += -DOPENVDB_3_ABI_COMPATIBLE=OFF
+  ARGS += -DOPENVDB_ENABLE_3_ABI_COMPATIBLE=OFF
 endif
 
 ARGS += -DBOOST_ROOT=$(BOOST_PACKAGE_ROOT)
