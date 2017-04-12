@@ -10,6 +10,7 @@ current installed version. To do this simply run this in
 openvdb/dd/openvdb_houdini
 
 .. code-block:: sh
+                
    make add-houdini-version-<version>
 
 Where <version> is the houdini version you want to add. It will not

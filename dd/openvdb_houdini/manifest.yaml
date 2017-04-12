@@ -42,9 +42,8 @@ Sites: all
 # given if installation should be performed for all knowns platforms.
 Os: cent6_64
 
-# Note: For houdini <16 use openvdb-4.0.1_abi3_tbb43
 Requires:
-  - openvdb-4.0.0_abi3
+  - openvdb-4.0.1_abi3_boost1.55
 
 Supports:
   - houdini-16.0.535
