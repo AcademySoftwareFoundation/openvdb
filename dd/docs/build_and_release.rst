@@ -166,12 +166,12 @@ Here follows what you need to think about for the different packages.
 Houdini
 ~~~~~~~
 
-Houdini ships with it's own plugins for openvdb. Therefore you need to
+Houdini ships with its own plugins for openvdb. Therefore you need to
 make sure that the user can pass data between those plugins and the
 one you are building.
 
 Both 15 and 16 are still on openvdb 3. Which means that if you just
-build openvdb 4.0 with it's default settings, things will
+build openvdb 4.0 with its default settings, things will
 break. Instead you need to use the abi 3 compatibility option when
 building. This will be automatically enable when you use the _abi3
 flavor in the version name for the core package of openvdb.
