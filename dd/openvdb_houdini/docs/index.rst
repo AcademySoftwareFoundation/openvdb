@@ -15,4 +15,4 @@ Contents
 
    online
    build_and_release
-
+   add_version
