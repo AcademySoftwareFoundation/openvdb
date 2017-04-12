@@ -18,7 +18,6 @@ GLFW_VERSION = $(call _get_version, glfw, $(requires_field))
 ILMBASE_VERSION = $(call _get_version, openexr, $(requires_field))
 OPENEXR_VERSION = $(call _get_version, openexr, $(requires_field))
 OPENVDB_VERSION = $(call _get_version, openvdb, $(requires_field))
-PYTHON_VERSION = $(call _get_version, python, $(requires_field))
 TBB_VERSION = $(call _get_version, tbb, $(requires_field))
 ZLIB_VERSION = $(call _get_version, zlib, $(requires_field))
 
@@ -26,11 +25,6 @@ ZLIB_VERSION = $(call _get_version, zlib, $(requires_field))
 CMAKE_VERSION ?= 3.6.2
 CPPUNIT_VERSION ?= 1.12.1
 GCC_VERSION ?= 4.8.3
-
-# Python need the short version for the include
-PYTHON_MAJOR_VERSION = $(word 1,$(subst ., ,$(PYTHON_VERSION)))
-PYTHON_MINOR_VERSION = $(word 2,$(subst ., ,$(PYTHON_VERSION)))
-PYTHON_SHORT_VERSION = $(PYTHON_MAJOR_VERSION).$(PYTHON_MINOR_VERSION)
 
 # Boost needs it for cmake to not pick up the system one
 BOOST_MAJOR_VERSION = $(word 1,$(subst ., ,$(BOOST_VERSION)))
@@ -49,6 +43,5 @@ GLFW_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/glfw/$(GLFW_VERSION)
 ILMBASE_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/ilmbase/$(ILMBASE_VERSION)
 OPENEXR_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/openexr/$(OPENEXR_VERSION)
 OPENVDB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/openvdb/$(OPENVDB_VERSION)
-PYTHON_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/python/$(PYTHON_VERSION)
 TBB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/tbb/$(TBB_VERSION)
 ZLIB_PACKAGE_ROOT = $(TOOLS_PACKAGE_ROOT)/zlib/$(ZLIB_VERSION)

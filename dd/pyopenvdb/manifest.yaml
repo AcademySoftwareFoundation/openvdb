@@ -55,7 +55,10 @@ Requires:
   - boost-1.61.0
   - tbb-4.4.6
   - openexr-2.2.0
-  - glfw-2.7.6
-  - python-2.7.3
   - blosc-1.5.0
   - zlib-1.2.8
+
+Supports:
+  - python-2.6.7
+  - python-2.7.3
+
