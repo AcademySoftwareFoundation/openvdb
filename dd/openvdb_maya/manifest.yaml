@@ -51,26 +51,14 @@ Os: cent6_64
 # these requirements are only for the core and maya library. For
 # houdini it uses the versions included in the houdini toolkit.
 
-# Note: For maya <2017 the flavor _tbb43
 Requires:
-  - openvdb-4.0.1   # For maya 2017+
+  - openvdb-4.0.1 
   - boost-1.61.0
   - openexr-2.2.0
   - blosc-1.5.0
   - python-2.7.3
 
 # List of software / versions this package supports.
-
-# Supports:
-#   - maya-2012.5
-#   - maya-2013
-#   - maya-2013.5
-#   - maya-2014.5
-#   - maya-2015
-#   - maya-2015.5
-#   - maya-2016
-#   - maya-2016.5x2
-#   - maya-2017
 
 Supports:
   - maya-2017

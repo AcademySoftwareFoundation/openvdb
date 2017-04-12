@@ -5,7 +5,7 @@
 include ../BuildConf.mk
 
 # Get maya and houdini versions to build for
-maya_versions = $(call _get_support_versions,maya)
+maya_versions = $(call _get_version,maya,$(supports_field))
 BUILD_POST_TARGETS += $(addprefix build-maya-,$(maya_versions))
 
 # Include the bulk of the makefiles
@@ -17,8 +17,12 @@ include ../Project.mk
 
 
 ARGS += $(CMAKE_DEFAULT_ARGS)
+
 ARGS += -DOPENVDB_BUILD_CORE=OFF
 ARGS += -DOPENVDB_BUILD_MAYA_PLUGIN=ON
+ARGS += -DOPENVDB_BUILD_HOUDINI_SOPS=OFF
+ARGS += -DOPENVDB_BUILD_PYTHON_MODULE=OFF
+
 ARGS += -DOPENVDB_ENABLE_RPATH=OFF
 ARGS += -DOPENVDB_MAYA_SUBDIR=ON
 ARGS += -DOPENVDB_MAYA_INSTALL_MOD=OFF
