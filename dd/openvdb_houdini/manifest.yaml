@@ -44,7 +44,7 @@ Os: cent6_64
 
 # Note: For houdini <16 use openvdb-4.0.1_abi3_tbb43
 Requires:
-  - openvdb-4.0.0_abi3  # For houdini 16+
+  - openvdb-4.0.0_abi3
 
 Supports:
   - houdini-16.0.535
