@@ -61,5 +61,6 @@ Requires:
 # List of software / versions this package supports.
 
 Supports:
+  - maya-2016.5x2
   - maya-2017
 
