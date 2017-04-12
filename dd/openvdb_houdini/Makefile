@@ -42,4 +42,7 @@ build-houdini-%:
 		$(CMAKE_PACKAGE_ROOT)/bin/cmake $(ARGS) $(PROJECT_ROOT) && \
 		make -j $(shell nproc) && make install
 
+add-houdini-version-%: build-houdini-%
+	@echo -e "\nNow run: pkappend --rem=all $(DIST_DIR)/houdini/$* $(DD_OS)"\
+                 "$(PACKAGE_NAME) $(PACKAGE_VERSION) houdini $*"
 
