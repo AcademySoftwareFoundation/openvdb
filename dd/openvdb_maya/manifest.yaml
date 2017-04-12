@@ -14,7 +14,7 @@ Schema: '1.0'
 # versioning.
 Name: openvdb_maya
 
-Version: 4.0.1_maya2016
+Version: 4.0.1_maya2015
 
 # The type of installation that will be performed for this software.
 # This information MUST be provided.
@@ -52,7 +52,7 @@ Os: cent6_64
 # houdini it uses the versions included in the houdini toolkit.
 
 Requires:
-  - openvdb-4.0.1_tbb43
+  - openvdb-4.0.1_tbb42
   - boost-1.61.0
   - openexr-2.2.0
   - blosc-1.5.0
@@ -60,7 +60,7 @@ Requires:
 # List of software / versions this package supports.
 
 Supports:
-  - maya-2016
-
+  - maya-2015
+  - maya-2015.5
 
 
