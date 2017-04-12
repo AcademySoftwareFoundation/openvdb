@@ -56,3 +56,4 @@ Requires:
   - openexr-2.2.0
   - glfw-2.7.6
   - blosc-1.5.0
+  - zlib-1.2.8
