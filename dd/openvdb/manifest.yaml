@@ -14,7 +14,7 @@ Schema: '1.0'
 # versioning.
 Name: openvdb
 
-Version: 4.0.1_tbb43
+Version: 4.0.1_tbb42
 
 # The type of installation that will be performed for this software.
 # This information MUST be provided.
@@ -52,7 +52,7 @@ Os: cent6_64
 # houdini it uses the versions included in the houdini toolkit.
 Requires:
   - boost-1.61.0
-  - tbb-4.3.5
+  - tbb-4.2.5
   - openexr-2.2.0
   - glfw-2.7.6
   - blosc-1.5.0
