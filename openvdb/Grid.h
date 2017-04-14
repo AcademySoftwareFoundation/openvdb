@@ -37,6 +37,7 @@
 #include "io/io.h"
 #include "math/Transform.h"
 #include "tree/Tree.h"
+#include "util/logging.h"
 #include "util/Name.h"
 #include <cassert>
 #include <iostream>
@@ -850,7 +851,14 @@ public:
     /// Return @c true if this grid type is registered.
     static bool isRegistered() { return GridBase::isRegistered(Grid::gridType()); }
     /// Register this grid type along with a factory function.
-    static void registerGrid() { GridBase::registerGrid(Grid::gridType(), Grid::factory); }
+    static void registerGrid()
+    {
+        GridBase::registerGrid(Grid::gridType(), Grid::factory);
+        if (!tree::LeafBufferFlags<ValueType>::IsAtomic) { ///< @todo remove this for ABI 5
+            OPENVDB_LOG_WARN("delayed loading of grids of type " << Grid::gridType()
+                << " might not be threadsafe on this platform");
+        }
+    }
     /// Remove this grid type from the registry.
     static void unregisterGrid() { GridBase::unregisterGrid(Grid::gridType()); }
 
