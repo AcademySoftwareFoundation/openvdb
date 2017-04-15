@@ -1,6 +1,30 @@
 OpenVDB Version History
 =======================
 
+Version 4.0.2 - In development
+
+    Bug fixes:
+    - Fixed a delayed-loading race condition that could result in crashes.
+      [Reported by Dan Bailey]
+
+      To preserve ABI compatibility, this fix is currently enabled only
+      on platforms for which the alignment of a tbb::atomic<uint32_t>
+      is the same as for a uint32_t.  On other platforms, warnings will
+      be logged during OpenVDB initialization, and it is recommended
+      to disable delayed loading in that case (for example, by defining
+      the environment variable OPENVDB_DISABLE_DELAYED_LOAD).
+
+    - Fixed a delayed-loading memory leak in the PointDataLeafNode.
+      [Contributed by Double Negative]
+
+    Houdini:
+    - Added a slider to the Remove Divergence SOP to set the error tolerance
+      for the pressure solver.
+    - The Extended Operator Info window in Houdini 16 now renders correctly
+      for OpenVDB SOPs, instead of displaying a Python stack trace.
+      [Contributed by Dan Bailey]
+
+
 Version 4.0.1 - March 8, 2017
 
     New features:

@@ -64,6 +64,9 @@ typedef openvdb::BBoxd      ColliderBBox;
 typedef openvdb::Coord      Coord;
 
 enum ColliderType { CT_NONE, CT_BBOX, CT_STATIC, CT_DYNAMIC };
+
+const int DEFAULT_MAX_ITERATIONS = 1000;
+const double DEFAULT_MAX_ERROR = 1.0e-20;
 }
 
 
@@ -97,10 +100,38 @@ newSopOperator(OP_OperatorTable* table)
             "VDBs with nonuniform voxels, including frustum grids, are not supported.\n"
             "They should be resampled to have a linear transform with uniform scale."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
-        .setDefault(50)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
-        .setHelpText("Maximum number of iterations of the solver"));
+    {
+        std::ostringstream ostr;
+        ostr << "If disabled, limit the pressure solver to "
+            << DEFAULT_MAX_ITERATIONS << " iterations.";
+
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "useiterations", "")
+            .setDefault(PRMoneDefaults)
+            .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+            .setHelpText(ostr.str().c_str()));
+
+        parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
+            .setDefault(50)
+            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
+            .setHelpText("Maximum number of iterations of the pressure solver"));
+    }
+    {
+        std::ostringstream ostr;
+        ostr << "If disabled, limit the pressure solver error to "
+            << std::setprecision(3) << DEFAULT_MAX_ERROR << ".";
+
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "usetolerance", "")
+            .setDefault(PRMoneDefaults)
+            .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+            .setHelpText(ostr.str().c_str()));
+
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Tolerance")
+            .setDefault(openvdb::math::Delta<float>::value())
+            .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 0.01)
+            .setHelpText(
+                "The pressure solver is deemed to have converged when\n"
+                "the magnitude of the error is less than this tolerance."));
+    }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usecollider", "")
         .setDefault(PRMzeroDefaults)
@@ -149,7 +180,7 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Remove Divergence",
         SOP_OpenVDB_Remove_Divergence::factory, parms, *table)
-        .addInput("Vector field VDBs")
+        .addInput("Velocity field VDBs")
         .addOptionalInput("Optional collider VDB or geometry");
 }
 
@@ -164,6 +195,8 @@ SOP_OpenVDB_Remove_Divergence::updateParmsFlags()
     changed |= enableParm("collidertype", useCollider);
     changed |= enableParm("invertcollider", useCollider);
     changed |= enableParm("collider", useCollider && (colliderTypeStr != "bbox"));
+    changed |= enableParm("iterations", evalInt("useiterations", 0, 0));
+    changed |= enableParm("tolerance", evalInt("usetolerance", 0, 0));
     return changed;
 }
 
@@ -192,6 +225,7 @@ struct SolverParms {
         : invertCollider(false)
         , colliderType(CT_NONE)
         , iterations(1)
+        , absoluteError(-1.0)
         , outputState(openvdb::math::pcg::terminationDefaults<double>())
         , interrupter(NULL)
     {}
@@ -204,6 +238,7 @@ struct SolverParms {
     bool invertCollider;
     ColliderType colliderType;
     int iterations;
+    double absoluteError;
     openvdb::math::pcg::State outputState;
     hvdb::Interrupter* interrupter;
 };
@@ -585,8 +620,9 @@ removeDivergenceWithColliderGrid(SolverParms& parms, const BoundaryOpType& bound
 
     parms.outputState = openvdb::math::pcg::terminationDefaults<VectorElementType>();
     parms.outputState.iterations = parms.iterations;
-    parms.outputState.relativeError = parms.outputState.absoluteError =
-        openvdb::math::Delta<VectorElementType>::value();
+    parms.outputState.absoluteError = (parms.absoluteError >= 0.0 ?
+        parms.absoluteError : DEFAULT_MAX_ERROR);
+    parms.outputState.relativeError = 0.0;
 
     typedef openvdb::math::pcg::JacobiPreconditioner<openvdb::tools::poisson::LaplacianMatrix> PCT;
 
@@ -791,7 +827,10 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
 
         SolverParms parms;
         parms.interrupter = &interrupter;
-        parms.iterations = static_cast<int>(evalInt("iterations", 0, time));
+        parms.iterations = (!evalInt("useiterations", 0, time) ?
+            DEFAULT_MAX_ITERATIONS : static_cast<int>(evalInt("iterations", 0, time)));
+        parms.absoluteError = (!evalInt("usetolerance", 0, time) ?
+            -1.0 : evalFloat("tolerance", 0, time));
         parms.invertCollider = evalInt("invertcollider", 0, time);
 
         UT_String groupStr;
@@ -805,7 +844,7 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
         UT_String colliderTypeStr;
         evalString(colliderTypeStr, "collidertype", 0, time);
 
-        UT_StringArray xformMismatchGridNames, failedGridNames, nonuniformGridNames;
+        UT_StringArray xformMismatchGridNames, nonuniformGridNames;
 
         // Retrieve either a collider grid or a collider bounding box
         // (or neither) from the reference input.
@@ -920,17 +959,21 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                 }
 
                 if (!success) {
-                    failedGridNames.append(getPrimitiveIndexAndName(*vdbIt));
+                    std::ostringstream errStrm;
+                    errStrm << "solver failed to converge for VDB "
+                        << getPrimitiveIndexAndName(*vdbIt).c_str()
+                        << " with error " << parms.outputState.absoluteError;
+                    addWarning(SOP_MESSAGE, errStrm.str().c_str());
                 } else {
                     if (outputPressure && parms.pressureGrid) {
                         hvdb::createVdbPrimitive(*gdp, parms.pressureGrid);
                     }
                     if (numGridsProcessed > 1) infoStrm << "\n";
-                    infoStrm << "VDB " << getPrimitiveIndexAndName(*vdbIt).c_str()
-                        << " converged in " << parms.outputState.iterations << " iteration"
+                    infoStrm << "solver converged for VDB "
+                        << getPrimitiveIndexAndName(*vdbIt).c_str()
+                        << " in " << parms.outputState.iterations << " iteration"
                             << (parms.outputState.iterations == 1 ? "" : "s")
-                        << " with relative error " << parms.outputState.relativeError
-                        << " and absolute error " << parms.outputState.absoluteError;
+                        << " with error " << parms.outputState.absoluteError;
                 }
             }
         }
@@ -950,13 +993,6 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                     const std::string names = joinNames(xformMismatchGridNames, " or ");
                     addWarning(SOP_MESSAGE,
                         ("vector field and collider transforms don't match for " + names).c_str());
-                }
-                if (failedGridNames.size() > 0) {
-                    std::ostringstream errStrm;
-                    errStrm << "solution failed to converge within " << parms.iterations
-                        << " iteration" << (parms.iterations == 1 ? "" : "s")
-                        << " for " << joinNames(failedGridNames);
-                    addWarning(SOP_MESSAGE, errStrm.str().c_str());
                 }
                 const std::string info = infoStrm.str();
                 if (!info.empty()) {
