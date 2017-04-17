@@ -80,7 +80,7 @@ namespace hutil = houdini_utils;
 #endif
 
 #if (UT_VERSION_INT < 0x0c050000) // before 12.5.0
-typedef UT_Vector3T<int32> UT_Vector3i;
+using UT_Vector3i = UT_Vector3T<int32>;
 #endif
 
 
@@ -93,11 +93,11 @@ class SOP_OpenVDB_Visualize: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Visualize(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Visualize() {}
+    ~SOP_OpenVDB_Visualize() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i) const { return (i == 1); }
+    int isRefInput(unsigned i) const override { return (i == 1); }
 
     static UT_Vector3 colorLevel(int level) { return mColors[std::max(3-level,0)]; }
     static const UT_Vector3& colorSign(bool negative) { return mColors[negative ? 5 : 4]; }
@@ -107,10 +107,10 @@ public:
         fpreal time = 0.0);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
-    static  UT_Vector3 mColors[];
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
+    static UT_Vector3 mColors[];
 };
 
 
@@ -131,44 +131,53 @@ UT_Vector3 SOP_OpenVDB_Visualize::mColors[] = {
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "The VDBs to be visualized (see [specifying volumes|/model/volumes#group])"));
 
 #if HAVE_SURFACING_PARM
     // Surfacing
-    parms.add(hutil::ParmFactory(PRM_HEADING,"surfacing", "Surfacing"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "surfacing", "Surfacing"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawsurface", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     {   // Meshing scheme
-        const char* items[] = {
+        char const * const items[] = {
             "openvdb",  "OpenVDB Mesher",
             "houdini",  "Houdini Surfacer",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "mesher", "Mesher")
-            .setHelpText("Select a meshing scheme.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Select a meshing scheme.")
+            .setDocumentation("The meshing scheme to be used to visualize scalar volumes"));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
+        .setDocumentation(
+            "How closely to match the surface\n\n"
+            "Higher adaptivity allows for more variation in polygon size,"
+            " so that fewer polygons are used to represent the surface."));
 
     //parms.add(hutil::ParmFactory(PRM_TOGGLE, "computeNormals", "Compute Point Normals"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
-        .setRange(PRM_RANGE_FREE, -2.0, PRM_RANGE_FREE, 2.0));
+        .setRange(PRM_RANGE_FREE, -2.0, PRM_RANGE_FREE, 2.0)
+        .setDocumentation("The isovalue of the surface to be meshed"));
     parms.add(
         hutil::ParmFactory(PRM_RGB_J, "surfaceColor", "Surface Color")
         .setDefault(std::vector<PRM_Default>(3, PRM_Default(0.84))) // RGB = (0.84, 0.84, 0.84)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setDocumentation("The color of the surface mesh"));
 
     // Tree Topology
     parms.add(hutil::ParmFactory(PRM_HEADING,"treeTopology", "Tree Topology"));
@@ -176,39 +185,57 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addcolor", "Color")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Specify whether to draw in color."));
+        .setTooltip("Specify whether to draw in color.")
+        .setDocumentation(
+            "Specify whether to generate geometry with the `Cd` color attribute."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewFrustum", "Frustum")
-        .setHelpText(
+        .setTooltip(
             "Specify whether to draw the camera frustums\n"
-            "of grids with frustum transforms."));
+            "of grids with frustum transforms.")
+        .setDocumentation(
+            "For VDBs with [frustum transforms|http://www.openvdb.org/documentation/"
+            "doxygen/transformsAndMaps.html#sFrustumTransforms],"
+            " generate geometry representing the frustum bounding box."));
 
 #ifdef DWA_OPENVDB
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", "Region of Interest"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", "Region of Interest")
+        .setDocumentation(
+            "If enabled, generate geometry representing the region of interest"
+            " (for grids with ROI metadata)."));
 #endif
 
-    const char* boxItems[] = {
+    char const * const boxItems[] = {
         "wirebox",  "Wireframe Boxes",
         "box",      "Solid Boxes",
-        NULL
+        nullptr
     };
-    const char* pointAndBoxItems[] = {
+    char const * const pointAndBoxItems[] = {
         "points",   "Points",
         "wirebox",  "Wireframe Boxes",
         "box",      "Solid Boxes",
-        NULL
+        nullptr
     };
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawleafnodes", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_ORD, "leafmode", "Leaf Nodes")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems));
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems)
+        .setDocumentation(
+            "Specify whether to render the leaf nodes of VDB trees"
+            " as wireframe boxes or as solid boxes.\n\n"
+            "If __Color__ is enabled, leaf nodes will be blue."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawinternalnodes", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_ORD, "internalmode", "Internal Nodes")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems));
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems)
+        .setDocumentation(
+            "Specify whether to render the internal nodes of VDB trees"
+            " as wireframe boxes or as solid boxes.\n\n"
+            "If __Color__ is enabled, the lowest-level internal nodes will be green"
+            " and higher-level internal nodes will be orange."));
 
     // Active tiles
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawtiles", "")
@@ -217,30 +244,55 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "tilemode", "Active Tiles")
         .setDefault(PRMoneDefaults)
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems)
+        .setDocumentation(
+            "Specify whether to render the active tiles of VDB trees"
+            " as wireframe boxes, as solid boxes, or as a single point"
+            " in the middle of each tile.\n\n"
+            "If __Color__ is enabled, negative-valued tiles will be white"
+            " and nonnegative tiles will be red."));
 
     // Active voxels
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawvoxels", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     parms.add(hutil::ParmFactory(PRM_ORD, "voxelmode", "Active Voxels")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems)
+        .setDocumentation(
+            "Specify whether to render the active voxels of VDB trees"
+            " as wireframe boxes, as solid boxes, or as a single point"
+            " in the middle of each voxel.\n\n"
+            "If __Color__ is enabled, negative-valued voxels will be white"
+            " and nonnegative voxels will be red.\n\n"
+            "WARNING:\n"
+            "    Rendering active voxels as boxes can generate large amounts of geometry."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "ignorestaggered", "Ignore Staggered Vectors")
-        .setHelpText("Draw staggered vectors as if they were collocated."));
+        .setTooltip("Draw staggered vectors as if they were collocated."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addindexcoord", "Points with Index Coordinates")
-        .setHelpText("Add a voxel/tile index coordinate attribute to points."));
+        .setTooltip("Add a voxel/tile index coordinate attribute to points.")
+        .setDocumentation(
+            "For voxels and tiles rendered as points, add an attribute to the points"
+            " that gives the coordinates of the points in the VDB's [index space|"
+            "http://www.openvdb.org/documentation/doxygen/overview.html#secSpaceAndTrans]."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addvalue", "Points with Values")
-        .setHelpText("Add a voxel/tile value attribute to points."));
+        .setTooltip("Add a voxel/tile value attribute to points.")
+        .setDocumentation(
+            "For voxels and tiles rendered as points, add an attribute to the points"
+            " that gives the voxel and tile values."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usegridname", "Name Point Attributes After Grids")
-        .setHelpText(
+        .setTooltip(
             "If enabled, use the grid name as the attribute name when\n"
             "displaying points with values.\n"
             "If disabled or if a grid has no name, use either \"vdb_int\",\n"
-            "\"vdb_float\" or \"vdb_vec3f\" as the attribute name."));
+            "\"vdb_float\" or \"vdb_vec3f\" as the attribute name.")
+        .setDocumentation(
+            "If enabled, name the attribute added by __Points with Values__ after"
+            " the VDB primitive.  If disabled or if a VDB has no name, name the point"
+            " attribute according to its type: `vdb_int`, `vdb_float`, `vdb_vec3f`, etc."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -255,34 +307,34 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "Other", "Other"));
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none",     "Disabled",
             "opevdb",   "OpenVDB Mesher", // note the misspelling
             "houdini",  "Houdini Surfacer",
-            NULL
+            nullptr
         };
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "meshing", "Meshing")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none",     "Disabled",
             "leaf",     "Leaf Nodes and Active Tiles",
             "nonconst", "Leaf and Internal Nodes",
-            NULL
+            nullptr
         };
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "nodes", "Tree Nodes")
             .setDefault(PRMoneDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none",     "Disabled",
             "points",   "Points",
             "pvalue",   "Points with Values",
             "wirebox",  "Wireframe Box",
             "box",      "Solid Box",
-            NULL
+            nullptr
         };
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "tiles", "Active Constant Tiles")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
@@ -299,7 +351,29 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Visualize", SOP_OpenVDB_Visualize::factory, parms, *table)
         .addAlias("OpenVDB Visualizer")
         .setObsoleteParms(obsoleteParms)
-        .addInput("Input with VDBs to visualize");
+        .addInput("Input with VDBs to visualize")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Generate geometry to visualize the internal\n\
+[tree structure|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
+of a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node can be a useful troubleshooting tool.\n\
+Among other things, it allows one to evaluate the\n\
+[sparseness|http://www.openvdb.org/documentation/doxygen/overview.html#secSparsity]\n\
+of VDB volumes as well as to examine their extents and the values of individual voxels.\n\
+\n\
+@related\n\
+- [Node:sop/vdbvisualizetree]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -496,7 +570,7 @@ SOP_OpenVDB_Visualize::evalRenderStyle(const char* toggleName, const char* modeN
 
 inline void
 createBox(GU_Detail& geo, const openvdb::math::Transform& xform,
-    const openvdb::CoordBBox& bbox, const UT_Vector3* color = NULL, bool solid = false)
+    const openvdb::CoordBBox& bbox, const UT_Vector3* color = nullptr, bool solid = false)
 {
     struct Local {
         static inline UT_Vector3 Vec3dToUTV3(const openvdb::Vec3d& v) {
@@ -582,7 +656,7 @@ struct TreeParms
 class TreeVisualizer
 {
 public:
-    TreeVisualizer(GU_Detail&, const TreeParms&, hvdb::Interrupter* = NULL);
+    TreeVisualizer(GU_Detail&, const TreeParms&, hvdb::Interrupter* = nullptr);
 
     template<typename GridType>
     void operator()(const GridType&);
@@ -634,7 +708,7 @@ TreeVisualizer::TreeVisualizer(GU_Detail& geo, const TreeParms& parms,
     : mParms(parms)
     , mGeo(&geo)
     , mInterrupter(interrupter)
-    , mXform(NULL)
+    , mXform(nullptr)
 {
 }
 
@@ -643,7 +717,7 @@ template<typename GridType>
 void
 TreeVisualizer::operator()(const GridType& grid)
 {
-    typedef typename GridType::TreeType TreeType;
+    using TreeType = typename GridType::TreeType;
 
     mXform = &grid.transform();
 
@@ -907,7 +981,7 @@ void
 TreeVisualizer::addBox(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, bool solid)
 {
-    createBox(*mGeo, *mXform, bbox, mParms.addColor ? &color : NULL, solid);
+    createBox(*mGeo, *mXform, bbox, mParms.addColor ? &color : nullptr, solid);
 }
 
 
@@ -920,7 +994,7 @@ class GridSurfacer
 {
 public:
     GridSurfacer(GU_Detail& geo, float iso = 0.0, float adaptivityThreshold = 0.0,
-        bool generateNormals = false, hvdb::Interrupter* interrupter = NULL);
+        bool generateNormals = false, hvdb::Interrupter* interrupter = nullptr);
 
     template<typename GridType>
     void operator()(const GridType&);
@@ -952,8 +1026,8 @@ template<typename GridType>
 void
 GridSurfacer::operator()(const GridType& grid)
 {
-    typedef typename GridType::TreeType TreeType;
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using TreeType = typename GridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
     openvdb::CoordBBox bbox;
 
     // Gets min & max and checks if the grid is empty
@@ -1054,7 +1128,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("Visualizer");
 
         const GU_Detail* refGdp = inputGeo(0);
-        if(refGdp == NULL) return error();
+        if(refGdp == nullptr) return error();
 
         // Get the group of grids to visualize.
         const GA_PrimitiveGroup* group =

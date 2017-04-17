@@ -139,11 +139,16 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be loaded.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be loaded.")
+        .setDocumentation(
+            "A subset of the input VDB Points primitives to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
-        .setHelpText("Specify VDB Points Groups to use as an input."));
+        .setTooltip(
+            "Specify an existing internal group in the VDB Points primitive"
+            " to use as a starting point for a new group."));
 
     parms.beginSwitcher("tabMenu1");
     parms.addFolder("Create");
@@ -151,47 +156,48 @@ newSopOperator(OP_OperatorTable* table)
     // Toggle to enable creation
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablecreate", "Enable")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Enable creation of group."));
+        .setTooltip("Enable creation of the group."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "groupname", "Group Name")
         .setDefault(0, ::strdup("group1"))
-        .setHelpText("Group name to create."));
+        .setTooltip("The name of the internal group to create"));
 
     parms.beginSwitcher("tabMenu2");
     parms.addFolder("Number");
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablenumber", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable number filtering."));
+        .setTooltip("Enable filtering by number."));
 
     {
-        const char* items[] = {
-            "percentage",       "Percentage",
-            "total",            "Total",
+        char const * const items[] = {
+            "percentage",   "Percentage",
+            "total",        "Total",
             nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "numbermode", "Mode")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip(
+                "Specify how to filter out a subset of the points inside the VDB Points."));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT, "pointpercent", "Percent")
         .setDefault(PRMtenDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 100)
-        .setHelpText("Point percentage to include in the Group."));
+        .setTooltip("The percentage of points to include in the group"));
 
     parms.add(hutil::ParmFactory(PRM_INT, "pointcount", "Count")
         .setDefault(&fiveThousandDefault)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1000000)
-        .setHelpText("Point percentage to include in the Group."));
+        .setTooltip("The total number of points to include in the group"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE_J, "enablepercentattribute", "")
         .setDefault(PRMzeroDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("."));
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "percentattribute", "Attribute Seed")
         .setDefault(0, ::strdup("id"))
-        .setHelpText("Point attribute to use as a seed for percent filtering."));
+        .setTooltip("The point attribute to use as a seed for percent filtering"));
 
     parms.endSwitcher();
 
@@ -200,10 +206,10 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enableboundingbox", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable bounding box filtering."));
+        .setTooltip("Enable filtering by bounding box."));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "boundingbox",      "Bounding Box",
             "boundingobject",   "Bounding Object",
             nullptr
@@ -214,14 +220,16 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "boundingname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText("Name of the bounding geometry."));
+        .setTooltip("The name of the bounding geometry"));
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "size", "Size")
         .setDefault(PRMoneDefaults)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip("The size of the bounding box"));
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "center", "Center")
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip("The center of the bounding box"));
 
     parms.endSwitcher();
 
@@ -230,35 +238,35 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablelevelset", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable level set filtering."));
+        .setTooltip("Enable filtering by level set."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "levelsetname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText("Name of the level set."));
+        .setTooltip("The name of the level set"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdfmin", "Enable")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable SDF minimum."));
+        .setTooltip("Enable SDF minimum."));
 
     parms.add(hutil::ParmFactory(PRM_FLT, "sdfmin", "SDF Minimum")
         .setDefault(&negPointOneDefault)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
-        .setHelpText("SDF minimum value."));
+        .setTooltip("SDF minimum value"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdfmax", "Enable")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable SDF maximum."));
+        .setTooltip("Enable SDF maximum."));
 
     parms.add(hutil::ParmFactory(PRM_FLT, "sdfmax", "SDF Maximum")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
-        .setHelpText("SDF maximum value."));
+        .setTooltip("SDF maximum value"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sdfinvert", "Invert")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Invert SDF minimum and maximum."));
+        .setTooltip("Invert SDF minimum and maximum."));
 
     parms.endSwitcher();
 
@@ -266,21 +274,28 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enableviewport", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Toggle viewport group."));
+        .setTooltip("Toggle viewport group.")
+        .setDocumentation(
+            "Enable the viewport group.\n\n"
+            "This allows one to specify a subset of points to be displayed in the viewport.\n"
+            "This minimizes the data transfer to the viewport without removing the data.\n\n"
+            "NOTE:\n"
+            "    Only one group can be tagged as a viewport group.\n"));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "addviewportgroup",      "Add Viewport Group",
             "removeviewportgroup",   "Remove Viewport Group",
             nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "viewportoperation", "Operation")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Specify whether to add or remove the viewport group."));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "viewportgroupname", "Name")
-        .setDefault(0, ::strdup("chs(\"groupname\")"), CH_OLD_EXPRESSION)
-        .setHelpText("Display only this group in the viewport."));
+        .setDefault("chs(\"groupname\")", CH_OLD_EXPRESSION)
+        .setTooltip("Display only this group in the viewport."));
 
     parms.endSwitcher();
 
@@ -290,7 +305,28 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Points Group",
         SOP_OpenVDB_Points_Group::factory, parms, *table)
         .addInput("VDB Points")
-        .addOptionalInput("Optional bounding geometry or level set");
+        .addOptionalInput("Optional bounding geometry or level set")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Manipulate the internal groups of a VDB Points primitive.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node acts like the [Node:sop/group] node, but for the points inside\n\
+a VDB Points primitive.\n\
+It can create and manipulate the primitive's internal groups.\n\
+Generated groups can be used to selectively unpack a subset of the points\n\
+with an [OpenVDB Points Convert node|Node:sop/DW_OpenVDBPointsConvert].\n\
+\n\
+@related\n\
+- [OpenVDB Points Convert|Node:sop/DW_OpenVDBPointsConvert]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 

@@ -88,7 +88,7 @@ struct SegmentActiveVoxels
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-         typedef typename GridType::Ptr   GridPtrType;
+        using GridPtrType = typename GridType::Ptr;
 
         std::vector<GridPtrType> segments;
 
@@ -141,7 +141,7 @@ struct SegmentSDF
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        typedef typename GridType::Ptr   GridPtrType;
+        using GridPtrType = typename GridType::Ptr;
 
         std::vector<GridPtrType> segments;
 
@@ -193,15 +193,15 @@ class SOP_OpenVDB_Segment: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Segment(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Segment() {}
+    ~SOP_OpenVDB_Segment() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i > 0); }
+    int isRefInput(unsigned i ) const override { return (i > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 ////////////////////////////////////////
@@ -210,22 +210,49 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Select a subset of the input OpenVDB grids to segment.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Select a subset of the input OpenVDB grids to segment.")
+        .setDocumentation(
+            "A subset of the input VDB grids to be segmented"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "colorsegments", "Color Segments")
-        .setDefault(PRMoneDefaults));
+        .setDefault(PRMoneDefaults)
+        .setDocumentation(
+            "If enabled, assign a unique, random color to each segment"
+            " for ease of identification."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "appendnumber", "Append Segment Number to Grid Name")
-        .setDefault(PRMoneDefaults));
+        .setDefault(PRMoneDefaults)
+        .setDocumentation(
+            "If enabled, name each output VDB after the input VDB with"
+            " a unique segment number appended for ease of identification."));
 
     hvdb::OpenVDBOpFactory("OpenVDB Segment", SOP_OpenVDB_Segment::factory, parms, *table)
-        .addInput("OpenVDB grids");
+        .addInput("OpenVDB grids")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Split SDF VDB volumes into connected components.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+A single SDF VDB may represent multiple disjoint objects.\n\
+This node detects disjoint components and creates a new VDB for each component.\n\
+\n\
+@related\n\
+- [Node:sop/vdbsegmentbyconnectivity]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -270,7 +297,7 @@ SOP_OpenVDB_Segment::cookMySop(OP_Context& context)
         const fpreal time = context.getTime();
 
         const GU_Detail* inputGeoPt = inputGeo(0);
-        const GA_PrimitiveGroup *group = NULL;
+        const GA_PrimitiveGroup *group = nullptr;
 
         hvdb::Interrupter boss("VDB Segment");
 

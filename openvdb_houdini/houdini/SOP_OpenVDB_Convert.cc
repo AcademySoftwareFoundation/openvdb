@@ -101,17 +101,17 @@ class SOP_OpenVDB_Convert: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Convert(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Convert() {}
+    ~SOP_OpenVDB_Convert() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
     // Return true for a given input if the connector to the input
     // should be drawn dashed rather than solid.
-    virtual int isRefInput(unsigned idx) const { return (idx == 1); }
+    int isRefInput(unsigned idx) const override { return (idx == 1); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
 private:
     void convertToPoly(
@@ -137,42 +137,78 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input primitives to convert.")
+        .setDocumentation(
+            "A subset of the input primitives to be converted"
+            " (see [specifying volumes|/model/volumes#group])"));
 
 
     { // Convert To Menu
-        const char* items[] = {
+        char const * const items[] = {
             "volume",   "Volume",
             "vdb",      "VDB",
             "poly",     "Polygons",
 #if HAVE_POLYSOUP
             "polysoup", "Polygon Soup",
 #endif
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+        .setDocumentation("\
+The type of conversion to perform\n\
+\n\
+Volume:\n\
+    Convert a VDB volume into a dense Houdini volume.\n\
+\n\
+    This allows legacy tools to understand the primitive,\n\
+    however the memory requirements of dense volumes with effective\n\
+    resolutions over 1000<sup>3</sup> might be prohibitive.\n"
+#if HAVE_SPLITTING
+"\
+    Consider using the __Split Disjoint Volumes__ option.\n"
+#endif
+"\
+\n\
+VDB:\n\
+    Convert a Houdini volume into a VDB volume.\n\
+\n\
+    By default, the resulting VDB will be of the same class as the input,\n\
+    so a fog volume becomes a fog VDB and an SDF volume an SDF VDB.\n\
+\n\
+Polygons:\n\
+    Generate a polygonal mesh representing an isosurface of a VDB volume.\n"
+#if HAVE_POLYSOUP
+"\
+Polygon Soup:\n\
+    Generate a polygonal mesh representing an isosurface of a VDB volume.\n\
+\n\
+    The mesh is stored as a polygon soup, which is more compact than\n\
+    an ordinary mesh but does not support most editing operations.\n"
+#endif
+        ));
     }
 
     { // Grid Class Menu
-        const char* class_items[] = {
+        char const * const class_items[] = {
             "none", "No Change",
             "sdf",  "Convert Fog to SDF",
             "fog",  "Convert SDF to Fog",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items)
+            .setTooltip("Convert fog volumes to signed distance fields or vice versa."));
     }
 
     //////////
@@ -181,10 +217,11 @@ newSopOperator(OP_OperatorTable* table)
 
 #if HAVE_SPLITTING
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "splitdisjointvolumes", "Split Disjoint Volumes")
-        .setHelpText("When converting to volumes, create multiple "
-            "volume primitives per VDB for unconnected regions where "
-            "possible. This allows very large and sparse VDBs to be converted "
-            "with less memory usage."));
+        .setTooltip(
+            "When converting to volumes, where possible create a separate"
+            " volume primitive for each connected component of a VDB."
+            " This allows very large and sparse VDBs to be converted"
+            " with a reduced memory footprint."));
 #endif
 
     //////////
@@ -193,24 +230,24 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
-        .setHelpText("The crossing point of the VDB values that is considered "
+        .setTooltip("The crossing point of the VDB values that is considered "
             "the surface when converting to polygons"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "fogisovalue", "Fog Isovalue")
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setDefault(PRMpointFiveDefaults)
-        .setHelpText("The crossing point of the VDB values that is considered "
+        .setTooltip("The crossing point of the VDB values that is considered "
             "the surface when converting to level sets from fog volumes"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 2.0)
-        .setHelpText("When converting to polygons the adaptivity threshold determines "
+        .setTooltip("When converting to polygons, the adaptivity threshold determines "
             "how closely the isosurface is matched by the resulting mesh. Higher "
             "thresholds will allow more variation in polygon size, using fewer "
             "polygons to express the surface."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "computenormals", "Compute Vertex Normals")
-        .setHelpText("Compute edge-preserving vertex normals"));
+        .setTooltip("Compute edge-preserving vertex normals."));
 
 
     //////////
@@ -219,46 +256,46 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "internaladaptivity", "Internal Adaptivity")
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
-        .setHelpText("When converting to polygons with a second input, this overrides "
+        .setTooltip("When converting to polygons with a second input, this overrides "
             "the adaptivity threshold for all internal surfaces."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes")
-        .setHelpText("When converting to polygons with a second input, this transfers "
-            "all attributes (primitive, vertex and point) from the reference surface. "
-            "Will override computed vertex normals for primitives in the surface group."));
+        .setTooltip("When converting to polygons with a second input, transfer "
+            "all attributes (primitive, vertex and point) from the reference surface.\n\n"
+            "This will override computed vertex normals for primitives in the surface group."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sharpenfeatures", "Sharpen Features")
-        .setHelpText("Sharpen edges and corners."));
+        .setTooltip("Sharpen edges and corners."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "edgetolerance", "Edge Tolerance")
         .setDefault(0.5)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
-        .setHelpText("Controls the edge adaptivity mask"));
+        .setTooltip("Controls the edge adaptivity mask"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
         .setDefault("surface_polygons")
-        .setHelpText("When converting to polygons with a second input, this "
+        .setTooltip("When converting to polygons with a second input, this "
             "specifies a group for all polygons that are coincident with the "
             "reference surface. This group is useful for transferring attributes such "
             "as uv coordinates, normals etc. from the reference surface."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "interiorgroup", "Interior Group")
         .setDefault("interior_polygons")
-        .setHelpText("When converting to polygons with a second input, this "
+        .setTooltip("When converting to polygons with a second input, this "
             "specifies a group for all polygons that are interior to the "
             "reference surface. This group can be used to identify surface regions "
             "that might require projected uv coordinates or new materials."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "seamlinegroup", "Seam Line Group")
         .setDefault("seam_polygons")
-        .setHelpText("When converting to polygons with a second input, this "
+        .setTooltip("When converting to polygons with a second input, this "
             "specifies a group for all polygons that are in proximity to "
             "the seam lines. This group can be used to drive secondary elements such "
             "as debris and dust."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "seampoints", "Seam Points")
         .setDefault("seam_points")
-        .setHelpText("When converting to polygons with a second input, this "
+        .setTooltip("When converting to polygons with a second input, this "
             "specifies a group of the fracture seam points. This can be "
             "used to drive local pre-fracture dynamics e.g. local surface buckling."));
 
@@ -270,27 +307,27 @@ newSopOperator(OP_OperatorTable* table)
    parms.add(hutil::ParmFactory(PRM_TOGGLE, "surfacemask", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable / disable the surface mask"));
+        .setTooltip("Enable / disable the surface mask"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacemaskname", "Surface Mask")
-        .setHelpText("A single level-set or sdf grid whose interior defines the region to mesh")
+        .setTooltip("A single level-set or SDF grid whose interior defines the region to mesh")
         .setChoiceList(&hutil::PrimGroupMenuInput3));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "surfacemaskoffset", "Mask Offset")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Isovalue used to offset the interior region of the surface mask")
+        .setTooltip("Isovalue used to offset the interior region of the surface mask")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "Invert Surface Mask")
-        .setHelpText("Used to mesh the complement of the mask"));
+        .setTooltip("Used to mesh the complement of the mask"));
 
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "adaptivityfield", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable / disable the the adaptivity field"));
+        .setTooltip("Enable / disable the the adaptivity field"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
-        .setHelpText(
+        .setTooltip(
             "A single scalar grid used as a spatial multiplier for the adaptivity threshold")
         .setChoiceList(&hutil::PrimGroupMenuInput3));
 
@@ -303,22 +340,48 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Collapse regions of constant value in output grids. "
+        .setTooltip("Collapse regions of constant value in output grids. "
             "Voxel values are considered equal if they differ "
-            "by less than the specified threshold."));
+            "by less than the specified threshold.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Prune Tolerance")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setTooltip(
+            "When pruning is enabled, voxel values are considered equal"
+            " if they differ by less than the specified tolerance.")
+        .setDocumentation(
+            "If enabled, reduce the memory footprint of output grids that have"
+            " (sufficiently large) regions of voxels with the same value,"
+            " where values are considered equal if they differ by less than"
+            " the specified threshold.\n\n"
+            "NOTE:\n"
+            "    Pruning affects only the memory usage of a grid.\n"
+            "    It does not remove voxels, apart from inactive voxels\n"
+            "    whose value is equal to the background."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "flood", "Signed-Flood Fill Output")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Reclassify inactive output voxels as either inside or outside."));
+        .setTooltip("Reclassify inactive output voxels as either inside or outside.")
+        .setDocumentation(
+            "Test inactive voxels to determine if they are inside or outside of an SDF"
+            " and hence whether they should have negative or positive sign.\n\n"
+            "NOTE:\n"
+            "    This option is ignored when converting native fog volumes to VDBs.\n"));
 
 #if HAVE_ACTIVATEINSIDE
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "activateinsidesdf", "Activate Inside Voxels")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "activateinsidesdf", "Activate Interior Voxels")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Activate all voxels inside a converted level set."));
+        .setTooltip("Activate all voxels inside a converted level set.")
+        .setDocumentation(
+            "Activate all voxels inside an SDF, even if they match the background value.\n\n"
+            "This option is useful if processing the resulting VDB with VEX,\n"
+            "which operates only on active voxels of a VDB.\n"
+            "However, disabling this option will retain only the narrow active internal\n"
+            "band of an incoming SDF if it has one, saving memory and downstream processing.\n\n"
+            "This toggle has no effect for non-SDF volumes, or if\n"
+            "__Signed-Flood Fill Output__ is disabled."));
 #endif
 
     //////////
@@ -338,7 +401,37 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional reference surface. Can be used "
             "to transfer attributes, sharpen features and to "
             "eliminate seams from fractured pieces.")
-        .addOptionalInput("Optional VDB masks");
+        .addOptionalInput("Optional VDB masks")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Convert VDB volumes into other primitive types.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node converts sparse volumes, or VDBs, into other primitive types,\n\
+including Houdini volumes.\n\
+It offers some options not available through the [Convert|Node:sop/convert] node.\n\
+\n\
+When converting to polygons, the second and third inputs can be optionally\n\
+supplied.\n\
+The second input provides a reference polygon surface that is useful\n\
+for preserving features of [fractured|Node:sop/DW_OpenVDBFracture] VDBs.\n\
+The third provides additional VDB fields that can be used for\n\
+masking (which voxels to convert to polygons) and/or for specifying\n\
+an adaptivity multiplier.\n\
+\n\
+@related\n\
+- [OpenVDB To Polygons|Node:sop/DW_OpenVDBToPolygons]\n\
+- [OpenVDB To Spheres|Node:sop/DW_OpenVDBToSpheres]\n\
+- [Node:sop/convert]\n\
+- [Node:sop/convertvolume]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -415,9 +508,9 @@ convertToOpenVDB(
     GU_PrimVDB::convertVolumesToVDBs(
         dst, dst, parms, flood, prune, tolerance, /*keep_original*/false
 #if HAVE_ACTIVATEINSIDE
-	, activateinsidesdf
+        , activateinsidesdf
 #endif
-	);
+        );
 }
 
 
@@ -492,9 +585,11 @@ convertVDBClass(
                     }
                 }
 
-                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(points, primitives);
+                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+                    mesh(points, primitives);
 
-                openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(mesh, *transform);
+                openvdb::FloatGrid::Ptr sdfGrid =
+                    openvdb::tools::meshToVolume<openvdb::FloatGrid>(mesh, *transform);
 
                 // Set grid and visualization
                 it->setGrid(*sdfGrid);
@@ -534,10 +629,10 @@ copyMesh(
 #else
     bool toPolySoup,
 #endif
-    GA_PrimitiveGroup* surfaceGroup = NULL,
-    GA_PrimitiveGroup* interiorGroup = NULL,
-    GA_PrimitiveGroup* seamGroup = NULL,
-    GA_PointGroup* seamPointGroup = NULL)
+    GA_PrimitiveGroup* surfaceGroup = nullptr,
+    GA_PrimitiveGroup* interiorGroup = nullptr,
+    GA_PrimitiveGroup* seamGroup = nullptr,
+    GA_PointGroup* seamPointGroup = nullptr)
 {
     const openvdb::tools::PointList& points = mesher.pointList();
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
@@ -547,7 +642,7 @@ copyMesh(
 
     // Disable adding to seamPointGroup if we don't have pointFlags()
     if (mesher.pointFlags().size() != mesher.pointListSize()) {
-        seamPointGroup = NULL;
+        seamPointGroup = nullptr;
     }
 
 #if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
@@ -852,8 +947,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
 #if HAVE_ACTIVATEINSIDE
     changed |= setVisibleState("activateinsidesdf", toOpenVDB);
-    if (toOpenVDB)
-	changed |= enableParm("activateinsidesdf", evalInt("flood",  0, time));
+    if (toOpenVDB) {
+        changed |= enableParm("activateinsidesdf", evalInt("flood",  0, time));
+    }
 #endif
 
     return changed;
@@ -875,10 +971,10 @@ SOP_OpenVDB_Convert::referenceMeshing(
     hvdb::Interrupter& boss,
     const fpreal time)
 {
-    if (refGeo == NULL) return;
+    if (refGeo == nullptr) return;
 
-    typedef typename GridType::TreeType TreeType;
-    typedef typename GridType::ValueType ValueType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
 
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
@@ -898,7 +994,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     typename GridType::ConstPtr refGrid;
 
-    typedef typename GridType::template ValueConverter<openvdb::Int32>::Type IntGridT;
+    using IntGridT = typename GridType::template ValueConverter<openvdb::Int32>::Type;
     typename IntGridT::Ptr indexGrid;
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
@@ -927,7 +1023,8 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
         if (boss.wasInterrupted()) return;
 
-        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+            mesh(pointList, primList);
 
         float bandWidth = 3.0;
 
@@ -945,7 +1042,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     if (boss.wasInterrupted()) return;
 
-    typedef typename TreeType::template ValueConverter<bool>::Type BoolTreeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     typename BoolTreeType::Ptr maskTree;
 
     if (sharpenFeatures) {
@@ -976,8 +1073,8 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;
 
-    GA_PrimitiveGroup *surfaceGroup = NULL, *interiorGroup = NULL, *seamGroup = NULL;
-    GA_PointGroup* seamPointGroup = NULL;
+    GA_PrimitiveGroup *surfaceGroup = nullptr, *interiorGroup = nullptr, *seamGroup = nullptr;
+    GA_PointGroup* seamPointGroup = nullptr;
 
     {
         UT_String newGropStr;
@@ -1318,15 +1415,15 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
             }
             case OPENVDB: {
 #if HAVE_ACTIVATEINSIDE
-		const bool activateinside = (evalInt("activateinsidesdf", 0, t) != 0);
+                const bool activateinside = (evalInt("activateinsidesdf", 0, t) != 0);
 #else
-		const bool activateinside = true;
+                const bool activateinside = true;
 #endif
                 convertToOpenVDB(*gdp, group,
                     (evalInt("flood", 0, t) != 0),
                     (evalInt("prune", 0, t) != 0),
                     evalFloat("tolerance", 0, t),
-		    activateinside);
+                    activateinside);
 
                 switch (evalInt("vdbclass", 0, t)) {
                     case CLASS_SDF:

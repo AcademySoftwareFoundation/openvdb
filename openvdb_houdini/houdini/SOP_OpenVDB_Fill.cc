@@ -50,16 +50,16 @@ public:
     enum Mode { MODE_INDEX = 0, MODE_WORLD, MODE_GEOM };
 
     SOP_OpenVDB_Fill(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Fill();
+    ~SOP_OpenVDB_Fill() override;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
-    virtual OP_ERROR cookMySop(OP_Context&);
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
+    OP_ERROR cookMySop(OP_Context&) override;
 
     Mode getMode(fpreal time) const
     {
@@ -78,54 +78,73 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDBs to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "index",  "Min and Max in Index Space",
             "world",  "Min and Max in World Space",
             "geom",   "Reference Geometry",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Bounds")
             .setDefault("index")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
+            .setTooltip(
                 "Index Space:\n"
                 "    Interpret the given min and max coordinates in index-space units.\n"
                 "World Space:\n"
                 "    Interpret the given min and max coordinates in world-space units.\n"
                 "Reference Geometry:\n"
-                "    Use the world-space bounds of the reference input geometry.\n"));
+                "    Use the world-space bounds of the reference input geometry.")
+            .setDocumentation(
+"How to specify the bounding box to be filled\n\n"
+"Index Space:\n"
+"    Interpret the given min and max coordinates in"
+" [index-space|http://www.openvdb.org/documentation/doxygen/overview.html#subsecVoxSpace] units.\n"
+"World Space:\n"
+"    Interpret the given min and max coordinates in"
+" [world-space|http://www.openvdb.org/documentation/doxygen/overview.html#subsecWorSpace] units.\n"
+"Reference Geometry:\n"
+"    Use the world-space bounds of the reference input geometry.\n"));
     }
 
-    parms.add(hutil::ParmFactory(PRM_INT_XYZ, "min", "Min coord").setVectorSize(3));
-    parms.add(hutil::ParmFactory(PRM_INT_XYZ, "max", "Max coord").setVectorSize(3));
+    parms.add(hutil::ParmFactory(PRM_INT_XYZ, "min", "Min Coord")
+        .setVectorSize(3)
+        .setTooltip("The minimum coordinate of the bounding box to be filled"));
+    parms.add(hutil::ParmFactory(PRM_INT_XYZ, "max", "Max Coord")
+        .setVectorSize(3)
+        .setTooltip("The maximum coordinate of the bounding box to be filled"));
 
-    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmin", "Min coord").setVectorSize(3));
-    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmax", "Max coord").setVectorSize(3));
+    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmin", "Min Coord")
+        .setVectorSize(3)
+        .setDocumentation(nullptr));
+    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmax", "Max Coord")
+        .setVectorSize(3)
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "val", "Value").setVectorSize(3)
         .setTypeExtended(PRM_TYPE_JOIN_PAIR)
-        .setHelpText(
+        .setTooltip(
             "The value with which to fill voxels\n"
             "(y and z are ignored when filling scalar grids)"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "active", "Active")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
-            "If enabled, activate voxels in the fill region, otherwise deactivate them."));
+        .setTooltip("If enabled, activate voxels in the fill region, otherwise deactivate them."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sparse", "Sparse")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
-            "If enabled, represent the filled region sparsely (if possible)."));
+        .setTooltip("If enabled, represent the filled region sparsely (if possible)."));
 
 
     hutil::ParmList obsoleteParms;
@@ -135,7 +154,27 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
-        .addOptionalInput("Optional bounding geometry");
+        .addOptionalInput("Optional bounding geometry")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Fill and activate/deactivate regions of voxels within a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node sets all voxels within an axis-aligned bounding box of a VDB volume\n\
+to a given value and active state.\n\
+By default, the operation uses a sparse voxel representation to reduce\n\
+the memory footprint of the output volume.\n\
+\n\
+@related\n\
+- [Node:sop/vdbactivate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -240,7 +279,7 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
     return ValueType(ElemType(val[0]), ElemType(val[1]));
 }
 
@@ -251,7 +290,7 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
     return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]));
 }
 
@@ -262,7 +301,7 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
     return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]), ElemType(1.0));
 }
 
@@ -295,7 +334,7 @@ struct FillOp
                worldBBox.min(), worldBBox.max(), imin, imax);
             bbox.reset(openvdb::Coord::floor(imin), openvdb::Coord::ceil(imax));
         }
-        typedef typename GridT::ValueType ValueT;
+        using ValueT = typename GridT::ValueType;
         if (sparse) {
             grid.sparseFill(bbox, convertValue<ValueT>(value), active);
         } else {

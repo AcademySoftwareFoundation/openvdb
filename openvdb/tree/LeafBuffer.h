@@ -89,6 +89,7 @@ class LeafBuffer
 {
 public:
     using ValueType = T;
+    using StorageType = ValueType;
     using NodeMaskType = util::NodeMask<Log2Dim>;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
@@ -503,6 +504,8 @@ class LeafBuffer<bool, Log2Dim>
 public:
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using WordType = typename NodeMaskType::Word;
+    using ValueType = bool;
+    using StorageType = WordType;
 
     static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
     static const Index SIZE = 1 << 3 * Log2Dim;

@@ -48,37 +48,37 @@ class SOP_OpenVDB_Platonic: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Platonic(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Platonic() {}
+    ~SOP_OpenVDB_Platonic() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     { // Shapes
-        const char* items[] = {
-            "sphere", "Sphere",
-            "tetrahedron", "Tetrahedron",
-            "cube", "Cube",
-            "octahedron", "Octahedron",
+        char const * const items[] = {
+            "sphere",       "Sphere",
+            "tetrahedron",  "Tetrahedron",
+            "cube",         "Cube",
+            "octahedron",   "Octahedron",
             "dodecahedron", "Dodecahedron",
-            "icosahedron", "Icosahedron",
-            NULL
+            "icosahedron",  "Icosahedron",
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "solidType", "Solid Type")
-                  .setHelpText("Select a sphere or one of the five platonic solids)")
-                  .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setTooltip("Select a sphere or one of the five platonic solids")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     { // Grid Class
@@ -90,36 +90,71 @@ newSopOperator(OP_OperatorTable* table)
 
         parms.add(hutil::ParmFactory(PRM_STRING, "gridclass", "Grid Class")
             .setDefault(openvdb::GridBase::gridClassToString(openvdb::GRID_LEVEL_SET))
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDocumentation("\
+The type of volume to generate\n\
+\n\
+Level Set:\n\
+    Generate a narrow-band signed distance field level set, in which\n\
+    the values define positive and negative distances to the surface\n\
+    of the solid up to a certain band width.\n\
+\n\
+Signed Distance Field:\n\
+    Generate a narrow-band unsigned distance field level set, in which\n\
+    the values define positive distances to the surface of the solid\n\
+    up to a certain band width.\n"));
     }
 
     // Radius
     parms.add(hutil::ParmFactory(PRM_FLT_J, "scalarRadius", "Radius/Size")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10)
+        .setTooltip("The size of the platonic solid or the radius of the sphere"));
 
     // Center
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "center", "Center")
         .setVectorSize(3)
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("The world-space center of the level set"));
 
     // Voxel size
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "Voxel size")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "Voxel Size")
         .setDefault(0.1f)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10)
+        .setTooltip("The size of a voxel in world units"));
 
     // Narrow-band half-width
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "halfWidth", "Half-band width")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "halfWidth", "Half-Band Width")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1.0, PRM_RANGE_UI, 10)
-        .setHelpText("Half the width of the narrow band in voxel units. "
-            "(3 is optimal for level set operations.)"));
+        .setTooltip(
+            "Half the width of the narrow band in voxel units\n\n"
+            "For proper operation, many nodes expect this to be at least three."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogVolume", "Convert to fog volume"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogVolume", "Convert to Fog Volume")
+        .setTooltip("If enabled, generate a fog volume instead of a level set"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Platonic",
-        SOP_OpenVDB_Platonic::factory, parms, *table);
+        SOP_OpenVDB_Platonic::factory, parms, *table)
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Generate a platonic solid as a level set or a fog volume VDB.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node generates a VDB representing a platonic solid as either a level set or fog volume.\n\
+\n\
+@related\n\
+- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
+- [Node:sop/platonic]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
