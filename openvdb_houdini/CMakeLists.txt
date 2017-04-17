@@ -92,6 +92,11 @@ ADD_LIBRARY ( openvdb_houdini SHARED
 
 TARGET_LINK_LIBRARIES ( openvdb_houdini
   openvdb_shared
+  HoudiniPRM
+  HoudiniGEO
+  HoudiniUT
+  HoudiniOP2
+  HoudiniOP3
   )
 
 SET_TARGET_PROPERTIES(
