@@ -475,9 +475,7 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_Ope
 	fi
 	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
-mantradsos: $(MANTRA_VRAY_SO_NAMES) houdini/VRAYprocedural
-	cp -f houdini/VRAYprocedural $(HOUDINI_DESTDIR)/../
-	@echo "Copied VRAYprocedural to $(HOUDINI_DESTDIR)/../"
+mantradsos: $(MANTRA_VRAY_SO_NAMES)
 
 install_lib: houdinilib
 
@@ -527,7 +525,6 @@ clean:
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
-	$(RM) $(HOUDINI_DESTDIR)/../VRAYprocedural
 	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 

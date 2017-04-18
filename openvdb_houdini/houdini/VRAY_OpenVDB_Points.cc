@@ -34,12 +34,14 @@
 ///
 /// @brief The Delayed Load Mantra Procedural for OpenVDB Points.
 
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 
 #include <UT/UT_DSOVersion.h>
 #include <GU/GU_Detail.h>
 #include <OP/OP_OperatorTable.h>
 #include <UT/UT_BoundingBox.h>
 #include <VRAY/VRAY_Procedural.h>
+#include <VRAY/VRAY_ProceduralFactory.h>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
@@ -73,10 +75,10 @@ public:
 
 private:
     UT_BoundingBox                              mBox;
-    UT_String                                   mFilename;
+    UT_StringHolder                             mFilename;
     std::vector<Name>                           mIncludeGroups;
     std::vector<Name>                           mExcludeGroups;
-    UT_String                                   mAttrStr;
+    UT_StringHolder                             mAttrStr;
     GridVecPtr                                  mGridPtrs;
     float                                       mPreBlur;
     float                                       mPostBlur;
@@ -335,16 +337,21 @@ static VRAY_ProceduralArg   theArgs[] = {
     VRAY_ProceduralArg()
 };
 
-VRAY_Procedural *
-allocProcedural(const char *)
+class ProcDef : public VRAY_ProceduralFactory::ProcDefinition
 {
-    return new VRAY_OpenVDB_Points();
-}
+public:
+    ProcDef()
+    : VRAY_ProceduralFactory::ProcDefinition("openvdb_points")
+    {
+    }
+    virtual VRAY_Procedural *create() const { return new VRAY_OpenVDB_Points(); }
+    virtual VRAY_ProceduralArg  *arguments() const { return theArgs; }
+};
 
-const VRAY_ProceduralArg *
-getProceduralArgs(const char *)
+void
+registerProcedural(VRAY_ProceduralFactory *factory)
 {
-    return theArgs;
+    factory->insert(new ProcDef);
 }
 
 VRAY_OpenVDB_Points::VRAY_OpenVDB_Points()
@@ -425,7 +432,7 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 
         import("maxspeed", &mMaxSpeed, 1);
 
-        UT_String rampStr;
+        UT_StringHolder rampStr;
         import("ramp", rampStr);
 
         std::stringstream rampStream(rampStr.toStdString());
@@ -442,7 +449,7 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
     mGridPtrs = Local::loadGrids(mFilename.toStdString(), streamData ? true : false);
 
     // extract which groups to include and exclude
-    UT_String groupStr;
+    UT_StringHolder groupStr;
     import("groupmask", groupStr);
     AttributeSet::Descriptor::parseNames(mIncludeGroups, mExcludeGroups, groupStr.toStdString());
 
@@ -574,8 +581,11 @@ VRAY_OpenVDB_Points::render()
     obj->addGeometry(geo);
 
     // Override the renderpoints setting to always enable points only rendering
-    obj->changeSetting("renderpoints", "true");
+    int one = 1;
+    obj->changeSetting("renderpoints", 1, &one);
 }
+
+#endif // 16.0.0 or later
 
 ////////////////////////////////////////
 
