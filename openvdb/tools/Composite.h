@@ -32,7 +32,7 @@
 ///
 /// @brief Functions to efficiently perform various compositing operations on grids
 ///
-/// @authors Peter Cucka, Mihai Alden
+/// @authors Peter Cucka, Mihai Alden, Ken Museth
 
 #ifndef OPENVDB_TOOLS_COMPOSITE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_COMPOSITE_HAS_BEEN_INCLUDED
@@ -45,7 +45,6 @@
 #include "ValueTransformer.h" // for transformValues()
 #include "Prune.h"// for prune
 #include "SignedFloodFill.h" // for signedFloodFill()
-#include <boost/utility/enable_if.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -53,6 +52,8 @@
 #include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
 
+#include <type_traits>
+#include <functional>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -124,17 +125,17 @@ namespace composite {
 
 // composite::min() and composite::max() for non-vector types compare with operator<().
 template<typename T> inline
-const typename boost::disable_if_c<VecTraits<T>::IsVec, T>::type& // = T if T is not a vector type
+const typename std::enable_if<!VecTraits<T>::IsVec, T>::type& // = T if T is not a vector type
 min(const T& a, const T& b) { return std::min(a, b); }
 
 template<typename T> inline
-const typename boost::disable_if_c<VecTraits<T>::IsVec, T>::type&
+const typename std::enable_if<!VecTraits<T>::IsVec, T>::type&
 max(const T& a, const T& b) { return std::max(a, b); }
 
 
 // composite::min() and composite::max() for OpenVDB vector types compare by magnitude.
 template<typename T> inline
-const typename boost::enable_if_c<VecTraits<T>::IsVec, T>::type& // = T if T is a vector type
+const typename std::enable_if<VecTraits<T>::IsVec, T>::type& // = T if T is a vector type
 min(const T& a, const T& b)
 {
     const typename T::ValueType aMag = a.lengthSqr(), bMag = b.lengthSqr();
@@ -142,7 +143,7 @@ min(const T& a, const T& b)
 }
 
 template<typename T> inline
-const typename boost::enable_if_c<VecTraits<T>::IsVec, T>::type&
+const typename std::enable_if<VecTraits<T>::IsVec, T>::type&
 max(const T& a, const T& b)
 {
     const typename T::ValueType aMag = a.lengthSqr(), bMag = b.lengthSqr();
@@ -151,11 +152,11 @@ max(const T& a, const T& b)
 
 
 template<typename T> inline
-typename boost::disable_if<boost::is_integral<T>, T>::type // = T if T is not an integer type
+typename std::enable_if<!std::is_integral<T>::value, T>::type // = T if T is not an integer type
 divide(const T& a, const T& b) { return a / b; }
 
 template<typename T> inline
-typename boost::enable_if<boost::is_integral<T>, T>::type // = T if T is an integer type
+typename std::enable_if<std::is_integral<T>::value, T>::type // = T if T is an integer type
 divide(const T& a, const T& b)
 {
     const T zero(0);
@@ -616,6 +617,128 @@ struct GridOrTreeConstructor<Grid<TreeType> >
 
 ////////////////////////////////////////
 
+/// @cond COMPOSITE_INTERNAL
+/// List of pairs of leaf node pointers
+template <typename LeafT>
+using LeafPairList = std::vector<std::pair<LeafT*, LeafT*>>;
+/// @endcond
+
+/// @cond COMPOSITE_INTERNAL
+/// Transfers leaf nodes from a source tree into a
+/// desitnation tree, unless it already exists in the destination tree
+/// in which case pointers to both leaf nodes are added to a list for
+/// subsequent compositing operations.
+template <typename TreeT>
+inline void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
+                              LeafPairList<typename TreeT::LeafNodeType> &overlapping)
+{
+    using LeafT = typename TreeT::LeafNodeType;
+    tree::ValueAccessor<TreeT> acc(dstTree);//destination
+    std::vector<LeafT*> srcLeafNodes;
+    srcLeafNodes.reserve(srcTree.leafCount());
+    srcTree.stealNodes(srcLeafNodes);
+    srcTree.clear();
+    for (LeafT *srcLeaf : srcLeafNodes) {
+        LeafT *dstLeaf = acc.probeLeaf(srcLeaf->origin());
+        if (dstLeaf) {
+            overlapping.emplace_back(dstLeaf, srcLeaf);//dst, src
+        } else {
+            acc.addLeaf(srcLeaf);
+        }
+    }
+}
+/// @endcond
+
+/// @cond COMPOSITE_INTERNAL
+/// Template specailization of compActiveLeafVoxels
+template <typename TreeT, typename OpT>
+inline
+typename std::enable_if<!std::is_same<typename TreeT::ValueType, bool>::value &&
+                        !std::is_same<typename TreeT::BuildType, ValueMask>::value &&
+                         std::is_same<typename TreeT::LeafNodeType::Buffer::ValueType,
+                                      typename TreeT::LeafNodeType::Buffer::StorageType>::value>::type
+doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
+{
+    using LeafT  = typename TreeT::LeafNodeType;
+    LeafPairList<LeafT> overlapping;//dst, src
+    transferLeafNodes(srcTree, dstTree, overlapping);
+
+    using RangeT = tbb::blocked_range<size_t>;
+    tbb::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            auto *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
+            dstLeaf->getValueMask() |= srcLeaf->getValueMask();
+            auto *ptr = dstLeaf->buffer().data();
+            for (auto v = srcLeaf->cbeginValueOn(); v; ++v) op(ptr[v.pos()], *v);
+            delete srcLeaf;
+        }
+   });
+}
+/// @endcond
+
+/// @cond COMPOSITE_INTERNAL
+/// Template specailization of compActiveLeafVoxels
+template <typename TreeT, typename OpT>
+inline
+typename std::enable_if<std::is_same<typename TreeT::BuildType, ValueMask>::value &&
+                        std::is_same<typename TreeT::ValueType, bool>::value>::type
+doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT)
+{
+    using LeafT  = typename TreeT::LeafNodeType;
+    LeafPairList<LeafT> overlapping;//dst, src
+    transferLeafNodes(srcTree, dstTree, overlapping);
+
+    using RangeT = tbb::blocked_range<size_t>;
+    tbb::parallel_for(RangeT(0, overlapping.size()), [&overlapping](const RangeT& r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            overlapping[i].first->getValueMask() |= overlapping[i].second->getValueMask();
+            delete overlapping[i].second;
+        }
+    });
+}
+
+/// @cond COMPOSITE_INTERNAL
+/// Template specailization of compActiveLeafVoxels
+template <typename TreeT, typename OpT>
+inline
+typename std::enable_if<std::is_same<typename TreeT::ValueType, bool>::value &&
+                        !std::is_same<typename TreeT::BuildType, ValueMask>::value>::type
+doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
+{
+    using LeafT = typename TreeT::LeafNodeType;
+    LeafPairList<LeafT> overlapping;//dst, src
+    transferLeafNodes(srcTree, dstTree, overlapping);
+
+    using RangeT = tbb::blocked_range<size_t>;
+    using WordT = typename LeafT::Buffer::WordType;
+    tbb::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            LeafT *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
+            WordT *w1 = dstLeaf->buffer().data();
+            const WordT *w2 = srcLeaf->buffer().data();
+            const WordT *w3 = &(srcLeaf->getValueMask().template getWord<WordT>(0));
+            for (Index32 n = LeafT::Buffer::WORD_COUNT; n--; ++w1) {
+                WordT tmp = *w1, state = *w3++;
+                op (tmp, *w2++);
+                *w1 = (state & tmp) | (~state & *w1);//inactive values are unchanged
+            }
+            dstLeaf->getValueMask() |= srcLeaf->getValueMask();
+            delete srcLeaf;
+        }
+    });
+}
+/// @endcond
+
+/// @cond COMPOSITE_INTERNAL
+/// Default functor for compActiveLeafVoxels
+template <typename TreeT>
+struct CopyOp
+{
+    using ValueT = typename TreeT::ValueType;
+    CopyOp() = default;
+    void operator()(ValueT& dst, const ValueT& src) const { dst = src; }
+};
+/// @endcond
 
 } // namespace composite
 
@@ -1093,6 +1216,35 @@ csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b)
                         Adapter::tree(a), Adapter::tree(b));
 
     return composite::GridOrTreeConstructor<GridOrTreeT>::construct(a, output);
+}
+
+////////////////////////////////////////////////////////
+
+/// @brief Composite the active values in leaf nodes, i.e. active
+///        voxels, of a source tree into a destination tree.
+///
+/// @param srcTree source tree from which active voxels are composited.
+///
+/// @param dstTree destination tree into which active voxels are composited.
+///
+/// @param op      a functor of the form <tt>void op(T& dst, const T& src)</tt>,
+///                where @c T is the @c ValueType of the tree, that composites
+///                a source value into a destination value. By default
+///                it copies the value from src to dst.
+///
+/// @details All active voxels in the source tree will
+///          be active in the destination tree, and their value is
+///          determined by a use-defined functor (OpT op) that operates on the
+///          source and destination values. The only exception is when
+///          the tree type is MaskTree, in which case no functor is
+///          needed since by defintion a MaskTree has no values (only topology).
+///
+/// @warning This function only operated on leaf node values,
+///          i.e. tile values are ignored.
+template <typename TreeT, typename OpT = composite::CopyOp<TreeT> >
+inline void compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<TreeT>())
+{
+    composite::doCompActiveLeafVoxels<TreeT, OpT>(srcTree, dstTree, op);
 }
 
 

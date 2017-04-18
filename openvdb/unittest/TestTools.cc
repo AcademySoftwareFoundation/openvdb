@@ -1107,7 +1107,6 @@ TestTools::testActivate()
     CPPUNIT_ASSERT_EQUAL(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
 }
 
-
 void
 TestTools::testFilter()
 {
@@ -2821,7 +2820,7 @@ TestTools::testPrune()
     }
 
     /*
-    {// Bechmark serial prune
+    {// Benchmark serial prune
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
@@ -2834,7 +2833,7 @@ TestTools::testPrune()
         timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
     }
-    {// Bechmark parallel prune
+    {// Benchmark parallel prune
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");

@@ -72,29 +72,59 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
-        .setHelpText("Specify a subset of the input VDB grids to be clipped.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be clipped.")
+        .setDocumentation(
+            "A subset of VDBs to clip (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "")
-        .setHelpText(
-            "If disabled, use the bounding box of the reference geometry\n"
-            "as the clipping region.")
         .setDefault(PRMzeroDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip(
+            "If disabled, use the bounding box of the reference geometry\n"
+            "as the clipping region."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
-        .setHelpText("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
+        .setDocumentation(
+            "VDB primitives from the second input to be used as a clipping mask"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "inside", "Keep Inside")
-        .setHelpText(
+        .setDefault(PRMoneDefaults)
+        .setTooltip(
             "If enabled, keep voxels that lie inside the clipping region.\n"
             "If disabled, keep voxels that lie outside the clipping region.")
-        .setDefault(PRMoneDefaults));
+        .setDocumentation(
+            "When enabled, keep voxels that lie inside the clipping region,"
+            " otherwise keep voxels that lie outside the clipping region."));
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
-        .addInput("Mask VDB or bounding geometry");
+        .addInput("Mask VDB or bounding geometry")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Clip VDB volumes using a bounding box or another VDB as a mask.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node removes voxels from VDB volume primitives from the first input\n\
+that are outside the bounding box of the geometry given in the second input.\n\
+A mask VDB may also be specified to perform an operation similar to\n\
+an intersection.\n\
+\n\
+@related\n\
+\n\
+- [OpenVDB Combine|Node:sop/DW_OpenVDBCombine]\n\
+- [Node:sop/vdbactivate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 

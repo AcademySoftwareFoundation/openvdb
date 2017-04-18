@@ -136,7 +136,7 @@ struct InRange {
 
 template<typename TreeType>
 struct GradientNorm {
-    typedef typename TreeType::ValueType ValueType;
+    using ValueType = typename TreeType::ValueType;
 
     GradientNorm(const TreeType& tree, double voxelSize, ValueType tol)
         : mAcc(tree), mScale(ValueType(1.0 / voxelSize)), mTol(tol) {}
@@ -188,7 +188,7 @@ private:
 
 template<typename TreeType>
 struct SameSign {
-    typedef typename TreeType::ValueType ValueType;
+    using ValueType = typename TreeType::ValueType;
 
     SameSign(const TreeType& tree) : mAcc(tree) {}
     SameSign(const SameSign& rhs) : mAcc(rhs.mAcc.tree()) {}
@@ -216,14 +216,14 @@ struct Visitor
     enum ValueKind { TILES_AND_VOXELS, TILES, VOXELS };
     enum ValueState { ALL_VALUES, ACTIVE_VALUES, INACTIVE_VALUES };
 
-    typedef typename GridType::TreeType                                         TreeType;
-    typedef typename TreeType::LeafNodeType                                     LeafNodeType;
-    typedef typename TreeType::RootNodeType                                     RootNodeType;
-    typedef typename RootNodeType::NodeChainType                                NodeChainType;
-    typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type  InternalNodeType;
+    using TreeType = typename GridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using RootNodeType = typename TreeType::RootNodeType;
+    using NodeChainType = typename RootNodeType::NodeChainType;
+    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
 
-    typedef typename TreeType::template ValueConverter<bool>::Type              BoolTreeType;
-    typedef typename BoolTreeType::Ptr                                          BoolTreePtr;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolTreePtr = typename BoolTreeType::Ptr;
 
     //////////
 
@@ -485,7 +485,7 @@ inline size_t
 getPoints(const openvdb::math::Transform& xform, const BoolTreeType& mask,
     boost::scoped_array<UT_Vector3>& points)
 {
-    typedef typename BoolTreeType::LeafNodeType BoolLeafNodeType;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     std::vector<const BoolLeafNodeType*> nodes;
     mask.getNodes(nodes);
@@ -557,9 +557,9 @@ transferPoints(GU_Detail& detail, const boost::scoped_array<UT_Vector3>& points,
 template<typename TreeType>
 struct GetValues
 {
-    typedef typename TreeType::ValueType                            ValueType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     GetValues(const TreeType& tree, const BoolLeafNodeType ** maskNodes,
         ValueType* values, const size_t* offsetTable)
@@ -599,9 +599,9 @@ getValues(const TreeType& tree,
     const typename TreeType::template ValueConverter<bool>::Type& mask,
     boost::scoped_array<typename TreeType::ValueType>& values)
 {
-    typedef typename TreeType::ValueType                            ValueType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     std::vector<const BoolLeafNodeType*> nodes;
     mask.getNodes(nodes);
@@ -668,7 +668,7 @@ transferValues(GU_Detail& detail, const std::string& name, GA_Offset startOffset
     GA_RWHandleV3 handle = attr.getAttribute();
 
     UT_Vector3 vec(0.0f, 0.0f, 0.0f);
-    typedef openvdb::math::Vec3<ValueType> VectorType;
+    using VectorType = openvdb::math::Vec3<ValueType>;
 
     for (size_t n = 0, N = pointCount; n < N; ++n) {
         const VectorType& val = values[n];
@@ -767,9 +767,9 @@ private:
 
 template<typename GridType>
 struct MaskData {
-    typedef typename GridType::TreeType                             TreeType;
-    typedef typename GridType::ValueType                            ValueType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
 
     MaskData() : mask(), minValue(ValueType(0)), maxValue(ValueType(0)), isRange(false) {}
 
@@ -833,12 +833,12 @@ clampValueAndVectorMagnitude(openvdb::math::Vec3<T> v,
 template<typename GridType>
 struct FixVoxelValues
 {
-    typedef typename GridType::TreeType                             TreeType;
-    typedef typename TreeType::ValueType                            ValueType;
-    typedef typename TreeType::LeafNodeType                         LeafNodeType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
-    typedef MaskData<GridType>                                      MaskDataType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
+    using MaskDataType = MaskData<GridType>;
 
     FixVoxelValues(TreeType& tree, const BoolLeafNodeType ** maskNodes,
         const MaskDataType& maskdata)
@@ -850,7 +850,7 @@ struct FixVoxelValues
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        typedef typename BoolLeafNodeType::ValueOnCIter ValueOnCIter;
+        using ValueOnCIter = typename BoolLeafNodeType::ValueOnCIter;
         openvdb::tree::ValueAccessor<TreeType> acc(*mTree);
 
         const ValueType minVal = mMaskData->minValue;
@@ -888,12 +888,11 @@ fixValues(const GridType& grid, std::vector<MaskData<GridType> > fixMasks,
     bool inactivateTiles = false,
     bool renormalizeLevelSet = false)
 {
-    typedef typename GridType::TreeType                             TreeType;
-    typedef typename GridType::ValueType                            ValueType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
-    typedef MaskData<GridType>                                      MaskDataType;
-
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
+    using MaskDataType = MaskData<GridType>;
 
     typename GridType::Ptr replacementGrid = grid.deepCopy();
 
@@ -973,10 +972,10 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
     hvdb::Interrupter& interupter,
     const GridType* replacementGrid = nullptr)
 {
-    typedef typename GridType::TreeType                             TreeType;
-    typedef typename GridType::ValueType                            ValueType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename openvdb::Grid<BoolTreeType>                    BoolGridType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolGridType = typename openvdb::Grid<BoolTreeType>;
 
     if (outputMask || outputPoints) {
 
@@ -1084,11 +1083,11 @@ struct TestCollection
     {
         mReplacementGrid.reset(); // clear
 
-        typedef typename GridType::TreeType                             TreeType;
-        typedef typename GridType::ValueType                            ValueType;
-        typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-        typedef MaskData<GridType>                                      MaskDataType;
-        typedef Visitor<GridType>                                       VisitorType;
+        using TreeType = typename GridType::TreeType;
+        using ValueType = typename GridType::ValueType;
+        using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+        using MaskDataType = MaskData<GridType>;
+        using VisitorType = Visitor<GridType>;
 
         //////////
 
@@ -1369,14 +1368,14 @@ class SOP_OpenVDB_Diagnostics: public hvdb::SOP_NodeVDB
 public:
     SOP_OpenVDB_Diagnostics(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
-    virtual int isRefInput(unsigned i ) const { return (i == 1); }
+    int isRefInput(unsigned i) const override { return (i == 1); }
 
     int selectOperationTests();
     int validateOperationTests();
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
     TestData getTestData(const fpreal time) const;
 };
 
@@ -1522,25 +1521,28 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input grids to examine.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenu)
+        .setTooltip("Specify a subset of the input VDBs to examine.")
+        .setDocumentation(
+            "A subset of the input VDBs to be examined"
+            " (see [specifying volumes|/model/volumes#group])"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "Mark in Mask Grid")
-        .setHelpText(
-            "For tests set to Mark, output a mask grid that highlights\n"
-            "problematic regions in input grids."));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "Mark in Mask VDB")
+        .setTooltip(
+            "For tests set to Mark, output a mask VDB that highlights\n"
+            "problematic regions in input VDBs."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usepoints", "Mark as Points With Values")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
+        .setTooltip(
             "For tests set to Mark, output a point cloud that highlights\n"
-            "problematic regions in input grids."));
+            "problematic regions in input VDBs."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "respectclass", "Respect Grid Class")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "respectclass", "Respect VDB Class")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
-            "If disabled, apply fog volume and level set tests to all grids,\n"
-            "not just grids classified as fog volumes or level sets."));
+        .setTooltip(
+            "If disabled, apply fog volume and level set tests to all VDBs,\n"
+            "not just VDBs classified as fog volumes or level sets."));
 
 
     //////////
@@ -1550,77 +1552,109 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verify_fogvolume", "Validate Fog Volumes")
         .setCallbackFunc(&selectOperationTestsCB)
-        .setHelpText("Verify that grids classified as fog volumes are valid fog volumes."));
+        .setTooltip("Verify that VDBs classified as fog volumes are valid fog volumes."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE,
         "verify_csg", "Validate for Level Set CSG and Fracture")
         .setCallbackFunc(&selectOperationTestsCB)
-        .setHelpText(
-            "Verify that level set grids meet the requirements\n"
+        .setTooltip(
+            "Verify that level set VDBs meet the requirements\n"
             "for CSG and fracture operations."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE,
         "verify_filtering", "Validate for Level Set Filtering and Renormalization")
         .setCallbackFunc(&selectOperationTestsCB)
-        .setHelpText(
-            "Verify that level set grids meet the requirements\n"
+        .setTooltip(
+            "Verify that level set VDBs meet the requirements\n"
             "for filtering and renormalization."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE,
         "verify_advection", "Validate for Level Set Advection and Morphing")
         .setCallbackFunc(&selectOperationTestsCB)
-        .setHelpText(
-            "Verify that level set grids meet the requirements\n"
+        .setTooltip(
+            "Verify that level set VDBs meet the requirements\n"
             "for advection and morphing."));
 
     //////////
     // General
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "general", "General Tests"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "general", "General Tests")
+        .setDocumentation(
+            "In the following, enable __Mark__ to add incorrect values"
+            " to the output mask and/or point cloud, and enable __Fix__"
+            " to replace incorrect values."));
 
     // { Finite values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-        "test_finite", "Finite Values" + spacing(30))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_finite", "Finite Values"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(30)
+#else
+        + spacing(35)
+#endif
+    )
         .setCallbackFunc(&validateOperationTestsCB)
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText("Verify that all values are finite and non-NaN."));
+        .setTooltip("Verify that all values are finite and non-NaN.")
+        .setDocumentation(
+            "Verify that all values are finite and non-NaN.\n\n"
+            "If __Fix__ is enabled, replace incorrect values with the background value."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_finite", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_finite", "Fix")
-        .setHelpText("Replace incorrect values with the background value."));
+        .setTooltip("Replace incorrect values with the background value.")
+        .setDocumentation(nullptr));
     // }
 
     // { Uniform background values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-        "test_background", "Uniform Background" + spacing(5))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_background", "Uniform Background"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(5)
+#endif
+        )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText("Verify that all inactive voxels are set to the background value."));
+        .setTooltip("Verify that all inactive voxels are set to the background value.")
+        .setDocumentation(
+            "Verify that all inactive voxels are set to the background value.\n\n"
+            "If __Fix__ is enabled, replace incorrect values with the background value."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_background", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_background", "Fix")
-        .setHelpText("Replace incorrect values with the background value."));
+        .setTooltip("Replace incorrect values with the background value.")
+        .setDocumentation(nullptr));
     // }
 
     // { Values in range
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-        "test_valrange", "Values in Range" + spacing(19))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_valrange", "Values in Range"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(19)
+#else
+        + spacing(23)
+#endif
+        )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText(
+        .setTooltip(
             "Verify that all scalar voxel values and vector magnitudes\n"
-            "are in the given range."));
+            "are in the given range.")
+        .setDocumentation(
+            "Verify that all scalar voxel values and vector magnitudes are in the given range.\n\n"
+            "If __Fix__ is enabled, clamp values and vector magnitudes to the given range."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_valrange", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_valrange", "Fix")
-        .setHelpText("Clamp values and vector magnitudes to the given range."));
+        .setTooltip("Clamp values and vector magnitudes to the given range.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_LABEL | PRM_TYPE_JOIN_NEXT, "label_valrange", ""));
 
@@ -1631,7 +1665,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "valrange", "Range")
         .setDefault(defaultRange)
         .setVectorSize(2)
-        .setHelpText("Minimum and maximum allowed values (inclusive)"));
+        .setTooltip("Minimum and maximum allowed values (inclusive)"));
     // }
 
 
@@ -1643,13 +1677,13 @@ newSopOperator(OP_OperatorTable* table)
     // { Symmetric Narrow Band
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_symmetric", "Symmetric Narrow Band")
         .setCallbackFunc(&validateOperationTestsCB)
-        .setHelpText("Verify that level set inside and outside values are of equal magnitude."));
+        .setTooltip("Verify that level set inside and outside values are of equal magnitude."));
     // }
 
     // { Min Band Width
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_bandwidth", "Minimum Band Width")
         .setCallbackFunc(&validateOperationTestsCB)
-        .setHelpText(
+        .setTooltip(
             "Verify that interior and exterior narrow band widths"
             " are sufficiently large."));
 
@@ -1663,66 +1697,99 @@ newSopOperator(OP_OperatorTable* table)
     // { Closed Surface
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_surface", "Closed Surface")
         .setCallbackFunc(&validateOperationTestsCB)
-        .setHelpText("Verify that level sets represent watertight surfaces."));
+        .setTooltip("Verify that level sets represent watertight surfaces."));
     // }
 
     // { Gradient magnitude
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-        "test_gradient", "Gradient Magnitude" + spacing(6))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_gradient", "Gradient Magnitude"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(6)
+#else
+        + spacing(7)
+#endif
+        )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText(
+        .setTooltip(
             "Verify that the level set gradient has magnitude one everywhere\n"
-            "(within a given tolerance)."));
+            "(within a given tolerance).")
+        .setDocumentation(
+            "Verify that the level set gradient has magnitude one everywhere"
+            " (within a given tolerance).\n\n"
+            "If __Fix__ is enabled, renormalize level sets."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_gradient", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_gradient", "Fix")
-        .setHelpText("Renormalize level sets."));
+        .setTooltip("Renormalize level sets.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_LABEL | PRM_TYPE_JOIN_NEXT, "label_gradient", ""));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "gradienttolerance", "Tolerance")
-        .setDefault(0.2f));
+        .setDefault(0.2f)
+        .setDocumentation(nullptr));
     // }
 
     // { Inactive Tiles
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_activetiles", "Inactive Tiles" + spacing(28))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_activetiles", "Inactive Tiles"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(28)
+#else
+        + spacing(36)
+#endif
+        )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText("Verify that level sets have no active tiles."));
+        .setTooltip("Verify that level sets have no active tiles.")
+        .setDocumentation(
+            "Verify that level sets have no active tiles.\n\n"
+            "If __Fix__ is enabled, deactivate all tiles."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_activetiles", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_activetiles", "Fix")
-        .setHelpText("Deactivate all tiles."));
+        .setTooltip("Deactivate all tiles.")
+        .setDocumentation(nullptr));
     // }
 
     // { Uniform Voxel Size
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_voxelsize", "Uniform Voxel Size")
-        .setHelpText("Verify that level sets have uniform voxel sizes."));
+        .setTooltip("Verify that level sets have uniform voxel sizes."));
     // }
 
     //////////
     // Fog Volume
 
     parms.add(hutil::ParmFactory(PRM_HEADING, "fog_heading", "Fog Volume Tests")
-        .setHelpText("Fog Volume specific tests."));
+        .setTooltip("Fog Volume specific tests."));
 
     // { Background values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-        "test_backgroundzero", "Background Zero" + spacing(15))
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_backgroundzero", "Background Zero"
+#if (UT_MAJOR_VERSION_INT < 16)
+        + spacing(15)
+#else
+        + spacing(17)
+#endif
+        )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText("Verify that all inactive voxels in fog volumes have value zero."));
+        .setTooltip("Verify that all inactive voxels in fog volumes have value zero.")
+        .setDocumentation(
+            "Verify that all inactive voxels in fog volumes have value zero.\n\n"
+            "If __Fix__ is enabled, set inactive voxels to zero."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_backgroundzero", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_backgroundzero", "Fix")
-        .setHelpText("Set inactive voxels to zero."));
+        .setTooltip("Set inactive voxels to zero.")
+        .setDocumentation(nullptr));
     // }
 
     // { Active values
@@ -1731,19 +1798,44 @@ newSopOperator(OP_OperatorTable* table)
         "test_fogvalues", "Active Values in [0, 1]")
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
-        .setHelpText(
+        .setTooltip(
             "Verify that all active voxels in fog volumes\n"
-            "have values in the range [0, 1]."));
+            "have values in the range [0, 1].")
+        .setDocumentation(
+            "Verify that all active voxels in fog volumes have values in the range"
+            " &#91;0, 1&#93;.\n\n" // "[0, 1]"
+            "If __Fix__ is enabled, clamp active voxels to the range &#91;0, 1&#93;."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_fogvalues", "Mark")
-        .setHelpText("Add incorrect values to the output mask and/or point cloud."));
+        .setTooltip("Add incorrect values to the output mask and/or point cloud.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_fogvalues", "Fix")
-        .setHelpText("Clamp active values to the range [0, 1]."));
+        .setTooltip("Clamp active values to the range [0, 1].")
+        .setDocumentation(nullptr));
     // }
 
     hvdb::OpenVDBOpFactory("OpenVDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
-        .addInput("VDB grids");
+        .addInput("VDB Volumes")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Examine VDB volumes for bad values.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node runs a suite of tests to validate and correct common errors in VDB volumes.\n\
+It provides the option to output either a mask VDB or a point cloud that identifies\n\
+the troublesome voxels, and it is optionally able to correct most types of errors.\n\
+\n\
+@related\n\
+- [Node:sop/vdbdiagnostics]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 

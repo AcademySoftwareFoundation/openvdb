@@ -59,10 +59,10 @@
 
 
 #ifdef SESI_OPENVDB
-    #ifdef OPENVDB_HOUDINI_API
-	#undef OPENVDB_HOUDINI_API
-	#define OPENVDB_HOUDINI_API
-    #endif
+  #ifdef OPENVDB_HOUDINI_API
+    #undef OPENVDB_HOUDINI_API
+    #define OPENVDB_HOUDINI_API
+  #endif
 #endif
 
 
@@ -82,18 +82,37 @@ public:
 
     ParmList() {}
 
+    /// @brief Return @c true if this list contains no parameters.
     bool empty() const { return mParmVec.empty(); }
+    /// @brief Return the number of parameters in this list.
+    /// @note Some parameter types have parameter lists of their own.
+    /// Those nested lists are not included in this count.
     size_t size() const { return mParmVec.size(); }
 
+    /// @brief Remove all parameters from this list.
     void clear() { mParmVec.clear(); mSwitchers.clear(); }
 
+    /// @{
+    /// @brief Add a parameter to this list.
     ParmList& add(const PRM_Template&);
     ParmList& add(const ParmFactory&);
+    /// @}
 
+    /// @brief Begin a collection of tabs.
+    /// @details Tabs may be nested.
     ParmList& beginSwitcher(const std::string& token, const std::string& label = "");
+    /// @brief Begin an exclusive collection of tabs.  Only one tab is "active" at a time.
+    /// @details Tabs may be nested.
     ParmList& beginExclusiveSwitcher(const std::string& token, const std::string& label = "");
+    /// @brief End a collection of tabs.
+    /// @throw std::runtime_error if not inside a switcher or if no tabs
+    /// were added to the switcher
     ParmList& endSwitcher();
 
+    /// @brief Add a tab with the given label to the current tab collection.
+    /// @details Parameters subsequently added to this ParmList until the next
+    /// addFolder() or endSwitcher() call will be displayed on the tab.
+    /// @throw std::runtime_error if not inside a switcher
     ParmList& addFolder(const std::string& label);
 
     /// Return a heap-allocated copy of this list's array of parameters.
@@ -156,9 +175,9 @@ public:
     /// @param inputIndex   specifies the zero based index of the input that should be used to get
     /// the items from, must be in the range of [0..3], inclusive
     /// @param typ          specifies the menu behavior (toggle, replace, etc.)
-    /// @details This method provides a more flexible alternative to 
+    /// @details This method provides a more flexible alternative to
     /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput1),
-    /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput2), etc. 
+    /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput2), etc.
     ///
     /// Calling this with a single input index is equivalent to calling
     /// @c setChoiceList with the corresponding @c houdini_utils::PrimGroupMenuInput1, etc.
@@ -230,7 +249,19 @@ public:
     /// Specify a default value or values for this parameter.
     ParmFactory& setDefault(const PRM_Default*);
 
+    /// @brief Specify a plain text tooltip for this parameter.
+    /// @details This method is equivalent to setTooltip()
     ParmFactory& setHelpText(const char*);
+    /// @brief Specify a plain text tooltip for this parameter.
+    /// @details This method is equivalent to setHelpText()
+    ParmFactory& setTooltip(const char*);
+    /// @brief Add documentation for this parameter.
+    /// @details Pass a null pointer or an empty string to inhibit
+    /// the generation of documentation for this parameter.
+    /// @details The text is parsed as wiki markup.
+    /// See the Houdini <A HREF="http://www.sidefx.com/docs/houdini/help/format">
+    /// Wiki Markup Reference</A> for the syntax.
+    ParmFactory& setDocumentation(const char*);
 
     ParmFactory& setParmGroup(int);
 
@@ -354,7 +385,13 @@ public:
     const std::string& iconName() const;
     /// @brief Return the new operator's help URL.
     /// @details This accessor is mainly for use by OpPolicy objects.
+    /// @note A help URL takes precedence over help text.
+    /// @sa helpText(), setHelpText()
     const std::string& helpURL() const;
+    /// @brief Return the new operator's documentation.
+    /// @note If the help URL is nonempty, the URL takes precedence over any help text.
+    /// @sa helpURL(), setDocumentation()
+    const std::string& documentation() const;
     /// @brief Return the operator table with which this factory is associated.
     /// @details This accessor is mainly for use by OpPolicy objects.
     const OP_OperatorTable& table() const;
@@ -369,6 +406,11 @@ public:
     /// add the old name as an alias.
     /// @note This variant takes an operator type name rather than an English name.
     OpFactory& addAliasVerbatim(const std::string& name);
+    /// @brief Add documentation for this operator.
+    /// @details The text is parsed as wiki markup.
+    /// @note If this factory's OpPolicy specifies a help URL, that URL
+    /// takes precedence over documentation supplied with this method.
+    OpFactory& setDocumentation(const std::string&);
     /// Add a required input with the given name.
     OpFactory& addInput(const std::string& name);
     /// Add an optional input with the given name.

@@ -2,6 +2,50 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly
+@par
+<B>Version 4.0.2</B> - <I>In development</I>
+@par
+New features:
+- Added @vdblink::tools::compActiveLeafVoxels compActiveLeafVoxels@endlink,
+  which composites active voxel values from a source tree into a destination
+  tree.
+  It is threaded and faster than existing tools that merge trees, however
+  it operates only on leaf nodes.
+
+@par
+Bug fixes:
+- Fixed a delayed-loading race condition that could result in crashes.
+  <I>[Reported&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+  <BLOCKQUOTE>
+  @b Note: To preserve ABI compatibility, this fix is currently enabled
+  only on platforms for which the alignment of a
+  <TT>tbb::atomic&lt;uint32_t&gt;</TT> is the same as for a @c uint32_t.
+  On other platforms, warnings will be logged during OpenVDB initialization,
+  and it is recommended to disable delayed loading in that case (for example,
+  by defining the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD).
+  </BLOCKQUOTE>
+- Fixed a delayed-loading memory leak in the
+  @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Houdini:
+- As of Houdini&nbsp;16.0.549, @c houdini_utils::OpFactory can generate
+  help cards for operators automatically.
+  New @c OpFactory::setDocumentation and @c ParmFactory::setDocumentation
+  methods allow one to add custom help text in
+  <A HREF="http://www.sidefx.com/docs/houdini/help/format">wiki markup</A>
+  format.
+- Added help cards for all SOPs.  Houdini&nbsp;16.0.578 or later is required.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey&nbsp;and&nbsp;SideFX]</I>
+- Added a slider to the Remove Divergence SOP to set the error tolerance
+  for the pressure solver.
+- The Extended Operator Info window in Houdini&nbsp;16 now renders correctly
+  for OpenVDB SOPs, instead of displaying a Python stack trace.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.1</B> - <I>March 8, 2017</I>

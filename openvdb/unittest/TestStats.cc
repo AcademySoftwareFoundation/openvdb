@@ -67,19 +67,63 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestStats);
 void
 TestStats::testMinMax()
 {
-    // test Coord which uses lexicographic less than
-    openvdb::math::MinMax<openvdb::Coord> s(openvdb::Coord::max(), openvdb::Coord::min());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord::max(), s.min());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord::min(), s.max());
-    s.add( openvdb::Coord(1,2,3) );
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.min());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.max());
-    s.add( openvdb::Coord(0,2,3) );
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0,2,3), s.min());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.max());
-    s.add( openvdb::Coord(1,2,4) );
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0,2,3), s.min());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,4), s.max());
+    {// test Coord which uses lexicographic less than
+        openvdb::math::MinMax<openvdb::Coord> s(openvdb::Coord::max(), openvdb::Coord::min());
+        //openvdb::math::MinMax<openvdb::Coord> s;// will not compile since Coord is not a POD type
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::max(), s.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::min(), s.max());
+        s.add( openvdb::Coord(1,2,3) );
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.max());
+        s.add( openvdb::Coord(0,2,3) );
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0,2,3), s.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,3), s.max());
+        s.add( openvdb::Coord(1,2,4) );
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0,2,3), s.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1,2,4), s.max());
+    }
+    {// test double
+        openvdb::math::MinMax<double> s;
+        CPPUNIT_ASSERT_EQUAL( std::numeric_limits<double>::max(), s.min());
+        CPPUNIT_ASSERT_EQUAL(-std::numeric_limits<double>::max(), s.max());
+        s.add( 1.0 );
+        CPPUNIT_ASSERT_EQUAL(1.0, s.min());
+        CPPUNIT_ASSERT_EQUAL(1.0, s.max());
+        s.add( 2.5 );
+        CPPUNIT_ASSERT_EQUAL(1.0, s.min());
+        CPPUNIT_ASSERT_EQUAL(2.5, s.max());
+        s.add( -0.5 );
+        CPPUNIT_ASSERT_EQUAL(-0.5, s.min());
+        CPPUNIT_ASSERT_EQUAL( 2.5, s.max());
+    }
+    {// test int
+        openvdb::math::MinMax<int> s;
+        CPPUNIT_ASSERT_EQUAL(std::numeric_limits<int>::max(), s.min());
+        CPPUNIT_ASSERT_EQUAL(std::numeric_limits<int>::min(), s.max());
+        s.add( 1 );
+        CPPUNIT_ASSERT_EQUAL(1, s.min());
+        CPPUNIT_ASSERT_EQUAL(1, s.max());
+        s.add( 2 );
+        CPPUNIT_ASSERT_EQUAL(1, s.min());
+        CPPUNIT_ASSERT_EQUAL(2, s.max());
+        s.add( -5 );
+        CPPUNIT_ASSERT_EQUAL(-5, s.min());
+        CPPUNIT_ASSERT_EQUAL( 2, s.max());
+    }
+    {// test unsigned
+        openvdb::math::MinMax<uint32_t> s;
+        CPPUNIT_ASSERT_EQUAL(std::numeric_limits<uint32_t>::max(), s.min());
+        CPPUNIT_ASSERT_EQUAL(uint32_t(0), s.max());
+        s.add( 1 );
+        CPPUNIT_ASSERT_EQUAL(uint32_t(1), s.min());
+        CPPUNIT_ASSERT_EQUAL(uint32_t(1), s.max());
+        s.add( 2 );
+        CPPUNIT_ASSERT_EQUAL(uint32_t(1), s.min());
+        CPPUNIT_ASSERT_EQUAL(uint32_t(2), s.max());
+        s.add( 0 );
+        CPPUNIT_ASSERT_EQUAL( uint32_t(0), s.min());
+        CPPUNIT_ASSERT_EQUAL( uint32_t(2), s.max());
+    }
 }
 
 

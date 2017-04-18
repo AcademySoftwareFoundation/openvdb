@@ -134,7 +134,9 @@ inline void dilateActiveValues(TreeType& tree,
 ///
 /// @note This method is fully multi-threaded and support active tiles!
 ///
-/// @param manager       Leaf node manager for the tree to be dilated
+/// @param manager       Leaf node manager for the tree to be dilated.
+///                      On exit it is updated to include all the leaf
+///                      nodes of the dilated tree.    
 /// @param iterations    number of iterations to apply the dilation
 /// @param nn            connectivity pattern of the dilation: either
 ///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
@@ -173,6 +175,8 @@ inline void dilateVoxels(TreeType& tree,
 /// @warning This method is NOT multi-threaded and ignores active tiles!
 ///
 /// @param manager       LeafManager containing the tree to be dilated.
+///                      On exit it is updated to include all the leaf
+///                      nodes of the dilated tree.
 /// @param iterations    number of iterations to apply the dilation
 /// @param nn           connectivity pattern of the dilation: either
 ///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
