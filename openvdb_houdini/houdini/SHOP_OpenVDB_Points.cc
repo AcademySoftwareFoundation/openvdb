@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file SHOP_OpenVDB_Points.cc
 ///
 /// @authors Dan Bailey, Richard Kwok
@@ -43,7 +43,7 @@
 
 #include <houdini_utils/ParmFactory.h>
 
-#include <iostream>
+#include <sstream>
 
 namespace hutil = houdini_utils;
 
@@ -54,18 +54,16 @@ public:
     static const char* nodeName() { return "openvdb_points"; }
 
     SHOP_OpenVDB_Points(OP_Network *parent, const char *name, OP_Operator *entry);
-    virtual ~SHOP_OpenVDB_Points() = default;
+    ~SHOP_OpenVDB_Points() override = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual bool    buildShaderString(UT_String &result, fpreal now,
-                    const UT_Options *options,
-                    OP_Node *obj=0, OP_Node *sop=0,
-                    SHOP_TYPE interpretType = SHOP_INVALID) override;
+    bool buildShaderString(UT_String &result, fpreal now, const UT_Options *options,
+        OP_Node *obj=0, OP_Node *sop=0, SHOP_TYPE interpretType = SHOP_INVALID) override;
 
 protected:
-    virtual OP_ERROR cookMe(OP_Context&) override;
-    virtual bool updateParmsFlags() override;
+    OP_ERROR cookMe(OP_Context&) override;
+    bool updateParmsFlags() override;
 }; // class SHOP_OpenVDB_Points
 
 
@@ -73,8 +71,7 @@ protected:
 
 
 OP_Node*
-SHOP_OpenVDB_Points::factory(OP_Network* net,
-    const char* name, OP_Operator* op)
+SHOP_OpenVDB_Points::factory(OP_Network* net, const char* name, OP_Operator* op)
 {
     return new SHOP_OpenVDB_Points(net, name, op);
 }
@@ -86,7 +83,7 @@ SHOP_OpenVDB_Points::SHOP_OpenVDB_Points(OP_Network *parent, const char *name, O
 
 bool
 SHOP_OpenVDB_Points::buildShaderString(UT_String &result, fpreal now,
-    const UT_Options *options, OP_Node *obj, OP_Node *sop, SHOP_TYPE interpretType)
+    const UT_Options*, OP_Node*, OP_Node*, SHOP_TYPE)
 {
     UT_String fileStr = "";
     evalString(fileStr, "file", 0, now);
@@ -160,14 +157,17 @@ newShopOperator(OP_OperatorTable *table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_FILE, "file", "File")
-        .setDefault(0, "./filename.vdb")
+        .setDefault("./filename.vdb")
         .setHelpText("File path to the VDB to load."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "streamdata", "Stream Data for Maximum Memory Efficiency")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE,
+        "streamdata", "Stream Data for Maximum Memory Efficiency")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Stream the data from disk to keep the memory footprint as small as possible. \
-                      This will make the initial conversion marginally slower because the data will be loaded twice, \
-                      once for pre-computation to evaluate the bounding box and once for the actual conversion."));
+        .setHelpText(
+            "Stream the data from disk to keep the memory footprint as small as possible."
+            " This will make the initial conversion marginally slower because the data"
+            " will be loaded twice, once for pre-computation to evaluate the bounding box"
+            " and once for the actual conversion."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "groupmask", "Group Mask")
         .setDefault("")
@@ -178,8 +178,10 @@ newShopOperator(OP_OperatorTable *table)
         .setHelpText("Specify VDB Points Attributes to use. (Default is all attributes)"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "speedtocolor", "Map Speed To Color")
-    .setDefault(PRMzeroDefaults)
-    .setHelpText("Replaces the 'Cd' point attribute with colors mapped from the 'v' point attribute using a ramp."));
+        .setDefault(PRMzeroDefaults)
+        .setHelpText(
+            "Replaces the 'Cd' point attribute with colors mapped from the"
+            " 'v' point attribute using a ramp."));
 
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
 
@@ -197,10 +199,10 @@ newShopOperator(OP_OperatorTable *table)
     SHOP_Operator* shop = new SHOP_Operator(SHOP_OpenVDB_Points::nodeName(), "OpenVDB Points",
         SHOP_OpenVDB_Points::factory,
         parms.get(),
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
-        nullptr,
+#if (UT_MAJOR_VERSION_INT >= 16)
+        /*child_table_name=*/nullptr,
 #endif
-        0, 0,
+        /*min_sources=*/0, /*max_sources=*/0,
         SHOP_Node::myVariableList,
         OP_FLAG_GENERATOR,
         SHOP_AUTOADD_NONE);
@@ -217,9 +219,6 @@ newShopOperator(OP_OperatorTable *table)
     // Set the rendermask to "*" and try to support *all* renderers.
     info->setRenderMask("*");
 }
-
-
-////////////////////////////////////////
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

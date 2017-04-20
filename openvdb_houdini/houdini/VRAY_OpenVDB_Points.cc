@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file VRAY_OpenVDB_Points.cc
 ///
 /// @authors Dan Bailey, Richard Kwok
@@ -45,12 +45,10 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
-
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
-
-#include "PointUtils.h"
+#include <openvdb_houdini/PointUtils.h>
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -65,26 +63,26 @@ public:
     using GridVecPtr = std::vector<PointDataGrid::Ptr>;
 
     VRAY_OpenVDB_Points();
-    virtual ~VRAY_OpenVDB_Points() = default;
+    ~VRAY_OpenVDB_Points() override = default;
 
-    virtual const char  *className() const override;
+    const char* className() const override;
 
-    virtual int      initialize(const UT_BoundingBox *) override;
-    virtual void     getBoundingBox(UT_BoundingBox &box) override;
-    virtual void     render() override;
+    int initialize(const UT_BoundingBox*) override;
+    void getBoundingBox(UT_BoundingBox&) override;
+    void render() override;
 
 private:
-    UT_BoundingBox                              mBox;
-    UT_StringHolder                             mFilename;
-    std::vector<Name>                           mIncludeGroups;
-    std::vector<Name>                           mExcludeGroups;
-    UT_StringHolder                             mAttrStr;
-    GridVecPtr                                  mGridPtrs;
-    float                                       mPreBlur;
-    float                                       mPostBlur;
-    bool                                        mSpeedToColor;
-    float                                       mMaxSpeed;
-    UT_Ramp                                     mFunctionRamp;
+    UT_BoundingBox      mBox;
+    UT_StringHolder     mFilename;
+    std::vector<Name>   mIncludeGroups;
+    std::vector<Name>   mExcludeGroups;
+    UT_StringHolder     mAttrStr;
+    GridVecPtr          mGridPtrs;
+    float               mPreBlur;
+    float               mPostBlur;
+    bool                mSpeedToColor;
+    float               mMaxSpeed;
+    UT_Ramp             mFunctionRamp;
 
 }; // class VRAY_OpenVDB_Points
 
@@ -120,9 +118,11 @@ struct GenerateBBoxOp {
 
                 std::string pscaleType = descriptor.type(pscaleIndex).first;
 
-                if (pscaleType == typeNameAsString<float>())        expandBBox<float>(*leafIter, pscaleIndex);
-                else if (pscaleType == typeNameAsString<half>())    expandBBox<half>(*leafIter, pscaleIndex);
-                else {
+                if (pscaleType == typeNameAsString<float>()) {
+                    expandBBox<float>(*leafIter, pscaleIndex);
+                } else if (pscaleType == typeNameAsString<half>()) {
+                    expandBBox<half>(*leafIter, pscaleIndex);
+                } else {
                     throw TypeError("Unsupported pscale type - " + pscaleType);
                 }
             }
@@ -140,14 +140,19 @@ struct GenerateBBoxOp {
     template <typename PscaleType>
     void expandBBox(const PointDataLeaf& leaf, size_t pscaleIndex) {
 
-        auto positionHandle = points::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+        auto positionHandle =
+            points::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
 
-        // expandBBox will not pick up a pscale handle unless the attribute type matches the template type
+        // expandBBox will not pick up a pscale handle unless
+        // the attribute type matches the template type
 
         typename AttributeHandle<PscaleType>::Ptr pscaleHandle;
         if (pscaleIndex != AttributeSet::INVALID_POS) {
-            if (leaf.attributeSet().descriptor().type(pscaleIndex).first == typeNameAsString<PscaleType>()) {
-                pscaleHandle = AttributeHandle<PscaleType>::create(leaf.constAttributeArray(pscaleIndex));
+            if (leaf.attributeSet().descriptor().type(pscaleIndex).first
+                == typeNameAsString<PscaleType>())
+            {
+                pscaleHandle =
+                    AttributeHandle<PscaleType>::create(leaf.constAttributeArray(pscaleIndex));
             }
         }
 
@@ -250,9 +255,11 @@ struct PopulateColorFromVelocityOp {
 
             auto& leaf = *leafIter;
 
-            auto colorHandle = points::AttributeWriteHandle<Vec3f>::create(leaf.attributeArray(mColorIndex));
+            auto colorHandle =
+                points::AttributeWriteHandle<Vec3f>::create(leaf.attributeArray(mColorIndex));
 
-            auto velocityHandle = points::AttributeHandle<Vec3f>::create(leaf.constAttributeArray(mVelocityIndex));
+            auto velocityHandle =
+                points::AttributeHandle<Vec3f>::create(leaf.constAttributeArray(mVelocityIndex));
 
             const bool uniform = velocityHandle->isUniform();
             const Vec3f uniformColor = getColorFromRamp(velocityHandle->get(0));
@@ -264,7 +271,8 @@ struct PopulateColorFromVelocityOp {
 
                 for (; iter; ++iter) {
 
-                    Vec3f color = uniform ? uniformColor : getColorFromRamp(velocityHandle->get(*iter));
+                    Vec3f color = uniform ?
+                        uniformColor : getColorFromRamp(velocityHandle->get(*iter));
                     colorHandle->set(*iter, color);
                 }
             }
@@ -274,7 +282,8 @@ struct PopulateColorFromVelocityOp {
 
                 for (; iter; ++iter) {
 
-                    Vec3f color = uniform ? uniformColor : getColorFromRamp(velocityHandle->get(*iter));
+                    Vec3f color = uniform ?
+                        uniformColor : getColorFromRamp(velocityHandle->get(*iter));
                     colorHandle->set(*iter, color);
                 }
             }
@@ -306,7 +315,7 @@ getBoundingBox( const std::vector<typename PointDataGridT::Ptr>& gridPtrs,
 
     BBoxd worldBounds;
 
-    for (const auto grid : gridPtrs) {
+    for (const auto& grid : gridPtrs) {
 
         tree::LeafManager<const PointDataTree> leafManager(grid->tree());
 
@@ -380,14 +389,15 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
                 io::File file(filename);
                 file.open();
 
-                for (auto iter = file.beginName(), endIter = file.endName(); iter != endIter; ++iter) {
+                for (auto iter=file.beginName(), endIter=file.endName(); iter != endIter; ++iter) {
 
                     GridBase::Ptr baseGrid = file.readGridMetadata(*iter);
                     if (baseGrid->isType<points::PointDataGrid>()) {
                         auto grid = StaticPtrCast<points::PointDataGrid>(file.readGrid(*iter));
                         assert(grid);
                         if (stream) {
-                            // enable streaming mode to auto-collapse attributes on read for improved memory efficiency
+                            // enable streaming mode to auto-collapse attributes
+                            // on read for improved memory efficiency
                             points::setStreamingMode(grid->tree(), /*on=*/true);
                         }
                         grids.push_back(grid);
@@ -441,7 +451,8 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
         std::vector<float> rampVals(begin, end);
 
         for (size_t n = 4, N = rampVals.size(); n < N; n += 5) {
-            mFunctionRamp.addNode(rampVals[n-4], UT_FRGBA(rampVals[n-3], rampVals[n-2], rampVals[n-1], 1.0f),
+            mFunctionRamp.addNode(rampVals[n-4],
+                UT_FRGBA(rampVals[n-3], rampVals[n-2], rampVals[n-1], 1.0f),
                 static_cast<UT_SPLINE_BASIS>(rampVals[n]));
         }
     }
@@ -455,8 +466,13 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 
     // get openvdb bounds and convert to houdini bounds
     BBoxd vdbBox = ::getBoundingBox<PointDataGrid>(mGridPtrs, mIncludeGroups, mExcludeGroups);
-    mBox.setBounds(vdbBox.min().x(), vdbBox.min().y(), vdbBox.min().z()
-                  ,vdbBox.max().x(), vdbBox.max().y(), vdbBox.max().z());
+    mBox.setBounds(
+        static_cast<float>(vdbBox.min().x()),
+        static_cast<float>(vdbBox.min().y()),
+        static_cast<float>(vdbBox.min().z()),
+        static_cast<float>(vdbBox.max().x()),
+        static_cast<float>(vdbBox.max().y()),
+        static_cast<float>(vdbBox.max().z()));
 
     // if streaming the data, re-open the file now that the bounding box has been computed
     if (streamData) {
@@ -487,16 +503,19 @@ VRAY_OpenVDB_Points::render()
     // extract which attributes to include and exclude
     std::vector<Name> includeAttributes;
     std::vector<Name> excludeAttributes;
-    AttributeSet::Descriptor::parseNames(includeAttributes, excludeAttributes, mAttrStr.toStdString());
+    AttributeSet::Descriptor::parseNames(
+        includeAttributes, excludeAttributes, mAttrStr.toStdString());
 
     // if nothing was included or excluded: "all attributes" is implied with an empty vector
-    // if nothing was included but something was explicitly excluded: add all attributes but then remove the excluded
-    // if something was included: add only explicitly included attributes and then removed any excluded
+    // if nothing was included but something was explicitly excluded:
+    //     add all attributes but then remove the excluded
+    // if something was included:
+    //     add only explicitly included attributes and then removed any excluded
 
     if (includeAttributes.empty() && !excludeAttributes.empty()) {
 
         // add all attributes
-        for (const auto grid : mGridPtrs) {
+        for (const auto& grid : mGridPtrs) {
 
             auto leafIter = grid->tree().cbeginLeaf();
             if (!leafIter) continue;
@@ -515,10 +534,13 @@ VRAY_OpenVDB_Points::render()
     // sort, and then remove any duplicates
     std::sort(includeAttributes.begin(), includeAttributes.end());
     std::sort(excludeAttributes.begin(), excludeAttributes.end());
-    includeAttributes.erase(std::unique(includeAttributes.begin(), includeAttributes.end()), includeAttributes.end());
-    excludeAttributes.erase(std::unique(excludeAttributes.begin(), excludeAttributes.end()), excludeAttributes.end());
+    includeAttributes.erase(
+        std::unique(includeAttributes.begin(), includeAttributes.end()), includeAttributes.end());
+    excludeAttributes.erase(
+        std::unique(excludeAttributes.begin(), excludeAttributes.end()), excludeAttributes.end());
 
-    // make a vector (validAttributes) of all elements that are in includeAttributes but are NOT in excludeAttributes
+    // make a vector (validAttributes) of all elements that are in includeAttributes
+    // but are NOT in excludeAttributes
     std::vector<Name> validAttributes(includeAttributes.size());
     auto pastEndIter = std::set_difference(includeAttributes.begin(), includeAttributes.end(),
         excludeAttributes.begin(), excludeAttributes.end(), validAttributes.begin());
@@ -531,7 +553,7 @@ VRAY_OpenVDB_Points::render()
 
     // map speed to color if requested
     if (mSpeedToColor) {
-        for (const auto grid : mGridPtrs) {
+        for (const auto& grid : mGridPtrs) {
 
             PointDataTree& tree = grid->tree();
 
@@ -541,14 +563,17 @@ VRAY_OpenVDB_Points::render()
             size_t velocityIndex = leafIter->attributeSet().find("v");
             if (velocityIndex != AttributeSet::INVALID_POS) {
 
-                const std::string velocityType = leafIter->attributeSet().descriptor().type(velocityIndex).first;
+                const std::string velocityType =
+                    leafIter->attributeSet().descriptor().type(velocityIndex).first;
 
                 // keep existing Cd attribute only if it is a supported type (float or half)
                 size_t colorIndex = leafIter->attributeSet().find("Cd");
                 std::string colorType = "";
                 if (colorIndex != AttributeSet::INVALID_POS) {
                     colorType = leafIter->attributeSet().descriptor().type(colorIndex).first;
-                    if (colorType != typeNameAsString<Vec3f>() && colorType != typeNameAsString<Vec3H>()) {
+                    if (colorType != typeNameAsString<Vec3f>()
+                        && colorType != typeNameAsString<Vec3H>())
+                    {
                         dropAttribute(tree, "Cd");
                         colorIndex = AttributeSet::INVALID_POS;
                     }
@@ -556,7 +581,8 @@ VRAY_OpenVDB_Points::render()
 
                 // create new Cd attribute if one did not previously exist
                 if (colorIndex == AttributeSet::INVALID_POS) {
-                    openvdb::points::appendAttribute<Vec3f, FixedPointCodec<false, UnitRange>>(tree, "Cd");
+                    openvdb::points::appendAttribute<Vec3f, FixedPointCodec<false, UnitRange>>(
+                        tree, "Cd");
                     colorIndex = leafIter->attributeSet().find("Cd");
                 }
 
@@ -569,9 +595,10 @@ VRAY_OpenVDB_Points::render()
         }
     }
 
-    for (const auto grid : mGridPtrs) {
+    for (const auto& grid : mGridPtrs) {
 
-        hvdb::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
+        hvdb::convertPointDataGridToHoudini(
+            *gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
     }
 
     geo.addVelocityBlur(mPreBlur, mPostBlur);
@@ -586,8 +613,6 @@ VRAY_OpenVDB_Points::render()
 }
 
 #endif // 16.0.0 or later
-
-////////////////////////////////////////
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

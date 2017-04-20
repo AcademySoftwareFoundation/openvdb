@@ -35,6 +35,9 @@ Version 4.0.2 - In development
     - The Extended Operator Info window in Houdini 16 now renders correctly
       for OpenVDB SOPs, instead of displaying a Python stack trace.
       [Contributed by Dan Bailey]
+    - Added a Mantra VRAY procedural and a delayed load SHOP for rendering
+      OpenVDB Points.  Houdini 16 is required.
+      [Contributed by Double Negative]
 
 
 Version 4.0.1 - March 8, 2017

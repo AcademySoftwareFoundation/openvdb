@@ -33,7 +33,8 @@
 # Targets:
 #   houdinilib          utility library for Houdini OpenVDB SOPs
 #   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DESTDIR)
-#   mantradsos          Mantra OpenVDB Procedurals (installed into HOUDINI_DESTDIR/mantra)
+#   mantradsos          Mantra OpenVDB procedurals
+#                       (installed into HOUDINI_DESTDIR/mantra)
 #
 #   all                 [default target] all of the above
 #   install_lib         install houdinilib into subdirectories of DESTDIR
@@ -135,6 +136,11 @@ else
         endif
     endif
 endif
+
+# TODO: For historical reasons, HOUDINI_DESTDIR specifies the installation
+# directory for Houdini DSOs.  It would probably be better if it specified
+# the parent directory.
+HOUDINI_USER_PREF_DIR := $(abspath $(HOUDINI_DESTDIR)/..)
 
 HOUDINI_INCL_DIR := $(HT)/include
 # Flags to be passed to the hcustom build script
@@ -297,7 +303,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Write.cc \
 #
 MANTRA_VRAY_SRC_NAMES := \
-	houdini/VRAY_OpenVDB_Points.cc \
+    houdini/VRAY_OpenVDB_Points.cc \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
 MANTRA_VRAY_NAMES := $(basename $(notdir $(MANTRA_VRAY_SRC_NAMES)))
@@ -464,16 +470,18 @@ $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
 $(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
 
 houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_OpenVDB.svg
-	if [ -d "$(HOUDINI_DESTDIR)/../config/Icons" ]; \
+	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/config/Icons" ]; \
 	then \
-	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
+	    mkdir -p $(HOUDINI_USER_PREF_DIR)/config/Icons; \
+	    echo "Created $(HOUDINI_USER_PREF_DIR)/config/Icons/"; \
 	fi
-	if [ ! -d "$(HOUDINI_DESTDIR)/../scripts/sop" ]; \
+	cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/scripts/sop" ]; \
 	then \
-	    mkdir -p $(HOUDINI_DESTDIR)/../scripts/sop; \
-	    echo "Created $(HOUDINI_DESTDIR)/../scripts/sop/"; \
+	    mkdir -p $(HOUDINI_USER_PREF_DIR)/scripts/sop; \
+	    echo "Created $(HOUDINI_USER_PREF_DIR)/scripts/sop/"; \
 	fi
-	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
+	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_USER_PREF_DIR)/scripts/sop/
 
 mantradsos: $(MANTRA_VRAY_SO_NAMES)
 
@@ -524,8 +532,8 @@ clean:
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
-	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
-	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../scripts/sop/,\
+	$(RM) $(HOUDINI_USER_PREF_DIR)/config/Icons/SOP_OpenVDB.svg
+	$(RM) $(addprefix $(HOUDINI_USER_PREF_DIR)/scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
