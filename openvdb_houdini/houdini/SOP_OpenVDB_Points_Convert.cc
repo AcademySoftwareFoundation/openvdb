@@ -837,21 +837,32 @@ newSopOperator(OP_OperatorTable* table)
 
         parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Conversion")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("The conversion method for the expected input types.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The conversion method for the expected input types.")
+            .setDocumentation(
+                "Whether to pack points into a VDB Points primitive"
+                " or to extract points from such a primitive "));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input point data grids to convert.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenu)
+        .setTooltip("Specify a subset of the input point data grids to convert.")
+        .setDocumentation(
+            "A subset of the input VDB Points primitives to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
-        .setHelpText("Specify VDB Points Groups to use as an input."));
+        .setTooltip("Specify VDB Points Groups to use as an input.")
+        .setDocumentation(
+            "The point group inside the VDB Points primitive to extract\n\n"
+            "This may be a normal point group that was collapsed into the"
+            " VDB Points primitive when it was created, or a new group created"
+            " with the [OpenVDB Points Group node|Node:sop/DW_OpenVDBPointsGroup]."));
 
     //  point grid name
     parms.add(hutil::ParmFactory(PRM_STRING, "name", "VDB Name")
         .setDefault("points")
-        .setHelpText("Output grid name."));
+        .setTooltip("The name of the VDB Points primitive to be created"));
 
     {   // Transform
         const char* items[] = {
@@ -864,7 +875,7 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_ORD, "transform", "Define Transform")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
+            .setTooltip(
                 "Specify how to construct the PointDataGrid transform. If\n"
                 "an optional transform input is provided for the first two\n"
                 "options, the rotate and translate components are preserved.\n"
@@ -874,32 +885,55 @@ newSopOperator(OP_OperatorTable* table)
                 "Using Voxel Size Only:\n"
                 "    Explicitly sets a voxel size.\n"
                 "To Match Reference VDB:\n"
-                "    Uses the complete transform provided from the second input."));
+                "    Uses the complete transform provided from the second input.")
+            .setDocumentation("\
+How to construct the VDB Points primitive's transform\n\n\
+An important consideration is how big to make the grid cells\n\
+that contain the points.  Too large and there are too many points\n\
+per cell and little optimization occurs.  Too small and the cost\n\
+of the cells outweighs the points.\n\
+\n\
+Using Target Points Per Voxel:\n\
+    Automatically calculate a voxel size so that the given number\n\
+    of points ends up in each voxel.  This will assume uniform\n\
+    distribution of points.\n\
+    \n\
+    If an optional transform input is provided, use its rotation\n\
+    and translation.\n\
+Using Voxel Size Only:\n\
+    Provide an explicit voxel size, and if an optional transform input\n\
+    is provided, use its rotation and translation.\n\
+To Match Reference VDB:\n\
+    Use the complete transform provided from the second input.\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
-        .setHelpText("The desired voxel size of the new VDB Points grid.")
-        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5));
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
+        .setTooltip("The desired voxel size of the new VDB Points grid"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "pointspervoxel", "Points Per Voxel")
         .setDefault(8)
-        .setHelpText("The number of points per voxel to use as the target for "
-                     "automatic voxel size computation.")
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16));
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16)
+        .setTooltip(
+            "The number of points per voxel to use as the target for "
+            "automatic voxel size computation"));
 
     // Group name (Transform reference)
     parms.add(hutil::ParmFactory(PRM_STRING, "refvdb", "Reference VDB")
         .setChoiceList(&hutil::PrimGroupMenu)
         .setSpareData(&SOP_Node::theSecondInput)
-        .setHelpText("References the first/selected grid's transform."));
+        .setTooltip("References the first/selected grid's transform.")
+        .setDocumentation(
+            "Which VDB in the second input to use as the reference for the transform\n\n"
+            "If this is not set, use the first VDB found."));
 
     //////////
 
     // Point attribute transfer
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             "int16", "16-bit Fixed Point",
             "int8", "8-bit Fixed Point",
@@ -908,8 +942,12 @@ newSopOperator(OP_OperatorTable* table)
 
         parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
             .setDefault(PRMoneDefaults)
-            .setHelpText("The position attribute compression setting.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The position attribute compression setting.")
+            .setDocumentation(
+                "The position can be stored relative to the center of the voxel.\n"
+                "This means it does not require the full 32-bit float representation,\n"
+                "but can be quantized to a smaller fixed-point value."));
     }
 
     parms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute Transfer"));
@@ -917,7 +955,7 @@ newSopOperator(OP_OperatorTable* table)
      // Mode. Either convert all or convert specifc attributes
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "all", "All Attributes",
             "spec", "Specific Attributes",
             nullptr
@@ -925,7 +963,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Mode")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Whether to transfer only specific attributes or all attributes found.")
+        .setTooltip("Whether to transfer only specific attributes or all attributes found")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
@@ -935,12 +973,12 @@ newSopOperator(OP_OperatorTable* table)
     attrParms.add(hutil::ParmFactory(PRM_STRING, "attribute#", "Attribute")
         .setChoiceList(&PrimAttrMenu)
         .setSpareData(&SOP_Node::theFirstInput)
-        .setHelpText("Select a point attribute to transfer. "
-            "Supports integer and floating point attributes of "
+        .setTooltip("Select a point attribute to transfer.\n\n"
+            "Supports integer and floating-point attributes of "
             "arbitrary precisions and tuple sizes."));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             "truncate", "16-bit Truncate",
             UnitVecCodec::name(), "Unit Vector",
@@ -951,24 +989,45 @@ newSopOperator(OP_OperatorTable* table)
 
         attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompression#", "Value Compression")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("Value Compression to use for specific attributes.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Value compression to use for specific attributes.")
+            .setDocumentation("\
+How to compress attribute values\n\
+\n\
+None:\n\
+    Values are stored with their full precision.\n\
+\n\
+16-bit Truncate:\n\
+    Values are stored at half precision, truncating lower-order bits.\n\
+\n\
+Unit Vector:\n\
+    Values are treated as unit vectors, so that if two components\n\
+    are known, the third is implied and need not be stored.\n\
+\n\
+8-bit Unit:\n\
+    Values are treated as lying in the 0..1 range and are quantized to 8 bits.\n\
+\n\
+16-bit Unit:\n\
+    Values are treated as lying in the 0..1 range and are quantized to 16 bits.\n"));
     }
 
     attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable Blosc Compression."));
+        .setTooltip(
+            "Enable Blosc compression\n\n"
+            "Blosc is a lossless compression codec that is effective with"
+            " floating-point data and is very fast to compress and decompress."));
 
     // Add multi parm
     parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Point Attributes")
-        .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
+        .setTooltip("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
 
     parms.add(hutil::ParmFactory(PRM_LABEL, "attributespacer", ""));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             UnitVecCodec::name(), "Unit Vector",
             "truncate", "16-bit Truncate",
@@ -977,12 +1036,12 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("All normal attributes will use this compression codec.")
+        .setTooltip("All normal attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
             FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
@@ -992,7 +1051,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("All color attributes will use this compression codec.")
+        .setTooltip("All color attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
@@ -1002,7 +1061,33 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Points Convert",
         SOP_OpenVDB_Points_Convert::factory, parms, *table)
         .addInput("Points to Convert")
-        .addOptionalInput("Optional Reference VDB (for transform)");
+        .addOptionalInput("Optional Reference VDB (for transform)")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Convert a point cloud into a VDB Points primitive, or vice versa.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node converts an unstructured cloud of points to and from a single\n\
+[VDB Points|http://www.openvdb.org/documentation/doxygen/points.html] primitive.\n\
+The resulting primitive will reorder the points to place spatially\n\
+close points close together.\n\
+It is then able to efficiently unpack regions of interest within that primitive.\n\
+The [OpenVDB Points Group node|Node:sop/DW_OpenVDBPointsGroup] can be used\n\
+to create regions of interest.\n\
+\n\
+Because nearby points often have similar data, there is the possibility\n\
+of aggressively compressing attribute data to minimize data size.\n\
+\n\
+@related\n\
+- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 

@@ -57,14 +57,14 @@ class SOP_OpenVDB_Rebuild_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Rebuild_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Rebuild_Level_Set() {}
+    ~SOP_OpenVDB_Rebuild_Level_Set() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -75,7 +75,7 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     //////////
     // Conversion settings
@@ -84,45 +84,56 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setHelpText("Specify a subset of the input VDB grids to be processed\n"
-            "(scalar, floating-point grids only)"));
+        .setTooltip("Specify a subset of the input VDB grids to be processed\n"
+            "(scalar, floating-point grids only)")
+        .setDocumentation(
+            "A subset of the scalar, floating-point input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
-        .setHelpText("The isovalue that defines the implicit surface"));
+        .setTooltip("The isovalue that defines the implicit surface"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units")
+        .setTooltip("If enabled, specify the width of the narrow band in world units."));
 
     // Voxel unit narrow-band width {
     parms.add(hutil::ParmFactory(PRM_FLT_J, "exteriorBandWidth", "Exterior Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the width of the exterior (d >= 0) portion of the narrow band. "
-            "(3 voxel units is optimal for level set operations.)"));
+        .setTooltip("Specify the width of the exterior (distance >= 0) portion of the narrow band. "
+            "(3 voxel units is optimal for level set operations.)")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "interiorBandWidth", "Interior Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the width of the interior (d < 0) portion of the narrow band. "
-            "(3 voxel units is optimal for level set operations.)"));
+        .setTooltip("Specify the width of the interior (distance < 0) portion of the narrow band. "
+            "(3 voxel units is optimal for level set operations.)")
+        .setDocumentation(nullptr));
     // }
-    
+
     // World unit narrow-band width {
     parms.add(hutil::ParmFactory(PRM_FLT_J, "exteriorBandWidthWS", "Exterior Band")
         .setDefault(0.1)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the width of the exterior (d >= 0) portion of the narrow band."));
+        .setTooltip("Specify the width of the exterior (distance >= 0) portion of the narrow band.")
+        .setDocumentation(
+            "Specify the width of the exterior (_distance_ => 0) portion of the narrow band."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "interiorBandWidthWS",  "Interior Band")
         .setDefault(0.1)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the width of the interior (d < 0) portion of the narrow band."));
+        .setTooltip("Specify the width of the interior (distance < 0) portion of the narrow band.")
+        .setDocumentation(
+            "Specify the width of the interior (_distance_ < 0) portion of the narrow band."));
     // }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fillinterior", "Fill Interior")
-        .setHelpText("Extract signed distances for all interior voxels, this "
-            "operation is going to densify the interior of the model. "
-            "Requires a closed watertight model."));
+        .setTooltip(
+            "If enabled, extract signed distances for all interior voxels.\n\n"
+            "This operation densifies the interior of the surface and requires"
+            " a closed, watertight surface."));
 
     //////////
     // Obsolete parameters
@@ -138,7 +149,31 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Rebuild Level Set",
         SOP_OpenVDB_Rebuild_Level_Set::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addInput("VDB grids to process");
+        .addInput("VDB grids to process")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Repair level sets represented by VDB volumes.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+Certain operations on a level set volume can cause the signed distances\n\
+to its zero crossing to become invalid.\n\
+This node restores proper distances by surfacing the level set with\n\
+a polygon mesh and then converting the mesh back to a level set.\n\
+As such, it can repair more badly damaged level sets than can the\n\
+[OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet] node.\n\
+\n\
+@related\n\
+- [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -253,14 +288,14 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
             GU_PrimVDB* vdbPrim = *it;
 
             float exWidth = exBandWidthVoxels, inWidth = inBandWidthVoxels;
-            
+
             if (worldUnits) {
                 const float voxelSize = float(vdbPrim->getGrid().voxelSize()[0]);
 
                 exWidth = exBandWidthWorld / voxelSize;
                 if (!fillInterior) inWidth = inBandWidthWorld / voxelSize;
 
-                if (exWidth < 1.0f || inWidth < 1.0f) {                    
+                if (exWidth < 1.0f || inWidth < 1.0f) {
                     exWidth = std::max(exWidth, 1.0f);
                     inWidth = std::max(inWidth, 1.0f);
                     std::string s = it.getPrimitiveNameOrIndex().toStdString();
@@ -276,7 +311,7 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
                 openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
 
                 vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/NULL, &boss));
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss));
 
                 const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
                 vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
@@ -286,7 +321,7 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
                 openvdb::DoubleGrid& grid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
 
                 vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/NULL, &boss));
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss));
 
                 const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
                 vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);

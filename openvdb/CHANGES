@@ -3,6 +3,12 @@ OpenVDB Version History
 
 Version 4.0.2 - In development
 
+    New features:
+    - Added tools::compActiveLeafVoxels(), which composites active
+      voxel values from a source tree into a destination tree.
+      It is threaded and faster than existing tools that merge trees,
+      however it operates only on leaf nodes.
+
     Bug fixes:
     - Fixed a delayed-loading race condition that could result in crashes.
       [Reported by Dan Bailey]
@@ -18,11 +24,20 @@ Version 4.0.2 - In development
       [Contributed by Double Negative]
 
     Houdini:
+    - As of Houdini 16.0.549, houdini_utils::OpFactory can generate help cards
+      for operators automatically.  New OpFactory::setDocumentation() and
+      ParmFactory::setDocumentation() methods allow one to add custom
+      help text in wiki markup format.
+    - Added help cards for all SOPs.  Houdini 16.0.578 or later is required.
+      [Contributed by Dan Bailey and SideFX]
     - Added a slider to the Remove Divergence SOP to set the error tolerance
       for the pressure solver.
     - The Extended Operator Info window in Houdini 16 now renders correctly
       for OpenVDB SOPs, instead of displaying a Python stack trace.
       [Contributed by Dan Bailey]
+    - Added a Mantra VRAY procedural and a delayed load SHOP for rendering
+      OpenVDB Points.  Houdini 16 is required.
+      [Contributed by Double Negative]
 
 
 Version 4.0.1 - March 8, 2017

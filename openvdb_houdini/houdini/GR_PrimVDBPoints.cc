@@ -106,7 +106,7 @@ using namespace openvdb::points;
 class OPENVDB_HOUDINI_API GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
 {
 public:
-    GUI_PrimVDBPointsHook() : GUI_PrimitiveHook("VDB Points") { }
+    GUI_PrimVDBPointsHook() : GUI_PrimitiveHook("DWA VDB Points") { }
     ~GUI_PrimVDBPointsHook() override = default;
 
     /// This is called when a new GR_Primitive is required for a VDB Points primitive.
@@ -220,7 +220,7 @@ newRenderHook(GR_RenderTable* table)
         static_cast<DM_RenderTable*>(table)->registerGTHook(
             new GUI_PrimVDBPointsHook(),
             GT_PRIM_VDB_VOLUME,
-            /*hook_priority=*/0,
+            /*hook_priority=*/1,
             GUI_HOOK_FLAG_AUGMENT_PRIM);
 
 OPENVDB_START_THREADSAFE_STATIC_WRITE

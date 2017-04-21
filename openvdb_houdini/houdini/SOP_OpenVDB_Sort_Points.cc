@@ -82,9 +82,10 @@ struct CopyElements {
     GA_Offset           const * const mOffsetArray;
 }; // struct CopyElements
 
-struct SetOffsets {
 
-    typedef openvdb::tools::UInt32PointPartitioner PointPartitioner;
+struct SetOffsets
+{
+    using PointPartitioner = openvdb::tools::UInt32PointPartitioner;
 
     SetOffsets(const GU_Detail& srcGeo, const PointPartitioner& partitioner, GA_Offset* offsetArray)
         : mSrcGeo(&srcGeo), mPartitioner(&partitioner), mOffsetArray(offsetArray) { }
@@ -121,28 +122,45 @@ struct SOP_OpenVDB_Sort_Points: public hvdb::SOP_NodeVDB {
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "pointgroup", "Point Group")
         .setChoiceList(&SOP_Node::pointGroupMenu)
-        .setHelpText("A group of points to rasterize."));
+        .setTooltip("A group of points to rasterize."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "binsize", "Bin Size")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
-        .setHelpText("The size (length of a side) of the cubic bin, in world units."));
+        .setTooltip("The size (length of a side) of the cubic bin, in world units."));
 
     hvdb::OpenVDBOpFactory("OpenVDB Sort Points",
         SOP_OpenVDB_Sort_Points::factory, parms, *table)
-        .addInput("points");
+        .addInput("points")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Reorder points into spatially-organized bins.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node reorders Houdini points so that they are sorted into\n\
+three-dimensional spatial bins.\n\
+By increasing CPU cache locality of point data, sorting can improve the\n\
+performance of algorithms such as rasterization that rely on neighbor access.\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 OP_Node*
