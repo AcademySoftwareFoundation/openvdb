@@ -194,9 +194,15 @@ TARGET_LINK_LIBRARIES ( openvdb_shared
   ${BLOSC_blosc_LIBRARY}
   )
 
-SET_TARGET_PROPERTIES ( openvdb_static
-  PROPERTIES OUTPUT_NAME openvdb
-  )
+IF (WIN32)
+  SET_TARGET_PROPERTIES ( openvdb_static
+	PROPERTIES OUTPUT_NAME libopenvdb
+	)
+ELSE()
+  SET_TARGET_PROPERTIES ( openvdb_static
+	PROPERTIES OUTPUT_NAME openvdb
+	)
+ENDIF()
 
 SET_TARGET_PROPERTIES(
   openvdb_shared
@@ -217,7 +223,7 @@ ADD_EXECUTABLE ( vdb_print
   )
 
 TARGET_LINK_LIBRARIES ( vdb_print
-  openvdb_static
+  openvdb_shared
   ${CMAKE_THREAD_LIBS_INIT}
   ${BLOSC_blosc_LIBRARY}
   )
@@ -232,7 +238,7 @@ ADD_EXECUTABLE ( vdb_render
   )
 
 TARGET_LINK_LIBRARIES ( vdb_render
-  openvdb_static
+  openvdb_shared
   ${CMAKE_THREAD_LIBS_INIT}
   ${BLOSC_blosc_LIBRARY}
   ${Openexr_ILMIMF_LIBRARY}
@@ -258,7 +264,7 @@ IF (NOT WIN32)
     )
 
   TARGET_LINK_LIBRARIES ( vdb_view
-    openvdb_static
+    openvdb_shared
     ${Boost_THREAD_LIBRARY}
     ${OPENGL_gl_LIBRARY}
     ${OPENGL_glu_LIBRARY}
@@ -374,7 +380,7 @@ IF ( OPENVDB_BUILD_UNITTESTS )
 
   TARGET_LINK_LIBRARIES ( vdb_test
     ${CPPUnit_cppunit_LIBRARY}
-    openvdb_static
+    openvdb_shared
     )
 
   ADD_TEST ( vdb_unit_test vdb_test )
@@ -416,10 +422,23 @@ INSTALL ( TARGETS
 
 INSTALL ( TARGETS
   openvdb_static
-  openvdb_shared
   DESTINATION
   lib
   )
+
+IF (WIN32)
+  INSTALL ( TARGETS
+	openvdb_shared
+	RUNTIME DESTINATION bin COMPONENT Runtime
+	ARCHIVE DESTINATION lib COMPONENT Runtime
+	)
+ELSE()
+  INSTALL ( TARGETS
+	openvdb_shared
+	DESTINATION
+	lib
+	)
+ENDIF ()
 
 INSTALL ( DIRECTORY ${PROJECT_SOURCE_DIR} DESTINATION include
   FILES_MATCHING PATTERN "*.h"
