@@ -26,13 +26,28 @@
 #
 PROJECT ( OpenVDBMaya )
 
+OPTION ( OPENVDB_MAYA_SUBDIR "Install plug-ins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF)
+OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
+
 FIND_PACKAGE ( Maya REQUIRED )
 FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED )
 FIND_PACKAGE ( ILMBase REQUIRED )
 
-INCLUDE_DIRECTORIES ( ${MAYA_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( ${Boost_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( ${ILMBASE_INCLUDE_DIRS} )
+IF ( NOT OPENVDB_BUILD_CORE )
+  FIND_PACKAGE ( OpenVDB REQUIRED )
+
+  # Use the library installed
+  SET ( OPENVDB_SHARED_LIB ${OpenVDB_OPENVDB_LIBRARY} )
+ELSE ()
+  # Use the target
+  SET ( OPENVDB_SHARED_LIB openvdb_shared)
+ENDIF ()
+
+# Include them as system headers to avoid getting spammed by internal
+# warnings
+INCLUDE_DIRECTORIES ( SYSTEM ${MAYA_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( SYSTEM ${ILMBASE_INCLUDE_DIRS} )
 
 ADD_DEFINITIONS ( ${MAYA_DEFINITIONS} )
 
@@ -81,7 +96,7 @@ ADD_LIBRARY ( openvdb_maya SHARED
   )
 
 TARGET_LINK_LIBRARIES ( openvdb_maya
-  openvdb_shared
+  ${OPENVDB_SHARED_LIB}
   ${MAYA_OpenMayaFX_LIBRARY}
   ${MAYA_OpenMayaUI_LIBRARY}
   ${MAYA_OpenMaya_LIBRARY}
@@ -95,10 +110,14 @@ SET_TARGET_PROPERTIES ( openvdb_maya
 
 MAYA_SET_LIBRARY_PROPERTIES ( openvdb_maya )
 
+SET( OPENVDB_MAYA_INSTALL_BASE_DIR
+  maya$<$<BOOL:${OPENVDB_MAYA_SUBDIR}>:/>${MAYA_VERSION_NUMBER}
+  CACHE PATH "Openvdb's maya install directory")
+
 INSTALL ( TARGETS
   openvdb_maya
   DESTINATION
-  maya${MAYA_VERSION_NUMBER}/plug-ins
+  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/plug-ins
   )
 
 INSTALL ( FILES
@@ -112,12 +131,22 @@ INSTALL ( FILES
   maya/AEOpenVDBVisualizeTemplate.mel
   maya/AEOpenVDBWriteTemplate.mel
   DESTINATION
-  maya${MAYA_VERSION_NUMBER}/scripts
+  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/scripts
   )
 
-INSTALL ( CODE
-  "                                                                                                                                         
-  FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}\n\")
+IF ( OPENVDB_MAYA_INSTALL_MOD )
+  # Cmake doesn't evaluate the generator-expression.
+  IF ( OPENVDB_MAYA_SUBDIR )
+    INSTALL ( CODE
+      "FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya/${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya/${MAYA_VERSION_NUMBER}\n\")
   "
-  COMPONENT Runtime
-)
+      COMPONENT Runtime
+      )
+  ELSE ()
+    INSTALL ( CODE
+      "FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}\n\")
+  "
+      COMPONENT Runtime
+      )
+  ENDIF ( OPENVDB_MAYA_SUBDIR )
+ENDIF ( OPENVDB_MAYA_INSTALL_MOD )
