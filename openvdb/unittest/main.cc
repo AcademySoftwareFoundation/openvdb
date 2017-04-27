@@ -41,6 +41,7 @@
 #include <cstdlib> // for EXIT_SUCCESS
 #include <cstring> // for strrchr()
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <string>
@@ -59,10 +60,12 @@ usage(const char* progName, std::ostream& ostrm)
 "Usage: " << progName << " [options]\n" <<
 "Which: runs OpenVDB library unit tests\n" <<
 "Options:\n" <<
+"    -f file   read whitespace-separated names of tests to be run\n" <<
+"              from the given file (\"#\" comments are supported)\n" <<
 "    -l        list all available tests\n" <<
+"    -shuffle  run tests in random order\n" <<
 "    -t test   specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
 "              or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
-"    -shuffle  run tests in random order\n" <<
 "    -v        verbose output\n";
 #ifdef OPENVDB_USE_LOG4CPLUS
     ostrm <<
@@ -117,6 +120,33 @@ run(int argc, char* argv[])
                 tests.push_back(argv[i]);
             } else {
                 OPENVDB_LOG_FATAL("missing test name after \"-t\"");
+                usage(progName, std::cerr);
+                return EXIT_FAILURE;
+            }
+        } else if (arg == "-f") {
+            if (i + 1 < argc) {
+                ++i;
+                std::ifstream file{argv[i]};
+                if (file.fail()) {
+                    OPENVDB_LOG_FATAL("unable to read file " << argv[i]);
+                    return EXIT_FAILURE;
+                }
+                while (file) {
+                    // Read a whitespace-separated string from the file.
+                    std::string test;
+                    file >> test;
+                    if (!test.empty()) {
+                        if (test[0] != '#') {
+                            tests.push_back(test);
+                        } else {
+                            // If the string starts with a comment symbol ("#"),
+                            // skip it and jump to the end of the line.
+                            while (file) { if (file.get() == '\n') break; }
+                        }
+                    }
+                }
+            } else {
+                OPENVDB_LOG_FATAL("missing filename after \"-f\"");
                 usage(progName, std::cerr);
                 return EXIT_FAILURE;
             }

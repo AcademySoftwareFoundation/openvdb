@@ -46,22 +46,20 @@
 #ifndef OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-#include <tbb/tbb_thread.h>
-#include <tbb/task_scheduler_init.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/tree/TreeIterator.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include <boost/scoped_array.hpp>
-#include <boost/bind.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_same.hpp>
 #include "Prune.h"// for pruneLevelSet
 #include "ValueTransformer.h" // for foreach()
+#include <tbb/tbb_thread.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/parallel_for.h>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -136,7 +134,7 @@ inline void dilateActiveValues(TreeType& tree,
 ///
 /// @param manager       Leaf node manager for the tree to be dilated.
 ///                      On exit it is updated to include all the leaf
-///                      nodes of the dilated tree.    
+///                      nodes of the dilated tree.
 /// @param iterations    number of iterations to apply the dilation
 /// @param nn            connectivity pattern of the dilation: either
 ///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
@@ -400,7 +398,7 @@ protected:
         void erode18(const RangeT&) const;
         void erode26(const RangeT&) const;
     private:
-        typedef typename boost::function<void (ErodeVoxelsOp*, const RangeT&)> FuncT;
+        using FuncT = typename std::function<void (ErodeVoxelsOp*, const RangeT&)>;
         FuncT                  mTask;
         std::vector<MaskType>& mSavedMasks;
         ManagerType&           mManager;
@@ -705,16 +703,17 @@ template<typename TreeType>
 inline void
 Morphology<TreeType>::ErodeVoxelsOp::runParallel(NearestNeighbors nn)
 {
+    namespace ph = std::placeholders;
     switch (nn) {
     case NN_FACE_EDGE:
-        mTask = boost::bind(&ErodeVoxelsOp::erode18, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode18, ph::_1, ph::_2);
         break;
     case NN_FACE_EDGE_VERTEX:
-        mTask = boost::bind(&ErodeVoxelsOp::erode26, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode26, ph::_1, ph::_2);
         break;
     case NN_FACE:
     default:
-        mTask = boost::bind(&ErodeVoxelsOp::erode6, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode6, ph::_1, ph::_2);
     }
     tbb::parallel_for(mManager.getRange(), *this);
 }
@@ -1049,7 +1048,7 @@ private:
     // Convert active tiles to leafs and de-construct the tree into a linear array of leafs.
     size_t linearize(MaskT& mask, TilePolicy mode)
     {
-        if (mode != IGNORE_TILES) mask.voxelizeActiveTiles();// light-weight since this is a mask tree
+        if (mode != IGNORE_TILES) mask.voxelizeActiveTiles();//lightweight since this is a mask tree
         const size_t numLeafs = mask.leafCount();
         mLeafs = new LeafT*[numLeafs];// fast pre-allocation
         MyArray tmp(mLeafs);
@@ -1057,14 +1056,16 @@ private:
         return numLeafs;
     }
 
-    template <typename T>
-    typename boost::enable_if<boost::is_same<T,MaskT>,size_t>::type init(T& tree, TilePolicy mode)
+    template<typename T>
+    typename std::enable_if<std::is_same<T, MaskT>::value, size_t>::type
+    init(T& tree, TilePolicy mode)
     {
         return this->linearize(tree, mode);
     }
 
-    template <typename T>
-    typename boost::disable_if<boost::is_same<T,MaskT>,size_t>::type init(const T& tree, TilePolicy mode)
+    template<typename T>
+    typename std::enable_if<!std::is_same<T, MaskT>::value, size_t>::type
+    init(const T& tree, TilePolicy mode)
     {
         MaskT mask(tree, false, true, TopologyCopy());
         return this->linearize(mask, mode);

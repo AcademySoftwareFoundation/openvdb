@@ -3401,6 +3401,9 @@ meshToVolume(
 ////////////////////////////////////////
 
 
+//{
+/// @cond OPENVDB_MESH_TO_VOLUME_INTERNAL
+
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>
 inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
@@ -3489,6 +3492,9 @@ doMeshConversion(
     OPENVDB_THROW(TypeError,
         "mesh to volume conversion is supported only for scalar floating-point grids");
 }
+
+/// @endcond
+//}
 
 
 ////////////////////////////////////////

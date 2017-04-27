@@ -12,6 +12,8 @@ New features:
   tree.
   It is threaded and faster than existing tools that merge trees, however
   it operates only on leaf nodes.
+- Added a <TT>vdb_test&nbsp;-f</TT> option that reads a list of tests
+  to be run from a text file.
 
 @par
 Bug fixes:
@@ -28,6 +30,9 @@ Bug fixes:
 - Fixed a delayed-loading memory leak in the
   @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Changed the random number seeding mechanism for <TT>.vdb</TT> file UUIDs
+  to avoid duplicate&nbsp;IDs.
+  <I>[Reported&nbsp;by&nbsp;Jason&nbsp;Lefley]</I>
 
 @par
 Houdini:
@@ -39,8 +44,6 @@ Houdini:
   format.
 - Added help cards for all SOPs.  Houdini&nbsp;16.0.578 or later is required.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey&nbsp;and&nbsp;SideFX]</I>
-- Added a slider to the Remove Divergence SOP to set the error tolerance
-  for the pressure solver.
 - The Extended Operator Info window in Houdini&nbsp;16 now renders correctly
   for OpenVDB SOPs, instead of displaying a Python stack trace.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
@@ -48,6 +51,9 @@ Houdini:
   OpenVDB&nbsp;Points.
   Houdini&nbsp;16 is required.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added a slider to the Remove Divergence SOP to set the error tolerance
+  for the pressure solver.
+- Added value type conversion options (for VDB output) to the Convert&nbsp;SOP.
 
 
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly

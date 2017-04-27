@@ -114,11 +114,18 @@ protected:
     bool updateParmsFlags() override;
 
 private:
+    void convertVDBType(
+        GU_Detail&,
+        GA_PrimitiveGroup*,
+        const UT_String& newTypeStr,
+        const UT_String& newPrecisionStr,
+        hvdb::Interrupter&);
+
     void convertToPoly(
         fpreal time,
-        GA_PrimitiveGroup *group,
+        GA_PrimitiveGroup*,
         bool buildpolysoup,
-        hvdb::Interrupter &boss);
+        hvdb::Interrupter&);
 
     template <class GridType>
     void referenceMeshing(
@@ -169,7 +176,7 @@ The type of conversion to perform\n\
 Volume:\n\
     Convert a VDB volume into a dense Houdini volume.\n\
 \n\
-    This allows legacy tools to understand the primitive,\n\
+    This allows legacy tools to operate on the primitive,\n\
     however the memory requirements of dense volumes with effective\n\
     resolutions over 1000<sup>3</sup> might be prohibitive.\n"
 #if HAVE_SPLITTING
@@ -182,7 +189,7 @@ VDB:\n\
     Convert a Houdini volume into a VDB volume.\n\
 \n\
     By default, the resulting VDB will be of the same class as the input,\n\
-    so a fog volume becomes a fog VDB and an SDF volume an SDF VDB.\n\
+    so a fog volume becomes a fog VDB and an SDF volume becomes an SDF VDB.\n\
 \n\
 Polygons:\n\
     Generate a polygonal mesh representing an isosurface of a VDB volume.\n"
@@ -209,6 +216,43 @@ Polygon Soup:\n\
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items)
             .setTooltip("Convert fog volumes to signed distance fields or vice versa."));
+    }
+    {
+        char const * const items[] = {
+            "none",   "No Change",
+            "float",  "Float",
+            "int",    "Integer",
+            "bool",   "Bool",
+            "vec3f",  "Vector Float",
+            "vec3i",  "Vector Integer",
+            nullptr,
+        };
+
+        parms.add(hutil::ParmFactory(PRM_STRING, "vdbtype", "VDB Type")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("none")
+            .setTooltip("Change the type of value stored at each voxel.")
+            .setDocumentation(
+                "Change the type of value stored at each voxel.\n\n"
+                "When converting from a scalar type to a vector type, the scalar value\n"
+                "is copied to each vector component.\n\n"
+                "When converting from a vector type to a scalar type, voxel values are\n"
+                "lost&mdash;only voxel topology is preserved.\n\n"
+                "This option is not available when VDB class conversion is enabled,\n"
+                "since SDFs and fog volumes always have scalar, floating-point values.\n"));
+    }
+    {
+        char const * const items[] = {
+            "none", "No Change",
+            "32",   "32-bit",
+            "64",   "64-bit",
+            nullptr,
+        };
+
+        parms.add(hutil::ParmFactory(PRM_STRING, "vdbprecision", "VDB Precision")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("none")
+            .setTooltip("Change the numerical precision of the value stored at each voxel."));
     }
 
     //////////
@@ -521,91 +565,98 @@ void
 convertVDBClass(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
-    openvdb::GridClass new_class,
+    openvdb::GridClass newClass,
     float isovalue)
 {
     using namespace openvdb;
 
     for (hvdb::VdbPrimIterator it(&dst, group); it; ++it) {
+        const auto typ = it->getStorageType();
+        if ((typ != UT_VDB_FLOAT) && (typ != UT_VDB_DOUBLE)) continue;
 
-        if (it->getStorageType() != UT_VDB_FLOAT)
-            continue;
-        if (it->getGrid().getGridClass() == new_class)
-            continue;
+        auto& grid = it->getGrid();
+        if (grid.getGridClass() == newClass) continue;
 
-        switch (new_class) {
-            case GRID_LEVEL_SET: { // from fog volume
-                // *** FIXME:TODO: Hack until we have a good method ***
-                // Convert to polygons
-                FloatGrid &grid = UTvdbGridCast<FloatGrid>(it->getGrid());
-                tools::VolumeToMesh mesher(isovalue);
-                mesher(grid);
-                // Convert to SDF
-                math::Transform::Ptr transform = grid.transformPtr();
-                std::vector<Vec3s> points;
-                points.reserve(mesher.pointListSize());
-                for (size_t i = 0, n = mesher.pointListSize(); i < n; i++) {
-                    // The MeshToVolume conversion further down, requires the
-                    // points to be in grid index space.
-                    points.push_back(
-                        transform->worldToIndex(mesher.pointList()[i]));
+        if (newClass == GRID_FOG_VOLUME) { // convert a level set to a fog volume
+            it->makeGridUnique();
+            if (typ == UT_VDB_FLOAT) {
+                FloatGrid& fogGrid = UTvdbGridCast<FloatGrid>(grid);
+                tools::sdfToFogVolume(fogGrid, std::numeric_limits<float>::max());
+            } else if (typ == UT_VDB_DOUBLE) {
+                DoubleGrid& fogGrid = UTvdbGridCast<DoubleGrid>(grid);
+                tools::sdfToFogVolume(fogGrid, std::numeric_limits<double>::max());
+            }
+            it->setVisualization(GEO_VOLUMEVIS_SMOKE, it->getVisIso(), it->getVisDensity());
+
+        } else if (newClass == GRID_LEVEL_SET) { // convert a fog volume to a level set
+            // *** FIXME:TODO: Hack until we have a good method ***
+            // Convert to polygons
+            tools::VolumeToMesh mesher(isovalue);
+            if (typ == UT_VDB_FLOAT) {
+                mesher(UTvdbGridCast<FloatGrid>(grid));
+            } else if (typ == UT_VDB_DOUBLE) {
+                mesher(UTvdbGridCast<DoubleGrid>(grid));
+            }
+
+            // Convert to SDF
+            math::Transform::Ptr transform = grid.transformPtr();
+            std::vector<Vec3s> points;
+            points.reserve(mesher.pointListSize());
+            for (size_t i = 0, n = mesher.pointListSize(); i < n; i++) {
+                // The MeshToVolume conversion further down, requires the
+                // points to be in grid index space.
+                points.push_back(
+                    transform->worldToIndex(mesher.pointList()[i]));
+            }
+
+            openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
+
+            std::vector<Vec4I> primitives;
+            size_t numPrimitives = 0;
+            for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+                const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
+                numPrimitives += polygons.numQuads();
+                numPrimitives += polygons.numTriangles();
+            }
+            primitives.reserve(numPrimitives);
+
+            for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+
+                const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
+
+                // Copy quads
+                for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
+                    primitives.push_back(polygons.quad(i));
                 }
 
-                openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
-
-                std::vector<Vec4I> primitives;
-                size_t numPrimitives = 0;
-                for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
-                    const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
-                    numPrimitives += polygons.numQuads();
-                    numPrimitives += polygons.numTriangles();
-                }
-                primitives.reserve(numPrimitives);
-
-                for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
-
-                    const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
-
-                    // Copy quads
-                    for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
-                        primitives.push_back(polygons.quad(i));
+                // Copy triangles (adaptive mesh)
+                if (polygons.numTriangles() != 0) {
+                    openvdb::Vec4I quad;
+                    quad[3] = openvdb::util::INVALID_IDX;
+                    for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
+                        const openvdb::Vec3I& triangle = polygons.triangle(i);
+                        quad[0] = triangle[0];
+                        quad[1] = triangle[1];
+                        quad[2] = triangle[2];
+                        primitives.push_back(quad);
                     }
-
-                    // Copy triangles (adaptive mesh)
-                    if (polygons.numTriangles() != 0) {
-                        openvdb::Vec4I quad;
-                        quad[3] = openvdb::util::INVALID_IDX;
-                        for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
-                            const openvdb::Vec3I& triangle = polygons.triangle(i);
-                            quad[0] = triangle[0];
-                            quad[1] = triangle[1];
-                            quad[2] = triangle[2];
-                            primitives.push_back(quad);
-                        }
-                    }
                 }
+            }
 
-                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
-                    mesh(points, primitives);
+            openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+                mesh(points, primitives);
 
-                openvdb::FloatGrid::Ptr sdfGrid =
-                    openvdb::tools::meshToVolume<openvdb::FloatGrid>(mesh, *transform);
-
-                // Set grid and visualization
-                it->setGrid(*sdfGrid);
-                it->setVisualization(
-                    GEO_VOLUMEVIS_ISO, it->getVisIso(), it->getVisDensity());
-                break;
-             } case GRID_FOG_VOLUME: { // from level set
-                 it->makeGridUnique();
-                 FloatGrid &grid = UTvdbGridCast<FloatGrid>(it->getGrid());
-                 tools::sdfToFogVolume(grid, std::numeric_limits<float>::max());
-                 it->setVisualization(GEO_VOLUMEVIS_SMOKE, it->getVisIso(), it->getVisDensity());
-                 break;
-             } default: {
-                 // ignore everything else
-                 break;
-             }
+            // Set grid and visualization
+            if (it->getStorageType() == UT_VDB_FLOAT) {
+                if (auto sdfGridPtr = tools::meshToVolume<FloatGrid>(mesh, *transform)) {
+                    it->setGrid(*sdfGridPtr);
+                }
+            } else if (it->getStorageType() == UT_VDB_DOUBLE) {
+                if (auto sdfGridPtr = tools::meshToVolume<DoubleGrid>(mesh, *transform)) {
+                    it->setGrid(*sdfGridPtr);
+                }
+            }
+            it->setVisualization(GEO_VOLUMEVIS_ISO, it->getVisIso(), it->getVisDensity());
         }
     }
 }
@@ -851,6 +902,133 @@ copyMesh(
 #endif // 12.5.245 or later
 }
 
+
+////////////////////////////////////////
+
+
+int
+getVDBPrecision(UT_VDBType typ)
+{
+    switch (typ) {
+        case UT_VDB_BOOL:    return 1;
+        case UT_VDB_FLOAT:
+        case UT_VDB_INT32:
+        case UT_VDB_VEC3F:
+        case UT_VDB_VEC3I:   return 32;
+        case UT_VDB_DOUBLE:
+        case UT_VDB_INT64:
+        case UT_VDB_VEC3D:   return 64;
+        default: break;
+    }
+    return 0;
+}
+
+
+const char*
+getVDBTypeName(UT_VDBType typ)
+{
+    switch (typ) {
+        case UT_VDB_BOOL:    return "bool";
+        case UT_VDB_FLOAT:
+        case UT_VDB_DOUBLE:  return "float";
+        case UT_VDB_INT32:
+        case UT_VDB_INT64:   return "int";
+        case UT_VDB_VEC3F:
+        case UT_VDB_VEC3D:   return "vec3f";
+        case UT_VDB_VEC3I:   return "vec3i";
+        default: break;
+    }
+    return "none";
+}
+
+
+UT_VDBType
+getVDBTypeFromNameAndPrecision(const UT_String& name, int bits)
+{
+    if (name == "float") {
+        return ((bits == 64) ? UT_VDB_DOUBLE : UT_VDB_FLOAT);
+    } else if (name == "vec3f") {
+        return ((bits == 64) ? UT_VDB_VEC3D : UT_VDB_VEC3F);
+    } else if (name == "bool") {
+        return UT_VDB_BOOL;
+    } else if (name == "int") {
+        return ((bits == 64) ? UT_VDB_INT64 : UT_VDB_INT32);
+    } else if (name == "vec3i") {
+        return UT_VDB_VEC3I;
+    }
+    return UT_VDB_INVALID;
+}
+
+
+// Functor for use with GEOvdbProcessTypedGrid*() to create a copy of a grid,
+// but with a new value type
+struct GridCopyOp
+{
+    UT_VDBType outType = UT_VDB_INVALID;
+    hvdb::GridPtr outGrid;
+
+    template<typename OutGridT, typename InGridT>
+    typename OutGridT::Ptr copyGrid(const InGridT& inGrid)
+    {
+        using OutValueT = typename OutGridT::ValueType;
+        using OutGridPtrT = typename OutGridT::Ptr;
+        using OutTreeT = typename OutGridT::TreeType;
+        using OutTreePtrT = typename OutTreeT::Ptr;
+
+        OutTreePtrT newTree;
+
+        try {
+            // Deep copy the input grid's tree, casting its values to the output grid's ValueType.
+            newTree.reset(new OutTreeT{inGrid.constTree()});
+        } catch (openvdb::TypeError&) {
+            try {
+                // If the value copy fails (due to incompatible value types),
+                // try a topology copy instead.
+                newTree.reset(new OutTreeT{inGrid.constTree(),
+                    openvdb::zeroVal<OutValueT>(), openvdb::TopologyCopy{}});
+            } catch (openvdb::TypeError&) {
+                // If the topology copy fails, give up.
+                return OutGridPtrT{};
+            }
+        }
+        auto outGrid = OutGridT::create(newTree);
+        outGrid->insertMeta(*inGrid.copyMeta());
+        outGrid->setTransform(inGrid.transform().copy());
+        if ((outType != UT_VDB_FLOAT) && (outType != UT_VDB_DOUBLE)
+            && (outGrid->getGridClass() == openvdb::GRID_LEVEL_SET))
+        {
+            // If the output grid is not floating-point scalar, then it can't be a level set.
+            outGrid->setGridClass(openvdb::GRID_UNKNOWN);
+        }
+        if ((UTvdbGetGridTupleSize(outType) != 1)
+            && (outGrid->getGridClass() == openvdb::GRID_FOG_VOLUME))
+        {
+            // If the output grid is not scalar, then it can't be a fog volume.
+            outGrid->setGridClass(openvdb::GRID_UNKNOWN);
+        }
+        return outGrid;
+    }
+
+    template<typename GridT>
+    void operator()(const GridT& inGrid)
+    {
+        outGrid.reset();
+        if (UTvdbGetGridType(inGrid) == outType) return;
+
+        switch (outType) {
+            case UT_VDB_BOOL:    outGrid = copyGrid<openvdb::BoolGrid>(inGrid); break;
+            case UT_VDB_FLOAT:   outGrid = copyGrid<openvdb::FloatGrid>(inGrid); break;
+            case UT_VDB_INT32:   outGrid = copyGrid<openvdb::Int32Grid>(inGrid); break;
+            case UT_VDB_VEC3F:   outGrid = copyGrid<openvdb::Vec3fGrid>(inGrid); break;
+            case UT_VDB_VEC3I:   outGrid = copyGrid<openvdb::Vec3IGrid>(inGrid); break;
+            case UT_VDB_DOUBLE:  outGrid = copyGrid<openvdb::DoubleGrid>(inGrid); break;
+            case UT_VDB_INT64:   outGrid = copyGrid<openvdb::Int64Grid>(inGrid); break;
+            case UT_VDB_VEC3D:   outGrid = copyGrid<openvdb::Vec3dGrid>(inGrid); break;
+            default: break;
+        }
+    }
+}; // struct GridCopyOp
+
 } // unnamed namespace
 
 
@@ -866,18 +1044,28 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
     ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
 #if HAVE_SPLITTING
-    bool toVolume = (target == HVOLUME);
+    const bool toVolume = (target == HVOLUME);
 #endif
-    bool toOpenVDB = (target == OPENVDB);
-    bool toPoly = (target == POLYGONS);
-    bool toPolySoup = false;
+    const bool toOpenVDB = (target == OPENVDB);
 #if HAVE_POLYSOUP
-    toPolySoup = (target == POLYSOUP);
-    toPoly |= toPolySoup;
+    const bool toPolySoup = (target == POLYSOUP);
+    const bool toPoly = toPolySoup || (target == POLYGONS);
+#else
+    const bool toPolySoup = false;
+    const bool toPoly = (target == POLYGONS);
 #endif
 
-    bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
+    const bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
+    const bool toFog = (evalInt("vdbclass", 0, time) == CLASS_FOG_VOLUME);
 
+    UT_String vdbTypeStr;
+    evalString(vdbTypeStr, "vdbtype", 0, time);
+    const bool toFixedPrecision = ((vdbTypeStr == "bool")
+        || (vdbTypeStr == "vec3i")); // bool and vec3i grids have fixed precision
+
+    //
+    // Enable/disable
+    //
     changed |= enableParm("adaptivity", toPoly);
     changed |= enableParm("isoValue", toPoly || (toOpenVDB && toSDF));
     changed |= enableParm("fogisovalue", toOpenVDB && toSDF);
@@ -897,9 +1085,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= enableParm("sharpenfeatures", toPoly && refexists);
     changed |= enableParm("edgetolerance", toPoly && refexists);
 
-
     const bool maskexists = (nInputs() == 3);
-
 
     changed |= enableParm("surfacemask", toPoly && maskexists);
     changed |= enableParm("adaptivityfield", toPoly && maskexists);
@@ -909,12 +1095,14 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= enableParm("surfacemaskoffset", toPoly && maskexists && surfacemask);
     changed |= enableParm("invertmask", toPoly && maskexists && surfacemask);
 
-
     changed |= enableParm("adaptivityfield", toPoly && maskexists);
 
     const bool adaptivityfield = bool(evalInt("adaptivityfield", 0, 0));
     changed |= enableParm("adaptivityfieldname", toPoly && maskexists && adaptivityfield);
 
+    //
+    // Show/hide
+    //
 #if HAVE_SPLITTING
     changed |= setVisibleState("splitdisjointvolumes", toVolume);
 #endif
@@ -944,6 +1132,8 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= setVisibleState("prune", toOpenVDB);
     changed |= setVisibleState("tolerance", toOpenVDB);
     changed |= setVisibleState("vdbclass", toOpenVDB);
+    changed |= setVisibleState("vdbtype", toOpenVDB && !(toSDF || toFog));
+    changed |= setVisibleState("vdbprecision", toOpenVDB && !toFixedPrecision);
 
 #if HAVE_ACTIVATEINSIDE
     changed |= setVisibleState("activateinsidesdf", toOpenVDB);
@@ -957,6 +1147,38 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
 
 ////////////////////////////////////////
+
+
+// Convert all VDB primitives in the given group to have a new storage type (where possible).
+void
+SOP_OpenVDB_Convert::convertVDBType(
+    GU_Detail& dst,
+    GA_PrimitiveGroup* group,
+    const UT_String& outTypeStr,
+    const UT_String& outPrecStr,
+    hvdb::Interrupter& boss)
+{
+    for (hvdb::VdbPrimIterator it(&dst, group); it; ++it) {
+        if (boss.wasInterrupted()) return;
+
+        const UT_VDBType inType = it->getStorageType();
+        const UT_String inTypeName = getVDBTypeName(inType);
+        const int inBits = getVDBPrecision(inType);
+
+        const UT_VDBType outType = getVDBTypeFromNameAndPrecision(
+            ((outTypeStr == "none") ? inTypeName : outTypeStr),
+            ((outPrecStr == "none") ? inBits : ((outPrecStr == "32") ? 32 : 64)));
+
+        if (outType != inType) {
+            GridCopyOp op;
+            op.outType = outType;
+            // Create a copy of the grid, but with a different value type.
+            // Store the copy as op.outGrid.
+            GEOvdbProcessTypedGridTopology(*it.getPrimitive(), op);
+            if (op.outGrid) it->setGrid(*op.outGrid);
+        }
+    }
+}
 
 
 template <class GridType>
@@ -1425,17 +1647,27 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                     evalFloat("tolerance", 0, t),
                     activateinside);
 
+                UT_String newTypeStr, newPrecStr;
+                evalString(newTypeStr, "vdbtype", 0, t);
+                evalString(newPrecStr, "vdbprecision", 0, t);
+
                 switch (evalInt("vdbclass", 0, t)) {
                     case CLASS_SDF:
                         convertVDBClass(*gdp, group, openvdb::GRID_LEVEL_SET,
                             static_cast<float>(evalFloat("fogisovalue", 0, t)));
+                        newTypeStr = "none"; // SDFs are always floating-point
                         break;
                     case CLASS_FOG_VOLUME:
                         convertVDBClass(*gdp, group, openvdb::GRID_FOG_VOLUME, /*unused*/0);
+                        newTypeStr = "none"; // fog volumes are always floating-point
                         break;
                     default:
                         // ignore
                         break;
+                }
+
+                if ((newTypeStr != "none") || (newPrecStr != "none")) {
+                    convertVDBType(*gdp, group, newTypeStr, newPrecStr, interrupter);
                 }
                 break;
             }

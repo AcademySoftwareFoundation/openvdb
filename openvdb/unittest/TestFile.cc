@@ -164,11 +164,17 @@ TestFile::testHeader()
 
     File file("something.vdb2");
 
-    std::ostringstream ostr(std::ios_base::binary);
+    std::ostringstream
+        ostr(std::ios_base::binary),
+        ostr2(std::ios_base::binary);
+
+    file.writeHeader(ostr2, /*seekable=*/true);
+    std::string uuidStr = file.getUniqueTag();
 
     file.writeHeader(ostr, /*seekable=*/true);
-
-    std::string uuid_str=file.getUniqueTag();
+    // Verify that a file gets a new UUID each time it is written.
+    CPPUNIT_ASSERT(!file.isIdentical(uuidStr));
+    uuidStr = file.getUniqueTag();
 
     std::istringstream istr(ostr.str(), std::ios_base::binary);
 
@@ -182,11 +188,11 @@ TestFile::testHeader()
     CPPUNIT_ASSERT_EQUAL(version, file.fileVersion());
     CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MAJOR_VERSION, file.libraryVersion().first);
     CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MINOR_VERSION, file.libraryVersion().second);
-    CPPUNIT_ASSERT_EQUAL(uuid_str, file.getUniqueTag());
+    CPPUNIT_ASSERT_EQUAL(uuidStr, file.getUniqueTag());
 
-    //std::cerr << "\nuuid=" << uuid_str << std::endl;
+    //std::cerr << "\nuuid=" << uuidStr << std::endl;
 
-    CPPUNIT_ASSERT(file.isIdentical(uuid_str));
+    CPPUNIT_ASSERT(file.isIdentical(uuidStr));
 
     remove("something.vdb2");
 }
@@ -1882,7 +1888,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
     // to make the derived class compatible with the tree structure.
 
     using LeafNodeType  = MultiPassLeafNode;
-    using Ptr           = boost::shared_ptr<MultiPassLeafNode>;
+    using Ptr           = openvdb::SharedPtr<MultiPassLeafNode>;
     using BaseLeaf      = openvdb::tree::LeafNode<T, Log2Dim>;
     using NodeMaskType  = openvdb::util::NodeMask<Log2Dim>;
     using ValueType     = T;
@@ -2584,6 +2590,10 @@ TestFile::testAsync()
         // (It is possible, though highly unlikely, for the previous task to complete
         // in time for this write() to actually succeed.)
         CPPUNIT_ASSERT_THROW(queue.write(grids, io::Stream(file2)), openvdb::RuntimeError);
+
+        while (!queue.empty()) {
+            tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(1.0/*sec*/));
+        }
     }
 }
 

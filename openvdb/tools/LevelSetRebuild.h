@@ -39,10 +39,9 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -69,7 +68,7 @@ namespace tools {
 template<class GridType>
 inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue = 0,
-    float halfWidth = float(LEVEL_SET_HALF_WIDTH), const math::Transform* xform = NULL);
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH), const math::Transform* xform = nullptr);
 
 
 /// @brief Return a new grid of type @c GridType that contains a narrow-band level set
@@ -89,7 +88,7 @@ levelSetRebuild(const GridType& grid, float isovalue = 0,
 template<class GridType>
 inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float inBandWidth,
-    const math::Transform* xform = NULL);
+    const math::Transform* xform = nullptr);
 
 
 /// @brief Return a new grid of type @c GridType that contains a narrow-band level set
@@ -110,7 +109,7 @@ levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float i
 template<class GridType, typename InterruptT>
 inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float inBandWidth,
-    const math::Transform* xform = NULL, InterruptT* interrupter = NULL);
+    const math::Transform* xform = nullptr, InterruptT* interrupter = nullptr);
 
 
 ////////////////////////////////////////
@@ -217,6 +216,9 @@ private:
 ////////////////////////////////////////
 
 
+//{
+/// @cond OPENVDB_LEVEL_SET_REBUILD_INTERNAL
+
 /// The normal entry points for level set rebuild are the levelSetRebuild() functions.
 /// doLevelSetRebuild() is mainly for internal use, but when the isovalue and half band
 /// widths are given in ValueType units (for example, if they are queried from
@@ -224,8 +226,8 @@ private:
 ///
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<class GridType, typename InterruptT>
-inline typename boost::enable_if<boost::is_floating_point<typename GridType::ValueType>,
-typename GridType::Ptr>::type
+inline typename std::enable_if<
+    std::is_floating_point<typename GridType::ValueType>::value, typename GridType::Ptr>::type
 doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
     typename GridType::ValueType exWidth, typename GridType::ValueType inWidth,
     const math::Transform* xform, InterruptT* interrupter)
@@ -238,14 +240,14 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
     tools::VolumeToMesh mesher(isovalue);
     mesher(grid);
 
-    math::Transform::Ptr transform = (xform != NULL) ? xform->copy() : grid.transform().copy();
+    math::Transform::Ptr transform = (xform != nullptr) ? xform->copy() : grid.transform().copy();
 
     std::vector<Vec3s> points(mesher.pointListSize());
 
     { // Copy and transform (required for MeshToVolume) points to grid space.
         internal::PointListTransform ptnXForm(mesher.pointList(), points, *transform);
         ptnXForm.runParallel();
-        mesher.pointList().reset(NULL);
+        mesher.pointList().reset(nullptr);
     }
 
     std::vector<Vec4I> primitives;
@@ -272,19 +274,19 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
 
     if (interrupter) {
         return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
-            DISABLE_RENORMALIZATION, NULL);
+            DISABLE_RENORMALIZATION, nullptr);
     }
 
     return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
-        DISABLE_RENORMALIZATION, NULL);
+        DISABLE_RENORMALIZATION, nullptr);
 }
 
 
 /// @internal This overload is enabled only for grids that do not have a scalar,
 /// floating-point ValueType.
 template<class GridType, typename InterruptT>
-inline typename boost::disable_if<boost::is_floating_point<typename GridType::ValueType>,
-typename GridType::Ptr>::type
+inline typename std::enable_if<
+    !std::is_floating_point<typename GridType::ValueType>::value, typename GridType::Ptr>::type
 doLevelSetRebuild(const GridType&, typename GridType::ValueType /*isovalue*/,
     typename GridType::ValueType /*exWidth*/, typename GridType::ValueType /*inWidth*/,
     const math::Transform*, InterruptT*)
@@ -292,6 +294,9 @@ doLevelSetRebuild(const GridType&, typename GridType::ValueType /*isovalue*/,
     OPENVDB_THROW(TypeError,
         "level set rebuild is supported only for scalar, floating-point grids");
 }
+
+/// @endcond
+//}
 
 
 ////////////////////////////////////////
@@ -302,7 +307,7 @@ inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
     const math::Transform* xform, InterruptT* interrupter)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     ValueT
         isovalue(zeroVal<ValueT>() + ValueT(iso)),
         exBandWidth(zeroVal<ValueT>() + ValueT(exWidth)),
@@ -317,14 +322,14 @@ inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
     const math::Transform* xform)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     ValueT
         isovalue(zeroVal<ValueT>() + ValueT(iso)),
         exBandWidth(zeroVal<ValueT>() + ValueT(exWidth)),
         inBandWidth(zeroVal<ValueT>() + ValueT(inWidth));
 
     return doLevelSetRebuild<GridType, util::NullInterrupter>(
-        grid, isovalue, exBandWidth, inBandWidth, xform, NULL);
+        grid, isovalue, exBandWidth, inBandWidth, xform, nullptr);
 }
 
 
@@ -332,13 +337,13 @@ template<class GridType>
 inline typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Transform* xform)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     ValueT
         isovalue(zeroVal<ValueT>() + ValueT(iso)),
         halfWidth(zeroVal<ValueT>() + ValueT(halfVal));
 
     return doLevelSetRebuild<GridType, util::NullInterrupter>(
-        grid, isovalue, halfWidth, halfWidth, xform, NULL);
+        grid, isovalue, halfWidth, halfWidth, xform, nullptr);
 }
 
 
