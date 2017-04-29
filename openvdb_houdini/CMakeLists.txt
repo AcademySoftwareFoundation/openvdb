@@ -122,6 +122,17 @@ ADD_LIBRARY ( openvdb_houdini SHARED
 
 TARGET_LINK_LIBRARIES ( openvdb_houdini
   ${OPENVDB_SHARED_LIB}
+  HoudiniAPPS3
+  HoudiniGEO
+  HoudiniOP1
+  HoudiniOP2
+  HoudiniOP3
+  HoudiniOPZ
+  HoudiniPRM
+  HoudiniRAY
+  HoudiniSIM
+  HoudiniUI
+  HoudiniUT
   )
 
 SET ( OPENVDB_SOP_NAMES "" )
