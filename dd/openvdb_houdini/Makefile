@@ -30,6 +30,7 @@ ARGS += -DOPENVDB_HOUDINI_SUBDIR=ON
 ARGS += -DOPENVDB_HOUDINI_INSTALL_LIBRARY=ON
 ARGS += -DOPENVDB_LOCATION=$(OPENVDB_PACKAGE_ROOT)
 ARGS += -DHDK_AUTO_GENERATE_SESITAG=OFF
+ARGS += -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--as-needed
 
 # Build the houdini libraries
 .PHONY:build-houdini-%
@@ -40,7 +41,7 @@ build-houdini-%:
 	source ./houdini_setup  && popd && \
         cd $(BUILD_DIR)/$* &&\
 		$(CMAKE_PACKAGE_ROOT)/bin/cmake $(ARGS) $(PROJECT_ROOT) && \
-		make -j $(shell nproc) && make install
+		make -j $(shell nproc) VERBOSE=1 && make install
 
 add-houdini-version-%: build-houdini-%
 	@echo -e "\nNow run: pkappend --rem=all $(DIST_DIR)/houdini/$* $(DD_OS)"\
