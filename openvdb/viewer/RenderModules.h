@@ -204,6 +204,28 @@ private:
     ShaderProgram mShader;
 };
 
+
+////////////////////////////////////////
+
+
+/// @brief Point render module
+class PointModule: public RenderModule
+{
+public:
+    PointModule(const openvdb::GridBase::ConstPtr&);
+    virtual ~PointModule() {}
+
+    virtual void render();
+
+private:
+    void init();
+
+    const openvdb::GridBase::ConstPtr& mGrid;
+    BufferObject mBufferObject;
+    bool mIsInitialized;
+    ShaderProgram mShader;
+};
+
 } // namespace openvdb_viewer
 
 #endif // OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
