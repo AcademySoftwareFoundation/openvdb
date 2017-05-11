@@ -1,0 +1,62 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBRasterizePoints
+#icon:     COMMON/openvdb
+
+= OpenVDB Rasterize Points =
+
+"""Rasterize points into density and attribute grids."""
+
+The OpenVDB Rasterize Points SOP rasterizes points into density and attribute grids. It has a accompanying creation script that adds a default VOP subnetwork and UI parameters for cloud and velocity field modeling.
+
+@parameters
+
+Point Group:
+    A group of points to rasterize.
+
+Transform VDB:
+    VDB grid that defines the output transform.
+
+Mask VDB:
+    VDB grid whose active topology defines what region to rasterize into.
+
+Invert Mask:
+    Toggle to rasterize in the region outside the mask.
+
+Voxel Size:
+    Uniform voxel edge length in world units. Decrease the voxel size to increase the volume resolution.
+
+Frustum Quality:
+    1 is the standard quality and fast. 10 is the highest quality where everything is rasterized at the frustum near-plane resolution and filtered down to frustum resolution which can be slow.
+
+Clip to Frustum:
+    When using a frustum transform only rasterize data inside the frustum region.
+
+Create Density Volume:
+    Toggle to enable or disable the density volume generation. Attribute volumes are still constructed as usual.
+
+Density Merge:
+    How to blend point densities in the density volume. Accumulate or Maximum.
+
+Density Scale:
+    The density attribute will be scaled by this. If there is no density, 1 will be used as the reference.
+
+Particle Scale:
+    The pscale point attribute, which defines the world space particle radius, will be scaled by this.  A value of one is assumed if the pscale attribute is missing.
+
+Solid Ratio:
+    The amount of the particle that gets full density. 0 means only the very center of the particle will have full density. 1 means the entire particle out to the pscale will have full density.
+
+Attributes:
+    List of (float or vector) point attributes that will be rasterized using weighted average blending.
+
+Enable VEX Processing:
+    Use the contained VOP network to define a VEX procedure that determines density and attribute values. See the embedded VOP network for further details.
+
+Export Point Mask:
+    Output the point mask used in the rasterization operation.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

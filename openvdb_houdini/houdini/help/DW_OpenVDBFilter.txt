@@ -1,0 +1,88 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBFilter
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Filter =
+
+"""Filters/smoothes the values in a VDB primitive."""
+
+[Include:volume_types]
+
+For each voxel, this node computes an average (see the __Operation__ parameter) from the surrounding values and sets the voxel to that average.
+(The "surrounding area" is a cube, despite the name __Filter Voxel Radius__).
+
+NOTE:
+    To smooth a level set, use [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet].
+
+@parameters
+
+Group:
+    The name of VDB primitive(s) in the input to be smoothed.
+    See [specifying volumes|/model/volumes#group].
+
+Alpha Mask:
+    #id: maskname
+    If enabled, it will use the second input's VDB for alpha masking. Assumes
+    voxel values are between 0 to 1 inclusive.
+    See [specifying volumes|/model/volumes#group] for more information.
+
+Operation:
+    How to smooth the voxel values.
+
+    Mean Value:
+        Find the mean (`total/count`) of the surrounding values.
+        This is equivalent to a box blur of the same radius.
+
+    Median Value:
+        Find the median (middle value) of the surrounding values.
+        This is useful for de-spiking noisy data as extreme values will not contribute to the final result.
+
+    Offset:
+        Dilate or Erode a level set.
+
+        Offset:
+        Specify a value to be added to all active voxels.
+
+Use World-space Radius Units:
+    When enabled, the filter radius is specified in world-space units.
+
+Filter Voxel Radius / Filter Radius:
+    #id: radius
+
+    The number of voxels/distance to run the smooth operation over.
+    This distance defines a _cube_, so increasing the "radius" will exponentially increase the work.
+
+Iterations:
+    Number of times to repeat the smoothing operation.
+
+    For a cone blur, multiply the radius by `0.454545` and use two passes.
+    For a gaussian, multiply the radius by `0.33` and use four passes.
+
+[Include:vdbrenormalizesdf#accuracy]
+
+Invert Alpha Mask:
+    #id: invert
+    Inverts the alpha mask so that values from 0-1 maps to 1-0.
+
+Min Mask Cutoff:
+    #id: minmask
+    Alpha mask values below this are mapped to 0.
+
+Max Mask Cutoff:
+    #id: maxmask
+    Alpha mask values above this are mapped to 1.
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

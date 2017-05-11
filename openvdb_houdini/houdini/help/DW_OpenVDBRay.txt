@@ -1,0 +1,51 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBRay
+#icon: COMMON/openvdb
+
+#tags: create, model
+
+= OpenVDB Ray =
+
+"""Projects geometry onto a level set VDB."""
+
+Performs geometry projections using level set ray intersections or closest point queries.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+Method:
+    Specify the projection method. Either ray intersection or closest surface point.
+
+Isovalue:
+    The crossing point of the VDB values that is considered the surface. The zero default value works for signed distance fields while fog volumes require a larger positive value, 0.5 is a good initial guess.
+
+Transform:
+    If enabled, transform the intersected geometry.
+
+Scale:
+    Specify the amount with which to scale the intersected geometry.
+
+Store Distances:
+    Creates a point attribute for the distance to the collision surface or the closest surface point.
+
+Intersect Farthest Surface:
+    The farthest intersection point is used instead of the closest.
+
+Reverse Rays:
+    Make rays fire in the direction opposite to the normals.
+
+Bias:
+    Offsets the starting position of the rays.
+
+Ray Hit Group:
+    If enabled, create a point group to hold all successful intersections.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

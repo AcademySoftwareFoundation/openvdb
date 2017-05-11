@@ -1,0 +1,40 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBWrite
+#icon:     COMMON/openvdb
+
+= OpenVDB Write =
+
+"""Write a VDB file to disk."""
+
+The OpenVDB Write SOP writes VDB grids to a file with the option to specify various compression types. This node is typically used for debugging, otherwise relying on Houdini's native Geometry ROP is usually preferable.
+
+@parameters
+
+File Name:
+    Path name for the output VDB file.
+
+Group:
+	Write only a subset of the input grids.
+
+Compression:
+	Blosc is fast and compresses well. Zip is slow but compresses very well. For most cases Blosc is the recommended compression type.
+
+Write Mode:
+	In Manual mode, click the Write Now button to write the output file. In Automatic mode, the file is written each time this node cooks.
+
+Write Now:
+	Click this button to force writing when in Manual mode.
+
+== Float Precision ==
+
+Write 16-Bit:
+	For grids that belong to the group(s) listed here, write floating-point scalar or vector voxel values using 16-bit half floats. If no groups are listed, all grids will be written using their existing precision settings.
+
+Write Full-Precision:
+	For grids that belong to the group(s) listed here, write floating-point scalar or vector voxel values using full-precision floats or doubles. If no groups are listed, all grids will be written using their existing precision settings.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

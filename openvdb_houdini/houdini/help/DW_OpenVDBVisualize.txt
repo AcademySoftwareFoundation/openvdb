@@ -1,0 +1,108 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBVisualize
+#icon: COMMON/openvdb
+
+#tags: vdbs
+
+= OpenVDB Visualize =
+
+"""Replaces a VDB volume with geometry that visualizes its structure."""
+
+[Include:volume_types]
+
+This node may be useful to experts for checking if the VDB volume is wasting memory.
+
+@parameters
+
+Group:
+    The name(s) of VDB primitives in the input to visualize.
+    See [specifying volumes|/model/volumes#group].
+
+== Surfacing ==
+
+Mesher:
+    Select a meshing scheme.
+
+Adaptivity:
+    Specify surface adaptivity.
+
+Isovalue:
+    Specify the value of the isosurface.
+
+Surface Color:
+    The color of the surface.
+
+== Tree Topology ==
+
+Color:
+    Specify whether to draw in color (which adds the `Cd` attribute).
+
+Frustrum:
+    For VDB primitives created based on a frustum, draw the corresponding frustum bounding box.
+    See the __Frustum__ and __From camera__ modes of the [OpenVDB Create SOP|Node:sop/DW_OpenVDBCreate].
+
+Leaf Nodes:
+    When enabled, it will draw leaf nodes with the specified method.
+    If __Color__ is enabled, they are drawn in blue.
+
+    Wireframe Boxes:
+	    Draw as wireframe boxes.
+    Solid Boxes:
+        Draw as solid boxes.
+
+Internal Nodes:
+    When enabled, it will draw non-leaf nodes with the specified method.
+    If `Color` is enabled, the first internal node level is shown in green,
+    otherwise shown in orange.
+
+    Wireframe Boxes:
+        Draw as wireframe boxes.
+    Solid Boxes:
+        Draw as solid boxes.
+
+Active Tiles:
+    When enabled, draw nodes that are active but hold the default (empty) value in the specified method.
+    Positive values are red, negative values are white.
+
+    Points:
+        Draw a single point in the middle of each node.
+    Wireframe Boxes:
+	    Draw as wireframe boxes.
+    Solid Boxes:
+        Draw as solid boxes.
+
+Active Voxels:
+    When enabled, draw active voxels in the specified method.
+    They are colored red if positive valued, white if negative valued.
+
+    Points:
+        Draw a single point in the middle of each voxel.
+    Wireframe Boxes:
+	    Draw as wireframe boxes.
+    Solid Boxes:
+        Draw as solid boxes.
+
+Ignore Staggered Vectors:
+    Draw staggered vectors as if they were collocated.
+
+Points with Index Coordinates:
+    Add a voxel/tile index coordinate attribute to points.
+
+Points with Values:
+    Add a voxel/tile value attribute to points.
+
+Name Point Attributes After Grids:
+    When enabled, name the attribute added by __Points with Values__ the same as
+    its VDB grid name.  If disabled or if a VDB grid has no name, the point
+    attributes will named according to their type such as `vdb_int`,
+    `vdb_float`, or `vdb_vec3f`.
+
+@related
+
+- [Node:sop/DW_OpenVDBConvert]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

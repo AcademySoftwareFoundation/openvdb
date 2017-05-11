@@ -1,0 +1,48 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBRebuildLevelSet
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Rebuild Level Set =
+
+"""Rebuild a level set VDB."""
+
+The OpenVDB Rebuild Level Set SOP can adjust the isosurface value and/or the number of exterior and interior narrow-band voxels. This requires proper signed distance fields for the results to be meaningful.
+
+NOTE:
+    If you have significant departures from a proper signed distance field, you can rebuild it with the [OpenVDB From Polygons node|Node:sop/DW_OpenVDBFromPolygons].
+    That node will implicitly convert an input SDF to polygons, then convert the polygons back to an SDF.
+
+@parameters
+
+Group:
+    The name(s) of the VDB volume primitives in the input to be normalized.
+    See [specifying volumes|/model/volumes#group].
+
+Isovalue:
+	The isovalue that defines the implicit surface.
+
+Use World Space Units:
+	If enabled, specify the narrow-band region in world-space.
+
+Exterior Band Voxels:
+	Specify the width of the exterior (d >= 0) portion of the narrow band (3 voxel units is optimal for level set operations).
+
+Interior Band Voxels:
+	Specify the width of the interior (d < 0) portion of the narrow band (3 voxel units is optimal for level set operations).
+
+Fill Interior:
+	Extract signed distances for all interior voxels, this operation is going to densify the interior of the model. Requires a closed watertight model.
+
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+- [Node:sop/DW_OpenVDBOffsetLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

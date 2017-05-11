@@ -1,0 +1,70 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBAnalysis
+#icon: COMMON/openvdb
+
+#tags: vdbs
+
+= OpenVDB Analysis =
+
+"""Computes an analytic property of a VDB volumes, such as gradient or curvature."""
+
+[Include:volume_types]
+
+This node computes some property from the values of VDB volumes, and generates new VDB volumes where the voxel values are the computed results.
+Using the __Output name__ parameter you can choose whether the results volumes replace the original volumes.
+
+@parameters
+
+Group:
+    The name(s) of the VDB primitives to analyze.
+    See [specifying volumes|/model/volumes#group].
+
+Operator:
+    What to compute. The labels on the items in the menu indicate what datatype the incoming VDB volume must be and the datatype of the output volume.
+
+    Gradient (scalar -> vector):
+        The gradient of a scalar field.
+
+    Curvature (scalar -> scalar):
+        Mean curvature of a scalar field.
+
+    Laplacian (scalar -> scalar):
+        The Laplacian of a scalar field.
+
+    Closest Point (scalar -> vector):
+        Generates voxels containing the location of the closest point on a surface defined by the incoming signed distance field.
+
+        You can then use the resulting field with the [OpenVDB advect points node|Node:sop/DW_OpenVDBAdvectPoints] to stick points to the surface.
+
+    Divergence (vector -> scalar):
+        The divergence of a vector field.
+
+    Curl (vector -> vector):
+        The curl of a vector field.
+
+    Magnitude (vector -> scalar):
+        The length of the vectors in a vector field.
+
+    Normalize (vector -> vector):
+        Divides vector field's values by their lengths.
+
+Mask VDB:
+    VDB (from the second input) used to define the iteration space.
+
+Output Name:
+    How to name the generated VDB volumes. If you choose "Keep incoming names", the generated fields will replace the input fields.
+
+Custom Name:
+    If this is not blank, the output VDB will use this name.
+
+
+@related
+
+- [Node:sop/volumeanalysis]
+- [Node:sop/DW_OpenVDBAdvectPoints]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

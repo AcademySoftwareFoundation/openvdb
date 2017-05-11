@@ -1,0 +1,73 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBSmoothLevelSet
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Smooth Level Set =
+
+"""Smooths out level set values in a VDB volume primitive."""
+
+[Include:volume_types]
+
+This node applies a simulated flow operation, moving the surface of the signed distance field according to some local property.
+
+For example, if you move along the normal by an amount dependent on the
+curvature, you will flatten out dimples and hills and leave flat areas
+unchanged.
+
+Unlike the smoothing options in the [OpenVDB Filter SOP|Node:sop/DW_OpenVDBFilter], this node ensure the level set remains a valid signed-distance field.
+
+@parameters
+
+Group:
+    The VDB primitives to be smoothed.
+    See [specifying volumes|/model/volumes#group] for more information.
+
+[Include:vdbsmooth#maskname]
+
+Operation:
+    What sort of smoothing process to apply to the VDB.
+
+    Mean Value:
+        Find the mean (`total/count`) of the surrounding values.
+        This is equivalent to a box blur of the same radius.
+
+    Median Value:
+        Find the median (middle value) of the surrounding values.
+        This is useful for de-spiking noisy data as extreme values will not contribute to the final result.
+
+    Mean Curvature Flow:
+        Finds the average curvature at each location.
+        Moves the surface along the local surface normal to flatten out bumps.
+
+    Laplacian Flow:
+        Finds the local "Laplacian" to control how much to move along
+        the normal.
+
+Use World Space Units:
+    Sets whether the `Radius` amount is specified in Houdini units. When this
+    option is off, the amount is interpreted as voxels.
+
+[Include:vdbsmooth#radius]
+
+Iterations:
+    Number of times to repeat the smoothing operation.
+
+[Include:vdbsmooth#invert]
+
+[Include:vdbsmooth#minmask]
+
+[Include:vdbsmooth#maxmask]
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+- [Node:sop/DW_OpenVDBOffsetLevelSet]
+- [Node:sop/DW_OpenVDBRenormalizeLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

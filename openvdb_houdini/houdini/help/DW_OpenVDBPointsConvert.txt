@@ -1,0 +1,146 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBPointsConvert
+#icon:     SOP/convertvdb
+
+= OpenVDB Points Convert =
+
+"""Converts a Point Cloud into a VDB Points Primitive, or vice versa."""
+
+The OpenVDB Points Convert SOP converts an unstructured cloud of points
+to and from a single VDB Points primitive.  The resulting primitive will
+re-order the points to place spatially close points close together.
+It is then able to efficiently unpack regions of interest within
+that primitive.  The [OpenVDB Points Group SOP|Node:sop/DW_OpenVDBPointsGroup] can be used to create
+regions of interest.
+
+Because nearby points often have similar data, there is the possibility
+of aggressively compressing attribute data to minimize data size.
+
+@parameters
+
+Conversion:
+    #id: conversion
+
+    Controls if the node is packing points into a VDB Points primitive, or extracting points out of such a primitive.
+
+Group:
+    #id: group
+
+    The VDBs to extract points from.
+
+
+VDB Points Group:
+    #id: vdbpointsgroup
+
+    The point group inside the VDB Points primitive to extract.  This
+    may be a normal point group that was collapsed into the VDB Points
+    primitive when it was created, or a new group created with the
+    [OpenVDB Points Group SOP|Node:sop/DW_OpenVDBPointsGroup].
+
+VDB Name:
+    #id: name
+
+    Name of the VDB Points primitive created.
+
+
+Define Transform:
+    #id: transform
+
+    An important consideration is how big to make the grid cells
+    that contain the points.  Too large and there are too many points
+    per cell and little optimization occurs.  Too small and the cost
+    of the cells outweigh the points.
+
+    Using Target Points per Voxel:
+	Attempt to size the voxels so the given number of points ends
+	up in each voxel.  This will assume uniform distribution of points.
+
+    Using Voxel Size Only:
+	Provide an explicit voxel dimension.
+
+    To Match Reference VDB:
+	Use the second input's transform.
+
+Voxel Size:
+    #id: voxelsize
+
+    The desired voxel size of the new VDB Points grid.
+
+Points per Voxel:
+    #id: pointspervoxel
+
+    The number of points per voxel to use as the target for automatic voxel size computation.
+
+Reference VDB:
+    #id: refvdb
+
+    Which VDB in the second input to use as the reference for the transform.
+    If not set, will use the first found VDB.
+
+Position Compression:
+    #id: poscompression
+
+    The position can be stored relative to the center of the voxel.
+    This means it does not require the full 32 bit float representation,
+    but can be quantized to a smaller fixed point value.
+
+== Attribute Transfer ==
+
+Mode:
+    #id: mode
+
+    Whether to transfer all point attributes, or only those
+    that are explicitly listed.
+
+
+Attribute:
+    #id: attribute#
+
+    Name of point attribute to include in the VDB Points primitive.
+
+Value Compression:
+    #id: valuecompression#
+
+    How to compress the attribute.
+
+    None:
+        The attribute is stored with its full precision.
+
+    16-bit Truncate:
+        The attribute is stored at half precision, truncating lower order bits.
+
+    Unit Vector:
+        The attribute is treated as a unit vector.  This assumption means that when two values are known, the third is implied.
+
+    8-bit Unit:
+        The attribute is treated as lying in the 0..1 range and converted to 8bit.
+
+    16-bit Unit:
+        The attribute is treated as lying in the 0..1 range and converted to 16bit.
+
+Blosc Compression:
+    #id: blosccompression#
+
+    Enable Blosc compression of the attribute.  This is a lossless compression
+    codec that is effective with floating point data and is very fast to
+    compress and decompress.
+
+
+Normal Compression:
+    #id: normalcompression
+
+    All normal attributes will use this compression codec.
+
+Color Compression:
+    #id: colorcompression
+
+    All color attributes will use this compression codec.
+
+@related
+- [Node:sop/DW_OpenVDBPointsGroup]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

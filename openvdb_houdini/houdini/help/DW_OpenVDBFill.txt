@@ -1,0 +1,47 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBFill
+#icon: COMMON/openvdb
+
+#tags: create, model
+
+= OpenVDB Fill =
+
+"""Fills and activates/deactivates specific regions of voxels within a VDB volume primitive."""
+
+[Include:volume_types]
+
+@parameters
+
+Group:
+    The name(s) of the VDB primitives to fill.
+    See [specifying volumes|/model/volumes#group].
+
+Bounds:
+    The bounds method to use.
+
+    Index Space:
+    Interpret the given min and max coordinates in index-space units.
+
+    World Space:
+    Interpret the given min and max coordinates in world-space units.
+
+    Reference Geometry:
+    Use the world-space bounds of the reference input geometry.
+
+Min Coord:
+    The minimum voxel-space or world-space co-ordinate.
+
+Max Coord:
+    The maximum voxel-space or world-space co-ordinate.
+
+Value:
+    The value with which to fill voxels (y and z are ignored when filling scalar grids).
+
+Active:
+    When enabled, activate voxels in the fill region, otherwise deactivate them.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

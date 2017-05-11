@@ -1,0 +1,36 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBClip
+#icon: COMMON/openvdb
+
+#tags: vdbs
+
+= OpenVDB Clip =
+
+"""Clips VDB volume primitives using a bounding box or another VDB as a mask."""
+
+This node removes (or deactivates) voxels from VDB volume primitives that are
+outside the bounding box of the geometry given in the second input. A mask VDB may also be specified to perform an operation similar to an intersection.
+
+@parameters
+
+Source Group:
+    Name(s) of the VDB primitives to clip. If empty, all VDBs are used.
+    See [specifying volumes|/model/volumes#group].
+
+Mask VDB:
+    When enabled, it specifies the VDB primitives from the second input to be
+    used as a clipping mask.
+
+Keep Inside:
+	When enabled, keep voxels that lie inside the clipping region, otherwise keep voxels that lie outside the clipping region.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBCombine]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

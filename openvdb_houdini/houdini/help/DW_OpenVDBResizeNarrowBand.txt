@@ -1,0 +1,43 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBResizeNarrowBand
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Resize Narrow Band =
+
+"""Resizes the narrow band of a signed distance field in VDB volume primitives."""
+
+[Include:volume_types]
+
+This node changes the size of the narrow band in a level set.
+
+@parameters
+
+Group:
+    The name of VDB primitive(s) in the input to be resized.
+    See [specifying volumes|/model/volumes#group] for more information.
+
+Use World Space Units:
+    Sets whether the `Offset` amount is specified in Houdini units. When this
+    option is off, the amount is interpreted as voxels.
+
+Half Width:
+    The size of the narrow band on each side of the isosurface. If `Use World-space Units` is disabled this will be in voxels.
+
+[Include:vdbrenormalizesdf#accuracy]
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+- [Node:sop/DW_OpenVDBOffsetLevelSet]
+- [Node:sop/DW_OpenVDBRenormalizeLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

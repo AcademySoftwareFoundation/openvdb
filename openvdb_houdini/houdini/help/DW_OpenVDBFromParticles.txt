@@ -1,0 +1,136 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBFromParticles
+#icon: COMMON/openvdb
+
+#tags: create, model
+
+= OpenVDB from Particles =
+
+"""Converts point clouds and/or point attributes into VDB volume primitives."""
+
+[Include:volume_types]
+
+This node can create a distance field (signed (SDF) or unsigned) and/or a density (fog) field.
+
+Since VDB primitives only store the voxels around each point, they can have a much a higher effective resolution than creating a standard Houdini volume.
+
+NOTE:
+    This node uses the point scale attribute (`pscale`) on the input points to convert them to spherical densities.
+    This attribute is set by the [Attribute POP|Node:pop/attribute] or the [Point SOP|Node:sop/point].
+
+    If points are smaller than 1.5 voxels, they cannot be resolved and will not appear in the VDB.
+
+    You can also scale all sizes using the __Point radius scale__ parameter.
+
+You can connect a VDB to the second input to automatically use that VDB's orientation and voxel size (see the __Reference VDB__ parameter).
+
+@parameters
+
+Distance VDB:
+    Create a distance field VDB, where each voxel stores the distance to the nearest point.
+
+Fog VDB:
+    Creates a density field, where a voxel is `1` inside a point (that is, the sphere centered around the point with radius defined by the point's `pscale` attribute), and `0` outside.
+
+Mask VDB:
+    Create a mask field VDB.
+
+    Generate an alpha mask that is very useful for subsequent constrained level
+    set smoothing of the level set surface from the particles. This alpha mask
+    is defined as the fog volume derived from the CSG difference between a
+    level set surface with a maximum radius of the particles and a level set
+    surface with a minimum radius of the particles. This mask will guarentee
+    that subsequent level set smoothing is constrained between the min/max
+    surfaces thus avoiding the problem that surface details can be completely
+    smoothed away.
+
+Bounding Limit:
+    Percentage to increase and decrease the particle radius.  Used to define the maximum and minimum limit surfaces for the alpha mask construction.
+
+Reference VDB:
+    #id: group
+
+    If the second input is connected, you can enter the name of a VDB primitive in the second input to copy the orientation and voxel size from it.
+
+    See [specifying volumes|/model/volumes#group].
+
+Merge with Reference VDB:
+    If a reference VDB is specified, the new particles will be unioned into
+    that signed distance field.  This allows one to use the particles to only
+    specify the surface detail, but have a coarse, offset, grid used for the
+    main bulk.
+
+Voxel Size:
+    The size of voxels in the generated VDB volume primitive.
+    Points smaller than this cannot be resolved by the VDB so will not be in the output.
+
+Use World Space for Band:
+    Sets whether the `Offset` amount is specified in Houdini units. When this
+    option is off, the amount is interpreted as voxels.
+
+Half Band:
+    The size of the narrow band on each side of the isosurface. If `Use World-space for Band` is disabled this will be in voxels.
+
+== Spheres ==
+
+Treat each point as a sphere with a radius.
+
+Particle Scale:
+    The pscale point attribute, which defines the world space particle radius, will be scaled by this.  A value of one is assumed if the pscale attribute is missing.
+
+Minimum Radius:
+    Points with radius less than this number of voxels are ignored.
+    Points with radius smaller than 1.5 voxels will likely cause aliasing artifacts, so you should not set this lower than `1.5`.
+
+Velocity Trails:
+    When enabled, create _multiple spheres_ trailing off in the direction of the point's velocity attribute (`v`). This may be useful for visualization.
+
+Velocity Scale:
+    When `Velocity Trails` is enabled, this scales the length of the trail relative to the point velocity attribute (`v`).
+
+Trail Resolution:
+    When `Velocity Trails` is enabled, this dictates how far apart to space the spheres in the trail.
+
+Attributes:
+    You can generate additional VDB primitives that store the values of point [attributes|/model/attributes].
+    Only voxels near the points will be set.
+
+Attribute:
+    A point attribute to create a VDB from.
+
+[Include:vdbfrompolygons#attributevdbname]
+
+[Include:vdbfrompolygons#vectype]
+
+== Points ==
+
+Computes a valid level set from the topology of the points.
+
+Dilation:
+    Number of morphological dilation iterations used to expand the active voxel region.
+
+Closing:
+    Number of morphological closing iterations used to fill gaps in the active voxel region.
+
+Smoothing:
+    Number of surface smoothing interations.
+
+@inputs
+
+Particles to convert:
+    The point geometry to convert.
+
+Optional reference VDB:
+    If connected, this node copies the orientation and voxel size from a VDB primitive in this input.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBFromPolygons]
+- [Node:sop/isooffset]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

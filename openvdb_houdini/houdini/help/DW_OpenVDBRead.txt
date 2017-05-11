@@ -1,0 +1,44 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBRead
+#icon:     COMMON/openvdb
+
+= OpenVDB Read =
+
+"""Read a VDB file from disk."""
+
+The OpenVDB Read SOP reads VDB grids from a file. Unlike the file SOP, there is the ability to use OpenVDB's native delayed-loading.
+
+@parameters
+
+Read Metadata Only:
+    If enabled, output empty grids populated with their metadata and transforms only.
+
+Clip to Reference Bounds:
+    If enabled, clip grids to the bounding box of the reference geometry.
+
+File Name:
+    Specify a VDB file.
+
+Grid(s):
+    Grid names separated by white space (wildcards allowed).
+
+Group:
+    If enabled, create a group with the given name that comprises the selected grids. If disabled, do not group the selected grids.
+
+Missing Frame:
+    If the specified file does not exist on disk, either report an error (Report Error) or warn and continue (No Geometry).
+
+Reload File:
+    Reread the VDB file.
+
+Delay Loading:
+    If enabled, don't allocate memory for or read voxel or attribute values until the values are actually accessed. Delayed loading can significantly lower memory usage, but note that viewport visualization of a volume usually requires the entire volume to be loaded into memory.
+
+Copy if smaller than:
+    When delayed loading is enabled, a file must not be modified on disk before it has been fully read. For safety, files smaller than the given size (in GB) will be copied to a private, temporary location (either $OPENVDB_TEMP_DIR, $TMPDIR or a system default temp directory).
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

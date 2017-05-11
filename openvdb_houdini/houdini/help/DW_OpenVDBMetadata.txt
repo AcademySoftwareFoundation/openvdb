@@ -1,0 +1,58 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBMetadata
+#icon:     COMMON/openvdb
+
+= OpenVDB Metadata =
+
+"""Modify the metadata attached to a VDB."""
+
+The OpenVDB Metadata SOP can create and edit the metadata attached to a VDB grid.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+Class:
+    The semantic meaning of the volume.  This controls how the raw volume
+    values are interpreted.  Certain VDB tools operate on certain
+    types of volumes, such as level sets, and use the class to help
+    determine how to treat their inputs.
+
+    Other:
+        No special meaning is assigned to the volume's data.
+
+    Level Set:
+        The volume is treated as a narrow-band signed distance field
+        level set.  The values are expected to define positive and negative
+        distances to a surface field up to a certain bandwidth.
+
+    Fog Volume:
+        The volume represents a density field.  Values should be
+        positive with zero representing empty regions.
+
+    Staggered Vector Field:
+        The volume's vector values are to be treated as lying on
+        the faces of the respective cells, not the centers.
+
+Creator:
+    Specify who created the grid.
+
+Transform Values:
+    For vector-valued grids, specify whether voxel values are in world space
+    and should be affected by transforms or in local space and should not be
+    transformed.
+
+[Include:primitive#vdbvectortype]
+
+Write 16-Bit Floats:
+    When saving the grid to a file, write floating-point scalar or vector
+    voxel values as 16-bit half floats.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,126 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBDiagnostics
+#icon:     SOP/vdbdiagnostics
+
+= OpenVDB Diagnostics =
+
+"""Tests VDBs for Bad Values and Repairs."""
+
+The OpenVDB Diagnostics node has a suite of tests to validate and correct common errors in OpenVDB nodes.  For most errors, it provides an option of marking the troublesome voxels and/or repairing them.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which input VDBs to examine.
+
+
+Mark in Mask Grid:
+    #id: usemask
+
+    For tests set to Mark, output a mask VDB that highlights problematic regions in input VDBs.
+
+Mark as Points With Values:
+    #id: usepoints
+
+    For tests set to Mark, output a point cloud that highlights problematic regions in input VDBs.
+
+
+Respect Grid Class:
+    #id: respectclass
+
+    If disabled, apply fog volume and level set tests to all VDBs, not just VDBs classified as fog volumes or level sets.
+
+Validate Fog Volumes:
+    #id: verify_fogvolume
+
+    Verify that VDBs classified as fog volumes are valid fog volumes.
+
+Validate for SDF CSG and Fracture:
+    #id: verify_csg
+
+    Verify that SDF VDBs meet the requirements for CSG and fracture operations.
+
+Validate for SDF Filtering and Renormalization:
+    #id: verify_filtering
+
+    Verify that SDF VDBs meet the requirements for filtering and renormalization.
+
+Validate for SDF Advection and Morphing:
+    #id: verify_advection
+
+    Verify that SDF VDBs meet the requirements for advection and morphing.
+
+== General Tests ==
+
+Finite Values:
+    #id: test_finite
+
+    Verify that all values are finite and non-NaN.
+
+Uniform Background:
+    #id: test_background
+
+    Verify that all inactive voxels are set to the background value.
+
+Values in Range:
+    #id: test_valrange
+
+    Verify that all scalar voxel values and vector magnitudes are in the given range.
+
+== Level Set Tests ==
+
+Range:
+    #id: valrange
+
+    Minimum and maximum allowed values (inclusive)
+
+Symmetric Narrow Band:
+    #id: test_symmetric
+
+    Verify that SDF inside and outside values are of equal magnitude.
+
+Minimum Band Width:
+    #id: test_bandwidth
+
+    Verify that interior and exterior narrow band widths are sufficiently large.
+
+Closed Surface:
+    #id: test_surface
+
+    Verify that SDFs represent watertight surfaces.
+
+Gradient Magnitude:
+    #id: test_gradient
+
+    Verify that the SDF gradient has magnitude one everywhere (within a given tolerance).
+
+Inactive Tiles:
+    #id: test_activetiles
+
+    Verify that SDFs have no active tiles. These would represent constant regions that should not occur in an SDF.
+
+
+Uniform Voxel Size:
+    #id: test_voxelsize
+
+    Verify that SDFs have uniform voxel sizes.
+
+== Fog Volume Tests ==
+
+Background Zero:
+    #id: test_backgroundzero
+
+    Verify that all inactive voxels in fog volumes have value zero.
+
+Active Values in `[0, 1]`:
+    #id: test_fogvalues
+
+    Verify that all active voxels in fog volumes have values in the range `[0, 1]`.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

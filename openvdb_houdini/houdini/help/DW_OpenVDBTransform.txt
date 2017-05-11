@@ -1,0 +1,41 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBTransform
+#icon:     COMMON/openvdb
+
+= OpenVDB Transform =
+
+"""Modify the transform in VDB grids."""
+
+The OpenVDB Transform SOP modifies the transform attached to each VDB grid.
+
+@parameters
+
+Group:
+	Specify a subset of the input VDB grids to be transformed.
+
+Translate:
+	Specify the translation to apply to the transform.
+
+Rotate:
+	Specify the rotation to apply to the transform. Note the order to apply rotation is XYZ.
+
+Scale:
+	Specify the scaling to apply to the transform.
+
+Pivot:
+	Specify the pivot to use in applying the transform.
+
+Uniform Scale:
+	Apply a uniform scaling to the transform.
+
+Invert Transformation:
+	Perform an inverse transformation.
+
+Transform Vectors:
+	Apply the transform to the voxel values of vector-valued grids, in accordance with those grids' Vector Type attributes.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

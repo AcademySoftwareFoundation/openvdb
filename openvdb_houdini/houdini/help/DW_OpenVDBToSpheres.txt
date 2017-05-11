@@ -1,0 +1,63 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBToSpheres
+#icon: COMMON/openvdb
+
+#tags: vdbs
+
+= OpenVDB To Spheres =
+
+"""Fills a VDB volume with adaptively-sized spheres."""
+
+This node is useful for generating proxy geometry for RBD simulations since
+converting non convex polygons into sphere compounds drastically improves the
+simulation time. This can be used for example, on the output of a
+[OpenVDB Fracture SOP|Node:sop/DW_OpenVDBFracture].
+
+It is also useful for cloud modeling, to produce the initial density volume.
+
+@parameters
+
+Group:
+    The name(s) of VDB primitives to fill. See [specifying volumes|/model/volumes#group] for more information.
+
+Isovalue:
+    The crossing point of the VDB values that is considered the surface.  A value of `0` works for signed distance fields, and `0.5` is a better choice for fog VDBs.
+
+Use World Space Units:
+	If enabled, the min and max radius is specified in world-space units.
+
+Min Radius in Voxels:
+    Determines the smallest sphere size in voxel units.
+
+Max Radius in Voxels:
+    Determines the largest sphere size in voxel units.
+
+Max Spheres:
+    No more than this number of spheres are generated per VDB primitive.
+
+Scatter Points:
+    Maximum number of interior points to consider for the sphere placement. Increasing this count increases the chances of finding optimal sphere sizes.
+
+Overlapping:
+    When enabled, spheres will be allowed to overlap/intersect.
+
+Preserve Attributes and Groups:
+    Enable to copy attributes and groups from the input.
+
+Add ID Attribute:
+    Enable to add an `id` point attribute that corresponds to different VDBs.
+
+Add PScale Attribute:
+    Enable to add a `pscale` point attribute that corresponds to the radius of each sphere.
+
+@related
+
+- [Node:sop/DW_OpenVDBConvert]
+- [Node:sop/cloud]
+- [Node:sop/DW_OpenVDBFracture]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

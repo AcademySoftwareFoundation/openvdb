@@ -1,0 +1,123 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBFromPolygons
+#icon: SOP/vdbfrompolygons
+
+#tags: create, model
+
+= OpenVDB From Polygons =
+
+"""Converts polygonal surfaces and/or surface attributes into VDB volume primitives."""
+
+[Include:volume_types]
+
+NOTE:
+    The input geometry must be a quad or triangle mesh.
+    This node will "convex" the input surface into such a mesh if it isn't.
+
+This node can create a distance field (signed (SDF) or unsigned) and/or a density (fog) field.
+
+When you create a fog field you can choose to fill the band of voxels on the surface or (if you have an airtight surface) fill the surface (see the __Fill interior__ parameter).
+
+Since VDB primitives only store the voxels around the surface, they can have a much a higher effective resolution than creating a traditional volume with [IsoOffset|Node:sop/isooffset].
+
+You can connect a VDB to the second input to automatically use that VDB's orientation and voxel size (see the __Reference VDB__ parameter).
+
+@parameters
+
+Distance VDB:
+    Creates a signed distance field (SDF).
+    An SDF stores the distance to the surface in each voxel.
+    (If the voxel is inside, the distance is negative.)
+
+Fog VDB:
+    Creates a density field.
+    Voxels in the band on the surface store `1` and voxels outside store `0`.
+    The size of the filled band is controlled with the __Interior Band Voxels__.
+
+    Turn on __Fill interior__ to create a solid VDB from an airtight surface instead of a narrow band.
+
+== Conversion Settings ==
+
+Reference VDB:
+    #id: group
+
+    If the second input is connected, you can enter the name of a VDB primitive in the second input to copy the orientation and voxel size from it.
+
+    See [specifying volumes|/model/volumes#group].
+
+Voxel:
+    Specify the voxel size in world units or voxel count along an axis
+
+Voxel Size:
+    #id: voxelsize
+
+    The size of voxels in the output VDB volume.
+    Surface features smaller than this will not be in the output VDB.
+
+Voxel Count:
+    Specify the voxel count along an axis. Note that the resulting voxel count might be off by one voxel due to roundoff errors during the conversion process.
+
+Use World Space for Band:
+    Sets whether __Exterior band__ and __Interior band__ are specified in Houdini units.
+    When this option is off, the band width parameters are in voxels.
+
+Exterior Band Voxels:
+    How many voxels outside the surface to fill in the generated VDB (when __Use world space for band__ is off).
+
+Exterior Band:
+    How many Houdini units outside the surface to fill in the generated VDB (when __Use world space for band__ is on).
+
+Interior Band Voxels:
+    How many voxels inside the surface to fill in the generated VDB (when __Use world space for band__ is off).
+
+Interior Band:
+    The distance to compute the distance field inside the mesh.
+
+Fill Interior:
+    In SDF mode, Fill Interior extends the signed value all the way to the middle of the volume. In Fog mode, a gradient is applied from 0 at the surface (0 values of the SDF) to 1 at the innermost distance of the SDF Field (the most negative SDF values).
+
+Unsigned Distance Field:
+    When creating a __Distance VDB__, simply store the distance from the voxel to the surface (no negative values).
+    This avoids trying to figure out inside and outside, so the surface doesn't need to be airtight.
+
+    This is similar to the Minimum function of the [Iso Offset SOP|Node:sop/isooffset].
+
+== Attribute Transfer ==
+
+Surface Attributes:
+    You can generate additional VDB primitives that store the values of primitive (face), point, or vertex [attributes|/model/attributes].
+    Only voxels in the band around the surface will be set.
+
+Attribute:
+    The name of point, vertex, or primitive attribute to create a VDB from.
+
+VDB Name:
+    #id: attributevdbname
+
+    A new name for the generated VDB primitive storing the attribute values.
+    Leave this blank to use the attribute name.
+
+Vector Type:
+    #id: vectype
+
+    How vector values should be interpreted.
+
+@inputs
+
+Polygonal mesh to convert:
+    The polygonal surface to convert.
+
+Optional reference VDB:
+    If connected, this node copies the orientation and voxel size from a VDB primitive in this input.
+
+@related
+
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBFromParticles]
+- [Node:sop/isooffset]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,25 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBSamplePoints
+#icon:     COMMON/openvdb
+
+= OpenVDB Sample Points =
+
+"""Samples grid values of a VDB onto points."""
+
+The OpenVDB Sample Points SOP samples OpenVDB grid values as attributes on spatially located particles. Currently the grid values can be scalar (float, double) or vec3 (float, double) but the attributes on the particles are single precision scalar or vec3.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,163 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBCombine
+#icon: COMMON/openvdb
+
+#tags: vdb, volumemix, vdbresample
+
+= OpenVDB Combine =
+
+"""Combines the values of two aligned VDB volumes in various ways."""
+
+[Include:volume_types]
+
+The [Volume Mix SOP|Node:sop/volumemix] also works on VDBs.
+However, Volume Mix only operates on the "active" area of the destination
+volume.
+That is, it will only update the "non-empty" voxels in the destination VDB.
+To get a true union of two disjoint VDB volumes, you must use this node.
+
+NOTE:
+    The VDBs you want to combine must match in voxel size and orientation or the results won't make sense.
+    You can use [VDB Resample|Node:sop/DW_OpenVDBResample] to match the size/orientation of one of the VDBs to the other before combining.
+
+@parameters
+
+See [specifying volumes|/model/volumes#group].
+
+Group A:
+    The volume primitives to be used from the first input.
+
+Group B:
+    The volume primitives to merge in from the second input.
+
+Flatten All B into A:
+    Requires that there is only one VDB in the A group.  Every VDB
+    in the B group will, in turn, be combined with the VDB in
+    the A group.  This can flatten a large collection of VDBs into
+    a single VDB.
+
+Combine A/B Pairs:
+    If disabled, each VDB in the A group will be combined with
+    the first VDB in the B group.  If enabled, the combination
+    will be done pairwise.
+
+Operation:
+    Each voxel that is active in either of the input grids
+    will be processed with this operation.
+
+    Copy A:
+        Use `A`, ignore `B`.
+
+    Copy B:
+        Use `B`, ignore `A`.
+
+    Invert A:
+        Use `0 - A`
+
+    Add:
+        Add the values of `A` and `B`.
+
+	NOTE:
+	    Using this for fog volumes (ie. density values betwen 0 and 1)
+	will push density values over 1.0, which causes a bright interface
+	between the input volumes when rendered. Try using the
+	`A + (1 - A) * B` operation to avoid this.
+
+    Subtract:
+        Subtract the values of `B` from the values of `A`.
+
+    Multiply:
+        Multiply the values of `A` and `B`.
+
+    Divide:
+        Divide the values of `A` by `B`.
+
+    Maximum:
+        Use the maximum of each corresponding value from `A` and `B`.
+
+	NOTE:
+	    Using this for fog volumes (ie. density values betwen 0 and 1)
+	can produce a dark interface between the inputs when rendered due to
+	the binary nature of choosing a value from either from `A` or `B`.
+	To avoid this problem, try using the `(1 - A) * B` operation.
+
+    Minimum:
+        Use the minimum of each corresponding value from `A` and `B`.
+
+    `(1 - A) * B`:
+	This is similar to `SDF Difference` except for fog volumes. It can also
+	be viewed as "soft cut out" operation. Typically used to clear out an
+	area around characters in a dust simulation or some other environmental
+	volume.
+
+    `A + (1 - A) * B`:
+	This is similar to `SDF Union` except for fog volumes. It can also be
+	viewed as a "soft union" or "merge" operation. Consider using this over
+	the `Maximum` or `Add` operations for fog volumes.
+
+    SDF Union:
+        Generate the union of signed distance fields A and B.
+
+    SDF Intersection:
+        Generate the intersection of signed distance fields A and B.
+
+    SDF Difference:
+        Remove signed distance field B from signed distance field A.
+
+    Replace A with Active B:
+	Copy the active voxels of B into A.
+
+    Activity Union:
+	Make voxels active which are active in both A _or_ B.
+
+    Activity Intersection:
+	Each voxel's active state is set to whether it is active in both A
+	_and_ B. This operation may deactivate voxels so it is recommended to
+	enable pruning when using this.
+
+    Activity Difference:
+	Each voxel's active state is set to *on* if is active in A but not B.
+	Otherwise, the voxel is made inactive.  It is recommended to enable
+	pruning when using this.
+
+A Multiplier:
+    Scale values in the first field by this amount before the operation.
+
+B Multiplier:
+    Scale values in the second field by this amount before the operation.
+
+Resample:
+    If the A and B VDB grids have different transforms, one grid should
+    be resampled to match the other before the two are combined.
+    Also, level set grids should have matching background values
+    (i.e., matching narrow band widths).
+
+Interpolation:
+    Specify the type of interpolation to be used when resampling.
+
+Deactivate Tolerance:
+    Deactivate active output voxels whose values equal the output grid's
+    background value.  Voxel values are considered equal if they differ by less
+    than the specified tolerance.
+
+Prune Tolerance:
+    After building the VDB grid there may be undetected constant tiles.
+    This tolerance is used to detect constant regions and collapse them.
+    Such areas that are within the background value will also be marked
+    inactive.
+
+Signed-Flood-Fill Output:
+    Tests areas of inactive background values to determine if they
+    are inside or outside of an SDF, and hence whether they should
+    have negative or positive sign.
+
+@related
+
+- [Node:sop/volumevop]
+- [Node:sop/volumemix]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

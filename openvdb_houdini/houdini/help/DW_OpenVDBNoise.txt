@@ -1,0 +1,51 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBNoise
+#icon:     COMMON/openvdb
+
+= OpenVDB Noise =
+
+"""Applies noise to level sets represented by VDBs."""
+
+The OpenVDB Noise SOP can apply noise to level sets represented by VDBs which can
+optionally be masked by another level set. This uses a Fractal Boltzman Generator
+for the noise.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+Amplitude:
+    Amplitude of the noise.
+
+Frequency:
+    Frequency of the noise.
+
+Octaves:
+    Number of octaves for the noise.
+
+Lacunarity:
+    Lacunarity of the noise.
+
+Gain:
+    Gain of the noise.
+
+Roughness:
+    Roughness of the noise.
+
+Surface Offset:
+    Offset from the Isosurface of the Level Set on which to apply the noise.
+
+Noise Offset:
+    Offset of the noise in 3D world-space.
+
+Noise Mode:
+    Straight, Absolute or Inverse Absolute modes.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,0 +1,112 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBToPolygons
+#icon: COMMON/openvdb
+
+#tags: convert, vdbs
+
+= OpenVDB To Polygons =
+
+"""Converts VDBs into polygons."""
+
+This node allows the conversion of VDB volumes or level sets into polygon geometry.
+
+The second and third inputs can be optionally supplied. The second input provides a reference polygon surface for converting the volume, which is useful for converting fractured VDBs back to polygons. The third provides additional VDB fields which can be used for masking (which voxels to convert to polygons), and/or for specifying an adaptivity multiplier.
+
+
+@parameters
+
+Group:
+    Subset of primitives to convert.
+
+Convert To:
+    What form of conversion to perform.
+
+    Polygons:
+        The VDB is surfaced along the specified iso value.  Polygons
+        are created.
+
+    Polygon Soup:
+        The VDB is surfaced, but a polygon soup is created.  While polygon
+        soups do not support most editing operations, they are a more
+        compact way of storing dense meshes.
+
+Isovalue:
+    The crossing point of the VDB values that is considered
+    the surface when converting to polygons.
+
+Adaptivity:
+    How closely to match the surface. Higher adaptivities will allow more variation in polygon size, using fewer polygons to express the surface.
+
+Compute Vertex Normals:
+    Compute vertex normals when converting to polygons. This uses the
+    optional second input to help eliminate seams if available.
+
+Preserve VDB Name:
+    Mark each primitive with the corresponding VDB name.
+
+== Reference Options ==
+
+Internal Adaptivity:
+    When converting to polygons with a second input, this is the adaptivity
+    threshold for regions that are inside the reference surface.
+
+Transfer Surface Attributes:
+    When converting to polygons with a second input, this transfers all
+    attributes (primitive, vertex and point) from the reference surface.
+    It will override computed vertex normals for primitives in the surface
+    group.
+
+Sharpen Features:
+    Sharpen edges and corners.
+
+Edge Tolerance:
+    Controls the edge adaptivity mask.
+
+Surface Group:
+    When converting to polygons with a second input, this specifies a group
+    for all polygons that are coincident with the reference surface.
+    This group is useful for transferring attributes such as uv
+    coordinates, normals, etc. from the reference surface.
+
+Interior Group:
+    When converting to polygons with a second input, this specifies a group
+    for all polygons that are inside the reference surface.
+    These group is useful for creating projected UV coordinates, or for
+    assigning a different material.
+
+Seam Line Group:
+    When converting to polygons with a second input, this parameter specifies a group
+    for all polygons that are near the seam lines. This can be used to drive secondary elements such as debris and dust.
+
+Seam Points:
+    When converting to polygons with a second input, this parameter specifies a group
+    of the fracture seam points. This can be used to drive local pre-fracture dynamics, such as local surface buckling.
+
+== Masking Options ==
+
+Surface Mask:
+    If enabled, specifies the name of the VDB field from the third input to
+    be used for masking.  The field's interior defines the region for
+    converting to polygons.
+
+Offset:
+    Iso value used to offset the interior region of the surface mask.
+
+Invert Surface Mask:
+    Causes the complement of the surface mask to be converted instead.
+
+Adaptivity Field:
+    If enabled, specifies the name of the VDB field from the third input for controlling adaptivity. The voxel values are multiplied with the __Adaptivity__ parameter value.
+
+@related
+
+- [Node:sop/convert]
+- [Node:sop/convertvolume]
+- [Node:sop/DW_OpenVDBCreate]
+- [Node:sop/DW_OpenVDBFromParticles]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

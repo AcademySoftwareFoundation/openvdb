@@ -1,0 +1,41 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBPrune
+#icon:     COMMON/openvdb
+
+= OpenVDB Prune =
+
+"""Prune tree branches from VDB grids."""
+
+The OpenVDB Prune SOP can prune tree branches where values may all be the same to reduce the memory footprint of a VDB grid.
+
+@parameters
+
+Group:
+    #id: group
+
+    Which of the input VDBs to process.
+
+Mode:
+    Value:
+        Collapse regions in which all voxels have the same
+        value and active state into tiles with those values
+        and active states.
+
+    Inactive:
+        Collapse regions in which all voxels are inactive
+        into inactive background tiles.
+
+    Level Set:
+        Collapse regions in which all voxels are inactive
+        into inactive tiles with either the inside or
+        the outside background value, depending on
+        the signs of the voxel values.
+
+Tolerance:
+    Voxel values are considered equal if they differ by less than the specified threshold.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

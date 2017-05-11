@@ -1,0 +1,47 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBRenormalizeLevelSet
+#icon: COMMON/openvdb
+
+#tags: vdb, merge
+
+= OpenVDB Renormalize Level Set =
+
+"""Fixes level sets stored in VDB volume primitives."""
+
+[Include:volume_types]
+
+This node iteratively adjusts the voxel values to properly respect the distance to the zero crossing line.
+This requires proper signed distance values for the results to be meaningful.
+
+NOTE:
+    If you have significant departures from a proper signed distance field, you can rebuild it with the [OpenVDB From Polygons node|Node:sop/DW_OpenVDBFromPolygons].
+    That node will implicitly convert an input level set to polygons, then convert the polygons back to an level set.
+
+@parameters
+
+Group:
+    The name(s) of the VDB volume primitives in the input to be normalized.
+    See [specifying volumes|/model/volumes#group].
+
+Iterations:
+    The number of rounds of renormalization that should be performed.  More rounds are slower but will result in a more correct level set.
+
+Renorm Accuracy:
+    #id: accuracy
+
+    The method for smoothing the level set after each iteration.
+    Later options in the list are slower but more accurate.
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+@related
+
+- [Node:sop/DW_OpenVDBSmoothLevelSet]
+- [Node:sop/DW_OpenVDBOffsetLevelSet]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

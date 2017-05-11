@@ -1,0 +1,49 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBPlatonic
+#icon:     COMMON/openvdb
+
+= OpenVDB Platonic =
+
+"""Generate a platonic solid as a level set or fog volume VDB."""
+
+The OpenVDB Platonic SOP generates a VDB representing a platonic solid as either a level set or fog volume.
+
+@parameters
+
+Solid Type:
+    Choose from a sphere or one of the five platonic solids.
+
+Grid Class:
+    The type of level set to generate.
+
+    Level Set:
+        The volume is treated as a narrow-band signed distance field
+        level set.  The values are expected to define positive and negative
+        distances to a surface field up to a certain bandwidth.
+
+    Signed Distance Field:
+        The volume is treated as a narrow-band unsigned distance field
+        level set.  The values are expected to define positive distances
+        to a surface field up to a certain bandwidth.
+
+Radius/Size:
+    The size of the platonic solid or radius in the case of a sphere.
+
+Center:
+    The world-space center of the level set.
+
+Voxel Size:
+    The voxel-size of the level set.
+
+Half-band Width:
+    Desired radius in voxel units around the surface (zeroth level set).
+    For proper operation, many nodes expect that half-width is at least 3.
+
+Convert to fog volume:
+    When enabled, generate a fog volume instead of a level set.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

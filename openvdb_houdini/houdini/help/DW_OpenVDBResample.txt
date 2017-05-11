@@ -1,0 +1,114 @@
+
+#type: node
+#context: sop
+#internal: DW_OpenVDBResample
+#icon: COMMON/openvdb
+
+#tags: vdb, volumemix, vdbcombine
+
+= OpenVDB Resample =
+
+"""Re-samples a VDB volume primitive into a new orientation and/or voxel size."""
+
+[Include:volume_types]
+
+NOTE:
+    This node does not filter the results.
+    If you change the resolution you may get aliasing artifacts.
+
+@parameters
+
+Group:
+    The name(s) of the VDB volume primitives in the input to be re-sampled.
+    See [specifying volumes|/model/volumes#group].
+
+[Include:vdbfrompolygons#group]
+
+Interpolation Order:
+    How to interpolate positions.
+
+    Nearest neighbor:
+        Choose the value from the nearest voxel.
+        This is fast but can cause aliasing artifacts.
+
+    Tri-linear:
+        Matches what [Volume Mix|Node:sop/volumemix] and [Vex:volumesample] do.
+
+    Tri-quadratic:
+        Smoother than tri-linear, but slower.
+
+Define Transform:
+    How to generate the new VDB's transform.
+
+    Explicitly:
+        Use the values in the transform parameters below.
+
+    To Match Reference VDB:
+        Use the transform and voxel size from a VDB in this node's second input.
+        The result is a copy of the first input, aligned to the second input.
+
+    Using Voxel Size Only:
+        Keep the transform of the input VDB, only changing the voxel size.
+        This is useful for increasing or decreasing the resolution.
+
+        This will result in an aliased grid since no filtering is done.
+
+    Using Voxel Scale Only:
+	Same as "Using Voxel Size Only" except that the new voxel size is
+	specified as a scale factor.
+
+Transform Order:
+    When __Define transform__ is "Explicitly", the order of operations for the new transform.
+
+Rotate Order:
+    When __Define transform__ is "Explicitly", the order of rotations for the new transform.
+
+Translate:
+    When __Define transform__ is "Explicitly", the position for the new transform.
+
+Rotate:
+    When __Define transform__ is "Explicitly", the rotation for the new transform.
+
+Scale:
+    When __Define transform__ is "Explicitly", the scale for the new transform.
+
+Pivot:
+    When __Define transform__ is "Explicitly", the pivot point for the new transform.
+
+Voxel Size:
+    The size of voxels in the new VDB. Larger voxels correspond to lower resolution.
+
+    NOTE:
+        This parameter is only visible when __Define transform__ is __Using voxel size only__.
+
+Voxel Scale:
+    The amount by which to scale the voxel size in the new VDB. Larger voxels correspond to lower resolution.
+
+    NOTE:
+        This parameter is only visible when __Define transform__ is __Using voxel scale only__.
+
+Transform Vectors:
+    When __Define transform__ is "Explicitly", apply the transform to the voxel
+    values of vector-valued VDBs according to its Vector Type.
+
+Rebuild SDF:
+    Transforming (especially scaling) a SDF might invalidate signed distances,
+    necessitating its reconstruction.  This option affects only SDF volumes,
+    and it should almost always be enabled for those cases.
+
+Prune Tolerance:
+    Remove voxels within this distance of the VDB primitive's "background" (empty) value.
+    This is necessary since the resampling can create active but "empty" voxels.
+
+    In general, you should leave this option on.
+    Expert users may want to turn this off based on very specific situations.
+    For example, if you know that pruning empty voxels is a waste of time since a later operation will reactivate many of them.
+
+@related
+
+- [Node:sop/DW_OpenVDBCombine]
+- [Node:sop/xform]
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

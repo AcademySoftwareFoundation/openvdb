@@ -1,0 +1,49 @@
+
+#type:     node
+#context:  sop
+#internal: DW_OpenVDBScatter
+#icon:     COMMON/openvdb
+
+= OpenVDB Scatter =
+
+"""Scatter points on a VDB grid."""
+
+The OpenVDB Scatter SOP can scatter points on a VDB grid, either by fixed count or by global or local point density.
+
+@parameters
+
+Group:
+    #id: group
+
+    Specify a subset of the input VDB grids to use for scattering.
+
+Keep Input VDB Grids:
+    The output will contain the input VDB grids.
+
+Scatter Group:
+    If enabled, add scattered points to the group with the given name.
+
+Random Seed:
+    Specify the random number seed.
+
+Spread:
+    Defines how far each point may be displaced from the center of its voxel or tile. A value of zero means that the point is placed exactly at the center. A value of one means that the point can be placed randomly anywhere inside the voxel or tile.
+
+Mode:
+    Specify how many points to scatter. Point Total: specify a fixed, total point count, Point Density: specify the number of points per unit volume, Points Per Voxel: specify the number of points per voxel.
+
+Count:
+    Specify the number of points to scatter. If mode is points-per-voxel, this will be the number of points in each voxel of the input VDB.
+
+Density:
+    Specify the number of points per unit volume.
+
+Scatter points inside level set grids:
+    If enabled, scatter points in the interior region of a level set (instead of the narrow band region used by default).
+
+Verbose:
+    Prints the sequence of operations to the terminal.
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
