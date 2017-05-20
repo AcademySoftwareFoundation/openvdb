@@ -151,8 +151,9 @@ ifeq (yes,$(strip $(verbose)))
     HCUSTOM_FLAGS += -e
 endif
 # Extra flags to be passed through hcustom to the compiler or linker
+# libHoudiniAPPS3 must be linked against for GR plug-ins
 HCUSTOM_EXTRA_CFLAGS := -DIGNORE_HDK_DEPRECATIONS
-HCUSTOM_EXTRA_LDFLAGS :=
+HCUSTOM_EXTRA_LDFLAGS := -lHoudiniAPPS3
 
 ifeq (yes,$(strip $(debug)))
     OPTIMIZE := -g
