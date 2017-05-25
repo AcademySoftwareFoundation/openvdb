@@ -57,9 +57,6 @@
 #include <UT/UT_Version.h>
 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/random.hpp>
-#include <boost/generator_iterator.hpp>
-#include <boost/random/uniform_real.hpp>
 #include <boost/math/constants/constants.hpp>
 
 #include <iostream>
@@ -308,10 +305,8 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
             return error();
         }
 
-
         std::string warningStr;
-        boost::shared_ptr<GU_Detail> geoPtr =
-            hvdb::validateGeometry(*cutterGeo, warningStr, &boss);
+        auto geoPtr = hvdb::convertGeometry(*cutterGeo, warningStr, &boss);
 
         if (geoPtr) {
             cutterGeo = geoPtr.get();
@@ -433,7 +428,7 @@ SOP_OpenVDB_Fracture::process(
 
     const bool randomizeRotation = bool(evalInt("randomizerotation", 0, time));
     const bool cutterOverlap = bool(evalInt("cutteroverlap", 0, time));
-    const int visualization = evalInt("visualizepieces", 0, time);
+    const exint visualization = evalInt("visualizepieces", 0, time);
     const bool segmentFragments = bool(evalInt("segmentfragments", 0, time));
 
     using ValueType = typename GridType::ValueType;
@@ -465,9 +460,9 @@ SOP_OpenVDB_Fracture::process(
         // attributes, we need to create an instance matrix.
         if (randomizeRotation || instanceMatrix.hasAnyAttribs()) {
             instanceRotations.resize(instancePoints.size());
-            using RandGen = boost::mt19937;
+            using RandGen = std::mt19937;
             RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
-            boost::uniform_01<RandGen, float> uniform01(rng);
+            std::uniform_real_distribution<float> uniform01;
             const float two_pi = 2.0f * boost::math::constants::pi<float>();
             UT_DMatrix4 xform;
             UT_Vector3 trans;
@@ -481,11 +476,11 @@ SOP_OpenVDB_Fracture::process(
                     // Generate uniform random rotations by picking random
                     // points in the unit cube and forming the unit quaternion.
 
-                    const float u  = uniform01();
+                    const float u  = uniform01(rng);
                     const float c1 = std::sqrt(1-u);
                     const float c2 = std::sqrt(u);
-                    const float s1 = two_pi * uniform01();
-                    const float s2 = two_pi * uniform01();
+                    const float s1 = two_pi * uniform01(rng);
+                    const float s2 = two_pi * uniform01(rng);
 
                     UT_Quaternion  orient(c1 * std::sin(s1), c1 * std::cos(s1),
                                           c2 * std::sin(s2), c2 * std::cos(s2));
@@ -553,17 +548,17 @@ SOP_OpenVDB_Fracture::process(
 
             // Generate uniform random rotations by picking random points
             // in the unit cube and forming the unit quaternion.
-            using RandGen = boost::mt19937;
+            using RandGen = std::mt19937;
             RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
-            boost::uniform_01<RandGen, float> uniform01(rng);
+            std::uniform_real_distribution<float> uniform01;
             const float two_pi = 2.0 * boost::math::constants::pi<float>();
             for (size_t n = 0, N = instanceRotations.size(); n < N; ++n) {
 
-                const float u  = uniform01();
+                const float u  = uniform01(rng);
                 const float c1 = std::sqrt(1-u);
                 const float c2 = std::sqrt(u);
-                const float s1 = two_pi * uniform01();
-                const float s2 = two_pi * uniform01();
+                const float s1 = two_pi * uniform01(rng);
+                const float s2 = two_pi * uniform01(rng);
 
                 instanceRotations[n][0] = c1 * std::sin(s1);
                 instanceRotations[n][1] = c1 * std::cos(s1);
@@ -747,8 +742,6 @@ SOP_OpenVDB_Fracture::process(
 
                 openvdb::Vec4I prim;
                 using Vec4IValueType = openvdb::Vec4I::ValueType;
-                unsigned int vtx;
-                GA_Size vtxn;
 
                 for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
                     for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
@@ -757,18 +750,24 @@ SOP_OpenVDB_Fracture::process(
                                 static_cast<int>(cutterGeo->primitiveIndex(i))))
                             {
                                 const GA_Primitive* primRef = cutterGeo->getPrimitiveList().get(i);
-                                vtxn = primRef->getVertexCount();
+                                const GA_Size vtxn = primRef->getVertexCount();
 
-                                if (primRef->getTypeId() == GEO_PRIMPOLY &&
+                                if ((primRef->getTypeId() == GEO_PRIMPOLY) &&
                                     (3 == vtxn || 4 == vtxn))
                                 {
+#if UT_MAJOR_VERSION_INT >= 16
+                                    for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
+                                        prim[int(vtx)] = static_cast<Vec4IValueType>(
+                                            cutterGeo->pointIndex(primRef->getPointOffset(vtx)));
+                                    }
+#else
                                     GA_Primitive::const_iterator it;
-                                    for (vtx = 0, primRef->beginVertex(it);
-                                        !it.atEnd(); ++it, ++vtx)
-                                    {
+                                    primRef->beginVertex(it);
+                                    for (unsigned int vtx = 0; !it.atEnd(); ++it, ++vtx) {
                                         prim[vtx] = static_cast<Vec4IValueType>(
                                             cutterGeo->pointIndex(it.getPointOffset()));
                                     }
+#endif
 
                                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
 
@@ -837,10 +836,6 @@ SOP_OpenVDB_Fracture::process(
 
     piececount.entries(gdp->getNumPrimitiveOffsets());
     totalpiececount.entries(gdp->getNumPrimitiveOffsets());
-
-    boost::mt19937 rng(1);
-    boost::uniform_real<float> range(0.3f, 0.8f);
-    boost::variate_generator<boost::mt19937, boost::uniform_real<float> > randNr(rng, range);
 
     GU_ConvertParms parms;
     parms.preserveGroups = true;

@@ -45,11 +45,12 @@
 #include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_String.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/regex.hpp>
+#include <functional>
+#include <memory>
 #include <set>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace hvdb = openvdb_houdini;
@@ -336,7 +337,7 @@ public:
     }
 
 private:
-    boost::shared_ptr<const ScalarTreeT> mDummyTree;
+    std::shared_ptr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     UT_Interrupt* mInterrupt;
 }; // MergeActiveOp
@@ -419,7 +420,7 @@ struct MergeInactiveOp
     }
 
 private:
-    boost::shared_ptr<const ScalarTreeT> mDummyTree;
+    std::shared_ptr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     mutable VectorAccessor mVecAcc;
     UT_Interrupt* mInterrupt;
@@ -432,7 +433,7 @@ private:
 class ScalarGridMerger
 {
 public:
-    using WarnFunc = boost::function<void (const char*)>;
+    using WarnFunc = std::function<void (const char*)>;
 
     ScalarGridMerger(
         const hvdb::Grid* x, const hvdb::Grid* y, const hvdb::Grid* z,
@@ -609,7 +610,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
 
         openvdb::VecType vecType = openvdb::VEC_INVARIANT;
         {
-            const int vtype = evalInt("vectype", 0, time);
+            const int vtype = static_cast<int>(evalInt("vectype", 0, time));
             if (vtype >= 0 && vtype < openvdb::NUM_VEC_TYPES) {
                 vecType = static_cast<openvdb::VecType>(vtype);
             }
@@ -689,7 +690,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             // Merge the input grids into an output grid.
             // This does not support a partial set so we quit early in that case.
             ScalarGridMerger op(xGrid, yGrid, zGrid, outGridName, copyInactiveValues,
-                boost::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage, this, _1));
+                std::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage,this,std::placeholders::_1));
             UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {

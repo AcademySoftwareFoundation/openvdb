@@ -45,8 +45,10 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <boost/math/special_functions/fpclassify.hpp> // for isfinite()
+#include <cmath> // for std::isfinite()
+#include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 
 namespace hvdb = openvdb_houdini;
@@ -519,9 +521,10 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
 
         const bool pairs = evalInt("pairs", /*idx=*/0, getTime());
         const bool flatten = evalInt("flatten", /*idx=*/0, getTime());
-        const Operation op = asOp(evalInt("operation", 0, getTime()));
+        const Operation op = asOp(static_cast<int>(evalInt("operation", 0, getTime())));
         const bool needA = needAGrid(op), needB = needBGrid(op);
-        const ResampleMode resample = asResampleMode(evalInt("resample", 0, getTime()));
+        const ResampleMode resample =
+            asResampleMode(static_cast<int>(evalInt("resample", 0, getTime())));
 
         GU_Detail* aGdp = gdp;
         const GU_Detail* bGdp = inputGeo(1, context);
@@ -747,7 +750,7 @@ struct ApproxEq<openvdb::math::Vec4<T> >
 };
 
 
-template<typename T> inline bool isFinite(const T& val) { return boost::math::isfinite(val); }
+template<typename T> inline bool isFinite(const T& val) { return std::isfinite(val); }
 inline bool isFinite(bool) { return true; }
 
 } // unnamed namespace
@@ -861,7 +864,8 @@ struct SOP_OpenVDB_Combine::CombineOp
             needA = self->needAGrid(op),
             needB = self->needBGrid(op),
             needBoth = needA && needB;
-        const int samplingOrder = self->evalInt("resampleinterp", 0, self->getTime());
+        const int samplingOrder = static_cast<int>(
+            self->evalInt("resampleinterp", 0, self->getTime()));
 
         // One of RESAMPLE_A, RESAMPLE_B or RESAMPLE_OFF, specifying whether
         // grid A, grid B or neither grid was resampled

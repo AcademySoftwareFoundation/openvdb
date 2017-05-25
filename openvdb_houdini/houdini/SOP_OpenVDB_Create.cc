@@ -42,9 +42,10 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_WorkArgs.h>
 #include <OBJ/OBJ_Camera.h>
-
-#include <sstream>
+#include <cmath>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 
 namespace hvdb = openvdb_houdini;
@@ -593,12 +594,12 @@ SOP_OpenVDB_Create::updateParmsFlags()
     bool changed = false;
     UT_String tmpStr;
 
-    const int transformParm = evalInt("transform", 0, 0);
-    const bool linear = transformParm == 0;
-    const bool frustum = transformParm == 1;
-    const bool matching = transformParm == 2;
+    const auto transformParm = evalInt("transform", 0, 0);
+    const bool linear = (transformParm == 0);
+    const bool frustum = (transformParm == 1);
+    const bool matching = (transformParm == 2);
 
-    for (int i = 1, N = evalInt("gridList", 0, 0); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("gridList", 0, 0)); i <= N; ++i) {
 
         evalStringInst("gridClass#", &i, tmpStr, 0, 0);
         openvdb::GridClass gridClass = openvdb::GridBase::stringToGridClass(tmpStr.toStdString());
@@ -767,8 +768,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
         }
 
         // Get reference VDB, if exists
-        const int transformParm = evalInt("transform", 0, time);
-        const bool matchTransfom = transformParm == 2;
+        const bool matchTransfom = (evalInt("transform", 0, time) == 2);
         const GU_PrimVDB* refVdb = (matchTransfom ? getReferenceVdb(context) : nullptr);
 
         // Create a shared transform
@@ -783,7 +783,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
         // Create the grids
         UT_String gridNameStr, tmpStr;
 
-        for (int i = 1, N = evalInt("gridList", 0, 0); i <= N; ++i) {
+        for (int i = 1, N = static_cast<int>(evalInt("gridList", 0, 0)); i <= N; ++i) {
 
             evalStringInst("gridName#", &i, gridNameStr, 0, time);
 
@@ -814,63 +814,66 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                         background = float(evalFloatInst("bgFloat#", &i, 0, time));
                     }
 
-                    createNewGrid<cvdb::FloatGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::FloatGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_DOUBLE:
                 {
                     double background = double(evalFloatInst("bgFloat#", &i, 0, time));
-                    createNewGrid<cvdb::DoubleGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::DoubleGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_INT:
                 {
-                    int background = evalIntInst("bgInt#", &i, 0, time);
-                    createNewGrid<cvdb::Int32Grid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    int background = static_cast<int>(evalIntInst("bgInt#", &i, 0, time));
+                    createNewGrid<cvdb::Int32Grid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_BOOL:
                 {
                     bool background = evalIntInst("bgBool#", &i, 0, time);
-                    createNewGrid<cvdb::BoolGrid>(gridNameStr, background,
-                                                  transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::BoolGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_VEC3S:
                 {
-                    cvdb::Vec3f background(float(evalFloatInst("bgVec3f#", &i, 0, time)),
-                                           float(evalFloatInst("bgVec3f#", &i, 1, time)),
-                                           float(evalFloatInst("bgVec3f#", &i, 2, time)));
+                    cvdb::Vec3f background(
+                        float(evalFloatInst("bgVec3f#", &i, 0, time)),
+                        float(evalFloatInst("bgVec3f#", &i, 1, time)),
+                        float(evalFloatInst("bgVec3f#", &i, 2, time)));
 
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
-                    createNewGrid<cvdb::Vec3SGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    createNewGrid<cvdb::Vec3SGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3D:
                 {
-                    cvdb::Vec3d background(double(evalFloatInst("bgVec3f#", &i, 0, time)),
-                                           double(evalFloatInst("bgVec3f#", &i, 1, time)),
-                                           double(evalFloatInst("bgVec3f#", &i, 2, time)));
+                    cvdb::Vec3d background(
+                        double(evalFloatInst("bgVec3f#", &i, 0, time)),
+                        double(evalFloatInst("bgVec3f#", &i, 1, time)),
+                        double(evalFloatInst("bgVec3f#", &i, 2, time)));
 
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
-                    createNewGrid<cvdb::Vec3DGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    createNewGrid<cvdb::Vec3DGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3I:
                 {
-                    cvdb::Vec3i background(evalIntInst("bgVec3i#", &i, 0, time),
-                                           evalIntInst("bgVec3i#", &i, 1, time),
-                                           evalIntInst("bgVec3i#", &i, 2, time));
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
-                    createNewGrid<cvdb::Vec3IGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    cvdb::Vec3i background(
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 0, time)),
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 1, time)),
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 2, time)));
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
+                    createNewGrid<cvdb::Vec3IGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
             } // eType switch
@@ -892,9 +895,9 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
         const GU_PrimVDB* refVdb)
 {
     fpreal time = context.getTime();
-    const int transformParm = evalInt("transform", 0, time);
-    const bool linear = transformParm == 0;
-    const bool frustum = transformParm == 1;
+    const auto transformParm = evalInt("transform", 0, time);
+    const bool linear = (transformParm == 0);
+    const bool frustum = (transformParm == 1);
 
     if (frustum) { // nonlinear frustum transform
 
@@ -926,7 +929,7 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
             nearPlane = static_cast<float>(evalFloat("nearPlane", 0, time)),
             farPlane = static_cast<float>(evalFloat("farPlane", 0, time)),
             voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
-        const int voxelCount = evalInt("voxelCount", 0, time);
+        const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
 
         transform = hvdb::frustumTransformFromCamera(*this, context, *cam,
             offset, nearPlane, farPlane, voxelDepthSize, voxelCount);

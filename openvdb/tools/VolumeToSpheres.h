@@ -671,7 +671,8 @@ fillWithSpheres(
     using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
     using Int16TreeT = typename TreeT::template ValueConverter<Int16>::Type;
 
-    using RandGen = boost::mt11213b;
+    using RandGen = std::mersenne_twister_engine<uint32_t, 32, 351, 175, 19,
+        0xccab8ee7, 11, 0xffffffff, 7, 0x31b6ab00, 15, 0xffe50000, 17, 1812433253>; // mt11213b
     RandGen mtRand(/*seed=*/0);
 
     const TreeT& tree = grid.tree();

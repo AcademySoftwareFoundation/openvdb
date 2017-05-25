@@ -283,9 +283,9 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         const bool worldUnits = evalInt("worldunits", 0, time);
 
-        const int sphereCount = evalInt("spheres", 0, time);
+        const int sphereCount = static_cast<int>(evalInt("spheres", 0, time));
         const bool overlapping = evalInt("overlapping", 0, time);
-        const int scatter = evalInt("scatter", 0, time);
+        const int scatter = static_cast<int>(evalInt("scatter", 0, time));
         const bool preserve = evalInt("preserve", 0, time);
 
         const bool addID = evalInt("doid", 0, time) != 0;
@@ -307,7 +307,8 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         if (addPScale) {
             GA_RWAttributeRef aRef = gdp->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
             if (!aRef.isValid()) {
-                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
+                aRef = gdp->addFloatTuple(
+                    GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
             }
             pscaleAttr = aRef.getAttribute();
             if(!pscaleAttr.isValid()) {

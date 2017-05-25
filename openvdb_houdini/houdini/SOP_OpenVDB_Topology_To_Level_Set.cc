@@ -48,6 +48,9 @@
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 
+#include <stdexcept>
+#include <string>
+
 
 namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
@@ -282,11 +285,11 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
         Converter converter(*gdp, boss);
         converter.worldSpaceUnits = evalInt("worldSpaceUnits", 0, time) != 0;
         converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
-        converter.bandWidthVoxels = evalInt("bandWidth", 0, time);
-        converter.closingWidth = evalInt("closingwidth", 0, time);
-        converter.dilation = evalInt("dilation", 0, time);
-        converter.smoothingSteps = evalInt("smoothingsteps", 0, time);
-        converter.outputName = evalInt("outputName", 0, time);
+        converter.bandWidthVoxels = static_cast<int>(evalInt("bandWidth", 0, time));
+        converter.closingWidth = static_cast<int>(evalInt("closingwidth", 0, time));
+        converter.dilation = static_cast<int>(evalInt("dilation", 0, time));
+        converter.smoothingSteps = static_cast<int>(evalInt("smoothingsteps", 0, time));
+        converter.outputName = static_cast<int>(evalInt("outputName", 0, time));
         converter.customName = customName.toStdString();
 
         // Process VDB primitives

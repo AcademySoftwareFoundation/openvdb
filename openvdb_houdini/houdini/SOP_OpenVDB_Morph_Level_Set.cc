@@ -39,6 +39,8 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
 #include <boost/algorithm/string/join.hpp>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -454,7 +456,7 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = evalInt("normSteps", 0, now);
+    parms.mNormCount = static_cast<int>(evalInt("normSteps", 0, now));
 
     const GU_Detail* targetGeo = inputGeo(1);
 

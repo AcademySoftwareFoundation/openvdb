@@ -64,6 +64,15 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <SYS/SYS_Types.h> // for int32, float32, etc
 
+#include <algorithm>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <utility> // for std::pair
+#include <vector>
+
 using namespace openvdb;
 using namespace openvdb::points;
 using namespace openvdb::math;
@@ -1121,7 +1130,7 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
 
     const bool toVdbPoints = evalInt("conversion", 0, 0) == 0;
     const bool convertAll = evalInt("mode", 0, 0) == 0;
-    const int transform = evalInt("transform", 0, 0);
+    const auto transform = evalInt("transform", 0, 0);
 
     changed |= enableParm("group", !toVdbPoints);
     changed |= setVisibleState("group", !toVdbPoints);
@@ -1270,7 +1279,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             transform = refPrim->getGrid().transform().copy();
         }
 
-        const int transformMode = evalInt("transform", 0, time);
+        const auto transformMode = evalInt("transform", 0, time);
 
         math::Mat4d matrix(math::Mat4d::identity());
 
@@ -1286,7 +1295,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         if (transformMode == TRANSFORM_TARGET_POINTS) {
             using HoudiniPositionAttribute = hvdb::HoudiniReadAttribute<openvdb::Vec3R>;
 
-            const int pointsPerVoxel(evalInt("pointspervoxel", 0, time));
+            const int pointsPerVoxel = static_cast<int>(evalInt("pointspervoxel", 0, time));
             HoudiniPositionAttribute positions(*(ptGeo->getP()));
 
             const float voxelSize =
@@ -1338,7 +1347,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         if (evalInt("mode", 0, time) != 0) {
             // Transfer point attributes.
             if (evalInt("attrList", 0, time) > 0) {
-                for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
+                for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, 0)); i <= N; ++i) {
                     evalStringInst("attribute#", &i, attrName, 0, 0);
                     const Name attributeName = Name(attrName);
 
@@ -1372,7 +1381,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                     const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
-                    int valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
+                    int valueCompression = static_cast<int>(
+                        evalIntInst("valuecompression#", &i, 0, 0));
 
                     // check value compression compatibility with attribute type
 
@@ -1436,8 +1446,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             // point attribute names
             auto iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
-            const int normalCompression = evalInt("normalcompression", 0, time);
-            const int colorCompression = evalInt("colorcompression", 0, time);
+            const auto normalCompression = evalInt("normalcompression", 0, time);
+            const auto colorCompression = evalInt("colorcompression", 0, time);
 
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
@@ -1494,7 +1504,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         // Determine position compression
 
-        const int positionCompression = evalInt("poscompression", 0, time);
+        const int positionCompression = static_cast<int>(evalInt("poscompression", 0, time));
 
         PointDataGrid::Ptr pointDataGrid = createPointDataGrid(
             *detail, positionCompression, attributes, *transform);

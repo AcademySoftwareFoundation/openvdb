@@ -38,6 +38,7 @@
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
 #include <boost/math/constants/constants.hpp>
+#include <stdexcept>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -195,7 +196,7 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
 
         s *= evalFloat("uniformScale", 0, time);
 
-        int flagInverse = evalInt("invert", 0, time);
+        const bool flagInverse = evalInt("invert", 0, time);
 
         const bool xformVec = evalInt("xformvectors", 0, time);
 

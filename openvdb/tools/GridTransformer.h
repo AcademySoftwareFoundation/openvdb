@@ -191,6 +191,9 @@ public:
     GridResampler(): mThreaded(true), mTransformTiles(true) {}
     virtual ~GridResampler() {}
 
+    GridResampler(const GridResampler&) = default;
+    GridResampler& operator=(const GridResampler&) = default;
+
     /// Enable or disable threading.  (Threading is enabled by default.)
     void setThreaded(bool b) { mThreaded = b; }
     /// Return @c true if threading is enabled.
@@ -264,6 +267,9 @@ public:
         const std::string& xformOrder = "tsr",
         const std::string& rotationOrder = "zyx");
     ~GridTransformer() override = default;
+
+    GridTransformer(const GridTransformer&) = default;
+    GridTransformer& operator=(const GridTransformer&) = default;
 
     const Mat4R& getTransform() const { return mTransform; }
 

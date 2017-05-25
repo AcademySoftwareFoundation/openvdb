@@ -42,6 +42,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
 
+#include <boost/integer_traits.hpp>
 #include <boost/scoped_array.hpp>
 
 #include <tbb/blocked_range.h>

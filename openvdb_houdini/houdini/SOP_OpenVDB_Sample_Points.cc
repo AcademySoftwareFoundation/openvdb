@@ -45,6 +45,10 @@
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
+#include <algorithm>
+#include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -67,7 +71,8 @@ protected:
 
 private:
     void sample(OP_Context&);
-    int mVerbose;
+
+    bool mVerbose = false;
 };
 
 
@@ -148,8 +153,6 @@ public:
         mInterrupter(other.mInterrupter)
     {
     }
-
-    ~PointSampler(){}
 
     void sample()
     {
@@ -325,7 +328,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
     const GU_Detail* bGdp = inputGeo(1, context); // where the grids live
 
     // extract UI data
-    mVerbose = evalInt("verbose", 0, time);
+    mVerbose = bool(evalInt("verbose", 0, time));
     const bool threaded = true; /*evalInt("threaded", 0, time);*/
     const GA_Size nPoints = aGdp->getNumPoints();
 

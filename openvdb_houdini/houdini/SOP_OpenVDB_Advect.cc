@@ -48,10 +48,12 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/smart_ptr/scoped_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/join.hpp>
+
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -571,7 +573,7 @@ SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parm
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = evalInt("normSteps", 0, now);
+    parms.mNormCount = static_cast<int>(evalInt("normSteps", 0, now));
 
     const GU_Detail* velGeo = inputGeo(1);
 

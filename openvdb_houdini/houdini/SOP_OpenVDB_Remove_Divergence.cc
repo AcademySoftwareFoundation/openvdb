@@ -53,6 +53,8 @@
 #include <tbb/parallel_for.h>
 
 #include <sstream>
+#include <string>
+#include <vector>
 
 
 namespace hvdb = openvdb_houdini;
@@ -245,8 +247,8 @@ SOP_OpenVDB_Remove_Divergence::updateParmsFlags()
     changed |= enableParm("collidertype", useCollider);
     changed |= enableParm("invertcollider", useCollider);
     changed |= enableParm("collider", useCollider && (colliderTypeStr != "bbox"));
-    changed |= enableParm("iterations", evalInt("useiterations", 0, 0));
-    changed |= enableParm("tolerance", evalInt("usetolerance", 0, 0));
+    changed |= enableParm("iterations", bool(evalInt("useiterations", 0, 0)));
+    changed |= enableParm("tolerance", bool(evalInt("usetolerance", 0, 0)));
     return changed;
 }
 

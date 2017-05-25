@@ -50,7 +50,8 @@
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
 
-#include <iostream>
+#include <algorithm> // for std::max()
+#include <sstream>
 #include <string>
 #include <limits>
 #include <vector>
@@ -677,7 +678,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     int attrClass = POINT_ATTR;
     const GU_Detail* meshGdp = this->getInputLastGeo(0, time);
     if (meshGdp) {
-        for (int i = 1, N = evalInt("attrList", 0, time); i <= N; ++i) {
+        for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
 
             evalStringInst("attribute#", &i, attrStr, 0, time);
             bool isVector = false;
@@ -743,14 +744,11 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
         // Validate geometry
         std::string warningStr;
-        boost::shared_ptr<GU_Detail> geoPtr =
-            hvdb::validateGeometry(*inputGdp, warningStr, &boss);
-
+        auto geoPtr = hvdb::convertGeometry(*inputGdp, warningStr, &boss);
         if (geoPtr) {
             inputGdp = geoPtr.get();
             if (!warningStr.empty()) addWarning(SOP_MESSAGE, warningStr.c_str());
         }
-
 
         //////////
         // Evaluate the UI parameters.
@@ -759,8 +757,6 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         const bool unsignedDistanceFieldConversion = bool(evalInt("unsignedDist", 0, time));
         const bool outputFogVolumeGrid = bool(evalInt("fogVolume", 0, time));
         const bool outputAttributeGrid = bool(evalInt("attrList", 0, time) > 0);
-
-
 
 
         if (!outputDistanceField && !outputFogVolumeGrid && !outputAttributeGrid) {
@@ -869,9 +865,11 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         // Mesh to volume conversion
 
 
-        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+            mesh(pointList, primList);
 
-        int conversionFlags = unsignedDistanceFieldConversion ? openvdb::tools::UNSIGNED_DISTANCE_FIELD : 0;
+        int conversionFlags = unsignedDistanceFieldConversion ?
+            openvdb::tools::UNSIGNED_DISTANCE_FIELD : 0;
 
 
         openvdb::Int32Grid::Ptr primitiveIndexGrid;
@@ -934,7 +932,8 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
                 evalStringInst("attributeGridName#", &closestPrimIndexInstance,
                     gridNameStr, 0, time);
                 if (gridNameStr.length() == 0) gridNameStr = "primitive_list_index";
-                hvdb::createVdbPrimitive(*gdp, primitiveIndexGrid, gridNameStr.toStdString().c_str());
+                hvdb::createVdbPrimitive(
+                    *gdp, primitiveIndexGrid, gridNameStr.toStdString().c_str());
             }
         }
 
@@ -971,7 +970,7 @@ SOP_OpenVDB_From_Polygons::constructGenericAtttributeLists(
     int closestPrimIndexInstance = -1;
 
     // for each selected attribute
-    for (int i = 1, N = evalInt("attrList", 0, time); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
 
         evalStringInst("attribute#", &i, attrStr, 0, time);
 
@@ -1013,7 +1012,7 @@ SOP_OpenVDB_From_Polygons::constructGenericAtttributeLists(
 
         evalStringInst("attributeGridName#", &i, attrStr, 0, time);
         std::string customName = attrStr.toStdString();
-        int vecType = evalIntInst("vecType#", &i, 0, time);
+        int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
 
         const GA_Attribute *attr = attrRef.getAttribute();

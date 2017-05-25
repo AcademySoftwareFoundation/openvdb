@@ -36,6 +36,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -183,11 +184,11 @@ SOP_OpenVDB_Metadata::updateParmsFlags()
     bool changed = false;
     const fpreal time = 0; // No point using CHgetTime as that is unstable.
 
-    changed |= enableParm("class",   evalInt("setclass", 0, time));
-    changed |= enableParm("creator", evalInt("setcreator", 0, time));
-    changed |= enableParm("float16", evalInt("setfloat16", 0, time));
-    changed |= enableParm("world",   evalInt("setworld", 0, time));
-    changed |= enableParm("vectype", evalInt("setvectype", 0, time));
+    changed |= enableParm("class",   bool(evalInt("setclass", 0, time)));
+    changed |= enableParm("creator", bool(evalInt("setcreator", 0, time)));
+    changed |= enableParm("float16", bool(evalInt("setfloat16", 0, time)));
+    changed |= enableParm("world",   bool(evalInt("setworld", 0, time)));
+    changed |= enableParm("vectype", bool(evalInt("setvectype", 0, time)));
 
     return changed;
 }

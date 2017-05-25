@@ -52,6 +52,14 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <PRM/PRM_Parm.h>
 
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility> // for std::pair
+#include <vector>
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -722,8 +730,8 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
 {
     bool changed = false;
 
-    changed |= enableParm("distancevdbname", evalInt("distancevdb", 0, 0));
-    changed |= enableParm("fogvdbname", evalInt("fogvdb", 0, 0));
+    changed |= enableParm("distancevdbname", bool(evalInt("distancevdb", 0, 0)));
+    changed |= enableParm("fogvdbname", bool(evalInt("fogvdb", 0, 0)));
 
     bool useMask = evalInt("maskvdb", 0, 0) == 1;
     changed |= enableParm("boundinglimit", useMask);
@@ -747,7 +755,7 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
     GA_ROAttributeRef attrRef;
     const GU_Detail* ptGeo = this->getInputLastGeo(0, CHgetEvalTime());
     if (ptGeo) {
-        for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
+        for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, 0)); i <= N; ++i) {
 
             evalStringInst("attribute#", &i, attrName, 0, 0);
             bool isVector = false;
@@ -895,9 +903,9 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             const bool doSphereConversion = evalInt("conversion",  0, mTime) == 0;
 
             // Point topology conversion settings
-            int dilation = evalInt("dilation", 0, mTime);
-            int closing = evalInt("closing", 0, mTime);
-            int smoothing = evalInt("smoothing", 0, mTime);
+            int dilation = static_cast<int>(evalInt("dilation", 0, mTime));
+            int closing = static_cast<int>(evalInt("closing", 0, mTime));
+            int smoothing = static_cast<int>(evalInt("smoothing", 0, mTime));
             int bandWidth = int(std::ceil(background / mVoxelSize));
             openvdb::MaskGrid::Ptr pointMaskGrid;
 
@@ -1110,7 +1118,7 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
     int closestPointIndexInstance = -1;
 
     // for each selected attribute
-    for (int i = 1, N = evalInt("attrList", 0, mTime); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, mTime)); i <= N; ++i) {
 
         evalStringInst("attribute#", &i, attrName, 0, mTime);
 
@@ -1135,7 +1143,7 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
         evalStringInst("attributeGridName#", &i, attrName, 0, mTime);
         std::string customName = attrName.toStdString();
 
-        int vecType = evalIntInst("vecType#", &i, 0, mTime);
+        int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, mTime));
 
         const GA_Attribute *attr = attrRef.getAttribute();
         if (!attr) {

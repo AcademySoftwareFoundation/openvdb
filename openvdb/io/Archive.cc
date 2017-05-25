@@ -71,6 +71,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <cerrno> // for errno
 #include <cstdlib> // for getenv()
 #include <cstring> // for std::memcpy()
+#include <ctime> // for std::time()
 #include <iostream>
 #include <map>
 #include <random>
@@ -963,7 +964,7 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
 
     // 6) Generate a new random 16-byte (128-bit) uuid and write it to the stream.
     std::mt19937 ran;
-    ran.seed(std::random_device()());
+    ran.seed(std::mt19937::result_type(std::random_device()() + std::time(nullptr)));
     boost::uuids::basic_random_generator<std::mt19937> gen(&ran);
     mUuid = gen(); // mUuid is mutable
     os << mUuid;

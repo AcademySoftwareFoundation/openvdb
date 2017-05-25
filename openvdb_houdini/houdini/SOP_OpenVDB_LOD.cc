@@ -37,10 +37,10 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
-
 #include <openvdb/tools/MultiResGrid.h>
-
 #include <boost/algorithm/string/join.hpp>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -167,7 +167,7 @@ SOP_OpenVDB_LOD::updateParmsFlags()
 {
     bool changed = false;
 
-    int lodMode = evalInt("lod", 0, 0);
+    const auto lodMode = evalInt("lod", 0, 0);
 
     changed |= enableParm("level", lodMode == 0);
     changed |= enableParm("reuse", lodMode == 0);
@@ -300,7 +300,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
 
         hvdb::Interrupter boss("LOD");
 
-        const int lodMode = evalInt("lod", 0, 0);
+        const auto lodMode = evalInt("lod", 0, 0);
         if (lodMode == 0) {
 
             const bool reuseName = evalInt("reuse", 0, 0) > 0;

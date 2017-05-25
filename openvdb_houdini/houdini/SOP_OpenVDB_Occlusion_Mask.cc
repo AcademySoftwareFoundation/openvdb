@@ -45,6 +45,8 @@
 
 #include <OBJ/OBJ_Camera.h>
 
+#include <cmath> // for std::floor()
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -421,7 +423,7 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
             const float nearPlane = static_cast<float>(cam->getNEAR(time));
             const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
             const float voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
-            const int voxelCount = evalInt("voxelCount", 0, time);
+            const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
 
             mFrustum = hvdb::frustumTransformFromCamera(*this, context, *cam,
                 0, nearPlane, farPlane, voxelDepthSize, voxelCount);
@@ -432,7 +434,8 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
 
 
         ConstructShadow shadowOp(*mFrustum,
-            evalInt("erode", 0, time), evalInt("zoffset", 0, time));
+            static_cast<int>(evalInt("erode", 0, time)),
+            static_cast<int>(evalInt("zoffset", 0, time)));
 
 
         // Get the group of grids to surface.

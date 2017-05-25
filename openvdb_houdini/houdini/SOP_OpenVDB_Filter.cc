@@ -43,6 +43,10 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace hvdb = openvdb_houdini;
@@ -511,10 +515,10 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
     const Operation op = stringToOp(s.toStdString());
 
     FilterParms parms(op);
-    parms.radius = evalInt("radius", 0, now);
+    parms.radius = static_cast<int>(evalInt("radius", 0, now));
     parms.worldRadius = float(evalFloat("worldradius", 0, now));
     parms.useWorldRadius = bool(evalInt("worldunits", 0, now));
-    parms.iterations = evalInt("iterations", 0, now);
+    parms.iterations = static_cast<int>(evalInt("iterations", 0, now));
 #ifndef SESI_OPENVDB
     parms.offset = static_cast<float>(evalFloat("offset", 0, now));
     parms.verbose = bool(evalInt("verbose", 0, now));

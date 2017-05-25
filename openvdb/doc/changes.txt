@@ -14,6 +14,8 @@ New features:
   it operates only on leaf nodes.
 - Added a <TT>vdb_test&nbsp;-f</TT> option that reads a list of tests
   to be run from a text file.
+- Added a view mode indicator to <TT>vdb_view</TT> and enabled display
+  of tree topology and active voxels for point data grids.
 
 @par
 Bug fixes:

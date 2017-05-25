@@ -30,12 +30,13 @@
 
 #include "RenderModules.h"
 
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
-
-#include <math.h>
+#include <cmath> // for std::abs(), std::fabs(), std::floor()
+#include <type_traits> // for std::is_const
 
 
 namespace openvdb_viewer {
@@ -73,7 +74,7 @@ inline void
 doProcessTypedGrid(GridPtrType grid, OpType& op)
 {
     GridProcessor<GridType, OpType,
-        boost::is_const<typename GridPtrType::element_type>::value>::call(op, grid);
+        std::is_const<typename GridPtrType::element_type>::value>::call(op, grid);
 }
 
 
@@ -107,6 +108,9 @@ processTypedGrid(GridPtrType grid, OpType& op)
     else if (grid->template isType<Vec3IGrid>())  doProcessTypedGrid<Vec3IGrid>(grid, op);
     else if (grid->template isType<Vec3SGrid>())  doProcessTypedGrid<Vec3SGrid>(grid, op);
     else if (grid->template isType<Vec3DGrid>())  doProcessTypedGrid<Vec3DGrid>(grid, op);
+    else if (grid->template isType<points::PointDataGrid>()) {
+        doProcessTypedGrid<points::PointDataGrid>(grid, op);
+    }
     else return false;
     return true;
 }
@@ -115,18 +119,6 @@ processTypedGrid(GridPtrType grid, OpType& op)
 /// @brief Utility function that, given a generic grid pointer, calls
 /// a functor on the fully-resolved grid, provided that the grid's
 /// voxel values are scalars
-///
-/// Usage:
-/// @code
-/// struct PruneOp {
-///     template<typename GridT>
-///     void operator()(typename GridT::Ptr grid) const { grid->tree()->prune(); }
-/// };
-///
-/// processTypedScalarGrid(myGridPtr, PruneOp());
-/// @endcode
-///
-/// @return @c false if the grid type is unknown or non-scalar.
 template<typename GridPtrType, typename OpType>
 bool
 processTypedScalarGrid(GridPtrType grid, OpType& op)
@@ -143,6 +135,23 @@ processTypedScalarGrid(GridPtrType grid, OpType& op)
 
 /// @brief Utility function that, given a generic grid pointer, calls
 /// a functor on the fully-resolved grid, provided that the grid's
+/// voxel values are scalars or PointIndex objects
+template<typename GridPtrType, typename OpType>
+bool
+processTypedScalarOrPointDataGrid(GridPtrType grid, OpType& op)
+{
+    using namespace openvdb;
+    if (processTypedScalarGrid(grid, op)) return true;
+    if (grid->template isType<points::PointDataGrid>()) {
+        doProcessTypedGrid<points::PointDataGrid>(grid, op);
+        return true;
+    }
+    return false;
+}
+
+
+/// @brief Utility function that, given a generic grid pointer, calls
+/// a functor on the fully-resolved grid, provided that the grid's
 /// voxel values are vectors
 template<typename GridPtrType, typename OpType>
 bool
@@ -150,7 +159,7 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 {
     using namespace openvdb;
     if (grid->template isType<Vec3IGrid>())       doProcessTypedGrid<Vec3IGrid>(grid, op);
-    else if (grid->template isType<Vec3SGrid>()) doProcessTypedGrid<Vec3SGrid>(grid, op);
+    else if (grid->template isType<Vec3SGrid>())  doProcessTypedGrid<Vec3SGrid>(grid, op);
     else if (grid->template isType<Vec3DGrid>())  doProcessTypedGrid<Vec3DGrid>(grid, op);
     else return false;
     return true;
@@ -160,8 +169,8 @@ template<class TreeType>
 class MinMaxVoxel
 {
 public:
-    typedef openvdb::tree::LeafManager<TreeType> LeafArray;
-    typedef typename TreeType::ValueType ValueType;
+    using LeafArray = openvdb::tree::LeafManager<TreeType>;
+    using ValueType = typename TreeType::ValueType;
 
     // LeafArray = openvdb::tree::LeafManager<TreeType> leafs(myTree)
     MinMaxVoxel(LeafArray&);
@@ -531,13 +540,13 @@ ViewportModule::render()
     float step = 0.125;
     for (float x = -1; x < 1.125; x+=step) {
 
-        if (fabs(x) == 0.5 || fabs(x) == 0.0) {
+        if (std::fabs(x) == 0.5 || std::fabs(x) == 0.0) {
             glLineWidth(1.5);
         } else {
             glLineWidth(1.0);
         }
 
-        glBegin( GL_LINES );
+        glBegin(GL_LINES);
         glVertex3f(x, 0, 1);
         glVertex3f(x, 0, -1);
         glVertex3f(1, 0, x);
@@ -821,7 +830,7 @@ template<typename TreeType>
 class PointGenerator
 {
 public:
-    typedef openvdb::tree::LeafManager<TreeType> LeafManagerType;
+    using LeafManagerType = openvdb::tree::LeafManager<TreeType>;
 
     PointGenerator(
         std::vector<GLfloat>& points,
@@ -849,7 +858,7 @@ public:
     {
         using openvdb::Index64;
 
-        typedef typename TreeType::LeafNodeType::ValueOnCIter ValueOnCIter;
+        using ValueOnCIter = typename TreeType::LeafNodeType::ValueOnCIter;
 
         openvdb::Vec3d pos;
         size_t index = 0;
@@ -919,10 +928,48 @@ private:
 
 
 template<typename GridType>
+class NormalGenerator
+{
+public:
+    using AccessorType = typename GridType::ConstAccessor;
+    using Grad = openvdb::math::ISGradient<openvdb::math::CD_2ND>;
+
+    NormalGenerator(const AccessorType& acc): mAccessor(acc) {}
+
+    NormalGenerator(const NormalGenerator&) = delete;
+    NormalGenerator& operator=(const NormalGenerator&) = delete;
+
+    void operator()(const openvdb::Coord& ijk, openvdb::Vec3d& normal)
+    {
+        openvdb::Vec3d v{Grad::result(mAccessor, ijk)};
+        const double length = v.length();
+        if (length > 1.0e-7) {
+            v *= 1.0 / length;
+            normal = v;
+        }
+    }
+
+private:
+    const AccessorType& mAccessor;
+}; // class NormalGenerator
+
+// Specialization for PointDataGrids, for which normals are not generated
+template<>
+class NormalGenerator<openvdb::points::PointDataGrid>
+{
+public:
+    NormalGenerator(const openvdb::points::PointDataGrid::ConstAccessor&) {}
+    NormalGenerator(const NormalGenerator&) = delete;
+    NormalGenerator& operator=(const NormalGenerator&) = delete;
+    void operator()(const openvdb::Coord&, openvdb::Vec3d&) {}
+};
+
+
+template<typename GridType>
 class PointAttributeGenerator
 {
 public:
-    typedef typename GridType::ValueType ValueType;
+    using ValueType = typename GridType::ValueType;
 
     PointAttributeGenerator(
         std::vector<GLfloat>& points,
@@ -934,7 +981,7 @@ public:
         bool isLevelSet = false)
         : mPoints(points)
         , mColors(colors)
-        , mNormals(NULL)
+        , mNormals(nullptr)
         , mGrid(grid)
         , mAccessor(grid.tree())
         , mMinValue(minValue)
@@ -977,9 +1024,10 @@ public:
     inline void operator()(const tbb::blocked_range<size_t>& range) const
     {
         openvdb::Coord ijk;
-        openvdb::Vec3d pos, tmpNormal, normal(0.0, -1.0, 0.0);
+        openvdb::Vec3d pos, normal(0.0, -1.0, 0.0);
         openvdb::Vec3s color(0.9f, 0.3f, 0.3f);
         float w = 0.0;
+        NormalGenerator<GridType> computeNormal{mAccessor};
 
         size_t e1, e2, e3, voxelNum = 0;
         for (size_t n = range.begin(); n < range.end(); ++n) {
@@ -1019,19 +1067,8 @@ public:
             mColors[e3] = color[2];
 
             if (mNormals) {
-
-                if ((voxelNum % 2) == 0) {
-                    tmpNormal = openvdb::Vec3d(openvdb::math::ISGradient<
-                        openvdb::math::CD_2ND>::result(mAccessor, ijk));
-
-                    double length = tmpNormal.length();
-                    if (length > 1.0e-7) {
-                        tmpNormal *= 1.0 / length;
-                        normal = tmpNormal;
-                    }
-                }
+                if ((voxelNum % 2) == 0) { computeNormal(ijk, normal); }
                 ++voxelNum;
-
                 (*mNormals)[e1] = static_cast<GLfloat>(normal[0]);
                 (*mNormals)[e2] = static_cast<GLfloat>(normal[1]);
                 (*mNormals)[e3] = static_cast<GLfloat>(normal[2]);
@@ -1095,9 +1132,9 @@ public:
 
         //////////
 
-        typedef typename GridType::ValueType ValueType;
-        typedef typename GridType::TreeType TreeType;
-        typedef typename TreeType::template ValueConverter<bool>::Type BoolTreeT;
+        using ValueType = typename GridType::ValueType;
+        using TreeType = typename GridType::TreeType;
+        using BoolTreeT = typename TreeType::template ValueConverter<bool>::Type;
 
         const TreeType& tree = grid->tree();
         const bool isLevelSetGrid = grid->getGridClass() == openvdb::GRID_LEVEL_SET;
@@ -1253,9 +1290,9 @@ public:
     {
         using openvdb::Index64;
 
-        typedef typename GridType::ValueType ValueType;
-        typedef typename GridType::TreeType TreeType;
-        typedef typename TreeType::template ValueConverter<bool>::Type BoolTreeT;
+        using ValueType = typename GridType::ValueType;
+        using TreeType = typename GridType::TreeType;
+        using BoolTreeT = typename TreeType::template ValueConverter<bool>::Type;
 
 
         const TreeType& tree = grid->tree();
@@ -1391,7 +1428,7 @@ ActiveValueModule::init()
 
     ActiveScalarValuesOp drawScalars(mInteriorBuffer, mSurfaceBuffer);
 
-    if (!util::processTypedScalarGrid(mGrid, drawScalars)) {
+    if (!util::processTypedScalarOrPointDataGrid(mGrid, drawScalars)) {
 
         ActiveVectorValuesOp drawVectors(mVectorBuffer);
 

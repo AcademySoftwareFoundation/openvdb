@@ -37,8 +37,10 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <boost/utility/enable_if.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 
 namespace hutil = houdini_utils;
 namespace hvdb = openvdb_houdini;
@@ -266,7 +268,7 @@ inline const openvdb::Vec3R& convertValue(const openvdb::Vec3R& val) { return va
 
 // Overload for scalar types (discards all but the first vector component)
 template<typename ValueType>
-inline typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
+inline typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     return ValueType(val[0]);
@@ -274,9 +276,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec2 types (not currently used)
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 2,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 2, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -285,9 +286,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec3 types
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 3,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 3, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -296,9 +296,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec4 types (not currently used)
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 4,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 4, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -365,15 +364,19 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
             active = evalInt("active", 0, t),
             sparse = evalInt("sparse", 0, t);
 
-        boost::scoped_ptr<const FillOp> fillOp;
+        std::unique_ptr<const FillOp> fillOp;
         switch (getMode(t)) {
             case MODE_INDEX:
             {
                 const openvdb::CoordBBox bbox(
                     openvdb::Coord(
-                        evalInt("min", 0, t), evalInt("min", 1, t), evalInt("min", 2, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 0, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 1, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 2, t))),
                     openvdb::Coord(
-                        evalInt("max", 0, t), evalInt("max", 1, t), evalInt("max", 2, t)));
+                        static_cast<openvdb::Int32>(evalInt("max", 0, t)),
+                        static_cast<openvdb::Int32>(evalInt("max", 1, t)),
+                        static_cast<openvdb::Int32>(evalInt("max", 2, t))));
                 fillOp.reset(new FillOp(bbox, value, active, sparse));
                 break;
             }

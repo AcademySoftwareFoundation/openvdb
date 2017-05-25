@@ -43,9 +43,13 @@
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>
 
-#include <boost/smart_ptr/scoped_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
+
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -391,7 +395,7 @@ public:
         IntegrationType integrator(mVelocityGrid);
 
         // Constrained-advection compiled out if Constrained == false
-        boost::scoped_ptr<ProjectorType> projector(nullptr);
+        std::unique_ptr<ProjectorType> projector(nullptr);
         if (Constrained && mCptGrid != nullptr) {
             projector.reset(new ProjectorType(*mCptGrid, mCptIterations));
         }
@@ -956,7 +960,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
             parms.mVelPrim->getGrid().getGridClass() == openvdb::GRID_STAGGERED;
 
         parms.mTimeStep = static_cast<float>(evalFloat("timeStep", 0, now));
-        parms.mSteps    = evalInt("steps", 0, now);
+        parms.mSteps = static_cast<int>(evalInt("steps", 0, now));
         // The underlying code will accumulate, so to make it substeps
         // we need to divide out.
         parms.mTimeStep /= static_cast<float>(parms.mSteps);
@@ -998,7 +1002,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
             return false;
         }
 
-        parms.mIterations = evalInt("cptIterations", 0, now);
+        parms.mIterations = static_cast<int>(evalInt("cptIterations", 0, now));
     }
 
     return true;

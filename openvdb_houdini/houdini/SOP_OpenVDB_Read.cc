@@ -38,6 +38,8 @@
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -306,7 +308,7 @@ SOP_OpenVDB_Read::updateParmsFlags()
     bool changed = false;
     float t = 0.0;
 
-    changed |= enableParm("group", evalInt("enable_grouping", 0, t));
+    changed |= enableParm("group", bool(evalInt("enable_grouping", 0, t)));
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     const bool delayedLoad = evalInt("delayload", 0, t);

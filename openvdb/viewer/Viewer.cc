@@ -42,6 +42,7 @@
 #include <cmath> // for fabs()
 #include <iomanip> // for std::setprecision()
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <vector>
 #include <limits>
@@ -68,9 +69,9 @@ namespace openvdb_viewer {
 class ViewerImpl
 {
 public:
-    typedef boost::shared_ptr<Camera> CameraPtr;
-    typedef boost::shared_ptr<ClipBox> ClipBoxPtr;
-    typedef boost::shared_ptr<RenderModule> RenderModulePtr;
+    using CameraPtr = std::shared_ptr<Camera>;
+    using ClipBoxPtr = std::shared_ptr<ClipBox>;
+    using RenderModulePtr = std::shared_ptr<RenderModule>;
 
     ViewerImpl();
 
@@ -157,8 +158,8 @@ private:
 
 namespace {
 
-ViewerImpl* sViewer = NULL;
-ThreadManager* sThreadMgr = NULL;
+ViewerImpl* sViewer = nullptr;
+ThreadManager* sThreadMgr = nullptr;
 tbb::mutex sLock;
 
 
@@ -248,9 +249,9 @@ windowRefreshCB()
 Viewer
 init(const std::string& progName, bool background)
 {
-    if (sViewer == NULL) {
+    if (sViewer == nullptr) {
         tbb::mutex::scoped_lock lock(sLock);
-        if (sViewer == NULL) {
+        if (sViewer == nullptr) {
             OPENVDB_START_THREADSAFE_STATIC_WRITE
             sViewer = new ViewerImpl;
             OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
@@ -259,20 +260,20 @@ init(const std::string& progName, bool background)
     sViewer->init(progName);
 
     if (background) {
-        if (sThreadMgr == NULL) {
+        if (sThreadMgr == nullptr) {
             tbb::mutex::scoped_lock lock(sLock);
-            if (sThreadMgr == NULL) {
+            if (sThreadMgr == nullptr) {
                 OPENVDB_START_THREADSAFE_STATIC_WRITE
                 sThreadMgr = new ThreadManager;
                 OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
             }
         }
     } else {
-        if (sThreadMgr != NULL) {
+        if (sThreadMgr != nullptr) {
             tbb::mutex::scoped_lock lock(sLock);
             delete sThreadMgr;
             OPENVDB_START_THREADSAFE_STATIC_WRITE
-            sThreadMgr = NULL;
+            sThreadMgr = nullptr;
             OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
         }
     }
@@ -420,7 +421,7 @@ ThreadManager::doViewTask(void* arg)
     if (ThreadManager* self = static_cast<ThreadManager*>(arg)) {
         self->doView();
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -439,7 +440,7 @@ ViewerImpl::ViewerImpl()
     , mShowInfo(true)
     , mInterrupt(false)
 #if GLFW_VERSION_MAJOR >= 3
-    , mWindow(NULL)
+    , mWindow(nullptr)
 #endif
 {
 }
@@ -488,10 +489,10 @@ ViewerImpl::getVersionString() const
     if (mDidInit) {
         ostr << ", " << "OpenGL: ";
 #if GLFW_VERSION_MAJOR >= 3
-        boost::shared_ptr<GLFWwindow> wPtr;
+        std::shared_ptr<GLFWwindow> wPtr;
         GLFWwindow* w = mWindow;
         if (!w) {
-            wPtr.reset(glfwCreateWindow(100, 100, "", NULL, NULL), &glfwDestroyWindow);
+            wPtr.reset(glfwCreateWindow(100, 100, "", nullptr, nullptr), &glfwDestroyWindow);
             w = wPtr.get();
         }
         if (w) {
@@ -518,7 +519,7 @@ ViewerImpl::getVersionString() const
 bool
 ViewerImpl::open(int width, int height)
 {
-    if (mWindow == NULL) {
+    if (mWindow == nullptr) {
         glfwWindowHint(GLFW_RED_BITS, 8);
         glfwWindowHint(GLFW_GREEN_BITS, 8);
         glfwWindowHint(GLFW_BLUE_BITS, 8);
@@ -527,14 +528,14 @@ ViewerImpl::open(int width, int height)
         glfwWindowHint(GLFW_STENCIL_BITS, 0);
 
         mWindow = glfwCreateWindow(
-            width, height, mProgName.c_str(), /*monitor=*/NULL, /*share=*/NULL);
+            width, height, mProgName.c_str(), /*monitor=*/nullptr, /*share=*/nullptr);
 
         OPENVDB_LOG_DEBUG_RUNTIME("created window " << std::hex << mWindow << std::dec
             << " from thread " << boost::this_thread::get_id());
 
-        if (mWindow != NULL) {
+        if (mWindow != nullptr) {
             // Temporarily make the new window the current context, then create a font.
-            boost::shared_ptr<GLFWwindow> curWindow(
+            std::shared_ptr<GLFWwindow> curWindow(
                 glfwGetCurrentContext(), glfwMakeContextCurrent);
             glfwMakeContextCurrent(mWindow);
             BitmapFont13::initialize();
@@ -542,7 +543,7 @@ ViewerImpl::open(int width, int height)
     }
     mCamera->setWindow(mWindow);
 
-    if (mWindow != NULL) {
+    if (mWindow != nullptr) {
         glfwSetKeyCallback(mWindow, keyCB);
         glfwSetMouseButtonCallback(mWindow, mouseButtonCB);
         glfwSetCursorPosCallback(mWindow, mousePosCB);
@@ -550,7 +551,7 @@ ViewerImpl::open(int width, int height)
         glfwSetWindowSizeCallback(mWindow, windowSizeCB);
         glfwSetWindowRefreshCallback(mWindow, windowRefreshCB);
     }
-    return (mWindow != NULL);
+    return (mWindow != nullptr);
 }
 #else // if GLFW_VERSION_MAJOR <= 2
 bool
@@ -585,7 +586,7 @@ bool
 ViewerImpl::isOpen() const
 {
 #if GLFW_VERSION_MAJOR >= 3
-    return (mWindow != NULL);
+    return (mWindow != nullptr);
 #else
     return glfwGetWindowParam(GLFW_OPENED);
 #endif
@@ -627,9 +628,9 @@ ViewerImpl::close()
     mViewportModule.reset();
     mRenderModules.clear();
 #if GLFW_VERSION_MAJOR >= 3
-    mCamera->setWindow(NULL);
+    mCamera->setWindow(nullptr);
     GLFWwindow* win = mWindow;
-    mWindow = NULL;
+    mWindow = nullptr;
     glfwDestroyWindow(win);
     OPENVDB_LOG_DEBUG_RUNTIME("destroyed window " << std::hex << win << std::dec
         << " from thread " << boost::this_thread::get_id());
@@ -747,7 +748,7 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
 #if GLFW_VERSION_MAJOR >= 3
     if (glfwGetCurrentContext() == mWindow) { ///< @todo not thread-safe
         // Detach this viewer's GL context.
-        glfwMakeContextCurrent(NULL);
+        glfwMakeContextCurrent(nullptr);
         OPENVDB_LOG_DEBUG_RUNTIME("detached window " << std::hex << mWindow << std::dec
             << " from thread " << boost::this_thread::get_id());
     }
@@ -783,7 +784,7 @@ void
 ViewerImpl::render()
 {
 #if GLFW_VERSION_MAJOR >= 3
-    if (mWindow == NULL) return;
+    if (mWindow == nullptr) return;
 
     // Prepare window for rendering.
     glfwMakeContextCurrent(mWindow);
@@ -820,6 +821,13 @@ ViewerImpl::render()
         BitmapFont13::print(10, height - 13 - 10, mGridInfo);
         BitmapFont13::print(10, height - 13 - 30, mTransformInfo);
         BitmapFont13::print(10, height - 13 - 50, mTreeInfo);
+
+        // Indicate via their hotkeys which render modules are enabled.
+        std::string keys = "123";
+        for (auto n: {0, 1, 2}) { if (!mRenderModules[n]->visible()) keys[n] = ' '; }
+        BitmapFont13::print(width - 10 - 30, 10, keys);
+        glColor3d(0.75, 0.75, 0.75);
+        BitmapFont13::print(width - 10 - 30, 10, "123");
 
         BitmapFont13::disableFontRendering();
     }
@@ -1072,7 +1080,7 @@ ViewerImpl::keyCallback(int key, int action)
     mCamera->keyCallback(key, action);
 
 #if GLFW_VERSION_MAJOR >= 3
-    if (mWindow == NULL) return;
+    if (mWindow == nullptr) return;
     const bool keyPress = (glfwGetKey(mWindow, key) == GLFW_PRESS);
     /// @todo Should use "modifiers" argument to keyCB().
     mShiftIsDown = glfwGetKey(mWindow, GLFW_KEY_LEFT_SHIFT);

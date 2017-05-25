@@ -10,6 +10,8 @@ Version 4.0.2 - In development
       however it operates only on leaf nodes.
     - Added a vdb_test -f option that reads a list of tests to be run
       from a text file.
+    - Added a view mode indicator to vdb_view and enabled display of
+      tree topology and active voxels for point data grids.
 
     Bug fixes:
     - Fixed a delayed-loading race condition that could result in crashes.

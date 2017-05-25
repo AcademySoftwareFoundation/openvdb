@@ -47,6 +47,10 @@
 #include <GEO/GEO_PrimVDB.h> // for GEOvdbProcessTypedGridScalar(), etc.
 #endif
 
+#include <sstream>
+#include <stdexcept>
+#include <string>
+
 namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -272,7 +276,8 @@ struct ToolOp
             // match transform
             cvdb::BoolGrid regionMask;
             regionMask.setTransform(inGrid.transform().copy());
-            openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(*mMaskGrid, regionMask, mBoss);
+            openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(
+                *mMaskGrid, regionMask, mBoss);
 
             ToolT<GridType, cvdb::BoolGrid, hvdb::Interrupter> tool(inGrid, regionMask, &mBoss);
             mOutGrid = tool.process(mThreaded);
@@ -353,7 +358,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
-        const int whichOp = evalInt("operator", 0, time);
+        const int whichOp = static_cast<int>(evalInt("operator", 0, time));
         if (whichOp < 0 || whichOp > 7) {
             std::ostringstream ostr;
             ostr << "expected 0 <= operator <= 7, got " << whichOp;
@@ -481,7 +486,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
 
             // Rename grid
             std::string gridName = vdb->getGridName();
-            const int renaming = evalInt("outputName", 0, time);
+            const auto renaming = evalInt("outputName", 0, time);
             if (renaming == 1) {
                 if (operationName.size() > 0) gridName += operationName;
             } else if (renaming == 2) {

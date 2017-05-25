@@ -48,6 +48,8 @@
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
+#include <sstream>
+#include <stdexcept>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -301,7 +303,7 @@ SOP_OpenVDB_Resample::updateParmsFlags()
 {
     bool changed = false;
 
-    const int mode = evalInt("mode", 0, 0);
+    const auto mode = evalInt("mode", 0, 0);
     changed |= enableParm("translate", mode == MODE_PARMS);
     changed |= enableParm("rotate", mode == MODE_PARMS);
     changed |= enableParm("scale", mode == MODE_PARMS);
@@ -316,7 +318,7 @@ SOP_OpenVDB_Resample::updateParmsFlags()
     changed |= setVisibleState("voxel_size", mode != MODE_VOXEL_SCALE);
     changed |= setVisibleState("voxelscale", mode == MODE_VOXEL_SCALE);
 
-    changed |= enableParm("tolerance", evalInt("prune", 0, 0));
+    changed |= enableParm("tolerance", bool(evalInt("prune", 0, 0)));
 
     return changed;
 }
@@ -403,7 +405,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         const GU_Detail* refGdp = inputGeo(1, context);
 
         // Get parameters.
-        const int samplingOrder = evalInt("order", 0, time);
+        const int samplingOrder = static_cast<int>(evalInt("order", 0, time));
         if (samplingOrder < 0 || samplingOrder > 2) {
             std::stringstream ss;
             ss << "expected interpolation order between 0 and 2, got "<< samplingOrder;
@@ -414,7 +416,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         evalString(xformOrder, "xOrd", 0, time);
         evalString(rotOrder, "rOrd", 0, time);
 
-        const int mode = evalInt("mode", 0, time);
+        const int mode = static_cast<int>(evalInt("mode", 0, time));
         if (mode < MODE_PARMS || mode > MODE_VOXEL_SCALE) {
             std::stringstream ss;
             ss << "expected mode between " << int(MODE_PARMS)

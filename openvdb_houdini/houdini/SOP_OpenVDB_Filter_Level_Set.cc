@@ -55,6 +55,11 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -797,7 +802,9 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 #endif
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT) {
+        if (startNode->duplicateSourceStealable(
+            0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT)
+        {
             return error();
         }
 
@@ -873,10 +880,10 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
     hutil::OP_EvalScope eval_scope(*this, context);
     fpreal now = context.getTime();
 
-    parms.mIterations   = evalInt("iterations", 0, now);
-    parms.mHalfWidth    = evalInt("halfWidth", 0, now);
+    parms.mIterations   = static_cast<int>(evalInt("iterations", 0, now));
+    parms.mHalfWidth    = static_cast<int>(evalInt("halfWidth", 0, now));
     parms.mHalfWidthWorld = float(evalFloat("halfWidthWorld", 0, now));
-    parms.mStencilWidth = evalInt("stencilWidth", 0, now);
+    parms.mStencilWidth = static_cast<int>(evalInt("stencilWidth", 0, now));
     parms.mStencilWidthWorld = float(evalFloat("stencilWidthWorld", 0, now));
     parms.mVoxelOffset  = static_cast<float>(evalFloat("voxelOffset", 0, now));
     parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));

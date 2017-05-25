@@ -136,8 +136,7 @@ public:
     //@}  Compatibility
 
     /// @return string representation of Classname
-    std::string
-    str() const {
+    std::string str() const {
         std::ostringstream buffer;
 
         buffer << "[";
@@ -145,7 +144,7 @@ public:
         // For each column
         for (unsigned j(0); j < SIZE; j++) {
             if (j) buffer << ", ";
-            buffer << mm[j];
+            buffer << PrintCast(mm[j]);
         }
 
         buffer << "]";

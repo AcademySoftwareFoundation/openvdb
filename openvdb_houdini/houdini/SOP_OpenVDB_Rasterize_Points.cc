@@ -3294,7 +3294,7 @@ SOP_OpenVDB_Rasterize_Points::updateParmsFlags()
     changed |= enableParm("maskvdb", maskexists);
     changed |= enableParm("invertmask", maskexists);
 
-    changed |= enableParm("compositing", evalInt("createdensity", 0, 0));
+    changed |= enableParm("compositing", bool(evalInt("createdensity", 0, 0)));
 
     const bool createDensity = evalInt("createdensity", 0, 0) != 0;
 
@@ -3323,6 +3323,16 @@ SOP_OpenVDB_Rasterize_Points::factory(OP_Network* net, const char* name, OP_Oper
     return new SOP_OpenVDB_Rasterize_Points(net, name, op);
 }
 
+
+#if UT_MAJOR_VERSION_INT >= 16
+SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
+    const char* name, OP_Operator* op)
+    : hvdb::SOP_NodeVDB(net, name, op)
+    , mCodeGenerator(this, new VOP_LanguageContextTypeList(VOP_LANGUAGE_VEX, VOP_CVEX_SHADER), 1, 1)
+    , mInitialParmNum(this->getParmList()->getEntries())
+{
+}
+#else
 SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
@@ -3330,10 +3340,9 @@ SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
         VOPconvertToContextType(VEX_CVEX_CONTEXT)), 1, 1)
     , mInitialParmNum(this->getParmList()->getEntries())
 {
-#if (UT_VERSION_INT < 0x10000000) // earlier than 16.0.0
     setOperatorTable(getOperatorTable(VOP_TABLE_NAME));
-#endif
 }
+#endif
 
 
 OP_ERROR
@@ -3356,7 +3365,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         const fpreal densityScale = evalFloat("densityscale", 0, time);
         const fpreal particleScale = evalFloat("particlescale", 0, time);
         const fpreal solidRatio = evalFloat("solidratio", 0, time);
-        const int compositing = evalInt("compositing", 0, time);
+        const exint compositing = evalInt("compositing", 0, time);
         float voxelSize = float(evalFloat("voxelsize", 0, time));
         const bool clipToFrustum = evalInt("cliptofrustum", 0, time) == 1;
         const bool invertMask = evalInt("invertmask", 0, time) == 1;

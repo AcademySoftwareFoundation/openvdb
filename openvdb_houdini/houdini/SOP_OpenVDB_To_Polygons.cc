@@ -909,10 +909,10 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 #endif
 
     // Check for reference mesh
-    boost::shared_ptr<GU_Detail> geoPtr;
+    std::unique_ptr<GU_Detail> geoPtr;
     if (!refGrid) {
         std::string warningStr;
-        geoPtr = hvdb::validateGeometry(*refGeo, warningStr, &boss);
+        geoPtr = hvdb::convertGeometry(*refGeo, warningStr, &boss);
 
         if (geoPtr) {
             refGeo = geoPtr.get();
@@ -933,7 +933,8 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
         if (boss.wasInterrupted()) return;
 
-        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+            mesh(pointList, primList);
 
         float bandWidth = 3.0;
 

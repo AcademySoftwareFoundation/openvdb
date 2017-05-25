@@ -43,6 +43,8 @@
 #include <openvdb/tools/Interpolation.h> // for box sampler
 #include <UT/UT_PNoise.h>
 #include <UT/UT_Interrupt.h>
+#include <sstream>
+#include <stdexcept>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -513,21 +515,23 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         duplicateSourceStealable(0, context);
 
         // Evaluate the FractalBoltzman noise parameters from UI
-        FractalBoltzmanGenerator fbGenerator(static_cast<float>(evalFloat("freq", 0, time)),
-                                             static_cast<float>(evalFloat("amp", 0, time)),
-                                             evalInt("oct", 0, time),
-                                             static_cast<float>(evalFloat("gain", 0, time)),
-                                             static_cast<float>(evalFloat("lac", 0, time)),
-                                             static_cast<float>(evalFloat("rough", 0, time)),
-                                             evalInt("mode", 0, time));
+        FractalBoltzmanGenerator fbGenerator(
+            static_cast<float>(evalFloat("freq", 0, time)),
+            static_cast<float>(evalFloat("amp", 0, time)),
+            static_cast<int>(evalInt("oct", 0, time)),
+            static_cast<float>(evalFloat("gain", 0, time)),
+            static_cast<float>(evalFloat("lac", 0, time)),
+            static_cast<float>(evalFloat("rough", 0, time)),
+            static_cast<int>(evalInt("mode", 0, time)));
 
         NoiseSettings settings;
 
         // evaluate parameter for blending noise
         settings.mOffset = static_cast<float>(evalFloat("soff", 0, time));
-        settings.mNOffset = cvdb::Vec3R(evalFloat("noff", 0, time),
-                                        evalFloat("noff", 1, time),
-                                        evalFloat("noff", 2, time));
+        settings.mNOffset = cvdb::Vec3R(
+            evalFloat("noff", 0, time),
+            evalFloat("noff", 1, time),
+            evalFloat("noff", 2, time));
 
         // Mask
         const openvdb::GridBase* maskGrid = nullptr;
@@ -544,7 +548,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
             hvdb::VdbPrimCIterator gridIter(refGdp, maskGroup);
 
             if (gridIter) {
-                settings.mMaskMode = evalInt("mask", 0, time);
+                settings.mMaskMode = static_cast<int>(evalInt("mask", 0, time));
                 settings.mThreshold = static_cast<float>(evalFloat("thres", 0, time));
                 settings.mFallOff = static_cast<float>(evalFloat("fall", 0, time));
 

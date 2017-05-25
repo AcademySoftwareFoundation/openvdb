@@ -48,8 +48,11 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <boost/scoped_array.hpp>
+#include <boost/mpl/at.hpp>
 
+#include <algorithm>
+#include <cmath>
+#include <map>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -651,10 +654,9 @@ SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
         RemapGridValues::Extrapolation belowExtrapolation = RemapGridValues::CLAMP;
         RemapGridValues::Extrapolation aboveExtrapolation = RemapGridValues::CLAMP;
 
-        int extrapolation = evalInt("below", 0, time);
+        auto extrapolation = evalInt("below", 0, time);
         if (extrapolation == 1) belowExtrapolation = RemapGridValues::PRESERVE;
         else if (extrapolation == 2) belowExtrapolation = RemapGridValues::EXTRAPOLATE;
-
 
         extrapolation = evalInt("above", 0, time);
         if (extrapolation == 1) aboveExtrapolation = RemapGridValues::PRESERVE;

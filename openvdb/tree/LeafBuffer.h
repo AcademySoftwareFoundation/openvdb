@@ -39,6 +39,7 @@
 #include <algorithm> // for std::swap
 #include <cstddef> // for offsetof()
 #include <iostream>
+#include <memory>
 #include <type_traits>
 
 
@@ -236,12 +237,10 @@ private:
 
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
+
 template<typename T, Index Log2Dim>
 const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
-#endif
 
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
 
 template<typename T, Index Log2Dim>
 inline
@@ -281,6 +280,8 @@ LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
         while (n--) *target++ = *source++;
     }
 }
+
+#endif // !OPENVDB_2_ABI_COMPATIBLE
 
 
 template<typename T, Index Log2Dim>
@@ -447,6 +448,8 @@ LeafBuffer<T, Log2Dim>::deallocate()
 }
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+
 template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::doLoad() const
@@ -498,7 +501,7 @@ LeafBuffer<T, Log2Dim>::detachFromFile()
     return false;
 }
 
-#endif // OPENVDB_2_ABI_COMPATIBLE
+#endif // !OPENVDB_2_ABI_COMPATIBLE
 
 
 ////////////////////////////////////////

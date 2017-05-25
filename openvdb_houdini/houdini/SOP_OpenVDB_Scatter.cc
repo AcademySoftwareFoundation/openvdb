@@ -38,11 +38,13 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/LevelSetUtil.h>
-#include <boost/random/mersenne_twister.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -220,14 +222,14 @@ bool
 SOP_OpenVDB_Scatter::updateParmsFlags()
 {
     bool changed = false;
-    const int pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
+    const auto pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
 
     changed |= setVisibleState("count",    (0 == pmode));
     changed |= setVisibleState("density",  (1 == pmode));
     changed |= setVisibleState("multiply", (1 == pmode));
     changed |= setVisibleState("ppv",      (2 == pmode));
 
-    const int dogroup = evalInt("dogroup", 0, 0);
+    const auto dogroup = evalInt("dogroup", 0, 0);
     changed |= enableParm("sgroup", 1 == dogroup);
 
     return changed;
@@ -314,7 +316,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         gdp->clearAndDestroy();
 
-        const int seed = evalInt("seed", /*idx=*/0, time);
+        const int seed = static_cast<int>(evalInt("seed", /*idx=*/0, time));
         const double spread = evalFloat("spread", 0, time);
         const bool verbose   = evalInt("verbose", /*idx=*/0, time) != 0;
         const openvdb::Index64 pointCount = evalInt("count", 0, time);
@@ -334,10 +336,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         // Choose a fast random generator with a long period. Drawback here for
         // mt11213b is that it requires 352*sizeof(uint32) bytes.
-        using RandGen = boost::mt11213b;
+        using RandGen = std::mersenne_twister_engine<uint32_t, 32, 351, 175, 19,
+            0xccab8ee7, 11, 0xffffffff, 7, 0x31b6ab00, 15, 0xffe50000, 17, 1812433253>; // mt11213b
         RandGen mtRand(seed);
 
-        const int pmode = evalInt("pointmode", 0, time);
+        const auto pmode = evalInt("pointmode", 0, time);
 
         std::vector<std::string> emptyGrids;
 
