@@ -28,14 +28,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_OpenVDB_Prune.cc
+/// @file SOP_OpenVDB_Densify.cc
 ///
 /// @author FX R&D OpenVDB team
 ///
-/// @brief SOP to prune tree branches from OpenVDB grids
+/// @brief SOP to replace active tiles with active voxels in OpenVDB grids
 
 #include <houdini_utils/ParmFactory.h>
-#include <openvdb/tools/Prune.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
@@ -44,17 +43,15 @@ namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 
-class SOP_OpenVDB_Prune: public hvdb::SOP_NodeVDB
+class SOP_OpenVDB_Densify: public hvdb::SOP_NodeVDB
 {
 public:
-    SOP_OpenVDB_Prune(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Prune() override {}
+    SOP_OpenVDB_Densify(OP_Network*, const char* name, OP_Operator*);
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
     OP_ERROR cookMySop(OP_Context&) override;
-    bool updateParmsFlags() override;
 };
 
 
@@ -71,62 +68,34 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the input VDBs to be pruned.")
+        .setTooltip("Specify a subset of the input VDBs to be densified.")
         .setDocumentation(
-            "A subset of the input VDBs to be pruned"
+            "A subset of the input VDBs to be densified"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
-            "value",    "Value",
-            "inactive", "Inactive",
-            "levelset", "Level Set",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Mode")
-            .setDefault("value")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "Value:\n"
-                "    Collapse regions in which all voxels have the same\n"
-                "    value and active state into tiles with those values\n"
-                "    and active states.\n"
-                "Inactive:\n"
-                "    Collapse regions in which all voxels are inactive\n"
-                "    into inactive background tiles.\n"
-                "Level Set:\n"
-                "    Collapse regions in which all voxels are inactive\n"
-                "    into inactive tiles with either the inside or\n"
-                "    the outside background value, depending on\n"
-                "    the signs of the voxel values.\n"));
-    }
-
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Tolerance")
-        .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
-        .setTooltip(
-            "Voxel values are considered equal if they differ\n"
-            "by less than the specified threshold."));
-
-    hvdb::OpenVDBOpFactory("OpenVDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
-        .addInput("Grids to process")
+    hvdb::OpenVDBOpFactory("OpenVDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
+        .addInput("VDBs to densify")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
 \n\
-\"\"\"Reduce the memory footprint of VDB volumes.\"\"\"\n\
+\"\"\"Densify sparse VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
 \n\
-This node prunes branches of VDB\n\
-[trees|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
-where all voxels have the same or similar values.\n\
-This can help to reduce the memory footprint of a VDB, without changing its topology.\n\
-With a suitably high tolerance, pruning can function as a simple\n\
-form of lossy compression.\n\
+This node replaces active\n\
+[tiles|http://www.openvdb.org/documentation/doxygen/overview.html#secSparsity]\n\
+in VDB [trees|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
+with dense, leaf-level voxels.\n\
+This is useful for subsequent processing with nodes like [Node:sop/volumevop]\n\
+that operate only on leaf voxels.\n\
+\n\
+WARNING:\n\
+    Densifying a sparse VDB can significantly increase its memory footprint.\n\
 \n\
 @related\n\
-- [OpenVDB Densify|Node:sop/DW_OpenVDBDensify]\n\
+- [OpenVDB Fill|Node:sop/DW_OpenVDBFill]\n\
+- [OpenVDB Prune|Node:sop/DW_OpenVDBPrune]\n\
 - [Node:sop/vdbactivate]\n\
 \n\
 @examples\n\
@@ -140,14 +109,14 @@ and usage examples.\n");
 
 
 OP_Node*
-SOP_OpenVDB_Prune::factory(OP_Network* net,
+SOP_OpenVDB_Densify::factory(OP_Network* net,
     const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Prune(net, name, op);
+    return new SOP_OpenVDB_Densify(net, name, op);
 }
 
 
-SOP_OpenVDB_Prune::SOP_OpenVDB_Prune(OP_Network* net,
+SOP_OpenVDB_Densify::SOP_OpenVDB_Densify(OP_Network* net,
     const char* name, OP_Operator* op):
     hvdb::SOP_NodeVDB(net, name, op)
 {
@@ -157,50 +126,21 @@ SOP_OpenVDB_Prune::SOP_OpenVDB_Prune(OP_Network* net,
 ////////////////////////////////////////
 
 
-// Enable/disable or show/hide parameters in the UI.
-bool
-SOP_OpenVDB_Prune::updateParmsFlags()
-{
-    bool changed = false;
-
-    UT_String modeStr;
-    evalString(modeStr, "mode", 0, 0);
-
-    changed |= enableParm("tolerance", modeStr == "value");
-
-    return changed;
-}
-
-
-////////////////////////////////////////
-
-
 namespace {
-struct PruneOp {
-    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), tolerance(tol) {}
+struct DensifyOp {
+    DensifyOp() {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
     {
-        using ValueT = typename GridT::ValueType;
-
-        if (mode == "value") {
-            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
-        } else if (mode == "inactive") {
-            openvdb::tools::pruneInactive(grid.tree());
-        } else if (mode == "levelset") {
-            openvdb::tools::pruneLevelSet(grid.tree());
-        }
+        grid.tree().voxelizeActiveTiles(/*threaded=*/true);
     }
-
-    std::string mode;
-    fpreal tolerance;
 };
 }
 
 
 OP_ERROR
-SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
+SOP_OpenVDB_Densify::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -217,15 +157,10 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup* group =
             this->matchGroup(*gdp, groupStr.toStdString());
 
-        // Get other UI parameters.
-        UT_String modeStr;
-        evalString(modeStr, "mode", 0, time);
-        const fpreal tolerance = evalFloat("tolerance", 0, time);
-
         // Construct a functor to process grids of arbitrary type.
-        const PruneOp pruneOp(modeStr.toStdString(), tolerance);
+        const DensifyOp densifyOp;
 
-        UT_AutoInterrupt progress("Pruning OpenVDB grids");
+        UT_AutoInterrupt progress("Densifying VDBs");
 
         // Process each VDB primitive that belongs to the selected group.
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
@@ -234,7 +169,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
             }
 
             GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, pruneOp);
+            GEOvdbProcessTypedGridTopology(*vdbPrim, densifyOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

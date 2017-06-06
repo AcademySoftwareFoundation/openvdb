@@ -16,6 +16,20 @@ New features:
   to be run from a text file.
 - Added a view mode indicator to <TT>vdb_view</TT> and enabled display
   of tree topology and active voxels for point data grids.
+- Added @vdblink::math::Mat::isFinite() isFinite@endlink,
+  @vdblink::math::Mat::isNan() isNan@endlink, and
+  @vdblink::math::Mat::isZero() isZero@endlink methods to
+  @vdblink::math::Mat math::Mat@endlink and added
+  @vdblink::math::Tuple::isZero() isZero@endlink to
+  @vdblink::math::Tuple math::Tuple@endlink.
+
+@par
+Improvements:
+- Moved the @vdblink::math::Tuple::isFinite() isFinite@endlink,
+  @vdblink::math::Tuple::isInfinite() isInfinite@endlink,
+  and @vdblink::math::Tuple::isNan() isNan@endlink methods from
+  @vdblink::math::Vec3 math::Vec3@endlink et&nbsp;al.
+  to @vdblink::math::Tuple math::Tuple@endlink.
 
 @par
 Bug fixes:
@@ -53,9 +67,14 @@ Houdini:
   OpenVDB&nbsp;Points.
   Houdini&nbsp;16 is required.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Replaced the Combine SOP&rsquo;s &ldquo;A/B&nbsp;Pairs&rdquo;
+  and &ldquo;Flatten&rdquo; toggles with a menu of collation options
+  that include flattening only <I>A</I>&nbsp;grids and flattening groups
+  of <I>A</I>&nbsp;grids independently.
 - Added a slider to the Remove Divergence SOP to set the error tolerance
   for the pressure solver.
 - Added value type conversion options (for VDB output) to the Convert&nbsp;SOP.
+- Added a Densify SOP that replaces active tiles with leaf voxels.
 
 
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly

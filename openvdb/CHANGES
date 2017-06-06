@@ -12,6 +12,12 @@ Version 4.0.2 - In development
       from a text file.
     - Added a view mode indicator to vdb_view and enabled display of
       tree topology and active voxels for point data grids.
+    - Added isFinite(), isInfinite(), isNan(), and isZero() methods
+      to math::Mat and added isZero() to math::Tuple.
+
+    Improvements:
+    - Moved the isFinite(), isInfinite() and isNan() methods from
+      math::Vec3 et al. to math::Tuple.
 
     Bug fixes:
     - Fixed a delayed-loading race condition that could result in crashes.
@@ -43,9 +49,13 @@ Version 4.0.2 - In development
     - Added a Mantra VRAY procedural and a delayed load SHOP for rendering
       OpenVDB Points.  Houdini 16 is required.
       [Contributed by Double Negative]
+    - Replaced the Combine SOP's "A/B Pairs" and "Flatten" toggles with
+      a menu of collation options that include flattening only A grids
+      and flattening groups of A grids independently.
     - Added a slider to the Remove Divergence SOP to set the error tolerance
       for the pressure solver.
     - Added value type conversion options (for VDB output) to the Convert SOP.
+    - Added a Densify SOP that replaces active tiles with leaf voxels.
 
 
 Version 4.0.1 - March 8, 2017

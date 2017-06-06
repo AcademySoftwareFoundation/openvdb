@@ -296,7 +296,6 @@ Polygon Soup:\n\
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "computenormals", "Compute Vertex Normals")
         .setTooltip("Compute edge-preserving vertex normals."));
 
-
     //////////
 
     // Reference input options
@@ -342,16 +341,16 @@ Polygon Soup:\n\
 
     parms.add(hutil::ParmFactory(PRM_STRING, "seampoints", "Seam Points")
         .setDefault("seam_points")
-        .setTooltip("When converting to polygons with a second input, this "
-            "specifies a group of the fracture seam points. This can be "
-            "used to drive local pre-fracture dynamics e.g. local surface buckling."));
+        .setTooltip(
+            "When converting to polygons with a second input, this specifies"
+            " a group of the fracture seam points. This can be used to drive"
+            " local pre-fracture dynamics such as local surface buckling."));
 
     //////////
 
     // Mask input options
 
-
-   parms.add(hutil::ParmFactory(PRM_TOGGLE, "surfacemask", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "surfacemask", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip("Enable / disable the surface mask"));
@@ -377,8 +376,6 @@ Polygon Soup:\n\
         .setTooltip(
             "A single scalar grid used as a spatial multiplier for the adaptivity threshold")
         .setChoiceList(&hutil::PrimGroupMenuInput3));
-
-
 
     //////////
 
@@ -606,10 +603,9 @@ convertVDBClass(
             std::vector<Vec3s> points;
             points.reserve(mesher.pointListSize());
             for (size_t i = 0, n = mesher.pointListSize(); i < n; i++) {
-                // The MeshToVolume conversion further down, requires the
+                // The MeshToVolume conversion, further down, requires the
                 // points to be in grid index space.
-                points.push_back(
-                    transform->worldToIndex(mesher.pointList()[i]));
+                points.push_back(transform->worldToIndex(mesher.pointList()[i]));
             }
 
             openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
@@ -1178,7 +1174,13 @@ SOP_OpenVDB_Convert::convertVDBType(
             // Create a copy of the grid, but with a different value type.
             // Store the copy as op.outGrid.
             GEOvdbProcessTypedGridTopology(*it.getPrimitive(), op);
-            if (op.outGrid) it->setGrid(*op.outGrid);
+            if (op.outGrid) {
+                auto& grid = *op.outGrid;
+                grid.removeMeta("value_type");
+                grid.insertMeta("value_type", openvdb::StringMetadata(grid.valueType()));
+                it->setGrid(grid);
+                it->syncAttrsFromMetadata();
+            }
         }
     }
 }

@@ -410,27 +410,6 @@ public:
     static unsigned numColumns()  { return 4; }
     static unsigned numElements()  { return 4; }
 
-    /// True if a Nan is present in vector
-    bool isNan() const
-    {
-        return isnan(this->mm[0]) || isnan(this->mm[1])
-            || isnan(this->mm[2]) || isnan(this->mm[3]);
-    }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const
-    {
-        return isinf(this->mm[0]) || isinf(this->mm[1])
-            || isinf(this->mm[2]) || isinf(this->mm[3]);
-    }
-
-    /// True if all no Nan or Inf values present
-    bool isFinite() const
-    {
-        return finite(this->mm[0]) && finite(this->mm[1])
-            && finite(this->mm[2]) && finite(this->mm[3]);
-    }
-
     /// Predefined constants, e.g.   Vec4f v = Vec4f::xNegAxis();
     static Vec4<T> zero() { return Vec4<T>(0, 0, 0, 0); }
     static Vec4<T> origin() { return Vec4<T>(0, 0, 0, 1); }
@@ -557,21 +536,6 @@ isApproxEqual(const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& eps)
            isApproxEqual(a[1], b[1], eps[1]) &&
            isApproxEqual(a[2], b[2], eps[2]) &&
            isApproxEqual(a[3], b[3], eps[3]);
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec4<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]) && isFinite(v[3]);
-}
-
-/// Return @c true if all components are exactly equal to zero.
-template<typename T>
-inline bool
-isZero(const Vec4<T>& v)
-{
-    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]) && isZero(v[3]);
 }
 
 template<typename T>

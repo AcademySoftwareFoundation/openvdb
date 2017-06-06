@@ -460,21 +460,6 @@ public:
         return u;
     }
 
-    /// True if a Nan is present in vector
-    bool isNan() const { return isnan(this->mm[0]) || isnan(this->mm[1]) || isnan(this->mm[2]); }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const
-    {
-        return isinf(this->mm[0]) || isinf(this->mm[1]) || isinf(this->mm[2]);
-    }
-
-    /// True if all no Nan or Inf values present
-    bool isFinite() const
-    {
-        return finite(this->mm[0]) && finite(this->mm[1]) && finite(this->mm[2]);
-    }
-
     /// Return a vector with the components of this in ascending order
     Vec3<T> sorted() const
     {
@@ -613,21 +598,6 @@ isApproxEqual(const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& eps)
     return isApproxEqual(a.x(), b.x(), eps.x()) &&
            isApproxEqual(a.y(), b.y(), eps.y()) &&
            isApproxEqual(a.z(), b.z(), eps.z());
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec3<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]);
-}
-
-/// Return @c true if all components are exactly equal to zero.
-template<typename T>
-inline bool
-isZero(const Vec3<T>& v)
-{
-    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]);
 }
 
 template<typename T>

@@ -34,8 +34,9 @@
 #ifndef OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-#include <sstream>
 #include "Math.h"
+#include <cmath>
+#include <sstream>
 
 
 namespace openvdb {
@@ -159,6 +160,38 @@ public:
         is.read(reinterpret_cast<char*>(&mm), sizeof(T)*SIZE);
     }
 
+    /// True if a Nan is present in this tuple
+    bool isNan() const { 
+        for (int i = 0; i < SIZE; ++i) {
+            if (std::isnan(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if an Inf is present in this tuple
+    bool isInfinite() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (std::isinf(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if no Nan or Inf values are present
+    bool isFinite() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (!std::isfinite(mm[i])) return false;
+        }
+        return true;
+    }
+
+    /// True if all elements are exactly zero
+    bool isZero() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (!isZero(mm[i])) return false;
+        }
+        return true;
+    }
+
 protected:
     T mm[SIZE];
 };
@@ -204,6 +237,21 @@ Abs(const Tuple<SIZE, T>& t)
     return result;
 }
 
+/// Return @c true if a Nan is present in the tuple.
+template<int SIZE, typename T>
+inline bool isNan(const Tuple<SIZE, T>& t) { return t.isNan(); }
+
+/// Return @c true if an Inf is present in the tuple.
+template<int SIZE, typename T>
+inline bool isInfinite(const Tuple<SIZE, T>& t) { return t.isInfinite(); }
+
+/// Return @c true if no Nan or Inf values are present.
+template<int SIZE, typename T>
+inline bool isFinite(const Tuple<SIZE, T>& t) { return t.isFinite(); }
+
+/// Return @c true if all elements are exactly equal to zero.
+template<int SIZE, typename T>
+inline bool isZero(const Tuple<SIZE, T>& t) { return t.isZero(); }
 
 ////////////////////////////////////////
 

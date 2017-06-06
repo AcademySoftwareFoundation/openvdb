@@ -44,6 +44,7 @@
 #include <cstdlib>   // for abs(int)
 #include <random>
 #include <string>
+#include <type_traits> // for std::is_arithmetic
 
 
 // Compile pragmas
@@ -341,7 +342,7 @@ template<> inline bool isNegative<bool>(const bool&) { return false; }
 
 
 /// Return @c true if @a x is finite.
-template<typename Type>
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
 isFinite(const Type& x) { return std::isfinite(x); }
 
