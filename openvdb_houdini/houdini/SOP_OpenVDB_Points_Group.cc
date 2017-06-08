@@ -322,6 +322,7 @@ with an [OpenVDB Points Convert node|Node:sop/DW_OpenVDBPointsConvert].\n\
 \n\
 @related\n\
 - [OpenVDB Points Convert|Node:sop/DW_OpenVDBPointsConvert]\n\
+- [OpenVDB Points Delete|Node:sop/DW_OpenVDBPointsDelete]\n\
 \n\
 @examples\n\
 \n\

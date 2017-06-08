@@ -348,6 +348,7 @@ INCLUDE_NAMES := \
     points/PointConversion.h \
     points/PointCount.h \
     points/PointDataGrid.h \
+    points/PointDelete.h \
     points/PointGroup.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
@@ -510,6 +511,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
