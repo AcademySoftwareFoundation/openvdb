@@ -861,6 +861,7 @@ newSopOperator(OP_OperatorTable* table)
             " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
         .setTooltip("Specify VDB Points Groups to use as an input.")
         .setDocumentation(
             "The point group inside the VDB Points primitive to extract\n\n"
