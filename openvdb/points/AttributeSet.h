@@ -386,12 +386,23 @@ public:
     void dropGroup(const Name& group);
     /// Clear all groups
     void clearGroups();
+    /// Rename a group
+    size_t renameGroup(const std::string& fromName, const std::string& toName);
+    /// Return a unique name for a group based on given name
+    const Name uniqueGroupName(const Name& name) const;
 
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
 
     /// Return true if the name is valid
     static bool validName(const Name& name);
+
+    /// Extract each name from nameStr into includeNames, or into excludeNames if name prefixed with caret
+    /// @param includeAll denotes whether a "*" wildcard is present in the includeNames
+    static void parseNames( std::vector<std::string>& includeNames,
+                            std::vector<std::string>& excludeNames,
+                            bool& includeAll,
+                            const std::string& nameStr);
 
     /// Extract each name from nameStr into includeNames, or into excludeNames if name prefixed with caret
     static void parseNames( std::vector<std::string>& includeNames,

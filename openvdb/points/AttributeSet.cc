@@ -685,6 +685,27 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
     return pos;
 }
 
+size_t
+AttributeSet::Descriptor::renameGroup(const std::string& fromName, const std::string& toName)
+{
+    if (!validName(toName))  throw RuntimeError("Group name contains invalid characters - " + toName);
+
+    size_t pos = INVALID_POS;
+
+    // check if the new name is already used.
+    auto it = mGroupMap.find(toName);
+    if (it != mGroupMap.end()) return pos;
+
+    it = mGroupMap.find(fromName);
+    if (it != mGroupMap.end()) {
+        pos = it->second;
+        mGroupMap.erase(it);
+        mGroupMap[toName] = pos;
+    }
+
+    return pos;
+}
+
 
 const Name&
 AttributeSet::Descriptor::valueType(size_t pos) const
@@ -923,11 +944,31 @@ AttributeSet::Descriptor::clearGroups()
 const Name
 AttributeSet::Descriptor::uniqueName(const Name& name) const
 {
+    auto it = mNameMap.find(name);
+    if (it == mNameMap.end()) return name;
+
     std::ostringstream ss;
-    for (size_t i = 0; i < this->size() + 1; i++) {
+    size_t i(0);
+    while (it != mNameMap.end()) {
         ss.str("");
-        ss << name << i;
-        if (this->find(ss.str()) == INVALID_POS)    break;
+        ss << name << i++;
+        it = mNameMap.find(ss.str());
+    }
+    return ss.str();
+}
+
+const Name
+AttributeSet::Descriptor::uniqueGroupName(const Name& name) const
+{
+    auto it = mGroupMap.find(name);
+    if (it == mGroupMap.end()) return name;
+
+    std::ostringstream ss;
+    size_t i(0);
+    while (it != mGroupMap.end()) {
+        ss.str("");
+        ss << name << i++;
+        it = mGroupMap.find(ss.str());
     }
     return ss.str();
 }
@@ -943,9 +984,10 @@ AttributeSet::Descriptor::validName(const Name& name)
 void
 AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
                                         std::vector<std::string>& excludeNames,
+                                        bool& includeAll,
                                         const std::string& nameStr)
 {
-    bool includeAll = false;
+    includeAll = false;
 
     std::stringstream tokenStream(nameStr);
 
@@ -970,6 +1012,15 @@ AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
             includeNames.push_back(token);
         }
     }
+}
+
+void
+AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
+                                        std::vector<std::string>& excludeNames,
+                                        const std::string& nameStr)
+{
+    bool includeAll = false;
+    Descriptor::parseNames(includeNames, excludeNames, includeAll, nameStr);
 }
 
 void
