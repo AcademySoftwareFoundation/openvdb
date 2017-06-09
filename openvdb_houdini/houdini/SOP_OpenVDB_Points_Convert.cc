@@ -35,7 +35,6 @@
 /// @brief Converts points to OpenVDB points.
 
 #include <openvdb/openvdb.h>
-#include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
@@ -139,6 +138,14 @@ namespace openvdb_houdini {
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+
+enum CONVERSION_MODE
+{
+    MODE_CONVERT_TO_VDB = 0,
+    MODE_CONVERT_FROM_VDB,
+    MODE_GENERATE_MASK,
+    MODE_COUNT_POINTS,
+};
 
 enum COMPRESSION_TYPE
 {
@@ -841,6 +848,8 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "vdb", "Pack Points into VDB Points",
             "hdk", "Extract Points from VDB Points",
+            "mask", "Generate Mask from VDB Points",
+            "count", "Points/Voxel Count from VDB Points",
             nullptr
         };
 
@@ -850,7 +859,9 @@ newSopOperator(OP_OperatorTable* table)
             .setTooltip("The conversion method for the expected input types.")
             .setDocumentation(
                 "Whether to pack points into a VDB Points primitive"
-                " or to extract points from such a primitive "));
+                " or to extract points from such a primitive or to generate"
+                " a mask from the primitive or to count the number of"
+                " points-per-voxel in the primitive"));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
@@ -873,6 +884,14 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "name", "VDB Name")
         .setDefault("points")
         .setTooltip("The name of the VDB Points primitive to be created"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "countname", "VDB Name")
+        .setDefault("count")
+        .setTooltip("The name of the VDB count primitive to be created"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "VDB Name")
+        .setDefault("mask")
+        .setTooltip("The name of the VDB mask primitive to be created"));
 
     {   // Transform
         const char* items[] = {
@@ -1130,6 +1149,8 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     bool changed = false;
 
     const bool toVdbPoints = evalInt("conversion", 0, 0) == 0;
+    const bool toMask = evalInt("conversion", 0, 0) == 2;
+    const bool toCount = evalInt("conversion", 0, 0) == 3;
     const bool convertAll = evalInt("mode", 0, 0) == 0;
     const auto transform = evalInt("transform", 0, 0);
 
@@ -1141,6 +1162,12 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
 
     changed |= enableParm("name", toVdbPoints);
     changed |= setVisibleState("name", toVdbPoints);
+
+    changed |= enableParm("countname", toCount);
+    changed |= setVisibleState("countname", toCount);
+
+    changed |= enableParm("maskname", toMask);
+    changed |= setVisibleState("maskname", toMask);
 
     const int refexists = (this->nInputs() == 2);
 
@@ -1189,27 +1216,29 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         const fpreal time = context.getTime();
 
-        if (evalInt("conversion", 0, time) != 0) {
+        const int conversion = static_cast<int>(evalInt("conversion", 0, time));
+
+        UT_String groupStr;
+        evalString(groupStr, "group", 0, time);
+        const GA_PrimitiveGroup *group =
+            matchGroup(const_cast<GU_Detail&>(*gdp), groupStr.toStdString());
+
+        // Extract VDB Point groups to filter
+
+        UT_String pointsGroupStr;
+        evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
+        const std::string pointsGroup = pointsGroupStr.toStdString();
+
+        std::vector<std::string> includeGroups;
+        std::vector<std::string> excludeGroups;
+        openvdb::points::AttributeSet::Descriptor::parseNames(
+            includeGroups, excludeGroups, pointsGroup);
+
+        if (conversion == MODE_CONVERT_FROM_VDB) {
 
             // Duplicate primary (left) input geometry and convert the VDB points inside
 
             if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
-
-            UT_String groupStr;
-            evalString(groupStr, "group", 0, time);
-            const GA_PrimitiveGroup *group =
-                matchGroup(const_cast<GU_Detail&>(*gdp), groupStr.toStdString());
-
-            // Extract VDB Point groups to filter
-
-            UT_String pointsGroupStr;
-            evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
-            const std::string pointsGroup = pointsGroupStr.toStdString();
-
-            std::vector<std::string> includeGroups;
-            std::vector<std::string> excludeGroups;
-            openvdb::points::AttributeSet::Descriptor::parseNames(
-                includeGroups, excludeGroups, pointsGroup);
 
             // passing an empty vector of attribute names implies that
             // all attributes should be converted
@@ -1291,6 +1320,53 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             }
 
             transform = refPrim->getGrid().transform().copy();
+        }
+
+        if (conversion == MODE_GENERATE_MASK || conversion == MODE_COUNT_POINTS) {
+
+            // Process each VDB primitive independently
+            for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
+
+                GU_Detail geo;
+
+                const GridBase& baseGrid = vdbIt->getGrid();
+                if (!baseGrid.isType<PointDataGrid>()) continue;
+
+                const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
+
+                if (conversion == MODE_GENERATE_MASK) {
+                    openvdb::BoolGrid::Ptr maskGrid;
+                    if (transform) {
+                        maskGrid = openvdb::points::convertPointsToMask(
+                            grid, *transform, includeGroups, excludeGroups);
+                    }
+                    else {
+                        maskGrid = openvdb::points::convertPointsToMask(
+                            grid, includeGroups, excludeGroups);
+                    }
+
+                    UT_String nameStr = "";
+                    evalString(nameStr, "maskname", 0, time);
+                    hvdb::createVdbPrimitive(*gdp, maskGrid, nameStr.toStdString().c_str());
+                }
+                else {
+                    openvdb::Int32Grid::Ptr countGrid;
+                    if (transform) {
+                        countGrid = openvdb::points::pointCountGrid(
+                            grid, *transform, includeGroups, excludeGroups);
+                    }
+                    else {
+                        countGrid = openvdb::points::pointCountGrid(
+                            grid, includeGroups, excludeGroups);
+                    }
+
+                    UT_String nameStr = "";
+                    evalString(nameStr, "countname", 0, time);
+                    hvdb::createVdbPrimitive(*gdp, countGrid, nameStr.toStdString().c_str());
+                }
+            }
+
+            return error();
         }
 
         const auto transformMode = evalInt("transform", 0, time);
