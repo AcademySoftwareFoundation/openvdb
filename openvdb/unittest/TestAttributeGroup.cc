@@ -204,6 +204,15 @@ TestAttributeGroup::testAttributeGroupHandle()
         CPPUNIT_ASSERT(handle3.get(3));
     }
 
+    { // test group 3 valid for attributes 1 and 3 (unsafe access)
+        GroupHandle handle3(attr, 3);
+
+        CPPUNIT_ASSERT(!handle3.getUnsafe(0));
+        CPPUNIT_ASSERT(handle3.getUnsafe(1));
+        CPPUNIT_ASSERT(!handle3.getUnsafe(2));
+        CPPUNIT_ASSERT(handle3.getUnsafe(3));
+    }
+
     { // group 6 valid for attributes 2 and 3 (using specific offset)
         GroupHandle handle6(attr, 6);
 

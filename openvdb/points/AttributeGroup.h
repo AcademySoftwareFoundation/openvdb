@@ -115,6 +115,7 @@ public:
     bool isUniform() const { return mArray.isUniform(); }
 
     bool get(Index n) const;
+    bool getUnsafe(Index n) const;
 
 protected:
     const GroupAttributeArray& mArray;
@@ -170,7 +171,7 @@ public:
     template <typename IterT>
     bool valid(const IterT& iter) const {
         assert(mHandle);
-        return mHandle->get(*iter);
+        return mHandle->getUnsafe(*iter);
     }
 
 private:

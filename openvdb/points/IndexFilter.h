@@ -143,14 +143,14 @@ public:
         // accept no include filters as valid
         bool includeValid = mIncludeHandles.empty();
         for (const GroupHandle& handle : mIncludeHandles) {
-            if (handle.get(*iter)) {
+            if (handle.getUnsafe(*iter)) {
                 includeValid = true;
                 break;
             }
         }
         if (!includeValid)          return false;
         for (const GroupHandle& handle : mExcludeHandles) {
-            if (handle.get(*iter))  return false;
+            if (handle.getUnsafe(*iter))  return false;
         }
         return true;
     }
