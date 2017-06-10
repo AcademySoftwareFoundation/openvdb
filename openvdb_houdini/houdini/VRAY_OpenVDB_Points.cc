@@ -170,7 +170,7 @@ struct GenerateBBoxOp {
 
         if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
-            points::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
+            points::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf.attributeSet());
             auto iter = leaf.beginIndexOn(filter);
 
             for (; iter; ++iter) {
@@ -267,7 +267,7 @@ struct PopulateColorFromVelocityOp {
 
             if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
-                MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
+                MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf.attributeSet());
                 auto iter = leaf.beginIndexOn(filter);
 
                 for (; iter; ++iter) {

@@ -361,8 +361,8 @@ TestAttributeGroup::testAttributeGroupHandle()
 class GroupNotFilter
 {
 public:
-    GroupNotFilter()
-        : mFilter("") { }
+    explicit GroupNotFilter(const AttributeSet::Descriptor::GroupIndex& index)
+        : mFilter(index) { }
 
     inline bool initialized() const { return mFilter.initialized(); }
 
@@ -386,7 +386,7 @@ struct HandleWrapper
     HandleWrapper(const GroupHandle& handle)
         : mHandle(handle) { }
 
-    GroupHandle groupHandle(const Name& /*name*/) const {
+    GroupHandle groupHandle(const AttributeSet::Descriptor::GroupIndex& /*index*/) const {
         return mHandle;
     }
 
@@ -398,6 +398,10 @@ private:
 void
 TestAttributeGroup::testAttributeGroupFilter()
 {
+    using GroupIndex = AttributeSet::Descriptor::GroupIndex;
+
+    GroupIndex zeroIndex;
+
     typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
@@ -405,7 +409,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // group values all zero
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -423,7 +427,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
 
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
@@ -452,7 +456,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
 
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
@@ -479,7 +483,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group next
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -494,7 +498,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -510,7 +514,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group postfix ++/--
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -526,7 +530,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group next
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 
@@ -541,7 +545,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 
@@ -557,7 +561,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group postfix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 

@@ -493,7 +493,7 @@ struct ConvertPointDataGridPositionOp {
             auto handle = AttributeHandle<ValueType>::create(leaf->constAttributeArray(mIndex));
 
             if (useGroups) {
-                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups, leaf->attributeSet()));
 
                 for (; iter; ++iter) {
                     const Vec3d xyz = iter.getCoord().asVec3d();
@@ -579,7 +579,7 @@ struct ConvertPointDataGridAttributeOp {
             if (uniform)    uniformValue = ValueType(handle->get(0));
 
             if (useGroups) {
-                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups, leaf->attributeSet()));
 
                 if (uniform) {
                     for (; iter; ++iter) {
@@ -685,7 +685,7 @@ struct ConvertPointDataGridGroupOp {
             }
 
             if (useGroups) {
-                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups, leaf->attributeSet()));
 
                 if (uniform) {
                     for (; iter; ++iter) {
