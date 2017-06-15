@@ -41,6 +41,7 @@ OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
+OPTION ( PY_OPENVDB_USE_NUMPY "Build the OpenVDB with numpy support" ON )
 
 IF (OPENVDB_BUILD_HOUDINI_SOPS)
   SET ( OPENVDB_BUILD_PYTHON_MODULE OFF )
