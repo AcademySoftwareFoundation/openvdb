@@ -815,6 +815,48 @@ TestAttributeSet::testAttributeSet()
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
+
+        { // test duplicateDrop configures group mapping
+            AttributeSet attrSetC;
+
+            const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
+
+            attrSetC.appendAttribute("test1", AttributeI::attributeType());
+            attrSetC.appendAttribute("__group1", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("test2", AttributeI::attributeType());
+            attrSetC.appendAttribute("__group2", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("__group3", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("__group4", GroupAttributeArray::attributeType());
+
+            // 5 attributes exist - append a group as the sixth and then drop
+
+            Descriptor::Ptr descriptor = attrSetC.descriptorPtr();
+            size_t count = descriptor->count(GroupAttributeArray::attributeType());
+            CPPUNIT_ASSERT_EQUAL(count, size_t(4));
+
+            descriptor->setGroup("test_group1", /*offset*/0); // __group1
+            descriptor->setGroup("test_group2", /*offset=8*/GROUP_BITS); // __group2
+            descriptor->setGroup("test_group3", /*offset=16*/GROUP_BITS*2); // __group3
+            descriptor->setGroup("test_group4", /*offset=28*/GROUP_BITS*3 + GROUP_BITS/2); // __group4
+
+            descriptor = descriptor->duplicateDrop({ 1, 2, 3 });
+            count = descriptor->count(GroupAttributeArray::attributeType());
+            CPPUNIT_ASSERT_EQUAL(count, size_t(2));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor->size());
+            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group1"));
+            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group2"));
+            CPPUNIT_ASSERT(descriptor->hasGroup("test_group3"));
+            CPPUNIT_ASSERT(descriptor->hasGroup("test_group4"));
+
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group1"), size_t(AttributeSet::INVALID_POS));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group2"), size_t(AttributeSet::INVALID_POS));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group3"), size_t(1));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group4"), size_t(2));
+
+            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group3"), size_t(0));
+            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group4"), size_t(GROUP_BITS + GROUP_BITS/2));
+        }
     }
 
     // replace existing arrays

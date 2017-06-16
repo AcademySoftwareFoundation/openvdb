@@ -102,8 +102,6 @@ struct DeleteByFilterOp
 
     void operator()(const LeafRangeT& range) const
     {
-        auto leaf = range.begin();
-
         for (auto leaf = range.begin(); leaf != range.end(); ++leaf)
         {
             // early-exit if the leaf has no points

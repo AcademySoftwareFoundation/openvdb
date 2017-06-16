@@ -391,6 +391,23 @@ public:
     /// Return a unique name for a group based on given name
     const Name uniqueGroupName(const Name& name) const;
 
+    //@{
+    /// @brief Return the group offset from the name or index of the group
+    /// A group attribute array is a single byte (8-bit), each bit of which
+    /// can denote a group. The group offset is the position of the bit that
+    /// denotes the requested group if all group attribute arrays in the set
+    /// (and only attribute arrays marked as group) were to be laid out linearly
+    /// according to their order in the set.
+    size_t groupOffset(const Name& groupName) const;
+    size_t groupOffset(const GroupIndex& index) const;
+    //@}
+
+    /// Return the group index from the name of the group
+    GroupIndex groupIndex(const Name& groupName) const;
+    /// Return the group index from the offset of the group
+    /// @note see offset description for groupOffset()
+    GroupIndex groupIndex(const size_t offset) const;
+
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
 
