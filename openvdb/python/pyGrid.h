@@ -1151,118 +1151,8 @@ copyVecArray(py::numeric::array& arrayObj, std::vector<VecT>& vec)
     }
 }
 
-
-/// @brief Given NumPy arrays of points, triangle indices and quad indices,
-/// call tools::meshToLevelSet() to generate a level set grid.
-template<typename GridType>
-inline typename GridType::Ptr
-meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
-    py::object xformObj, py::object halfWidthObj)
-{
-    struct Local {
-        // Return the name of the Python grid method (for use in error messages).
-        static const char* methodName() { return "createLevelSetFromPolygons"; }
-
-        // Raise a Python exception if the given NumPy array does not have dimensions M x N
-        // or does not have an integer or floating-point data type.
-        static void validate2DNumPyArray(py::numeric::array arrayObj,
-            const int N, const char* desiredType)
-        {
-            PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr());
-
-            const PyArray_Descr* dtype = PyArray_DESCR(arrayObjPtr);
-            const py::object shape = arrayObj.attr("shape");
-            const int numDims = int(py::len(shape));
-
-            bool wrongArrayType = false;
-            // Check array dimensions.
-            if (numDims != 2 || py::extract<int>(shape[1]) != N) {
-                wrongArrayType = true;
-            } else {
-                // Check array data type.
-                switch (dtype->type_num) {
-                    case NPY_FLOAT: case NPY_DOUBLE: case NPY_INT16: //case NPY_HALF:
-                    case NPY_INT32: case NPY_INT64: case NPY_UINT32: case NPY_UINT64: break;
-                    default: wrongArrayType = true; break;
-                }
-            }
-            if (wrongArrayType) {
-                // Generate an error message and raise a Python TypeError.
-                std::string arrayTypeName;
-                if (PyObject_HasAttrString(arrayObj.ptr(), "dtype")) {
-                    arrayTypeName = pyutil::str(arrayObj.attr("dtype"));
-                } else {
-                    arrayTypeName = "'_'";
-                    arrayTypeName[1] = dtype->kind;
-                }
-                std::ostringstream os;
-                os << "expected N x 3 numpy.ndarray of " << desiredType << ", found ";
-                switch (numDims) {
-                    case 0: os << "zero-dimensional"; break;
-                    case 1: os << "one-dimensional"; break;
-                    default:
-                        os << py::extract<int>(shape[0]);
-                        for (int i = 1; i < numDims; ++i) {
-                            os << " x " << py::extract<int>(shape[i]);
-                        }
-                        break;
-                }
-                os << " " << arrayTypeName << " array as argument 1 to "
-                    << pyutil::GridTraits<GridType>::name() << "." << methodName() << "()";
-                PyErr_SetString(PyExc_TypeError, os.str().c_str());
-                py::throw_error_already_set();
-            }
-        }
-    };
-
-    // Extract the narrow band half width from the arguments to this method.
-    const float halfWidth = extractValueArg<GridType, float>(
-        halfWidthObj, Local::methodName(), /*argIdx=*/5, "float");
-
-    // Extract the transform from the arguments to this method.
-    math::Transform::Ptr xform = math::Transform::createLinearTransform();
-    if (!xformObj.is_none()) {
-        xform = extractValueArg<GridType, math::Transform::Ptr>(
-            xformObj, Local::methodName(), /*argIdx=*/4, "Transform");
-    }
-
-    // Extract the list of mesh vertices from the arguments to this method.
-    std::vector<Vec3s> points;
-    if (!pointsObj.is_none()) {
-        // Extract a reference to (not a copy of) a NumPy array argument,
-        // or throw an exception if the argument is not a NumPy array object.
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            pointsObj, Local::methodName(), /*argIdx=*/1, "numpy.ndarray");
-
-        // Throw an exception if the array has the wrong type or dimensions.
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"float");
-
-        // Copy values from the array to the vector.
-        copyVecArray(arrayObj, points);
-    }
-
-    // Extract the list of triangle indices from the arguments to this method.
-    std::vector<Vec3I> triangles;
-    if (!trianglesObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            trianglesObj, Local::methodName(), /*argIdx=*/2, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"int");
-        copyVecArray(arrayObj, triangles);
-    }
-
-    // Extract the list of quad indices from the arguments to this method.
-    std::vector<Vec4I> quads;
-    if (!quadsObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            quadsObj, Local::methodName(), /*argIdx=*/3, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/4, /*desiredType=*/"int");
-        copyVecArray(arrayObj, quads);
-    }
-
-    // Generate and return a level set grid.
-    return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
-}
-
+/// @brief Convert NumPy arrays of points, triangle indices and quad indices
+/// to STL vectors.
 template<typename GridType>
 void meshNumPyToSTL(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
         const char* methodName, int pointsIdx, int trianglesIdx, int quadsIdx,
@@ -1353,6 +1243,39 @@ void meshNumPyToSTL(py::object pointsObj, py::object trianglesObj, py::object qu
 
     return;
 }
+/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// call tools::meshToLevelSet() to generate a level set grid.
+template<typename GridType>
+inline typename GridType::Ptr
+meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
+    py::object xformObj, py::object halfWidthObj)
+{
+    struct Local {
+        // Return the name of the Python grid method (for use in error messages).
+        static const char* methodName() { return "createLevelSetFromPolygons"; }
+    };
+
+    // Extract the narrow band half width from the arguments to this method.
+    const float halfWidth = extractValueArg<GridType, float>(
+        halfWidthObj, Local::methodName(), /*argIdx=*/5, "float");
+
+    // Extract the transform from the arguments to this method.
+    math::Transform::Ptr xform = math::Transform::createLinearTransform();
+    if (!xformObj.is_none()) {
+        xform = extractValueArg<GridType, math::Transform::Ptr>(
+            xformObj, Local::methodName(), /*argIdx=*/4, "Transform");
+    }
+
+    std::vector<Vec3s> points;
+    std::vector<Vec3I> triangles;
+    std::vector<Vec4I> quads;
+    meshNumPyToSTL<GridType>(pointsObj, trianglesObj, quadsObj, Local::methodName(), 1, 2, 3,
+        points, triangles, quads);
+
+    // Generate and return a level set grid.
+    return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
+}
+
 
 /// @brief Given NumPy arrays of points, triangle indices and quad indices,
 /// call tools::meshToSignedDistanceField() to generate a signed distance field grid.
