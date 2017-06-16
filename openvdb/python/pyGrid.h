@@ -1316,6 +1316,40 @@ meshToSignedDistanceField(py::object exBandWidthObj, py::object inBandWidthObj, 
 }
 
 
+/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// call tools::meshToUnsignedDistanceField() to generate a unsigned distance field grid.
+template<typename GridType>
+inline typename GridType::Ptr
+meshToUnsignedDistanceField(py::object bandWidthObj, py::object pointsObj, py::object trianglesObj,
+    py::object quadsObj, py::object xformObj)
+{
+    struct Local {
+        // Return the name of the Python grid method (for use in error messages).
+        static const char* methodName() { return "createUnsignedDistanceFieldFromPolygons"; }
+    };
+
+    // Extract the exterior band width from the arguments to this method.
+    const float bandWidth = extractValueArg<GridType, float>(
+        bandWidthObj, Local::methodName(), /*argIdx=*/1, "float");
+
+    std::vector<Vec3s> points;
+    std::vector<Vec3I> triangles;
+    std::vector<Vec4I> quads;
+    meshNumPyToSTL<GridType>(pointsObj, trianglesObj, quadsObj, Local::methodName(), 2, 3, 4,
+        points, triangles, quads);
+
+    // Extract the transform from the arguments to this method.
+    math::Transform::Ptr xform = math::Transform::createLinearTransform();
+    if (!xformObj.is_none()) {
+        xform = extractValueArg<GridType, math::Transform::Ptr>(
+            xformObj, Local::methodName(), /*argIdx=*/5, "Transform");
+    }
+
+    // Generate and return a level set grid.
+    return tools::meshToUnsignedDistanceField<GridType>(*xform, points, triangles, quads,
+        bandWidth);
+}
+
 template<typename GridType>
 inline py::object
 volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
@@ -2324,9 +2358,27 @@ exportGrid()
                 "the vertices of the triangles and quadrilaterals that form the mesh.\n"
                 "Either the triangle or the quad array may be empty or None.\n"
                 "The resulting volume will have the given transform (or the identity\n"
-                "transform if no transform is given) and an exterior/interior narrow-band width\n"
+                "transform if no transform is given) and an exterior/interior narrow-band\n"
                 "of exBandWidth/inBandWidth voxels.").c_str())
             .staticmethod("createSignedDistanceFieldFromPolygons")
+            .def("createUnsignedDistanceFieldFromPolygons",
+                &pyGrid::meshToUnsignedDistanceField<GridType>,
+                (py::arg("bandWidth"),
+                     py::arg("points"),
+                     py::arg("triangles")=py::object(),
+                     py::arg("quads")=py::object(),
+                     py::arg("transform")=py::object()),
+                ("createUnsignedDistanceFieldFromPolygons(bandWidth, points, triangles=None,\n"
+                 "    quads=None, transform=None) -> "+ pyGridTypeName + "\n\n"
+                "Convert a triangle and/or quad mesh to a unsigned distance field with a\n"
+                "narrow band. It does not require a closed surface. \n"
+                "The mesh is described by a NumPy array of world-space points\n"
+                "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+                "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+                "Either the triangle or the quad array may be empty or None.\n"
+                "The resulting volume will have the given transform (or the identity\n"
+                "transform if no transform is given) and a narrow-band of bandWidth voxels.").c_str())
+            .staticmethod("createUnsignedDistanceFieldFromPolygons")
 
             .def("prune", &pyGrid::prune<GridType>,
                 (py::arg("tolerance")=0),
