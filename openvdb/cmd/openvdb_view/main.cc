@@ -60,6 +60,7 @@ usage [[noreturn]] (const char* progName, int status)
 "    1                  toggle tree topology view on/off\n" <<
 "    2                  toggle surface view on/off\n" <<
 "    3                  toggle data view on/off\n" <<
+"    4                  toggle point view for PointDataGrids on/off\n" <<
 "    G                  (\"geometry\") look at center of geometry\n" <<
 "    H                  (\"home\") look at origin\n" <<
 "    I                  toggle on-screen grid info on/off\n" <<
