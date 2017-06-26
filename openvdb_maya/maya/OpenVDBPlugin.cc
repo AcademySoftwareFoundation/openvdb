@@ -144,7 +144,7 @@ NodeRegistry::deregisterNodes(MFnPlugin& plugin, MStatus& status)
 
             const NodeInfo& node = (*gNodes)[n];
 
-            status = plugin.deregisterData(node.typeId);
+            status = plugin.deregisterNode(node.typeId);
 
             if (!status) {
                 const std::string msg = "Failed to deregister '" +

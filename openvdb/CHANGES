@@ -10,10 +10,14 @@ Version 4.0.2 - In development
       however it operates only on leaf nodes.
     - Added a vdb_test -f option that reads a list of tests to be run
       from a text file.
-    - Added a view mode indicator to vdb_view and enabled display of
-      tree topology and active voxels for point data grids.
+    - Enabled display of point data grids in vdb_view.
+      [Contributed by Nick Avramoussis]
+    - Added a view mode indicator to vdb_view.
     - Added isFinite(), isInfinite(), isNan(), and isZero() methods
       to math::Mat and added isZero() to math::Tuple.
+    - Added tools::interiorMask(), which constructs a boolean mask grid
+      from the active voxels of an input grid or, if the input grid is
+      a level set, from the interior voxels of the level set.
 
     Improvements:
     - Moved the isFinite(), isInfinite() and isNan() methods from
@@ -56,6 +60,10 @@ Version 4.0.2 - In development
       for the pressure solver.
     - Added value type conversion options (for VDB output) to the Convert SOP.
     - Added a Densify SOP that replaces active tiles with leaf voxels.
+    - Fixed a bug in the Rasterize Points SOP that capped density values
+      to one instead of to the particles' densities.
+    - The Convert and To Polygons SOPs now accept grids of any type
+      as surface masks, not just level set or SDF grids.
 
 
 Version 4.0.1 - March 8, 2017

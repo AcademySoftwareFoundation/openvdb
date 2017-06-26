@@ -40,6 +40,7 @@
 
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/GridTransformer.h>
 
 #include <UT/UT_Interrupt.h>
@@ -177,7 +178,7 @@ Normalize (vector -> vector):\n\
             " (see [specifying volumes|/model/volumes#group])\n\n"
             "The selected __Operator__ will be applied only where the mask VDB has"
             " [active|http://www.openvdb.org/documentation/doxygen/overview.html#subsecInactive]"
-            " voxels."));
+            " voxels or, if the mask VDB is a level set, only in the interior of the level set."));
 
     { // Output name
         char const * const items[] = {
@@ -298,16 +299,7 @@ struct ToolOp
 struct MaskOp
 {
     template<typename GridType>
-    void operator()(const GridType& grid)
-    {
-        if (openvdb::GRID_LEVEL_SET == grid.getGridClass()) {
-            mMaskGrid = openvdb::tools::sdfInteriorMask(grid);
-        } else {
-            mMaskGrid = cvdb::BoolGrid::create(false);
-            mMaskGrid->setTransform(grid.transform().copy());
-            mMaskGrid->tree().topologyUnion(grid.tree());
-        }
-    }
+    void operator()(const GridType& grid) { mMaskGrid = cvdb::tools::interiorMask(grid); }
 
     cvdb::BoolGrid::Ptr mMaskGrid;
 };
@@ -390,7 +382,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
-                UTvdbProcessTypedGridScalar(maskIt->getStorageType(), maskIt->getGrid(), op);
+                UTvdbProcessTypedGridTopology(maskIt->getStorageType(), maskIt->getGrid(), op);
                 maskGrid = op.mMaskGrid;
             }
 

@@ -39,6 +39,7 @@
 #include <openvdb_houdini/Utils.h>
 
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/VolumeToMesh.h>
@@ -356,16 +357,20 @@ Polygon Soup:\n\
         .setTooltip("Enable / disable the surface mask"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacemaskname", "Surface Mask")
-        .setTooltip("A single level-set or SDF grid whose interior defines the region to mesh")
-        .setChoiceList(&hutil::PrimGroupMenuInput3));
+        .setChoiceList(&hutil::PrimGroupMenuInput3)
+        .setTooltip(
+            "A single VDB whose active voxels or (if the VDB is a level set or SDF)\n"
+            "interior voxels define the region to be meshed"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "surfacemaskoffset", "Mask Offset")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Isovalue used to offset the interior region of the surface mask")
-        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0));
+        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
+        .setTooltip(
+            "Isovalue that determines the interior of the surface mask\n"
+            "when the mask is a level set or SDF"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "Invert Surface Mask")
-        .setTooltip("Used to mesh the complement of the mask"));
+        .setTooltip("If enabled, mesh the complement of the mask."));
 
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "adaptivityfield", "")
@@ -1028,6 +1033,43 @@ struct GridCopyOp
     }
 }; // struct GridCopyOp
 
+
+////////////////////////////////////////
+
+
+struct InteriorMaskOp
+{
+    InteriorMaskOp(double iso = 0.0): inIsovalue(iso) {}
+
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        outGridPtr = openvdb::tools::interiorMask(grid, inIsovalue);
+    }
+
+    const double inIsovalue;
+    openvdb::BoolGrid::Ptr outGridPtr;
+};
+
+
+// Extract a boolean mask from a grid of any type.
+inline hvdb::GridCPtr
+getMaskFromGrid(const hvdb::GridCPtr& gridPtr, double isovalue = 0.0)
+{
+    hvdb::GridCPtr maskGridPtr;
+    if (gridPtr) {
+        if (gridPtr->isType<openvdb::BoolGrid>()) {
+            // If the input grid is already boolean, return it.
+            maskGridPtr = gridPtr;
+        } else {
+            InteriorMaskOp op{isovalue};
+            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*gridPtr), *gridPtr, op);
+            maskGridPtr = op.outGridPtr;
+        }
+    }
+    return maskGridPtr;
+}
+
 } // unnamed namespace
 
 
@@ -1465,23 +1507,17 @@ SOP_OpenVDB_Convert::convertToPoly(
             } else {
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
-                    const openvdb::GridClass gridClass = maskIt->getGrid().getGridClass();
-                    if (gridClass == openvdb::GRID_LEVEL_SET) {
-
-                        openvdb::FloatGrid::ConstPtr grid =
-                            openvdb::gridConstPtrCast<openvdb::FloatGrid>(maskIt->getGridPtr());
-
-                        mesher.setSurfaceMask(
-                            openvdb::tools::sdfInteriorMask(*grid, static_cast<float>(maskoffset)),
-                            invertmask);
+                    if (auto maskGridPtr = getMaskFromGrid(maskIt->getGridPtr(), maskoffset)) {
+                        mesher.setSurfaceMask(maskGridPtr, invertmask);
                     } else {
-                        addWarning(SOP_MESSAGE, "Currently only supporting level set masks.");
+                        std::string mesg = "Surface mask "
+                            + maskIt.getPrimitiveNameOrIndex().toStdString()
+                            + " of type " + maskIt->getGrid().type() + " is not supported.";
+                        addWarning(SOP_MESSAGE, mesg.c_str());
                     }
                 }
             }
-
         }
-
 
         if (evalInt("adaptivityfield", 0, time)) {
             UT_String maskStr;

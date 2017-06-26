@@ -2334,7 +2334,7 @@ private:
                             const float dist = std::sqrt(distSqr) - solidRadius;
 
                             const float weight = dist > 0.0f ?
-                                densityScale * (1.0f - invResidualRadius * dist) : 1.0f;
+                                densityScale * (1.0f - invResidualRadius * dist) : densityScale;
 
                             if (weight > 0.0f) densitySamples.push_back(DensitySample(weight, pos));
                         }
@@ -3190,7 +3190,7 @@ newSopOperator(OP_OperatorTable* table)
 
     { // density compositing
         char const * const items[] = {
-            "add",  "Accumulate",
+            "add",  "Add",
             "max",  "Maximum",
             nullptr
         };
@@ -3198,7 +3198,13 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_ORD, "compositing", "Density Merge")
             .setDefault(PRMoneDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("How to blend point densities in the density volume."));
+            .setTooltip("How to blend point densities in the density volume")
+            .setDocumentation(
+                "How to blend point densities in the density volume\n\n"
+                "Add:\n"
+                "    Sum densities at each voxel.\n"
+                "Maximum:\n"
+                "    Choose the maximum density at each voxel.\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "densityscale", "Density Scale")

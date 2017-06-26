@@ -40,6 +40,7 @@
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetMorph.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/Mask.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/PointAdvect.h>
 #include <openvdb/tools/PointScatter.h>
@@ -78,6 +79,7 @@ public:
     CPPUNIT_TEST(testActivate);
     CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
+    CPPUNIT_TEST(testInteriorMask);
     CPPUNIT_TEST(testLevelSetSphere);
     CPPUNIT_TEST(testLevelSetPlatonic);
     CPPUNIT_TEST(testLevelSetAdvect);
@@ -105,6 +107,7 @@ public:
     void testActivate();
     void testFilter();
     void testFloatApply();
+    void testInteriorMask();
     void testLevelSetSphere();
     void testLevelSetPlatonic();
     void testLevelSetAdvect();
@@ -1231,6 +1234,39 @@ TestTools::testFilter()
         //std::cerr << "Successfully completed TestTools::testFilter mean test" << std::endl;
     }
 }
+
+
+void
+TestTools::testInteriorMask()
+{
+    using namespace openvdb;
+
+    const CoordBBox
+        extBand{Coord{-1}, Coord{100}},
+        isoBand{Coord{0}, Coord{99}},
+        intBand{Coord{1}, Coord{98}},
+        inside{Coord{2}, Coord{97}};
+
+    // Construct a "level set" with a three-voxel narrow band
+    // (the distances aren't correct, but they have the right sign).
+    FloatGrid lsgrid{/*background=*/2.f};
+    lsgrid.fill(extBand, 1.f);
+    lsgrid.fill(isoBand, 0.f);
+    lsgrid.fill(intBand, -1.f);
+    lsgrid.fill(inside, -2.f, /*active=*/false);
+
+    // For a non-level-set grid, tools::interiorMask() should return
+    // a mask of the active voxels.
+    auto mask = tools::interiorMask(lsgrid);
+    CPPUNIT_ASSERT_EQUAL(extBand.volume() - inside.volume(), mask->activeVoxelCount());
+
+    // For a level set, tools::interiorMask() should return a mask
+    // of the interior of the isosurface.
+    lsgrid.setGridClass(GRID_LEVEL_SET);
+    mask = tools::interiorMask(lsgrid);
+    CPPUNIT_ASSERT_EQUAL(intBand.volume(), mask->activeVoxelCount());
+}
+
 
 void
 TestTools::testLevelSetSphere()

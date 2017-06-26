@@ -14,14 +14,19 @@ New features:
   it operates only on leaf nodes.
 - Added a <TT>vdb_test&nbsp;-f</TT> option that reads a list of tests
   to be run from a text file.
-- Added a view mode indicator to <TT>vdb_view</TT> and enabled display
-  of tree topology and active voxels for point data grids.
+- Enabled display of point data grids in <TT>vdb_view</TT>.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Added a view mode indicator to <TT>vdb_view</TT>.
 - Added @vdblink::math::Mat::isFinite() isFinite@endlink,
   @vdblink::math::Mat::isNan() isNan@endlink, and
   @vdblink::math::Mat::isZero() isZero@endlink methods to
   @vdblink::math::Mat math::Mat@endlink and added
   @vdblink::math::Tuple::isZero() isZero@endlink to
   @vdblink::math::Tuple math::Tuple@endlink.
+- Added @vdblink::tools::interiorMask() tools::interiorMask@endlink,
+  which constructs a boolean mask grid from the active voxels of an
+  input grid or, if the input grid is a level set, from the interior
+  voxels of the level set.
 
 @par
 Improvements:
@@ -75,6 +80,10 @@ Houdini:
   for the pressure solver.
 - Added value type conversion options (for VDB output) to the Convert&nbsp;SOP.
 - Added a Densify SOP that replaces active tiles with leaf voxels.
+- Fixed a bug in the Rasterize Points&nbsp;SOP that capped density values
+  to one instead of to the particles&rsquo; densities.
+- The Convert and To&nbsp;Polygons SOPs now accept grids of any type
+  as surface masks, not just level set or SDF grids.
 
 
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
