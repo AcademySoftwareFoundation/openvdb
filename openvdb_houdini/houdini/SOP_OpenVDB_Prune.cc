@@ -234,7 +234,11 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
             }
 
             GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, pruneOp);
+            if (!GEOvdbProcessTypedGridTopology(*vdbPrim, pruneOp)) {
+#if UT_MAJOR_VERSION_INT >= 16
+               GEOvdbProcessTypedGridPoint(*vdbPrim, pruneOp);
+#endif
+            }
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

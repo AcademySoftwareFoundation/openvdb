@@ -382,8 +382,15 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
-                UTvdbProcessTypedGridTopology(maskIt->getStorageType(), maskIt->getGrid(), op);
-                maskGrid = op.mMaskGrid;
+
+                if (UTvdbProcessTypedGridTopology(maskIt->getStorageType(), maskIt->getGrid(), op)) {
+                    maskGrid = op.mMaskGrid;
+                }
+# if UT_MAJOR_VERSION_INT >= 16
+                else if(UTvdbProcessTypedGridPoint(maskIt->getStorageType(), maskIt->getGrid(), op)) {
+                    maskGrid = op.mMaskGrid;
+                }
+#endif
             }
 
             if (!maskGrid) addWarning(SOP_MESSAGE, "Mask VDB not found.");
@@ -472,7 +479,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
                 std::ostringstream ss;
                 ss << "Can't compute " << sOpName[whichOp] << " from grid";
                 if (inGridName.isstring()) ss << " " << inGridName;
-                ss << " of type " << vdb->getGrid().valueType();
+                ss << " of type " << UTvdbGetGridTypeString(vdb->getGrid());
                 addWarning(SOP_MESSAGE, ss.str().c_str());
             }
 

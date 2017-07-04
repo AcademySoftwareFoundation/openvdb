@@ -2668,7 +2668,12 @@ applyClippingMask(PointIndexGridCollection::BoolTreeType& mask, RasterizationSet
         GridTopologyClipOp<PointIndexGridCollection::BoolTreeType>
             op(mask, *settings.transform, settings.invertMask);
 
-        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*settings.maskGrid), *settings.maskGrid, op);
+        if (!UTvdbProcessTypedGridTopology(UTvdbGetGridType(*settings.maskGrid), *settings.maskGrid, op)) {
+#if UT_MAJOR_VERSION_INT >= 16
+            UTvdbProcessTypedGridPoint(UTvdbGetGridType(*settings.maskGrid), *settings.maskGrid, op);
+#endif
+
+        }
     }
 }
 
