@@ -41,8 +41,8 @@
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeSet);
     CPPUNIT_TEST(testAttributeSetDescriptor);

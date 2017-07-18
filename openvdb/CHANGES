@@ -10,6 +10,9 @@ Version 4.0.2 - In development
       however it operates only on leaf nodes.
     - Added a vdb_test -f option that reads a list of tests to be run
       from a text file.
+    - Added functions for deleting points from point data grids based on
+      group membership.
+      [Contributed by Double Negative]
     - Enabled display of point data grids in vdb_view.
       [Contributed by Nick Avramoussis]
     - Added a view mode indicator to vdb_view.
@@ -18,6 +21,8 @@ Version 4.0.2 - In development
     - Added tools::interiorMask(), which constructs a boolean mask grid
       from the active voxels of an input grid or, if the input grid is
       a level set, from the interior voxels of the level set.
+    - Added begin() and end() iterator methods (and related methods)
+      to math::CoordBBox, so that it can be used in range-based for loops.
 
     Improvements:
     - Moved the isFinite(), isInfinite() and isNan() methods from
@@ -39,6 +44,8 @@ Version 4.0.2 - In development
     - Changed the random number seeding mechanism for .vdb file UUIDs
       to avoid duplicate IDs.
       [Reported by Jason Lefley]
+    - Fixed an off-by-one bug in the resampler that produced grid patterns
+      of missing interior voxels for scale factors greater than one.
 
     Houdini:
     - As of Houdini 16.0.549, houdini_utils::OpFactory can generate help cards
@@ -50,8 +57,11 @@ Version 4.0.2 - In development
     - The Extended Operator Info window in Houdini 16 now renders correctly
       for OpenVDB SOPs, instead of displaying a Python stack trace.
       [Contributed by Dan Bailey]
+    - Added a Points Delete SOP for deleting points from point data grids
+      based on group membership.
+      [Contributed by Double Negative]
     - Added a Mantra VRAY procedural and a delayed load SHOP for rendering
-      OpenVDB Points.  Houdini 16 is required.
+      point data grids.  Houdini 16 is required.
       [Contributed by Double Negative]
     - Replaced the Combine SOP's "A/B Pairs" and "Flatten" toggles with
       a menu of collation options that include flattening only A grids

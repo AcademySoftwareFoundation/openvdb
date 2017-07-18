@@ -33,7 +33,6 @@
 /// @file PointDelete.h
 ///
 /// @brief Methods for deleting points based on group membership
-///
 
 #ifndef OPENVDB_POINTS_POINT_DELETE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_DELETE_HAS_BEEN_INCLUDED
@@ -74,7 +73,7 @@ inline void deleteFromGroups(PointDataTree& pointTree, const std::vector<std::st
 ///          points that belong to none of the groups.
 ///
 /// @param   pointTree    the point tree with the group to delete
-/// @param   groups       the name of the group to delete
+/// @param   group        the name of the group to delete
 /// @param   invert       If this flag is set to true, points *not* in this group will be deleted
 ///
 /// @note    If the invert flag is true, the group will not be dropped after deleting points.
@@ -130,7 +129,8 @@ struct DeleteGroupsOp
             }
 
             const AttributeSet& existingAttributeSet = leaf->attributeSet();
-            AttributeSet* newAttributeSet = new AttributeSet(existingAttributeSet, newSize);
+            AttributeSet* newAttributeSet = new AttributeSet(
+                existingAttributeSet, static_cast<Index>(newSize));
             const size_t attributeSetSize = existingAttributeSet.size();
 
             // cache the attribute arrays for efficiency
@@ -143,7 +143,7 @@ struct DeleteGroupsOp
                 existingAttributeArrays.push_back(existingAttributeSet.getConst(i));
             }
 
-            size_t attributeIndex = 0;
+            typename ValueType::IntType attributeIndex = 0;
             std::vector<ValueType> endOffsets;
 
             endOffsets.reserve(LeafNodeT::NUM_VALUES);
@@ -151,11 +151,10 @@ struct DeleteGroupsOp
             // now construct new attribute arrays which exclude data from deleted points
 
             for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
-                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), *filter);
-                     iter; ++iter) {
+                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), *filter); iter; ++iter) {
                     for (size_t i = 0; i < attributeSetSize; i++) {
-                        newAttributeArrays[i]->set(attributeIndex, *(existingAttributeArrays[i]),
-                            *iter);
+                        newAttributeArrays[i]->set(static_cast<Index>(attributeIndex),
+                            *(existingAttributeArrays[i]), *iter);
                     }
                     ++attributeIndex;
                 }

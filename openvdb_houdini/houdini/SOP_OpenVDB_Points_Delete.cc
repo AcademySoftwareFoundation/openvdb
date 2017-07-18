@@ -207,8 +207,7 @@ SOP_OpenVDB_Points_Delete::cookMySop(OP_Context& context)
 
             const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
             const bool hasPointsToDrop = std::any_of(pointGroups.begin(), pointGroups.end(),
-                                                    [&descriptor](const std::string &group) ->
-                                                        bool{return descriptor.hasGroup(group);});
+                [&descriptor](const std::string& grp) -> bool { return descriptor.hasGroup(grp); });
 
             if (!hasPointsToDrop)    continue;
 

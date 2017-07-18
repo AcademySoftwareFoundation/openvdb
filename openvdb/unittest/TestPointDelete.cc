@@ -1,4 +1,4 @@
-/////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
 //
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
@@ -46,8 +46,8 @@ using namespace openvdb::points;
 class TestPointDelete: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointDelete);
     CPPUNIT_TEST(testDeleteFromGroups);

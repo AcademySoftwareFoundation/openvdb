@@ -421,21 +421,20 @@ pointDataGridSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& gr
 namespace {
 
 inline int
-lookupGroupInput(const PRM_SpareData *spare)
+lookupGroupInput(const PRM_SpareData* spare)
 {
-    const char  *istring;
     if (!spare) return 0;
-    istring = spare->getValue("sop_input");
+    const char* istring = spare->getValue("sop_input");
     return istring ? atoi(istring) : 0;
 }
 
 void
-sopBuildVDBPointsGroupMenu(void *data, PRM_Name *menuEntries, int themenusize,
-    const PRM_SpareData *spare, const PRM_Parm *parm)
+sopBuildVDBPointsGroupMenu(void* data, PRM_Name* menuEntries, int /*themenusize*/,
+    const PRM_SpareData* spare, const PRM_Parm* /*parm*/)
 {
     using openvdb::points::PointDataGrid;
 
-    SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
+    SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
     int inputIndex = lookupGroupInput(spare);
 
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());

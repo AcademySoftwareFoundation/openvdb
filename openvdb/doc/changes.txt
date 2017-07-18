@@ -14,6 +14,9 @@ New features:
   it operates only on leaf nodes.
 - Added a <TT>vdb_test&nbsp;-f</TT> option that reads a list of tests
   to be run from a text file.
+- Added functions for @link points/PointDelete.h deleting points@endlink
+  from point data grids based on group membership.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Enabled display of point data grids in <TT>vdb_view</TT>.
   <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 - Added a view mode indicator to <TT>vdb_view</TT>.
@@ -27,6 +30,10 @@ New features:
   which constructs a boolean mask grid from the active voxels of an
   input grid or, if the input grid is a level set, from the interior
   voxels of the level set.
+- Added @vdblink::math::CoordBBox::begin() begin@endlink
+  and @vdblink::math::CoordBBox::end() end@endlink iterator methods
+  (and related methods) to @vdblink::math::CoordBBox CoordBBox@endlink,
+  so that it can be used in range-based <TT>for</TT>&nbsp;loops.
 
 @par
 Improvements:
@@ -54,6 +61,9 @@ Bug fixes:
 - Changed the random number seeding mechanism for <TT>.vdb</TT> file UUIDs
   to avoid duplicate&nbsp;IDs.
   <I>[Reported&nbsp;by&nbsp;Jason&nbsp;Lefley]</I>
+- Fixed an off-by-one bug in the
+  @vdblink::tools::GridResampler resampler@endlink that produced grid patterns
+  of missing interior voxels for scale factors greater than one.
 
 @par
 Houdini:
@@ -68,8 +78,11 @@ Houdini:
 - The Extended Operator Info window in Houdini&nbsp;16 now renders correctly
   for OpenVDB SOPs, instead of displaying a Python stack trace.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added a Points Delete SOP for deleting points from point data grids
+  based on group membership.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Added a Mantra VRAY procedural and a delayed load SHOP for rendering
-  OpenVDB&nbsp;Points.
+  point data grids.
   Houdini&nbsp;16 is required.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Replaced the Combine SOP&rsquo;s &ldquo;A/B&nbsp;Pairs&rdquo;
