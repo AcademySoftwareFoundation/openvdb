@@ -280,6 +280,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Occlusion_Mask.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
     houdini/SOP_OpenVDB_Points_Convert.cc \
+    houdini/SOP_OpenVDB_Points_Delete.cc \
     houdini/SOP_OpenVDB_Points_Group.cc \
     houdini/SOP_OpenVDB_Prune.cc \
     houdini/SOP_OpenVDB_Rasterize_Points.cc \

@@ -839,8 +839,8 @@ newSopOperator(OP_OperatorTable* table)
 
     {
         const char* items[] = {
-            "vdb", "Houdini Points to VDB Points",
-            "hdk", "VDB Points to Houdini Points",
+            "vdb", "Pack Points into VDB Points",
+            "hdk", "Extract Points from VDB Points",
             nullptr
         };
 
@@ -861,6 +861,7 @@ newSopOperator(OP_OperatorTable* table)
             " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
         .setTooltip("Specify VDB Points Groups to use as an input.")
         .setDocumentation(
             "The point group inside the VDB Points primitive to extract\n\n"
@@ -1185,18 +1186,19 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
 
         const fpreal time = context.getTime();
-        // Check for particles in the primary (left) input port
-        const GU_Detail* ptGeo = inputGeo(0, context);
 
         if (evalInt("conversion", 0, time) != 0) {
+
+            // Duplicate primary (left) input geometry and convert the VDB points inside
+
+            if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
 
             UT_String groupStr;
             evalString(groupStr, "group", 0, time);
             const GA_PrimitiveGroup *group =
-                matchGroup(const_cast<GU_Detail&>(*ptGeo), groupStr.toStdString());
+                matchGroup(const_cast<GU_Detail&>(*gdp), groupStr.toStdString());
 
             // Extract VDB Point groups to filter
 
@@ -1213,8 +1215,11 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             // all attributes should be converted
             const std::vector<std::string> emptyNameVector;
 
-            // Mesh each VDB primitive independently
-            for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
+            UT_Array<GEO_Primitive*> primsToDelete;
+            primsToDelete.clear();
+
+            // Convert each VDB primitive independently
+            for (hvdb::VdbPrimIterator vdbIt(gdp, group); vdbIt; ++vdbIt) {
 
                 GU_Detail geo;
 
@@ -1249,10 +1254,19 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 }
 
                 gdp->merge(geo);
+                primsToDelete.append(*vdbIt);
             }
 
+            gdp->deletePrimitives(primsToDelete, true);
             return error();
         }
+
+        // if we're here, we're converting Houdini points to OpenVDB. Clear gdp entirely
+        // before proceeding, then check for particles in the primary (left) input port
+
+        gdp->clearAndDestroy();
+
+        const GU_Detail* ptGeo = inputGeo(0, context);
 
         // Set member data
 
