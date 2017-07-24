@@ -55,6 +55,7 @@ void exportMetadata();
 void exportFloatGrid();
 void exportIntGrid();
 void exportVec3Grid();
+void exportPointGrid();
 
 
 namespace _openvdbmodule {
@@ -715,6 +716,7 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     exportFloatGrid();
     exportIntGrid();
     exportVec3Grid();
+    exportPointGrid();
 
 
     py::def("read",

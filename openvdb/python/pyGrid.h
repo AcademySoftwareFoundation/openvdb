@@ -56,6 +56,7 @@
 #include "openvdb/openvdb.h"
 #include "openvdb/io/Stream.h"
 #include "openvdb/math/Math.h" // for math::isExactlyEqual()
+#include "openvdb/points/PointDataGrid.h"
 #include "openvdb/tools/LevelSetSphere.h"
 #include "openvdb/tools/Dense.h"
 #include "openvdb/tools/ChangeBackground.h"
@@ -103,6 +104,7 @@ getPyObjectFromGrid(const GridBase::Ptr& grid)
     CONVERT_BASE_TO_GRID(Int64Grid, grid);
     CONVERT_BASE_TO_GRID(Vec3IGrid, grid);
     CONVERT_BASE_TO_GRID(Vec3DGrid, grid);
+    CONVERT_BASE_TO_GRID(points::PointDataGrid, grid);
 #endif
 #undef CONVERT_BASE_TO_GRID
 
@@ -132,6 +134,7 @@ getGridFromPyObject(const boost::python::object& gridObj)
     CONVERT_GRID_TO_BASE(Int64Grid::Ptr);
     CONVERT_GRID_TO_BASE(Vec3IGrid::Ptr);
     CONVERT_GRID_TO_BASE(Vec3DGrid::Ptr);
+    CONVERT_GRID_TO_BASE(points::PointDataGrid::Ptr);
 #endif
 #undef CONVERT_GRID_TO_BASE
 
