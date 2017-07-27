@@ -135,6 +135,7 @@ of an input volume inside a camera frustum that would be occluded\n\
 when viewed through the camera.\n\
 \n\
 @related\n\
+- [OpenVDB Clip|Node:sop/DW_OpenVDBClip]\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
 \n\
 @examples\n\

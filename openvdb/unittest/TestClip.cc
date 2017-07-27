@@ -30,6 +30,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tools/Clip.h>
 
 
@@ -52,6 +53,7 @@ public:
 
     CPPUNIT_TEST_SUITE(TestClip);
     CPPUNIT_TEST(testBBox);
+    CPPUNIT_TEST(testFrustum);
     CPPUNIT_TEST(testMaskGrid);
     CPPUNIT_TEST(testBoolMask);
     CPPUNIT_TEST(testInvertedBoolMask);
@@ -60,6 +62,7 @@ public:
     CPPUNIT_TEST_SUITE_END();
 
     void testBBox();
+    void testFrustum();
     void testMaskGrid();
     void testBoolMask();
     void testInvertedBoolMask();
@@ -141,6 +144,60 @@ TestClip::testBBox()
     BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
     FloatGrid::Ptr clipped = tools::clip(mCube, clipBox);
     validate(*clipped);
+}
+
+
+// Test clipping against a camera frustum.
+void
+TestClip::testFrustum()
+{
+    using namespace openvdb;
+
+    const auto d = double(kCubeBBox.max().z());
+    const math::NonlinearFrustumMap frustum{
+        /*position=*/Vec3d{0.0, 0.0, 5.0 * d},
+        /*direction=*/Vec3d{0.0, 0.0, -1.0},
+        /*up=*/Vec3d{0.0, d / 2.0, 0.0},
+        /*aspect=*/1.0,
+        /*near=*/4.0 * d + 1.0,
+        /*depth=*/kCubeBBox.dim().z() - 2.0,
+        /*x_count=*/100,
+        /*z_count=*/100};
+    const auto frustumIndexBBox = frustum.getBBox();
+
+    {
+        auto clipped = tools::clip(mCube, frustum);
+
+        const auto bbox = clipped->evalActiveVoxelBoundingBox();
+        const auto cubeDim = kCubeBBox.dim();
+        CPPUNIT_ASSERT_EQUAL(kCubeBBox.min().z() + 1, bbox.min().z());
+        CPPUNIT_ASSERT_EQUAL(kCubeBBox.max().z() - 1, bbox.max().z());
+        CPPUNIT_ASSERT(int(bbox.volume()) < int(cubeDim.x() * cubeDim.y() * (cubeDim.z() - 2)));
+
+        // Note: mCube index space corresponds to world space.
+        for (auto it = clipped->beginValueOn(); it; ++it) {
+            const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
+            CPPUNIT_ASSERT(frustumIndexBBox.isInside(xyz));
+        }
+    }
+    {
+        auto tile = openvdb::FloatGrid{0.0f};
+        tile.tree().addTile(/*level=*/2, Coord{0}, /*value=*/5.0f, /*active=*/true);
+
+        auto clipped = tools::clip(tile, frustum);
+        CPPUNIT_ASSERT(!clipped->empty());
+        for (auto it = clipped->beginValueOn(); it; ++it) {
+            const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
+            CPPUNIT_ASSERT(frustumIndexBBox.isInside(xyz));
+        }
+
+        clipped = tools::clip(tile, frustum, /*keepInterior=*/false);
+        CPPUNIT_ASSERT(!clipped->empty());
+        for (auto it = clipped->beginValueOn(); it; ++it) {
+            const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
+            CPPUNIT_ASSERT(!frustumIndexBBox.isInside(xyz));
+        }
+    }
 }
 
 

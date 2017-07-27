@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly
 @par
-<B>Version 4.0.2</B> - <I>In development</I>
+<B>Version 4.0.2</B> - <I>July 28, 2017</I>
 @par
 New features:
 - Added @vdblink::tools::compActiveLeafVoxels compActiveLeafVoxels@endlink,
@@ -34,6 +34,9 @@ New features:
   and @vdblink::math::CoordBBox::end() end@endlink iterator methods
   (and related methods) to @vdblink::math::CoordBBox CoordBBox@endlink,
   so that it can be used in range-based <TT>for</TT>&nbsp;loops.
+- The @link tools/Clip.h clip@endlink tool now accepts either a box,
+  a mask grid or a camera frustum as the clipping region.
+  The latter is new in this version.
 
 @par
 Improvements:
@@ -97,6 +100,7 @@ Houdini:
   to one instead of to the particles&rsquo; densities.
 - The Convert and To&nbsp;Polygons SOPs now accept grids of any type
   as surface masks, not just level set or SDF grids.
+- Added an option to the Clip&nbsp;SOP to clip to a camera frustum.
 
 
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly

@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 4.0.2 - In development
+Version 4.0.2 - July 28, 2017
 
     New features:
     - Added tools::compActiveLeafVoxels(), which composites active
@@ -23,6 +23,8 @@ Version 4.0.2 - In development
       a level set, from the interior voxels of the level set.
     - Added begin() and end() iterator methods (and related methods)
       to math::CoordBBox, so that it can be used in range-based for loops.
+    - tools::clip() now accepts either a box, a mask grid or a camera frustum
+      as the clipping region.  The latter is new in this version.
 
     Improvements:
     - Moved the isFinite(), isInfinite() and isNan() methods from
@@ -74,6 +76,7 @@ Version 4.0.2 - In development
       to one instead of to the particles' densities.
     - The Convert and To Polygons SOPs now accept grids of any type
       as surface masks, not just level set or SDF grids.
+    - Added an option to the Clip SOP to clip to a camera frustum.
 
 
 Version 4.0.1 - March 8, 2017
