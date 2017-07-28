@@ -142,7 +142,7 @@ Mask VDB:\n\
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
-        .addInput("Mask VDB or bounding geometry")
+        .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
@@ -458,6 +458,10 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
                 clipBox.max()[1] = box.ymax();
                 clipBox.max()[2] = box.zmax();
             }
+        }
+        else {
+            addError(SOP_MESSAGE, "Not enough sources specified.");
+            return UT_ERROR_ABORT;
         }
 
         // Get the group of grids to process.
