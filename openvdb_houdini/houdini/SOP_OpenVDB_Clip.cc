@@ -458,10 +458,9 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
                 clipBox.max()[1] = box.ymax();
                 clipBox.max()[2] = box.zmax();
             }
-        }
-        else {
+        } else {
             addError(SOP_MESSAGE, "Not enough sources specified.");
-            return UT_ERROR_ABORT;
+            return error();
         }
 
         // Get the group of grids to process.
