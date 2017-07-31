@@ -266,6 +266,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Combine.cc \
     houdini/SOP_OpenVDB_Convert.cc \
     houdini/SOP_OpenVDB_Create.cc \
+    houdini/SOP_OpenVDB_Densify.cc \
     houdini/SOP_OpenVDB_Diagnostics.cc \
     houdini/SOP_OpenVDB_Fill.cc \
     houdini/SOP_OpenVDB_Filter.cc \
