@@ -382,6 +382,7 @@ INCLUDE_NAMES := \
     tools/PointScatter.h \
     tools/PointsToMask.h \
     tools/PoissonSolver.h \
+    tools/PotentialFlow.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -517,6 +518,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointPartitioner.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
+    unittest/TestPotentialFlow.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
