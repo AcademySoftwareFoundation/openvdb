@@ -72,6 +72,35 @@ struct Traits {
 
 /// @private
 template<typename GridType>
+inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
+    typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
+doLevelSetInteriorMask(const GridType& grid, const double isovalue)
+{
+    using GridValueT = typename GridType::ValueType;
+    using MaskGridPtrT = typename mask_internal::Traits<GridType>::BoolGridPtrType;
+
+    // If the input grid is a level set (and floating-point), return a mask of its interior.
+    if (grid.getGridClass() == GRID_LEVEL_SET) {
+        return tools::sdfInteriorMask(grid, static_cast<GridValueT>(isovalue));
+    }
+    return MaskGridPtrT{};
+}
+
+
+/// @private
+// No-op specialization for non-floating-point grids
+template<typename GridType>
+inline typename std::enable_if<!std::is_floating_point<typename GridType::ValueType>::value,
+    typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
+doLevelSetInteriorMask(const GridType&, const double /*isovalue*/)
+{
+    using MaskGridPtrT = typename mask_internal::Traits<GridType>::BoolGridPtrType;
+    return MaskGridPtrT{};
+}
+
+
+/// @private
+template<typename GridType>
 inline typename std::enable_if<mask_internal::Traits<GridType>::isBool,
     typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
 doInteriorMask(const GridType& grid, const double /*isovalue*/)
@@ -87,12 +116,11 @@ inline typename std::enable_if<!(mask_internal::Traits<GridType>::isBool),
     typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
 doInteriorMask(const GridType& grid, const double isovalue)
 {
-    using GridValueT = typename GridType::ValueType;
     using MaskGridT = typename mask_internal::Traits<GridType>::BoolGridType;
 
-    // If the input grid is a level set (and floating-point), return a mask of its interior.
-    if ((grid.getGridClass() == GRID_LEVEL_SET) && std::is_floating_point<GridValueT>::value) {
-        return tools::sdfInteriorMask(grid, static_cast<GridValueT>(isovalue));
+    // If the input grid is a level set, return a mask of its interior.
+    if (auto maskGridPtr = doLevelSetInteriorMask(grid, isovalue)) {
+        return maskGridPtr;
     }
 
     // For any other grid type, return a mask of its active voxels.

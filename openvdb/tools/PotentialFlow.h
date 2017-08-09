@@ -27,8 +27,8 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-/// @file PotentialFlow.h
+
+/// @file tools/PotentialFlow.h
 ///
 /// @brief Tools for creating potential flow fields through solving Laplace's equation
 ///
@@ -51,8 +51,19 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief Construct a mask for the Potential Flow domain. For a level set, this represents a
-/// rebuilt exterior narrow band. For any other grid it is a new region that surrounds the active voxels.
+/// @brief Metafunction to convert a vector-valued grid type to a scalar grid type
+template<typename VecGridT>
+struct VectorToScalarGrid {
+    using Type =
+        typename VecGridT::template ValueConverter<typename VecGridT::ValueType::value_type>::Type;
+    using Ptr = typename Type::Ptr;
+    using ConstPtr = typename Type::ConstPtr;
+};
+
+
+/// @brief Construct a mask for the Potential Flow domain.
+/// @details For a level set, this represents a rebuilt exterior narrow band.
+/// For any other grid it is a new region that surrounds the active voxels.
 /// @param grid         source grid to use for computing the mask
 /// @param dilation     dilation in voxels of the source grid to form the new potential flow mask
 template<typename GridT, typename MaskT = typename GridT::template ValueConverter<ValueMask>::Type>
@@ -70,36 +81,38 @@ createPotentialFlowMask(const GridT& grid, int dilation = 5);
 /// around the collider by supplying an empty boundary Velocity and a
 /// non-zero background velocity.
 template<typename Vec3T, typename GridT, typename MaskT>
-typename GridT::template ValueConverter<Vec3T>::Type::Ptr
+inline typename GridT::template ValueConverter<Vec3T>::Type::Ptr
 createPotentialFlowNeumannVelocities(const GridT& collider, const MaskT& domain,
     const typename GridT::template ValueConverter<Vec3T>::Type::ConstPtr boundaryVelocity,
     const Vec3T& backgroundVelocity);
 
 
-/// @brief Compute the Potential on the domain using the neumann boundary conditions on
+/// @brief Compute the Potential on the domain using the Neumann boundary conditions on
 /// solid boundaries
 /// @param domain       a mask to represent the domain in which to perform the solve
 /// @param neumann      the topology of this grid defines where the solid boundaries are and grid
-///                     values give the neumann boundaries that should be applied there
+///                     values give the Neumann boundaries that should be applied there
 /// @param state        the solver parameters for computing the solution
+/// @param interrupter  pointer to an optional interrupter adhering to the
+///                     util::NullInterrupter interface
 /// @details On input, the State object should specify convergence criteria
 /// (minimum error and maximum number of iterations); on output, it gives
 /// the actual termination conditions.
 template<typename Vec3GridT, typename MaskT, typename InterrupterT = util::NullInterrupter>
-typename Vec3GridT::template ValueConverter<typename Vec3GridT::ValueType::value_type>::Type::Ptr
+inline typename VectorToScalarGrid<Vec3GridT>::Ptr
 computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann, math::pcg::State& state,
     InterrupterT* interrupter = nullptr);
 
 
-/// @brief Compute a vector Flow Field comprising the gradient of the potential with neumann
+/// @brief Compute a vector Flow Field comprising the gradient of the potential with Neumann
 /// boundary conditions applied
 /// @param potential    scalar potential, typically computed from computeScalarPotential()
 /// @param neumann      the topology of this grid defines where the solid boundaries are and grid
-///                     values give the neumann boundaries that should be applied there
+///                     values give the Neumann boundaries that should be applied there
+/// @param backgroundVelocity   a background velocity value
 template<typename Vec3GridT>
-typename Vec3GridT::Ptr
-computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
-    Vec3GridT::ValueType::value_type>::Type& potential,
+inline typename Vec3GridT::Ptr
+computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potential,
     const Vec3GridT& neumann,
     const typename Vec3GridT::ValueType backgroundVelocity =
         zeroVal<typename Vec3GridT::TreeType::ValueType>());
@@ -111,9 +124,10 @@ computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
 namespace potential_flow_internal {
 
 
+/// @private
 // helper function for retrieving a mask that comprises the outer-most layer of voxels
 template<typename GridT>
-typename GridT::TreeType::template ValueConverter<ValueMask>::Type::Ptr
+inline typename GridT::TreeType::template ValueConverter<ValueMask>::Type::Ptr
 extractOuterVoxelMask(GridT& inGrid)
 {
     using MaskTreeT = typename GridT::TreeType::template ValueConverter<ValueMask>::Type;
@@ -126,7 +140,7 @@ extractOuterVoxelMask(GridT& inGrid)
 }
 
 
-// computes neumann velocities through sampling the gradient and velocities
+// computes Neumann velocities through sampling the gradient and velocities
 template<typename Vec3GridT, typename GradientT>
 struct ComputeNeumannVelocityOp
 {
@@ -191,9 +205,10 @@ template<typename Vec3GridT, typename MaskT>
 struct SolveBoundaryOp
 {
     SolveBoundaryOp(const Vec3GridT& velGrid, const MaskT& domainGrid)
-        : mVelGrid(velGrid)
+        : mVoxelSize(domainGrid.voxelSize()[0])
+        , mVelGrid(velGrid)
         , mDomainGrid(domainGrid)
-        , mVoxelSize(domainGrid.voxelSize()[0]) { }
+    { }
 
     void operator()(const Coord& ijk, const Coord& neighbor,
                     double& source, double& diagonal) const {
@@ -224,7 +239,8 @@ struct SolveBoundaryOp
 ////////////////////////////////////////////////////////////////////////////
 
 template<typename GridT, typename MaskT>
-typename MaskT::Ptr createPotentialFlowMask(const GridT& grid, int dilation)
+inline typename MaskT::Ptr
+createPotentialFlowMask(const GridT& grid, int dilation)
 {
     using MaskTreeT = typename MaskT::TreeType;
 
@@ -321,7 +337,7 @@ typename GridT::template ValueConverter<Vec3T>::Type::Ptr createPotentialFlowNeu
 
 
 template<typename Vec3GridT, typename MaskT, typename InterrupterT>
-typename Vec3GridT::template ValueConverter<typename Vec3GridT::ValueType::value_type>::Type::Ptr
+inline typename VectorToScalarGrid<Vec3GridT>::Ptr
 computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann,
     math::pcg::State& state, InterrupterT* interrupter)
 {
@@ -351,9 +367,9 @@ computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann,
 
 
 template<typename Vec3GridT>
-typename Vec3GridT::Ptr
-computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
-    Vec3GridT::ValueType::value_type>::Type& potential, const Vec3GridT& neumann,
+inline typename Vec3GridT::Ptr
+computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potential,
+    const Vec3GridT& neumann,
     const typename Vec3GridT::ValueType backgroundVelocity)
 {
     using Vec3T = const typename Vec3GridT::ValueType;
@@ -361,8 +377,8 @@ computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
 
     // The VDB gradient op uses the background grid value, which is zero by default, when
     // computing the gradient at the boundary.  This works at the zero-dirichlet boundaries, but
-    // give spurious values at neumann ones as the potential should be non-zero there.  To avoid
-    // the extra error, we just substitute the neumann condition on the boundaries.
+    // give spurious values at Neumann ones as the potential should be non-zero there.  To avoid
+    // the extra error, we just substitute the Neumann condition on the boundaries.
     // Technically, we should allow for some tangential velocity, coming from the gradient of
     // potential.  However, considering the voxelized nature of our solve, a decent approximation
     // to a tangential derivative isn't probably worth our time. Any tangential component will be
@@ -370,7 +386,7 @@ computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
 
     auto gradient = tools::gradient(potential);
 
-    // apply neumann values to the gradient
+    // apply Neumann values to the gradient
 
     auto applyNeumann = [&gradient, &neumann] (
         const MaskGrid::TreeType::LeafNodeType& leaf, size_t)
@@ -401,8 +417,8 @@ computePotentialFlow(const typename Vec3GridT::template ValueConverter<typename
             }
         };
 
-        typename tree::LeafManager<typename Vec3GridT::TreeType> leafManager(gradient->tree());
-        leafManager.foreach(applyBackgroundVelocity);
+        typename tree::LeafManager<typename Vec3GridT::TreeType> leafManager2(gradient->tree());
+        leafManager2.foreach(applyBackgroundVelocity);
     }
 
     return gradient;

@@ -29,8 +29,6 @@
 ///////////////////////////////////////////////////////////////////////////
 
 /// @file tree/Tree.h
-///
-/// @todo Optimize Tree::evalMinMax
 
 #ifndef OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
@@ -534,15 +532,12 @@ public:
         mRoot.prune(tolerance);
     }
 
-    //@{
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
     /// If a leaf node with the same origin already exists, replace it.
     ///
     /// @warning Ownership of the leaf is transferred to the tree so
     /// the client code should not attempt to delete the leaf pointer!
     void addLeaf(LeafNodeType* leaf) { assert(leaf); mRoot.addLeaf(leaf); }
-    OPENVDB_DEPRECATED void addLeaf(LeafNodeType& leaf) { mRoot.addLeaf(&leaf); }
-    //@}
 
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
@@ -2213,6 +2208,7 @@ template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
 {
+    /// @todo optimize
     minVal = maxVal = zeroVal<ValueType>();
     if (ValueOnCIter iter = this->cbeginValueOn()) {
         minVal = maxVal = *iter;

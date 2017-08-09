@@ -323,7 +323,6 @@ inline void
 closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
     UT_FloatArray& distances, UT_Vector3Array* positions, InterrupterT& boss)
 {
-
     std::vector<openvdb::Vec3R> tmpPoints(distances.entries());
 
     GA_ROHandleV3 points = GA_ROHandleV3(gdp.getP());
@@ -335,20 +334,17 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
         tmpPoints[n][2] = pos.z();
     }
 
-
     std::vector<float> tmpDistances;
 
     const bool transformPoints = (positions != nullptr);
 
-    openvdb::tools::ClosestSurfacePoint<GridT> closestPoint;
-    if (!closestPoint.initialize(grid, isovalue, &boss)) return;
+    auto closestPoint = openvdb::tools::ClosestSurfacePoint<GridT>::create(grid, isovalue, &boss);
+    if (!closestPoint) return;
 
-    if (transformPoints) closestPoint.searchAndReplace(tmpPoints, tmpDistances);
-    else closestPoint.search(tmpPoints, tmpDistances);
+    if (transformPoints) closestPoint->searchAndReplace(tmpPoints, tmpDistances);
+    else closestPoint->search(tmpPoints, tmpDistances);
 
     for (size_t n = 0, N = tmpDistances.size(); n < N; ++n) {
-
-
         if (tmpDistances[n] < distances(n)) {
             distances(n) = tmpDistances[n];
             if (transformPoints) {

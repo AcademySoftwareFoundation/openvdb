@@ -1,4 +1,3 @@
-
 ///////////////////////////////////////////////////////////////////////////
 //
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
@@ -31,13 +30,11 @@
 
 /// @file unittest/TestPotentialFlow.cc
 
-
-#include <cppunit/extensions/HelperMacros.h>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/PotentialFlow.h>
+
 
 class TestPotentialFlow: public CppUnit::TestCase
 {
@@ -294,7 +291,7 @@ TestPotentialFlow::testUniformStream()
     // check convergence
 
     CPPUNIT_ASSERT(state.success);
-    CPPUNIT_ASSERT(state.iterations > 1 && state.iterations < 1000);
+    CPPUNIT_ASSERT(state.iterations > 0 && state.iterations < 1000);
     CPPUNIT_ASSERT(state.absoluteError < 1e-6);
 
     CPPUNIT_ASSERT_EQUAL(potential->activeVoxelCount(), mask->activeVoxelCount());
@@ -316,9 +313,9 @@ TestPotentialFlow::testUniformStream()
 
     for (auto leaf = flow->tree().cbeginLeaf(); leaf; ++leaf) {
         for (auto iter = leaf->cbeginValueOn(); iter; ++iter) {
-            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().x(), 0.0, /*tolerance*/1e-7));
-            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().y(), 0.0, /*tolerance*/1e-7));
-            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().z(), 1.0, /*tolerance*/1e-7));
+            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().x(), 0.0, /*tolerance*/1e-6));
+            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().y(), 0.0, /*tolerance*/1e-6));
+            CPPUNIT_ASSERT(math::isApproxEqual(iter.getValue().z(), 1.0, /*tolerance*/1e-6));
         }
     }
 }
@@ -458,3 +455,7 @@ TestPotentialFlow::testFlowAroundSphere()
         CPPUNIT_ASSERT(flowVel);
     }
 }
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

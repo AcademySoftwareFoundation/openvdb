@@ -31,12 +31,13 @@
 #ifndef OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-#include <iomanip>
-#include <assert.h>
-#include <math.h>
 #include <openvdb/Exceptions.h>
 #include "Vec3.h"
 #include "Mat.h"
+#include <algorithm> // for std::copy(), std::swap()
+#include <cassert>
+#include <cmath>
+#include <iomanip>
 
 
 namespace openvdb {
@@ -55,9 +56,9 @@ class Mat3: public Mat<3, T>
 {
 public:
     /// Data type held by the matrix.
-    typedef T         value_type;
-    typedef T         ValueType;
-    typedef Mat<3, T> MyBase;
+    using value_type = T;
+    using ValueType = T;
+    using MyBase = Mat<3, T>;
     /// Trivial constructor, the matrix is NOT initialized
     Mat3() {}
 
@@ -265,12 +266,6 @@ public:
         MyBase::mm[7] = v2[2];
         MyBase::mm[8] = v3[2];
     } // setColumns
-
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3
-    OPENVDB_DEPRECATED void setBasis(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
-    {
-        this->setRows(v1, v2, v3);
-    }
 
     /// Set diagonal and symmetric triangular components
     void setSymmetric(const Vec3<T> &vdiag, const Vec3<T> &vtri)
@@ -704,9 +699,9 @@ Mat3<T> outerProduct(const Vec3<T>& v1, const Vec3<T>& v2)
                    v1[2]*v2[0], v1[2]*v2[1], v1[2]*v2[2]);
 }// outerProduct
 
-typedef Mat3<float>  Mat3s;
-typedef Mat3<double> Mat3d;
-typedef Mat3d        Mat3f;
+using Mat3s = Mat3<float>;
+using Mat3d = Mat3<double>;
+using Mat3f = Mat3d;
 
 
 /// Interpolate the rotation between m1 and m2 using Mat::powSolve.
@@ -722,67 +717,70 @@ Mat3<T> powLerp(const Mat3<T0> &m1, const Mat3<T0> &m2, T t)
 }
 
 
-namespace {
-    template<typename T>
-    void pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
-    {
-        const int& n = Mat3<T>::size;  // should be 3
-        T temp;
-        /// scratch variables used in pivoting
-        double cotan_of_2_theta;
-        double tan_of_theta;
-        double cosin_of_theta;
-        double sin_of_theta;
-        double z;
+namespace mat3_internal {
 
-        double Sij = S(i,j);
+template<typename T>
+inline void
+pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
+{
+    const int& n = Mat3<T>::size;  // should be 3
+    T temp;
+    /// scratch variables used in pivoting
+    double cotan_of_2_theta;
+    double tan_of_theta;
+    double cosin_of_theta;
+    double sin_of_theta;
+    double z;
 
-        double Sjj_minus_Sii = D[j] - D[i];
+    double Sij = S(i,j);
 
-        if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
-            tan_of_theta = Sij / Sjj_minus_Sii;
+    double Sjj_minus_Sii = D[j] - D[i];
+
+    if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
+        tan_of_theta = Sij / Sjj_minus_Sii;
+    } else {
+        /// pivot on Sij
+        cotan_of_2_theta = 0.5*Sjj_minus_Sii / Sij ;
+
+        if (cotan_of_2_theta < 0.) {
+            tan_of_theta =
+                -1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
         } else {
-            /// pivot on Sij
-            cotan_of_2_theta = 0.5*Sjj_minus_Sii / Sij ;
-
-            if (cotan_of_2_theta < 0.) {
-                tan_of_theta =
-                    -1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
-            } else {
-                tan_of_theta =
-                    1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
-            }
+            tan_of_theta =
+                1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
         }
-
-        cosin_of_theta = 1./sqrt( 1. + tan_of_theta * tan_of_theta);
-        sin_of_theta = cosin_of_theta * tan_of_theta;
-        z = tan_of_theta * Sij;
-        S(i,j) = 0;
-        D[i] -= z;
-        D[j] += z;
-        for (int k = 0; k < i; ++k) {
-            temp = S(k,i);
-            S(k,i) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-            S(k,j)= sin_of_theta * temp + cosin_of_theta * S(k,j);
-        }
-        for (int k = i+1; k < j; ++k) {
-            temp = S(i,k);
-            S(i,k) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-            S(k,j) = sin_of_theta * temp + cosin_of_theta * S(k,j);
-        }
-        for (int k = j+1; k < n; ++k) {
-            temp = S(i,k);
-            S(i,k) = cosin_of_theta * temp - sin_of_theta * S(j,k);
-            S(j,k) = sin_of_theta * temp + cosin_of_theta * S(j,k);
-        }
-        for (int k = 0; k < n; ++k)
-            {
-                temp = Q(k,i);
-                Q(k,i) = cosin_of_theta * temp - sin_of_theta*Q(k,j);
-                Q(k,j) = sin_of_theta * temp + cosin_of_theta*Q(k,j);
-            }
     }
+
+    cosin_of_theta = 1./sqrt( 1. + tan_of_theta * tan_of_theta);
+    sin_of_theta = cosin_of_theta * tan_of_theta;
+    z = tan_of_theta * Sij;
+    S(i,j) = 0;
+    D[i] -= z;
+    D[j] += z;
+    for (int k = 0; k < i; ++k) {
+        temp = S(k,i);
+        S(k,i) = cosin_of_theta * temp - sin_of_theta * S(k,j);
+        S(k,j)= sin_of_theta * temp + cosin_of_theta * S(k,j);
+    }
+    for (int k = i+1; k < j; ++k) {
+        temp = S(i,k);
+        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(k,j);
+        S(k,j) = sin_of_theta * temp + cosin_of_theta * S(k,j);
+    }
+    for (int k = j+1; k < n; ++k) {
+        temp = S(i,k);
+        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(j,k);
+        S(j,k) = sin_of_theta * temp + cosin_of_theta * S(j,k);
+    }
+    for (int k = 0; k < n; ++k)
+        {
+            temp = Q(k,i);
+            Q(k,i) = cosin_of_theta * temp - sin_of_theta*Q(k,j);
+            Q(k,j) = sin_of_theta * temp + cosin_of_theta*Q(k,j);
+        }
 }
+
+} // namespace mat3_internal
 
 
 /// @brief Use Jacobi iterations to decompose a symmetric 3x3 matrix
@@ -791,7 +789,8 @@ namespace {
 /// Joachim Kopp.  arXiv.org preprint: physics/0610206
 /// with the addition of largest pivot
 template<typename T>
-bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
+inline bool
+diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     unsigned int MAX_ITERATIONS=250)
 {
     /// use Givens rotation matrix to eliminate off-diagonal entries.
@@ -841,7 +840,7 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
                 }
             }
         }
-        pivot(ip, jp, S, D, Q);
+        mat3_internal::pivot(ip, jp, S, D, Q);
     } while (iterations < MAX_ITERATIONS);
 
     return false;

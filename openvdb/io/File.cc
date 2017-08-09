@@ -591,54 +591,6 @@ File::readGridMetadata(const Name& name)
 ////////////////////////////////////////
 
 
-GridBase::ConstPtr
-File::readGridPartial(const Name& name)
-{
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading.");
-    }
-
-    GridBase::ConstPtr ret;
-    if (!inputHasGridOffsets()) {
-        // Retrieve the grid from mGrids, which should already contain
-        // the entire contents of the file.
-        if (GridBase::Ptr grid = readGrid(name)) {
-            ret = ConstPtrCast<const GridBase>(grid);
-        }
-    } else {
-        NameMapCIter it = findDescriptor(name);
-        if (it == gridDescriptors().end()) {
-            OPENVDB_THROW(KeyError, filename() << " has no grid named \"" << name << "\"");
-        }
-
-        // Seek to and read in the grid from the file.
-        const GridDescriptor& gd = it->second;
-        ret = readGridPartial(gd, /*readTopology=*/true);
-
-        if (gd.isInstance()) {
-            NameMapCIter parentIt =
-                findDescriptor(GridDescriptor::nameAsString(gd.instanceParentName()));
-            if (parentIt == gridDescriptors().end()) {
-                OPENVDB_THROW(KeyError, "missing instance parent \""
-                    << GridDescriptor::nameAsString(gd.instanceParentName())
-                    << "\" for grid " << GridDescriptor::nameAsString(gd.uniqueName())
-                    << " in file " << filename());
-            }
-            if (GridBase::ConstPtr parent =
-                readGridPartial(parentIt->second, /*readTopology=*/true))
-            {
-                ConstPtrCast<GridBase>(ret)->setTree(
-                    ConstPtrCast<GridBase>(parent)->baseTreePtr());
-            }
-        }
-    }
-    return ret;
-}
-
-
-////////////////////////////////////////
-
-
 GridBase::Ptr
 File::readGrid(const Name& name)
 {

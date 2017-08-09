@@ -27,25 +27,28 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file SOP_OpenVDB_Potential_Flow.cc
 ///
 /// @authors Todd Keeler, Dan Bailey
-
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 
 #include <openvdb/Types.h>
-#include <openvdb/tree/LeafManager.h>
-
 #include <openvdb/tools/PotentialFlow.h>
 #include <openvdb/tools/TopologyToLevelSet.h>
 
 #include <UT/UT_Interrupt.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+#include <vector>
 
 
 namespace hvdb = openvdb_houdini;
@@ -65,8 +68,8 @@ struct SOP_OpenVDB_Potential_Flow: public hvdb::SOP_NodeVDB
     int isRefInput(unsigned i) const override { return (i == 1); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 }; // SOP_OpenVDB_Potential_Flow
 
 // using namespace openvdb;
@@ -93,8 +96,8 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setDocumentation(
         "A VDB from the second input used to modify the volume where the potential flow"
-        " will be solved.  The domain can either restricted to the vdb input, or excluded"
-        " from expanding in the vdb input."));
+        " will be solved.  The domain can either be restricted to the VDB input, or excluded"
+        " from expanding in the VDB input."));
 
     char const * const items[] = {
         "intersection",  "Intersection",
@@ -105,10 +108,10 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_ORD, "masktype", "Domain Mask Type")
         .setDefault(PRMzeroDefaults)
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-        .setTooltip("Mode for applying the domain modification mask (2nd input)")
-        .setDocumentation("Modify the constructed domain using the 2nd input vdb mask for"
-        " calculating the potential flow velocity.  \"Intersection\" causes the created"
-        " domain to be restricted to the Mask's active topology.  \"Difference\" removes"
+        .setTooltip("Mode for applying the domain modification mask (second input)")
+        .setDocumentation("Modify the constructed domain using the second input VDB mask for"
+        " calculating the potential flow velocity.  __Intersection__ causes the created"
+        " domain to be restricted to the Mask's active topology.  __Difference__ removes"
         " any overlap between the constructed domain and the topology.  The domain geometry"
         " will likely change the results"));
 
@@ -246,20 +249,20 @@ newSopOperator(OP_OperatorTable* table)
     " The primary input is a VDB signed distance field (SDF) on the first input."
     " The resolution and grid transform for the new velocity field will be taken from the input"
     " SDF."
-    " If there are multiple SDF's only the first one is used, it is recommended to sample multiple"
+    " If there are multiple SDFs only the first one is used, it is recommended to sample multiple"
     " SDFs into a single one for multiple obstacles."
     " This SDF can be accompanied by a VDB velocity field which will be used to impart the SDF"
     " velocity into the solver."
     " The potential flow created is divergence free by design and has the same velocity on the"
     " boundary as the background velocity.\n\n"
     " The simplest workflow for multiple moving objects is to animate the polygonal geometry and"
-    " then create SDF's and velocity VDB's by using the VDB from Polygons node."
+    " then create SDFs and velocity VDBs by using the VDB from Polygons node."
     " The output can be fed directly into the first input of the Potential Flow SOP."
     " The second input of the SOP allows a Mask VDB input for modifiying the solution domain"
     " created by the Potential Flow SOP."
     " The created domain can either be restricted to the active voxels of the Mask VDB, or"
     " restricted from creating a domain inside the active voxels."
-    " These modes are defined by the respective \"Intersection\" or \"Difference\" modes on the"
+    " These modes are defined by the respective __Intersection__ or __Difference__ modes on the"
     " parameter toggle"
     );
 }
@@ -278,10 +281,10 @@ SOP_OpenVDB_Potential_Flow::updateParmsFlags()
     const bool hasMask = (2 == nInputs());
     changed |= enableParm("maskvdbname", hasMask);
     changed |= enableParm("masktype", hasMask);
-    changed |= enableParm("iterations", evalInt("useiterations", 0, 0));
-    changed |= enableParm("tolerance", evalInt("usetolerance", 0, 0));
-    changed |= enableParm("backgroundvelocity", evalInt("usebackgroundvelocity", 0, 0));
-    changed |= enableParm("applybackgroundvelocity", evalInt("usebackgroundvelocity", 0, 0));
+    changed |= enableParm("iterations", bool(evalInt("useiterations", 0, 0)));
+    changed |= enableParm("tolerance", bool(evalInt("usetolerance", 0, 0)));
+    changed |= enableParm("backgroundvelocity", bool(evalInt("usebackgroundvelocity", 0, 0)));
+    changed |= enableParm("applybackgroundvelocity", bool(evalInt("usebackgroundvelocity", 0, 0)));
 
     return changed;
 }
@@ -464,11 +467,11 @@ SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
                 if (GEOvdbProcessTypedGridTopology(*vdb, op)) {
                     grid = op.mSdfGrid;
                 }
-# if UT_MAJOR_VERSION_INT >= 16
+#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
                 else if (GEOvdbProcessTypedGridPoint(*vdb, op)) {
                     grid = op.mSdfGrid;
                 }
-# endif
+#endif
             }
         }
 
@@ -498,12 +501,12 @@ SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
                         maskIt->getGrid(), op)) {
                         mask = op.mMaskGrid;
                     }
-# if UT_MAJOR_VERSION_INT >= 16
+#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
                     else if (UTvdbProcessTypedGridPoint(maskIt->getStorageType(),
                         maskIt->getGrid(), op)) {
                         mask = op.mMaskGrid;
                     }
-# endif
+#endif
                     else {
                         addWarning(SOP_MESSAGE, "Cannot convert VDB type to mask.");
                     }
@@ -535,16 +538,17 @@ SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
 
             if (mask) {
                 if (static_cast<int>(evalInt("masktype", 0, time)) == /*intersection*/0) {
-                   domain->treePtr()->topologyIntersection(mask->tree());
+                    domain->treePtr()->topologyIntersection(mask->tree());
                 } else {
-                   domain->treePtr()->topologyDifference(mask->tree());
+                    domain->treePtr()->topologyDifference(mask->tree());
                 }
             }
 
             const int iterations = (static_cast<int>(evalInt("useiterations", 0, time)) == 1 ?
-               static_cast<int>(evalInt("iterations", 0, time)) : DEFAULT_MAX_ITERATIONS);
-            const float absoluteError = (static_cast<int>(evalInt("usetolerance", 0, time)) == 1 ?
-               static_cast<float>(evalFloat("tolerance", 0, time)) : DEFAULT_MAX_ERROR);
+                static_cast<int>(evalInt("iterations", 0, time)) : DEFAULT_MAX_ITERATIONS);
+            const float absoluteError = static_cast<float>(
+                static_cast<int>(evalInt("usetolerance", 0, time)) == 1 ?
+                evalFloat("tolerance", 0, time) : DEFAULT_MAX_ERROR);
 
             openvdb::Vec3f backgroundVelocity(0);
             bool applyBackground(false);
@@ -626,4 +630,4 @@ SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 (http://www.mozilla.org/MPL/2.0/)
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

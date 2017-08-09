@@ -1653,12 +1653,6 @@ void uninitialize();
 
 }
 
-
-/// @deprecated See internal::initialize()
-OPENVDB_DEPRECATED void initialize();
-/// @deprecated See internal::uninitialize()
-OPENVDB_DEPRECATED void uninitialize();
-
 } // namespace points
 
 

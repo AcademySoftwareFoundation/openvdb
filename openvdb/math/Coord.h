@@ -31,7 +31,10 @@
 #ifndef OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
+#include <algorithm> // for std::min(), std::max()
 #include <array> // for std::array
+#include <iostream>
+#include <limits>
 #include <openvdb/Platform.h>
 #include "Math.h"
 #include "Vec3.h"

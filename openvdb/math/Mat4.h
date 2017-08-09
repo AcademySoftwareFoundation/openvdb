@@ -33,14 +33,14 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Platform.h>
-#include <iomanip>
-#include <assert.h>
-#include <math.h>
-#include <algorithm>
 #include "Math.h"
 #include "Mat3.h"
 #include "Vec3.h"
 #include "Vec4.h"
+#include <algorithm> // for std::copy(), std::swap()
+#include <cassert>
+#include <iomanip>
+#include <cmath>
 
 
 namespace openvdb {
@@ -58,9 +58,9 @@ class Mat4: public Mat<4, T>
 {
 public:
     /// Data type held by the matrix.
-    typedef T                   value_type;
-    typedef T                   ValueType;
-    typedef Mat<4, T>           MyBase;
+    using value_type = T;
+    using ValueType = T;
+    using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
     Mat4() {}
@@ -285,14 +285,6 @@ public:
         MyBase::mm[14] = v3[3];
         MyBase::mm[15] = v4[3];
     }
-
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3, v4
-    OPENVDB_DEPRECATED void setBasis(const Vec4<T> &v1, const Vec4<T> &v2,
-                                     const Vec4<T> &v3, const Vec4<T> &v4)
-    {
-        this->setRows(v1, v2, v3, v4);
-    }
-
 
     // Set "this" matrix to zero
     void setZero()
@@ -1370,9 +1362,9 @@ inline bool hasTranslation(const Mat4<T>& m) {
 }
 
 
-typedef Mat4<float>  Mat4s;
-typedef Mat4<double> Mat4d;
-typedef Mat4d        Mat4f;
+using Mat4s = Mat4<float>;
+using Mat4d = Mat4<double>;
+using Mat4f = Mat4d;
 
 } // namespace math
 

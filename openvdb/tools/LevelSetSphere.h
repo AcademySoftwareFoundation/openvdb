@@ -43,9 +43,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
-#include <boost/utility.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 #include "SignedFloodFill.h"
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -68,7 +68,7 @@ namespace tools {
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
 createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize,
-                     float halfWidth = float(LEVEL_SET_HALF_WIDTH), InterruptT* interrupt =  NULL);
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH), InterruptT* interrupt = nullptr);
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
 /// representation of a sphere.
@@ -104,9 +104,10 @@ template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetSphere
 {
 public:
-    typedef typename GridT::ValueType   ValueT;
-    typedef typename math::Vec3<ValueT> Vec3T;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename math::Vec3<ValueT>;
+    static_assert(std::is_floating_point<ValueT>::value,
+        "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor
     ///
@@ -118,7 +119,7 @@ public:
     /// @note If the radius of the sphere is smaller than
     /// 1.5*voxelSize, i.e. the sphere is smaller than the Nyquist
     /// frequency of the grid, it is ignored!
-    LevelSetSphere(ValueT radius, const Vec3T &center, InterruptT* interrupt = NULL)
+    LevelSetSphere(ValueT radius, const Vec3T &center, InterruptT* interrupt = nullptr)
         : mRadius(radius), mCenter(center), mInterrupt(interrupt)
     {
         if (mRadius<=0) OPENVDB_THROW(ValueError, "radius must be positive");
@@ -163,19 +164,19 @@ private:
 
         if (mInterrupt) mInterrupt->start("Generating level set of sphere");
         // Compute signed distances to sphere using leapfrogging in k
-        for ( i = imin; i <= imax; ++i ) {
+        for (i = imin; i <= imax; ++i) {
             if (util::wasInterrupted(mInterrupt)) return;
-            const float x2 = math::Pow2(i - c[0]);
-            for ( j = jmin; j <= jmax; ++j ) {
-                const float x2y2 = math::Pow2(j - c[1]) + x2;
-                for (k=kmin; k<=kmax; k += m) {
+            const auto x2 = math::Pow2(i - c[0]);
+            for (j = jmin; j <= jmax; ++j) {
+                const auto x2y2 = math::Pow2(j - c[1]) + x2;
+                for (k = kmin; k <= kmax; k += m) {
                     m = 1;
                     /// Distance in voxel units to sphere
-                    const float v = math::Sqrt(x2y2 + math::Pow2(k-c[2]))-r0,
-                        d = math::Abs(v);
-                    if ( d < w ){ // inside narrow band
+                    const auto v = math::Sqrt(x2y2 + math::Pow2(k-c[2]))-r0;
+                    const auto d = math::Abs(v);
+                    if (d < w) { // inside narrow band
                         accessor.setValue(ijk, dx*v);// distance in world units
-                    } else {// outside narrow band
+                    } else { // outside narrow band
                         m += math::Floor(d-w);// leapfrog
                     }
                 }//end leapfrog over k
@@ -204,9 +205,10 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
     float halfWidth, InterruptT* interrupt)
 {
     // GridType::ValueType is required to be a floating-point scalar.
-    BOOST_STATIC_ASSERT(boost::is_floating_point<typename GridType::ValueType>::value);
+    static_assert(std::is_floating_point<typename GridType::ValueType>::value,
+        "level set grids must have scalar, floating-point value types");
 
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     LevelSetSphere<GridType, InterruptT> factory(ValueT(radius), center, interrupt);
     return factory.getLevelSet(ValueT(voxelSize), ValueT(halfWidth));
 }

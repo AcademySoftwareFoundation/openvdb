@@ -89,9 +89,6 @@ internal::uninitialize()
     AttributeArray::clearRegistry();
 }
 
-void initialize() { internal::initialize(); }
-void uninitialize() { internal::uninitialize(); }
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

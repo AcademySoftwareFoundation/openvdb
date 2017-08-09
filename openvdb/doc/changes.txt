@@ -2,6 +2,39 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 5.0.0</B> - <I>In development</I>
+@par
+New features:
+- Added tools for creating @link tools/PotentialFlow.h potential flow@endlink
+  fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB
+  <A HREF="http://www.openvdb.org/documentation/">course&nbsp;notes</A>.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Bug fixes:
+- Fixed bugs in the distance calculations in the
+  @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  tool that caused searches to produce incorrect results.
+
+@par
+API changes:
+- Replaced @c tools::ClosestSurfacePoint::initialize with
+  @vdblink::tools::ClosestSurfacePoint::create()
+  tools::ClosestSurfacePoint::create@endlink,
+  which returns a newly-allocated and properly initialized object.
+- Removed a number of methods that were deprecated in version&nbsp;4.0.0
+  or earlier.
+
+@par
+Houdini:
+- Fixed bugs that caused the Ray&nbsp;SOP&rsquo;s closest surface point
+  searches to produce incorrect results.
+- Added a Potential&nbsp;Flow&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+
 @htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.2</B> - <I>July 28, 2017</I>
@@ -300,7 +333,7 @@ Bug fixes:
   returns an empty list of spheres instead of crashing when the user selects
   an isosurface that lies outside the bounding volume&rsquo;s narrow band.
 - Fixed a null pointer dereference when copying grids that were loaded
-  with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
+  with @c io::File::readGridPartial.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 @anchor v4_0_0_ABI_changes
@@ -333,10 +366,8 @@ API changes:
 - Made @c LeafNode::Buffer a top-level class and renamed it to
   @vdblink::tree::LeafBuffer LeafBuffer@endlink.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
-- Deprecated @vdblink::io::File::readGridPartial()
-  io::File::readGridPartial@endlink in favor of delayed loading.
-- @vdblink::tools::ClosestSurfacePoint::initialize()
-  tools::ClosestSurfacePoint::initialize@endlink now returns a boolean
+- Deprecated @c io::File::readGridPartial in favor of delayed loading.
+- @c tools::ClosestSurfacePoint::initialize now returns a boolean
   indicating whether initialization was successful.
 - Dropped the @c CopyPolicy enum and added
   @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
@@ -554,8 +585,7 @@ Bug fixes:
 
 @par
 API changes:
-- Deprecated @vdblink::math::Mat3::setBasis Mat3::setBasis@endlink and
-  @vdblink::math::Mat4::setBasis Mat4::setBasis@endlink.
+- Deprecated @c math::Mat3::setBasis and @c math::Mat4::setBasis.
 - Renamed @c GudonovsNormSqrd to
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
@@ -875,9 +905,9 @@ Houdini:
   an index-space bounding box.
 - Added @vdblink::tools::clip() tools::clip@endlink, which clips a grid
   either against a bounding box or against the active voxels of a mask grid.
-- @vdblink::io::File::readGridPartial() File::readGridPartial@endlink
-  allocates the nodes of a grid&rsquo;s tree as before, but it now allocates
-  leaf nodes without data buffers.  (This feature is mainly for internal use.
+- @c io::File::readGridPartial allocates the nodes of a grid&rsquo;s tree
+  as before, but it now allocates leaf nodes without data buffers.
+  (This feature is mainly for internal use.
   Partially-read grids should be used with care if at all, and they should
   be treated as read-only.)
 - Grid names retrieved using a

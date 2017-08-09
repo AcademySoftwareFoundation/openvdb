@@ -36,7 +36,9 @@
 #include "io.h" // for MappedFile::Notifier
 #include "Archive.h"
 #include "GridDescriptor.h"
+#include <algorithm> // for std::copy()
 #include <iosfwd>
+#include <iterator> // for std::back_inserter()
 #include <map>
 #include <memory>
 #include <string>
@@ -135,13 +137,6 @@ public:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr readGridMetadata(const Name&);
 
-    /// @brief Read a grid's metadata, topology, transform, etc., but not
-    /// any of its leaf node data blocks.
-    /// @return the grid pointer to the partially loaded grid.
-    /// @deprecated Partially-loaded grids might not be compatible with all tools.
-    /// Use them with caution, and preferably use delayed loading instead.
-    OPENVDB_DEPRECATED GridBase::ConstPtr readGridPartial(const Name&);
-
     /// Read an entire grid, including all of its data blocks.
     GridBase::Ptr readGrid(const Name&);
 #ifndef OPENVDB_2_ABI_COMPATIBLE
@@ -150,7 +145,6 @@ public:
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
 #endif
 
-    /// @todo GridPtrVec readAllGridsPartial(const Name&)
     /// @todo GridPtrVec readAllGrids(const Name&)
 
     /// @brief Write the grids in the given container to the file whose name

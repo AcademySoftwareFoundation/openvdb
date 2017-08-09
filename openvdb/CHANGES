@@ -1,6 +1,31 @@
 OpenVDB Version History
 =======================
 
+Version 5.0.0 - In development
+
+    New features:
+    - Added tools for creating potential flow fields, as described in
+      the 2017 SIGGRAPH OpenVDB course notes.
+      [Contributed by Double Negative]
+
+    Bug fixes:
+    - Fixed bugs in the distance calculations in tools::ClosestSurfacePoint
+      that caused searches to produce incorrect results.
+
+    API changes:
+    - Replaced tools::ClosestSurfacePoint::initialize() with
+      tools::ClosestSurfacePoint::create(), which returns a newly-allocated
+      and properly initialized object.
+    - Removed a number of methods that were deprecated in version 4.0.0
+      or earlier.
+
+    Houdini:
+    - Fixed bugs that caused the Ray SOP's closest surface point searches
+      to produce incorrect results.
+    - Added a Potential Flow SOP.
+      [Contributed by Double Negative]
+
+
 Version 4.0.2 - July 28, 2017
 
     New features:
