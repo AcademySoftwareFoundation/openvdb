@@ -512,7 +512,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
 
             // Create a new, empty output grid of the same type as the input grid
             // and with the same metadata.
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
             hvdb::GridPtr outGrid = grid.copyGrid(/*tree=*/openvdb::CP_NEW);
 #else
             hvdb::GridPtr outGrid = grid.copyGridWithNewTree();

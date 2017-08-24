@@ -63,7 +63,7 @@
 #include <tbb/task_scheduler_init.h>
 
 #include <boost/integer_traits.hpp> // for const_max
-#include <boost/scoped_array.hpp>
+#include <boost/shared_array.hpp>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()
@@ -774,15 +774,13 @@ private:
 
 
 template<typename TreeType>
-struct LeafNodeConnectivityTable {
-
+struct LeafNodeConnectivityTable
+{
     enum { INVALID_OFFSET = boost::integer_traits<size_t>::const_max };
 
     using LeafNodeType = typename TreeType::LeafNodeType;
 
     LeafNodeConnectivityTable(TreeType& tree)
-        : mLeafNodes()
-        , mOffsets(nullptr)
     {
         mLeafNodes.reserve(tree.leafCount());
         tree.getNodes(mLeafNodes);
@@ -796,7 +794,7 @@ struct LeafNodeConnectivityTable {
 
         // stash the leafnode origin coordinate and temporarily store the
         // linear offset in the origin.x variable.
-        boost::scoped_array<Coord> coordinates(new Coord[mLeafNodes.size()]);
+        std::unique_ptr<Coord[]> coordinates{new Coord[mLeafNodes.size()]};
         tbb::parallel_for(range,
             StashOriginAndStoreOffset<TreeType>(mLeafNodes, coordinates.get()));
 
@@ -828,7 +826,7 @@ struct LeafNodeConnectivityTable {
 
 private:
     std::vector<LeafNodeType*> mLeafNodes;
-    boost::scoped_array<size_t> mOffsets;
+    std::unique_ptr<size_t[]> mOffsets;
 }; // struct LeafNodeConnectivityTable
 
 
@@ -1372,7 +1370,9 @@ struct ComputeIntersectingVoxelSign
     using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
     using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
 
-    using LocalData = std::pair<boost::shared_array<Vec3d>, boost::shared_array<bool> >;
+    using PointArray = boost::shared_array<Vec3d>;
+    using MaskArray = boost::shared_array<bool>;
+    using LocalData = std::pair<PointArray, MaskArray>;
     using LocalDataTable = tbb::enumerable_thread_specific<LocalData>;
 
     ComputeIntersectingVoxelSign(
@@ -1402,10 +1402,10 @@ struct ComputeIntersectingVoxelSign
 
         LocalData& localData = mLocalDataTable->local();
 
-        boost::shared_array<Vec3d>& points = localData.first;
+        PointArray& points = localData.first;
         if (!points) points.reset(new Vec3d[LeafNodeType::SIZE * 2]);
 
-        boost::shared_array<bool>& mask = localData.second;
+        MaskArray& mask = localData.second;
         if (!mask) mask.reset(new bool[LeafNodeType::SIZE]);
 
 
@@ -3041,9 +3041,9 @@ traceExteriorBoundaries(FloatTreeT& tree)
     const size_t numLeafNodes = nodeConnectivity.size();
     const size_t numVoxels = numLeafNodes * FloatTreeT::LeafNodeType::SIZE;
 
-    boost::scoped_array<bool> changedNodeMaskA(new bool[numLeafNodes]);
-    boost::scoped_array<bool> changedNodeMaskB(new bool[numLeafNodes]);
-    boost::scoped_array<bool> changedVoxelMask(new bool[numVoxels]);
+    std::unique_ptr<bool[]> changedNodeMaskA{new bool[numLeafNodes]};
+    std::unique_ptr<bool[]> changedNodeMaskB{new bool[numLeafNodes]};
+    std::unique_ptr<bool[]> changedVoxelMask{new bool[numVoxels]};
 
     mesh_to_volume_internal::fillArray(changedNodeMaskA.get(), true, numLeafNodes);
     mesh_to_volume_internal::fillArray(changedNodeMaskB.get(), false, numLeafNodes);
@@ -3338,7 +3338,7 @@ meshToVolume(
         nodes.reserve(distTree.leafCount());
         distTree.getNodes(nodes);
 
-        boost::scoped_array<ValueType> buffer(new ValueType[LeafNodeType::SIZE * nodes.size()]);
+        std::unique_ptr<ValueType[]> buffer{new ValueType[LeafNodeType::SIZE * nodes.size()]};
 
         const ValueType offset = ValueType(0.8 * voxelSize);
 
@@ -3423,7 +3423,7 @@ doMeshConversion(
     }
 
     const size_t numPoints = points.size();
-    boost::scoped_array<Vec3s> indexSpacePoints(new Vec3s[numPoints]);
+    std::unique_ptr<Vec3s[]> indexSpacePoints{new Vec3s[numPoints]};
 
     // transform points to local grid index space
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numPoints),
@@ -3450,7 +3450,7 @@ doMeshConversion(
     // pack primitives
 
     const size_t numPrimitives = triangles.size() + quads.size();
-    boost::scoped_array<Vec4I> prims(new Vec4I[numPrimitives]);
+    std::unique_ptr<Vec4I[]> prims{new Vec4I[numPrimitives]};
 
     for (size_t n = 0, N = triangles.size(); n < N; ++n) {
         const Vec3I& triangle = triangles[n];

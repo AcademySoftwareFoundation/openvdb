@@ -50,7 +50,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-namespace {
+namespace internal {
 
 /// @internal For delayed loading to be threadsafe, LeafBuffer::mOutOfCore must be
 /// memory-fenced when it is set in LeafBuffer::doLoad(), otherwise that operation
@@ -63,10 +63,14 @@ namespace {
 /// its non-atomic counterpart.
 /// This helper class conditionally declares mOutOfCore as an atomic only if doing so
 /// doesn't break ABI compatibility.
-/// @todo Remove this for ABI 5.
 template<typename T>
 struct LeafBufferFlags
 {
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+    /// The type of LeafBuffer::mOutOfCore
+    using type = tbb::atomic<Index32>;
+    static constexpr bool IsAtomic = true;
+#else // OPENVDB_ABI_VERSION_NUMBER < 5
     // These structs need to have the same data members as LeafBuffer.
     struct Atomic { union { T* data; void* ptr; }; tbb::atomic<Index32> i; tbb::spin_mutex mutex; };
     struct NonAtomic { union { T* data; void* ptr; }; Index32 i; tbb::spin_mutex mutex; };
@@ -85,12 +89,13 @@ struct LeafBufferFlags
     static constexpr size_t size = sizeof(Atomic);
     /// The type of LeafBuffer::mOutOfCore
     using type = typename std::conditional<IsAtomic, tbb::atomic<Index32>, Index32>::type;
+#endif
 };
 
-} // unnamed namespace
+} // namespace internal
 
 
-/// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
+/// @brief Array of fixed size 2<SUP>3<I>Log2Dim</I></SUP> that stores
 /// the voxel values of a LeafNode
 template<typename T, Index Log2Dim>
 class LeafBuffer
@@ -101,7 +106,7 @@ public:
     using NodeMaskType = util::NodeMask<Log2Dim>;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     struct FileInfo
     {
         FileInfo(): bufpos(0) , maskpos(0) {}
@@ -112,7 +117,7 @@ public:
     };
 #endif
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     /// Default constructor
     LeafBuffer(): mData(new ValueType[SIZE]) {}
     /// Construct a buffer populated with the specified value.
@@ -196,7 +201,7 @@ private:
 
     bool deallocate();
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     void setOutOfCore(bool) {}
     void loadValues() const {}
     void doLoad() const {}
@@ -211,10 +216,10 @@ private:
 #endif
 
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     ValueType* mData;
 #else
-    using FlagsType = typename LeafBufferFlags<ValueType>::type;
+    using FlagsType = typename internal::LeafBufferFlags<ValueType>::type;
 
     union {
         ValueType* mData;
@@ -236,7 +241,7 @@ private:
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 template<typename T, Index Log2Dim>
 const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
@@ -281,7 +286,7 @@ LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
     }
 }
 
-#endif // !OPENVDB_2_ABI_COMPATIBLE
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
 
 template<typename T, Index Log2Dim>
@@ -289,7 +294,7 @@ inline void
 LeafBuffer<T, Log2Dim>::setValue(Index i, const ValueType& val)
 {
     assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     mData[i] = val;
 #else
     this->loadValues();
@@ -303,7 +308,7 @@ inline LeafBuffer<T, Log2Dim>&
 LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
 {
     if (&other != this) {
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
         if (other.mData != nullptr) {
             this->allocate();
             ValueType* target = mData;
@@ -311,7 +316,7 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
             Index n = SIZE;
             while (n--) *target++ = *source++;
         }
-#else // ! OPENVDB_2_ABI_COMPATIBLE
+#else // OPENVDB_ABI_VERSION_NUMBER >= 3
         if (this->isOutOfCore()) {
             this->detachFromFile();
         } else {
@@ -366,7 +371,7 @@ inline void
 LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
 {
     std::swap(mData, other.mData);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     std::swap(mOutOfCore, other.mOutOfCore);
 #endif
 }
@@ -377,7 +382,7 @@ inline Index
 LeafBuffer<T, Log2Dim>::memUsage() const
 {
     size_t n = sizeof(*this);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     if (mData) n += SIZE * sizeof(ValueType);
 #else
     if (this->isOutOfCore()) n += sizeof(FileInfo);
@@ -391,7 +396,7 @@ template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data() const
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     this->loadValues();
     if (mData == nullptr) {
         LeafBuffer* self = const_cast<LeafBuffer*>(this);
@@ -407,7 +412,7 @@ template<typename T, Index Log2Dim>
 inline typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data()
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     this->loadValues();
     if (mData == nullptr) {
         // This lock will be contended at most once.
@@ -424,7 +429,7 @@ inline const typename LeafBuffer<T, Log2Dim>::ValueType&
 LeafBuffer<T, Log2Dim>::at(Index i) const
 {
     assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     return mData[i];
 #else
     this->loadValues();
@@ -448,7 +453,7 @@ LeafBuffer<T, Log2Dim>::deallocate()
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 template<typename T, Index Log2Dim>
 inline void
@@ -501,7 +506,7 @@ LeafBuffer<T, Log2Dim>::detachFromFile()
     return false;
 }
 
-#endif // !OPENVDB_2_ABI_COMPATIBLE
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
 
 ////////////////////////////////////////

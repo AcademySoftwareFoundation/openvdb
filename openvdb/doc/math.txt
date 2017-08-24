@@ -29,7 +29,9 @@ float value = accessor.getValue(ijk);
 @endcode
 
 A @vdblink::math::Transform Transform@endlink relates index space coordinates
-to world space coordinates that give a spatial context for the discretized data.Translation from index coordinates @ijk to world space coordinates @xyz is
+to world space coordinates that give a spatial context for the
+discretized data.
+Translation from index coordinates @ijk to world space coordinates @xyz is
 done with a call to the
 @vdblink::math::Transform::indexToWorld() indexToWorld@endlink
 method, and from world space coordinates to index space coordinates with
@@ -50,7 +52,7 @@ openvdb::Vec3d indexSpacePoint = linearTransform->worldToIndex(worldSpacePoint);
 @endcode
 In the above example, there are two things to notice.
 First, world space locations are specified as three-dimensional,
-double-precision, floating-point vectors, and second, @c worldToIndex
+double-precision, floating-point vectors, and second, @b worldToIndex
 does not return discrete coordinates, but rather a floating-point vector.
 This is a reflection of the fact that not every location in a continuous
 world space, i.e., not every @xyz, is the image of discrete integral
@@ -61,7 +63,7 @@ Currently two different types of transforms are supported: linear and
 frustum transforms.
 A linear transform can be composed of scale, translation, rotation, and shear;
 essentially those things that can be mathematically represented by an
-invertible, constant-coefficient, @f$3 \times 3@f$ matrix and a translation
+invertible, constant-coefficient, 3&times;3 matrix and a translation
 (mathematically, an affine map).
 An essential feature of a linear transformation is that it treats all regions
 of index space equally: a small box in index space about origin @ijk=(0,0,0)
@@ -130,7 +132,7 @@ a question of interpretation and transforms.
 The cell-centered interpretation imagines world space as divided
 into discrete cells (e.g., cubes) centered on the image of the
 index-space lattice points.
-So the physical location @xyz that is the image (result of @c indexToWorld)
+So the physical location @xyz that is the image (result of @b indexToWorld)
 of a lattice point @ijk is the center of a cube.
 In the vertex-centered approach, the images of the lattice points form the
 vertices of cells, so the location @xyz would be a corner, not the
@@ -140,13 +142,13 @@ The link between transforms and cell-centered or vertex-centered
 partitioning of world space is tenuous.
 It boils down to this: the &ldquo;first&rdquo; cell vertex often is aligned
 with the origin.
-In the cell-centered case, when the cells are cubes of length @f$\Delta@f$
-on a side, the transform
-@f$(x,y,z) = (\Delta i + \Delta/2, \Delta j + \Delta/2, \Delta k + \Delta /2 )@f$
-will place the center of the first cube (i.e., the image of @f$(0,0,0)@f$)
-at the world space location of @f$(\Delta/2, \Delta/2, \Delta/2)@f$,
-and the cube will have walls coincident with the @f$x=0@f$, @f$y=0@f$
-and @f$z=0@f$ planes.
+In the cell-centered case, when the cells are cubes of length &Delta;
+on a side, the transform @xyz = (&Delta;<I>i</I> + &Delta;/2,
+&Delta;<I>j</I> + &Delta;/2, &Delta;<I>k</I> + &Delta; /2)
+will place the center of the first cube (i.e., the image of (0,0,0))
+at the world space location of (&Delta;/2,&nbsp;&Delta;/2,&nbsp;&Delta;/2),
+and the cube will have walls coincident with the <I>x</I>=0, <I>y</I>=0
+and <I>z</I>=0 planes.
 Using the OpenVDB transforms to create a so-called cell-centered transform
 could be done like this:
 @code
@@ -166,9 +168,10 @@ openvdb::math::Transform::Ptr transform =
 transform->postTranslate(offset);
 @endcode
 In contrast, for the vertex-centered partitions of space the first
-vertex is just the image of the first lattice point @f$ijk = (0,0,0)@f$,
+vertex is just the image of the first lattice point @ijk = (0,0,0),
 and the transform would lack the offset used in the cell-centered case;
-so it would simply be @f$(x,y,z) = (\Delta i , \Delta j ,\Delta k)@f$
+so it would simply be
+@xyz = (&Delta;<I>i</I>,&nbsp;&Delta;<I>j</I>,&nbsp;&Delta;<I>k</I>).
 @code
 // -- Constructing a uniform, vertex-centered transform --
 
@@ -201,7 +204,7 @@ methods such as @vdblink::math::Transform::voxelSize() voxelSize@endlink
 and @vdblink::math::Transform::voxelVolume() voxelVolume@endlink that suppose
 a particular interpretation of a voxel.
 They assume a voxel that is the image of a vertex-centered cube in index space,
-so the @c voxelSize methods return the lengths of line segments in world space
+so the @b voxelSize methods return the lengths of line segments in world space
 that connect vertices:
 @code
 openvdb::Coord ijk(0,0,0);
@@ -216,13 +219,13 @@ size.z() = (xform.indexToWorld(ijk + tmp2) - xform.indexToWorld(ijk)).length();
 // the computation above.
 assert(xform.voxelSize(ijk) == size);
 @endcode
-In the case where the transform is linear, the result of @c voxelSize
+In the case where the transform is linear, the result of @b voxelSize
 will be independent of the actual location @ijk, but the voxel size for a
 nonlinear transform such as a frustum will be spatially varying.
-The related @c voxelVolume can not in general be computed from the
-@c voxelSize, because there is no guarantee that a general transform
+The related @b voxelVolume can not in general be computed from the
+@b voxelSize, because there is no guarantee that a general transform
 will convert a cube-shaped voxel into another cube.
-As a result, the @c voxelVolume actually returns the determinant of the
+As a result, @b voxelVolume actually returns the determinant of the
 transform, which will be a correct measure of volume even if the voxel
 is sheared into a general parallelepiped.
 
@@ -235,14 +238,15 @@ In this case the lattice point @ijk identifies a cell in world space
 by mapping to the cell&rsquo;s center, but each element of the velocity
 vector is identified with a different face of the cell.
 The first element of the vector is identified with the image of the
-@f$(i-1/2,j,k)@f$ face, the second element with @f$(i,j-1/2,k)@f$,
-and the third element with @f$(i,j,k-1/2)@f$.
+(<I>i</I>&minus;1/2,&nbsp;<I>j</I>,&nbsp;<I>k</I>) face, the second element
+with (<I>i</I>,&nbsp;<I>j</I>&minus;1/2,&nbsp;<I>k</I>), and
+the third element with (<I>i</I>,&nbsp;<I>j</I>,&nbsp;<I>k</I>&minus;1/2).
 
 
 @section sMaps Maps in OpenVDB Transforms
 The actual work of a @vdblink::math::Transform Transform@endlink is performed
 by an implementation object called a @vdblink::math::MapBase Map@endlink.
-The map in turn is a polymorphic object whose derived types are designed to
+The @b Map in turn is a polymorphic object whose derived types are designed to
 optimally represent the most common transformations.
 Specifically, the @vdblink::math::Transform Transform@endlink holds a
 @vdblink::math::MapBase MapBase@endlink pointer to a derived type that
@@ -250,10 +254,10 @@ has been simplified to minimize calculations.
 When the transform is updated by prepending or appending a linear operation
 (e.g., with @vdblink::math::Transform::preRotate() preRotate@endlink),
 the implementation map is recomputed and simplified if possible.
-For example, in many level-set-oriented applications the transform
-between index space and world space is simply a uniform scaling of the
-index points, i.e., @f$(x,y,z) = (\Delta i, \Delta j, \Delta k)@f$,
-where @f$\Delta@f$ has some world space units.
+For example, in many level-set-oriented applications the transform between
+index space and world space is simply a uniform scaling of the index points,
+i.e., @xyz = (&Delta;<I>i</I>,&nbsp;&Delta;<I>j</I>,&nbsp;&Delta;<I>k</I>),
+where &Delta; has some world space units.
 For transforms such as this, the implementation is a
 @vdblink::math::UniformScaleMap UniformScaleMap@endlink.
 @code
@@ -308,7 +312,7 @@ openvdb::math::Vec3d worldSpace = indexSpace * transform;
 @endcode
 Any linear map can produce an equivalent
 @vdblink::math::AffineMap AffineMap@endlink, which in turn can produce
-an equivalent @f$4 \times 4@f$ matrix.
+an equivalent 4&times;4 matrix.
 Starting with a linear transform one can produce a consistent matrix as follows:
 @code
 openvdb::math::Mat4d matrix;
@@ -348,10 +352,12 @@ This allows the tools direct access to the map&rsquo;s simplified
 representation and gives the compiler a free hand to inline.
 
 Maps themselves know nothing of index space and world space, but are
-simply functions @f$x_{range} = f(x_{domain})@f$ that map 3-vectors from
+simply functions <I>x</I><SUB><I>range</I></SUB> =
+<I>f</I>(<I>x</I><SUB><I>domain</I></SUB>) that map 3-vectors from
 one space (the domain) to another (the range), or from the range back to
-the domain (@f$x_{domain} = f^{-1}(x_{range})@f$), by means of the methods
-@vdblink::math::MapBase::applyMap() applyMap@endlink and
+the domain (<I>x</I><SUB><I>domain</I></SUB> =
+<I>f</I><SUP>&minus;1</SUP>(<I>x</I><SUB><I>range</I></SUB>)), by means of
+the methods @vdblink::math::MapBase::applyMap() applyMap@endlink and
 @vdblink::math::MapBase::applyInverseMap() applyInverseMap@endlink.
 
 @code

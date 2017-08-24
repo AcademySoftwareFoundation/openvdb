@@ -31,6 +31,7 @@
 #ifndef OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include "Compression.h" // for COMPRESS_ZIP, etc.
 #include <openvdb/Grid.h>
 #include <openvdb/MetaMap.h>
@@ -157,7 +158,7 @@ protected:
 
     /// Populate the given grid from the input stream.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Populate the given grid from the input stream, but only where it
     /// intersects the given world-space bounding box.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const BBoxd&);
@@ -166,7 +167,7 @@ protected:
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const CoordBBox&);
 #endif
 
-    typedef std::map<Name /*uniqueName*/, GridBase::Ptr> NamedGridMap;
+    using NamedGridMap = std::map<Name /*uniqueName*/, GridBase::Ptr>;
 
     /// @brief If the grid represented by the given grid descriptor
     /// is an instance, connect it with its instance parent.

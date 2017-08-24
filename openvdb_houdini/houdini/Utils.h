@@ -39,8 +39,8 @@
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
-#include <boost/function.hpp> ///< @todo use std::function instead
-#include <boost/shared_ptr.hpp>
+#include <functional>
+#include <memory>
 #include <type_traits>
 
 
@@ -73,7 +73,7 @@ using GridCRef = const openvdb::GridBase&;
 class OPENVDB_HOUDINI_API VdbPrimCIterator
 {
 public:
-    using FilterFunc = boost::function<bool (const GU_PrimVDB&)>;
+    using FilterFunc = std::function<bool (const GU_PrimVDB&)>;
 
     /// @param gdp
     ///     the geometry detail over which to iterate
@@ -134,7 +134,7 @@ protected:
     VdbPrimCIterator(const GEO_Detail*, GA_Range::safedeletions,
         const GA_PrimitiveGroup* = nullptr, FilterFunc = FilterFunc());
 
-    boost::shared_ptr<GA_GBPrimitiveIterator> mIter;
+    std::shared_ptr<GA_GBPrimitiveIterator> mIter;
     FilterFunc mFilter;
 }; // class VdbPrimCIterator
 

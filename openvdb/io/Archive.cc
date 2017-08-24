@@ -75,6 +75,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <iostream>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <system_error> // for std::error_code()
 
@@ -1021,7 +1022,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     return false;
 #else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
@@ -1039,7 +1040,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 {
     struct Local {
         static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
             g.readBuffers(istrm, indexBBox);
         }
@@ -1120,7 +1121,7 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     doReadGrid(grid, gd, is, NoBBox());
 }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     std::istream& is, const BBoxd& worldBBox)

@@ -34,8 +34,9 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   bits=32|64          build for 32-bit or 64-bit environments (default: 64)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands in verbose mode
@@ -141,8 +142,10 @@ INCLDIRS := \
 CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:
 CXXFLAGS += \

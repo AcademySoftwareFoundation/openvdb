@@ -2342,7 +2342,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 
             if (childMask.isOn(i)) {
                 // Read in and insert a child node.
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
                 ChildT* child = new ChildT(origin, mBackground);
 #else
                 ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
@@ -2389,7 +2389,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     for (Index n = 0; n < numChildren; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
         Coord origin(vec);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
         ChildT* child = new ChildT(origin, mBackground);
 #else
         ChildT* child = new ChildT(PartialCreate(), origin, mBackground);

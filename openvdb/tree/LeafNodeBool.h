@@ -37,9 +37,11 @@
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
 #include "Iterator.h"
-#include <boost/shared_array.hpp>
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 
 namespace openvdb {
@@ -91,7 +93,7 @@ public:
     /// @param active  the active state to which to initialize all voxels
     explicit LeafNode(const Coord& xyz, bool value = false, bool active = false);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// "Partial creation" constructor used during file input
     LeafNode(PartialCreate, const Coord& xyz, bool value = false, bool active = false);
 #endif
@@ -152,7 +154,7 @@ public:
     /// Return @c true if this node only contains active voxels.
     bool isDense() const { return mValueMask.isOn(); }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Return @c true if memory for this node's buffer has been allocated.
     /// @details Currently, boolean leaf nodes don't support partial creation,
     /// so this always returns @c true.
@@ -801,7 +803,7 @@ LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active)
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<Index Log2Dim>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active)
@@ -1032,7 +1034,7 @@ LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
 
         // Read in the buffer.
         // (Note: prior to the bool leaf optimization, buffers were always compressed.)
-        boost::shared_array<bool> buf(new bool[SIZE]);
+        std::unique_ptr<bool[]> buf{new bool[SIZE]};
         io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
 
         // Transfer values to mBuffer.

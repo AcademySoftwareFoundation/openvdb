@@ -458,7 +458,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
     };
 
     // Construct an output grid with the same transform and metadata as the input grid.
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     auto outGrid = inGrid.copy(CP_NEW);
 #else
     auto outGrid = inGrid.copyWithNewTree();

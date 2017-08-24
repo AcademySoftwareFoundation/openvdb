@@ -108,7 +108,7 @@ public:
     /// @param active    State assigned to all the tiles
     InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
 #endif
 
@@ -137,7 +137,11 @@ public:
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                  const ValueType& offValue, const ValueType& onValue, TopologyCopy);
 
-    virtual ~InternalNode(); ///< @todo remove
+#if OPENVDB_ABI_VERSION_NUMBER < 5
+    virtual ~InternalNode();
+#else
+    ~InternalNode();
+#endif
 
 protected:
     using MaskOnIterator = typename NodeMaskType::OnIterator;
@@ -881,7 +885,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 // For InternalNodes, the PartialCreate constructor is identical to its
 // non-PartialCreate counterpart.
 template<typename ChildT, Index Log2Dim>
@@ -2199,7 +2203,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
 #endif
@@ -2211,7 +2215,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
                     new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
 #else
                     new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
@@ -2250,7 +2254,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
             ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
 #else
             ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);

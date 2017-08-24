@@ -469,7 +469,7 @@ GridBase::getStatsMetadata() const
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 GridBase::clipGrid(const BBoxd& worldBBox)
 {

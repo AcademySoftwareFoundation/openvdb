@@ -112,7 +112,7 @@ public:
 
     ~GridBase() override {}
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
     virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
@@ -209,7 +209,7 @@ public:
     /// (converted to this grid's value type).
     virtual void pruneGrid(float tolerance = 0.0) = 0;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Clip this grid to the given world-space bounding box.
     /// @details Voxels that lie outside the bounding box are set to the background.
     /// @warning Clipping a level set will likely produce a grid that is
@@ -383,7 +383,7 @@ public:
 
     /// Read all data buffers for this grid.
     virtual void readBuffers(std::istream&) = 0;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
     /// @brief Read all of this grid's data buffers that are not yet resident in memory
@@ -412,7 +412,7 @@ protected:
     /// @brief Deep copy another grid's metadata and transform.
     GridBase(const GridBase& other): MetaMap(other), mTransform(other.mTransform->copy()) {}
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Copy another grid's metadata but share its transform.
     GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
 #else
@@ -560,7 +560,7 @@ public:
     /// or if this grid's ValueType is not constructible from the other grid's ValueType.
     template<typename OtherTreeType>
     explicit Grid(const Grid<OtherTreeType>&);
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// Deep copy another grid's metadata, but share its tree and transform.
     Grid(const Grid&, ShallowCopy);
 #else
@@ -577,7 +577,7 @@ public:
     Grid& operator=(const Grid&) = delete;
 
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     //@{
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
@@ -704,7 +704,7 @@ public:
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     void pruneGrid(float tolerance = 0.0) override;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Clip this grid to the given index-space bounding box.
     /// @details Voxels that lie outside the bounding box are set to the background.
     /// @warning Clipping a level set will likely produce a grid that is
@@ -823,7 +823,7 @@ public:
 
     /// Read all data buffers for this grid.
     void readBuffers(std::istream&) override;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
     /// @brief Read all of this grid's data buffers that are not yet resident in memory
@@ -854,7 +854,7 @@ public:
     static void registerGrid()
     {
         GridBase::registerGrid(Grid::gridType(), Grid::factory);
-        if (!tree::LeafBufferFlags<ValueType>::IsAtomic) { ///< @todo remove this for ABI 5
+        if (!tree::internal::LeafBufferFlags<ValueType>::IsAtomic) {
             OPENVDB_LOG_WARN("delayed loading of grids of type " << Grid::gridType()
                 << " might not be threadsafe on this platform");
         }
@@ -1155,7 +1155,7 @@ inline Grid<TreeT>::Grid(const Grid<OtherTreeType>& other):
 }
 
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
 template<typename TreeT>
 inline Grid<TreeT>::Grid(const Grid& other, ShallowCopy):
     GridBase(other, ShallowCopy()),
@@ -1219,7 +1219,7 @@ Grid<TreeT>::create(const GridBase& other)
 ////////////////////////////////////////
 
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
 
 template<typename TreeT>
 inline typename Grid<TreeT>::Ptr
@@ -1249,7 +1249,7 @@ Grid<TreeT>::copyGrid(CopyPolicy treePolicy) const
     return this->copy(treePolicy);
 }
 
-#else // !OPENVDB_3_ABI_COMPATIBLE
+#else // if OPENVDB_ABI_VERSION_NUMBER > 3
 
 template<typename TreeT>
 inline typename Grid<TreeT>::ConstPtr
@@ -1298,7 +1298,7 @@ Grid<TreeT>::copyGridWithNewTree() const
     return this->copyWithNewTree();
 }
 
-#endif // OPENVDB_3_ABI_COMPATIBLE
+#endif
 
 
 ////////////////////////////////////////
@@ -1357,7 +1357,7 @@ Grid<TreeT>::pruneGrid(float tolerance)
     this->tree().prune(ValueType(zeroVal<ValueType>() + tolerance));
 }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<typename TreeT>
 inline void
 Grid<TreeT>::clip(const CoordBBox& bbox)
@@ -1475,7 +1475,7 @@ Grid<TreeT>::readBuffers(std::istream& is)
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 /// @todo Refactor this and the readBuffers() above
 /// once support for ABI 2 compatibility is dropped.
@@ -1509,7 +1509,7 @@ Grid<TreeT>::readNonresidentBuffers() const
     tree().readNonresidentBuffers();
 }
 
-#endif // !OPENVDB_2_ABI_COMPATIBLE
+#endif
 
 
 template<typename TreeT>

@@ -51,6 +51,7 @@
 #include <memory>
 #include <set>
 #include <sstream>
+#include <string>
 #include <vector>
 #include <sys/types.h> // for stat()
 #include <sys/stat.h>
@@ -86,7 +87,7 @@ public:
     CPPUNIT_TEST(testWriteOpenFile);
     CPPUNIT_TEST(testReadGridMetadata);
     CPPUNIT_TEST(testReadGrid);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     CPPUNIT_TEST(testReadClippedGrid);
 #endif
     CPPUNIT_TEST(testMultiPassIO);
@@ -116,7 +117,7 @@ public:
     void testWriteOpenFile();
     void testReadGridMetadata();
     void testReadGrid();
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void testReadClippedGrid();
 #endif
     void testMultiPassIO();
@@ -688,7 +689,7 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     CPPUNIT_ASSERT(density.get() != nullptr);
-#if !defined(OPENVDB_2_ABI_COMPATIBLE) && !defined(OPENVDB_3_ABI_COMPATIBLE)
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
     CPPUNIT_ASSERT(density->unallocatedLeafCount() > 0);
     CPPUNIT_ASSERT_EQUAL(density->leafCount(), density->unallocatedLeafCount());
 #endif
@@ -1628,7 +1629,7 @@ TestFile::testReadGrid()
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 template<typename GridT>
 void
@@ -1741,7 +1742,7 @@ TestFile::testReadClippedGrid()
     }
 }
 
-#endif // !defined(OPENVDB_2_ABI_COMPATIBLE)
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
 
 ////////////////////////////////////////
@@ -1784,7 +1785,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
 
     MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
         : BaseLeaf(coords, value, active) {}
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     MultiPassLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value,
         bool active = false): BaseLeaf(openvdb::PartialCreate(), coords, value, active) {}
 #endif
@@ -1931,6 +1932,7 @@ TestFile::testMultiPassIO()
         CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
         CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
     }
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
     {
         // Verify that when using multi-pass and bbox clipping that each leaf node
         // is still being read before being clipped
@@ -1948,6 +1950,7 @@ TestFile::testMultiPassIO()
         ++leafIter;
         CPPUNIT_ASSERT(!leafIter); // second leaf node has now been clipped
     }
+#endif
 
     // Clear the pass data.
     writePasses.clear();
