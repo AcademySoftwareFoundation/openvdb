@@ -41,7 +41,6 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
-#include <boost/scoped_array.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <algorithm> // for std::lower_bound()
@@ -49,6 +48,7 @@
 #include <cmath> // for std::isfinite()
 #include <limits>
 #include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -108,10 +108,10 @@ terminationDefaults()
 ///     <dt><i>iterations</i>
 ///     <dd>the maximum number of iterations, with or without convergence
 ///     <dt><i>relativeError</i>
-///     <dd>the relative error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| / ||<i>b</i>||
+///     <dd>the relative error ||<i>b</i> &minus; <i>Ax</i>|| / ||<i>b</i>||
 ///         that denotes convergence
 ///     <dt><i>absoluteError</i>
-///     <dd>the absolute error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| that denotes convergence
+///     <dd>the absolute error ||<i>b</i> &minus; <i>Ax</i>|| that denotes convergence
 ///
 /// @throw ArithmeticError if either @a x or @a b is not of the appropriate size.
 template<typename PositiveDefMatrix>
@@ -137,10 +137,10 @@ solve(
 ///     <dt><i>iterations</i>
 ///     <dd>the maximum number of iterations, with or without convergence
 ///     <dt><i>relativeError</i>
-///     <dd>the relative error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| / ||<i>b</i>||
+///     <dd>the relative error ||<i>b</i> &minus; <i>Ax</i>|| / ||<i>b</i>||
 ///         that denotes convergence
 ///     <dt><i>absoluteError</i>
-///     <dd>the absolute error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| that denotes convergence
+///     <dd>the absolute error ||<i>b</i> &minus; <i>Ax</i>|| that denotes convergence
 /// @param interrupter  an object adhering to the util::NullInterrupter interface
 ///     with which computation can be interrupted
 ///
@@ -477,9 +477,9 @@ private:
     template<typename OtherValueType> struct EqOp;
 
     const SizeType                  mNumRows;
-    boost::scoped_array<ValueType>  mValueArray;
-    boost::scoped_array<SizeType>   mColumnIdxArray;
-    boost::scoped_array<SizeType>   mRowSizeArray;
+    std::unique_ptr<ValueType[]>    mValueArray;
+    std::unique_ptr<SizeType[]>     mColumnIdxArray;
+    std::unique_ptr<SizeType[]>     mRowSizeArray;
 }; // class SparseStencilMatrix
 
 
@@ -1322,7 +1322,7 @@ public:
         tbb::parallel_for(SizeRange(0, A.numRows()), InitOp(A, mDiag.data()));
     }
 
-    virtual ~JacobiPreconditioner() override = default;
+    ~JacobiPreconditioner() override = default;
 
     void apply(const Vector<ValueType>& r, Vector<ValueType>& z) override
     {

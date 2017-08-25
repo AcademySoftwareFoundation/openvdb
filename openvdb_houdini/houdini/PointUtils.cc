@@ -32,6 +32,7 @@
 /// @authors Dan Bailey, Nick Avramoussis, Richard Kwok
 
 #include "PointUtils.h"
+#include "Utils.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/util/Formats.h>
 #include <openvdb/points/AttributeArrayString.h>
@@ -41,9 +42,14 @@
 #include <sstream>
 #include <string>
 
+#include <CH/CH_Manager.h>
+#include <PRM/PRM_SpareData.h>
+#include <SOP/SOP_Node.h>
+
+namespace openvdb_houdini {
 
 void
-openvdb_houdini::convertPointDataGridToHoudini(
+convertPointDataGridToHoudini(
     GU_Detail& detail,
     const openvdb::points::PointDataGrid& grid,
     const std::vector<std::string>& attributes,
@@ -51,7 +57,9 @@ openvdb_houdini::convertPointDataGridToHoudini(
     const std::vector<std::string>& excludeGroups,
     const bool inCoreOnly)
 {
-    using openvdb_houdini::HoudiniWriteAttribute;
+    using openvdb::math::Vec3;
+    using openvdb::math::Quat;
+    using openvdb::math::Mat4;
 
     const openvdb::points::PointDataTree& tree = grid.tree();
 
@@ -70,13 +78,15 @@ openvdb_houdini::convertPointDataGridToHoudini(
 
     // obtain cumulative point offsets and total points
     std::vector<openvdb::Index64> pointOffsets;
-    const openvdb::Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups, inCoreOnly);
+    const openvdb::Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups,
+        inCoreOnly);
 
     // a block's global offset is needed to transform its point offsets to global offsets
     const openvdb::Index64 startOffset = detail.appendPointBlock(total);
 
     HoudiniWriteAttribute<openvdb::Vec3f> positionAttribute(*detail.getP());
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, includeGroups, excludeGroups, inCoreOnly);
+    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, includeGroups,
+        excludeGroups, inCoreOnly);
 
     // add other point attributes to the hdk detail
     const openvdb::points::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
@@ -88,7 +98,10 @@ openvdb_houdini::convertPointDataGridToHoudini(
         if (name == "P")    continue;
 
         // filter attributes
-        if (!sortedAttributes.empty() && !std::binary_search(sortedAttributes.begin(), sortedAttributes.end(), name))   continue;
+        if (!sortedAttributes.empty() &&
+            !std::binary_search(sortedAttributes.begin(), sortedAttributes.end(), name)) {
+            continue;
+        }
 
         // don't convert group attributes
         if (descriptor.hasGroup(name))  continue;
@@ -142,7 +155,8 @@ openvdb_houdini::convertPointDataGridToHoudini(
                 attributeRef->getOptions().setTypeInfo(GA_TYPE_TRANSFORM);
             }
 
-            // '|' and ':' characters are valid in OpenVDB Points names but will make Houdini Attribute names invalid
+            // '|' and ':' characters are valid in OpenVDB Points names but
+            // will make Houdini Attribute names invalid
             if (attributeRef.isInvalid()) {
                 OPENVDB_THROW(  openvdb::RuntimeError,
                                 "Unable to create Houdini Points Attribute with name '" + name +
@@ -152,59 +166,73 @@ openvdb_houdini::convertPointDataGridToHoudini(
 
         if (valueType == "string") {
             HoudiniWriteAttribute<openvdb::Name> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "bool") {
             HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "int16") {
             HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "int32") {
             HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "int64") {
             HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "float") {
             HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "double") {
             HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "vec3i") {
-            HoudiniWriteAttribute<openvdb::math::Vec3<int> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Vec3<int> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "vec3s") {
-            HoudiniWriteAttribute<openvdb::math::Vec3<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Vec3<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "vec3d") {
-            HoudiniWriteAttribute<openvdb::math::Vec3<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Vec3<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "quats") {
-            HoudiniWriteAttribute<openvdb::math::Quat<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Quat<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "quatd") {
-            HoudiniWriteAttribute<openvdb::math::Quat<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Quat<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "mat4s") {
-            HoudiniWriteAttribute<openvdb::math::Mat4<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Mat4<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else if (valueType == "mat4d") {
-            HoudiniWriteAttribute<openvdb::math::Mat4<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups, inCoreOnly);
+            HoudiniWriteAttribute<Mat4<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
         }
         else {
             throw std::runtime_error("Unknown Attribute Type for Conversion: " + valueType);
@@ -236,7 +264,7 @@ openvdb_houdini::convertPointDataGridToHoudini(
 
 
 void
-openvdb_houdini::pointDataGridSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
+pointDataGridSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
 {
     typedef openvdb::points::PointDataGrid PointDataGrid;
     typedef openvdb::points::PointDataTree PointDataTree;
@@ -260,7 +288,7 @@ openvdb_houdini::pointDataGridSpecificInfoText(std::ostream& infoStr, const open
 
     std::string viewportGroupName = "";
     if (openvdb::StringMetadata::ConstPtr stringMeta =
-        grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT))
+        grid.getMetadata<openvdb::StringMetadata>(META_GROUP_VIEWPORT))
     {
         viewportGroupName = stringMeta->value();
     }
@@ -347,8 +375,7 @@ openvdb_houdini::pointDataGridSpecificInfoText(std::ostream& infoStr, const open
         const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
 
         first = true;
-        for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
-                it != it_end; ++it) {
+        for (auto it = nameToPosMap.begin(), it_end = nameToPosMap.end(); it != it_end; ++it) {
             const openvdb::points::AttributeArray& array = iter->constAttributeArray(it->second);
             if (isGroup(array))    continue;
 
@@ -390,6 +417,95 @@ openvdb_houdini::pointDataGridSpecificInfoText(std::ostream& infoStr, const open
         if (first)  infoStr << "<none>";
     }
 }
+
+namespace {
+
+inline int
+lookupGroupInput(const PRM_SpareData* spare)
+{
+    if (!spare) return 0;
+    const char* istring = spare->getValue("sop_input");
+    return istring ? atoi(istring) : 0;
+}
+
+void
+sopBuildVDBPointsGroupMenu(void* data, PRM_Name* menuEntries, int /*themenusize*/,
+    const PRM_SpareData* spare, const PRM_Parm* /*parm*/)
+{
+    using openvdb::points::PointDataGrid;
+
+    SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
+    int inputIndex = lookupGroupInput(spare);
+
+    const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
+
+    // const cast as iterator requires non-const access, however data is not modified
+    VdbPrimIterator vdbIt(const_cast<GU_Detail*>(gdp));
+
+    int n_entries = 0;
+
+    for (; vdbIt; ++vdbIt) {
+        GU_PrimVDB* vdbPrim = *vdbIt;
+
+        PointDataGrid::ConstPtr grid =
+                openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
+
+        // ignore all but point data grids
+        if (!grid)      continue;
+        auto leafIter = grid->tree().cbeginLeaf();
+        if (!leafIter)  continue;
+
+        const openvdb::points::AttributeSet::Descriptor& descriptor =
+            leafIter->attributeSet().descriptor();
+
+        for (const auto& it : descriptor.groupMap()) {
+            // add each VDB Points group to the menu
+            menuEntries[n_entries].setToken(it.first.c_str());
+            menuEntries[n_entries].setLabel(it.first.c_str());
+            n_entries++;
+        }
+    }
+
+    // zero value ends the menu
+
+    menuEntries[n_entries].setToken(0);
+    menuEntries[n_entries].setLabel(0);
+}
+
+} // unnamed namespace
+
+
+#ifdef _MSC_VER
+
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+VDBPointsGroupMenuInput1(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+VDBPointsGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+VDBPointsGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+OPENVDB_HOUDINI_API const PRM_ChoiceList
+VDBPointsGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+
+OPENVDB_HOUDINI_API const PRM_ChoiceList VDBPointsGroupMenu(PRM_CHOICELIST_TOGGLE,
+    sopBuildVDBPointsGroupMenu);
+
+#else
+
+const PRM_ChoiceList
+VDBPointsGroupMenuInput1(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+const PRM_ChoiceList
+VDBPointsGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+const PRM_ChoiceList
+VDBPointsGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+const PRM_ChoiceList
+VDBPointsGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
+
+const PRM_ChoiceList VDBPointsGroupMenu(PRM_CHOICELIST_TOGGLE,
+    sopBuildVDBPointsGroupMenu);
+
+#endif
+
+} // namespace openvdb_houdini
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

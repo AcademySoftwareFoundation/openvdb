@@ -50,10 +50,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/system/error_code.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/version.hpp> // for BOOST_VERSION
 
 #include <tbb/atomic.h>
 
@@ -73,13 +71,13 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <cerrno> // for errno
 #include <cstdlib> // for getenv()
 #include <cstring> // for std::memcpy()
+#include <ctime> // for std::time()
 #include <iostream>
 #include <map>
+#include <random>
+#include <set>
 #include <sstream>
-
-#ifndef DWA_BOOST_VERSION
-#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
-#endif
+#include <system_error> // for std::error_code()
 
 
 namespace openvdb {
@@ -516,11 +514,7 @@ MappedFile::clearNotifier()
 std::string
 getErrorString(int errorNum)
 {
-#if DWA_BOOST_VERSION >= 1044000
-    return boost::system::error_code(errorNum, boost::system::generic_category()).message();
-#else
-    return boost::system::error_code(errorNum, boost::system::get_generic_category()).message();
-#endif
+    return std::error_code(errorNum, std::generic_category()).message();
 }
 
 
@@ -564,11 +558,7 @@ Archive::copy() const
 std::string
 Archive::getUniqueTag() const
 {
-    /// @todo Once versions of Boost < 1.44.0 are no longer in use,
-    /// this can be replaced with "return boost::uuids::to_string(mUuid);".
-    std::ostringstream ostr;
-    ostr << mUuid;
-    return ostr.str();
+    return boost::uuids::to_string(mUuid);
 }
 
 
@@ -974,9 +964,9 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
     //    (Omitted as of version 222)
 
     // 6) Generate a new random 16-byte (128-bit) uuid and write it to the stream.
-    boost::mt19937 ran;
-    ran.seed(static_cast<boost::mt19937::result_type>(time(nullptr)));
-    boost::uuids::basic_random_generator<boost::mt19937> gen(&ran);
+    std::mt19937 ran;
+    ran.seed(std::mt19937::result_type(std::random_device()() + std::time(nullptr)));
+    boost::uuids::basic_random_generator<std::mt19937> gen(&ran);
     mUuid = gen(); // mUuid is mutable
     os << mUuid;
 }
@@ -1032,7 +1022,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     return false;
 #else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
@@ -1050,7 +1040,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 {
     struct Local {
         static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
             g.readBuffers(istrm, indexBBox);
         }
@@ -1131,7 +1121,7 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     doReadGrid(grid, gd, is, NoBBox());
 }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     std::istream& is, const BBoxd& worldBBox)
@@ -1185,12 +1175,12 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     }
     os.write(reinterpret_cast<char*>(&gridCount), sizeof(int32_t));
 
-    typedef std::map<const TreeBase*, GridDescriptor> TreeMap;
-    typedef TreeMap::iterator TreeMapIter;
+    using TreeMap = std::map<const TreeBase*, GridDescriptor>;
+    using TreeMapIter = TreeMap::iterator;
     TreeMap treeMap;
 
     // Determine which grid names are unique and which are not.
-    typedef std::map<std::string, int /*count*/> NameHistogram;
+    using NameHistogram = std::map<std::string, int /*count*/>;
     NameHistogram nameCount;
     for (GridCPtrVecCIter i = grids.begin(), e = grids.end(); i != e; ++i) {
         if (const GridBase::ConstPtr& grid = *i) {

@@ -42,6 +42,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
 
+#include <boost/integer_traits.hpp>
 #include <boost/scoped_array.hpp>
 
 #include <tbb/blocked_range.h>
@@ -5225,6 +5226,9 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 ////////////////////////////////////////
 
 
+//{
+/// @cond OPENVDB_VOLUME_TO_MESH_INTERNAL
+
 /// @internal This overload is enabled only for grids with a scalar ValueType.
 template<typename GridType>
 inline typename std::enable_if<std::is_scalar<typename GridType::ValueType>::value, void>::type
@@ -5295,6 +5299,9 @@ doVolumeToMesh(
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
+
+/// @endcond
+//}
 
 
 template<typename GridType>

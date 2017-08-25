@@ -36,6 +36,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -47,26 +48,29 @@ class SOP_OpenVDB_Metadata: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Metadata(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Metadata() {}
+    ~SOP_OpenVDB_Metadata() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual OP_ERROR cookMySop(OP_Context&);
+    bool updateParmsFlags() override;
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be modified.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setTooltip("Specify a subset of the input VDBs to be modified.")
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setDocumentation(
+            "A subset of the input VDBs to be modified"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setclass", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
@@ -80,22 +84,40 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(
             hutil::ParmFactory(PRM_STRING, "class", "Class")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText("Specify how the grid's values should be interpreted."));
+            .setTooltip("Specify how voxel values should be interpreted.")
+            .setDocumentation("\
+How voxel values should be interpreted\n\
+\n\
+Fog Volume:\n\
+    The volume represents a density field.  Values should be positive,\n\
+    with zero representing empty regions.\n\
+Level Set:\n\
+    The volume is treated as a narrow-band signed distance field level set.\n\
+    The voxels within a certain distance&mdash;the \"narrow band width\"&mdash;of\n\
+    an isosurface are expected to define positive (exterior) and negative (interior)\n\
+    distances to the surface.  Outside the narrow band, the distance value\n\
+    is constant and equal to the band width.\n\
+Staggered Vector Field:\n\
+    If the volume is vector-valued, the _x_, _y_ and _z_ vector components\n\
+    are to be treated as lying on the respective faces of voxels,\n\
+    not at their centers.\n\
+Other:\n\
+    No special meaning is assigned to the volume's data.\n"));
     }
 
     /// @todo Do we really need to expose this?
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setcreator", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_STRING, "creator", "Creator")
-        .setHelpText("Specify who created the grid."));
+        .setTooltip("Who (or what node) created the VDB"));
 
     /// @todo Currently, no SOP pays attention to this setting.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setworld", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "world", "Transform Values")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
-            "For vector-valued grids, specify whether voxel values\n"
+        .setTooltip(
+            "For vector-valued VDBs, specify whether voxel values\n"
             "are in world space and should be affected by transforms\n"
             "or in local space and should not be transformed."));
 
@@ -103,32 +125,56 @@ newSopOperator(OP_OperatorTable* table)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     {
         std::string help =
-            "For vector-valued grids, specify how voxel values are affected by transforms:\n";
+            "For vector-valued VDBs, specify an interpretation of the vectors"
+            " that determines how they are affected by transforms.\n";
         std::vector<std::string> items;
         for (int n = 0; n < openvdb::NUM_VEC_TYPES; ++n) {
-            openvdb::VecType vectype = static_cast<openvdb::VecType>(n);
+            const auto vectype = static_cast<openvdb::VecType>(n);
             items.push_back(openvdb::GridBase::vecTypeToString(vectype));
             items.push_back(openvdb::GridBase::vecTypeExamples(vectype));
             help += "\n" + openvdb::GridBase::vecTypeExamples(vectype) + "\n    "
                 + openvdb::GridBase::vecTypeDescription(vectype) + ".";
         }
-        parms.add(
-            hutil::ParmFactory(PRM_STRING, "vectype", "Vector Type")
+        parms.add(hutil::ParmFactory(PRM_STRING, "vectype", "Vector Type")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(::strdup(help.c_str())));
+            .setTooltip(::strdup(help.c_str())));
     }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setfloat16", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "float16", "Write 16-Bit Floats")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
-            "When saving the grid to a file, write floating-point\n"
+        .setTooltip(
+            "When saving the VDB to a file, write floating-point\n"
             "scalar or vector voxel values as 16-bit half floats."));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
-        .addInput("Input with VDB grids");
+        .addInput("Input with VDBs")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Modify the metadata associated with a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node allows one to create and edit metadata attached to a VDB volume.\n\
+Some standard VDB metadata, such as the\n\
+[grid class|http://www.openvdb.org/documentation/doxygen/overview.html#secGrid],\n\
+is exposed via intrinsic attributes on the primitive and can be viewed\n\
+and in some cases edited either from the [geometry spreadsheet|/ref/panes/geosheet]\n\
+or with the [Node:sop/attribcreate] node.\n\
+This node provides more direct access to the standard VDB metadata.\n\
+\n\
+@related\n\
+- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
+- [Node:sop/attribcreate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -138,11 +184,11 @@ SOP_OpenVDB_Metadata::updateParmsFlags()
     bool changed = false;
     const fpreal time = 0; // No point using CHgetTime as that is unstable.
 
-    changed |= enableParm("class",   evalInt("setclass", 0, time));
-    changed |= enableParm("creator", evalInt("setcreator", 0, time));
-    changed |= enableParm("float16", evalInt("setfloat16", 0, time));
-    changed |= enableParm("world",   evalInt("setworld", 0, time));
-    changed |= enableParm("vectype", evalInt("setvectype", 0, time));
+    changed |= enableParm("class",   bool(evalInt("setclass", 0, time)));
+    changed |= enableParm("creator", bool(evalInt("setcreator", 0, time)));
+    changed |= enableParm("float16", bool(evalInt("setfloat16", 0, time)));
+    changed |= enableParm("world",   bool(evalInt("setworld", 0, time)));
+    changed |= enableParm("vectype", bool(evalInt("setvectype", 0, time)));
 
     return changed;
 }

@@ -28,10 +28,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <sstream>
-#include <algorithm>// for std::sort
-#include <cppunit/extensions/HelperMacros.h>
-#include <tbb/atomic.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
@@ -44,6 +40,7 @@
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetMorph.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/Mask.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/PointAdvect.h>
 #include <openvdb/tools/PointScatter.h>
@@ -55,6 +52,12 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <cppunit/extensions/HelperMacros.h>
+#include <tbb/atomic.h>
+#include <algorithm> // for std::sort
+#include <random>
+#include <sstream>
+
 
 // Uncomment to test on models from our web-site
 //#define TestTools_DATA_PATH "/home/kmu/src/openvdb/data/"
@@ -66,8 +69,8 @@
 class TestTools: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestTools);
     CPPUNIT_TEST(testDilateVoxels);
@@ -76,6 +79,7 @@ public:
     CPPUNIT_TEST(testActivate);
     CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
+    CPPUNIT_TEST(testInteriorMask);
     CPPUNIT_TEST(testLevelSetSphere);
     CPPUNIT_TEST(testLevelSetPlatonic);
     CPPUNIT_TEST(testLevelSetAdvect);
@@ -103,6 +107,7 @@ public:
     void testActivate();
     void testFilter();
     void testFloatApply();
+    void testInteriorMask();
     void testLevelSetSphere();
     void testLevelSetPlatonic();
     void testLevelSetAdvect();
@@ -168,7 +173,7 @@ TestTools::testDilateVoxels()
     using openvdb::Index32;
     using openvdb::Index64;
 
-    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
+    using Tree543f = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 
     Tree543f::Ptr tree(new Tree543f);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
@@ -259,7 +264,7 @@ TestTools::testDilateVoxels()
     }
 
     {// dialte a narrow band of a sphere
-        typedef openvdb::Grid<Tree543f> GridType;
+        using GridType = openvdb::Grid<Tree543f>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -271,7 +276,7 @@ TestTools::testDilateVoxels()
     }
 
     {// dilate a fog volume of a sphere
-        typedef openvdb::Grid<Tree543f> GridType;
+        using GridType = openvdb::Grid<Tree543f>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -492,7 +497,7 @@ TestTools::testDilateActiveValues()
     using openvdb::Index32;
     using openvdb::Index64;
 
-    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
+    using Tree543f = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 
     Tree543f::Ptr tree(new Tree543f);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
@@ -610,7 +615,7 @@ TestTools::testDilateActiveValues()
     }
 
     {// dialte a narrow band of a sphere
-        typedef openvdb::Grid<Tree543f> GridType;
+        using GridType = openvdb::Grid<Tree543f>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -622,7 +627,7 @@ TestTools::testDilateActiveValues()
     }
 
     {// dilate a fog volume of a sphere
-        typedef openvdb::Grid<Tree543f> GridType;
+        using GridType = openvdb::Grid<Tree543f>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -849,7 +854,7 @@ TestTools::testErodeVoxels()
     using openvdb::Index32;
     using openvdb::Index64;
 
-    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type TreeType;
+    using TreeType = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 
     TreeType::Ptr tree(new TreeType);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
@@ -984,7 +989,7 @@ TestTools::testErodeVoxels()
     }
 
     {// erode a narrow band of a sphere
-        typedef openvdb::Grid<TreeType> GridType;
+        using GridType = openvdb::Grid<TreeType>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -996,7 +1001,7 @@ TestTools::testErodeVoxels()
     }
 
     {// erode a fog volume of a sphere
-        typedef openvdb::Grid<TreeType> GridType;
+        using GridType = openvdb::Grid<TreeType>;
         GridType grid(tree->background());
         unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
                                             /*center=*/openvdb::Vec3f(0, 0, 0),
@@ -1106,7 +1111,6 @@ TestTools::testActivate()
     // Verify that the expected number of voxels are active.
     CPPUNIT_ASSERT_EQUAL(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
 }
-
 
 void
 TestTools::testFilter()
@@ -1231,6 +1235,39 @@ TestTools::testFilter()
     }
 }
 
+
+void
+TestTools::testInteriorMask()
+{
+    using namespace openvdb;
+
+    const CoordBBox
+        extBand{Coord{-1}, Coord{100}},
+        isoBand{Coord{0}, Coord{99}},
+        intBand{Coord{1}, Coord{98}},
+        inside{Coord{2}, Coord{97}};
+
+    // Construct a "level set" with a three-voxel narrow band
+    // (the distances aren't correct, but they have the right sign).
+    FloatGrid lsgrid{/*background=*/2.f};
+    lsgrid.fill(extBand, 1.f);
+    lsgrid.fill(isoBand, 0.f);
+    lsgrid.fill(intBand, -1.f);
+    lsgrid.fill(inside, -2.f, /*active=*/false);
+
+    // For a non-level-set grid, tools::interiorMask() should return
+    // a mask of the active voxels.
+    auto mask = tools::interiorMask(lsgrid);
+    CPPUNIT_ASSERT_EQUAL(extBand.volume() - inside.volume(), mask->activeVoxelCount());
+
+    // For a level set, tools::interiorMask() should return a mask
+    // of the interior of the isosurface.
+    lsgrid.setGridClass(GRID_LEVEL_SET);
+    mask = tools::interiorMask(lsgrid);
+    CPPUNIT_ASSERT_EQUAL(intBand.volume(), mask->activeVoxelCount());
+}
+
+
 void
 TestTools::testLevelSetSphere()
 {
@@ -1347,12 +1384,12 @@ TestTools::testLevelSetAdvect()
     const float radius = 0.15f, voxelSize = 1.0f/(dim-1);
     const float halfWidth = 3.0f, gamma = halfWidth*voxelSize;
 
-    typedef FloatGrid GridT;
-    //typedef Vec3fGrid VectT;
+    using GridT = FloatGrid;
+    //using VectT = Vec3fGrid;
 
     {//test tracker::resize
         GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
-        typedef tools::LevelSetTracker<GridT>  TrackerT;
+        using TrackerT = tools::LevelSetTracker<GridT>;
         TrackerT tracker(*grid);
         tracker.setSpatialScheme(math::FIRST_BIAS);
         tracker.setTemporalScheme(math::TVD_RK1);
@@ -1409,7 +1446,7 @@ TestTools::testLevelSetAdvect()
     /*
     {//test tracker
         GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
-        typedef openvdb::tools::LevelSetTracker<GridT>  TrackerT;
+        using TrackerT = openvdb::tools::LevelSetTracker<GridT>;
         TrackerT tracker(*grid);
         tracker.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
         tracker.setTemporalScheme(openvdb::math::TVD_RK1);
@@ -1427,10 +1464,10 @@ TestTools::testLevelSetAdvect()
     /*
     {//test EnrightField
         GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
-        typedef openvdb::tools::EnrightField<float> FieldT;
+        using FieldT = openvdb::tools::EnrightField<float>;
         FieldT field;
 
-        typedef openvdb::tools::LevelSetAdvection<GridT, FieldT>  AdvectT;
+        using AdvectT = openvdb::tools::LevelSetAdvection<GridT, FieldT>;
         AdvectT advect(*grid, field);
         advect.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
         advect.setTemporalScheme(openvdb::math::TVD_RK2);
@@ -1450,9 +1487,9 @@ TestTools::testLevelSetAdvect()
     {// test DiscreteGrid - Aligned
         GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         VectT vect(openvdb::Vec3f(1,0,0));
-        typedef openvdb::tools::DiscreteField<VectT> FieldT;
+        using FieldT = openvdb::tools::DiscreteField<VectT>;
         FieldT field(vect);
-        typedef openvdb::tools::LevelSetAdvection<GridT, FieldT>  AdvectT;
+        using AdvectT = openvdb::tools::LevelSetAdvection<GridT, FieldT>;
         AdvectT advect(*grid, field);
         advect.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
         advect.setTemporalScheme(openvdb::math::TVD_RK2);
@@ -1476,9 +1513,9 @@ TestTools::testLevelSetAdvect()
                 for (ijk[2]=0; ijk[2]<dim; ++ijk[2])
                     acc.setValue(ijk, openvdb::Vec3f(1,0,0));
         vect.transform().scale(2.0f);
-        typedef openvdb::tools::DiscreteField<VectT> FieldT;
+        using FieldT = openvdb::tools::DiscreteField<VectT>;
         FieldT field(vect);
-        typedef openvdb::tools::LevelSetAdvection<GridT, FieldT>  AdvectT;
+        using AdvectT = openvdb::tools::LevelSetAdvection<GridT, FieldT>;
         AdvectT advect(*grid, field);
         advect.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
         advect.setTemporalScheme(openvdb::math::TVD_RK2);
@@ -1500,7 +1537,7 @@ TestTools::testLevelSetAdvect()
 void
 TestTools::testLevelSetMorph()
 {
-    typedef openvdb::FloatGrid GridT;
+    using GridT = openvdb::FloatGrid;
     {//test morphing overlapping but aligned spheres
         const int dim = 64;
         const openvdb::Vec3f C1(0.35f, 0.35f, 0.35f), C2(0.4f, 0.4f, 0.4f);
@@ -1509,7 +1546,7 @@ TestTools::testLevelSetMorph()
         GridT::Ptr source = openvdb::tools::createLevelSetSphere<GridT>(radius, C1, voxelSize);
         GridT::Ptr target = openvdb::tools::createLevelSetSphere<GridT>(radius, C2, voxelSize);
 
-        typedef openvdb::tools::LevelSetMorphing<GridT>  MorphT;
+        using MorphT = openvdb::tools::LevelSetMorphing<GridT>;
         MorphT morph(*source, *target);
         morph.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
         morph.setTemporalScheme(openvdb::math::TVD_RK3);
@@ -1565,7 +1602,7 @@ TestTools::testLevelSetMorph()
         targetFile.open();
         GridT::Ptr target = openvdb::gridPtrCast<GridT>(targetFile.getGrids()->at(0));
 
-        typedef openvdb::tools::LevelSetMorphing<GridT>  MorphT;
+        using MorphT = openvdb::tools::LevelSetMorphing<GridT>;
         MorphT morph(*source, *target);
         morph.setSpatialScheme(openvdb::math::FIRST_BIAS);
         //morph.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
@@ -1598,7 +1635,7 @@ TestTools::testLevelSetMorph()
         targetFile.open();
         GridT::Ptr target = openvdb::gridPtrCast<GridT>(targetFile.getGrids()->at(0));
 
-        typedef openvdb::tools::LevelSetMorphing<GridT>  MorphT;
+        using MorphT = openvdb::tools::LevelSetMorphing<GridT>;
         MorphT morph(*source, *target);
         morph.setSpatialScheme(openvdb::math::FIRST_BIAS);
         //morph.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
@@ -1627,7 +1664,7 @@ void
 TestTools::testLevelSetMeasure()
 {
     const double percentage = 0.1/100.0;//i.e. 0.1%
-    typedef openvdb::FloatGrid GridT;
+    using GridT = openvdb::FloatGrid;
     const int dim = 256;
     openvdb::Real a, v, c, area, volume, curv;
 
@@ -1638,7 +1675,7 @@ TestTools::testLevelSetMeasure()
     GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(
         float(r), C, float(voxelSize));
 
-    typedef openvdb::tools::LevelSetMeasure<GridT>  MeasureT;
+    using MeasureT = openvdb::tools::LevelSetMeasure<GridT>;
     MeasureT m(*sphere);
 
     /// Test area and volume of sphere in world units
@@ -1900,9 +1937,9 @@ TestTools::testNormalize()
 
     openvdb::VectorGrid::Ptr grad = openvdb::tools::gradient(*grid);
 
-    typedef openvdb::VectorGrid::ValueType Vec3Type;
+    using Vec3Type = openvdb::VectorGrid::ValueType;
 
-    typedef openvdb::VectorGrid::ValueOnIter ValueIter;
+    using ValueIter = openvdb::VectorGrid::ValueOnIter;
 
     struct Local {
         static inline Vec3Type op(const Vec3Type &x) { return x * 2.0f; }
@@ -1943,9 +1980,9 @@ TestTools::testMaskedNormalize()
 
     openvdb::VectorGrid::Ptr grad = openvdb::tools::gradient(*grid);
 
-    typedef openvdb::VectorGrid::ValueType Vec3Type;
+    using Vec3Type = openvdb::VectorGrid::ValueType;
 
-    typedef openvdb::VectorGrid::ValueOnIter ValueIter;
+    using ValueIter = openvdb::VectorGrid::ValueOnIter;
 
     struct Local {
         static inline Vec3Type op(const Vec3Type &x) { return x * 2.0f; }
@@ -2144,16 +2181,17 @@ namespace {
 void
 TestTools::testPointScatter()
 {
-    typedef openvdb::FloatGrid GridType;
+    using GridType = openvdb::FloatGrid;
     const openvdb::Coord dim(64, 64, 64);
     const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
     const float radius = 20.0;
-    typedef boost::mt11213b RandGen;
+    using RandGen = std::mersenne_twister_engine<uint32_t, 32, 351, 175, 19,
+        0xccab8ee7, 11, 0xffffffff, 7, 0x31b6ab00, 15, 0xffe50000, 17, 1812433253>; // mt11213b
     RandGen mtRand;
 
     GridType::Ptr grid = GridType::create(/*background=*/2.0);
-    unittest_util::makeSphere<GridType>(dim, center, radius, *grid,
-                                        unittest_util::SPHERE_DENSE_NARROW_BAND);
+    unittest_util::makeSphere<GridType>(
+        dim, center, radius, *grid, unittest_util::SPHERE_DENSE_NARROW_BAND);
 
     {// test fixed point count scattering
         const openvdb::Index64 pointCount = 1000;
@@ -2198,9 +2236,9 @@ TestTools::testVolumeAdvect()
     using namespace openvdb;
 
     Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
-    typedef FloatGrid GridT;
-    typedef tools::VolumeAdvection<Vec3fGrid> AdvT;
-    typedef tools::Sampler<1> SamplerT;
+    using GridT = FloatGrid;
+    using AdvT = tools::VolumeAdvection<Vec3fGrid>;
+    using SamplerT = tools::Sampler<1>;
 
     {//test non-uniform grids (throws)
         GridT::Ptr density0 = GridT::create(0.0f);
@@ -2376,7 +2414,7 @@ TestTools::testVolumeAdvect()
 void
 TestTools::testFloatApply()
 {
-    typedef openvdb::FloatTree::ValueOnIter ValueIter;
+    using ValueIter = openvdb::FloatTree::ValueOnIter;
 
     struct Local {
         static inline float op(float x) { return x * 2.f; }
@@ -2434,7 +2472,7 @@ struct MatMul {
 void
 TestTools::testVectorApply()
 {
-    typedef openvdb::VectorTree::ValueOnIter ValueIter;
+    using ValueIter = openvdb::VectorTree::ValueOnIter;
 
     const openvdb::Vec3s background(1, 1, 1);
     openvdb::VectorTree tree(background);
@@ -2483,7 +2521,7 @@ struct AccumSum {
 
 
 struct AccumLeafVoxelCount {
-    typedef openvdb::tree::LeafManager<openvdb::Int32Tree>::LeafRange LeafRange;
+    using LeafRange = openvdb::tree::LeafManager<openvdb::Int32Tree>::LeafRange;
     openvdb::Index64 count;
     AccumLeafVoxelCount(): count(0) {}
     void operator()(const LeafRange::Iterator& it) { count += it->onVoxelCount(); }
@@ -2531,8 +2569,8 @@ namespace {
 template<typename InIterT, typename OutTreeT>
 struct FloatToVec
 {
-    typedef typename InIterT::ValueT ValueT;
-    typedef typename openvdb::tree::ValueAccessor<OutTreeT> Accessor;
+    using ValueT = typename InIterT::ValueT;
+    using Accessor = typename openvdb::tree::ValueAccessor<OutTreeT>;
 
     // Transform a scalar value into a vector value.
     static openvdb::Vec3s toVec(const ValueT& v) { return openvdb::Vec3s(v, v*2, v*3); }
@@ -2564,8 +2602,8 @@ TestTools::testTransformValues()
     using openvdb::Coord;
     using openvdb::Vec3s;
 
-    typedef openvdb::tree::Tree4<float, 3, 2, 3>::Type Tree323f;
-    typedef openvdb::tree::Tree4<Vec3s, 3, 2, 3>::Type Tree323v;
+    using Tree323f = openvdb::tree::Tree4<float, 3, 2, 3>::Type;
+    using Tree323v = openvdb::tree::Tree4<Vec3s, 3, 2, 3>::Type;
 
     const float background = 1.0;
     Tree323f ftree(background);
@@ -2621,7 +2659,7 @@ TestTools::testUtil()
     using openvdb::Coord;
     using openvdb::Vec3s;
 
-    typedef openvdb::tree::Tree4<bool, 3, 2, 3>::Type CharTree;
+    using CharTree = openvdb::tree::Tree4<bool, 3, 2, 3>::Type;
 
     // Test boolean operators
     CharTree treeA(false), treeB(false);
@@ -2784,7 +2822,7 @@ TestTools::testPrune()
     }
 
     {// Prune a tree with a single leaf node with random values in the range [0,1]
-        typedef tree::LeafNode<float,3> LeafNodeT;
+        using LeafNodeT = tree::LeafNode<float,3>;
         const float val = 1.0, tol = 1.1f;
 
         // Fill a leaf node with random values in the range [0,1]
@@ -2821,7 +2859,7 @@ TestTools::testPrune()
     }
 
     /*
-    {// Bechmark serial prune
+    {// Benchmark serial prune
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
@@ -2834,7 +2872,7 @@ TestTools::testPrune()
         timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
     }
-    {// Bechmark parallel prune
+    {// Benchmark parallel prune
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");

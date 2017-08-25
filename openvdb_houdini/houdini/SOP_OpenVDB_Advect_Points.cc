@@ -43,9 +43,13 @@
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>
 
-#include <boost/smart_ptr/scoped_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
+
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -180,10 +184,10 @@ struct AdvectionParms
 {
     AdvectionParms(GU_Detail *outputGeo)
         : mOutputGeo(outputGeo)
-        , mPointGeo(NULL)
-        , mPointGroup(NULL)
-        , mVelPrim(NULL)
-        , mCptPrim(NULL)
+        , mPointGeo(nullptr)
+        , mPointGroup(nullptr)
+        , mVelPrim(nullptr)
+        , mCptPrim(nullptr)
         , mPropagationType(PROPAGATION_TYPE_ADVECTION)
         , mIntegrationType(INTEGRATION_TYPE_FWD_EULER)
         , mTimeStep(1.0)
@@ -267,9 +271,9 @@ appendLineNodes(GU_Detail& geo, GA_Size firstline, const GU_Detail& ptnGeo)
 template<typename GridType>
 class ProjectionOp
 {
-    typedef openvdb::tools::ClosestPointProjector<GridType> ProjectorType;
-    typedef typename GridType::ValueType VectorType;
-    typedef typename VectorType::ValueType ElementType;
+    using ProjectorType = openvdb::tools::ClosestPointProjector<GridType>;
+    using VectorType = typename GridType::ValueType;
+    using ElementType = typename VectorType::ValueType;
 
 public:
 
@@ -348,18 +352,19 @@ private:
 template<typename GridType, int IntegrationOrder, bool StaggeredVelocity, bool Constrained = false>
 class AdvectionOp
 {
-    typedef openvdb::tools::VelocityIntegrator<GridType, StaggeredVelocity> IntegrationType;
-    typedef openvdb::tools::ClosestPointProjector<GridType> ProjectorType; // Used for constrained advection
+    using IntegrationType = openvdb::tools::VelocityIntegrator<GridType, StaggeredVelocity>;
+    using ProjectorType =
+        openvdb::tools::ClosestPointProjector<GridType>; // Used for constrained advection
 
-    typedef typename GridType::ValueType VectorType;
-    typedef typename VectorType::ValueType ElementType;
+    using VectorType = typename GridType::ValueType;
+    using ElementType = typename VectorType::ValueType;
 
 public:
 
     AdvectionOp(const GridType& velocityGrid, GU_Detail& geo, hvdb::Interrupter& boss,
         double timeStep, GA_ROHandleF traillen, int steps)
         : mVelocityGrid(velocityGrid)
-        , mCptGrid(NULL)
+        , mCptGrid(nullptr)
         , mGeo(geo)
         , mBoss(boss)
         , mTimeStep(timeStep)
@@ -390,8 +395,8 @@ public:
         IntegrationType integrator(mVelocityGrid);
 
         // Constrained-advection compiled out if Constrained == false
-        boost::scoped_ptr<ProjectorType> projector(NULL);
-        if (Constrained && mCptGrid != NULL) {
+        std::unique_ptr<ProjectorType> projector(nullptr);
+        if (Constrained && mCptGrid != nullptr) {
             projector.reset(new ProjectorType(*mCptGrid, mCptIterations));
         }
 
@@ -495,8 +500,8 @@ public:
     void constrainedAdvection(const GridType& velocityGrid)
     {
         const GridType& cptGrid = static_cast<const GridType&>(mParms.mCptPrim->getGrid());
-        typedef AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity, /*Constrained*/true>
-            AdvectionOp;
+        using AdvectionOp =
+            AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity, /*Constrained*/true>;
 
         if (mBoss.wasInterrupted()) return;
 
@@ -539,7 +544,7 @@ public:
         if (mParms.mPropagationType == PROPAGATION_TYPE_ADVECTION) {
             if (!mParms.mStaggered) advection<GridType, IntegrationOrder, false>(velocityGrid);
             else advection<GridType, IntegrationOrder, true>(velocityGrid);
-        } else if (mParms.mCptPrim != NULL) { // constrained
+        } else if (mParms.mCptPrim != nullptr) { // constrained
             if (!mParms.mStaggered) {
                 constrainedAdvection<GridType, IntegrationOrder, false>(velocityGrid);
             } else {
@@ -579,15 +584,15 @@ class SOP_OpenVDBAdvectPoints: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDBAdvectPoints(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDBAdvectPoints() {}
+    ~SOP_OpenVDBAdvectPoints() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i > 0); }
+    int isRefInput(unsigned i ) const override { return (i > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
     bool evalAdvectionParms(OP_Context&, AdvectionParms&);
 };
@@ -600,23 +605,33 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Points to process
     parms.add(hutil::ParmFactory(PRM_STRING, "ptnGroup", "Point Group")
-        .setChoiceList(&SOP_Node::pointGroupMenu));
+        .setChoiceList(&SOP_Node::pointGroupMenu)
+        .setTooltip("A subset of points in the first input to move using the velocity field"));
 
     // Velocity grid
     parms.add(hutil::ParmFactory(PRM_STRING, "velGroup", "Velocity VDB")
-        .setHelpText("Velocity grid")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Velocity grid")
+        .setDocumentation(
+            "The name of a VDB primitive in the second input to use as"
+            " the velocity field (see [specifying volumes|/model/volumes#group])\n\n"
+            "This must be a vector-valued VDB primitive."
+            " You can use the [Vector Merge node|Node:sop/DW_OpenVDBVectorMerge]"
+            " to turn a `vel.[xyz]` triple into a single primitive."));
 
     // Closest point grid
     parms.add(hutil::ParmFactory(PRM_STRING, "cptGroup", "Closest-Point VDB")
-        .setHelpText("Vector grid that in each voxel stores the closest point on a surface.")
-        .setChoiceList(&hutil::PrimGroupMenuInput3));
+        .setChoiceList(&hutil::PrimGroupMenuInput3)
+        .setTooltip("Vector grid that in each voxel stores the closest point on a surface.")
+        .setDocumentation(
+            "The name of a VDB primitive in the third input to use for"
+            " the closest point values (see [specifying volumes|/model/volumes#group])"));
 
     // Propagation scheme
     {
@@ -630,9 +645,18 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "propagation", "Operation")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(items[0])
-            .setHelpText("Advection: Move the point along the velocity field.\n"
+            .setTooltip("Advection: Move the point along the velocity field.\n"
                 "Projection: Move point to the nearest surface point.\n"
-                "Projected advection: Advect, then project to the nearest surface point."));
+                "Projected advection: Advect, then project to the nearest surface point.")
+            .setDocumentation(
+                "How to use the velocity field to move the points\n\n"
+                "Advection:\n"
+                "    Move each point along the velocity field.\n"
+                "Projection:\n"
+                "    Move each point to the nearest surface point using the closest point field.\n"
+                "Constrained Advection:\n"
+                "    Move the along the velocity field, and then project using the"
+                "    closest point field. This forces the particles to remain on a surface."));
     }
 
     // Integration scheme
@@ -647,33 +671,55 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "integration", "Integration")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(items[0])
-            .setHelpText("Lower order means faster performance, "
-                "but the points will not follow the velocity field closely."));
+            .setTooltip("Lower order means faster performance, "
+                "but the points will not follow the velocity field closely.")
+            .setDocumentation("Algorithm to use to move the points\n\n"
+                "Later options in the list are slower but better follow the velocity field."));
     }
 
     // Closest point iterations
     parms.add(hutil::ParmFactory(PRM_INT_J, "cptIterations", "Iterations")
         .setDefault(PRMzeroDefaults )
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("The interpolation step when sampling nearest points introduces\n"
+        .setTooltip("The interpolation step when sampling nearest points introduces\n"
             "error so that the result of a single sample may not lie exactly\n"
-            "on the surface. Multiple iterations help minimize this error."));
+            "on the surface. Multiple iterations help minimize this error.")
+        .setDocumentation(
+            "Number of times to try projecting to the nearest point on the surface\n\n"
+            "Projecting might not move exactly to the surface on the first try."
+            " More iterations are slower but give more accurate projection."));
 
     // Time step
     parms.add(hutil::ParmFactory(PRM_FLT, "timeStep", "Time Step")
         .setDefault(1, "1.0/$FPS")
-        .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 10));
+        .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 10)
+        .setDocumentation(
+            "Number of seconds of movement to apply to the input points\n\n"
+            "The default is `1/$FPS` (one frame's worth of time)."
+            " You can use negative values to move the points backwards through"
+            " the velocity field.\n\n"
+            "If the attribute `traillen` is present, it is multiplied by this"
+            " time step allowing per-particle variation in trail length."));
 
     // Steps
     parms.add(hutil::ParmFactory(PRM_INT_J, "steps", "Substeps")
         .setDefault(1)
-        .setHelpText("Number of timesteps to take per frame.")
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+        .setTooltip("Number of timesteps to take per frame.")
+        .setDocumentation(
+            "How many times to repeat the advection step\n\n"
+            "This will produce a more accurate motion, especially if large"
+            " time steps or high velocities are present."));
 
     // Output streamlines
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "outputStreamlines", "Output Streamlines")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Output the particle path as line segments."));
+        .setTooltip("Output the particle path as line segments.")
+        .setDocumentation(
+            "Generate polylines instead of moving points.\n\n"
+            "This is useful for visualizing the effect of the node."
+            " It may also be useful for special effects (see also the"
+            " [Trail SOP|Node:sop/trail])."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -687,7 +733,69 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Points to Advect")
         .addOptionalInput("Velocity VDB")
-        .addOptionalInput("Closest Point VDB");
+        .addOptionalInput("Closest Point VDB")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Move points in the input geometry along a VDB velocity field.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node has different functions based on the value of the __Operation__ parameter.\n\
+* Move geometry points according to a VDB velocity field.\n\
+* Move points onto a surface using a VDB field storing the nearest surface point at each voxel.\n\
+  # Convert the \"sticky\" surface to a VDB SDF using the\n\
+    [OpenVDB From Polygons node|Node:sop/DW_OpenVDBFromPolygons].\n\
+  # Generate a \"nearest point\" VDB using the \n\
+    [OpenVDB Analysis node|Node:sop/DW_OpenVDBAnalysis].\n\
+  # Connect the points you want to stick, and the \"nearest point\" field,\n\
+    into this node.\n\
+* Move geometry points according to a VDB velocity field _and_ stick them\n\
+  to a surface using a \"nearest point\" field (combine the first two operations).\n\
+  This lets you advect points through a velocity field while keeping them\n\
+  stuck to a surface.\n\
+\n\
+NOTE:\n\
+    The `traillen` float attribute can be used to control how far particles\n\
+    move on a per-particle basis.\n\
+\n\
+@animation Animating advection\n\
+\n\
+*This node is not a feedback loop*.\n\
+ It moves the points it finds in the input geometry.  It _cannot_ modify\n\
+ the point locations over time.  (That is, if you hook this node up to do advection\n\
+ and press play, the points will not animate.)\n\
+\n\
+To set up a feedback loop, where the advection at each frame affects\n\
+ the advected point positions from the previous frame, do one of the following:\n\
+\n\
+* Do the advection inside a [SOP Solver|Node:sop/solver].\n\
+* Set __Substeps__ to `$F` and the __Time Step__ to `$T`\n\
+\n\
+  This will cause the node to recalculate, _at every frame_, the path\n\
+  of every particle through _every previous frame_ to get the current one.\n\
+  This is obviously not very practical, however the calculations are fast\n\
+  so it may be useful as a quick \"hack\" to animate the advection\n\
+  for small numbers of particles.\n\
+\n\
+@inputs\n\
+Points to Advect:\n\
+    The points to advect are copied from this input.\n\
+Velocity VDB:\n\
+    The VDB that stores the velocity at each location\n\
+Closest Point VDB:\n\
+    The VDB that stores the closest point to each location\n\
+\n\
+@related\n\
+- [OpenVDB Advect|Node:sop/DW_OpenVDBAdvect]\n\
+- [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
+- [Node:sop/vdbadvectpoints]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -852,7 +960,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
             parms.mVelPrim->getGrid().getGridClass() == openvdb::GRID_STAGGERED;
 
         parms.mTimeStep = static_cast<float>(evalFloat("timeStep", 0, now));
-        parms.mSteps    = evalInt("steps", 0, now);
+        parms.mSteps = static_cast<int>(evalInt("steps", 0, now));
         // The underlying code will accumulate, so to make it substeps
         // we need to divide out.
         parms.mTimeStep /= static_cast<float>(parms.mSteps);
@@ -894,7 +1002,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
             return false;
         }
 
-        parms.mIterations = evalInt("cptIterations", 0, now);
+        parms.mIterations = static_cast<int>(evalInt("cptIterations", 0, now));
     }
 
     return true;

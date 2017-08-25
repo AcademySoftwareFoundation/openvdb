@@ -35,6 +35,7 @@
 #include <boost/python/exception_translator.hpp>
 #ifdef PY_OPENVDB_USE_NUMPY
 #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
+#include <numpyconfig.h>
 #ifdef NPY_1_7_API_VERSION
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #endif

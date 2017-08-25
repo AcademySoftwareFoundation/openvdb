@@ -53,17 +53,22 @@
 #include <tbb/parallel_for.h>
 
 #include <sstream>
+#include <string>
+#include <vector>
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 namespace {
-typedef openvdb::BoolGrid   ColliderMaskGrid; ///< @todo really should derive from velocity grid
-typedef openvdb::BBoxd      ColliderBBox;
-typedef openvdb::Coord      Coord;
+using ColliderMaskGrid = openvdb::BoolGrid; ///< @todo really should derive from velocity grid
+using ColliderBBox = openvdb::BBoxd;
+using Coord = openvdb::Coord;
 
 enum ColliderType { CT_NONE, CT_BBOX, CT_STATIC, CT_DYNAMIC };
+
+const int DEFAULT_MAX_ITERATIONS = 10000;
+const double DEFAULT_MAX_ERROR = 1.0e-20;
 }
 
 
@@ -75,48 +80,91 @@ struct SOP_OpenVDB_Remove_Divergence: public hvdb::SOP_NodeVDB
     SOP_OpenVDB_Remove_Divergence(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input > 0); }
+    int isRefInput(unsigned input) const override { return (input > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setHelpText(
-            "Names of vector-valued VDBs to be processed\n\n"
+        .setTooltip("Names of vector-valued VDBs to be processed")
+        .setDocumentation(
+            "A subset of vector-valued input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])\n\n"
             "VDBs with nonuniform voxels, including frustum grids, are not supported.\n"
-            "They should be resampled to have a linear transform with uniform scale."));
+            "They should be [resampled|Node:sop/DW_OpenVDBResample]"
+            " to have a linear transform with uniform scale."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
-        .setDefault(50)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
-        .setHelpText("Maximum number of iterations of the solver"));
+    {
+        std::ostringstream ostr;
+        ostr << "If disabled, limit the pressure solver to "
+            << DEFAULT_MAX_ITERATIONS << " iterations.";
+        const std::string tooltip = ostr.str();
+
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "useiterations", "")
+            .setDefault(PRMoneDefaults)
+            .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+            .setTooltip(tooltip.c_str()));
+
+        parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
+            .setDefault(1000)
+            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 2000)
+            .setTooltip("Maximum number of iterations of the pressure solver")
+            .setDocumentation(
+                ("Maximum number of iterations of the pressure solver\n\n" + tooltip).c_str()));
+    }
+    {
+        std::ostringstream ostr;
+        ostr << "If disabled, limit the pressure solver error to "
+            << std::setprecision(3) << DEFAULT_MAX_ERROR << ".";
+        const std::string tooltip = ostr.str();
+
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "usetolerance", "")
+            .setDefault(PRMoneDefaults)
+            .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+            .setTooltip(tooltip.c_str()));
+
+        ostr.str("");
+        ostr << "If disabled, limit the pressure solver error to 10<sup>"
+            << int(std::log10(DEFAULT_MAX_ERROR)) << "</sup>.";
+
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Tolerance")
+            .setDefault(openvdb::math::Delta<float>::value())
+            .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 0.01)
+            .setTooltip(
+                "The pressure solver is deemed to have converged when\n"
+                "the magnitude of the error is less than this tolerance.")
+            .setDocumentation(
+                ("The pressure solver is deemed to have converged when"
+                " the magnitude of the error is less than this tolerance.\n\n"
+                + ostr.str()).c_str()));
+    }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usecollider", "")
         .setDefault(PRMzeroDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "bbox",    "Bounding Box",
             "static",  "Static VDB",
             "dynamic", "Dynamic VDB",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_STRING, "collidertype", "Collider Type")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault("bbox")
-            .setHelpText(
+            .setTooltip(
 "Bounding Box:\n"
 "    Use the bounding box of any reference geometry as the collider.\n"
 "Static VDB:\n"
@@ -130,27 +178,62 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "collider", "Collider")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText(
-            "Name of the reference VDB volume whose active voxels denote solid obstacles\n"
+        .setTooltip(
+            "Name of the reference VDB volume whose active voxels denote solid obstacles\n\n"
             "If multiple volumes are selected, only the first one will be used."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertcollider", "Invert Collider")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
+        .setTooltip(
             "Invert the collider so that active voxels denote empty space\n"
             "and inactive voxels denote solid obstacles."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "pressure", "Output Pressure")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
+        .setTooltip(
             "Output the computed pressure for each input VDB \"v\"\n"
             "as a scalar VDB named \"v_pressure\"."));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Remove Divergence",
         SOP_OpenVDB_Remove_Divergence::factory, parms, *table)
-        .addInput("Vector field VDBs")
-        .addOptionalInput("Optional collider VDB or geometry");
+        .addInput("Velocity field VDBs")
+        .addOptionalInput("Optional collider VDB or geometry")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Remove divergence from VDB velocity fields.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+A vector-valued VDB volume can represent a velocity field.\n\
+When particles flow through the field, they might either expand\n\
+from a voxel or collapse into a voxel.\n\
+These source/sink behaviors indicate divergence in the field.\n\
+\n\
+This node computes a new vector field that is close to the input\n\
+but has no divergence.\n\
+This can be used to condition velocity fields to limit particle creation,\n\
+creating more realistic flows.\n\
+\n\
+If the optional collider volume is provided, the output velocity field\n\
+will direct flow around obstacles (i.e., active voxels) in that volume.\n\
+The collider itself may be a velocity field, in which case the obstacles\n\
+are considered to be moving with the given velocities.\n\
+\n\
+Combined with the [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
+node and a [Solver|Node:sop/solver] node for feedback, this node\n\
+can be used to build a simple FLIP solver.\n\
+\n\
+@related\n\
+- [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
+- [Node:sop/solver]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -164,6 +247,8 @@ SOP_OpenVDB_Remove_Divergence::updateParmsFlags()
     changed |= enableParm("collidertype", useCollider);
     changed |= enableParm("invertcollider", useCollider);
     changed |= enableParm("collider", useCollider && (colliderTypeStr != "bbox"));
+    changed |= enableParm("iterations", bool(evalInt("useiterations", 0, 0)));
+    changed |= enableParm("tolerance", bool(evalInt("usetolerance", 0, 0)));
     return changed;
 }
 
@@ -192,8 +277,9 @@ struct SolverParms {
         : invertCollider(false)
         , colliderType(CT_NONE)
         , iterations(1)
+        , absoluteError(-1.0)
         , outputState(openvdb::math::pcg::terminationDefaults<double>())
-        , interrupter(NULL)
+        , interrupter(nullptr)
     {}
 
     hvdb::GridPtr velocityGrid;
@@ -204,6 +290,7 @@ struct SolverParms {
     bool invertCollider;
     ColliderType colliderType;
     int iterations;
+    double absoluteError;
     openvdb::math::pcg::State outputState;
     hvdb::Interrupter* interrupter;
 };
@@ -249,7 +336,7 @@ template<typename GridType>
 class GridConstAccessor
 {
 public:
-    typedef typename GridType::ValueType ValueType;
+    using ValueType = typename GridType::ValueType;
 
     explicit GridConstAccessor(const SolverParms& parms):
         mAcc(static_cast<const GridType&>(*parms.colliderGrid).getConstAccessor())
@@ -270,14 +357,14 @@ private:
     typename GridType::ConstAccessor mAcc;
 }; // class GridConstAccessor
 
-typedef GridConstAccessor<ColliderMaskGrid>  ColliderMaskAccessor;
+using ColliderMaskAccessor = GridConstAccessor<ColliderMaskGrid>;
 
 
 /// @brief Bounding box accessor
 class BBoxConstAccessor
 {
 public:
-    typedef double ValueType;
+    using ValueType = double;
 
     explicit BBoxConstAccessor(const SolverParms& parms):
         mBBox(parms.velocityGrid->transform().worldToIndexNodeCentered(parms.colliderBBox)) {}
@@ -302,8 +389,8 @@ private:
 template<typename TreeType>
 struct PressureProjectionOp
 {
-    typedef typename TreeType::LeafNodeType LeafNodeType;
-    typedef typename TreeType::ValueType    ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
     PressureProjectionOp(SolverParms& parms, LeafNodeType** velNodes,
         const LeafNodeType** gradPressureNodes, bool staggered)
@@ -316,7 +403,7 @@ struct PressureProjectionOp
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        typedef typename ValueType::value_type ElementType;
+        using ElementType = typename ValueType::value_type;
 
         // Account for voxel size here, instead of in the Poisson solve.
         const ElementType scale = ElementType((mStaggered ? 1.0 : 4.0) * mVoxelSize * mVoxelSize);
@@ -348,7 +435,7 @@ struct PressureProjectionOp
 template<typename VectorType>
 struct SetVecElemOp
 {
-    typedef typename VectorType::ValueType ValueType;
+    using ValueType = typename VectorType::ValueType;
 
     SetVecElemOp(int axis_, ValueType value_): axis(axis_), value(value_) {}
     void operator()(VectorType& v) const { v[axis] = value; }
@@ -363,10 +450,10 @@ template<typename VelocityGridType>
 class CorrectCollisionVelocityOp
 {
 public:
-    typedef typename VelocityGridType::ValueType VectorType;
-    typedef typename VectorType::ValueType VectorElementType;
-    typedef typename VelocityGridType::template ValueConverter<bool>::Type MaskGridType;
-    typedef typename MaskGridType::TreeType MaskTreeType;
+    using VectorType = typename VelocityGridType::ValueType;
+    using VectorElementType = typename VectorType::ValueType;
+    using MaskGridType = typename VelocityGridType::template ValueConverter<bool>::Type;
+    using MaskTreeType = typename MaskGridType::TreeType;
 
     explicit CorrectCollisionVelocityOp(SolverParms& parms): mParms(&parms)
     {
@@ -390,7 +477,7 @@ public:
     template<typename ColliderAccessorType>
     void correctVelocity(const ColliderAccessorType& collider)
     {
-        typedef typename ColliderAccessorType::ValueType ColliderValueType;
+        using ColliderValueType = typename ColliderAccessorType::ValueType;
 
         VelocityGridType& velocityGrid = static_cast<VelocityGridType&>(*mParms->velocityGrid);
 
@@ -488,7 +575,7 @@ template<typename VelocityGridType, typename ColliderAccessorType>
 class ColliderBoundaryOp
 {
 public:
-    typedef typename VelocityGridType::ValueType VectorType;
+    using VectorType = typename VelocityGridType::ValueType;
 
     explicit ColliderBoundaryOp(const SolverParms& parms)
         : mVelocity(static_cast<VelocityGridType&>(*parms.velocityGrid).getConstAccessor())
@@ -563,15 +650,15 @@ template<typename VectorGridType, typename ColliderGridType, typename BoundaryOp
 inline bool
 removeDivergenceWithColliderGrid(SolverParms& parms, const BoundaryOpType& boundaryOp)
 {
-    typedef typename VectorGridType::TreeType       VectorTreeType;
-    typedef typename VectorTreeType::LeafNodeType   VectorLeafNodeType;
-    typedef typename VectorGridType::ValueType      VectorType;
-    typedef typename VectorType::ValueType          VectorElementType;
+    using VectorTreeType = typename VectorGridType::TreeType;
+    using VectorLeafNodeType = typename VectorTreeType::LeafNodeType;
+    using VectorType = typename VectorGridType::ValueType;
+    using VectorElementType = typename VectorType::ValueType;
 
-    typedef typename VectorGridType::template ValueConverter<VectorElementType>::Type ScalarGrid;
-    typedef typename ScalarGrid::TreeType           ScalarTree;
+    using ScalarGrid = typename VectorGridType::template ValueConverter<VectorElementType>::Type;
+    using ScalarTree = typename ScalarGrid::TreeType;
 
-    typedef typename VectorGridType::template ValueConverter<bool>::Type MaskGridType;
+    using MaskGridType = typename VectorGridType::template ValueConverter<bool>::Type;
 
     VectorGridType& velocityGrid = static_cast<VectorGridType&>(*parms.velocityGrid);
 
@@ -585,10 +672,11 @@ removeDivergenceWithColliderGrid(SolverParms& parms, const BoundaryOpType& bound
 
     parms.outputState = openvdb::math::pcg::terminationDefaults<VectorElementType>();
     parms.outputState.iterations = parms.iterations;
-    parms.outputState.relativeError = parms.outputState.absoluteError =
-        openvdb::math::Delta<VectorElementType>::value();
+    parms.outputState.absoluteError = (parms.absoluteError >= 0.0 ?
+        parms.absoluteError : DEFAULT_MAX_ERROR);
+    parms.outputState.relativeError = 0.0;
 
-    typedef openvdb::math::pcg::JacobiPreconditioner<openvdb::tools::poisson::LaplacianMatrix> PCT;
+    using PCT = openvdb::math::pcg::JacobiPreconditioner<openvdb::tools::poisson::LaplacianMatrix>;
 
     // Solve for pressure using Poisson's equation.
     typename ScalarTree::Ptr pressure;
@@ -699,7 +787,7 @@ struct ColliderDispatchOp
     template<typename ColliderGridType>
     void operator()(const ColliderGridType&)
     {
-        typedef GridConstAccessor<ColliderGridType> ColliderAccessorType;
+        using ColliderAccessorType = GridConstAccessor<ColliderGridType>;
         ColliderBoundaryOp<VelocityGridType, ColliderAccessorType> boundaryOp(*parms);
         success = removeDivergenceWithColliderGrid<VelocityGridType, ColliderGridType>(
             *parms, boundaryOp);
@@ -752,7 +840,7 @@ inline UT_String
 getPrimitiveIndexAndName(const hvdb::GU_PrimVDB* prim)
 {
     UT_String result(UT_String::ALWAYS_DEEP);
-    if (prim != NULL) {
+    if (prim != nullptr) {
         result.itoa(prim->getMapIndex());
         UT_String name = prim->getGridName();
         result += (" (" + name.toStdString() + ")").c_str();
@@ -791,7 +879,10 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
 
         SolverParms parms;
         parms.interrupter = &interrupter;
-        parms.iterations = static_cast<int>(evalInt("iterations", 0, time));
+        parms.iterations = (!evalInt("useiterations", 0, time) ?
+            DEFAULT_MAX_ITERATIONS : static_cast<int>(evalInt("iterations", 0, time)));
+        parms.absoluteError = (!evalInt("usetolerance", 0, time) ?
+            -1.0 : evalFloat("tolerance", 0, time));
         parms.invertCollider = evalInt("invertcollider", 0, time);
 
         UT_String groupStr;
@@ -805,7 +896,7 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
         UT_String colliderTypeStr;
         evalString(colliderTypeStr, "collidertype", 0, time);
 
-        UT_StringArray xformMismatchGridNames, failedGridNames, nonuniformGridNames;
+        UT_StringArray xformMismatchGridNames, nonuniformGridNames;
 
         // Retrieve either a collider grid or a collider bounding box
         // (or neither) from the reference input.
@@ -920,17 +1011,21 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                 }
 
                 if (!success) {
-                    failedGridNames.append(getPrimitiveIndexAndName(*vdbIt));
+                    std::ostringstream errStrm;
+                    errStrm << "solver failed to converge for VDB "
+                        << getPrimitiveIndexAndName(*vdbIt).c_str()
+                        << " with error " << parms.outputState.absoluteError;
+                    addWarning(SOP_MESSAGE, errStrm.str().c_str());
                 } else {
                     if (outputPressure && parms.pressureGrid) {
                         hvdb::createVdbPrimitive(*gdp, parms.pressureGrid);
                     }
                     if (numGridsProcessed > 1) infoStrm << "\n";
-                    infoStrm << "VDB " << getPrimitiveIndexAndName(*vdbIt).c_str()
-                        << " converged in " << parms.outputState.iterations << " iteration"
+                    infoStrm << "solver converged for VDB "
+                        << getPrimitiveIndexAndName(*vdbIt).c_str()
+                        << " in " << parms.outputState.iterations << " iteration"
                             << (parms.outputState.iterations == 1 ? "" : "s")
-                        << " with relative error " << parms.outputState.relativeError
-                        << " and absolute error " << parms.outputState.absoluteError;
+                        << " with error " << parms.outputState.absoluteError;
                 }
             }
         }
@@ -950,13 +1045,6 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                     const std::string names = joinNames(xformMismatchGridNames, " or ");
                     addWarning(SOP_MESSAGE,
                         ("vector field and collider transforms don't match for " + names).c_str());
-                }
-                if (failedGridNames.size() > 0) {
-                    std::ostringstream errStrm;
-                    errStrm << "solution failed to converge within " << parms.iterations
-                        << " iteration" << (parms.iterations == 1 ? "" : "s")
-                        << " for " << joinNames(failedGridNames);
-                    addWarning(SOP_MESSAGE, errStrm.str().c_str());
                 }
                 const std::string info = infoStrm.str();
                 if (!info.empty()) {

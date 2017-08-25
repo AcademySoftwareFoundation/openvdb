@@ -386,6 +386,10 @@ public:
     void dropGroup(const Name& group);
     /// Clear all groups
     void clearGroups();
+    /// Rename a group
+    size_t renameGroup(const std::string& fromName, const std::string& toName);
+    /// Return a unique name for a group based on given name
+    const Name uniqueGroupName(const Name& name) const;
 
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
@@ -393,7 +397,19 @@ public:
     /// Return true if the name is valid
     static bool validName(const Name& name);
 
-    /// Extract each name from nameStr into includeNames, or into excludeNames if name prefixed with caret
+    /// @brief Extract each name from @a nameStr into @a includeNames, or into @a excludeNames
+    /// if the name is prefixed with a caret.
+    /// @param nameStr       the input string of names
+    /// @param includeNames  on exit, the list of names that are not prefixed with a caret
+    /// @param excludeNames  on exit, the list of names that are prefixed with a caret
+    /// @param includeAll    on exit, @c true if a "*" wildcard is present in the @a includeNames
+    static void parseNames( std::vector<std::string>& includeNames,
+                            std::vector<std::string>& excludeNames,
+                            bool& includeAll,
+                            const std::string& nameStr);
+
+    /// @brief Extract each name from @a nameStr into @a includeNames, or into @a excludeNames
+    /// if the name is prefixed with a caret.
     static void parseNames( std::vector<std::string>& includeNames,
                             std::vector<std::string>& excludeNames,
                             const std::string& nameStr);

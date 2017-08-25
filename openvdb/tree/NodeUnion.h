@@ -47,7 +47,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-#ifndef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
 
 // Forward declaration of traits class
 template<typename T> struct CopyTraits;
@@ -133,7 +133,7 @@ template<> struct CopyTraits<math::Coord> { static const bool IsCopyable = true;
 ////////////////////////////////////////
 
 
-#else // OPENVDB_3_ABI_COMPATIBLE
+#else // OPENVDB_ABI_VERSION_NUMBER <= 3
 
 // Prior to OpenVDB 4 and the introduction of C++11, values of non-POD types
 // were heap-allocated and stored by pointer due to C++98 restrictions on unions.
@@ -217,7 +217,7 @@ struct NodeUnion: public NodeUnionImpl<std::is_class<ValueT>::value, ValueT, Chi
     NodeUnion() {}
 };
 
-#endif // OPENVDB_3_ABI_COMPATIBLE
+#endif
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

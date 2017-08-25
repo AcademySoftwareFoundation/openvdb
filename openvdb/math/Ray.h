@@ -40,9 +40,9 @@
 #include "Math.h"
 #include "Vec3.h"
 #include "Transform.h"
+#include <algorithm> // for std::swap()
 #include <iostream> // for std::ostream
-#include <boost/type_traits/is_floating_point.hpp>
-#include <limits>// for std::numeric_limits<Type>::max()
+#include <limits> // for std::numeric_limits<Type>::max()
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -53,10 +53,13 @@ template<typename RealT = double>
 class Ray
 {
 public:
-    BOOST_STATIC_ASSERT(boost::is_floating_point<RealT>::value);
-    typedef RealT       RealType;
-    typedef Vec3<RealT> Vec3Type;
-    typedef Vec3Type    Vec3T;
+    static_assert(std::is_floating_point<RealT>::value,
+        "math::Ray requires a floating-point value type");
+
+    using RealType = RealT;
+    using Vec3Type = Vec3<RealT>;
+    using Vec3T = Vec3Type;
+
     struct TimeSpan {
         RealT t0, t1;
         /// @brief Default constructor
@@ -88,17 +91,18 @@ public:
     inline void setEye(const Vec3Type& eye) { mEye = eye; }
 
     inline void setDir(const Vec3Type& dir)
-      {
-          mDir = dir;
-          mInvDir = 1/mDir;
-      }
+    {
+        mDir = dir;
+        mInvDir = 1/mDir;
+    }
 
     inline void setMinTime(RealT t0) { assert(t0>0); mTimeSpan.t0 = t0; }
 
     inline void setMaxTime(RealT t1) { assert(t1>0); mTimeSpan.t1 = t1; }
 
-    inline void setTimes(RealT t0 = math::Delta<RealT>::value(),
-                         RealT t1 = std::numeric_limits<RealT>::max())
+    inline void setTimes(
+        RealT t0 = math::Delta<RealT>::value(),
+        RealT t1 = std::numeric_limits<RealT>::max())
     {
         assert(t0>0 && t1>0);
         mTimeSpan.set(t0, t1);
@@ -106,10 +110,11 @@ public:
 
     inline void scaleTimes(RealT scale) { mTimeSpan.scale(scale); }
 
-    inline void reset(const Vec3Type& eye,
-                      const Vec3Type& direction,
-                      RealT t0 = math::Delta<RealT>::value(),
-                      RealT t1 = std::numeric_limits<RealT>::max())
+    inline void reset(
+        const Vec3Type& eye,
+        const Vec3Type& direction,
+        RealT t0 = math::Delta<RealT>::value(),
+        RealT t1 = std::numeric_limits<RealT>::max())
     {
         this->setEye(eye);
         this->setDir(direction);
@@ -138,14 +143,8 @@ public:
     /// @brief Return the midpoint of the ray.
     inline Vec3R mid() const { return (*this)(mTimeSpan.mid()); }
 
-    /// @brief Return @c true if t0 is strictly less than t1.
-    OPENVDB_DEPRECATED inline bool test() const { return mTimeSpan.valid(RealT(0)); }
-
     /// @brief Return @c true if t1 is larger than t0 by at least eps.
-    inline bool valid(RealT eps=math::Delta<float>::value()) const
-      {
-          return mTimeSpan.valid(eps);
-      }
+    inline bool valid(RealT eps=math::Delta<float>::value()) const { return mTimeSpan.valid(eps); }
 
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
     inline bool test(RealT time) const { return mTimeSpan.test(time); }
@@ -160,7 +159,8 @@ public:
     inline Ray applyMap(const MapType& map) const
     {
         assert(map.isLinear());
-        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1), Tolerance<RealT>::value(), Delta<RealT>::value()));
+        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1),
+            Tolerance<RealT>::value(), Delta<RealT>::value()));
         const Vec3T eye = map.applyMap(mEye);
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length();
@@ -320,6 +320,7 @@ private:
     TimeSpan mTimeSpan;
 }; // end of Ray class
 
+
 /// @brief Output streaming of the Ray class.
 /// @note Primarily intended for debugging.
 template<typename RealT>
@@ -329,7 +330,6 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
        << " t0=" << r.t0()  << " t1="  << r.t1();
     return os;
 }
-
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

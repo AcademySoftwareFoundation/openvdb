@@ -164,12 +164,12 @@ private:
 ////////////////////////////////////////
 
 
-/// @brief Tree topology render module
-class ActiveValueModule: public RenderModule
+/// @brief Module to render active voxels as points
+class VoxelModule: public RenderModule
 {
 public:
-    ActiveValueModule(const openvdb::GridBase::ConstPtr&);
-    virtual ~ActiveValueModule() {}
+    VoxelModule(const openvdb::GridBase::ConstPtr&);
+    virtual ~VoxelModule() {}
 
     virtual void render();
 

@@ -198,7 +198,7 @@ private:
 #endif
 
 public:
-    typedef ValueT ValueType;
+    using ValueType = ValueT;
 
     /// @brief Default constructor
     PagedArray() = default;
@@ -258,34 +258,6 @@ public:
         (*mPageTable[index >> Log2PageSize])[index] = value;
         return index;
     }
-
-    /// @brief Returns the last element, decrements the size by one.
-    ///
-    /// @deprecated This method will be removed in the near future
-    ///
-    /// @bug This method can produce unexpected results if used
-    /// in combination with a ValueBuffer (due to empty pages).
-    /// However,it can safely be used the push_back methods
-    /// defined above.
-    ///
-    /// @details Consider subsequnetly calling shrink_to_fit to
-    /// reduce the page table to match the new size.
-    ///
-    /// @note Calling this method on an empty containter is
-    /// undefined (as is also the case for std containers).
-    ///
-    /// @warning If values were added to the container by means of
-    /// multiple ValueBuffers the last value might not be what you
-    /// expect since the ordering is generally not perserved. Only
-    /// PagedArray::push_back preserves the ordering (or a single
-    /// instance of a ValueBuffer).
-    OPENVDB_DEPRECATED ValueType pop_back()
-    {
-        assert(mSize>0);
-        --mSize;
-        return (*mPageTable[mSize >> Log2PageSize])[mSize];
-    }
-
 
     /// @brief Reduce the page table to fix the current size.
     ///
@@ -626,7 +598,7 @@ class PagedArray<ValueT, Log2PageSize, TableT>::
 ValueBuffer
 {
 public:
-    typedef PagedArray<ValueT, Log2PageSize, TableT> PagedArrayType;
+    using PagedArrayType = PagedArray<ValueT, Log2PageSize, TableT>;
     /// @brief Constructor from a PageArray
     ValueBuffer(PagedArray& parent) : mParent(&parent), mPage(new Page()), mSize(0) {}
     /// @warning This copy-constructor is shallow in the sense that no
@@ -674,8 +646,8 @@ class PagedArray<ValueT, Log2PageSize, TableT>::
 ConstIterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
-    typedef std::iterator<std::random_access_iterator_tag, ValueT> BaseT;
-    typedef typename BaseT::difference_type difference_type;
+    using BaseT = std::iterator<std::random_access_iterator_tag, ValueT>;
+    using difference_type = typename BaseT::difference_type;
     // constructors and assignment
     ConstIterator() : mPos(0), mParent(nullptr) {}
     ConstIterator(const PagedArray& parent, size_t pos=0) : mPos(pos), mParent(&parent) {}
@@ -718,14 +690,15 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// Non-const std-compliant iterator
 // Public member-class of PagedArray
 template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
 class PagedArray<ValueT, Log2PageSize, TableT>::
 Iterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
-    typedef std::iterator<std::random_access_iterator_tag, ValueT> BaseT;
-    typedef typename BaseT::difference_type difference_type;
+    using BaseT = std::iterator<std::random_access_iterator_tag, ValueT>;
+    using difference_type = typename BaseT::difference_type;
     // constructors and assignment
     Iterator() : mPos(0), mParent(nullptr) {}
     Iterator(PagedArray& parent, size_t pos=0) : mPos(pos), mParent(&parent) {}

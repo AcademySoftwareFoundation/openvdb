@@ -31,12 +31,13 @@
 #ifndef OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-#include <iomanip>
-#include <assert.h>
-#include <math.h>
 #include <openvdb/Exceptions.h>
 #include "Vec3.h"
 #include "Mat.h"
+#include <algorithm> // for std::copy()
+#include <cassert>
+#include <cmath>
+#include <iomanip>
 
 
 namespace openvdb {
@@ -55,9 +56,9 @@ class Mat3: public Mat<3, T>
 {
 public:
     /// Data type held by the matrix.
-    typedef T         value_type;
-    typedef T         ValueType;
-    typedef Mat<3, T> MyBase;
+    using value_type = T;
+    using ValueType = T;
+    using MyBase = Mat<3, T>;
     /// Trivial constructor, the matrix is NOT initialized
     Mat3() {}
 
@@ -238,7 +239,7 @@ public:
         return MyBase::mm[3*i+j];
     } // trivial
 
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3
+    /// Set the rows of this matrix to the vectors v1, v2, v3
     void setRows(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
     {
         MyBase::mm[0] = v1[0];
@@ -252,7 +253,7 @@ public:
         MyBase::mm[8] = v3[2];
     } // setRows
 
-    /// Set the columns of "this" matrix to the vectors v1, v2, v3
+    /// Set the columns of this matrix to the vectors v1, v2, v3
     void setColumns(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
     {
         MyBase::mm[0] = v1[0];
@@ -265,12 +266,6 @@ public:
         MyBase::mm[7] = v2[2];
         MyBase::mm[8] = v3[2];
     } // setColumns
-
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3
-    OPENVDB_DEPRECATED void setBasis(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
-    {
-        this->setRows(v1, v2, v3);
-    }
 
     /// Set diagonal and symmetric triangular components
     void setSymmetric(const Vec3<T> &vdiag, const Vec3<T> &vtri)
@@ -286,8 +281,7 @@ public:
         MyBase::mm[8] = vdiag[2];
     } // setSymmetricTest
 
-    /// Returns matrix with prescribed diagonal and symmetric triangular
-    /// components
+    /// Return a matrix with the prescribed diagonal and symmetric triangular components.
     static Mat3 symmetric(const Vec3<T> &vdiag, const Vec3<T> &vtri)
     {
         return Mat3(
@@ -326,7 +320,7 @@ public:
         MyBase::mm[8] = 0;
     } // trivial
 
-    /// Set "this" matrix to identity
+    /// Set this matrix to identity
     void setIdentity()
     {
         MyBase::mm[0] = 1;
@@ -351,7 +345,7 @@ public:
         return *this;
     } // opEqualToTest
 
-    /// Test if "this" is equivalent to m with tolerance of eps value
+    /// Return @c true if this matrix is equivalent to @a m within a tolerance of @a eps.
     bool eq(const Mat3 &m, T eps=1.0e-8) const
     {
         return (isApproxEqual(MyBase::mm[0],m.mm[0],eps) &&
@@ -380,7 +374,7 @@ public:
     //     return m*scalar;
     // }
 
-    /// @brief Returns m, where \f$m_{i,j} *= scalar\f$ for \f$i, j \in [0, 2]\f$
+    /// Multiply each element of this matrix by @a scalar.
     template <typename S>
     const Mat3<T>& operator*=(S scalar)
     {
@@ -396,7 +390,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} += m1_{i,j}\f$ for \f$i, j \in [0, 2]\f$
+    /// Add each element of the given matrix to the corresponding element of this matrix.
     template <typename S>
     const Mat3<T> &operator+=(const Mat3<S> &m1)
     {
@@ -414,7 +408,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} -= m1_{i,j}\f$ for \f$i, j \in [0, 2]\f$
+    /// Subtract each element of the given matrix from the corresponding element of this matrix.
     template <typename S>
     const Mat3<T> &operator-=(const Mat3<S> &m1)
     {
@@ -432,7 +426,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} *= m1_{i,j}\f$ for \f$i, j \in [0, 2]\f$
+    /// Multiply this matrix by the given matrix.
     template <typename S>
     const Mat3<T> &operator*=(const Mat3<S> &m1)
     {
@@ -473,7 +467,7 @@ public:
         return *this;
     }
 
-    /// @brief Return the cofactor matrix of "this"
+    /// @brief Return the cofactor matrix of this matrix.
     Mat3 cofactor() const
     {
         return Mat3<T>(
@@ -488,7 +482,7 @@ public:
           MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
     }
 
-    /// returns adjoint of "this", i.e. the transpose of the cofactor of "this"
+    /// Return the adjoint of this matrix, i.e., the transpose of its cofactor.
     Mat3 adjoint() const
     {
         return Mat3<T>(
@@ -522,7 +516,7 @@ public:
 
         const T det = inv.mm[0]*MyBase::mm[0] + inv.mm[1]*MyBase::mm[3] + inv.mm[2]*MyBase::mm[6];
 
-        // If the determinant is 0, m was singular and "this" will contain junk.
+        // If the determinant is 0, m was singular and the result will be invalid.
         if (isApproxEqual(det,T(0.0),tolerance)) {
             OPENVDB_THROW(ArithmeticError, "Inversion of singular 3x3 matrix");
         }
@@ -553,7 +547,7 @@ public:
         return snapMatBasis(*this, axis, direction);
     }
 
-    /// Return the transformed vector by "this" matrix.
+    /// Return the transformed vector by this matrix.
     /// This function is equivalent to post-multiplying the matrix.
     template<typename T0>
     Vec3<T0> transform(const Vec3<T0> &v) const
@@ -561,7 +555,7 @@ public:
         return static_cast< Vec3<T0> >(v * *this);
     } // xformVectorTest
 
-    /// Return the transformed vector by transpose of "this" matrix.
+    /// Return the transformed vector by transpose of this matrix.
     /// This function is equivalent to pre-multiplying the matrix.
     template<typename T0>
     Vec3<T0> pretransform(const Vec3<T0> &v) const
@@ -570,8 +564,8 @@ public:
     } // xformTVectorTest
 
 
-    /// Treats diag as a diagonal matrix and returns the
-    /// multiplication of "this" with diag (from the right).
+    /// @brief Treat @a diag as a diagonal matrix and return the product
+    /// of this matrix with @a diag (from the right).
     Mat3 timesDiagonal(const Vec3<T>& diag) const
     {
         Mat3 ret(*this);
@@ -610,13 +604,13 @@ template <typename T0, typename T1>
 bool operator!=(const Mat3<T0> &m0, const Mat3<T1> &m1) { return !(m0 == m1); }
 
 /// @relates Mat3
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 2]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat3<typename promote<S, T>::type> operator*(S scalar, const Mat3<T> &m)
 { return m*scalar; }
 
 /// @relates Mat3
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 2]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat3<typename promote<S, T>::type> operator*(const Mat3<T> &m, S scalar)
 {
@@ -626,7 +620,7 @@ Mat3<typename promote<S, T>::type> operator*(const Mat3<T> &m, S scalar)
 }
 
 /// @relates Mat3
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} + m1_{i,j}\f$ for \f$i, j \in [0, 2]\f$
+/// @brief Add corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat3<typename promote<T0, T1>::type> operator+(const Mat3<T0> &m0, const Mat3<T1> &m1)
 {
@@ -636,7 +630,7 @@ Mat3<typename promote<T0, T1>::type> operator+(const Mat3<T0> &m0, const Mat3<T1
 }
 
 /// @relates Mat3
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} - m1_{i,j}\f$ for \f$i, j \in [0, 2]\f$
+/// @brief Subtract corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat3<typename promote<T0, T1>::type> operator-(const Mat3<T0> &m0, const Mat3<T1> &m1)
 {
@@ -646,10 +640,7 @@ Mat3<typename promote<T0, T1>::type> operator-(const Mat3<T0> &m0, const Mat3<T1
 }
 
 
-/// @brief Matrix multiplication.
-///
-/// Returns M, where
-///     \f$M_{ij} = \sum_{n=0}^2\left(m0_{nj} + m1_{in}\right)\f$ for \f$i, j \in [0, 2]\f$
+/// @brief Multiply @a m0 by @a m1 and return the resulting matrix.
 template <typename T0, typename T1>
 Mat3<typename promote<T0, T1>::type>operator*(const Mat3<T0> &m0, const Mat3<T1> &m1)
 {
@@ -659,7 +650,7 @@ Mat3<typename promote<T0, T1>::type>operator*(const Mat3<T0> &m0, const Mat3<T1>
 }
 
 /// @relates Mat3
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^2 m_{i,n} * v_n\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _m by @a _v and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
 operator*(const Mat3<MT> &_m, const Vec3<T> &_v)
@@ -672,7 +663,7 @@ operator*(const Mat3<MT> &_m, const Vec3<T> &_v)
 }
 
 /// @relates Mat3
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^2 m_{n,i} * v_n\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _v by @a _m and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
 operator*(const Vec3<T> &_v, const Mat3<MT> &_m)
@@ -685,7 +676,7 @@ operator*(const Vec3<T> &_v, const Mat3<MT> &_m)
 }
 
 /// @relates Mat3
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^2 m_{i,n} * v_n\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _v by @a _m and replace @a _v with the resulting vector.
 template<typename T, typename MT>
 inline Vec3<T> &operator *= (Vec3<T> &_v, const Mat3<MT> &_m)
 {
@@ -704,9 +695,9 @@ Mat3<T> outerProduct(const Vec3<T>& v1, const Vec3<T>& v2)
                    v1[2]*v2[0], v1[2]*v2[1], v1[2]*v2[2]);
 }// outerProduct
 
-typedef Mat3<float>  Mat3s;
-typedef Mat3<double> Mat3d;
-typedef Mat3d        Mat3f;
+using Mat3s = Mat3<float>;
+using Mat3d = Mat3<double>;
+using Mat3f = Mat3d;
 
 
 /// Interpolate the rotation between m1 and m2 using Mat::powSolve.
@@ -722,67 +713,70 @@ Mat3<T> powLerp(const Mat3<T0> &m1, const Mat3<T0> &m2, T t)
 }
 
 
-namespace {
-    template<typename T>
-    void pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
-    {
-        const int& n = Mat3<T>::size;  // should be 3
-        T temp;
-        /// scratch variables used in pivoting
-        double cotan_of_2_theta;
-        double tan_of_theta;
-        double cosin_of_theta;
-        double sin_of_theta;
-        double z;
+namespace mat3_internal {
 
-        double Sij = S(i,j);
+template<typename T>
+inline void
+pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
+{
+    const int& n = Mat3<T>::size;  // should be 3
+    T temp;
+    /// scratch variables used in pivoting
+    double cotan_of_2_theta;
+    double tan_of_theta;
+    double cosin_of_theta;
+    double sin_of_theta;
+    double z;
 
-        double Sjj_minus_Sii = D[j] - D[i];
+    double Sij = S(i,j);
 
-        if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
-            tan_of_theta = Sij / Sjj_minus_Sii;
+    double Sjj_minus_Sii = D[j] - D[i];
+
+    if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
+        tan_of_theta = Sij / Sjj_minus_Sii;
+    } else {
+        /// pivot on Sij
+        cotan_of_2_theta = 0.5*Sjj_minus_Sii / Sij ;
+
+        if (cotan_of_2_theta < 0.) {
+            tan_of_theta =
+                -1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
         } else {
-            /// pivot on Sij
-            cotan_of_2_theta = 0.5*Sjj_minus_Sii / Sij ;
-
-            if (cotan_of_2_theta < 0.) {
-                tan_of_theta =
-                    -1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
-            } else {
-                tan_of_theta =
-                    1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
-            }
+            tan_of_theta =
+                1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
         }
-
-        cosin_of_theta = 1./sqrt( 1. + tan_of_theta * tan_of_theta);
-        sin_of_theta = cosin_of_theta * tan_of_theta;
-        z = tan_of_theta * Sij;
-        S(i,j) = 0;
-        D[i] -= z;
-        D[j] += z;
-        for (int k = 0; k < i; ++k) {
-            temp = S(k,i);
-            S(k,i) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-            S(k,j)= sin_of_theta * temp + cosin_of_theta * S(k,j);
-        }
-        for (int k = i+1; k < j; ++k) {
-            temp = S(i,k);
-            S(i,k) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-            S(k,j) = sin_of_theta * temp + cosin_of_theta * S(k,j);
-        }
-        for (int k = j+1; k < n; ++k) {
-            temp = S(i,k);
-            S(i,k) = cosin_of_theta * temp - sin_of_theta * S(j,k);
-            S(j,k) = sin_of_theta * temp + cosin_of_theta * S(j,k);
-        }
-        for (int k = 0; k < n; ++k)
-            {
-                temp = Q(k,i);
-                Q(k,i) = cosin_of_theta * temp - sin_of_theta*Q(k,j);
-                Q(k,j) = sin_of_theta * temp + cosin_of_theta*Q(k,j);
-            }
     }
+
+    cosin_of_theta = 1./sqrt( 1. + tan_of_theta * tan_of_theta);
+    sin_of_theta = cosin_of_theta * tan_of_theta;
+    z = tan_of_theta * Sij;
+    S(i,j) = 0;
+    D[i] -= z;
+    D[j] += z;
+    for (int k = 0; k < i; ++k) {
+        temp = S(k,i);
+        S(k,i) = cosin_of_theta * temp - sin_of_theta * S(k,j);
+        S(k,j)= sin_of_theta * temp + cosin_of_theta * S(k,j);
+    }
+    for (int k = i+1; k < j; ++k) {
+        temp = S(i,k);
+        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(k,j);
+        S(k,j) = sin_of_theta * temp + cosin_of_theta * S(k,j);
+    }
+    for (int k = j+1; k < n; ++k) {
+        temp = S(i,k);
+        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(j,k);
+        S(j,k) = sin_of_theta * temp + cosin_of_theta * S(j,k);
+    }
+    for (int k = 0; k < n; ++k)
+        {
+            temp = Q(k,i);
+            Q(k,i) = cosin_of_theta * temp - sin_of_theta*Q(k,j);
+            Q(k,j) = sin_of_theta * temp + cosin_of_theta*Q(k,j);
+        }
 }
+
+} // namespace mat3_internal
 
 
 /// @brief Use Jacobi iterations to decompose a symmetric 3x3 matrix
@@ -791,7 +785,8 @@ namespace {
 /// Joachim Kopp.  arXiv.org preprint: physics/0610206
 /// with the addition of largest pivot
 template<typename T>
-bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
+inline bool
+diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     unsigned int MAX_ITERATIONS=250)
 {
     /// use Givens rotation matrix to eliminate off-diagonal entries.
@@ -841,7 +836,7 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
                 }
             }
         }
-        pivot(ip, jp, S, D, Q);
+        mat3_internal::pivot(ip, jp, S, D, Q);
     } while (iterations < MAX_ITERATIONS);
 
     return false;

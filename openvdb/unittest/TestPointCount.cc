@@ -37,6 +37,11 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cstdio> // for std::remove()
+#include <cstdlib> // for std::getenv()
+#include <string>
+#include <vector>
+
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
@@ -48,8 +53,8 @@ class TestPointCount: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointCount);
     CPPUNIT_TEST(testCount);
@@ -360,7 +365,7 @@ TestPointCount::testGroup()
 
             PointDataTree& inputTree = inputGrid->tree();
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
             CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
             CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
@@ -595,7 +600,7 @@ TestPointCount::testOffsets()
 
         Index64 total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
         CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
         CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(0));

@@ -31,6 +31,7 @@
 #ifndef OPENVDB_TREE_LEAF_NODE_MASK_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAF_NODE_MASK_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include <openvdb/math/Math.h> // for math::isZero()
@@ -38,7 +39,10 @@
 #include "LeafNode.h"
 #include "Iterator.h"
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 
 namespace openvdb {
@@ -90,7 +94,7 @@ public:
     /// @param dummy   dummy value
     explicit LeafNode(const Coord& xyz, bool value = false, bool dummy = false);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// "Partial creation" constructor used during file input
     LeafNode(PartialCreate, const Coord& xyz, bool value = false, bool dummy = false);
 #endif
@@ -154,7 +158,7 @@ public:
     /// Return @c true if this node only contains active voxels.
     bool isDense() const { return mBuffer.mData.isOn(); }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Return @c true if memory for this node's buffer has been allocated.
     /// @details Currently, boolean leaf nodes don't support partial creation,
     /// so this always returns @c true.
@@ -805,7 +809,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<Index Log2Dim>
 inline
 LeafNode<ValueMask, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active)

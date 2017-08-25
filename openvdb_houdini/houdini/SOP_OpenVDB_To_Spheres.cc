@@ -67,17 +67,17 @@ class SOP_OpenVDB_To_Spheres: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_To_Spheres(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_To_Spheres() {}
+    ~SOP_OpenVDB_To_Spheres() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i) const { return (i > 0); }
+    int isRefInput(unsigned i) const override { return (i > 0); }
 
     void checkActivePart(float time);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -87,55 +87,64 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
-
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDBs to be processed.")
+        .setDocumentation(
+            "A subset of the input VDB grids to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
-        .setHelpText("The crossing point of the VDB values that is considered "
-            "the surface. The zero default value works for signed distance "
-            "fields while fog volumes require a larger positive value, 0.5 is "
-            "a good initial guess."));
+        .setTooltip(
+            "The crossing point of the VDB values that is considered the surface\n\n"
+            "Zero works for signed distance fields, while fog volumes"
+            " require a larger positive value (0.5 is a good initial guess)."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units")
+        .setDocumentation(
+            "If enabled, specify sphere sizes in world units, otherwise in voxels."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius in Voxels")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
-        .setHelpText("Determines the smallest sphere size, voxel units."));
+        .setTooltip("Determines the smallest sphere size, voxel units.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minradiusworld", "Min Radius")
         .setDefault(0.1)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
-        .setHelpText("Determines the smallest sphere size, world units."));
+        .setTooltip("Determines the smallest sphere size, world units.")
+        .setDocumentation("The radius of the smallest sphere allowed"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius in Voxels")
         .setDefault(std::numeric_limits<float>::max())
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
-        .setHelpText("Determines the largest sphere size, voxel units."));
+        .setTooltip("Determines the largest sphere size, voxel units.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradiusworld", "Max Radius")
         .setDefault(std::numeric_limits<float>::max())
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
-        .setHelpText("Determines the largest sphere size, world units."));
+        .setTooltip("Determines the largest sphere size, world units.")
+        .setDocumentation("The radius of the largest sphere allowed"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Max Spheres")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
-        .setHelpText("No more than this number of spheres are generated")
-        .setDefault(50));
+        .setDefault(50)
+        .setTooltip("No more than this number of spheres are generated (but possibly fewer)."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "scatter", "Scatter Points")
         .setRange(PRM_RANGE_RESTRICTED, 1000, PRM_RANGE_UI, 50000)
-        .setHelpText("How many interior points to consider for the sphere placement, "
-            "increasing this count increases the chances of finding optimal sphere sizes.")
-        .setDefault(10000));
+        .setDefault(10000)
+        .setTooltip(
+            "How many interior points to consider for the sphere placement\n\n"
+            "Increasing this count increases the chances of finding optimal sphere sizes."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "overlapping", "Overlapping")
 #ifndef SESI_OPENVDB
@@ -143,7 +152,7 @@ newSopOperator(OP_OperatorTable* table)
 #else
         .setDefault(PRMoneDefaults)
 #endif
-        .setHelpText("Toggle to allow spheres to overlap/intersect."));
+        .setTooltip("If enabled, allow spheres to overlap/intersect."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "preserve", "Preserve Attributes and Groups")
 #ifndef SESI_OPENVDB
@@ -151,7 +160,7 @@ newSopOperator(OP_OperatorTable* table)
 #else
         .setDefault(PRMoneDefaults)
 #endif
-        .setHelpText("Enable to copy attributes and groups from the input"));
+        .setTooltip("If enabled, copy attributes and groups from the input."));
 
     // The "doid" parameter name comes from the standard in POPs
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "doid", "Add ID Attribute")
@@ -160,15 +169,47 @@ newSopOperator(OP_OperatorTable* table)
 #else
         .setDefault(PRMzeroDefaults)
 #endif
-        .setHelpText("Enable to add an id point attribute that corresponds to different VDBs."));
+        .setTooltip("If enabled, add an id point attribute that denotes the source VDB.")
+        .setDocumentation(
+            "If enabled, add an `id` point attribute that denotes the source VDB"
+            " for each sphere."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dopscale", "Add PScale Attribute")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("If enabled, add a pscale point attribute to each sphere.")
+        .setDocumentation(
+            "If enabled, add a `pscale` point attribute that indicates"
+            " the radius of each sphere."));
 
     //////////
 
     hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
-        .addInput("VDBs to convert");
+        .addInput("VDBs to convert")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Fill a VDB volume with adaptively-sized spheres.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node is useful for generating proxy geometry for RBD simulations,\n\
+since approximating nonconvex geometry with sphere compounds\n\
+drastically improves the simulation time.\n\
+This can be used, for example, on the output of an\n\
+[OpenVDB Fracture node|Node:sop/DW_OpenVDBFracture].\n\
+\n\
+Another use is to produce the initial density volume for cloud modeling.\n\
+\n\
+@related\n\
+- [OpenVDB Fracture|Node:sop/DW_OpenVDBFracture]\n\
+- [Node:sop/cloud]\n\
+- [Node:sop/vdbtospheres]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -218,7 +259,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("OpenVDB to Spheres");
 
         const GU_Detail* vdbGeo = inputGeo(0);
-        if(vdbGeo == NULL) return error();
+        if (vdbGeo == nullptr) return error();
 
         // Get the group of grids to surface.
         UT_String groupStr;
@@ -242,9 +283,9 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         const bool worldUnits = evalInt("worldunits", 0, time);
 
-        const int sphereCount = evalInt("spheres", 0, time);
+        const int sphereCount = static_cast<int>(evalInt("spheres", 0, time));
         const bool overlapping = evalInt("overlapping", 0, time);
-        const int scatter = evalInt("scatter", 0, time);
+        const int scatter = static_cast<int>(evalInt("scatter", 0, time));
         const bool preserve = evalInt("preserve", 0, time);
 
         const bool addID = evalInt("doid", 0, time) != 0;
@@ -266,7 +307,8 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         if (addPScale) {
             GA_RWAttributeRef aRef = gdp->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
             if (!aRef.isValid()) {
-                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
+                aRef = gdp->addFloatTuple(
+                    GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
             }
             pscaleAttr = aRef.getAttribute();
             if(!pscaleAttr.isValid()) {

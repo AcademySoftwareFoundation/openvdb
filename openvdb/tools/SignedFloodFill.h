@@ -30,23 +30,20 @@
 //
 /// @file SignedFloodFill.h
 ///
-/// @brief Propagates the sign of distance values from the active
-/// voxels in the narrow band to the inactive values outside the
-/// narrow band.
+/// @brief Propagate the signs of distance values from the active voxels
+/// in the narrow band to the inactive values outside the narrow band.
 ///
 /// @author Ken Museth
 
 #ifndef OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 
-#include <boost/utility/enable_if.hpp>
-#include <openvdb/math/Math.h> // for math::negative
+#include <openvdb/version.h>
 #include <openvdb/Types.h> // for Index typedef
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/type_traits/is_signed.hpp>
-
+#include <openvdb/math/Math.h> // for math::negative
 #include <openvdb/tree/NodeManager.h>
+#include <map>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -111,10 +108,11 @@ template<typename TreeOrLeafManagerT>
 class SignedFloodFillOp
 {
 public:
-    typedef typename TreeOrLeafManagerT::ValueType    ValueT;
-    typedef typename TreeOrLeafManagerT::RootNodeType RootT;
-    typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value || boost::is_signed<ValueT>::value);
+    using ValueT = typename TreeOrLeafManagerT::ValueType;
+    using RootT = typename TreeOrLeafManagerT::RootNodeType;
+    using LeafT = typename TreeOrLeafManagerT::LeafNodeType;
+    static_assert(std::is_signed<ValueT>::value,
+        "signed flood fill is supported only for signed value grids");
 
     SignedFloodFillOp(const TreeOrLeafManagerT& tree, Index minLevel = 0)
         : mOutside(ValueT(math::Abs(tree.background())))
@@ -135,8 +133,8 @@ public:
     {
         if (LeafT::LEVEL < mMinLevel) return;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        if (!leaf.allocate()) return;//this assures that the buffer is allocated and in-memory
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
+        if (!leaf.allocate()) return; // this assures that the buffer is allocated and in-memory
 #endif
         const typename LeafT::NodeMaskType& valueMask = leaf.getValueMask();
         // WARNING: "Never do what you're about to see at home, we're what you call experts!"
@@ -211,7 +209,7 @@ public:
     void operator()(RootT& root) const
     {
         if (RootT::LEVEL < mMinLevel) return;
-        typedef typename RootT::ChildNodeType ChildT;
+        using ChildT = typename RootT::ChildNodeType;
         // Insert the child nodes into a map sorted according to their origin
         std::map<Coord, ChildT*> nodeKeys;
         typename RootT::ChildOnIter it = root.beginChildOn();
@@ -239,11 +237,12 @@ private:
 };// SignedFloodFillOp
 
 
+//{
+/// @cond OPENVDB_SIGNED_FLOOD_FILL_INTERNAL
+
 template<typename TreeOrLeafManagerT>
 inline
-typename boost::enable_if_c<
-    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
-    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
+typename std::enable_if<std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT& tree,
                   typename TreeOrLeafManagerT::ValueType outsideValue,
                   typename TreeOrLeafManagerT::ValueType insideValue,
@@ -256,12 +255,10 @@ doSignedFloodFill(TreeOrLeafManagerT& tree,
     nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
-// Dummy (no-op) implementation for non-float types
+// Dummy (no-op) implementation for unsigned types
 template <typename TreeOrLeafManagerT>
 inline
-typename boost::disable_if_c<
-    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
-    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
+typename std::enable_if<!std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   const typename TreeOrLeafManagerT::ValueType&,
@@ -272,6 +269,9 @@ doSignedFloodFill(TreeOrLeafManagerT&,
     OPENVDB_THROW(TypeError,
         "signedFloodFill is supported only for signed value grids");
 }
+
+/// @endcond
+//}
 
 
 // If the narrow-band is symmetric and unchanged

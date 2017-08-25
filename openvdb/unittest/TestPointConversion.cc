@@ -629,21 +629,21 @@ TestPointConversion::testComputeVoxelSize()
             positionHandle.set(i, 0, Vec3f(0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/8);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 18.5528f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(18.5528f, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 5.51306f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.51306f, voxelSize, /*tolerance=*/1e-4);
 
         // test decimal place accuracy
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 10);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 5.5130610466f, /*tolerance=*/1e-9);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.5130610466f, voxelSize, /*tolerance=*/1e-9);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 1);
-        CPPUNIT_ASSERT_EQUAL(voxelSize, 5.5f);
+        CPPUNIT_ASSERT_EQUAL(5.5f, voxelSize);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 0);
-        CPPUNIT_ASSERT_EQUAL(voxelSize, 6.0f);
+        CPPUNIT_ASSERT_EQUAL(6.0f, voxelSize);
     }
 
     // test coplanar points (Y=0)
@@ -658,10 +658,10 @@ TestPointConversion::testComputeVoxelSize()
         positionHandle.set(4, 0, Vec3f(10.0f, 0.0f, 0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 20.0f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0f, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 11.696f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(11.696f, voxelSize, /*tolerance=*/1e-4);
     }
 
     // test collinear points (X=0, Y=0)
@@ -676,10 +676,10 @@ TestPointConversion::testComputeVoxelSize()
         positionHandle.set(4, 0, Vec3f(0.0f, 0.0f, 0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 20.0f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(20.0f, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 8.32034f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(8.32034f, voxelSize, /*tolerance=*/1e-4);
     }
 
     // test min limit collinear points (X=0, Y=0, Z=+/-float min)
@@ -691,10 +691,10 @@ TestPointConversion::testComputeVoxelSize()
         positionHandle.set(1, 0, Vec3f(0.0f, 0.0f, std::numeric_limits<float>::min()));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/2);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, minimumVoxelSize, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(minimumVoxelSize, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, minimumVoxelSize, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(minimumVoxelSize, voxelSize, /*tolerance=*/1e-4);
     }
 
     // test max limit collinear points (X=+/-float max, Y=0, Z=0)
@@ -706,10 +706,10 @@ TestPointConversion::testComputeVoxelSize()
         positionHandle.set(1, 0, Vec3f(std::numeric_limits<float>::max(), 0.0f, 0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/2);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, maximumVoxelSize, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(maximumVoxelSize, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, maximumVoxelSize, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(maximumVoxelSize, voxelSize, /*tolerance=*/1e-4);
     }
 
     // max pointsPerVoxel
@@ -750,7 +750,7 @@ TestPointConversion::testComputeVoxelSize()
         CPPUNIT_ASSERT_EQUAL(voxelSize, minimumVoxelSize);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, minimumVoxelSize, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(minimumVoxelSize, voxelSize, /*tolerance=*/1e-4);
 
         PointDataGrid::Ptr grid = Local::genPointsGrid(voxelSize, position);
         CPPUNIT_ASSERT_EQUAL(grid->activeVoxelCount(), Index64(1));
@@ -795,10 +795,10 @@ TestPointConversion::testComputeVoxelSize()
         }
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/10);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 0.00012f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.00012f, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 2e-5, /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2e-5, voxelSize, /*tolerance=*/1e-6);
 
         PointDataGrid::Ptr grid = Local::genPointsGrid(voxelSize, position);
         CPPUNIT_ASSERT_EQUAL(grid->activeVoxelCount(), Index64(150001));
@@ -806,7 +806,7 @@ TestPointConversion::testComputeVoxelSize()
         // check zero decimal place still returns valid result
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 2e-5, /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2e-5, voxelSize, /*tolerance=*/1e-6);
     }
 
     // random position generation within two bounds of equal size.
@@ -836,7 +836,7 @@ TestPointConversion::testComputeVoxelSize()
         }
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 0.00052f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.00052f, voxelSize, /*tolerance=*/1e-4);
 
         PointDataGrid::Ptr grid = Local::genPointsGrid(voxelSize, position);
         const auto pointsPerVoxel = static_cast<Index64>(
@@ -879,7 +879,7 @@ TestPointConversion::testComputeVoxelSize()
         }
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/10);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 0.24758f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.24758f, voxelSize, /*tolerance=*/1e-3);
 
         PointDataGrid::Ptr grid = Local::genPointsGrid(voxelSize, position);
         auto pointsPerVoxel = static_cast<Index64>(
@@ -887,7 +887,7 @@ TestPointConversion::testComputeVoxelSize()
         CPPUNIT_ASSERT(math::isApproxEqual(pointsPerVoxel, Index64(10), Index64(2)));
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 0.00231f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.00231f, voxelSize, /*tolerance=*/1e-4);
 
         grid = Local::genPointsGrid(voxelSize, position);
         pointsPerVoxel = static_cast<Index64>(
@@ -921,7 +921,7 @@ TestPointConversion::testComputeVoxelSize()
     {
         const float voxelSize = computeVoxelSize(position, /*points per voxel*/2);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxelSize, 2.6275f, /*tolerance=*/1e-4);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.6275f, voxelSize, /*tolerance=*/0.01);
 
         PointDataGrid::Ptr grid = Local::genPointsGrid(voxelSize, position);
         const Index64 pointsPerVoxel = count / grid->activeVoxelCount();

@@ -35,27 +35,19 @@
 #ifndef OPENVDB_MATH_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_HAS_BEEN_INCLUDED
 
-#include <assert.h>
-#include <algorithm> // for std::max()
-#include <cmath>     // for floor(), ceil() and sqrt()
-#include <math.h>    // for pow(), fabs() etc
-#include <cstdlib>   // for srand(), abs(int)
-#include <limits>    // for std::numeric_limits<Type>::max()
-#include <string>
-#include <boost/numeric/conversion/conversion_traits.hpp>
-#include <boost/math/special_functions/cbrt.hpp>
-#include <boost/math/special_functions/fpclassify.hpp> // boost::math::isfinite
-#include <boost/random/mersenne_twister.hpp> // for boost::random::mt19937
-#include <boost/random/uniform_01.hpp>
-#include <boost/random/uniform_int.hpp>
-#include <boost/version.hpp> // for BOOST_VERSION
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
+#include <boost/numeric/conversion/conversion_traits.hpp>
+#include <algorithm> // for std::max()
+#include <cassert>
+#include <cmath>     // for std::ceil(), std::fabs(), std::pow(), std::sqrt(), etc.
+#include <cstdlib>   // for abs(int)
+#include <random>
+#include <string>
+#include <type_traits> // for std::is_arithmetic
 
 
 // Compile pragmas
-
-#define PRAGMA(x) _Pragma(#x)
 
 // Intel(r) compiler fires remark #1572: floating-point equality and inequality
 // comparisons are unrealiable when == or != is used with floating point operands.
@@ -90,7 +82,7 @@ namespace OPENVDB_VERSION_NAME {
 /// @brief Return the value of type T that corresponds to zero.
 /// @note A zeroVal<T>() specialization must be defined for each @c ValueType T
 /// that cannot be constructed using the form @c T(0).  For example, @c std::string(0)
-/// treats 0 as @c NULL and throws a @c std::logic_error.
+/// treats 0 as @c nullptr and throws a @c std::logic_error.
 template<typename T> inline T zeroVal() { return T(0); }
 /// Return the @c std::string value that corresponds to zero.
 template<> inline std::string zeroVal<std::string>() { return ""; }
@@ -139,15 +131,15 @@ template<> struct Delta<double>   { static double value() { return 1e-9; } };
 
 /// @brief Simple generator of random numbers over the range [0, 1)
 /// @details Thread-safe as long as each thread has its own Rand01 instance
-template<typename FloatType = double, typename EngineType = boost::mt19937>
+template<typename FloatType = double, typename EngineType = std::mt19937>
 class Rand01
 {
 private:
     EngineType mEngine;
-    boost::uniform_01<FloatType> mRand;
+    std::uniform_real_distribution<FloatType> mRand;
 
 public:
-    typedef FloatType ValueType;
+    using ValueType = FloatType;
 
     /// @brief Initialize the generator.
     /// @param engine  random number generator
@@ -170,20 +162,16 @@ public:
     FloatType operator()() { return mRand(mEngine); }
 };
 
-typedef Rand01<double, boost::mt19937> Random01;
+using Random01 = Rand01<double, std::mt19937>;
 
 
 /// @brief Simple random integer generator
 /// @details Thread-safe as long as each thread has its own RandInt instance
-template<typename IntType = int, typename EngineType = boost::mt19937>
+template<typename IntType = int, typename EngineType = std::mt19937>
 class RandInt
 {
 private:
-#if BOOST_VERSION >= 104700
-    typedef boost::random::uniform_int_distribution<IntType> Distr;
-#else
-    typedef boost::uniform_int<IntType> Distr;
-#endif
+    using Distr = std::uniform_int_distribution<IntType>;
     EngineType mEngine;
     Distr mRand;
 
@@ -227,15 +215,11 @@ public:
     IntType operator()(IntType imin, IntType imax)
     {
         const IntType lo = std::min(imin, imax), hi = std::max(imin, imax);
-#if BOOST_VERSION >= 104700
         return mRand(mEngine, typename Distr::param_type(lo, hi));
-#else
-        return Distr(lo, hi)(mEngine);
-#endif
     }
 };
 
-typedef RandInt<int, boost::mt19937> RandomInt;
+using RandomInt = RandInt<int, std::mt19937>;
 
 
 // ==========> Clamp <==================
@@ -266,7 +250,7 @@ ClampTest01(Type &x)
     return true;
 }
 
-/// @brief Return 0 if @a x < @a 0, 1 if @a x > 1 or else @f$(3-2x)x^2@f$.
+/// @brief Return 0 if @a x < @a 0, 1 if @a x > 1 or else (3 &minus; 2 @a x) @a x&sup2;.
 template<typename Type>
 inline Type
 SmoothUnitStep(Type x)
@@ -274,8 +258,8 @@ SmoothUnitStep(Type x)
     return x > 0 ? x < 1 ? (3-2*x)*x*x : Type(1) : Type(0);
 }
 
-/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else @f$(3-2t)t^2@f$,
-/// where @f$t = (x-min)/(max-min)@f$.
+/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else (3 &minus; 2 @a t) @a t&sup2;,
+/// where @a t = (@a x &minus; @a min)/(@a max &minus; @a min).
 template<typename Type>
 inline Type
 SmoothUnitStep(Type x, Type min, Type max)
@@ -299,9 +283,9 @@ inline int64_t Abs(int64_t i)
     return labs(i);
 #endif
 }
-inline float Abs(float x) { return fabsf(x); }
-inline double Abs(double x) { return fabs(x); }
-inline long double Abs(long double x) { return fabsl(x); }
+inline float Abs(float x) { return std::fabs(x); }
+inline double Abs(double x) { return std::fabs(x); }
+inline long double Abs(long double x) { return std::fabs(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 inline bool Abs(bool b) { return b; }
@@ -358,9 +342,9 @@ template<> inline bool isNegative<bool>(const bool&) { return false; }
 
 
 /// Return @c true if @a x is finite.
-template<typename Type>
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
-isFinite(const Type& x) { return boost::math::isfinite(x); }
+isFinite(const Type& x) { return std::isfinite(x); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
@@ -509,19 +493,19 @@ isUlpsEqual(const float aLeft, const float aRight, const int32_t aUnitsInLastPla
 
 // ==========> Pow <==================
 
-/// Return @f$ x^2 @f$.
+/// Return @a x<sup>2</sup>.
 template<typename Type>
 inline Type Pow2(Type x) { return x*x; }
 
-/// Return @f$ x^3 @f$.
+/// Return @a x<sup>3</sup>.
 template<typename Type>
 inline Type Pow3(Type x) { return x*x*x; }
 
-/// Return @f$ x^4 @f$.
+/// Return @a x<sup>4</sup>.
 template<typename Type>
 inline Type Pow4(Type x) { return Pow2(Pow2(x)); }
 
-/// Return @f$ x^n @f$.
+/// Return @a x<sup>@a n</sup>.
 template<typename Type>
 Type
 Pow(Type x, int n)
@@ -536,7 +520,7 @@ Pow(Type x, int n)
 }
 
 //@{
-/// Return @f$ b^e @f$.
+/// Return @a b<sup>@a e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -548,7 +532,7 @@ inline double
 Pow(double b, double e)
 {
     assert( b >= 0.0 && "Pow(double,double): base is negative" );
-    return pow(b,e);
+    return std::pow(b,e);
 }
 //@}
 
@@ -560,7 +544,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b)
 {
-    return std::max(a,b) ;
+    return std::max(a,b);
 }
 
 /// Return the maximum of three values
@@ -568,7 +552,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c)
 {
-    return std::max( std::max(a,b), c ) ;
+    return std::max(std::max(a,b), c);
 }
 
 /// Return the maximum of four values
@@ -671,26 +655,26 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 // ============> Exp <==================
 
-/// Return @f$ e^x @f$.
+/// Return @a e<sup>@a x</sup>.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
 
 // ============> Sin <==================
 
 //@{
-/// Return @f$ sin(x) @f$.
-inline float Sin(const float& x) { return sinf(x); }
+/// Return sin @a x.
+inline float Sin(const float& x) { return std::sin(x); }
 
-inline double Sin(const double& x) { return sin(x); }
+inline double Sin(const double& x) { return std::sin(x); }
 //@}
 
 // ============> Cos <==================
 
 //@{
-/// Return @f$ cos(x) @f$.
-inline float Cos(const float& x) { return cosf(x); }
+/// Return cos @a x.
+inline float Cos(const float& x) { return std::cos(x); }
 
-inline double Cos(const double& x) { return cos(x); }
+inline double Cos(const double& x) { return std::cos(x); }
 //@}
 
 
@@ -724,35 +708,35 @@ ZeroCrossing(const Type& a, const Type& b)
 
 //@{
 /// Return the square root of a floating-point value.
-inline float Sqrt(float x) { return sqrtf(x); }
-inline double Sqrt(double x) { return sqrt(x); }
-inline long double Sqrt(long double x) { return sqrtl(x); }
+inline float Sqrt(float x) { return std::sqrt(x); }
+inline double Sqrt(double x) { return std::sqrt(x); }
+inline long double Sqrt(long double x) { return std::sqrt(x); }
 //@}
 
 
 //@{
 /// Return the cube root of a floating-point value.
-inline float Cbrt(float x) { return boost::math::cbrt(x); }
-inline double Cbrt(double x) { return boost::math::cbrt(x); }
-inline long double Cbrt(long double x) { return boost::math::cbrt(x); }
+inline float Cbrt(float x) { return std::cbrt(x); }
+inline double Cbrt(double x) { return std::cbrt(x); }
+inline long double Cbrt(long double x) { return std::cbrt(x); }
 //@}
 
 
 //@{
 /// Return the remainder of @a x / @a y.
 inline int Mod(int x, int y) { return (x % y); }
-inline float Mod(float x, float y) { return fmodf(x,y); }
-inline double Mod(double x, double y) { return fmod(x,y); }
-inline long double Mod(long double x, long double y) { return fmodl(x,y); }
-template<typename Type> inline Type Remainder(Type x, Type y) { return Mod(x,y); }
+inline float Mod(float x, float y) { return std::fmod(x, y); }
+inline double Mod(double x, double y) { return std::fmod(x, y); }
+inline long double Mod(long double x, long double y) { return std::fmod(x, y); }
+template<typename Type> inline Type Remainder(Type x, Type y) { return Mod(x, y); }
 //@}
 
 
 //@{
 /// Return @a x rounded up to the nearest integer.
-inline float RoundUp(float x) { return ceilf(x); }
-inline double RoundUp(double x) { return ceil(x); }
-inline long double RoundUp(long double x) { return ceill(x); }
+inline float RoundUp(float x) { return std::ceil(x); }
+inline double RoundUp(double x) { return std::ceil(x); }
+inline long double RoundUp(long double x) { return std::ceil(x); }
 //@}
 /// Return @a x rounded up to the nearest multiple of @a base.
 template<typename Type>
@@ -766,9 +750,9 @@ RoundUp(Type x, Type base)
 
 //@{
 /// Return @a x rounded down to the nearest integer.
-inline float RoundDown(float x) { return floorf(x); }
-inline double RoundDown(double x) { return floor(x); }
-inline long double RoundDown(long double x) { return floorl(x); }
+inline float RoundDown(float x) { return std::floor(x); }
+inline double RoundDown(double x) { return std::floor(x); }
+inline long double RoundDown(long double x) { return std::floor(x); }
 //@}
 /// Return @a x rounded down to the nearest multiple of @a base.
 template<typename Type>
@@ -843,6 +827,18 @@ Truncate(Type x, unsigned int digits)
 ////////////////////////////////////////
 
 
+/// @brief 8-bit integer values print to std::ostreams as characters.
+/// Cast them so that they print as integers instead.
+template<typename T>
+inline auto PrintCast(const T& val) -> typename std::enable_if<!std::is_same<T, int8_t>::value
+    && !std::is_same<T, uint8_t>::value, const T&>::type { return val; }
+inline int32_t PrintCast(int8_t val) { return int32_t(val); }
+inline uint32_t PrintCast(uint8_t val) { return uint32_t(val); }
+
+
+////////////////////////////////////////
+
+
 /// Return the inverse of @a x.
 template<typename Type>
 inline Type
@@ -874,7 +870,7 @@ enum RotationOrder {
 
 template <typename S, typename T>
 struct promote {
-    typedef typename boost::numeric::conversion_traits<S, T>::supertype type;
+    using type = typename boost::numeric::conversion_traits<S, T>::supertype;
 };
 
 

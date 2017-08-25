@@ -81,6 +81,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <vector>
 
 
 namespace openvdb {
@@ -128,7 +129,7 @@ template<typename GridT, typename InterrupterT>
 class PointsToMask
 {
 public:
-    typedef typename GridT::ValueType ValueT;
+    using ValueT = typename GridT::ValueType;
 
     /// @brief Constructor from a grid and optional interrupter
     ///
@@ -150,7 +151,7 @@ public:
     {
         if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
         if (grainSize > 0) {
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
             typename GridT::Ptr examplar = mGrid->copy(CP_NEW);
 #else
             typename GridT::Ptr examplar = mGrid->copyWithNewTree();
@@ -188,7 +189,7 @@ private:
 
     // Private struct that implements concurrent thread-local
     // insersion of points into a grid
-    typedef tbb::enumerable_thread_specific<GridT> PoolType;
+    using PoolType = tbb::enumerable_thread_specific<GridT>;
     template<typename PointListT> struct AddPoints;
 
     // Private class that implements concurrent reduction of a thread-local pool
@@ -236,16 +237,16 @@ struct PointsToMask<GridT, InterrupterT>::AddPoints
 template<typename GridT, typename InterrupterT>
 struct PointsToMask<GridT, InterrupterT>::ReducePool
 {
-    typedef std::vector<GridT*>       VecT;
-    typedef typename VecT::iterator   IterT;
-    typedef tbb::blocked_range<IterT> RangeT;
+    using VecT = std::vector<GridT*>;
+    using IterT = typename VecT::iterator;
+    using RangeT = tbb::blocked_range<IterT>;
 
     ReducePool(PoolType& pool, GridT* grid, size_t grainSize = 1)
         : mOwnsGrid(false)
         , mGrid(grid)
     {
         if ( grainSize == 0 ) {
-            typedef typename PoolType::const_iterator IterT;
+            using IterT = typename PoolType::const_iterator;
             for (IterT i=pool.begin(); i!=pool.end(); ++i) mGrid->topologyUnion( *i );
         } else {
             VecT grids( pool.size() );

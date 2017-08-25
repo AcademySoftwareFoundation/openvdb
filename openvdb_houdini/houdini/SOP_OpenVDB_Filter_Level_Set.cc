@@ -55,6 +55,11 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -341,21 +346,21 @@ class SOP_OpenVDB_Filter_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Filter_Level_Set(OP_Network*, const char* name, OP_Operator*, OperatorType);
-    virtual ~SOP_OpenVDB_Filter_Level_Set() {}
+    ~SOP_OpenVDB_Filter_Level_Set() override {}
 
     static OP_Node* factoryRenormalize(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factorySmooth(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factoryReshape(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factoryNarrowBand(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
 private:
-    typedef hvdb::Interrupter BossT;
+    using BossT = hvdb::Interrupter;
     const OperatorType mOpType;
 
     OP_ERROR evalFilterParms(OP_Context&, FilterParms&);
@@ -419,19 +424,29 @@ newSopOperator(OP_OperatorTable* table)
 
         // Define a string-valued group name pattern parameter and add it to the list.
         parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-            .setHelpText("Specify a subset of the input VDB grids to be processed.")
-            .setChoiceList(&hutil::PrimGroupMenuInput1));
+            .setChoiceList(&hutil::PrimGroupMenuInput1)
+            .setTooltip("Specify a subset of the input VDB grids to be processed.")
+            .setDocumentation(
+                "A subset of the input VDBs to be processed"
+                " (see [specifying volumes|/model/volumes#group])"));
 
         if (OP_TYPE_RENORM != op && OP_TYPE_RESIZE != op) { // Filter menu
 
             parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
                 .setDefault(PRMoneDefaults)
                 .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-                .setHelpText("Enable / disable the mask."));
+                .setTooltip("Enable / disable the mask."));
 
             parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
-                .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-                .setChoiceList(&hutil::PrimGroupMenuInput2));
+                .setChoiceList(&hutil::PrimGroupMenuInput2)
+                .setTooltip("Optional VDB used for alpha masking. Assumes values 0->1.")
+                .setDocumentation(
+                    "If enabled, operate on the input VDBs using the given VDB"
+                    " from the second input as an alpha mask.\n\n"
+                    "The mask VDB is assumed to be scalar, with values between zero and one."
+                    " Where the mask is zero, no processing occurs.  Where the mask is one,"
+                    " the operation is applied at full strength.  For intermediate mask values,"
+                    " the strength varies linearly."));
 
             std::vector<std::string> items;
 
@@ -439,43 +454,52 @@ newSopOperator(OP_OperatorTable* table)
 
             parms.add(hutil::ParmFactory(PRM_STRING, "operation", "Operation")
                 .setDefault(items[0])
-                .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-
+                .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+                .setTooltip("The operation to be applied"));
         }
 
         // Toggle between world- and index-space units for offset
-        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space Units"));
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space Units")
+            .setTooltip("If enabled, use world-space units, otherwise use voxels."));
 
         // Stencil width
         parms.add(hutil::ParmFactory(PRM_INT_J, "stencilWidth", "Filter Voxel Radius")
             .setDefault(PRMoneDefaults)
-            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5));
+            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5)
+            .setDocumentation(nullptr));
 
         parms.add(hutil::ParmFactory(PRM_FLT_J, "stencilWidthWorld", "Filter Radius")
             .setDefault(0.1)
-            .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
+            .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
+            .setDocumentation("The desired radius of the filter"));
 
         // steps
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
-            .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+            .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+            .setTooltip("The number of times to apply the operation"));
 
         // Narrow-Band half-width
         parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width")
             .setDefault(PRMthreeDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-            .setHelpText("Desired narrow band half-width in voxel units "
-                         "(3 voxel units is optimal for level set operations.)."));
+            .setTooltip(
+                "Half the width of the narrow band, in voxels\n\n"
+                "(Many level set operations require this to be a minimum of three voxels.)"));
 
         parms.add(hutil::ParmFactory(PRM_FLT_J, "halfWidthWorld", "Half-Width")
             .setDefault(0.1)
             .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-            .setHelpText("Desired narrow band half-width in world units"));
+            .setTooltip("Desired narrow band half-width in world units")
+            .setDocumentation(nullptr));
 
         // Offset
         parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
-                  .setDefault(PRMoneDefaults)
-                  .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
+            .setDefault(PRMoneDefaults)
+            .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
+            .setTooltip(
+                "The distance in voxels by which to offset the level set surface"
+                " along its normals"));
 
         { // Renormalization accuracy
 
@@ -498,24 +522,24 @@ newSopOperator(OP_OperatorTable* table)
 
         //Invert mask.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
-                .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+            .setTooltip("Invert the optional alpha mask, mapping 0 to 1 and 1 to 0."));
 
         // Min mask range
         parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-                .setHelpText("Value below which the mask values map to zero")
-                .setDefault(PRMzeroDefaults)
-                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+            .setDefault(PRMzeroDefaults)
+            .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+            .setTooltip("Threshold below which voxel values in the mask map to zero"));
 
-       // Max mask range
-       parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-                .setHelpText("Value above which the mask values map to one")
-                .setDefault(PRMoneDefaults)
-                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        // Max mask range
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+            .setDefault(PRMoneDefaults)
+            .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+            .setTooltip("Threshold above which voxel values in the mask map to one"));
 
 #ifndef SESI_OPENVDB
         // Verbosity toggle.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
-            .setHelpText("Prints the sequence of operations to the terminal."));
+            .setTooltip("If enabled, print the sequence of operations to the terminal."));
 #endif
 
         // Obsolete parameters
@@ -529,7 +553,35 @@ newSopOperator(OP_OperatorTable* table)
             hvdb::OpenVDBOpFactory("OpenVDB Renormalize Level Set",
                 SOP_OpenVDB_Filter_Level_Set::factoryRenormalize, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDB grids to process");
+                .addInput("Input with VDB grids to process")
+                .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Repair level sets represented by VDB volumes.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+Certain operations on a level set volume can cause the signed distances\n\
+to its zero crossing to become invalid.\n\
+This node iteratively adjusts voxel values to restore proper distances.\n\
+\n\
+NOTE:\n\
+    If the level set departs significantly from a proper signed distance field,\n\
+    it might be necessary to rebuild it completely.\n\
+    That can be done with the\
+ [OpenVDB Rebuild Level Set node|Node:sop/DW_OpenVDBRebuildLevelSet],\n\
+    which converts an input level set to polygons and then back to a level set.\n\
+\n\
+@related\n\
+- [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
+- [OpenVDB Rebuild Level Set|Node:sop/DW_OpenVDBRebuildLevelSet]\n\
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 
         } else if (OP_TYPE_RESHAPE == op) {
 
@@ -537,7 +589,28 @@ newSopOperator(OP_OperatorTable* table)
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
-                .addOptionalInput("Optional VDB Alpha Mask");
+                .addOptionalInput("Optional VDB Alpha Mask")
+                .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Offset level sets represented by VDB volumes.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node changes the shape of a level set by moving the surface in or out\n\
+along its normals.\n\
+Unlike just adding an offset to a signed distance field, this node properly\n\
+updates the active voxels to account for the transformation.\n\
+\n\
+@related\n\
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
@@ -545,14 +618,60 @@ newSopOperator(OP_OperatorTable* table)
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
-                .addOptionalInput("Optional VDB Alpha Mask");
+                .addOptionalInput("Optional VDB Alpha Mask")
+                .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Smooth the surface of a level set represented by a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node applies a simulated flow operation, moving the surface of a\n\
+signed distance field according to some local property.\n\
+\n\
+For example, if you move along the normal by an amount dependent on the curvature,\n\
+you will flatten out dimples and hills and leave flat areas unchanged.\n\
+\n\
+Unlike the [OpenVDB Filter|Node:sop/DW_OpenVDBFilter] node,\n\
+this node ensures that the level set remains a valid signed distance field.\n\
+\n\
+@related\n\
+- [OpenVDB Filter|Node:sop/DW_OpenVDBFilter]\n\
+- [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 
         } else if (OP_TYPE_RESIZE == op) {
 
             hvdb::OpenVDBOpFactory("OpenVDB Resize Narrow Band",
                 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDBs to process");
+                .addInput("Input with VDBs to process")
+                .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Change the width of the narrow band of a VDB signed distance field.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node adjusts the width of the narrow band of a signed distance field\n\
+represented by a VDB volume.\n\
+\n\
+@related\n\
+- [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
+- [OpenVDB Rebuild Level Set|Node:sop/DW_OpenVDBRebuildLevelSet]\n\
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
         }
     }
  }
@@ -683,7 +802,9 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 #endif
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT) {
+        if (startNode->duplicateSourceStealable(
+            0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT)
+        {
             return error();
         }
 
@@ -759,10 +880,10 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
     hutil::OP_EvalScope eval_scope(*this, context);
     fpreal now = context.getTime();
 
-    parms.mIterations   = evalInt("iterations", 0, now);
-    parms.mHalfWidth    = evalInt("halfWidth", 0, now);
+    parms.mIterations   = static_cast<int>(evalInt("iterations", 0, now));
+    parms.mHalfWidth    = static_cast<int>(evalInt("halfWidth", 0, now));
     parms.mHalfWidthWorld = float(evalFloat("halfWidthWorld", 0, now));
-    parms.mStencilWidth = evalInt("stencilWidth", 0, now);
+    parms.mStencilWidth = static_cast<int>(evalInt("stencilWidth", 0, now));
     parms.mStencilWidthWorld = float(evalFloat("stencilWidthWorld", 0, now));
     parms.mVoxelOffset  = static_cast<float>(evalFloat("voxelOffset", 0, now));
     parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));
@@ -819,9 +940,9 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
     if (!grid) return false;
 
-    typedef typename GridT::ValueType ValueT;
-    typedef openvdb::FloatGrid MaskT;
-    typedef openvdb::tools::LevelSetFilter<GridT, MaskT, BossT> FilterT;
+    using ValueT = typename GridT::ValueType;
+    using MaskT = openvdb::FloatGrid;
+    using FilterT = openvdb::tools::LevelSetFilter<GridT, MaskT, BossT>;
 
     const float voxelSize = static_cast<float>(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
@@ -856,7 +977,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
     const FilterParms& parms, BossT& boss, bool verbose)
 {
     // Alpha-masking
-    typedef typename FilterT::MaskType MaskT;
+    using MaskT = typename FilterT::MaskType;
     typename MaskT::ConstPtr maskGrid;
 
     if (parms.mMaskInputNode) {

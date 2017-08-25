@@ -33,14 +33,14 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Platform.h>
-#include <iomanip>
-#include <assert.h>
-#include <math.h>
-#include <algorithm>
 #include "Math.h"
 #include "Mat3.h"
 #include "Vec3.h"
 #include "Vec4.h"
+#include <algorithm> // for std::copy(), std::swap()
+#include <cassert>
+#include <iomanip>
+#include <cmath>
 
 
 namespace openvdb {
@@ -58,9 +58,9 @@ class Mat4: public Mat<4, T>
 {
 public:
     /// Data type held by the matrix.
-    typedef T                   value_type;
-    typedef T                   ValueType;
-    typedef Mat<4, T>           MyBase;
+    using value_type = T;
+    using ValueType = T;
+    using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
     Mat4() {}
@@ -236,7 +236,7 @@ public:
         return MyBase::mm[4*i+j];
     }
 
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3, v4
+    /// Set the rows of this matrix to the vectors v1, v2, v3, v4
     void setRows(const Vec4<T> &v1, const Vec4<T> &v2,
                  const Vec4<T> &v3, const Vec4<T> &v4)
     {
@@ -261,7 +261,7 @@ public:
         MyBase::mm[15] = v4[3];
     }
 
-    /// Set the columns of "this" matrix to the vectors v1, v2, v3, v4
+    /// Set the columns of this matrix to the vectors v1, v2, v3, v4
     void setColumns(const Vec4<T> &v1, const Vec4<T> &v2,
                     const Vec4<T> &v3, const Vec4<T> &v4)
     {
@@ -286,15 +286,7 @@ public:
         MyBase::mm[15] = v4[3];
     }
 
-    /// Set the rows of "this" matrix to the vectors v1, v2, v3, v4
-    OPENVDB_DEPRECATED void setBasis(const Vec4<T> &v1, const Vec4<T> &v2,
-                                     const Vec4<T> &v3, const Vec4<T> &v4)
-    {
-        this->setRows(v1, v2, v3, v4);
-    }
-
-
-    // Set "this" matrix to zero
+    // Set this matrix to zero
     void setZero()
     {
         MyBase::mm[ 0] = 0;
@@ -315,7 +307,7 @@ public:
         MyBase::mm[15] = 0;
     }
 
-    /// Set "this" matrix to identity
+    /// Set this matrix to identity
     void setIdentity()
     {
         MyBase::mm[ 0] = 1;
@@ -383,7 +375,7 @@ public:
         return *this;
     }
 
-    /// Test if "this" is equivalent to m with tolerance of eps value
+    /// Return @c true if this matrix is equivalent to @a m within a tolerance of @a eps.
     bool eq(const Mat4 &m, T eps=1.0e-8) const
     {
         for (int i = 0; i < 16; i++) {
@@ -404,7 +396,7 @@ public:
                        );
     } // trivial
 
-    /// Return m, where \f$m_{i,j} *= scalar\f$ for \f$i, j \in [0, 3]\f$
+    /// Multiply each element of this matrix by @a scalar.
     template <typename S>
     const Mat4<T>& operator*=(S scalar)
     {
@@ -430,7 +422,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} += m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Add each element of the given matrix to the corresponding element of this matrix.
     template <typename S>
     const Mat4<T> &operator+=(const Mat4<S> &m1)
     {
@@ -459,7 +451,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} -= m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Subtract each element of the given matrix from the corresponding element of this matrix.
     template <typename S>
     const Mat4<T> &operator-=(const Mat4<S> &m1)
     {
@@ -488,7 +480,7 @@ public:
         return *this;
     }
 
-    /// Return m, where \f$m_{i,j} = \sum_{k} m0_{i,k}*m1_{k,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Multiply this matrix by the given matrix.
     template <typename S>
     const Mat4<T> &operator*=(const Mat4<S> &m1)
     {
@@ -1166,7 +1158,7 @@ template <typename T0, typename T1>
 bool operator!=(const Mat4<T0> &m0, const Mat4<T1> &m1) { return !(m0 == m1); }
 
 /// @relates Mat4
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat4<typename promote<S, T>::type> operator*(S scalar, const Mat4<T> &m)
 {
@@ -1174,7 +1166,7 @@ Mat4<typename promote<S, T>::type> operator*(S scalar, const Mat4<T> &m)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat4<typename promote<S, T>::type> operator*(const Mat4<T> &m, S scalar)
 {
@@ -1184,7 +1176,7 @@ Mat4<typename promote<S, T>::type> operator*(const Mat4<T> &m, S scalar)
 }
 
 /// @relates Mat4
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^3 m_{i,n} * v_n \f$ for \f$i \in [0, 3]\f$
+/// @brief Multiply @a _m by @a _v and return the resulting vector.
 template<typename T, typename MT>
 inline Vec4<typename promote<T, MT>::type>
 operator*(const Mat4<MT> &_m,
@@ -1199,7 +1191,7 @@ operator*(const Mat4<MT> &_m,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^3 m_{n,i} * v_n \f$ for \f$i \in [0, 3]\f$
+/// @brief Multiply @a _v by @a _m and return the resulting vector.
 template<typename T, typename MT>
 inline Vec4<typename promote<T, MT>::type>
 operator*(const Vec4<T> &_v,
@@ -1214,12 +1206,10 @@ operator*(const Vec4<T> &_v,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where
-///     \f$v_{i} = \sum_{n=0}^3\left(m_{i,n} * v_n + m_{i,3}\right)\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _m by @a _v and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
-operator*(const Mat4<MT> &_m,
-          const Vec3<T> &_v)
+operator*(const Mat4<MT> &_m, const Vec3<T> &_v)
 {
     MT const *m = _m.asPointer();
     return Vec3<typename promote<T, MT>::type>(
@@ -1229,12 +1219,10 @@ operator*(const Mat4<MT> &_m,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where
-///     \f$v_{i} = \sum_{n=0}^3\left(m_{n,i} * v_n + m_{3,i}\right)\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _v by @a _m and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
-operator*(const Vec3<T> &_v,
-          const Mat4<MT> &_m)
+operator*(const Vec3<T> &_v, const Mat4<MT> &_m)
 {
     MT const *m = _m.asPointer();
     return Vec3<typename promote<T, MT>::type>(
@@ -1244,7 +1232,7 @@ operator*(const Vec3<T> &_v,
 }
 
 /// @relates Mat4
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} + m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Add corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator+(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1255,7 +1243,7 @@ operator+(const Mat4<T0> &m0, const Mat4<T1> &m1)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} - m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Subtract corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator-(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1266,8 +1254,7 @@ operator-(const Mat4<T0> &m0, const Mat4<T1> &m1)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where
-///     \f$M_{ij} = \sum_{n=0}^3\left(m0_{nj} + m1_{in}\right)\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply @a m0 by @a m1 and return the resulting matrix.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator*(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1370,9 +1357,9 @@ inline bool hasTranslation(const Mat4<T>& m) {
 }
 
 
-typedef Mat4<float>  Mat4s;
-typedef Mat4<double> Mat4d;
-typedef Mat4d        Mat4f;
+using Mat4s = Mat4<float>;
+using Mat4d = Mat4<double>;
+using Mat4f = Mat4d;
 
 } // namespace math
 

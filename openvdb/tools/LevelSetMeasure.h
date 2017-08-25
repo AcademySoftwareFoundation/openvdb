@@ -35,13 +35,6 @@
 #ifndef OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_sort.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/math/constants/constants.hpp>//for Pi
 #include <openvdb/math/Math.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
@@ -50,6 +43,11 @@
 #include <openvdb/math/FiniteDifference.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <boost/math/constants/constants.hpp>//for Pi
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_sort.h>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -129,22 +127,22 @@ private:
 /// catastrophic cancellation) and guarantee determinism during
 /// multi-threading this class is implemented using parallel_for, and
 /// delayed reduction of a sorted list.
-template<typename GridT,
-         typename InterruptT = util::NullInterrupter>
+template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetMeasure
 {
 public:
-    typedef GridT                                GridType;
-    typedef typename GridType::TreeType          TreeType;
-    typedef typename TreeType::ValueType         ValueType;
-    typedef typename tree::LeafManager<const TreeType> ManagerType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    using GridType = GridT;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename TreeType::ValueType;
+    using ManagerType = typename tree::LeafManager<const TreeType>;
+    static_assert(std::is_floating_point<ValueType>::value,
+        "level set measure is supported only for scalar, floating-point grids");
 
     /// @brief Main constructor from a grid
     /// @param grid The level set to be measured.
     /// @param interrupt Optional interrupter.
     /// @throw RuntimeError if the grid is not a level set.
-    LevelSetMeasure(const GridType& grid, InterruptT* interrupt = NULL);
+    LevelSetMeasure(const GridType& grid, InterruptT* interrupt = nullptr);
 
     LevelSetMeasure(ManagerType& leafs, Real Dx, InterruptT* interrupt);
 
@@ -193,10 +191,10 @@ private:
     // @brief Return false if the process was interrupted
     bool checkInterrupter();
 
-    typedef typename TreeType::LeafNodeType  LeafT;
-    typedef typename LeafT::ValueOnCIter     VoxelCIterT;
-    typedef typename ManagerType::LeafRange  LeafRange;
-    typedef typename LeafRange::Iterator     LeafIterT;
+    using LeafT = typename TreeType::LeafNodeType;
+    using VoxelCIterT = typename LeafT::ValueOnCIter;
+    using LeafRange = typename ManagerType::LeafRange;
+    using LeafIterT = typename LeafRange::Iterator;
 
     struct Measure2
     {
@@ -244,10 +242,10 @@ template<typename GridT, typename InterruptT>
 inline
 LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
     : mTree(&(grid.tree()))
-    , mLeafs(NULL)
+    , mLeafs(nullptr)
     , mInterrupter(interrupt)
     , mDx(grid.voxelSize()[0])
-    , mArray(NULL)
+    , mArray(nullptr)
     , mGrainSize(1)
 {
     if (!grid.hasUniformVoxels()) {
@@ -270,7 +268,7 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(
     , mLeafs(&leafs)
     , mInterrupter(interrupt)
     , mDx(dx)
-    , mArray(NULL)
+    , mArray(nullptr)
     , mGrainSize(1)
 {
 }
@@ -289,7 +287,7 @@ LevelSetMeasure<GridT, InterruptT>::reinit(const GridType& grid)
             " try setting the grid class to \"level set\"");
     }
     mTree = &(grid.tree());
-    mLeafs = NULL;
+    mLeafs = nullptr;
     mDx = grid.voxelSize()[0];
 }
 
@@ -313,7 +311,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
     if (mInterrupter) mInterrupter->start("Measuring level set");
 
 
-    const bool newLeafs = mLeafs == NULL;
+    const bool newLeafs = mLeafs == nullptr;
     if (newLeafs) mLeafs = new ManagerType(*mTree);
     const size_t leafCount = mLeafs->leafCount();
     if (leafCount == 0) {
@@ -330,7 +328,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
 
     if (newLeafs) {
         delete mLeafs;
-        mLeafs = NULL;
+        mLeafs = nullptr;
     }
     delete [] mArray;
 
@@ -346,7 +344,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume,
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
 
-    const bool newLeafs = mLeafs == NULL;
+    const bool newLeafs = mLeafs == nullptr;
     if (newLeafs) mLeafs = new ManagerType(*mTree);
     const size_t leafCount = mLeafs->leafCount();
     if (leafCount == 0) {
@@ -364,7 +362,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume,
 
     if (newLeafs) {
         delete mLeafs;
-        mLeafs = NULL;
+        mLeafs = nullptr;
     }
     delete [] mArray;
 
@@ -391,8 +389,8 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::
 Measure2::operator()(const LeafRange& range) const
 {
-    typedef math::Vec3<ValueType> Vec3T;
-    typedef math::ISGradient<math::CD_2ND> Grad;
+    using Vec3T = math::Vec3<ValueType>;
+    using Grad = math::ISGradient<math::CD_2ND>;
     mParent->checkInterrupter();
     const Real invDx = 1.0/mParent->mDx;
     const DiracDelta<Real> DD(1.5);
@@ -420,9 +418,9 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::
 Measure3::operator()(const LeafRange& range) const
 {
-    typedef math::Vec3<ValueType> Vec3T;
-    typedef math::ISGradient<math::CD_2ND> Grad;
-    typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> Curv;
+    using Vec3T = math::Vec3<ValueType>;
+    using Grad = math::ISGradient<math::CD_2ND>;
+    using Curv = math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>;
     mParent->checkInterrupter();
     const Real invDx = 1.0/mParent->mDx;
     const DiracDelta<Real> DD(1.5);
@@ -451,10 +449,16 @@ Measure3::operator()(const LeafRange& range) const
     }
 }
 
+
 ////////////////////////////////////////
 
+
+//{
+/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+
 template<class GridT>
-inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
+inline
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT& grid, bool useWorldSpace)
 {
     Real area, volume;
@@ -464,12 +468,17 @@ doLevelSetArea(const GridT& grid, bool useWorldSpace)
 }
 
 template<class GridT>
-inline typename boost::disable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
+inline
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
         "level set area is supported only for scalar, floating-point grids");
 }
+
+/// @endcond
+//}
+
 
 template<class GridT>
 inline Real
@@ -478,10 +487,16 @@ levelSetArea(const GridT& grid, bool useWorldSpace)
     return doLevelSetArea<GridT>(grid, useWorldSpace);
 }
 
+
 ////////////////////////////////////////
 
+
+//{
+/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+
 template<class GridT>
-inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
+inline
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT& grid, bool useWorldSpace)
 {
     Real area, volume;
@@ -491,12 +506,17 @@ doLevelSetVolume(const GridT& grid, bool useWorldSpace)
 }
 
 template<class GridT>
-inline typename boost::disable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
+inline
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
         "level set volume is supported only for scalar, floating-point grids");
 }
+
+/// @endcond
+//}
+
 
 template<class GridT>
 inline Real
@@ -505,10 +525,16 @@ levelSetVolume(const GridT& grid, bool useWorldSpace)
     return doLevelSetVolume<GridT>(grid, useWorldSpace);
 }
 
+
 ////////////////////////////////////////
 
+
+//{
+/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+
 template<class GridT>
-inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType> >::type
+inline
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value>::type
 doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -516,12 +542,17 @@ doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpac
 }
 
 template<class GridT>
-inline typename boost::disable_if<boost::is_floating_point<typename GridT::ValueType> >::type
+inline
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value>::type
 doLevelSetMeasure(const GridT&, Real&, Real&, bool)
 {
     OPENVDB_THROW(TypeError,
         "level set measure is supported only for scalar, floating-point grids");
 }
+
+/// @endcond
+//}
+
 
 template<class GridT>
 inline void
@@ -530,10 +561,16 @@ levelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
     doLevelSetMeasure<GridT>(grid, area, volume, useWorldSpace);
 }
 
+
 ////////////////////////////////////////
 
+
+//{
+/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+
 template<class GridT>
-inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType> >::type
+inline
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value>::type
 doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
                   bool useWorldSpace)
 {
@@ -542,12 +579,17 @@ doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvatur
 }
 
 template<class GridT>
-inline typename boost::disable_if<boost::is_floating_point<typename GridT::ValueType> >::type
+inline
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value>::type
 doLevelSetMeasure(const GridT&, Real&, Real&, Real&, bool)
 {
     OPENVDB_THROW(TypeError,
         "level set measure is supported only for scalar, floating-point grids");
 }
+
+/// @endcond
+//}
+
 
 template<class GridT>
 inline void

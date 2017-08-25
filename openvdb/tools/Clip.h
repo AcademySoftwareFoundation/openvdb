@@ -30,20 +30,22 @@
 
 /// @file Clip.h
 ///
-/// @brief Functions to clip a grid against a bounding box or against
-/// another grid's active voxel topology
+/// @brief Functions to clip a grid against a bounding box, a camera frustum,
+/// or another grid's active voxel topology
 
 #ifndef OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for math::isNegative()
+#include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tree/LeafManager.h>
 #include "GridTransformer.h" // for tools::resampleToMatch()
 #include "Prune.h"
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 #include <type_traits> // for std::enable_if, std::is_same
+#include <vector>
 
 
 namespace openvdb {
@@ -59,9 +61,20 @@ namespace tools {
 ///     if false, discard voxels that lie inside the bounding box
 /// @warning Clipping a level set will likely produce a grid that is
 /// no longer a valid level set.
-template<typename GridType> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridType>
 inline typename GridType::Ptr
 clip(const GridType& grid, const BBoxd& bbox, bool keepInterior = true);
+
+/// @brief Clip the given grid against a frustum and return a new grid containing the result.
+/// @param grid          the grid to be clipped
+/// @param frustum       a frustum map
+/// @param keepInterior  if true, discard voxels that lie outside the frustum;
+///     if false, discard voxels that lie inside the frustum
+/// @warning Clipping a level set will likely produce a grid that is
+/// no longer a valid level set.
+template<typename GridType>
+inline typename GridType::Ptr
+clip(const GridType& grid, const math::NonlinearFrustumMap& frustum, bool keepInterior = true);
 
 /// @brief Clip a grid against the active voxels of another grid
 /// and return a new grid containing the result.
@@ -75,7 +88,7 @@ clip(const GridType& grid, const BBoxd& bbox, bool keepInterior = true);
 /// of the level set.
 /// @warning Clipping a level set will likely produce a grid that is
 /// no longer a valid level set.
-template<typename GridType, typename MaskTreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridType, typename MaskTreeType>
 inline typename GridType::Ptr
 clip(const GridType& grid, const Grid<MaskTreeType>& mask, bool keepInterior = true);
 
@@ -220,11 +233,7 @@ struct BoolSampler
     static bool sample(const TreeT& inTree,
         const Vec3R& inCoord, typename TreeT::ValueType& result)
     {
-        Coord ijk;
-        ijk[0] = int(std::floor(inCoord[0]));
-        ijk[1] = int(std::floor(inCoord[1]));
-        ijk[2] = int(std::floor(inCoord[2]));
-        return inTree.probeValue(ijk, result);
+        return inTree.probeValue(Coord::floor(inCoord), result);
     }
 };
 
@@ -362,7 +371,6 @@ doClip(
 
 /// @private
 template<typename GridType>
-OPENVDB_STATIC_SPECIALIZATION
 inline typename GridType::Ptr
 clip(const GridType& grid, const BBoxd& bbox, bool keepInterior)
 {
@@ -384,7 +392,6 @@ clip(const GridType& grid, const BBoxd& bbox, bool keepInterior)
 
 /// @private
 template<typename SrcGridType, typename ClipTreeType>
-OPENVDB_STATIC_SPECIALIZATION
 inline typename SrcGridType::Ptr
 clip(const SrcGridType& srcGrid, const Grid<ClipTreeType>& clipGrid, bool keepInterior)
 {
@@ -411,6 +418,177 @@ clip(const SrcGridType& srcGrid, const Grid<ClipTreeType>& clipGrid, bool keepIn
 
     // Clip the source grid against the mask grid.
     return clip_internal::doClip(srcGrid, *clipMask, keepInterior);
+}
+
+
+/// @private
+template<typename GridType>
+inline typename GridType::Ptr
+clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool keepInterior)
+{
+    using ValueT = typename GridType::ValueType;
+    using TreeT = typename GridType::TreeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    const auto& gridXform = inGrid.transform();
+    const auto frustumIndexBBox = frustumMap.getBBox();
+
+    // Return true if index-space point (i,j,k) lies inside the frustum.
+    auto frustumContainsCoord = [&](const Coord& ijk) -> bool {
+        auto xyz = gridXform.indexToWorld(ijk);
+        xyz = frustumMap.applyInverseMap(xyz);
+        return frustumIndexBBox.isInside(xyz);
+    };
+
+    // Return the frustum index-space bounding box of the corners of
+    // the given grid index-space bounding box.
+    auto toFrustumIndexSpace = [&](const CoordBBox& inBBox) -> BBoxd {
+        const Coord bounds[2] = { inBBox.min(), inBBox.max() };
+        Coord ijk;
+        BBoxd outBBox;
+        for (int i = 0; i < 8; ++i) {
+            ijk[0] = bounds[(i & 1) >> 0][0];
+            ijk[1] = bounds[(i & 2) >> 1][1];
+            ijk[2] = bounds[(i & 4) >> 2][2];
+            auto xyz = gridXform.indexToWorld(ijk);
+            xyz = frustumMap.applyInverseMap(xyz);
+            outBBox.expand(xyz);
+        }
+        return outBBox;
+    };
+
+    // Construct an output grid with the same transform and metadata as the input grid.
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
+    auto outGrid = inGrid.copy(CP_NEW);
+#else
+    auto outGrid = inGrid.copyWithNewTree();
+#endif
+    if (outGrid->getGridClass() == GRID_LEVEL_SET) {
+        // After clipping, a level set grid might no longer be a valid SDF.
+        outGrid->setGridClass(GRID_UNKNOWN);
+    }
+
+    const auto& bg = outGrid->background();
+
+    auto outAcc = outGrid->getAccessor();
+
+    // Copy active and inactive tiles that intersect the clipping region
+    // from the input grid to the output grid.
+    // ("Clipping region" refers to either the interior or the exterior
+    // of the frustum, depending on the value of keepInterior.)
+    auto tileIter = inGrid.beginValueAll();
+    tileIter.setMaxDepth(GridType::ValueAllIter::LEAF_DEPTH - 1);
+    CoordBBox tileBBox;
+    for ( ; tileIter; ++tileIter) {
+        const bool tileActive = tileIter.isValueOn();
+        const auto& tileValue = tileIter.getValue();
+
+        // Skip background tiles.
+        if (!tileActive && math::isApproxEqual(tileValue, bg)) continue;
+
+        // Transform the tile's bounding box into frustum index space.
+        tileIter.getBoundingBox(tileBBox);
+        const auto tileFrustumBBox = toFrustumIndexSpace(tileBBox);
+
+        // Determine whether any or all of the tile intersects the clipping region.
+        enum class CopyTile { kNone, kPartial, kFull };
+        auto copyTile = CopyTile::kNone;
+        if (keepInterior) {
+            if (frustumIndexBBox.isInside(tileFrustumBBox)) {
+                copyTile = CopyTile::kFull;
+            } else if (frustumIndexBBox.hasOverlap(tileFrustumBBox)) {
+                copyTile = CopyTile::kPartial;
+            }
+        } else {
+            if (!frustumIndexBBox.hasOverlap(tileFrustumBBox)) {
+                copyTile = CopyTile::kFull;
+            } else if (!frustumIndexBBox.isInside(tileFrustumBBox)) {
+                copyTile = CopyTile::kPartial;
+            }
+        }
+        switch (copyTile) {
+            case CopyTile::kNone:
+                break;
+            case CopyTile::kFull:
+                // Copy the entire tile.
+                outAcc.addTile(tileIter.getLevel(), tileBBox.min(), tileValue, tileActive);
+                break;
+            case CopyTile::kPartial:
+                // Copy only voxels inside the clipping region.
+                for (std::vector<CoordBBox> bboxVec = { tileBBox }; !bboxVec.empty(); ) {
+                    // For efficiency, subdivide sufficiently large tiles and discard
+                    // subregions based on additional bounding box intersection tests.
+                    // The mimimum subregion size is chosen so that cost of the
+                    // bounding box test is comparable to testing every voxel.
+                    if (bboxVec.back().volume() > 64 && bboxVec.back().is_divisible()) {
+                        // Subdivide this region in-place and append the other half to the list.
+                        bboxVec.emplace_back(bboxVec.back(), tbb::split{});
+                        continue;
+                    }
+                    auto subBBox = bboxVec.back();
+                    bboxVec.pop_back();
+
+                    // Discard the subregion if it lies completely outside the clipping region.
+                    if (keepInterior) {
+                        if (!frustumIndexBBox.hasOverlap(toFrustumIndexSpace(subBBox))) continue;
+                    } else {
+                        if (frustumIndexBBox.isInside(toFrustumIndexSpace(subBBox))) continue;
+                    }
+
+                    // Test every voxel within the subregion.
+                    for (const auto& ijk: subBBox) {
+                        if (frustumContainsCoord(ijk) == keepInterior) {
+                            if (tileActive) {
+                                outAcc.setValueOn(ijk, tileValue);
+                            } else {
+                                outAcc.setValueOff(ijk, tileValue);
+                            }
+                        }
+                    }
+                }
+                break;
+        }
+    }
+    tools::prune(outGrid->tree());
+
+    // Ensure that the output grid has the same leaf node topology as the input grid,
+    // with the exception of leaf nodes that lie completely outside the clipping region.
+    // (This operation is serial.)
+    for (auto leafIter = inGrid.constTree().beginLeaf(); leafIter; ++leafIter) {
+        const auto leafBBox = leafIter->getNodeBoundingBox();
+        const auto leafFrustumBBox = toFrustumIndexSpace(leafBBox);
+        if (keepInterior) {
+            if (frustumIndexBBox.hasOverlap(leafFrustumBBox)) {
+                outAcc.touchLeaf(leafBBox.min());
+            }
+        } else {
+            if (!frustumIndexBBox.hasOverlap(leafFrustumBBox)
+                || !frustumIndexBBox.isInside(leafFrustumBBox))
+            {
+                outAcc.touchLeaf(leafBBox.min());
+            }
+        }
+    }
+
+    // In parallel across output leaf nodes, copy leaf voxels
+    // from the input grid to the output grid.
+    tree::LeafManager<TreeT> outLeafNodes{outGrid->tree()};
+    outLeafNodes.foreach(
+        [&](LeafT& leaf, size_t /*idx*/) {
+            auto inAcc = inGrid.getConstAccessor();
+            ValueT val;
+            for (auto voxelIter = leaf.beginValueAll(); voxelIter; ++voxelIter) {
+                const auto ijk = voxelIter.getCoord();
+                if (frustumContainsCoord(ijk) == keepInterior) {
+                    const bool active = inAcc.probeValue(ijk, val);
+                    voxelIter.setValue(val);
+                    voxelIter.setValueOn(active);
+                }
+            }
+        }
+    );
+
+    return outGrid;
 }
 
 } // namespace tools

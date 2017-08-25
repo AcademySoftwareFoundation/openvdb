@@ -48,6 +48,8 @@
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
+#include <sstream>
+#include <stdexcept>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -59,17 +61,17 @@ public:
     enum { MODE_PARMS = 0, MODE_REF_GRID, MODE_VOXEL_SIZE, MODE_VOXEL_SCALE };
 
     SOP_OpenVDB_Resample(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Resample() {}
+    ~SOP_OpenVDB_Resample() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i) const { return (i == 1); }
+    int isRefInput(unsigned i) const override { return (i == 1); }
 
 protected:
     struct RebuildOp;
 
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -80,132 +82,184 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setHelpText("Specify a subset of the input\nVDB grids to be resampled"));
+        .setTooltip("Specify a subset of the input VDBs to be resampled")
+        .setDocumentation(
+            "A subset of the input VDBs to be resampled"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // Reference grid group
     parms.add(hutil::ParmFactory(PRM_STRING, "reference_grid", "Reference")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText(
-            "Specify a single reference grid from the\n"
+        .setTooltip(
+            "Specify a single reference VDB from the\n"
             "first input whose transform is to be matched.\n"
-            "Alternatively, connect the reference grid\n"
+            "Alternatively, connect the reference VDB\n"
             "to the second input."));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "point",     "Nearest",
             "linear",    "Linear",
             "quadratic", "Quadratic",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "order", "Interpolation")
             .setDefault(PRMoneDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDocumentation("\
+How to interpolate values at fractional voxel positions\n\
+\n\
+Nearest:\n\
+    Use the value from the nearest voxel.\n\n\
+    This is fast but can cause aliasing artifacts.\n\
+Linear:\n\
+    Interpolate trilinearly between the values of immediate neighbors.\n\n\
+    This matches what [Node:sop/volumemix] and [Vex:volumesample] do.\n\
+Quadratic:\n\
+    Interpolate triquadratically between the values of neighbors.\n\n\
+    This produces smoother results than trilinear interpolation but is slower.\n"));
     }
 
     {   // Transform source
-        const char* items[] = {
+        char const * const items[] = {
             "explicit",       "Explicitly",
             "refvdb",         "To Match Reference VDB",
             "voxelsizeonly",  "Using Voxel Size Only",
             "voxelscaleonly", "Using Voxel Scale Only",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Define Transform")
             .setDefault(PRMoneDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
+            .setTooltip(
                 "Specify how to define the relative transform\n"
-                "between an input and an output grid."));
+                "between an input and an output VDB.")
+            .setDocumentation("\
+How to generate the new VDB's transform\n\
+\n\
+Explicitly:\n\
+    Use the values of the transform parameters below.\n\
+To Match Reference VDB:\n\
+    Match the transform and voxel size of a reference VDB.\n\n\
+    The resulting volume is a copy of the input VDB,\n\
+    aligned to the reference VDB.\n\
+Using Voxel Size Only:\n\
+    Keep the transform of the input VDB but set a new voxel size,\n\
+    increasing or decreasing the resolution.\n\
+Using Voxel Scale Only:\n\
+    Keep the transform of the input VDB but scale the voxel size,\n\
+    increasing or decreasing the resolution.\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_ORD, "xOrd", "Transform Order")
         .setDefault(0, "tsr")
         .setChoiceList(&PRMtrsMenu)
-        .setTypeExtended(PRM_TYPE_JOIN_PAIR));
+        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the order of operations"
+            " for the new transform"));
 
     parms.add(hutil::ParmFactory(
         PRM_ORD | PRM_Type(PRM_Type::PRM_INTERFACE_LABEL_NONE), "rOrd", "")
         .setDefault(0, "zyx")
-        .setChoiceList(&PRMxyzMenu));
+        .setChoiceList(&PRMxyzMenu)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the order of rotations"
+            " for the new transform"));
 
     // Translation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "translate", "Translate")
         .setDefault(PRMzeroDefaults)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the position for the new transform"));
 
     // Rotation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "rotate", "Rotate")
         .setDefault(PRMzeroDefaults)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the rotation for the new transform"));
 
     // Scale
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "scale", "Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 10)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the scale for the new transform"));
 
     // Pivot
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "pivot", "Pivot")
         .setDefault(PRMzeroDefaults)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip(
+            "When __Define Transform__ is Explicitly, the world-space pivot point"
+            " for scaling and rotation in the new transform"));
 
     // Voxel size
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxel_size", "Voxel Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 1)
-        .setHelpText(
-            "Specify the desired absolute voxel size for all output grids.\n"
+        .setTooltip(
+            "The desired absolute voxel size for all output VDBs\n\n"
             "Larger voxels correspond to lower resolution.\n"));
 
     // Voxel scale
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelscale", "Voxel Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 1)
-        .setHelpText(
-            "Specify the amount by which to scale the voxel size for each output grid.\n"
+        .setTooltip(
+            "The amount by which to scale the voxel size for each output VDB\n\n"
             "Larger voxels correspond to lower resolution.\n"));
 
     // Toggle to apply transform to vector values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "xformvectors", "Transform Vectors")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
-            "Apply the resampling transform to the voxel values of\n"
-            "vector-valued grids, in accordance with those grids'\n"
-            "Vector Type attributes.\n"));
+        .setTooltip(
+            "Apply the resampling transform to the voxel values of vector-valued VDBs,"
+            " in accordance with those VDBs'"
+            " [Vector Type|http://www.openvdb.org/documentation/doxygen/overview.html#secGrid]"
+            " attributes."));
 
     // Level set rebuild toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "rebuild", "Rebuild SDF")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
+        .setTooltip(
             "Transforming (especially scaling) a level set might invalidate\n"
             "signed distances, necessitating reconstruction of the SDF.\n\n"
-            "This option affects only level set grids, and it should\n"
+            "This option affects only level set volumes, and it should\n"
             "almost always be enabled."));
 
     // Prune toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Tolerance")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText(
-            "Collapse regions of constant value in output grids.\n"
-            "Voxel values are considered equal if they differ\n"
-            "by less than the specified threshold."));
+        .setTooltip(
+            "Reduce the memory footprint of output VDBs that have"
+            " (sufficiently large) regions of voxels with the same value.\n\n"
+            "Voxel values are considered equal if they differ by less than"
+            " the specified threshold.\n\n"
+            "NOTE:\n"
+            "    Pruning affects only the memory usage of a grid.\n"
+            "    It does not remove voxels, apart from inactive voxels\n"
+            "    whose value is equal to the background."));
 
     // Pruning tolerance slider
     parms.add(hutil::ParmFactory(
         PRM_FLT_J, "tolerance", "Prune Tolerance")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setDocumentation(nullptr));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -217,7 +271,29 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Source VDB grids to resample")
-        .addOptionalInput("Optional transform reference VDB grid");
+        .addOptionalInput("Optional transform reference VDB grid")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Resample a VDB volume into a new orientation and/or voxel size.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node resamples voxels from input VDBs into new VDBs (of the same type)\n\
+through a sampling transform that is either specified by user-supplied\n\
+translation, rotation, scale and pivot parameters or taken from\n\
+an optional reference VDB.\n\
+\n\
+@related\n\
+- [OpenVDB Combine|Node:sop/DW_OpenVDBCombine]\n\
+- [Node:sop/vdbresample]\n\
+- [Node:sop/xform]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -227,7 +303,7 @@ SOP_OpenVDB_Resample::updateParmsFlags()
 {
     bool changed = false;
 
-    const int mode = evalInt("mode", 0, 0);
+    const auto mode = evalInt("mode", 0, 0);
     changed |= enableParm("translate", mode == MODE_PARMS);
     changed |= enableParm("rotate", mode == MODE_PARMS);
     changed |= enableParm("scale", mode == MODE_PARMS);
@@ -242,7 +318,7 @@ SOP_OpenVDB_Resample::updateParmsFlags()
     changed |= setVisibleState("voxel_size", mode != MODE_VOXEL_SCALE);
     changed |= setVisibleState("voxelscale", mode == MODE_VOXEL_SCALE);
 
-    changed |= enableParm("tolerance", evalInt("prune", 0, 0));
+    changed |= enableParm("tolerance", bool(evalInt("prune", 0, 0)));
 
     return changed;
 }
@@ -277,7 +353,7 @@ struct SOP_OpenVDB_Resample::RebuildOp
     template<typename GridT>
     void operator()(const GridT& grid)
     {
-        typedef typename GridT::ValueType ValueT;
+        using ValueT = typename GridT::ValueType;
 
         const ValueT halfWidth = ValueT(grid.background() * (1.0 / grid.voxelSize()[0]));
 
@@ -329,7 +405,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         const GU_Detail* refGdp = inputGeo(1, context);
 
         // Get parameters.
-        const int samplingOrder = evalInt("order", 0, time);
+        const int samplingOrder = static_cast<int>(evalInt("order", 0, time));
         if (samplingOrder < 0 || samplingOrder > 2) {
             std::stringstream ss;
             ss << "expected interpolation order between 0 and 2, got "<< samplingOrder;
@@ -340,7 +416,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         evalString(xformOrder, "xOrd", 0, time);
         evalString(rotOrder, "rOrd", 0, time);
 
-        const int mode = evalInt("mode", 0, time);
+        const int mode = static_cast<int>(evalInt("mode", 0, time));
         if (mode < MODE_PARMS || mode > MODE_VOXEL_SCALE) {
             std::stringstream ss;
             ss << "expected mode between " << int(MODE_PARMS)
@@ -382,8 +458,8 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             // Get the (optional) reference grid.
             UT_String refGroupStr;
             evalString(refGroupStr, "reference_grid", 0, time);
-            const GA_PrimitiveGroup* refGroup = NULL;
-            if (refGdp == NULL) {
+            const GA_PrimitiveGroup* refGroup = nullptr;
+            if (refGdp == nullptr) {
                 // If the second input is unconnected, the reference_grid parameter
                 // specifies a reference grid from the first input.
                 refGdp = gdp;
@@ -436,7 +512,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
 
             // Create a new, empty output grid of the same type as the input grid
             // and with the same metadata.
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
             hvdb::GridPtr outGrid = grid.copyGrid(/*tree=*/openvdb::CP_NEW);
 #else
             hvdb::GridPtr outGrid = grid.copyGridWithNewTree();

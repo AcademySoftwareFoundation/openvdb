@@ -39,6 +39,7 @@
 #ifndef OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
@@ -48,8 +49,13 @@
 #include "AttributeGroup.h"
 #include "AttributeSet.h"
 #include "StreamCompression.h"
+#include <cstring> // std::memcpy
+#include <iostream>
+#include <limits>
+#include <memory>
 #include <type_traits> // std::is_same
 #include <utility> // std::pair, std::make_pair
+#include <vector>
 
 
 class TestPointDataLeaf;
@@ -325,7 +331,7 @@ public:
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
@@ -1545,7 +1551,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
 #endif
 
@@ -1652,12 +1658,6 @@ void initialize();
 void uninitialize();
 
 }
-
-
-/// @deprecated See internal::initialize()
-OPENVDB_DEPRECATED void initialize();
-/// @deprecated See internal::uninitialize()
-OPENVDB_DEPRECATED void uninitialize();
 
 } // namespace points
 

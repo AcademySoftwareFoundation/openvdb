@@ -221,9 +221,10 @@ TestGridTransformer::testResampleToMatch()
 
     // Create an input grid with an identity transform.
     FloatGrid inGrid;
-    // Populate it with a 10 x 10 x 10 cube.
-    inGrid.fill(CoordBBox(Coord(5), Coord(14)), /*value=*/1.0);
-    CPPUNIT_ASSERT_EQUAL(1000, int(inGrid.activeVoxelCount()));
+    // Populate it with a 20 x 20 x 20 cube.
+    inGrid.fill(CoordBBox(Coord(5), Coord(24)), /*value=*/1.0);
+    CPPUNIT_ASSERT_EQUAL(8000, int(inGrid.activeVoxelCount()));
+    CPPUNIT_ASSERT(inGrid.tree().activeTileCount() > 0);
 
     {//test identity transform
         FloatGrid outGrid;
@@ -241,7 +242,7 @@ TestGridTransformer::testResampleToMatch()
     {//test nontrivial transform
         // Create an output grid with a different transform.
         math::Transform::Ptr xform = math::Transform::createLinearTransform();
-        xform->preScale(Vec3d(2.0, 2.0, 1.0));
+        xform->preScale(Vec3d(0.5, 0.5, 1.0));
         FloatGrid outGrid;
         outGrid.setTransform(xform);
         CPPUNIT_ASSERT(outGrid.transform() != inGrid.transform());
@@ -252,12 +253,15 @@ TestGridTransformer::testResampleToMatch()
         // The output grid's transform should not have changed.
         CPPUNIT_ASSERT_EQUAL(*xform, outGrid.transform());
 
-        // The output grid should have half the resolution of the input grid in x and y
-        // and the same resolution in z.
-        CPPUNIT_ASSERT_EQUAL(250, int(outGrid.activeVoxelCount()));
-        CPPUNIT_ASSERT_EQUAL(Coord(5, 5, 10), outGrid.evalActiveVoxelDim()),
-            CPPUNIT_ASSERT_EQUAL(CoordBBox(Coord(3, 3, 5), Coord(7, 7, 14)),
-                                 outGrid.evalActiveVoxelBoundingBox());
+        // The output grid should have double the resolution of the input grid
+        // in x and y and the same resolution in z.
+        CPPUNIT_ASSERT_EQUAL(32000, int(outGrid.activeVoxelCount()));
+        CPPUNIT_ASSERT_EQUAL(Coord(40, 40, 20), outGrid.evalActiveVoxelDim());
+        CPPUNIT_ASSERT_EQUAL(CoordBBox(Coord(9, 9, 5), Coord(48, 48, 24)),
+            outGrid.evalActiveVoxelBoundingBox());
+        for (auto it = outGrid.tree().cbeginValueOn(); it; ++it) {
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, *it, 1.0e-6);
+        }
     }
 }
 

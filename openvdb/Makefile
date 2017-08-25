@@ -54,8 +54,9 @@
 #   test                run tests
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -284,8 +285,10 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
@@ -370,6 +373,7 @@ INCLUDE_NAMES := \
     points/PointConversion.h \
     points/PointCount.h \
     points/PointDataGrid.h \
+    points/PointDelete.h \
     points/PointGroup.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
@@ -405,6 +409,7 @@ INCLUDE_NAMES := \
     tools/PointScatter.h \
     tools/PointsToMask.h \
     tools/PoissonSolver.h \
+    tools/PotentialFlow.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -534,11 +539,13 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
+    unittest/TestPotentialFlow.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \

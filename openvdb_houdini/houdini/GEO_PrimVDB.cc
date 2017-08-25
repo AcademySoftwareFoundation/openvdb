@@ -99,6 +99,7 @@
 #include <GEO/GEO_AttributeHandleList.h>
 #include <GEO/GEO_WorkVertexBuffer.h>
 
+#include <openvdb/version.h>
 #include <openvdb/io/Stream.h>
 #include <openvdb/math/Maps.h>
 #include <openvdb/tools/Interpolation.h>
@@ -2980,7 +2981,7 @@ GEO_PrimVDB::GridAccessor::setGridAdapter(
     if (myGrid.get() == &grid)
 	return;
     setVertexPosition(grid.transform(), prim);
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     myGrid = grid.copyGrid(); // always shallow-copy the source grid
 #else
     myGrid = openvdb::ConstPtrCast<openvdb::GridBase>(

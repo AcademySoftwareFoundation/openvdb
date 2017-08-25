@@ -68,15 +68,15 @@ class SOP_OpenVDB_Ray: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Ray(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Ray() {}
+    ~SOP_OpenVDB_Ray() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i) const { return (i > 0); }
+    int isRefInput(unsigned i) const override { return (i > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -85,72 +85,89 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to process.")
+        .setDocumentation(
+            "A subset of VDBs to process (see [specifying volumes|/model/volumes#group])"));
 
     { // Method
-        const char* items[] = {
-            "rayintersection", "Ray Intersection",
-            "closestpoint",   "Closest Surface Point",
-            NULL
+        char const * const items[] = {
+            "rayintersection",  "Ray Intersection",
+            "closestpoint",     "Closest Surface Point",
+            nullptr
         };
-
         parms.add(hutil::ParmFactory(PRM_ORD, "method", "Method")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("Projection method")
+            .setTooltip("Projection method")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
-        .setHelpText("The crossing point of the VDB values that is considered "
-            "the surface. The zero default value works for signed distance "
-            "fields while fog volumes require a larger positive value, 0.5 is "
-            "a good initial guess."));
+        .setTooltip(
+            "The voxel value that defines the surface\n\n"
+            "Zero works for signed distance fields, while fog volumes require"
+            " a larger positive value (0.5 is a good initial guess)."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dotrans", "Transform")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Move the intersected geometry."));
+        .setTooltip("If enabled, transform the intersected geometry."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "scale", "Scale")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 1)
+        .setTooltip("Specify the amount by which to scale the intersected geometry."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "putdist", "Store Distances")
-        .setHelpText("Creates a point attribute for the distance to the "
-            "collision surface or the closest surface point."));
+        .setTooltip(
+            "Create a point attribute giving the distance to the"
+            " collision surface or to the closest surface point."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "lookfar", "Intersect Farthest Surface")
-        .setHelpText("The farthest intersection point is used instead of the closest."));
+        .setTooltip("Use the farthest intersection point instead of the closest."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "reverserays", "Reverse Rays")
-        .setHelpText("Make rays fire in the direction opposite to the normals."));
+        .setTooltip("Make rays fire in the direction opposite to the normals."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bias", "Bias")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 1)
-        .setHelpText("Offsets the starting position of the rays."));
+        .setTooltip("Offset the starting position of the rays."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "creategroup", "Create Ray Hit Group")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Point group of all successful intersections"));
+        .setTooltip("If enabled, create a point group to hold all successful intersections"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "hitgrp", "Ray Hit Group")
         .setDefault("rayHitGroup")
-        .setHelpText("Point group name"));
-
+        .setTooltip("Point group name"));
 
     //////////
 
     hvdb::OpenVDBOpFactory("OpenVDB Ray", SOP_OpenVDB_Ray::factory, parms, *table)
         .addInput("points")
-        .addInput("level set grids");
+        .addInput("level set grids")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Project geometry onto a level set VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node performs geometry projections using level set ray intersections\n\
+or closest point queries.\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -226,7 +243,7 @@ public:
     {
         GA_Offset start, end;
         GA_Index pointIndex;
-        typedef openvdb::math::Ray<double> RayT;
+        using RayT = openvdb::math::Ray<double>;
         openvdb::Vec3d eye, dir, intersection;
 
         const bool doScaling = !openvdb::math::isApproxEqual(mScale, 1.0);
@@ -306,7 +323,6 @@ inline void
 closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
     UT_FloatArray& distances, UT_Vector3Array* positions, InterrupterT& boss)
 {
-
     std::vector<openvdb::Vec3R> tmpPoints(distances.entries());
 
     GA_ROHandleV3 points = GA_ROHandleV3(gdp.getP());
@@ -318,20 +334,17 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
         tmpPoints[n][2] = pos.z();
     }
 
-
     std::vector<float> tmpDistances;
 
-    const bool transformPoints = (positions != NULL);
+    const bool transformPoints = (positions != nullptr);
 
-    openvdb::tools::ClosestSurfacePoint<GridT> closestPoint;
-    if (!closestPoint.initialize(grid, isovalue, &boss)) return;
+    auto closestPoint = openvdb::tools::ClosestSurfacePoint<GridT>::create(grid, isovalue, &boss);
+    if (!closestPoint) return;
 
-    if (transformPoints) closestPoint.searchAndReplace(tmpPoints, tmpDistances);
-    else closestPoint.search(tmpPoints, tmpDistances);
+    if (transformPoints) closestPoint->searchAndReplace(tmpPoints, tmpDistances);
+    else closestPoint->search(tmpPoints, tmpDistances);
 
     for (size_t n = 0, N = tmpDistances.size(); n < N; ++n) {
-
-
         if (tmpDistances[n] < distances(n)) {
             distances(n) = tmpDistances[n];
             if (transformPoints) {
@@ -413,7 +426,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("OpenVDB Ray");
 
         const GU_Detail* vdbGeo = inputGeo(1);
-        if(vdbGeo == NULL) return error();
+        if (vdbGeo == nullptr) return error();
 
         // Get the group of grids to surface.
         UT_String groupStr;

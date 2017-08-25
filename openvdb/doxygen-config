@@ -38,10 +38,11 @@ PROJECT_NAME           = "OpenVDB"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 4.0.1
+PROJECT_NUMBER         = 5.0.0
 
-ALIASES += vdbnamespace="openvdb::v4_0_1"
-PREDEFINED = OPENVDB_VERSION_NAME=v4_0_1
+ALIASES += vdbnamespace="openvdb::v5_0_0"
+PREDEFINED = OPENVDB_VERSION_NAME=v5_0_0
+PREDEFINED += OPENVDB_ABI_VERSION_NUMBER=5
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
 PREDEFINED += OPENVDB_STATIC_SPECIALIZATION=""
@@ -242,8 +243,8 @@ TAB_SIZE               = 4
 # "Side Effects:". You can put \n's in the value part of an alias to insert
 # newlines.
 
-ALIASES += ijk="@f$(i,j,k)@f$"
-ALIASES += xyz="@f$(x,y,z)@f$"
+ALIASES += ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)"
+ALIASES += xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)"
 ALIASES += const="<tt>const</tt>"
 # Use this command to create a link to an OpenVDB class, function, etc.
 # Usage is "@vdblink::<symbol> <text>@endlink", where <symbol> is a fully

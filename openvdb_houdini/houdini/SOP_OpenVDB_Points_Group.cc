@@ -86,6 +86,11 @@ struct GroupParms {
     bool                          mEnableViewport     = false;
     bool                          mAddViewport        = false;
     std::string                   mViewportGroupName  = "";
+    // drop groups
+    bool                          mDropAllGroups      = false;
+    std::vector<std::string>      mDropIncludeGroups;
+    std::vector<std::string>      mDropExcludeGroups;
+
 };
 
 } // namespace
@@ -139,59 +144,66 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be loaded.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
-
-    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
-        .setHelpText("Specify VDB Points Groups to use as an input."));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be loaded.")
+        .setDocumentation(
+            "A subset of the input VDB Points primitives to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.beginSwitcher("tabMenu1");
     parms.addFolder("Create");
 
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "Filter by VDB Group")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
+        .setTooltip("Create a new VDB points group as a subset of an existing VDB points group(s)."));
+
+    parms.add(houdini_utils::ParmFactory(PRM_LABEL, "spacer1", ""));
+
     // Toggle to enable creation
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablecreate", "Enable")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Enable creation of group."));
+        .setTooltip("Enable creation of the group."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "groupname", "Group Name")
         .setDefault(0, ::strdup("group1"))
-        .setHelpText("Group name to create."));
+        .setTooltip("The name of the internal group to create"));
 
     parms.beginSwitcher("tabMenu2");
     parms.addFolder("Number");
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablenumber", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable number filtering."));
+        .setTooltip("Enable filtering by number."));
 
     {
-        const char* items[] = {
-            "percentage",       "Percentage",
-            "total",            "Total",
+        char const * const items[] = {
+            "percentage",   "Percentage",
+            "total",        "Total",
             nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "numbermode", "Mode")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip(
+                "Specify how to filter out a subset of the points inside the VDB Points."));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT, "pointpercent", "Percent")
         .setDefault(PRMtenDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 100)
-        .setHelpText("Point percentage to include in the Group."));
+        .setTooltip("The percentage of points to include in the group"));
 
     parms.add(hutil::ParmFactory(PRM_INT, "pointcount", "Count")
         .setDefault(&fiveThousandDefault)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1000000)
-        .setHelpText("Point percentage to include in the Group."));
+        .setTooltip("The total number of points to include in the group"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE_J, "enablepercentattribute", "")
         .setDefault(PRMzeroDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("."));
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "percentattribute", "Attribute Seed")
         .setDefault(0, ::strdup("id"))
-        .setHelpText("Point attribute to use as a seed for percent filtering."));
+        .setTooltip("The point attribute to use as a seed for percent filtering"));
 
     parms.endSwitcher();
 
@@ -200,10 +212,10 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enableboundingbox", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable bounding box filtering."));
+        .setTooltip("Enable filtering by bounding box."));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "boundingbox",      "Bounding Box",
             "boundingobject",   "Bounding Object",
             nullptr
@@ -214,14 +226,16 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "boundingname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText("Name of the bounding geometry."));
+        .setTooltip("The name of the bounding geometry"));
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "size", "Size")
         .setDefault(PRMoneDefaults)
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip("The size of the bounding box"));
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "center", "Center")
-        .setVectorSize(3));
+        .setVectorSize(3)
+        .setTooltip("The center of the bounding box"));
 
     parms.endSwitcher();
 
@@ -230,57 +244,72 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablelevelset", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable level set filtering."));
+        .setTooltip("Enable filtering by level set."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "levelsetname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText("Name of the level set."));
+        .setTooltip("The name of the level set"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdfmin", "Enable")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable SDF minimum."));
+        .setTooltip("Enable SDF minimum."));
 
     parms.add(hutil::ParmFactory(PRM_FLT, "sdfmin", "SDF Minimum")
         .setDefault(&negPointOneDefault)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
-        .setHelpText("SDF minimum value."));
+        .setTooltip("SDF minimum value"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdfmax", "Enable")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable SDF maximum."));
+        .setTooltip("Enable SDF maximum."));
 
     parms.add(hutil::ParmFactory(PRM_FLT, "sdfmax", "SDF Maximum")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
-        .setHelpText("SDF maximum value."));
+        .setTooltip("SDF maximum value"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sdfinvert", "Invert")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Invert SDF minimum and maximum."));
+        .setTooltip("Invert SDF minimum and maximum."));
 
     parms.endSwitcher();
+
+    parms.addFolder("Delete");
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "deletegroups", "Point Groups")
+        .setDefault(0, "")
+        .setHelpText("A space-delimited list of groups to delete.  This will delete the selected groups but \
+                     will not delete the points contained in them.")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1));
 
     parms.addFolder("Viewport");
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enableviewport", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Toggle viewport group."));
+        .setTooltip("Toggle viewport group.")
+        .setDocumentation(
+            "Enable the viewport group.\n\n"
+            "This allows one to specify a subset of points to be displayed in the viewport.\n"
+            "This minimizes the data transfer to the viewport without removing the data.\n\n"
+            "NOTE:\n"
+            "    Only one group can be tagged as a viewport group.\n"));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "addviewportgroup",      "Add Viewport Group",
             "removeviewportgroup",   "Remove Viewport Group",
             nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "viewportoperation", "Operation")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Specify whether to add or remove the viewport group."));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "viewportgroupname", "Name")
-        .setDefault(0, ::strdup("chs(\"groupname\")"), CH_OLD_EXPRESSION)
-        .setHelpText("Display only this group in the viewport."));
+        .setDefault("chs(\"groupname\")", CH_OLD_EXPRESSION)
+        .setTooltip("Display only this group in the viewport."));
 
     parms.endSwitcher();
 
@@ -290,7 +319,29 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Points Group",
         SOP_OpenVDB_Points_Group::factory, parms, *table)
         .addInput("VDB Points")
-        .addOptionalInput("Optional bounding geometry or level set");
+        .addOptionalInput("Optional bounding geometry or level set")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Manipulate the internal groups of a VDB Points primitive.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node acts like the [Node:sop/group] node, but for the points inside\n\
+a VDB Points primitive.\n\
+It can create and manipulate the primitive's internal groups.\n\
+Generated groups can be used to selectively unpack a subset of the points\n\
+with an [OpenVDB Points Convert node|Node:sop/DW_OpenVDBPointsConvert].\n\
+\n\
+@related\n\
+- [OpenVDB Points Convert|Node:sop/DW_OpenVDBPointsConvert]\n\
+- [OpenVDB Points Delete|Node:sop/DW_OpenVDBPointsDelete]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -311,6 +362,7 @@ SOP_OpenVDB_Points_Group::updateParmsFlags()
     const bool sdfmax = evalInt("enablesdfmax", 0, 0);
     const bool viewportadd = evalInt("viewportoperation", 0, 0) == 0;
 
+    changed |= enableParm("vdbpointsgroup", creation);
     changed |= enableParm("groupname", creation);
     changed |= enableParm("enablenumber", creation);
     changed |= enableParm("numbermode", creation && number);
@@ -360,8 +412,6 @@ SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
 OP_ERROR
 SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 {
-    using PointDataGrid = openvdb::points::PointDataGrid;
-
     try {
         hutil::ScopedInputLock lock(*this, context);
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
@@ -400,10 +450,46 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
                         removeViewportMetadata(outputGrid);
                     }
                 }
+            }
+
+            const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+
+            std::vector<std::string> groupsToDrop;
+
+            bool hasGroupsToDrop = !descriptor.groupMap().empty();
+            if (hasGroupsToDrop) {
+                // exclude groups mode
+                if (!parms.mDropExcludeGroups.empty()) {
+                    // if any groups are to be excluded, ignore those to be included
+                    // and rebuild them
+                    for (const auto& it: descriptor.groupMap()) {
+                        if (std::find(  parms.mDropExcludeGroups.begin(),
+                                        parms.mDropExcludeGroups.end(), it.first) ==
+                                        parms.mDropExcludeGroups.end()) {
+                            groupsToDrop.push_back(it.first);
+                        }
+                    }
+                }
+                else if (!parms.mDropAllGroups) {
+                    // if any groups are to be included, intersect them with groups that exist
+                    for (const auto& groupName : parms.mDropIncludeGroups) {
+                        if (descriptor.hasGroup(groupName)) {
+                            groupsToDrop.push_back(groupName);
+                        }
+                    }
+                }
+            }
+
+            if (hasGroupsToDrop)    hasGroupsToDrop = parms.mDropAllGroups || !groupsToDrop.empty();
+
+            // If we are not creating groups and there are no groups to drop (due to an empty list or because none of
+            // the chosen ones were actually present), we can continue the loop early here
+            if(!parms.mEnable && !hasGroupsToDrop) {
                 continue;
             }
 
             // Evaluate grid-specific UI parameters
+
             if (evalGridGroupParms(pointDataGrid, context, parms) >= UT_ERROR_ABORT)
                 return error();
 
@@ -413,13 +499,24 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
             auto&& outputGrid = UTvdbGridCast<PointDataGrid>(vdbPrim->getGrid());
 
             // filter and create the point group in the grid
-            performGroupFiltering(outputGrid, parms);
+            if (parms.mEnable) {
+                performGroupFiltering(outputGrid, parms);
+            }
+
+            // drop groups
+            if (parms.mDropAllGroups) {
+                dropGroups(outputGrid.tree());
+            }
+            else if (!groupsToDrop.empty()) {
+                dropGroups(outputGrid.tree(), groupsToDrop);
+            }
 
             // attach group viewport metadata to the grid
             if (parms.mEnableViewport) {
                 if (parms.mAddViewport)     setViewportMetadata(outputGrid, parms);
                 else                        removeViewportMetadata(outputGrid);
             }
+
         }
 
         return error();
@@ -645,6 +742,27 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
     parms.mViewportGroupName = viewportGroupName;
 
+    // group deletion
+
+    UT_String groupsToDropNamesStr;
+    evalString(groupsToDropNamesStr, "deletegroups", 0, time);
+
+    AttributeSet::Descriptor::parseNames(parms.mDropIncludeGroups, parms.mDropExcludeGroups,
+        parms.mDropAllGroups, groupsToDropNamesStr.toStdString());
+
+    if (parms.mDropAllGroups) {
+        // include groups only apply if not also deleting all groups
+        parms.mDropIncludeGroups.clear();
+        // if exclude groups is not empty, don't delete all groups
+        if (!parms.mDropExcludeGroups.empty()) {
+            parms.mDropAllGroups = false;
+        }
+    }
+    else {
+        // exclude groups only apply if also deleting all groups
+        parms.mDropExcludeGroups.clear();
+    }
+
     return error();
 }
 
@@ -664,52 +782,55 @@ SOP_OpenVDB_Points_Group::evalGridGroupParms(const PointDataGrid& grid,
 
     // check new group doesn't already exist
 
-    if (descriptor.hasGroup(parms.mGroupName)) {
-        addError(SOP_MESSAGE, ("Cannot create duplicate group - " + parms.mGroupName).c_str());
-        return error();
-    }
+    if (parms.mEnable) {
 
-    // group
-
-    if (parms.mOpGroup)
-    {
-        for (const std::string& name : parms.mIncludeGroups) {
-            if (!descriptor.hasGroup(name)) {
-                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
-                return error();
-            }
-        }
-
-        for (const std::string& name : parms.mExcludeGroups) {
-            if (!descriptor.hasGroup(name)) {
-                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
-                return error();
-            }
-        }
-    }
-
-    // number
-
-    if (parms.mHashMode)
-    {
-        // retrieve percent attribute type (if it exists)
-
-        const size_t index = descriptor.find(parms.mHashAttribute);
-
-        if (index == AttributeSet::INVALID_POS) {
-            addError(SOP_MESSAGE, ("Unable to find attribute - " + parms.mHashAttribute).c_str());
+        if (descriptor.hasGroup(parms.mGroupName)) {
+            addError(SOP_MESSAGE, ("Cannot create duplicate group - " + parms.mGroupName).c_str());
             return error();
         }
 
-        parms.mHashAttributeIndex = index;
-        const std::string attributeType = descriptor.valueType(index);
+        // group
 
-        if (attributeType == "int32")       parms.mOpHashI = true;
-        else if (attributeType == "int64")  parms.mOpHashL = true;
-        else {
-            addError(SOP_MESSAGE, ("Unsupported attribute type for percent attribute filtering - "
-                + attributeType).c_str());
-            return error();
+        if (parms.mOpGroup)
+        {
+            for (const std::string& name : parms.mIncludeGroups) {
+                if (!descriptor.hasGroup(name)) {
+                    addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
+                    return error();
+                }
+            }
+
+            for (const std::string& name : parms.mExcludeGroups) {
+                if (!descriptor.hasGroup(name)) {
+                    addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
+                    return error();
+                }
+            }
+        }
+
+        // number
+
+        if (parms.mHashMode)
+        {
+            // retrieve percent attribute type (if it exists)
+
+            const size_t index = descriptor.find(parms.mHashAttribute);
+
+            if (index == AttributeSet::INVALID_POS) {
+                addError(SOP_MESSAGE, ("Unable to find attribute - " + parms.mHashAttribute).c_str());
+                return error();
+            }
+
+            parms.mHashAttributeIndex = index;
+            const std::string attributeType = descriptor.valueType(index);
+
+            if (attributeType == "int32")       parms.mOpHashI = true;
+            else if (attributeType == "int64")  parms.mOpHashL = true;
+            else {
+                addError(SOP_MESSAGE, ("Unsupported attribute type for percent attribute filtering - "
+                    + attributeType).c_str());
+                return error();
+            }
         }
     }
 

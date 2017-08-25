@@ -45,6 +45,10 @@
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
+#include <algorithm>
+#include <iostream>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -55,19 +59,20 @@ class SOP_OpenVDB_Sample_Points: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Sample_Points(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Sample_Points() {}
+    ~SOP_OpenVDB_Sample_Points() override {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
     // The VDB port holds read-only VDBs.
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
 
 private:
     void sample(OP_Context&);
-    int mVerbose;
+
+    bool mVerbose = false;
 };
 
 
@@ -125,7 +130,7 @@ template<
 class PointSampler
 {
 public:
-    typedef typename GridType::ConstAccessor Accessor;
+    using Accessor = typename GridType::ConstAccessor;
 
     // constructor. from grid and GU_Detail*
     PointSampler(const hvdb::Grid& grid, const bool threaded,
@@ -148,8 +153,6 @@ public:
         mInterrupter(other.mInterrupter)
     {
     }
-
-    ~PointSampler(){}
 
     void sample()
     {
@@ -243,18 +246,22 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // verbose option toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("If enabled, print the sequence of operations to the terminal."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -267,7 +274,26 @@ newSopOperator(OP_OperatorTable* table)
         .addAlias("OpenVDB Point Sample")
         .setObsoleteParms(obsoleteParms)
         .addInput("Points")
-        .addInput("VDB");
+        .addInput("VDB")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Sample VDB voxel values onto points.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node samples VDB voxel values as attributes on spatially located particles.\n\
+Currently, the voxel values can be single- or double-precision scalars or vectors,\n\
+but the attributes on the particles will be single-precision only.\n\
+\n\
+@related\n\
+- [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 
 }
 
@@ -302,7 +328,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
     const GU_Detail* bGdp = inputGeo(1, context); // where the grids live
 
     // extract UI data
-    mVerbose = evalInt("verbose", 0, time);
+    mVerbose = bool(evalInt("verbose", 0, time));
     const bool threaded = true; /*evalInt("threaded", 0, time);*/
     const GA_Size nPoints = aGdp->getNumPoints();
 

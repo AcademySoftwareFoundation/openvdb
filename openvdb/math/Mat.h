@@ -34,11 +34,12 @@
 #ifndef OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-#include <math.h>
-#include <iostream>
-#include <boost/format.hpp>
-#include <openvdb/Exceptions.h>
 #include "Math.h"
+#include <openvdb/Exceptions.h>
+#include <algorithm> // for std::max()
+#include <cmath>
+#include <iostream>
+#include <string>
 
 
 namespace openvdb {
@@ -52,8 +53,8 @@ template<unsigned SIZE, typename T>
 class Mat
 {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
     enum SIZE_ { size = SIZE };
 
     // Number of cols, rows, elements
@@ -111,16 +112,17 @@ public:
 
                 // Put a comma after everything except the last
                 if (j) ret.append(", ");
-                ret.append((boost::format("%1%") % mm[(i*SIZE)+j]).str());
+                ret.append(std::to_string(mm[(i*SIZE)+j]));
             }
 
             ret.append("]");
 
             // At the end of every row (except the last)...
-            if (i < SIZE-1 )
-                // ...suffix the row bracket with a comma, newline, and
-                // advance indentation
-                ret.append((boost::format(",\n%1%") % indent).str());
+            if (i < SIZE - 1) {
+                // ...suffix the row bracket with a comma, newline, and advance indentation.
+                ret.append(",\n");
+                ret.append(indent);
+            }
         }
 
         ret.append("]");
@@ -148,9 +150,42 @@ public:
     /// Return the maximum of the absolute of all elements in this matrix
     T absMax() const {
         T x = static_cast<T>(std::fabs(mm[0]));
-        for (int i = 1; i < SIZE*SIZE; ++i)
+        for (unsigned i = 1; i < numElements(); ++i) {
             x = std::max(x, static_cast<T>(std::fabs(mm[i])));
+        }
         return x;
+    }
+
+    /// True if a Nan is present in this matrix
+    bool isNan() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isnan(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if an Inf is present in this matrix
+    bool isInfinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isinf(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if no Nan or Inf values are present
+    bool isFinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!std::isfinite(mm[i])) return false;
+        }
+        return true;
+    }
+
+    /// True if all elements are exactly zero
+    bool isZero() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!isZero(mm[i])) return false;
+        }
+        return true;
     }
 
 protected:
@@ -169,7 +204,7 @@ MatType
 rotation(const Quat<typename MatType::value_type> &q,
     typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
 
     T qdot(q.dot(q));
     T s(0);
@@ -209,7 +244,7 @@ template<class MatType>
 MatType
 rotation(Axis axis, typename MatType::value_type angle)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     T c = static_cast<T>(cos(angle));
     T s = static_cast<T>(sin(angle));
 
@@ -247,7 +282,7 @@ template<class MatType>
 MatType
 rotation(const Vec3<typename MatType::value_type> &_axis, typename MatType::value_type angle)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     T txy, txz, tyz, sx, sy, sz;
 
     Vec3<T> axis(_axis.unit());
@@ -332,8 +367,8 @@ eulerAngles(
     RotationOrder rotationOrder,
     typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
-    typedef typename MatType::value_type ValueType;
-    typedef Vec3<ValueType> V;
+    using ValueType = typename MatType::value_type;
+    using V = Vec3<ValueType>;
     ValueType phi, theta, psi;
 
     switch(rotationOrder)
@@ -500,7 +535,7 @@ rotation(
     const Vec3<typename MatType::value_type>& _v2,
     typename MatType::value_type eps=1.0e-8)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     Vec3<T> v1(_v1);
     Vec3<T> v2(_v2);
 
@@ -622,12 +657,12 @@ scale(const Vec3<typename MatType::value_type>& s)
 }
 
 
-/// Return a Vec3 representing the lengths of the passed matrix's upper 3x3's rows.
+/// Return a Vec3 representing the lengths of the passed matrix's upper 3&times;3's rows.
 template<class MatType>
 Vec3<typename MatType::value_type>
 getScale(const MatType &mat)
 {
-    typedef Vec3<typename MatType::value_type> V;
+    using V = Vec3<typename MatType::value_type>;
     return V(
         V(mat[0][0], mat[0][1], mat[0][2]).length(),
         V(mat[1][0], mat[1][1], mat[1][2]).length(),
@@ -635,7 +670,7 @@ getScale(const MatType &mat)
 }
 
 
-/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized.
+/// @brief Return a copy of the given matrix with its upper 3&times;3 rows normalized.
 /// @details This can be geometrically interpreted as a matrix with no scaling
 /// along its major axes.
 template<class MatType>
@@ -647,7 +682,7 @@ unit(const MatType &mat, typename MatType::value_type eps = 1.0e-8)
 }
 
 
-/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized,
+/// @brief Return a copy of the given matrix with its upper 3&times;3 rows normalized,
 /// and return the length of each of these rows in @a scaling.
 /// @details This can be geometrically interpretted as a matrix with no scaling
 /// along its major axes, and the scaling in the input vector
@@ -658,7 +693,7 @@ unit(
     typename MatType::value_type eps,
     Vec3<typename MatType::value_type>& scaling)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     MatType result(in);
 
     for (int i(0); i < 3; i++) {
@@ -702,7 +737,7 @@ template<class MatType>
 MatType
 skew(const Vec3<typename MatType::value_type> &skew)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
 
     MatType r;
     r[0][0] = T(0);      r[0][1] = skew.z();  r[0][2] = -skew.y();
@@ -721,7 +756,7 @@ MatType
 aim(const Vec3<typename MatType::value_type>& direction,
     const Vec3<typename MatType::value_type>& vertical)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     Vec3<T> forward(direction.unit());
     Vec3<T> horizontal(vertical.unit().cross(forward).unit());
     Vec3<T> up(forward.cross(horizontal).unit());
@@ -745,7 +780,7 @@ template<class MatType>
 inline MatType
 snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::value_type>& direction)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
 
     Vec3<T> unitDir(direction.unit());
     Vec3<T> ourUnitAxis(source.row(axis).unit());
@@ -772,7 +807,7 @@ snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::valu
 }
 
 /// @brief Write 0s along Mat4's last row and column, and a 1 on its diagonal.
-/// @details Useful initialization when we're initializing just the 3x3 block.
+/// @details Useful initialization when we're initializing just the 3&times;3 block.
 template<class MatType>
 static MatType&
 padMat4(MatType& dest)
@@ -863,7 +898,7 @@ template<typename MatType>
 inline bool
 isInvertible(const MatType& m)
 {
-    typedef typename MatType::ValueType ValueType;
+    using ValueType = typename MatType::ValueType;
     return !isApproxEqual(m.det(), ValueType(0));
 }
 
@@ -883,8 +918,8 @@ template<typename MatType>
 inline bool
 isUnitary(const MatType& m)
 {
-    typedef typename MatType::ValueType value_type;
-    if (!isApproxEqual(std::abs(m.det()), value_type(1.0))) return false;
+    using ValueType = typename MatType::ValueType;
+    if (!isApproxEqual(std::abs(m.det()), ValueType(1.0))) return false;
     // check that the matrix transpose is the inverse
     MatType temp = m * m.transpose();
     return temp.eq(MatType::identity());
@@ -901,7 +936,7 @@ isDiagonal(const MatType& mat)
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             if (i != j) {
-                temp+=std::abs(mat(i,j));
+                temp += std::abs(mat(i,j));
             }
         }
     }
@@ -909,7 +944,7 @@ isDiagonal(const MatType& mat)
 }
 
 
-/// Return the @f$L_\infty@f$ norm of an N x N matrix.
+/// Return the <i>L</i><sub>&infin;</sub> norm of an <i>N</i>&times;<i>N</i> matrix.
 template<typename MatType>
 typename MatType::ValueType
 lInfinityNorm(const MatType& matrix)
@@ -930,7 +965,7 @@ lInfinityNorm(const MatType& matrix)
 }
 
 
-/// Return the @f$L_1@f$ norm of an N x N matrix.
+/// Return the <i>L</i><sub>1</sub> norm of an <i>N</i>&times;<i>N</i> matrix.
 template<typename MatType>
 typename MatType::ValueType
 lOneNorm(const MatType& matrix)
@@ -951,7 +986,7 @@ lOneNorm(const MatType& matrix)
 }
 
 
-/// @brief Decompose an invertible 3x3 matrix into a unitary matrix
+/// @brief Decompose an invertible 3&times;3 matrix into a unitary matrix
 /// followed by a symmetric matrix (positive semi-definite Hermitian),
 /// i.e., M = U * S.
 /// @details If det(U) = 1 it is a rotation, otherwise det(U) = -1,

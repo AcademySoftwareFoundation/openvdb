@@ -782,6 +782,12 @@ inline bool GEOvdbProcessTypedGridVec3(const GEO_PrimVDB &vdb, OpT &op)
     return UTvdbProcessTypedGridVec3(vdb.getStorageType(), vdb.getGrid(), op);
 }
 
+template <typename OpT>
+inline bool GEOvdbProcessTypedGridPoint(const GEO_PrimVDB &vdb, OpT &op)
+{
+    return UTvdbProcessTypedGridPoint(vdb.getStorageType(), vdb.getGrid(), op);
+}
+
 /// @brief Utility function to process the grid of a primitive using functor @a op.
 /// @param vdb  the primitive whose grid is to be processed
 /// @param op  a functor with a call operator of the form
@@ -822,6 +828,13 @@ inline bool GEOvdbProcessTypedGridVec3(GEO_PrimVDB &vdb, OpT &op, bool makeUniqu
 {
     if (makeUnique) return UTvdbProcessTypedGridVec3(vdb.getStorageType(), vdb, op);
     return UTvdbProcessTypedGridVec3(vdb.getStorageType(), vdb.getGrid(), op);
+}
+
+template <typename OpT>
+inline bool GEOvdbProcessTypedGridPoint(GEO_PrimVDB &vdb, OpT &op, bool makeUnique = true)
+{
+    if (makeUnique) return UTvdbProcessTypedGridPoint(vdb.getStorageType(), vdb, op);
+    return UTvdbProcessTypedGridPoint(vdb.getStorageType(), vdb.getGrid(), op);
 }
 /// @}
 
