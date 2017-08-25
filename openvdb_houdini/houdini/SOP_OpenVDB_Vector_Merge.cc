@@ -637,7 +637,8 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             // Merge the input grids into an output grid.
             // This does not support a partial set so we quit early in that case.
             ScalarGridMerger op(xGrid, yGrid, zGrid, outGridName, copyInactiveValues,
-                boost::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage, this, _1));
+                boost::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage, this,
+                            boost::placeholders::_1));
             UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {

@@ -651,7 +651,6 @@ SOP_OpenVDB_Fracture::process(
 
     if (cutterObjects > 1) {
         GA_Offset start, end;
-        GA_Primitive::const_iterator vtxIt;
         GA_SplittableRange range(cutterGeo->getPrimitiveRange());
 
         for (int classId = 0; classId < cutterObjects; ++classId) {
@@ -696,6 +695,15 @@ SOP_OpenVDB_Fracture::process(
                                 if (primRef->getTypeId() == GEO_PRIMPOLY &&
                                     (3 == vtxn || 4 == vtxn))
                                 {
+#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
+                                    GA_Size vtx = 0;
+                                    primRef->forEachPoint(
+                                        [&prim, &vtx, cutterGeo]( const GA_Offset pt )
+                                        {
+                                            prim[vtx++] = static_cast<Vec4IValueType>(
+                                                cutterGeo->pointIndex(pt));
+                                        });
+#else
                                     GA_Primitive::const_iterator it;
                                     for (vtx = 0, primRef->beginVertex(it);
                                         !it.atEnd(); ++it, ++vtx)
@@ -703,6 +711,7 @@ SOP_OpenVDB_Fracture::process(
                                         prim[vtx] = static_cast<Vec4IValueType>(
                                             cutterGeo->pointIndex(it.getPointOffset()));
                                     }
+#endif
 
                                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
 

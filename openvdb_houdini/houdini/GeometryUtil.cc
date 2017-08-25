@@ -37,7 +37,8 @@
 #include <houdini_utils/geometry.h> // for createBox()
 #include <openvdb/tools/VolumeToMesh.h>
 
-#include <UT/UT_ScopedPtr.h>
+#include <boost/scoped_ptr.hpp>
+
 #include <UT/UT_String.h>
 #include <UT/UT_BoundingBox.h>
 #include <UT/UT_Version.h>
@@ -50,7 +51,7 @@
 #include <OBJ/OBJ_Camera.h>
 
 
-namespace openvdb_houdini {
+namespace openvdb_houdini  {
 
 
 void
@@ -516,11 +517,19 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 
                 if (primRef->getTypeId() == GEO_PRIMPOLY && (3 == vtxn || 4 == vtxn)) {
 
+#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
+                    vtx = 0;
+                    primRef->forEachPoint([&prim, &vtx, this] (const GA_Offset pt) {
+                        prim[vtx++] = static_cast<openvdb::Vec4I::ValueType>(
+                            mGdp->pointIndex(pt));
+                    });
+#else
                     GA_Primitive::const_iterator vit;
                     for (vtx = 0, primRef->beginVertex(vit); !vit.atEnd(); ++vit, ++vtx) {
                         prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
                             mGdp->pointIndex(vit.getPointOffset()));
                     }
+#endif
 
                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
 
@@ -560,7 +569,9 @@ void
 VertexNormalOp::operator()(const GA_SplittableRange& range) const
 {
     GA_Offset start, end, vtxOffset, primOffset;
+#if( UT_VERSION_INT < 0x10000189 ) // earlier than 16.0.393
     GA_Primitive::const_iterator it;
+#endif    
     UT_Vector3 primN, avgN, tmpN;
     bool interiorPrim = false;
     const GA_Primitive * primRef = NULL;
@@ -573,11 +584,17 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
 
                 primN = mDetail.getGEOPrimitive(i)->computeNormal();
                 interiorPrim = isInteriorPrim(i);
-
+#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
+                for (GA_Size i = 0, I = primRef->getVertexCount(); i < I; ++i) {
+                    const GA_Offset ptOffset = primRef->getPointOffset(i);
+                     
+#else
                 for (primRef->beginVertex(it); !it.atEnd(); ++it) {
+                    const GA_Offset ptOffset = it.getPointOffset();
+#endif
 
                     avgN = primN;
-                    vtxOffset = mDetail.pointVertex(it.getPointOffset());
+                    vtxOffset = mDetail.pointVertex(ptOffset);
 
                     while (GAisValid(vtxOffset)) {
 
@@ -590,8 +607,11 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
                     }
 
                     avgN.normalize();
+#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
+                    mNormalHandle.set(i, avgN);
+#else
                     mNormalHandle.set(*it, avgN);
-
+#endif
                 } // prim vtx iteration.
             }
         }
