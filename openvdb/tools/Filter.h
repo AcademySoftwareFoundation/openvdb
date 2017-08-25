@@ -256,13 +256,13 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) {
-        mTask = boost::bind(&Filter::doBoxX, _1, _2, w);
+        mTask = boost::bind(&Filter::doBoxX, boost::placeholders::_1, boost::placeholders::_2, w);
         this->cook(leafs);
 
-        mTask = boost::bind(&Filter::doBoxY, _1, _2, w);
+        mTask = boost::bind(&Filter::doBoxY, boost::placeholders::_1, boost::placeholders::_2, w);
         this->cook(leafs);
 
-        mTask = boost::bind(&Filter::doBoxZ, _1, _2, w);
+        mTask = boost::bind(&Filter::doBoxZ, boost::placeholders::_1, boost::placeholders::_2, w);
         this->cook(leafs);
     }
 
@@ -284,13 +284,13 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 
     for (int i=0; i<iterations; ++i) {
         for (int n=0; n<4 && !this->wasInterrupted(); ++n) {
-            mTask = boost::bind(&Filter::doBoxX, _1, _2, w);
+            mTask = boost::bind(&Filter::doBoxX, boost::placeholders::_1, boost::placeholders::_2, w);
             this->cook(leafs);
 
-            mTask = boost::bind(&Filter::doBoxY, _1, _2, w);
+            mTask = boost::bind(&Filter::doBoxY, boost::placeholders::_1, boost::placeholders::_2, w);
             this->cook(leafs);
 
-            mTask = boost::bind(&Filter::doBoxZ, _1, _2, w);
+            mTask = boost::bind(&Filter::doBoxZ, boost::placeholders::_1, boost::placeholders::_2, w);
             this->cook(leafs);
         }
     }
@@ -309,7 +309,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
-    mTask = boost::bind(&Filter::doMedian, _1, _2, std::max(1, width));
+    mTask = boost::bind(&Filter::doMedian, boost::placeholders::_1, boost::placeholders::_2, std::max(1, width));
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();
@@ -326,7 +326,7 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 
     LeafManagerType leafs(mGrid->tree(), 0, mGrainSize==0);
 
-    mTask = boost::bind(&Filter::doOffset, _1, _2, value);
+    mTask = boost::bind(&Filter::doOffset, boost::placeholders::_1, boost::placeholders::_2, value);
     this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();

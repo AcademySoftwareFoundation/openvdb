@@ -259,7 +259,7 @@ Filter::median(int width)
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = boost::bind(&Filter::median, _1, _2, std::max(1, width));
+    mTask = boost::bind(&Filter::median, boost::placeholders::_1, boost::placeholders::_2, std::max(1, width));
     this->cook(true);
 
     mParent->track();
@@ -300,13 +300,13 @@ Filter::box(int width)
 
     width = std::max(1, width);
 
-    mTask = boost::bind(&Filter::boxX, _1, _2, width);
+    mTask = boost::bind(&Filter::boxX, boost::placeholders::_1, boost::placeholders::_2, width);
     this->cook(true);
 
-    mTask = boost::bind(&Filter::boxY, _1, _2, width);
+    mTask = boost::bind(&Filter::boxY, boost::placeholders::_1, boost::placeholders::_2, width);
     this->cook(true);
 
-    mTask = boost::bind(&Filter::boxZ, _1, _2, width);
+    mTask = boost::bind(&Filter::boxZ, boost::placeholders::_1, boost::placeholders::_2, width);
     this->cook(true);
 
     mParent->track();
@@ -321,7 +321,7 @@ Filter::meanCurvature()
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = boost::bind(&Filter::meanCurvature, _1, _2);
+    mTask = boost::bind(&Filter::meanCurvature, boost::placeholders::_1, boost::placeholders::_2);
     this->cook(true);
 
     mParent->track();
@@ -338,7 +338,7 @@ Filter::laplacian()
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = boost::bind(&Filter::laplacian, _1, _2);
+    mTask = boost::bind(&Filter::laplacian, boost::placeholders::_1, boost::placeholders::_2);
     this->cook(true);
 
     mParent->track();
@@ -361,7 +361,7 @@ Filter::offset(ValueType value)
         const ValueType delta = openvdb::math::Min(offset-dist, CFL);
         dist += delta;
 
-        mTask = boost::bind(&Filter::offset, _1, _2, copysign(delta, value));
+        mTask = boost::bind(&Filter::offset, boost::placeholders::_1, boost::placeholders::_2, copysign(delta, value));
         this->cook(false);
 
         mParent->track();

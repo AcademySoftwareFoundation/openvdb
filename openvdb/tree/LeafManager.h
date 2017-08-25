@@ -405,7 +405,7 @@ public:
     bool swapLeafBuffer(size_t bufferIdx, bool serial = false)
     {
         if (bufferIdx == 0 || bufferIdx > mAuxBuffersPerLeaf || this->isConstTree()) return false;
-        mTask = boost::bind(&LeafManager::doSwapLeafBuffer, _1, _2, bufferIdx - 1);
+        mTask = boost::bind(&LeafManager::doSwapLeafBuffer, boost::placeholders::_1, boost::placeholders::_2, bufferIdx - 1);
         this->cook(serial ? 0 : 512);
         return true;//success
     }
@@ -420,9 +420,9 @@ public:
         if (b1 == b2 || b2 > mAuxBuffersPerLeaf) return false;
         if (b1 == 0) {
             if (this->isConstTree()) return false;
-            mTask = boost::bind(&LeafManager::doSwapLeafBuffer, _1, _2, b2-1);
+            mTask = boost::bind(&LeafManager::doSwapLeafBuffer, boost::placeholders::_1, boost::placeholders::_2, b2-1);
         } else {
-            mTask = boost::bind(&LeafManager::doSwapAuxBuffer, _1, _2, b1-1, b2-1);
+            mTask = boost::bind(&LeafManager::doSwapAuxBuffer, boost::placeholders::_1, boost::placeholders::_2, b1-1, b2-1);
         }
         this->cook(serial ? 0 : 512);
         return true;//success
@@ -439,7 +439,7 @@ public:
     bool syncAuxBuffer(size_t bufferIdx, bool serial = false)
     {
         if (bufferIdx == 0 || bufferIdx > mAuxBuffersPerLeaf) return false;
-        mTask = boost::bind(&LeafManager::doSyncAuxBuffer, _1, _2, bufferIdx - 1);
+        mTask = boost::bind(&LeafManager::doSyncAuxBuffer, boost::placeholders::_1, boost::placeholders::_2, bufferIdx - 1);
         this->cook(serial ? 0 : 64);
         return true;//success
     }
@@ -451,9 +451,9 @@ public:
     {
         switch (mAuxBuffersPerLeaf) {
             case 0: return false;//nothing to do
-            case 1: mTask = boost::bind(&LeafManager::doSyncAllBuffers1, _1, _2); break;
-            case 2: mTask = boost::bind(&LeafManager::doSyncAllBuffers2, _1, _2); break;
-            default: mTask = boost::bind(&LeafManager::doSyncAllBuffersN, _1, _2); break;
+            case 1: mTask = boost::bind(&LeafManager::doSyncAllBuffers1, boost::placeholders::_1, boost::placeholders::_2); break;
+            case 2: mTask = boost::bind(&LeafManager::doSyncAllBuffers2, boost::placeholders::_1, boost::placeholders::_2); break;
+            default: mTask = boost::bind(&LeafManager::doSyncAllBuffersN, boost::placeholders::_1, boost::placeholders::_2); break;
         }
         this->cook(serial ? 0 : 64);
         return true;//success

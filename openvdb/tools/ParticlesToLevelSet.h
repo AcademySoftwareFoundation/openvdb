@@ -473,7 +473,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
         }
-        mTask = boost::bind(&Raster::rasterSpheres, _1, _2);
+        mTask = boost::bind(&Raster::rasterSpheres, boost::placeholders::_1, boost::placeholders::_2);
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -492,7 +492,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
                 mParent.mInterrupter->start(
                     "Rasterizing particles to level set using const spheres");
             }
-            mTask = boost::bind(&Raster::rasterFixedSpheres, _1, _2, SdfT(radius));
+            mTask = boost::bind(&Raster::rasterFixedSpheres, boost::placeholders::_1, boost::placeholders::_2, SdfT(radius));
             this->cook();
             if (mParent.mInterrupter) mParent.mInterrupter->end();
         }
@@ -517,7 +517,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using trails");
         }
-        mTask = boost::bind(&Raster::rasterTrails, _1, _2, SdfT(delta));
+        mTask = boost::bind(&Raster::rasterTrails, boost::placeholders::_1, boost::placeholders::_2, SdfT(delta));
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }

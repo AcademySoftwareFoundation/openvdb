@@ -701,16 +701,17 @@ template<typename TreeType>
 inline void
 Morphology<TreeType>::ErodeVoxelsOp::runParallel(NearestNeighbors nn)
 {
+
     switch (nn) {
     case NN_FACE_EDGE:
-        mTask = boost::bind(&ErodeVoxelsOp::erode18, _1, _2);
+        mTask = boost::bind(&ErodeVoxelsOp::erode18, boost::placeholders::_1, boost::placeholders::_2);
         break;
     case NN_FACE_EDGE_VERTEX:
-        mTask = boost::bind(&ErodeVoxelsOp::erode26, _1, _2);
+        mTask = boost::bind(&ErodeVoxelsOp::erode26, boost::placeholders::_1, boost::placeholders::_2);
         break;
     case NN_FACE:
     default:
-        mTask = boost::bind(&ErodeVoxelsOp::erode6, _1, _2);
+        mTask = boost::bind(&ErodeVoxelsOp::erode6, boost::placeholders::_1, boost::placeholders::_2);
     }
     tbb::parallel_for(mManager.getRange(), *this);
 }
