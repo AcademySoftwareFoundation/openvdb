@@ -46,6 +46,7 @@
 #include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>
 #include <boost/math/constants/constants.hpp>
+#include <functional>
 //#include <openvdb/util/CpuTimer.h>
 
 namespace openvdb {
@@ -215,7 +216,7 @@ private:
         VectorType*        mVelocity;
         size_t*            mOffsets;
         const MapT*        mMap;
-        typename boost::function<void (Advect*, const LeafRange&)> mTask;
+        typename std::function<void (Advect*, const LeafRange&)> mTask;
         const bool         mIsMaster;
     }; // end of private Advect struct
 
@@ -385,7 +386,7 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK1", 1);
@@ -393,14 +394,14 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK1 (step 1 of 2)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Advect::euler12, _1, _2, dt);
+            mTask = std::bind(&Advect::euler12, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook("Advecting level set using TVD_RK1 (step 2 of 2)", 1);
@@ -408,21 +409,21 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK3 (step 1 of 3)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Advect::euler34, _1, _2, dt);
+            mTask = std::bind(&Advect::euler34, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook("Advecting level set using TVD_RK3 (step 2 of 3)", 2);
 
             // Convex combine explict Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
-            mTask = boost::bind(&Advect::euler13, _1, _2, dt);
+            mTask = std::bind(&Advect::euler13, std::placeholders::_1, std::placeholders::_2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook("Advecting level set using TVD_RK3 (step 3 of 3)", 2);
@@ -462,9 +463,9 @@ sampleField(ValueType time0, ValueType time1)
 
     // Sample the velocity field
     if (mParent.mField.transform() == mParent.mTracker.grid().transform()) {
-        mTask = boost::bind(&Advect::sampleAligned, _1, _2, time0, time1);
+        mTask = std::bind(&Advect::sampleAligned, std::placeholders::_1, std::placeholders::_2, time0, time1);
     } else {
-        mTask = boost::bind(&Advect::sampleXformed, _1, _2, time0, time1);
+        mTask = std::bind(&Advect::sampleXformed, std::placeholders::_1, std::placeholders::_2, time0, time1);
     }
     assert(voxelCount == mParent.mTracker.grid().activeVoxelCount());
     mVelocity = new VectorType[ voxelCount ];

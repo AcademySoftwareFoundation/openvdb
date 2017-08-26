@@ -79,9 +79,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/math/special_functions/round.hpp>
 #include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/math/special_functions/round.hpp>
 #include <string>
 #include <list>
 #include <vector>

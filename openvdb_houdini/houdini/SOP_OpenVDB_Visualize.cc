@@ -57,16 +57,15 @@
 #include <GU/GU_PolyReduce.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/type_traits/is_arithmetic.hpp>
+#include <type_traits>
 
-namespace boost {
-template<> struct is_integral<openvdb::PointIndex32>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointIndex64>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointDataIndex32>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointDataIndex64>: public boost::true_type {};
+#include <boost/utility/enable_if.hpp>
+
+namespace std {
+template<> struct is_integral<openvdb::PointIndex32>: public std::true_type {};
+template<> struct is_integral<openvdb::PointIndex64>: public std::true_type {};
+template<> struct is_integral<openvdb::PointDataIndex32>: public std::true_type {};
+template<> struct is_integral<openvdb::PointDataIndex64>: public std::true_type {};
 }
 
 namespace hvdb = openvdb_houdini;
@@ -668,15 +667,15 @@ private:
     GA_Offset createPoint(const openvdb::CoordBBox&, const UT_Vector3& color);
 
     template<typename ValType>
-    typename boost::enable_if<boost::is_integral<ValType>, void>::type
+    typename boost::enable_if<std::is_integral<ValType>, void>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
-    typename boost::enable_if<boost::is_floating_point<ValType>, void>::type
+    typename boost::enable_if<std::is_floating_point<ValType>, void>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
-    typename boost::disable_if<boost::is_arithmetic<ValType>, void>::type
+    typename boost::disable_if<std::is_arithmetic<ValType>, void>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType v, bool staggered);
 
     void addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, bool staggered);
@@ -901,7 +900,7 @@ TreeVisualizer::createPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::enable_if<boost::is_integral<ValType>, void>::type
+typename boost::enable_if<std::is_integral<ValType>, void>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType s, bool)
 {
@@ -910,7 +909,7 @@ TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::enable_if<boost::is_floating_point<ValType>, void>::type
+typename boost::enable_if<std::is_floating_point<ValType>, void>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType s, bool)
 {
@@ -919,7 +918,7 @@ TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::disable_if<boost::is_arithmetic<ValType>, void>::type
+typename boost::disable_if<std::is_arithmetic<ValType>, void>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType v, bool staggered)
 {

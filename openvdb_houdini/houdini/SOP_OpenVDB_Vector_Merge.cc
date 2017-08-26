@@ -35,7 +35,6 @@
 /// @brief Merge groups of up to three scalar grids into vector grids.
 
 #ifdef _WIN32
-#define BOOST_REGEX_NO_LIB
 #endif
 
 #include <houdini_utils/ParmFactory.h>
@@ -45,7 +44,7 @@
 #include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_String.h>
-#include <boost/regex.hpp>
+#include <regex>
 #include <functional>
 #include <memory>
 #include <set>
@@ -675,8 +674,8 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             std::string outGridName;
             if (mergeName.isstring()) {
                 UT_String s; s.itoa(i);
-                outGridName = boost::regex_replace(
-                    mergeName.toStdString(), boost::regex("#+"), s.toStdString());
+                outGridName = std::regex_replace(
+                    mergeName.toStdString(), std::regex("#+"), s.toStdString());
             }
 
             if (useXName && nonNullVdb) {

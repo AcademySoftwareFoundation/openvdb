@@ -100,9 +100,6 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/mpl/if.hpp>
 #include <openvdb/Types.h>
@@ -110,6 +107,8 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <type_traits>
+#include <functional>
 #include "Composite.h" // for csgUnion()
 #include "PointPartitioner.h"
 #include "Prune.h"
@@ -119,6 +118,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
 
 namespace p2ls_internal {
 // This is a simple type that combines a distance value and a particle
@@ -134,7 +134,7 @@ template<typename SdfGridT,
 class ParticlesToLevelSet
 {
 public:
-    typedef typename boost::is_void<AttributeT>::type DisableT;
+    typedef typename std::is_void<AttributeT>::type DisableT;
     typedef InterrupterT                          InterrupterType;
 
     typedef SdfGridT                              SdfGridType;
@@ -143,7 +143,7 @@ public:
     typedef typename boost::mpl::if_<DisableT, size_t, AttributeT>::type  AttType;
     typedef typename SdfGridT::template ValueConverter<AttType>::Type AttGridType;
 
-    BOOST_STATIC_ASSERT(boost::is_floating_point<SdfType>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<SdfType>::value);
 
     /// @brief Constructor using an exiting signed distance,
     /// i.e. narrow band level set, grid.
@@ -414,7 +414,7 @@ template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template<typename ParticleListT, typename GridT>
 struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
 {
-    typedef typename boost::is_void<AttributeT>::type DisableT;
+    typedef typename std::is_void<AttributeT>::type DisableT;
     typedef ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT> ParticlesToLevelSetT;
     typedef typename ParticlesToLevelSetT::SdfType   SdfT;//type of signed distance values
     typedef typename ParticlesToLevelSetT::AttType   AttT;//type of particle attribute
@@ -473,7 +473,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
         }
-        mTask = boost::bind(&Raster::rasterSpheres, _1, _2);
+        mTask = std::bind(&Raster::rasterSpheres, std::placeholders::_1, std::placeholders::_2);
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -492,7 +492,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
                 mParent.mInterrupter->start(
                     "Rasterizing particles to level set using const spheres");
             }
-            mTask = boost::bind(&Raster::rasterFixedSpheres, _1, _2, SdfT(radius));
+            mTask = std::bind(&Raster::rasterFixedSpheres, std::placeholders::_1, std::placeholders::_2, SdfT(radius));
             this->cook();
             if (mParent.mInterrupter) mParent.mInterrupter->end();
         }
@@ -517,7 +517,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using trails");
         }
-        mTask = boost::bind(&Raster::rasterTrails, _1, _2, SdfT(delta));
+        mTask = std::bind(&Raster::rasterTrails, std::placeholders::_1, std::placeholders::_2, SdfT(delta));
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -747,7 +747,7 @@ private:
         }//end loop over x
         return true;
     }
-    typedef typename boost::function<void (Raster*, const tbb::blocked_range<size_t>&)> FuncType;
+    typedef typename std::function<void (Raster*, const tbb::blocked_range<size_t>&)> FuncType;
 
     template <typename DisableType>
     typename boost::enable_if<DisableType>::type
@@ -758,11 +758,11 @@ private:
     getAtt(size_t n, AttT& a) const { mParticles.getAtt(n, a); }
 
     template <typename T>
-    typename boost::enable_if<boost::is_same<T,ValueT>, ValueT>::type
+    typename boost::enable_if<std::is_same<T,ValueT>, ValueT>::type
     Merge(T s, const AttT&) const { return s; }
 
     template <typename T>
-    typename boost::disable_if<boost::is_same<T,ValueT>, ValueT>::type
+    typename boost::disable_if<std::is_same<T,ValueT>, ValueT>::type
     Merge(T s, const AttT& a) const { return ValueT(s,a); }
 
     ParticlesToLevelSetT& mParent;

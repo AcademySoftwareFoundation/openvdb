@@ -49,7 +49,6 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <boost/utility.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -338,7 +337,7 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
     float voxelSize, float halfWidth, InterruptT *interrupt)
 {
     // GridType::ValueType is required to be a floating-point scalar.
-    BOOST_STATIC_ASSERT(boost::is_floating_point<typename GridType::ValueType>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<typename GridType::ValueType>::value);
 
     const math::Transform::Ptr xform = math::Transform::createLinearTransform( voxelSize );
 

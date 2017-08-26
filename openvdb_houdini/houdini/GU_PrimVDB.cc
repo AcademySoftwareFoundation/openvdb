@@ -1067,10 +1067,10 @@ namespace // anonymous
 {
 
 #define SCALAR_RET(T) \
-	typename boost::enable_if< boost::is_arithmetic< T >, T >::type
+    typename boost::enable_if< std::is_arithmetic< T >, T >::type
 
 #define NON_SCALAR_RET(T) \
-	typename boost::disable_if< boost::is_arithmetic< T >, T >::type
+    typename boost::disable_if< std::is_arithmetic< T >, T >::type
 
 /// Houdini Volume wrapper to abstract multiple volumes with a consistent API.
 template <int TUPLE_SIZE>

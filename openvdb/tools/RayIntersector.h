@@ -67,7 +67,6 @@
 #include <openvdb/Types.h>
 #include "Morphology.h"
 #include <boost/utility.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 
 
 namespace openvdb {
@@ -117,7 +116,7 @@ public:
     typedef typename GridT::TreeType      TreeT;
 
     BOOST_STATIC_ASSERT( NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1);
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<ValueT>::value);
 
     /// @brief Constructor
     /// @param grid level set grid to intersect rays against.

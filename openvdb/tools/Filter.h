@@ -40,9 +40,6 @@
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Stencils.h>
@@ -50,6 +47,8 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/Grid.h>
+#include <functional>
+#include <type_traits>
 #include "Interpolation.h"
 
 namespace openvdb {
@@ -75,7 +74,7 @@ public:
     typedef typename tree::LeafManager<TreeType> LeafManagerType;
     typedef typename LeafManagerType::LeafRange  RangeType;
     typedef typename LeafManagerType::BufferType BufferType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<AlphaType>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<AlphaType>::value);
 
     /// Constructor
     /// @param grid Grid to be filtered.
@@ -208,7 +207,7 @@ private:
     bool wasInterrupted();
 
     GridType*        mGrid;
-    typename boost::function<void (Filter*, const RangeType&)> mTask;
+    typename std::function<void (Filter*, const RangeType&)> mTask;
     InterruptT*      mInterrupter;
     const MaskType*  mMask;
     int              mGrainSize;
@@ -256,13 +255,13 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) {
-        mTask = boost::bind(&Filter::doBoxX, _1, _2, w);
+        mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
         this->cook(leafs);
 
-        mTask = boost::bind(&Filter::doBoxY, _1, _2, w);
+        mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
         this->cook(leafs);
 
-        mTask = boost::bind(&Filter::doBoxZ, _1, _2, w);
+        mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
         this->cook(leafs);
     }
 
@@ -284,13 +283,13 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 
     for (int i=0; i<iterations; ++i) {
         for (int n=0; n<4 && !this->wasInterrupted(); ++n) {
-            mTask = boost::bind(&Filter::doBoxX, _1, _2, w);
+            mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
             this->cook(leafs);
 
-            mTask = boost::bind(&Filter::doBoxY, _1, _2, w);
+            mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
             this->cook(leafs);
 
-            mTask = boost::bind(&Filter::doBoxZ, _1, _2, w);
+            mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
             this->cook(leafs);
         }
     }
@@ -309,7 +308,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
-    mTask = boost::bind(&Filter::doMedian, _1, _2, std::max(1, width));
+    mTask = std::bind(&Filter::doMedian, std::placeholders::_1, std::placeholders::_2, std::max(1, width));
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();
@@ -326,7 +325,7 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 
     LeafManagerType leafs(mGrid->tree(), 0, mGrainSize==0);
 
-    mTask = boost::bind(&Filter::doOffset, _1, _2, value);
+    mTask = std::bind(&Filter::doOffset, std::placeholders::_1, std::placeholders::_2, value);
     this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();

@@ -71,7 +71,7 @@ class DiscreteField
 public:
     typedef typename VelGridT::ValueType     VectorType;
     typedef typename VectorType::ValueType   ValueType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<ValueType>::value);
 
     DiscreteField(const VelGridT &vel)
         : mAccessor(vel.tree())
@@ -129,7 +129,7 @@ class EnrightField
 public:
     typedef ScalarT             ValueType;
     typedef math::Vec3<ScalarT> VectorType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ScalarT>::value);
+    BOOST_STATIC_ASSERT(std::is_floating_point<ScalarT>::value);
 
     EnrightField() {}
 
