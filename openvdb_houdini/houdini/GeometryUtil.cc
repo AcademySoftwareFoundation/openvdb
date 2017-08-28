@@ -50,6 +50,9 @@
 #include <GA/GA_Types.h>
 #include <OBJ/OBJ_Camera.h>
 
+#include <cmath>
+#include <stdexcept>
+
 
 namespace openvdb_houdini  {
 
@@ -345,11 +348,11 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail& geo, const GA_PrimitiveGroup& g
 ////////////////////////////////////////
 
 
-boost::shared_ptr<GU_Detail>
-validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* boss)
+std::unique_ptr<GU_Detail>
+convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* boss)
 {
     const GU_Detail* geo = &geometry;
-    boost::shared_ptr<GU_Detail> geoPtr;
+    std::unique_ptr<GU_Detail> geoPtr;
 
     const GEO_Primitive *prim;
     bool needconvert = false, needdivide = false, needclean = false;
@@ -450,6 +453,14 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
 }
 
 
+boost::shared_ptr<GU_Detail>
+validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* boss)
+{
+    auto geoPtr = convertGeometry(geometry, warning, boss);
+    return boost::shared_ptr<GU_Detail>{geoPtr.release()};
+}
+
+
 ////////////////////////////////////////
 
 
@@ -503,7 +514,6 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
     openvdb::Vec4I prim;
     GA_Offset start, end;
     GA_Size vtxn;
-    int vtx;
 
     // Iterate over pages in the range
     for (GA_PageIterator pit = r.beginPages(); !pit.atEnd(); ++pit) {
@@ -517,15 +527,15 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 
                 if (primRef->getTypeId() == GEO_PRIMPOLY && (3 == vtxn || 4 == vtxn)) {
 
-#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
-                    vtx = 0;
-                    primRef->forEachPoint([&prim, &vtx, this] (const GA_Offset pt) {
-                        prim[vtx++] = static_cast<openvdb::Vec4I::ValueType>(
-                            mGdp->pointIndex(pt));
-                    });
+#if UT_MAJOR_VERSION_INT >= 16
+                    for (int vtx = 0, vtxN = int(primRef->getVertexCount()); vtx < vtxN; ++vtx) {
+                        prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
+                            mGdp->pointIndex(primRef->getPointOffset(vtx)));
+                    }
 #else
                     GA_Primitive::const_iterator vit;
-                    for (vtx = 0, primRef->beginVertex(vit); !vit.atEnd(); ++vit, ++vtx) {
+                    primRef->beginVertex(vit);
+                    for (int vtx = 0; !vit.atEnd(); ++vit, ++vtx) {
                         prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
                             mGdp->pointIndex(vit.getPointOffset()));
                     }
@@ -569,12 +579,12 @@ void
 VertexNormalOp::operator()(const GA_SplittableRange& range) const
 {
     GA_Offset start, end, vtxOffset, primOffset;
-#if( UT_VERSION_INT < 0x10000189 ) // earlier than 16.0.393
+#if UT_MAJOR_VERSION_INT < 16
     GA_Primitive::const_iterator it;
-#endif    
+#endif
     UT_Vector3 primN, avgN, tmpN;
     bool interiorPrim = false;
-    const GA_Primitive * primRef = NULL;
+    const GA_Primitive* primRef = nullptr;
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
@@ -584,20 +594,12 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
 
                 primN = mDetail.getGEOPrimitive(i)->computeNormal();
                 interiorPrim = isInteriorPrim(i);
-#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
-                for (GA_Size i = 0, I = primRef->getVertexCount(); i < I; ++i) {
-                    const GA_Offset ptOffset = primRef->getPointOffset(i);
-                     
-#else
-                for (primRef->beginVertex(it); !it.atEnd(); ++it) {
-                    const GA_Offset ptOffset = it.getPointOffset();
-#endif
 
+#if UT_MAJOR_VERSION_INT >= 16
+                for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
                     avgN = primN;
-                    vtxOffset = mDetail.pointVertex(ptOffset);
-
+                    vtxOffset = mDetail.pointVertex(primRef->getPointOffset(vtx));
                     while (GAisValid(vtxOffset)) {
-
                         primOffset = mDetail.vertexPrimitive(vtxOffset);
                         if (interiorPrim == isInteriorPrim(primOffset)) {
                             tmpN = mDetail.getGEOPrimitive(primOffset)->computeNormal();
@@ -605,14 +607,25 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
                         }
                         vtxOffset = mDetail.vertexToNextVertex(vtxOffset);
                     }
-
                     avgN.normalize();
-#if( UT_VERSION_INT >= 0x10000189 ) // 16.0.393 or later
-                    mNormalHandle.set(i, avgN);
+                    mNormalHandle.set(primRef->getVertexOffset(vtx), avgN);
+                }
 #else
+                for (primRef->beginVertex(it); !it.atEnd(); ++it) {
+                    avgN = primN;
+                    vtxOffset = mDetail.pointVertex(it.getPointOffset());
+                    while (GAisValid(vtxOffset)) {
+                        primOffset = mDetail.vertexPrimitive(vtxOffset);
+                        if (interiorPrim == isInteriorPrim(primOffset)) {
+                            tmpN = mDetail.getGEOPrimitive(primOffset)->computeNormal();
+                            if (tmpN.dot(primN) > mAngle) avgN += tmpN;
+                        }
+                        vtxOffset = mDetail.vertexToNextVertex(vtxOffset);
+                    }
+                    avgN.normalize();
                     mNormalHandle.set(*it, avgN);
-#endif
                 } // prim vtx iteration.
+#endif
             }
         }
     }
@@ -641,8 +654,8 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 {
     openvdb::tools::MeshToVoxelEdgeData::Accessor acc = mEdgeData.getAccessor();
 
-    typedef openvdb::tree::ValueAccessor<const openvdb::BoolTree> BoolAccessor;
-    boost::scoped_ptr<BoolAccessor> maskAcc;
+    using BoolAccessor = openvdb::tree::ValueAccessor<const openvdb::BoolTree>;
+    std::unique_ptr<BoolAccessor> maskAcc;
 
     if (mMaskTree) {
         maskAcc.reset(new BoolAccessor(*mMaskTree));
@@ -796,8 +809,8 @@ GUconvertCopySingleVertexPrimAttribsAndGroups(
     GA_PrimitiveWrangler&       prim_wrangler = wranglers.getPrimitive();
     GA_VertexWrangler&          vtx_wrangler = wranglers.getVertex();
     GA_PointWrangler&           pt_wrangler = wranglers.getPoint();
-    GA_PrimitiveWrangler*       prim_group_wrangler = NULL;
-    GA_PointWrangler*           pt_group_wrangler = NULL;
+    GA_PrimitiveWrangler*       prim_group_wrangler = nullptr;
+    GA_PointWrangler*           pt_group_wrangler = nullptr;
 
 #if 1
     bool have_vtx_attribs = true;
@@ -813,10 +826,10 @@ GUconvertCopySingleVertexPrimAttribsAndGroups(
     {
         prim_group_wrangler = &parms.getGroupWranglers(dst,&src).getPrimitive();
         if (prim_group_wrangler->getNumAttributes() <= 0)
-            prim_group_wrangler = NULL;
+            prim_group_wrangler = nullptr;
         pt_group_wrangler = &parms.getGroupWranglers(dst,&src).getPoint();
         if (pt_group_wrangler->getNumAttributes() <= 0)
-            pt_group_wrangler = NULL;
+            pt_group_wrangler = nullptr;
     }
 #endif
 

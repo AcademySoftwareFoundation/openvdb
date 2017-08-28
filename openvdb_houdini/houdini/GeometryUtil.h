@@ -45,6 +45,11 @@
 #include <UT/UT_Version.h>
 #include <boost/shared_ptr.hpp>
 
+#include <algorithm> // for std::max/min()
+#include <memory>
+#include <string>
+#include <vector>
+
 
 class GA_SplittableRange;
 class OBJ_Camera;
@@ -95,13 +100,22 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail&, const GA_PrimitiveGroup&);
 ////////////////////////////////////////
 
 
-/// @brief  Convert geometry to quads and triangles.
-///
+/// @brief Convert geometry to quads and triangles.
 /// @return a pointer to a new GU_Detail object if the geometry was
-///         converted or subdivided, otherwise a null pointer
+/// converted or subdivided, otherwise a null pointer
+/// @deprecated Use convertGeometry() instead.
 OPENVDB_HOUDINI_API
+OPENVDB_DEPRECATED
 boost::shared_ptr<GU_Detail>
 validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter*);
+
+
+/// @brief Convert geometry to quads and triangles.
+/// @return a pointer to a new GU_Detail object if the geometry was
+/// converted or subdivided, otherwise a null pointer
+OPENVDB_HOUDINI_API
+std::unique_ptr<GU_Detail>
+convertGeometry(const GU_Detail&, std::string& warning, Interrupter*);
 
 
 ////////////////////////////////////////
@@ -150,7 +164,7 @@ private:
 class OPENVDB_HOUDINI_API VertexNormalOp
 {
 public:
-    VertexNormalOp(GU_Detail&, const GA_PrimitiveGroup* interiorPrims = NULL, float angle = 0.7f);
+    VertexNormalOp(GU_Detail&, const GA_PrimitiveGroup* interiorPrims=nullptr, float angle=0.7f);
     void operator()(const GA_SplittableRange&) const;
 
 private:
@@ -174,11 +188,11 @@ private:
 class OPENVDB_HOUDINI_API SharpenFeaturesOp
 {
 public:
-    typedef openvdb::tools::MeshToVoxelEdgeData EdgeData;
+    using EdgeData = openvdb::tools::MeshToVoxelEdgeData;
 
     SharpenFeaturesOp(GU_Detail& meshGeo, const GU_Detail& refGeo, EdgeData& edgeData,
-        const openvdb::math::Transform& xform, const GA_PrimitiveGroup* surfacePrims = NULL,
-        const openvdb::BoolTree* mask = NULL);
+        const openvdb::math::Transform& xform, const GA_PrimitiveGroup* surfacePrims = nullptr,
+        const openvdb::BoolTree* mask = nullptr);
 
     void operator()(const GA_SplittableRange&) const;
 
@@ -200,7 +214,7 @@ template<typename IndexTreeType, typename BoolTreeType>
 class GenAdaptivityMaskOp
 {
 public:
-    typedef openvdb::tree::LeafManager<BoolTreeType> BoolLeafManager;
+    using BoolLeafManager = openvdb::tree::LeafManager<BoolTreeType>;
 
     GenAdaptivityMaskOp(const GU_Detail& refGeo,
         const IndexTreeType& indexTree, BoolLeafManager&, float edgetolerance = 0.0);
@@ -247,7 +261,7 @@ void
 GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::operator()(
     const tbb::blocked_range<size_t>& range) const
 {
-    typedef typename openvdb::tree::ValueAccessor<const IndexTreeType> IndexAccessorType;
+    using IndexAccessorType = typename openvdb::tree::ValueAccessor<const IndexTreeType>;
     IndexAccessorType idxAcc(mIndexTree);
 
     UT_Vector3 tmpN, normal;
