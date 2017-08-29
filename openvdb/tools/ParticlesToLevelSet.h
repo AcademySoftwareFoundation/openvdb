@@ -473,7 +473,9 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
         }
-        mTask = std::bind(&Raster::rasterSpheres, std::placeholders::_1, std::placeholders::_2);
+        mTask = [](Raster* raster, const tbb::blocked_range<size_t>& range) {
+            return raster->rasterSpheres(range);
+        };
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -492,7 +494,9 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
                 mParent.mInterrupter->start(
                     "Rasterizing particles to level set using const spheres");
             }
-            mTask = std::bind(&Raster::rasterFixedSpheres, std::placeholders::_1, std::placeholders::_2, SdfT(radius));
+            mTask = [radius](Raster* raster, const tbb::blocked_range<size_t>& range) {
+                return raster->rasterFixedSpheres(range, SdfT(radius));
+            };
             this->cook();
             if (mParent.mInterrupter) mParent.mInterrupter->end();
         }
@@ -517,7 +521,9 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using trails");
         }
-        mTask = std::bind(&Raster::rasterTrails, std::placeholders::_1, std::placeholders::_2, SdfT(delta));
+        mTask = [delta](Raster* raster, const tbb::blocked_range<size_t>& range) {
+            return raster->rasterTrails(range, SdfT(delta));
+        };
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }

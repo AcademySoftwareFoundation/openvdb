@@ -226,16 +226,16 @@ private:
         };
 
         template <typename AvgT>
-        void boxImpl( const LeafRange& r, Int32 w);
+        void box( const LeafRange& r, Int32 w);
 
-        void boxX(const LeafRange& r, Int32 w) { this->boxImpl<Avg<0> >(r,w); }
-        void boxZ(const LeafRange& r, Int32 w) { this->boxImpl<Avg<1> >(r,w); }
-        void boxY(const LeafRange& r, Int32 w) { this->boxImpl<Avg<2> >(r,w); }
+        void boxX(const LeafRange& r, Int32 w) { this->box<Avg<0> >(r,w); }
+        void boxZ(const LeafRange& r, Int32 w) { this->box<Avg<1> >(r,w); }
+        void boxY(const LeafRange& r, Int32 w) { this->box<Avg<2> >(r,w); }
 
-        void medianImpl(const LeafRange&, int);
-        void meanCurvatureImpl(const LeafRange&);
-        void laplacianImpl(const LeafRange&);
-        void offsetImpl(const LeafRange&, ValueType);
+        void median(const LeafRange&, int);
+        void meanCurvature(const LeafRange&);
+        void laplacian(const LeafRange&);
+        void offset(const LeafRange&, ValueType);
 
         LevelSetFilter* mParent;
         const MaskType* mMask;
@@ -259,8 +259,11 @@ Filter::median(int width)
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = std::bind(&Filter::medianImpl, std::placeholders::_1,
-                      std::placeholders::_2, std::max(1, width));
+    mTask = [width](Filter* f, const LeafRange& range) {
+
+        return f->median(range, width);
+    };
+
     this->cook(true);
 
     mParent->track();
@@ -301,13 +304,19 @@ Filter::box(int width)
 
     width = std::max(1, width);
 
-    mTask = std::bind(&Filter::boxX, std::placeholders::_1, std::placeholders::_2, width);
+    mTask = [width](Filter* f, const LeafRange& range) {
+        return f->boxX(range, width);
+    };
     this->cook(true);
 
-    mTask = std::bind(&Filter::boxY, std::placeholders::_1, std::placeholders::_2, width);
+    mTask = [width](Filter* f, const LeafRange& range) {
+        return f->boxY(range, width);
+    };
     this->cook(true);
 
-    mTask = std::bind(&Filter::boxZ, std::placeholders::_1, std::placeholders::_2, width);
+    mTask = [width](Filter* f, const LeafRange& range) {
+        return f->boxZ(range, width);
+    };
     this->cook(true);
 
     mParent->track();
@@ -322,7 +331,9 @@ Filter::meanCurvature()
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = std::bind(&Filter::meanCurvatureImpl, std::placeholders::_1, std::placeholders::_2);
+    mTask = [](Filter* f, const LeafRange& range) {
+        return f->meanCurvature(range);
+    };
     this->cook(true);
 
     mParent->track();
@@ -339,7 +350,9 @@ Filter::laplacian()
 
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    mTask = std::bind(&Filter::laplacianImpl, std::placeholders::_1, std::placeholders::_2);
+    mTask = [](Filter* f, const LeafRange& range) {
+        return f->laplacian(range);
+    };
     this->cook(true);
 
     mParent->track();
@@ -362,8 +375,11 @@ Filter::offset(ValueType value)
         const ValueType delta = openvdb::math::Min(offset-dist, CFL);
         dist += delta;
 
-        mTask = std::bind(&Filter::offsetImpl, std::placeholders::_1, std::placeholders::_2, copysign(delta, value));
+        mTask = [delta, value](Filter* f, const LeafRange& range) {
+            return f->offset(range,copysign(delta, value) );
+        };
         this->cook(false);
+
 
         mParent->track();
     }
@@ -378,7 +394,7 @@ Filter::offset(ValueType value)
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
-Filter::meanCurvatureImpl(const LeafRange& range)
+Filter::meanCurvature(const LeafRange& range)
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
@@ -419,7 +435,7 @@ Filter::meanCurvatureImpl(const LeafRange& range)
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
-Filter::laplacianImpl(const LeafRange& range)
+Filter::laplacian(const LeafRange& range)
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
@@ -454,7 +470,7 @@ Filter::laplacianImpl(const LeafRange& range)
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
-Filter::offsetImpl(const LeafRange& range, ValueType offset)
+Filter::offset(const LeafRange& range, ValueType offset)
 {
     mParent->checkInterrupter();
     if (mMask) {
@@ -479,7 +495,7 @@ Filter::offsetImpl(const LeafRange& range, ValueType offset)
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
-Filter::medianImpl(const LeafRange& range, int width)
+Filter::median(const LeafRange& range, int width)
 {
     mParent->checkInterrupter();
     typename math::DenseStencil<GridType> stencil(mParent->grid(), width);//creates local cache!
@@ -512,7 +528,7 @@ template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
-Filter::boxImpl(const LeafRange& range, Int32 w)
+Filter::box(const LeafRange& range, Int32 w)
 {
     mParent->checkInterrupter();
     AvgT avg(mParent->grid(), w);

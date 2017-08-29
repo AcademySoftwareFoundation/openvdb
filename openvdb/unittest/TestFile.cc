@@ -45,7 +45,6 @@
 #include <algorithm> // for std::sort()
 #include <cstdio> // for remove() and rename()
 #include <fstream>
-#include <functional> // for std::bind()
 #include <iostream>
 #include <map>
 #include <memory>
@@ -2323,8 +2322,9 @@ struct TestAsyncHelper
 
     io::Queue::Notifier notifier()
     {
-        return std::bind(&TestAsyncHelper::validate, this,
-            std::placeholders::_1, std::placeholders::_2);
+        return [this](io::Queue::Id id, io::Queue::Status status){
+            TestAsyncHelper::validate(id, status);
+        };
     }
 
     void insert(io::Queue::Id id, const std::string& filename)

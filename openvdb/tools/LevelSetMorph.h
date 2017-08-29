@@ -408,7 +408,9 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * Speed(2) * |Grad[Phi(0)]|
-            mTask = std::bind(&Morph::euler01, std::placeholders::_1, std::placeholders::_2, dt, /*speed*/2);
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler01(range, dt, 2);
+            };
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
@@ -416,14 +418,18 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * Speed(2) * |Grad[Phi(0)]|
-            mTask = std::bind(&Morph::euler01, std::placeholders::_1, std::placeholders::_2, dt, /*speed*/2);
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler01(range, dt, 2);
+            };
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * Speed(2) * |Grad[Phi(0)]|)
-            mTask = std::bind(&Morph::euler12, std::placeholders::_1, std::placeholders::_2, dt);
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler12(range, dt);
+            };
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook(PARALLEL_FOR, 1);
@@ -431,22 +437,26 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * Speed(3) * |Grad[Phi(0)]|
-            mTask = std::bind(&Morph::euler01, std::placeholders::_1, std::placeholders::_2, dt, /*speed*/3);
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler01(range, dt, 3);
+            };
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * Speed(3) * |Grad[Phi(0)]|)
-            mTask = std::bind(&Morph::euler34, std::placeholders::_1, std::placeholders::_2, dt);
-
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler34(range, dt);
+            };
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook(PARALLEL_FOR, 2);
 
             // Convex combine explict Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * Speed(3) * |Grad[Phi(0)]|)
-            mTask = std::bind(&Morph::euler13, std::placeholders::_1, std::placeholders::_2, dt);
-
+            mTask = [dt](Morph* morph, const LeafRange& range) {
+                return morph->euler13(range, dt);
+            };
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook(PARALLEL_FOR, 2);
             break;
@@ -482,9 +492,13 @@ sampleSpeed(ValueType time0, ValueType time1, Index speedBuffer)
     const math::Transform& xform  = mParent->mTracker.grid().transform();
     if (mParent->mTarget->transform() == xform &&
         (mParent->mMask == nullptr || mParent->mMask->transform() == xform)) {
-        mTask = std::bind(&Morph::sampleAlignedSpeed, std::placeholders::_1, std::placeholders::_2, speedBuffer);
+            mTask = [speedBuffer](Morph* morph, const LeafRange& range) {
+                return morph->sampleAlignedSpeed(range, speedBuffer);
+            };
     } else {
-        mTask = std::bind(&Morph::sampleXformedSpeed, std::placeholders::_1, std::placeholders::_2, speedBuffer);
+        mTask = [speedBuffer](Morph* morph, const LeafRange& range) {
+            return morph->sampleXformedSpeed(range, speedBuffer);
+        };
     }
     this->cook(PARALLEL_REDUCE);
     if (math::isApproxEqual(mMinAbsS, mMaxAbsS)) return ValueType(0);//speed is essentially zero

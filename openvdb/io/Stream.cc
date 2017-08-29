@@ -37,7 +37,6 @@
 #include <cstdint>
 #include <boost/iostreams/copy.hpp>
 #include <cstdio> // for remove()
-#include <functional> // for std::bind()
 #include <iostream>
 #include <vector>
 
@@ -113,7 +112,11 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
             mImpl->mFile->setCopyMaxBytes(0); // don't make a copy of the temporary file
             /// @todo Need to pass auto-deletion flag to MappedFile.
             mImpl->mFile->open(delayLoad,
-                std::bind(&removeTempFile, filename, std::placeholders::_1));
+                               [filename](std::string fName){
+                        return removeTempFile(filename, fName);
+            });
+
+
         }
     }
 

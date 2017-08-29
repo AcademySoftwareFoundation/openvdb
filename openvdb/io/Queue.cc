@@ -201,8 +201,11 @@ struct Queue::Impl
                     "unable to queue I/O task; " << mTimeout << "-second time limit expired");
             }
         }
-        Queue::Notifier notify = std::bind(&Impl::setStatusWithNotification, this,
-            std::placeholders::_1, std::placeholders::_2);
+
+        Queue::Notifier notify = [this](Queue::Id id, Queue::Status status) {
+            return Impl::setStatusWithNotification(id,status) ;
+        };
+
         task.setNotifier(notify);
         this->setStatus(task.id(), Queue::PENDING);
         tbb::task::enqueue(task);

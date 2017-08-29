@@ -399,9 +399,10 @@ public:
     /// the first auxiliary buffer.
     bool swapLeafBuffer(size_t bufferIdx, bool serial = false)
     {
-        namespace ph = std::placeholders;
         if (bufferIdx == 0 || bufferIdx > mAuxBuffersPerLeaf || this->isConstTree()) return false;
-        mTask = std::bind(&LeafManager::doSwapLeafBuffer, ph::_1, ph::_2, bufferIdx - 1);
+        mTask = [bufferIdx](LeafManager* leafManager, const RangeType& rangeType) {
+            return leafManager->doSwapLeafBuffer(rangeType, bufferIdx - 1);
+        };
         this->cook(serial ? 0 : 512);
         return true;//success
     }
@@ -417,9 +418,13 @@ public:
         if (b1 == b2 || b2 > mAuxBuffersPerLeaf) return false;
         if (b1 == 0) {
             if (this->isConstTree()) return false;
-            mTask = std::bind(&LeafManager::doSwapLeafBuffer, ph::_1, ph::_2, b2-1);
+            mTask = [b2](LeafManager* leafManager, const RangeType& rangeType) {
+                return leafManager->doSwapLeafBuffer(rangeType, b2 - 1);
+            };
         } else {
-            mTask = std::bind(&LeafManager::doSwapAuxBuffer, ph::_1, ph::_2, b1-1, b2-1);
+            mTask = [b1, b2](LeafManager* leafManager, const RangeType& rangeType) {
+                return leafManager->doSwapAuxBuffer(rangeType, b1-1, b2-1);
+            };
         }
         this->cook(serial ? 0 : 512);
         return true;//success
@@ -437,7 +442,9 @@ public:
     {
         namespace ph = std::placeholders;
         if (bufferIdx == 0 || bufferIdx > mAuxBuffersPerLeaf) return false;
-        mTask = std::bind(&LeafManager::doSyncAuxBuffer, ph::_1, ph::_2, bufferIdx - 1);
+        mTask = [bufferIdx](LeafManager* leafManager, const RangeType& rangeType) {
+            return leafManager->doSyncAuxBuffer(rangeType, bufferIdx - 1);
+        };
         this->cook(serial ? 0 : 64);
         return true;//success
     }
@@ -450,9 +457,18 @@ public:
         namespace ph = std::placeholders;
         switch (mAuxBuffersPerLeaf) {
             case 0: return false;//nothing to do
-            case 1: mTask = std::bind(&LeafManager::doSyncAllBuffers1, ph::_1, ph::_2); break;
-            case 2: mTask = std::bind(&LeafManager::doSyncAllBuffers2, ph::_1, ph::_2); break;
-            default: mTask = std::bind(&LeafManager::doSyncAllBuffersN, ph::_1, ph::_2); break;
+            case 1: mTask = [](LeafManager* leafManager, const RangeType& rangeType) {
+                return leafManager->doSyncAllBuffers1(rangeType);
+            };break;
+
+            case 2: mTask = [](LeafManager* leafManager, const RangeType& rangeType) {
+                return leafManager->doSyncAllBuffers2(rangeType);
+            };break;
+
+            default: mTask = [](LeafManager* leafManager, const RangeType& rangeType) {
+                return leafManager->doSyncAllBuffersN(rangeType);
+            };break;
+
         }
         this->cook(serial ? 0 : 64);
         return true;//success

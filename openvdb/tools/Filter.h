@@ -255,13 +255,19 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) {
-        mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
+        mTask = [w](Filter* filter, const RangeType& range) {
+            return filter->doBoxX(range, w);
+        };
         this->cook(leafs);
 
-        mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
+        mTask = [w](Filter* filter, const RangeType& range) {
+            return filter->doBoxY(range, w);
+        };
         this->cook(leafs);
 
-        mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
+        mTask = [w](Filter* filter, const RangeType& range) {
+            return filter->doBoxZ(range, w);
+        };
         this->cook(leafs);
     }
 
@@ -283,13 +289,19 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 
     for (int i=0; i<iterations; ++i) {
         for (int n=0; n<4 && !this->wasInterrupted(); ++n) {
-            mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
+            mTask = [w](Filter* filter, const RangeType& range) {
+                return filter->doBoxX(range, w);
+            };
             this->cook(leafs);
 
-            mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
+            mTask = [w](Filter* filter, const RangeType& range) {
+                return filter->doBoxY(range, w);
+            };
             this->cook(leafs);
 
-            mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
+            mTask = [w](Filter* filter, const RangeType& range) {
+                return filter->doBoxZ(range, w);
+            };
             this->cook(leafs);
         }
     }
@@ -308,7 +320,9 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
 
-    mTask = std::bind(&Filter::doMedian, std::placeholders::_1, std::placeholders::_2, std::max(1, width));
+    mTask = [width](Filter* filter, const RangeType& range) {
+        return filter->doMedian(range, std::max(1, width));
+    };
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i) this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();
@@ -325,7 +339,9 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 
     LeafManagerType leafs(mGrid->tree(), 0, mGrainSize==0);
 
-    mTask = std::bind(&Filter::doOffset, std::placeholders::_1, std::placeholders::_2, value);
+    mTask = [value](Filter* filter, const RangeType& range) {
+        return filter->doOffset(range, value);
+    };
     this->cook(leafs);
 
     if (mInterrupter) mInterrupter->end();

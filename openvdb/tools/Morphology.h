@@ -706,14 +706,20 @@ Morphology<TreeType>::ErodeVoxelsOp::runParallel(NearestNeighbors nn)
     namespace ph = std::placeholders;
     switch (nn) {
     case NN_FACE_EDGE:
-        mTask = std::bind(&ErodeVoxelsOp::erode18, ph::_1, ph::_2);
+        mTask = [](ErodeVoxelsOp* erodeOp, const RangeT& range){
+            return erodeOp->erode18(range);
+        };
         break;
     case NN_FACE_EDGE_VERTEX:
-        mTask = std::bind(&ErodeVoxelsOp::erode26, ph::_1, ph::_2);
+        mTask = [](ErodeVoxelsOp* erodeOp, const RangeT& range){
+            return erodeOp->erode26(range);
+        };
         break;
     case NN_FACE:
     default:
-        mTask = std::bind(&ErodeVoxelsOp::erode6, ph::_1, ph::_2);
+        mTask = [](ErodeVoxelsOp* erodeOp, const RangeT& range){
+            return erodeOp->erode6(range);
+        };
     }
     tbb::parallel_for(mManager.getRange(), *this);
 }

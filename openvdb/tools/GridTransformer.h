@@ -677,8 +677,9 @@ template<typename InterrupterType>
 void
 GridResampler::setInterrupter(InterrupterType& interrupter)
 {
-    mInterrupt = std::bind(&InterrupterType::wasInterrupted,
-        /*this=*/&interrupter, /*percent=*/-1);
+    mInterrupt = [&interrupter]() -> bool {
+        return interrupter.wasInterrupted(/*percent=*/-1 );
+    };
 }
 
 
