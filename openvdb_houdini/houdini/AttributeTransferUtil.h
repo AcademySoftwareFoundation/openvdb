@@ -589,6 +589,8 @@ MeshAttrTransfer::operator()(IterRange &range) const
             // Transfer vertex and point attributes
             const GA_Primitive * primRef = mMeshGdp.getPrimitiveList().get(prmOffset);
 
+            vtxn = primRef->getVertexCount();
+
             // Get vertex and point offests
 #if UT_MAJOR_VERSION_INT >= 16
             for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
@@ -627,7 +629,7 @@ MeshAttrTransfer::operator()(IterRange &range) const
             vtxOffsets[2] = vtxOffsetList[1];
             ptnOffsets[2] = ptnOffsetList[1];
 
-            if (4 == primRef->getVertexCount()) {
+            if (4 == vtxn) {
                 cpt2 = closestPointOnTriangleToPoint(
                         ptnList[0], ptnList[3], ptnList[2], xyz, uvw2);
 
