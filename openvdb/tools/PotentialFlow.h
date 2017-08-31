@@ -181,11 +181,7 @@ struct ComputeNeumannVelocityOp
                     velocitySampler->wsSample(xyz) : zeroVal<ValueT>();
                 auto velocity = sampledVelocity + mBackgroundVelocity;
                 auto value = gradient.dot(velocity) * gradient;
-                if (math::isApproxEqual(value, zeroVal<GradientValueT>())) {
-                    it.setValueOff();
-                } else {
-                    it.setValue(value);
-                }
+                it.setValue(value);
             }
             else {
                 it.setValueOff();
@@ -256,17 +252,10 @@ createPotentialFlowMask(const GridT& grid, int dilation)
     typename MaskT::Ptr mask = MaskT::create(maskTree);
     mask->setTransform(grid.transform().copy());
 
-    // dilate by one voxel less than requested (as we dilate by an additional voxel afterwards)
-    // clamp to a minimum of one voxel
-    dilation = dilation > 1 ? dilation - 1 : 1;
-
     dilateActiveValues(*maskTree, dilation, NN_FACE_EDGE);
 
     // subtract the interior region from the mask to leave just the exterior narrow band
     mask->tree().topologyDifference(interior->tree());
-
-    // dilate mask by one voxel to ensure the solid boundary is included
-    dilateActiveValues(*maskTree, 1, NN_FACE_EDGE);
 
     return mask;
 }
@@ -285,7 +274,6 @@ typename GridT::template ValueConverter<Vec3T>::Type::Ptr createPotentialFlowNeu
     using GradientT = typename ScalarToVectorConverter<GridT>::Type;
 
     using potential_flow_internal::ComputeNeumannVelocityOp;
-    using potential_flow_internal::extractOuterVoxelMask;
 
     // this method requires the collider to be a level set to generate the gradient
     // use the tools::topologyToLevelset() method if you need to convert a mask into a level set
@@ -303,9 +291,9 @@ typename GridT::template ValueConverter<Vec3T>::Type::Ptr createPotentialFlowNeu
     }
 
     // extract the intersection between the collider and the domain
-    typename MaskT::TreeType::Ptr boundary = extractOuterVoxelMask(domain);
+    using MaskTreeT = typename GridT::TreeType::template ValueConverter<ValueMask>::Type;
+    typename MaskTreeT::Ptr boundary(new MaskTreeT(domain.tree(), false, TopologyCopy()));
     boundary->topologyIntersection(collider.tree());
-    dilateVoxels(*boundary, 2, NN_FACE_EDGE_VERTEX);
 
     typename TreeT::Ptr neumannTree(new TreeT(*boundary, zeroVal<ValueT>(), TopologyCopy()));
     neumannTree->voxelizeActiveTiles();

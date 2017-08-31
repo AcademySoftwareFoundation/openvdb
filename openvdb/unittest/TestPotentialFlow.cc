@@ -77,10 +77,9 @@ TestPotentialFlow::testMask()
 
     // the isosurface of this sphere is at y = 6
     // this mask forms a band dilated outwards from the isosurface by 5 voxels
-    // and dilated inwards from the isosurface by 1 voxel
 
-    CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 4, 0)));
-    CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 5, 0)));
+    CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 5, 0)));
+    CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 6, 0)));
     CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 10, 0)));
     CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 11, 0)));
 
@@ -101,8 +100,8 @@ TestPotentialFlow::testMask()
 
     acc = mask->getAccessor();
 
-    CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 4, 0)));
-    CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 5, 0)));
+    CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 5, 0)));
+    CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 6, 0)));
     CPPUNIT_ASSERT(acc.isValueOn(Coord(0, 7, 0)));
     CPPUNIT_ASSERT(!acc.isValueOn(Coord(0, 8, 0)));
 
