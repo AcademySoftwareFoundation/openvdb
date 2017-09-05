@@ -43,7 +43,7 @@
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
 
-FIND_PATH ( ILMBASE_LOCATION include/OpenEXR/IlmBaseConfig.h
+FIND_PATH ( ILMBASE_LOCATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/IlmBaseConfig.h
   "$ENV{ILMBASE_ROOT}"
   NO_DEFAULT_PATH
   NO_SYSTEM_ENVIRONMENT_PATH
@@ -57,11 +57,11 @@ OPTION ( ILMBASE_NAMESPACE_VERSIONING "Namespace versioning of libraries" ON )
 
 IF ( ILMBASE_FOUND )
 
-  FILE ( STRINGS "${ILMBASE_LOCATION}/include/OpenEXR/IlmBaseConfig.h" _ilmbase_version_major_string REGEX "#define ILMBASE_VERSION_MAJOR ")
+  FILE ( STRINGS "${ILMBASE_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/IlmBaseConfig.h" _ilmbase_version_major_string REGEX "#define ILMBASE_VERSION_MAJOR ")
   STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MAJOR" "" _ilmbase_version_major_unstrip "${_ilmbase_version_major_string}")
   STRING ( STRIP "${_ilmbase_version_major_unstrip}" ILMBASE_VERSION_MAJOR )
 
-  FILE ( STRINGS "${ILMBASE_LOCATION}/include/OpenEXR/IlmBaseConfig.h" _ilmbase_version_minor_string REGEX "#define ILMBASE_VERSION_MINOR ")
+  FILE ( STRINGS "${ILMBASE_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/IlmBaseConfig.h" _ilmbase_version_minor_string REGEX "#define ILMBASE_VERSION_MINOR ")
   STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MINOR" "" _ilmbase_version_minor_unstrip "${_ilmbase_version_minor_string}")
   STRING ( STRIP "${_ilmbase_version_minor_unstrip}" ILMBASE_VERSION_MINOR )
 
@@ -78,10 +78,10 @@ IF ( ILMBASE_FOUND )
   ENDIF ( ILMBASE_NAMESPACE_VERSIONING )
 
   SET ( ILMBASE_INCLUDE_DIRS
-    ${ILMBASE_LOCATION}/include
-    ${ILMBASE_LOCATION}/include/OpenEXR
+    ${ILMBASE_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}
+    ${ILMBASE_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR
     CACHE STRING "ILMBase include directories")
-  SET ( ILMBASE_LIBRARYDIR ${ILMBASE_LOCATION}/lib
+  SET ( ILMBASE_LIBRARYDIR ${ILMBASE_LOCATION}/${CMAKE_INSTALL_LIBDIR}
     CACHE STRING "ILMBase library directories")
   SET ( ILMBASE_FOUND TRUE )
   

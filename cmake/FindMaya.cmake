@@ -40,7 +40,7 @@
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
 
-FIND_PATH( MAYA_LOCATION include/maya/MTypes.h
+FIND_PATH( MAYA_LOCATION ${CMAKE_INSTALL_INCLUDEDIR}/maya/MTypes.h
   "$ENV{MAYA_LOCATION}"
   NO_DEFAULT_PATH
   NO_CMAKE_ENVIRONMENT_PATH
@@ -55,7 +55,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Maya
 
 IF ( MAYA_FOUND )
 
-  SET( MAYA_INCLUDE_DIR       "${MAYA_LOCATION}/include" CACHE STRING "Maya include directory")
+  SET( MAYA_INCLUDE_DIR       "${MAYA_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}" CACHE STRING "Maya include directory")
 
   # Determine Maya version, including point releases
   # Currently only works for Maya 2016 and onwards so
@@ -88,7 +88,7 @@ IF ( MAYA_FOUND )
   
   FOREACH ( lib_component ${MAYA_LIBRARY_COMPONENTS} )
     FIND_LIBRARY ( MAYA_${lib_component}_LIBRARY  ${lib_component}
-      PATHS ${MAYA_LOCATION}/lib
+      PATHS ${MAYA_LOCATION}/${CMAKE_INSTALL_LIDIR}
 	  NO_DEFAULT_PATH
       NO_SYSTEM_ENVIRONMENT_PATH
       )
@@ -108,7 +108,7 @@ IF ( MAYA_FOUND )
 	
 	FOREACH ( lib_component ${MAYA_BOOST_LIBRARY_COMPONENTS} )
       FIND_LIBRARY ( MAYA_${lib_component}_LIBRARY  ${lib_component}-${MAYA_BOOST_VERSION}
-		PATHS ${MAYA_LOCATION}/lib
+		PATHS ${MAYA_LOCATION}/${CMAKE_INSTALL_LIBDIR}
 		NO_DEFAULT_PATH
 		NO_SYSTEM_ENVIRONMENT_PATH
 		)

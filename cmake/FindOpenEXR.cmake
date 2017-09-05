@@ -38,7 +38,7 @@
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
 
-FIND_PATH ( OPENEXR_LOCATION include/OpenEXR/OpenEXRConfig.h
+FIND_PATH ( OPENEXR_LOCATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/OpenEXRConfig.h
   ENV OPENEXR_ROOT
   NO_DEFAULT_PATH
   NO_SYSTEM_ENVIRONMENT_PATH
@@ -52,11 +52,11 @@ OPTION ( OPENEXR_NAMESPACE_VERSIONING "Namespace versioning of libraries" ON )
 
 IF ( OPENEXR_FOUND )
 
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR ")
+  FILE ( STRINGS "${OPENEXR_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/OpenEXRConfig.h" _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR ")
   STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MAJOR" "" _openexr_version_major_unstrip "${_openexr_version_major_string}")
   STRING ( STRIP "${_openexr_version_major_unstrip}" OPENEXR_VERSION_MAJOR )
 
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
+  FILE ( STRINGS "${OPENEXR_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
   STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" "" _openexr_version_minor_unstrip "${_openexr_version_minor_string}")
   STRING ( STRIP "${_openexr_version_minor_unstrip}" OPENEXR_VERSION_MINOR )
   
@@ -69,10 +69,10 @@ IF ( OPENEXR_FOUND )
   ENDIF ( OPENEXR_NAMESPACE_VERSIONING )
 	
   SET ( OPENEXR_INCLUDE_DIRS
-    ${OPENEXR_LOCATION}/include
-    ${OPENEXR_LOCATION}/include/OpenEXR
+    ${OPENEXR_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}
+    ${OPENEXR_LOCATION}/${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR
     CACHE STRING "Openexr include directories")
-  SET ( OPENEXR_LIBRARYDIR ${OPENEXR_LOCATION}/lib
+  SET ( OPENEXR_LIBRARYDIR ${OPENEXR_LOCATION}/${CMAKE_INSTALL_LIBDIR}
     CACHE STRING "Openexr library directories")
   SET ( OPENEXR_FOUND TRUE )
 
