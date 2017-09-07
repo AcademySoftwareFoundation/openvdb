@@ -1071,6 +1071,15 @@ meshToLevelSet(py::object, py::object, py::object, py::object, py::object)
 }
 
 template<typename GridType>
+inline typename GridType::Ptr
+meshToSignedDistanceField(py::object, py::object, py::object, py::object, py::object, py::object)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
+    boost::python::throw_error_already_set();
+    return typename GridType::Ptr();
+}
+
+template<typename GridType>
 inline py::object
 volumeToQuadMesh(const GridType&, py::object)
 {
@@ -1142,22 +1151,18 @@ copyVecArray(py::numeric::array& arrayObj, std::vector<VecT>& vec)
     }
 }
 
-
-/// @brief Given NumPy arrays of points, triangle indices and quad indices,
-/// call tools::meshToLevelSet() to generate a level set grid.
+/// @brief Convert NumPy arrays of points, triangle indices and quad indices
+/// to STL vectors.
 template<typename GridType>
-inline typename GridType::Ptr
-meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
-    py::object xformObj, py::object halfWidthObj)
+void meshNumPyToSTL(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
+        const char* methodName, int pointsIdx, int trianglesIdx, int quadsIdx,
+        std::vector<Vec3s>& points, std::vector<Vec3I>& triangles, std::vector<Vec4I>& quads)
 {
     struct Local {
-        // Return the name of the Python grid method (for use in error messages).
-        static const char* methodName() { return "createLevelSetFromPolygons"; }
-
         // Raise a Python exception if the given NumPy array does not have dimensions M x N
         // or does not have an integer or floating-point data type.
         static void validate2DNumPyArray(py::numeric::array arrayObj,
-            const int N, const char* desiredType)
+            const int N, const char* desiredType, const char* methodName)
         {
             PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr());
 
@@ -1199,11 +1204,55 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
                         break;
                 }
                 os << " " << arrayTypeName << " array as argument 1 to "
-                    << pyutil::GridTraits<GridType>::name() << "." << methodName() << "()";
+                    << pyutil::GridTraits<GridType>::name() << "." << methodName << "()";
                 PyErr_SetString(PyExc_TypeError, os.str().c_str());
                 py::throw_error_already_set();
             }
         }
+    };
+
+    // Extract the list of mesh vertices
+    if (!pointsObj.is_none()) {
+        // Extract a reference to (not a copy of) a NumPy array argument,
+        // or throw an exception if the argument is not a NumPy array object.
+        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+            pointsObj, methodName, /*argIdx=*/pointsIdx, "numpy.ndarray");
+
+        // Throw an exception if the array has the wrong type or dimensions.
+        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"float", methodName);
+
+        // Copy values from the array to the vector.
+        copyVecArray(arrayObj, points);
+    }
+
+    // Extract the list of triangle indices
+    if (!trianglesObj.is_none()) {
+        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+            trianglesObj, methodName, /*argIdx=*/trianglesIdx, "numpy.ndarray");
+        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"int", methodName);
+        copyVecArray(arrayObj, triangles);
+    }
+
+    // Extract the list of quad indices
+    if (!quadsObj.is_none()) {
+        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+            quadsObj, methodName, /*argIdx=*/quadsIdx, "numpy.ndarray");
+        Local::validate2DNumPyArray(arrayObj, /*N=*/4, /*desiredType=*/"int", methodName);
+        copyVecArray(arrayObj, quads);
+    }
+
+    return;
+}
+/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// call tools::meshToLevelSet() to generate a level set grid.
+template<typename GridType>
+inline typename GridType::Ptr
+meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
+    py::object xformObj, py::object halfWidthObj)
+{
+    struct Local {
+        // Return the name of the Python grid method (for use in error messages).
+        static const char* methodName() { return "createLevelSetFromPolygons"; }
     };
 
     // Extract the narrow band half width from the arguments to this method.
@@ -1217,43 +1266,89 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
             xformObj, Local::methodName(), /*argIdx=*/4, "Transform");
     }
 
-    // Extract the list of mesh vertices from the arguments to this method.
     std::vector<Vec3s> points;
-    if (!pointsObj.is_none()) {
-        // Extract a reference to (not a copy of) a NumPy array argument,
-        // or throw an exception if the argument is not a NumPy array object.
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            pointsObj, Local::methodName(), /*argIdx=*/1, "numpy.ndarray");
-
-        // Throw an exception if the array has the wrong type or dimensions.
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"float");
-
-        // Copy values from the array to the vector.
-        copyVecArray(arrayObj, points);
-    }
-
-    // Extract the list of triangle indices from the arguments to this method.
     std::vector<Vec3I> triangles;
-    if (!trianglesObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            trianglesObj, Local::methodName(), /*argIdx=*/2, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"int");
-        copyVecArray(arrayObj, triangles);
-    }
-
-    // Extract the list of quad indices from the arguments to this method.
     std::vector<Vec4I> quads;
-    if (!quadsObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
-            quadsObj, Local::methodName(), /*argIdx=*/3, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/4, /*desiredType=*/"int");
-        copyVecArray(arrayObj, quads);
-    }
+    meshNumPyToSTL<GridType>(pointsObj, trianglesObj, quadsObj, Local::methodName(), 1, 2, 3,
+        points, triangles, quads);
 
     // Generate and return a level set grid.
     return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
 }
 
+
+/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// call tools::meshToSignedDistanceField() to generate a signed distance field grid.
+template<typename GridType>
+inline typename GridType::Ptr
+meshToSignedDistanceField(py::object exBandWidthObj, py::object inBandWidthObj, py::object pointsObj,
+    py::object trianglesObj, py::object quadsObj, py::object xformObj)
+{
+    struct Local {
+        // Return the name of the Python grid method (for use in error messages).
+        static const char* methodName() { return "createSignedDistanceFieldFromPolygons"; }
+    };
+
+    // Extract the exterior band width from the arguments to this method.
+    const float exBandWidth = extractValueArg<GridType, float>(
+        exBandWidthObj, Local::methodName(), /*argIdx=*/1, "float");
+
+    // Extract the interior band width from the arguments to this method.
+    const float inBandWidth = extractValueArg<GridType, float>(
+        inBandWidthObj, Local::methodName(), /*argIdx=*/2, "float");
+
+    std::vector<Vec3s> points;
+    std::vector<Vec3I> triangles;
+    std::vector<Vec4I> quads;
+    meshNumPyToSTL<GridType>(pointsObj, trianglesObj, quadsObj, Local::methodName(), 3, 4, 5,
+        points, triangles, quads);
+
+    // Extract the transform from the arguments to this method.
+    math::Transform::Ptr xform = math::Transform::createLinearTransform();
+    if (!xformObj.is_none()) {
+        xform = extractValueArg<GridType, math::Transform::Ptr>(
+            xformObj, Local::methodName(), /*argIdx=*/6, "Transform");
+    }
+
+    // Generate and return a level set grid.
+    return tools::meshToSignedDistanceField<GridType>(*xform, points, triangles, quads,
+        exBandWidth, inBandWidth);
+}
+
+
+/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// call tools::meshToUnsignedDistanceField() to generate a unsigned distance field grid.
+template<typename GridType>
+inline typename GridType::Ptr
+meshToUnsignedDistanceField(py::object bandWidthObj, py::object pointsObj, py::object trianglesObj,
+    py::object quadsObj, py::object xformObj)
+{
+    struct Local {
+        // Return the name of the Python grid method (for use in error messages).
+        static const char* methodName() { return "createUnsignedDistanceFieldFromPolygons"; }
+    };
+
+    // Extract the exterior band width from the arguments to this method.
+    const float bandWidth = extractValueArg<GridType, float>(
+        bandWidthObj, Local::methodName(), /*argIdx=*/1, "float");
+
+    std::vector<Vec3s> points;
+    std::vector<Vec3I> triangles;
+    std::vector<Vec4I> quads;
+    meshNumPyToSTL<GridType>(pointsObj, trianglesObj, quadsObj, Local::methodName(), 2, 3, 4,
+        points, triangles, quads);
+
+    // Extract the transform from the arguments to this method.
+    math::Transform::Ptr xform = math::Transform::createLinearTransform();
+    if (!xformObj.is_none()) {
+        xform = extractValueArg<GridType, math::Transform::Ptr>(
+            xformObj, Local::methodName(), /*argIdx=*/5, "Transform");
+    }
+
+    // Generate and return a level set grid.
+    return tools::meshToUnsignedDistanceField<GridType>(*xform, points, triangles, quads,
+        bandWidth);
+}
 
 template<typename GridType>
 inline py::object
@@ -2245,6 +2340,45 @@ exportGrid()
                 "transform if no transform is given) and a narrow band width of\n"
                 "2 x halfWidth voxels.").c_str())
             .staticmethod("createLevelSetFromPolygons")
+            .def("createSignedDistanceFieldFromPolygons",
+                &pyGrid::meshToSignedDistanceField<GridType>,
+                (py::arg("exBandWidth"),
+                     py::arg("inBandWidth"),
+                     py::arg("points"),
+                     py::arg("triangles")=py::object(),
+                     py::arg("quads")=py::object(),
+                     py::arg("transform")=py::object()),
+                ("createSignedDistanceFieldFromPolygons(exBandWidth, inBandWidth, points,\n"
+                 "    triangles=None, quads=None, transform=None) -> "+ pyGridTypeName + "\n\n"
+                "Convert a triangle and/or quad mesh to a signed distance field with an\n"
+                "asymmetrical narrow band. The mesh must form a closed surface, but the surface\n"
+                "need not be manifold and may have self intersections and degenerate faces.\n"
+                "The mesh is described by a NumPy array of world-space points\n"
+                "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+                "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+                "Either the triangle or the quad array may be empty or None.\n"
+                "The resulting volume will have the given transform (or the identity\n"
+                "transform if no transform is given) and an exterior/interior narrow-band\n"
+                "of exBandWidth/inBandWidth voxels.").c_str())
+            .staticmethod("createSignedDistanceFieldFromPolygons")
+            .def("createUnsignedDistanceFieldFromPolygons",
+                &pyGrid::meshToUnsignedDistanceField<GridType>,
+                (py::arg("bandWidth"),
+                     py::arg("points"),
+                     py::arg("triangles")=py::object(),
+                     py::arg("quads")=py::object(),
+                     py::arg("transform")=py::object()),
+                ("createUnsignedDistanceFieldFromPolygons(bandWidth, points, triangles=None,\n"
+                 "    quads=None, transform=None) -> "+ pyGridTypeName + "\n\n"
+                "Convert a triangle and/or quad mesh to a unsigned distance field with a\n"
+                "narrow band. It does not require a closed surface. \n"
+                "The mesh is described by a NumPy array of world-space points\n"
+                "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+                "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+                "Either the triangle or the quad array may be empty or None.\n"
+                "The resulting volume will have the given transform (or the identity\n"
+                "transform if no transform is given) and a narrow-band of bandWidth voxels.").c_str())
+            .staticmethod("createUnsignedDistanceFieldFromPolygons")
 
             .def("prune", &pyGrid::prune<GridType>,
                 (py::arg("tolerance")=0),
