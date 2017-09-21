@@ -40,6 +40,7 @@
 #include <OP/OP_Operator.h>
 #include <PRM/PRM_Include.h>
 #include <PRM/PRM_SpareData.h>
+#include <GA/GA_Attribute.h>
 #include <SOP/SOP_Node.h>
 #if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
   // OPENVDB_HOUDINI_API, which has no meaning in a DWA build environment but
@@ -52,8 +53,10 @@
 #else
   #include <openvdb/Platform.h>
 #endif
-#include <boost/shared_ptr.hpp>
+#include <exception>
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -68,6 +71,7 @@
 
 class GU_Detail;
 class OP_OperatorTable;
+class PRM_Parm;
 
 namespace houdini_utils {
 
@@ -78,7 +82,7 @@ class ParmFactory;
 class OPENVDB_HOUDINI_API ParmList
 {
 public:
-    typedef std::vector<PRM_Template> PrmTemplateVec;
+    using PrmTemplateVec = std::vector<PRM_Template>;
 
     ParmList() {}
 
@@ -120,7 +124,7 @@ public:
 
 private:
     struct SwitcherInfo { size_t parmIdx; std::vector<PRM_Default> folders; bool exclusive; };
-    typedef std::vector<SwitcherInfo> SwitcherStack;
+    using SwitcherStack = std::vector<SwitcherInfo>;
 
     void incFolderParmCount();
     SwitcherInfo* getCurrentSwitcher();
@@ -171,19 +175,18 @@ public:
     /// @param items   a list of token, label, token, label,... string pairs
     /// @note The @a items array must be null-terminated.
     ParmFactory& setChoiceListItems(PRM_ChoiceListType typ, const char* const* items);
-    /// @brief Specify a menu that is populated with the primitive groups of the selected input.
-    /// @param inputIndex   specifies the zero based index of the input that should be used to get
-    /// the items from, must be in the range of [0..3], inclusive
-    /// @param typ          specifies the menu behavior (toggle, replace, etc.)
-    /// @details This method provides a more flexible alternative to
-    /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput1),
+
+    /// @brief Specify a menu of primitive group names for this parameter.
+    ///
+    /// @param inputIndex  the zero-based index of the input from which to get primitive groups
+    /// @param typ         the menu behavior (toggle, replace, etc.)
+    ///
+    /// @details Calling this method with the default (toggle) behavior is equivalent
+    /// to calling @c setChoiceList(&houdini_utils::PrimGroupMenuInput1),
     /// @c setChoiceList(&houdini_utils::PrimGroupMenuInput2), etc.
     ///
-    /// Calling this with a single input index is equivalent to calling
-    /// @c setChoiceList with the corresponding @c houdini_utils::PrimGroupMenuInput1, etc.
-    ///
     /// @par Example
-    /// To limit the choice from the menu to a single primitive, replace
+    /// To limit the user to choosing a single primitive group, replace
     /// @code
     /// parms.add(houdini_utils::ParmFactory(PRM_STRING, "reference", "Reference")
     ///     .setChoiceList(&houdini_utils::PrimGroupMenuInput2);
@@ -193,7 +196,45 @@ public:
     /// parms.add(houdini_utils::ParmFactory(PRM_STRING, "reference", "Reference")
     ///     .setGroupChoiceList(1, PRM_CHOICELIST_REPLACE); // input index is zero based
     /// @endcode
-    ParmFactory& setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ = PRM_CHOICELIST_TOGGLE);
+    ParmFactory& setGroupChoiceList(size_t inputIndex,
+        PRM_ChoiceListType typ = PRM_CHOICELIST_TOGGLE);
+
+    /// @brief Functor to filter a list of attributes from a SOP's input
+    /// @details Arguments to the functor are an attribute to be filtered
+    /// and the parameter and SOP for which the filter is being called.
+    /// The functor should return @c true for attributes that should be added
+    /// to the list and @c false for attributes that should be ignored.
+    using AttrFilterFunc =
+        std::function<bool (const GA_Attribute&, const PRM_Parm&, const SOP_Node&)>;
+
+    /// @brief Specify a menu of attribute names for this parameter.
+    ///
+    /// @param inputIndex  the zero-based index of the input from which to get attributes
+    /// @param attrOwner   the class of attribute with which to populate the menu:
+    ///     either per-vertex (@c GA_ATTRIB_VERTEX), per-point (@c GA_ATTRIB_POINT),
+    ///     per-primitive (@c GA_ATTRIB_PRIMITIVE), global (@c GA_ATTRIB_GLOBAL),
+    ///     or all of the above (@c GA_ATTRIB_INVALID or any other value)
+    /// @param typ         the menu behavior (toggle, replace, etc.)
+    /// @param attrFilter  an optional filter functor that returns @c true for each
+    ///     attribute that should appear in the menu; the functor will be moved,
+    ///     if possible, or else copied
+    ///
+    /// @note This method is supported only for SOPs.
+    ///
+    /// @par Example
+    /// Create a menu that allows multiple selection from among all the string attributes
+    /// on a SOP's first input:
+    /// @code
+    /// houdini_utils::ParmList parms;
+    /// parms.add(houdini_utils::ParmFactory(PRM_STRING, "stringattr", "String Attribute")
+    ///     .setAttrChoiceList(/*input=*/0, GA_ATTRIB_INVALID, PRM_CHOICELIST_TOGGLE,
+    ///         [](const GA_Attribute& attr, const PRM_Parm&, const SOP_Node&) {
+    ///             return (attr.getStorageClass() == GA_STORECLASS_STRING);
+    ///         }));
+    /// @endcode
+    ParmFactory& setAttrChoiceList(size_t inputIndex, GA_AttributeOwner attrOwner,
+        PRM_ChoiceListType typ = PRM_CHOICELIST_TOGGLE,
+        AttrFilterFunc attrFilter = AttrFilterFunc{});
 
 
 #if defined(GCC3)
@@ -236,7 +277,7 @@ public:
     /// @details If the string is null, the floating-point value will be used
     /// (but rounded if this parameter is integer-valued).
     /// @note The string pointer must not point to a temporary.
-    ParmFactory& setDefault(fpreal, const char* = NULL, CH_StringMeaning = CH_STRING_LITERAL);
+    ParmFactory& setDefault(fpreal, const char* = nullptr, CH_StringMeaning = CH_STRING_LITERAL);
     /// @brief Specify a default string value for this parameter.
     ParmFactory& setDefault(const std::string&, CH_StringMeaning = CH_STRING_LITERAL);
     /// @brief Specify default numeric values for the vector elements of this parameter
@@ -297,7 +338,7 @@ public:
 
 private:
     struct Impl;
-    boost::shared_ptr<Impl> mImpl;
+    std::shared_ptr<Impl> mImpl;
 
     // For internal use only, and soon to be removed:
     ParmFactory& doSetChoiceList(PRM_ChoiceListType, const std::vector<std::string>&, bool);
@@ -309,7 +350,7 @@ private:
 
 
 class OpPolicy;
-typedef boost::shared_ptr<OpPolicy> OpPolicyPtr;
+using OpPolicyPtr = std::shared_ptr<OpPolicy>;
 
 
 /// @brief Helper class to simplify operator registration
@@ -435,7 +476,7 @@ private:
         ParmList&, OP_OperatorTable&, OpFlavor);
 
     struct Impl;
-    boost::shared_ptr<Impl> mImpl;
+    std::shared_ptr<Impl> mImpl;
 };
 
 
@@ -478,10 +519,10 @@ public:
     /// @details The operator's type name is generated from its English name
     /// by prepending "DW_" and removing non-alphanumeric characters.
     /// For example, "My Node" becomes "DW_MyNode".
-    virtual std::string getName(const OpFactory&, const std::string& english);
+    std::string getName(const OpFactory&, const std::string& english) override;
 
     /// @brief Return a help URL for the operator defined by the given factory.
-    virtual std::string getHelpURL(const OpFactory&);
+    std::string getHelpURL(const OpFactory&) override;
 };
 
 /// @brief Default policies for DWA R&D operator types
@@ -492,21 +533,21 @@ class DWALevel1RnDOpPolicy : public DWAOpPolicy
 {
 public:
     /// @brief Level 1: show-wide
-    virtual std::string getIconName(const OpFactory&) { return "DreamWorks_L1_RnD"; }
+    std::string getIconName(const OpFactory&) override { return "DreamWorks_L1_RnD"; }
 };
 
 class DWALevel2RnDOpPolicy : public DWAOpPolicy
 {
 public:
     /// @brief Level 2: global
-    virtual std::string getIconName(const OpFactory&) { return "DreamWorks_L2_RnD"; }
+    std::string getIconName(const OpFactory&) override { return "DreamWorks_L2_RnD"; }
 };
 
 class DWALevel3RnDOpPolicy : public DWAOpPolicy
 {
 public:
     /// @brief Level 3: depot, map, most stable
-    virtual std::string getIconName(const OpFactory&) { return "DreamWorks_L3_RnD"; }
+    std::string getIconName(const OpFactory&) override { return "DreamWorks_L3_RnD"; }
 };
 
 ////////////////////////////////////////

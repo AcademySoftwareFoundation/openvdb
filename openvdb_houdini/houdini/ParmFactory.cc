@@ -47,16 +47,80 @@
 #include <UT/UT_IntArray.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
-#include <cstring> // for ::strdup()
+#include <algorithm> // for std::for_each(), std::max(), std::remove(), std::sort()
+#include <cstdint> // for std::uintptr_t()
+#include <cstdlib> // for std::atoi()
+#include <cstring> // for std::strcmp(), ::strdup()
 #include <limits>
+#include <ostream>
 #include <sstream>
 
 namespace houdini_utils {
 
 namespace {
-/// PRM_SpareData token name for parameter documentation wiki markup
-char const * const PARM_DOC_TOKEN = "houdini_utils::doc";
+
+// PRM_SpareData token names
+
+// SOP input index specifier
+/// @todo Is there an existing constant for this token?
+char const * const kSopInputToken = "sop_input";
+// Parameter documentation wiki markup
+char const * const kParmDocToken = "houdini_utils::doc";
+// String-encoded GA_AttributeOwner
+char const * const kAttrOwnerToken = "houdini_utils::attr_owner";
+// Pointer to an AttrFilterFunc
+char const * const kAttrFilterToken = "houdini_utils::attr_filter";
+
+
+// Add an integer value (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSpareInteger(PRM_SpareData* spare, const char* token, int value)
+{
+    if (spare && token) {
+        spare->addTokenValue(token, std::to_string(value).c_str());
+    }
 }
+
+// Retrieve the integer value with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default integer value.
+inline int
+getSpareInteger(const PRM_SpareData* spare, const char* token, int deflt = 0)
+{
+    if (!spare || !token) return deflt;
+    char const * const str = spare->getValue(token);
+    return str ? std::atoi(str) : deflt;
+}
+
+
+// Add a pointer (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSparePointer(PRM_SpareData* spare, const char* token, const void* ptr)
+{
+    if (spare && token) {
+        spare->addTokenValue(token,
+            std::to_string(reinterpret_cast<std::uintptr_t>(ptr)).c_str());
+    }
+}
+
+// Retrieve the pointer with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default pointer.
+inline const void*
+getSparePointer(const PRM_SpareData* spare, const char* token, const void* deflt = nullptr)
+{
+    if (!spare || !token) return deflt;
+    if (sizeof(std::uintptr_t) > sizeof(unsigned long long)) {
+        throw std::range_error{"houdini_utils::ParmFactory: can't decode pointer from string"};
+    }
+    if (const char* str = spare->getValue(token)) {
+        auto intPtr = static_cast<std::uintptr_t>(std::stoull(str));
+        return reinterpret_cast<void*>(intPtr);
+    }
+    return deflt;
+}
+
+} // anonymous namespace
 
 
 ParmList&
@@ -210,6 +274,10 @@ struct ParmFactory::Impl
         const_cast<PRM_Name*>(name)->harden();
     }
 
+    static PRM_SpareData* getSopInputSpareData(size_t inp); ///< @todo return a const pointer?
+    static void getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+        const PRM_SpareData*, const PRM_Parm*);
+
     PRM_Callback               callbackFunc;
     const PRM_ChoiceList*      choicelist;
     const PRM_ConditionalBase* conditional;
@@ -232,6 +300,109 @@ struct ParmFactory::Impl
 PRM_SpareData* const ParmFactory::Impl::sSOPInputSpareData[4] = {
         &SOP_Node::theFirstInput, &SOP_Node::theSecondInput,
         &SOP_Node::theThirdInput, &SOP_Node::theFourthInput};
+
+
+// Return one of the predefined PRM_SpareData maps that specify a SOP input number,
+// or construct new PRM_SpareData if none exists for the given input number.
+PRM_SpareData*
+ParmFactory::Impl::getSopInputSpareData(size_t inp)
+{
+    if (inp < 4) return Impl::sSOPInputSpareData[inp];
+
+    auto spare = new PRM_SpareData{SOP_Node::theFirstInput};
+    spare->addTokenValue(kSopInputToken, std::to_string(inp).c_str());
+    return spare;
+}
+
+
+// PRM_ChoiceGenFunc invoked by ParmFactory::setAttrChoiceList()
+void
+ParmFactory::Impl::getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+    const PRM_SpareData* spare, const PRM_Parm* parm)
+{
+    if (!op || !choices || !parm) return;
+    // This function can only be used in SOPs, because it calls SOP_Node::fillAttribNameMenu().
+    if (static_cast<OP_Node*>(op)->getOpTypeID() != SOP_OPTYPE_ID) return;
+
+    auto* sop = static_cast<SOP_Node*>(op);
+
+    // Extract the SOP input number, the attribute class, and an optional
+    // pointer to a filter functor from the spare data.
+    const int inp = getSpareInteger(spare, kSopInputToken);
+    const int attrOwner = getSpareInteger(spare, kAttrOwnerToken, GA_ATTRIB_INVALID);
+    const auto* attrFilter =
+        static_cast<const AttrFilterFunc*>(getSparePointer(spare, kAttrFilterToken));
+
+    // Marshal pointers to the filter functor and the parameter and SOP for which this function
+    // is being called into blind data that can be passed to SOP_Node::fillAttribNameMenu().
+    struct AttrFilterData {
+        const AttrFilterFunc* func;
+        const PRM_Parm* parm;
+        const SOP_Node* sop;
+    };
+    AttrFilterData cbData{attrFilter, parm, sop};
+
+    // Define a filter callback function to be passed to SOP_Node::fillAttribNameMenu().
+    // Because the latter uses a C-style callback mechanism, this callback must be
+    // equivalent to a static function pointer (as a non-capturing lambda is).
+    auto cb = [](const GA_Attribute* aAttr, void* aData) -> bool {
+        if (!aAttr) return false;
+        // Cast the blind data pointer supplied by SOP_Node::fillAttribNameMenu().
+        const auto* data = static_cast<AttrFilterData*>(aData);
+        if (!data || !data->func) return true; // no filter; accept all attributes
+        // Invoke the filter functor and return the result.
+        return (*(data->func))(*aAttr, *(data->parm), *(data->sop));
+    };
+
+    // Invoke SOP_Node::fillAttribNameMenu() for the appropriate attribute class.
+    switch (attrOwner) {
+        case GA_ATTRIB_VERTEX:
+        case GA_ATTRIB_POINT:
+        case GA_ATTRIB_PRIMITIVE:
+        case GA_ATTRIB_DETAIL:
+            if (cbData.func) {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp, cb, &cbData);
+            } else {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp);
+            }
+            break;
+        default: // all attributes
+        {
+            // To collect all classes of attributes, call SOP_Node::fillAttribNameMenu()
+            // once for each class.  Each call appends zero or more PRM_Names to the list
+            // as well as an end-of-list terminator.
+            auto* head = choices;
+            int count = 0, maxCount = maxChoices;
+            for (auto owner:
+                { GA_ATTRIB_VERTEX, GA_ATTRIB_POINT, GA_ATTRIB_PRIMITIVE, GA_ATTRIB_DETAIL })
+            {
+                int numAdded = (cbData.func ?
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp, cb, &cbData) :
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp));
+                if (numAdded > 0) {
+                    // SOP_Node::fillAttribNameMenu() returns the number of entries added
+                    // to the list, not including the terminator.
+                    // Advance the list head pointer so that the next entry to be added
+                    // (if any) overwrites the terminator.
+                    count += numAdded;
+                    head += numAdded;
+                    maxCount -= numAdded;
+                }
+            }
+            if (count) {
+                // Sort the list by name to reproduce the behavior of SOP_Node::allAttribMenu.
+                std::sort(choices, choices + count,
+                    [](const PRM_Name& n1, const PRM_Name& n2) {
+                        return (0 > std::strcmp(n1.getToken(), n2.getToken()));
+                    }
+                );
+            }
+            break;
+        }
+    }
+}
 
 
 ////////////////////////////////////////
@@ -368,20 +539,39 @@ ParmFactory::setChoiceListItems(PRM_ChoiceListType typ, const std::vector<std::s
     return doSetChoiceList(typ, items, /*paired=*/true);
 }
 
+
 ParmFactory&
-ParmFactory::setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ)
+ParmFactory::setGroupChoiceList(size_t inputIndex, PRM_ChoiceListType typ)
 {
-    if (0 <= inputIndex && inputIndex < 4) {
-        mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+    mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+
 #if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
-        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            nullptr, inputIndex, Impl::sSOPInputSpareData[inputIndex]));
+    setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE, nullptr,
+        static_cast<int>(inputIndex), mImpl->getSopInputSpareData(inputIndex)));
 #else
-        setSpareData(Impl::sSOPInputSpareData[inputIndex]);
+    setSpareData(mImpl->getSopInputSpareData(inputIndex));
 #endif
-    }
+
     return *this;
 }
+
+
+ParmFactory&
+ParmFactory::setAttrChoiceList(size_t inputIndex, GA_AttributeOwner attrOwner,
+    PRM_ChoiceListType typ, AttrFilterFunc attrFilter)
+{
+    setChoiceList(new PRM_ChoiceList{typ, Impl::getAttrChoices});
+
+    mImpl->spareData = new PRM_SpareData;
+    setSpareInteger(mImpl->spareData, kSopInputToken, int(inputIndex));
+    setSpareInteger(mImpl->spareData, kAttrOwnerToken, static_cast<int>(attrOwner));
+    if (attrFilter) {
+        setSparePointer(mImpl->spareData, kAttrFilterToken, new AttrFilterFunc{attrFilter});
+    }
+
+    return *this;
+}
+
 
 ParmFactory&
 ParmFactory::setConditional(const PRM_ConditionalBase* c) { mImpl->conditional = c; return *this; }
@@ -437,7 +627,7 @@ ParmFactory&
 ParmFactory::setDocumentation(const char* doc)
 {
     if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
-    mImpl->spareData->addTokenValue(PARM_DOC_TOKEN, ::strdup(doc ? doc : ""));
+    mImpl->spareData->addTokenValue(kParmDocToken, ::strdup(doc ? doc : ""));
     return *this;
 }
 
@@ -469,7 +659,7 @@ ParmFactory::setRange(const PRM_Range* r) { mImpl->range = r; return *this; }
 ParmFactory&
 ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
 {
-    typedef std::map<std::string, std::string> StringMap;
+    using StringMap = std::map<std::string, std::string>;
     if (!items.empty()) {
         if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
         for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
@@ -587,11 +777,11 @@ documentParms(std::ostream& os, PRM_Template const * const parmList, int level =
 
         UT_String parmDoc;
         const PRM_SpareData* const spare = parm->getSparePtr();
-        if (spare && spare->getValue(PARM_DOC_TOKEN)) {
+        if (spare && spare->getValue(kParmDocToken)) {
             // If the parameter was documented with setDocumentation(), use that text.
-            // (This relies on PARM_DOC_TOKEN not being paired with nullptr.
+            // (This relies on kParmDocToken not being paired with nullptr.
             // ParmFactory::setDocumentation(), at least, ensures that it isn't.)
-            parmDoc = spare->getValue(PARM_DOC_TOKEN);
+            parmDoc = spare->getValue(kParmDocToken);
             // If the text is empty, suppress this parameter.
             if (!parmDoc.isstring()) continue;
         } else {
@@ -1083,22 +1273,12 @@ namespace {
 // (this functionality was added to SOP_Node::primGroupMenu some time ago,
 // possibly as early as Houdini 12.5)
 
-inline int
-lookupGroupInput(const PRM_SpareData *spare)
-{
-    const char  *istring;
-    if (!spare) return 0;
-    istring = spare->getValue("sop_input");
-    return istring ? atoi(istring) : 0;
-}
-
-
 void
 sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     const PRM_SpareData *spare, const PRM_Parm *parm)
 {
     SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
-    int inputIndex = lookupGroupInput(spare);
+    int inputIndex = getSopInputIndex(spare);
 
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
 

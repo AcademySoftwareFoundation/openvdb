@@ -1143,7 +1143,9 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
     GA_Offset start, end, source, target, v0, v1, v2;
     const GA_Primitive * primRef = nullptr;
+#if UT_MAJOR_VERSION_INT <= 15
     GA_Primitive::const_iterator vtxIt;
+#endif
 
     typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();

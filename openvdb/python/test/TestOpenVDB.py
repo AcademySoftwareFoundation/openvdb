@@ -495,7 +495,7 @@ class TestOpenVDB(unittest.TestCase):
             return
 
         # Skip this test if the OpenVDB module was built without NumPy support.
-        arr = np.ndarray((1, 2, 1))
+        arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         try:
             grid.copyFromArray(arr)
@@ -505,11 +505,11 @@ class TestOpenVDB(unittest.TestCase):
         # Verify that a non-three-dimensional array can't be copied into a grid.
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray('abc'))
-        arr = np.ndarray((1, 2))
+        arr = np.zeros((1, 2))
         self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
 
         # Verify that complex-valued arrays are not supported.
-        arr = np.ndarray((1, 2, 1), dtype = complex)
+        arr = np.zeros((1, 2, 1), dtype = complex)
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
 
@@ -591,7 +591,7 @@ class TestOpenVDB(unittest.TestCase):
             return
 
         # Skip this test if the OpenVDB module was built without NumPy support.
-        arr = np.ndarray((1, 2, 1))
+        arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         try:
             grid.copyFromArray(arr)
@@ -601,11 +601,11 @@ class TestOpenVDB(unittest.TestCase):
         # Verify that a grid can't be copied into a non-three-dimensional array.
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray('abc'))
-        arr = np.ndarray((1, 2))
+        arr = np.zeros((1, 2))
         self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
 
         # Verify that complex-valued arrays are not supported.
-        arr = np.ndarray((1, 2, 1), dtype = complex)
+        arr = np.zeros((1, 2, 1), dtype = complex)
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
 

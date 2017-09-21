@@ -712,7 +712,6 @@ SOP_OpenVDB_Fracture::process(
 
     if (cutterObjects > 1) {
         GA_Offset start, end;
-        GA_Primitive::const_iterator vtxIt;
         GA_SplittableRange range(cutterGeo->getPrimitiveRange());
 
         for (int classId = 0; classId < cutterObjects; ++classId) {

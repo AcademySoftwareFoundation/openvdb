@@ -27,12 +27,10 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
-/// @file LevelSetAdvect.h
+/// @file tools/LevelSetAdvect.h
 ///
 /// @brief Hyperbolic advection of narrow-band level sets
 
@@ -45,8 +43,9 @@
 #include "LevelSetTracker.h"
 #include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>
-#include <boost/math/constants/constants.hpp>
 //#include <openvdb/util/CpuTimer.h>
+#include <functional>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -84,9 +83,9 @@ namespace tools {
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 ///};
 /// @endcode
 ///
@@ -101,16 +100,16 @@ template<typename GridT,
 class LevelSetAdvection
 {
 public:
-    typedef GridT                              GridType;
-    typedef LevelSetTracker<GridT, InterruptT> TrackerT;
-    typedef typename TrackerT::LeafRange       LeafRange;
-    typedef typename TrackerT::LeafType        LeafType;
-    typedef typename TrackerT::BufferType      BufferType;
-    typedef typename TrackerT::ValueType       ValueType;
-    typedef typename FieldT::VectorType        VectorType;
+    using GridType = GridT;
+    using TrackerT = LevelSetTracker<GridT, InterruptT>;
+    using LeafRange = typename TrackerT::LeafRange;
+    using LeafType = typename TrackerT::LeafType;
+    using BufferType = typename TrackerT::BufferType;
+    using ValueType = typename TrackerT::ValueType;
+    using VectorType = typename FieldT::VectorType;
 
     /// Main constructor
-    LevelSetAdvection(GridT& grid, const FieldT& field, InterruptT* interrupt = NULL):
+    LevelSetAdvection(GridT& grid, const FieldT& field, InterruptT* interrupt = nullptr):
         mTracker(grid, interrupt), mField(field),
         mSpatialScheme(math::HJWENO5_BIAS),
         mTemporalScheme(math::TVD_RK2) {}
@@ -215,7 +214,7 @@ private:
         VectorType*        mVelocity;
         size_t*            mOffsets;
         const MapT*        mMap;
-        typename boost::function<void (Advect*, const LeafRange&)> mTask;
+        typename std::function<void (Advect*, const LeafRange&)> mTask;
         const bool         mIsMaster;
     }; // end of private Advect struct
 
@@ -329,8 +328,8 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 Advect(LevelSetAdvection& parent)
     : mParent(parent)
-    , mVelocity(NULL)
-    , mOffsets(NULL)
+    , mVelocity(nullptr)
+    , mOffsets(nullptr)
     , mMap(parent.mTracker.grid().transform().template constMap<MapT>().get())
     , mTask(0)
     , mIsMaster(true)
@@ -367,6 +366,8 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 advect(ValueType time0, ValueType time1)
 {
+    namespace ph = std::placeholders;
+
     //util::CpuTimer timer;
     size_t countCFL = 0;
     if ( math::isZero(time0 - time1) ) return countCFL;
@@ -385,7 +386,7 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK1", 1);
@@ -393,14 +394,14 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK1 (step 1 of 2)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Advect::euler12, _1, _2, dt);
+            mTask = std::bind(&Advect::euler12, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook("Advecting level set using TVD_RK1 (step 2 of 2)", 1);
@@ -408,21 +409,21 @@ advect(ValueType time0, ValueType time1)
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
-            mTask = boost::bind(&Advect::euler01, _1, _2, dt);
+            mTask = std::bind(&Advect::euler01, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Advecting level set using TVD_RK3 (step 1 of 3)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Advect::euler34, _1, _2, dt);
+            mTask = std::bind(&Advect::euler34, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook("Advecting level set using TVD_RK3 (step 2 of 3)", 2);
 
             // Convex combine explict Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
-            mTask = boost::bind(&Advect::euler13, _1, _2, dt);
+            mTask = std::bind(&Advect::euler13, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook("Advecting level set using TVD_RK3 (step 3 of 3)", 2);
@@ -453,6 +454,8 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 sampleField(ValueType time0, ValueType time1)
 {
+    namespace ph = std::placeholders;
+
     const int grainSize = mParent.mTracker.getGrainSize();
     const size_t leafCount = mParent.mTracker.leafs().leafCount();
     if (leafCount==0) return ValueType(0.0);
@@ -462,9 +465,9 @@ sampleField(ValueType time0, ValueType time1)
 
     // Sample the velocity field
     if (mParent.mField.transform() == mParent.mTracker.grid().transform()) {
-        mTask = boost::bind(&Advect::sampleAligned, _1, _2, time0, time1);
+        mTask = std::bind(&Advect::sampleAligned, ph::_1, ph::_2, time0, time1);
     } else {
-        mTask = boost::bind(&Advect::sampleXformed, _1, _2, time0, time1);
+        mTask = std::bind(&Advect::sampleXformed, ph::_1, ph::_2, time0, time1);
     }
     assert(voxelCount == mParent.mTracker.grid().activeVoxelCount());
     mVelocity = new VectorType[ voxelCount ];
@@ -502,7 +505,7 @@ Advect<MapT, SpatialScheme, TemporalScheme>::
 sample(const LeafRange& range, ValueType time0, ValueType time1)
 {
     const bool isForward = time0 < time1;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
+    using VoxelIterT = typename LeafType::ValueOnCIter;
     const MapT& map = *mMap;
     const FieldT field( mParent.mField );
     mParent.mTracker.checkInterrupter();
@@ -529,8 +532,8 @@ clearField()
 {
     delete [] mOffsets;
     delete [] mVelocity;
-    mOffsets  = NULL;
-    mVelocity = NULL;
+    mOffsets = nullptr;
+    mVelocity = nullptr;
 }
 
 
@@ -570,10 +573,10 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 {
-    typedef math::BIAS_SCHEME<SpatialScheme>                             SchemeT;
-    typedef typename SchemeT::template ISStencil<GridType>::StencilType  StencilT;
-    typedef typename LeafType::ValueOnCIter                              VoxelIterT;
-    typedef math::GradientBiased<MapT, SpatialScheme>                    GradT;
+    using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
+    using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+    using VoxelIterT = typename LeafType::ValueOnCIter;
+    using GradT = math::GradientBiased<MapT, SpatialScheme>;
 
     static const ValueType Alpha = ValueType(Nominator)/ValueType(Denominator);
     static const ValueType Beta  = ValueType(1) - Alpha;
