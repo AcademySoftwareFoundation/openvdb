@@ -81,6 +81,15 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 #pragma clang diagnostic pop
 #endif
 
+#if BOOST_VERSION < 106500
+    typedef typename py::numeric::array pyndarray;
+    namespace arrayFunc = boost::python::numeric;
+#else
+    #include <boost/python/numpy.hpp>
+    typedef typename py::numpy::ndarray pyndarray;
+    namespace arrayFunc = boost::python::numpy;
+#endif
+
 
 namespace pyopenvdb {
 
@@ -820,7 +829,7 @@ public:
 
         // Extract a reference to (not a copy of) the NumPy array,
         // or throw an exception if arrObj is not a NumPy array object.
-        const py::numeric::array arrayObj = pyutil::extractArg<py::numeric::array>(
+        const pyndarray arrayObj = pyutil::extractArg<pyndarray>(
             arrObj, opName[toGrid], pyutil::GridTraits<GridType>::name(),
             /*argIdx=*/1, "numpy.ndarray");
 
@@ -1113,7 +1122,7 @@ struct CopyVecOp<T, T> {
 // and sizes from NumPy arrays to STL vectors
 template<typename VecT>
 inline void
-copyVecArray(py::numeric::array& arrayObj, std::vector<VecT>& vec)
+copyVecArray(pyndarray& arrayObj, std::vector<VecT>& vec)
 {
     typedef typename VecT::ValueType ValueT;
 
@@ -1156,7 +1165,7 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
 
         // Raise a Python exception if the given NumPy array does not have dimensions M x N
         // or does not have an integer or floating-point data type.
-        static void validate2DNumPyArray(py::numeric::array arrayObj,
+        static void validate2DNumPyArray(pyndarray arrayObj,
             const int N, const char* desiredType)
         {
             PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr());
@@ -1222,7 +1231,7 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
     if (!pointsObj.is_none()) {
         // Extract a reference to (not a copy of) a NumPy array argument,
         // or throw an exception if the argument is not a NumPy array object.
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+        pyndarray arrayObj = extractValueArg<GridType, pyndarray>(
             pointsObj, Local::methodName(), /*argIdx=*/1, "numpy.ndarray");
 
         // Throw an exception if the array has the wrong type or dimensions.
@@ -1235,7 +1244,7 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
     // Extract the list of triangle indices from the arguments to this method.
     std::vector<Vec3I> triangles;
     if (!trianglesObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+        pyndarray arrayObj = extractValueArg<GridType, pyndarray>(
             trianglesObj, Local::methodName(), /*argIdx=*/2, "numpy.ndarray");
         Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"int");
         copyVecArray(arrayObj, triangles);
@@ -1244,7 +1253,7 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
     // Extract the list of quad indices from the arguments to this method.
     std::vector<Vec4I> quads;
     if (!quadsObj.is_none()) {
-        py::numeric::array arrayObj = extractValueArg<GridType, py::numeric::array>(
+        pyndarray arrayObj = extractValueArg<GridType, pyndarray>(
             quadsObj, Local::methodName(), /*argIdx=*/3, "numpy.ndarray");
         Local::validate2DNumPyArray(arrayObj, /*N=*/4, /*desiredType=*/"int");
         copyVecArray(arrayObj, quads);
@@ -1268,7 +1277,7 @@ volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
     tools::volumeToMesh(grid, points, quads, isovalue);
 
     // Copy vertices into an N x 3 NumPy array.
-    py::object pointArrayObj = py::numeric::array(py::list(), "float32");
+    py::object pointArrayObj = arrayFunc::array(py::list(), "float32");
     if (!points.empty()) {
         npy_intp dims[2] = { npy_intp(points.size()), 3 };
         // Construct a NumPy array that wraps the point vector.
@@ -1282,7 +1291,7 @@ volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
     }
 
     // Copy face indices into an N x 4 NumPy array.
-    py::object quadArrayObj = py::numeric::array(py::list(), "uint32");
+    py::object quadArrayObj = arrayFunc::array(py::list(), "uint32");
     if (!quads.empty()) {
         npy_intp dims[2] = { npy_intp(quads.size()), 4 };
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
@@ -1312,7 +1321,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
     tools::volumeToMesh(grid, points, triangles, quads, isovalue, adaptivity);
 
     // Copy vertices into an N x 3 NumPy array.
-    py::object pointArrayObj = py::numeric::array(py::list(), "float32");
+    py::object pointArrayObj = arrayFunc::array(py::list(), "float32");
     if (!points.empty()) {
         npy_intp dims[2] = { npy_intp(points.size()), 3 };
         // Construct a NumPy array that wraps the point vector.
@@ -1326,7 +1335,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
     }
 
     // Copy triangular face indices into an N x 3 NumPy array.
-    py::object triangleArrayObj = py::numeric::array(py::list(), "uint32");
+    py::object triangleArrayObj = arrayFunc::array(py::list(), "uint32");
     if (!triangles.empty()) {
         npy_intp dims[2] = { npy_intp(triangles.size()), 3 };
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
@@ -1337,7 +1346,7 @@ volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivity
     }
 
     // Copy quadrilateral face indices into an N x 4 NumPy array.
-    py::object quadArrayObj = py::numeric::array(py::list(), "uint32");
+    py::object quadArrayObj = arrayFunc::array(py::list(), "uint32");
     if (!quads.empty()) {
         npy_intp dims[2] = { npy_intp(quads.size()), 4 };
         if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
