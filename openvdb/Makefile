@@ -87,6 +87,8 @@
 # The directory into which to install libraries, executables and header files
 DESTDIR := /tmp/OpenVDB
 
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
+
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
@@ -891,16 +893,16 @@ install_lib: lib
 	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBOPENVDB) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR_LIB_DIR)
+	@echo "Created $(DESTDIR_LIB_DIR)"
+	cp -f $(LIBOPENVDB) $(DESTDIR_LIB_DIR)
+	pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED) ]; then \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SHARED_NAME); \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SONAME); \
 	    fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR_LIB_DIR)"
 
 install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	if [ -f $(LIBVIEWER) ]; \
@@ -909,12 +911,12 @@ install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
 	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
 	    @echo "Copied vdb_view header files to $(DESTDIR)/include" \
-	    cp -f $(LIBVIEWER) $(DESTDIR)/lib; \
-	    pushd $(DESTDIR)/lib > /dev/null; \
+	    cp -f $(LIBVIEWER) $(DESTDIR_LIB_DIR); \
+	    pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	        if [ -f $(LIBVIEWER_SHARED) ]; then \
 	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_SHARED_NAME); fi; \
 	        popd > /dev/null; \
-	    @echo "Copied libopenvdb_viewer to $(DESTDIR)/lib/"; \
+	    @echo "Copied libopenvdb_viewer to $(DESTDIR_LIB_DIR)"; \
 	fi
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
