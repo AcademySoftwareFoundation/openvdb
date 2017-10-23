@@ -32,6 +32,16 @@ OPTION ( OPENVDB_HOUDINI_SHORT_VERSION "User major.minor as <version> instead of
 OPTION ( OPENVDB_HOUDINI_INSTALL_LIBRARY "Install headers and place the shared library in a lib directory." OFF)
 FIND_PACKAGE ( HDK REQUIRED )
 
+# Checking if hdk version is >= 16.5
+# Houdini 16.5 stopped shipping boost.
+IF (( HDK_VERSION_MAJOR GREATER 16 ) OR 
+    (( HDK_VERSION_MAJOR EQUAL 16 ) AND ( HDK_VERSION_MINOR EQUAL 5 )))
+
+  FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED )
+  INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
+
+ENDIF()
+
 IF ( NOT OPENVDB_BUILD_CORE )
   FIND_PACKAGE ( OpenVDB REQUIRED )
 
