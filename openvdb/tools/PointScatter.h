@@ -188,7 +188,7 @@ public:
     // the operator() method was called
     void print(const std::string &name, std::ostream& os = std::cout) const
     {
-        os << "Uniformely scattered " << mPointCount << " points into " << mVoxelCount
+        os << "Uniformly scattered " << mPointCount << " points into " << mVoxelCount
            << " active voxels in \"" << name << "\" corresponding to "
            << mPointsPerVolume << " points per volume." << std::endl;
     }

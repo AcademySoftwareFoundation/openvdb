@@ -353,6 +353,7 @@ INCLUDE_NAMES := \
     points/PointDataGrid.h \
     points/PointDelete.h \
     points/PointGroup.h \
+    points/PointScatter.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
     tools/Clip.h \
@@ -519,6 +520,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointScatter.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
     unittest/TestPotentialFlow.cc \
