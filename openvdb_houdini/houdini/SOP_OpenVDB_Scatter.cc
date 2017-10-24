@@ -368,7 +368,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);
                 } else {
-                    UTvdbProcessTypedGridScalar(gridType, grid, scatter);
+                    if (!UTvdbProcessTypedGridScalar(gridType, grid, scatter)) {
+#if UT_MAJOR_VERSION_INT >= 16
+                        UTvdbProcessTypedGridPoint(gridType, grid, scatter);
+#endif
+                    }
                 }
 
                 if (verbose) scatter.print(gridName);
@@ -399,7 +403,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
                     if (interior && isSignedDistance) {
                         processLSInterior(gridType, grid, scatter);
                     } else {
-                        UTvdbProcessTypedGridTopology(gridType, grid, scatter);
+                        if (!UTvdbProcessTypedGridTopology(gridType, grid, scatter)) {
+#if UT_MAJOR_VERSION_INT >= 16
+                            UTvdbProcessTypedGridPoint(gridType, grid, scatter);
+#endif
+                        }
                     }
 
                     if (verbose) scatter.print(gridName);
@@ -413,7 +421,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);
                 } else {
-                    UTvdbProcessTypedGridTopology(gridType, grid, scatter);
+                    if (!UTvdbProcessTypedGridTopology(gridType, grid, scatter)) {
+#if UT_MAJOR_VERSION_INT >= 16
+                        UTvdbProcessTypedGridPoint(gridType, grid, scatter);
+#endif
+                    }
                 }
 
                 if (verbose) scatter.print(gridName);

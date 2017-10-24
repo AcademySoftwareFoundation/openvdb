@@ -317,8 +317,14 @@ struct MaskClipOp
         if (mask) {
             // Dispatch on the mask grid type, now that the source grid type is resolved.
             MaskClipDispatchOp<GridType> op(grid, inside);
-            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op);
-            outputGrid = op.outputGrid;
+            if (UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op)) {
+                outputGrid = op.outputGrid;
+            }
+# if UT_MAJOR_VERSION_INT >= 16
+            else if (UTvdbProcessTypedGridPoint(UTvdbGetGridType(*mask), *mask, op)) {
+                outputGrid = op.outputGrid;
+            }
+#endif
         }
     }
 

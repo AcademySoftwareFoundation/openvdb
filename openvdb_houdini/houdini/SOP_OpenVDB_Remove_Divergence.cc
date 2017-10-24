@@ -968,8 +968,13 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                         parms.colliderType = CT_STATIC;
                         ColliderMaskOp op;
                         op.mask = ColliderMaskGrid::create();
-                        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
-                            *parms.colliderGrid, op);
+                        if (!UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
+                            *parms.colliderGrid, op)) {
+#if UT_MAJOR_VERSION_INT >= 16
+                            UTvdbProcessTypedGridPoint(UTvdbGetGridType(*parms.colliderGrid),
+                                                        *parms.colliderGrid, op);
+#endif
+                        }
                         parms.colliderGrid = op.mask;
                     }
                 }

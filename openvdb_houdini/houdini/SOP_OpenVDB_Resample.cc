@@ -44,6 +44,7 @@
 #include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbProcessTypedGridReal()
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
@@ -485,6 +486,11 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             if (progress.wasInterrupted()) throw std::runtime_error("Was Interrupted");
 
             GU_PrimVDB* vdb = *it;
+
+            if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
+                addWarning(SOP_MESSAGE, "Point data grids cannot currently be resampled, skipping");
+                continue;
+            }
 
             const UT_VDBType valueType = vdb->getStorageType();
 

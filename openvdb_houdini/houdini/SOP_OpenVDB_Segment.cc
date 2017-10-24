@@ -38,6 +38,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
 
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/LevelSetUtil.h>
 
 
@@ -326,6 +327,11 @@ SOP_OpenVDB_Segment::cookMySop(OP_Context& context)
             if (boss.wasInterrupted()) break;
 
             const GU_PrimVDB* vdb = vdbIt.getPrimitive();
+
+            if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
+                addWarning(SOP_MESSAGE, "VDB points grids cannot currently be segmented and will be ignored.");
+                continue;
+            }
 
             const openvdb::GridClass gridClass = vdb->getGrid().getGridClass();
             if (gridClass == openvdb::GRID_LEVEL_SET) {
