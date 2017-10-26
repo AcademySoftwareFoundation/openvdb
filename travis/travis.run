@@ -52,7 +52,8 @@ RELEASE="$4"
 HOUDINI_MAJOR="$5"
 
 # Disable Doxygen, Log4CPlus, Python and GLFW for now
-COMMON_ARGS="   DESTDIR=/tmp/OpenVDB\
+COMMON_ARGS="   CXX=$HOME/ccache_clang++\
+                DESTDIR=/tmp/OpenVDB\
                 CONCURRENT_MALLOC_LIB=\
                 DOXYGEN=\
                 LOG4CPLUS_INCL_DIR=\
@@ -77,6 +78,16 @@ HOUDINI_BLOSC_ARGS="    BLOSC_INCL_DIR=/test/hou/toolkit/include\
                         BLOSC_LIB_DIR=/test/hou/dsolib"
 NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
                         BLOSC_LIB_DIR="
+
+# introduce wrapper to clang++ that uses ccache, this is mainly
+# for use in hcustom where changing the compiler is hard
+echo '#!/bin/bash' > $HOME/ccache_clang++
+echo 'export CCACHE_MAXSIZE=20G' >> $HOME/ccache_clang++
+echo 'ccache clang++ -Qunused-arguments $*' >> $HOME/ccache_clang++
+chmod 755 $HOME/ccache_clang++
+
+# zero ccache stats
+ccache -z
 
 if [ "$TASK" = "install" ]; then
     # update OS
@@ -136,6 +147,9 @@ elif [ "$TASK" = "script" ]; then
         cd hou
         source houdini_setup
         cd -
+        # disable hcustom tagging to remove timestamps in Houdini DSOs for ccache
+        # note that this means the DSO can no longer be loaded in Houdini
+        sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
         # build OpenVDB core library and OpenVDB houdini library
         make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
         make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi=3 -j4
@@ -145,6 +159,9 @@ elif [ "$TASK" = "script" ]; then
         cp openvdb_houdini/houdini/*.h houdini_utils
         cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
         # build OpenVDB Houdini SOPs
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS all abi=3 -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
     fi
 fi
+
+# output ccache stats
+ccache -s
