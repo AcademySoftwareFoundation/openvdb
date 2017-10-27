@@ -199,8 +199,9 @@ struct VolumeToMesh
 
     // Mesh data accessors
 
-    const size_t& pointListSize() const;
-    PointList& pointList();
+	const size_t& pointListSize() const;
+	PointList& pointList();
+	const PointList& pointList() const;
 
     const size_t& polygonPoolListSize() const;
     PolygonPoolList& polygonPoolList();
@@ -4838,6 +4839,13 @@ inline PointList&
 VolumeToMesh::pointList()
 {
     return mPoints;
+}
+
+
+inline const PointList&
+VolumeToMesh::pointList() const
+{
+	return mPoints;
 }
 
 
