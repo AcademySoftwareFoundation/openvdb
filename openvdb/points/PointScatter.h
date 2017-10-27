@@ -27,17 +27,17 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Nick Avramoussis
 ///
-/// @file PointScatter.h
+/// @file points/PointScatter.h
 ///
 /// @brief Various point scattering methods for generating VDB Points.
 ///
 ///  All random number calls are made to the same generator to produce
 ///  temporarily consistent results in relation to the provided seed. This
 ///  comes with some multi-threaded performance trade-offs.
-///
+
 #ifndef OPENVDB_POINTS_POINT_SCATTER_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_SCATTER_HAS_BEEN_INCLUDED
 
@@ -72,9 +72,9 @@ namespace points {
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 ///};
 /// @endcode
 ///
@@ -179,7 +179,7 @@ namespace point_scatter_internal
 
 /// @brief initialise the topology of a PointDataGrid and ensure
 /// everything is voxelized
-/// @parm grid   The source grid from which to base the topology generation
+/// @param grid   The source grid from which to base the topology generation
 template<typename PointDataGridT, typename GridT>
 inline typename PointDataGridT::Ptr
 initialisePointTopology(const GridT& grid)
@@ -195,12 +195,12 @@ initialisePointTopology(const GridT& grid)
 }
 
 /// @brief Generate random point positions for a leaf node
-/// @parm leaf       The leaf node to initialize
-/// @parm descriptor The descriptor containing the position type
-/// @parm count      The number of points to generate
-/// @parm spread     The spread of points from the voxel center
-/// @parm rand01     The random number generator, expected to produce floating point
-///                  values between 0 and 1.
+/// @param leaf       The leaf node to initialize
+/// @param descriptor The descriptor containing the position type
+/// @param count      The number of points to generate
+/// @param spread     The spread of points from the voxel center
+/// @param rand01     The random number generator, expected to produce floating point
+///                   values between 0 and 1.
 template<typename PositionType,
          typename CodecT,
          typename RandGenT,
@@ -216,7 +216,7 @@ generatePositions(LeafNodeT& leaf,
     using ValueType = typename PositionTraits::ElementType;
     using PositionWriteHandle = AttributeWriteHandle<PositionType, CodecT>;
 
-    leaf.initializeAttributes(descriptor, count);
+    leaf.initializeAttributes(descriptor, static_cast<Index>(count));
 
     // directly expand to avoid needlessly setting uniform values in the
     // write handle
@@ -229,7 +229,7 @@ generatePositions(LeafNodeT& leaf,
         P[0] = (spread * (rand01() - ValueType(0.5)));
         P[1] = (spread * (rand01() - ValueType(0.5)));
         P[2] = (spread * (rand01() - ValueType(0.5)));
-        pHandle.set(index, P);
+        pHandle.set(static_cast<Index>(index), P);
     }
 }
 
@@ -307,7 +307,7 @@ uniformPointScatter(const GridT& grid,
     if (remainder == 0) {
         return denseUniformPointScatter<
             GridT, RandGenT, PositionArrayT, PointDataGridT, InterrupterT>(
-                grid, pointsPerVoxel, seed, spread, interrupter);
+                grid, float(pointsPerVoxel), seed, spread, interrupter);
     }
 
     std::vector<Index64> voxelOffsets, values;
@@ -383,7 +383,7 @@ uniformPointScatter(const GridT& grid,
         Index32 offset(0);
         for (auto iter = leaf->beginValueAll(); iter; ++iter) {
             if (iter.isValueOn()) {
-                const Index32 value = pointsPerVolume + Index32(*iter);
+                const Index32 value = Index32(pointsPerVolume + Index32(*iter));
                 if (value == 0) leaf->setValueOff(iter.pos());
                 else            offset += value;
             }

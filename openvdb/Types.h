@@ -117,6 +117,7 @@ class ValueMask {};
 
 // Use Boost shared pointers in OpenVDB 3 ABI compatibility mode.
 template<typename T> using SharedPtr = boost::shared_ptr<T>;
+template<typename T> using WeakPtr = boost::weak_ptr<T>;
 
 template<typename T, typename U> inline SharedPtr<T>
 ConstPtrCast(const SharedPtr<U>& ptr) { return boost::const_pointer_cast<T, U>(ptr); }
@@ -131,6 +132,7 @@ StaticPtrCast(const SharedPtr<U>& ptr) { return boost::static_pointer_cast<T, U>
 
 // Use STL shared pointers from OpenVDB 4 on.
 template<typename T> using SharedPtr = std::shared_ptr<T>;
+template<typename T> using WeakPtr = std::weak_ptr<T>;
 
 /// @brief Return a new shared pointer that points to the same object
 /// as the given pointer but with possibly different <TT>const</TT>-ness.

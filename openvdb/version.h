@@ -33,12 +33,11 @@
 ///
 /// @details
 /// When the library is built with the latest ABI, its namespace has the form
-/// <B>openvdb::vX_Y_Z</B>, where @e X, @e Y and @e Z are the major, minor
-/// and patch version numbers, respectively.
+/// <B>openvdb::vX_Y</B>, where @e X and @e Y are the major and minor version numbers.
 ///
 /// The library can be built using an older ABI by changing the value of the
 /// @b OPENVDB_ABI_VERSION_NUMBER macro (e.g., via <TT>-DOPENVDB_ABI_VERSION_NUMBER=<I>N</I></TT>).
-/// In that case, the namespace has the form <B>openvdb::vX_Y_ZabiN</B>,
+/// In that case, the namespace has the form <B>openvdb::vX_YabiN</B>,
 /// where N is the ABI version number.
 /// The ABI version must be set consistently when building code that depends on OpenVDB.
 ///
@@ -121,25 +120,23 @@
     ///
     /// When the ABI version number matches the library major version number,
     /// symbols are named as in the following examples:
-    /// - @b openvdb::vX_Y_Z::Vec3i
-    /// - @b openvdb::vX_Y_Z::io::File
-    /// - @b openvdb::vX_Y_Z::tree::Tree
+    /// - @b openvdb::vX_Y::Vec3i
+    /// - @b openvdb::vX_Y::io::File
+    /// - @b openvdb::vX_Y::tree::Tree
     ///
-    /// where X, Y and Z are the major, minor and patch version numbers, respectively.
+    /// where X and Y are the major and minor version numbers.
     ///
     /// When the ABI version number does not match the library major version number,
     /// symbol names include the ABI version:
-    /// - @b openvdb::vX_Y_ZabiN::Vec3i
-    /// - @b openvdb::vX_Y_ZabiN::io::File
-    /// - @b openvdb::vX_Y_ZabiN::tree::Tree
+    /// - @b openvdb::vX_YabiN::Vec3i
+    /// - @b openvdb::vX_YabiN::io::File
+    /// - @b openvdb::vX_YabiN::tree::Tree
     ///
-    /// where X, Y, Z and N are the major, minor, patch and ABI version numbers, respectively.
+    /// where X, Y and N are the major, minor and ABI version numbers, respectively.
     #define OPENVDB_VERSION_NAME                                            \
         OPENVDB_PREPROC_CONCAT(v,                                           \
         OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,        \
-        OPENVDB_PREPROC_CONCAT(_,                                           \
-        OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MINOR_VERSION_NUMBER,        \
-        OPENVDB_PREPROC_CONCAT(_, OPENVDB_LIBRARY_PATCH_VERSION_NUMBER)))))
+        OPENVDB_PREPROC_CONCAT(_, OPENVDB_LIBRARY_MINOR_VERSION_NUMBER)))
 #else
     // This duplication of code is necessary to avoid issues with recursive macro expansion.
     #define OPENVDB_VERSION_NAME                                            \
@@ -147,9 +144,7 @@
         OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,        \
         OPENVDB_PREPROC_CONCAT(_,                                           \
         OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MINOR_VERSION_NUMBER,        \
-        OPENVDB_PREPROC_CONCAT(_,                                           \
-        OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_PATCH_VERSION_NUMBER,        \
-        OPENVDB_PREPROC_CONCAT(abi, OPENVDB_ABI_VERSION_NUMBER)))))))
+        OPENVDB_PREPROC_CONCAT(abi, OPENVDB_ABI_VERSION_NUMBER)))))
 #endif
 
 /// @brief Library version number string of the form "<major>.<minor>.<patch>"
@@ -179,7 +174,7 @@
 
 /// By default, the @b OPENVDB_REQUIRE_VERSION_NAME macro is undefined, and
 /// symbols from the version namespace are promoted to the top-level namespace
-/// so that, for example, @b openvdb::v1_0_0::io::File can be referred to
+/// so that, for example, @b openvdb::v5_0::io::File can be referred to
 /// simply as @b openvdb::io::File.
 ///
 /// When @b OPENVDB_REQUIRE_VERSION_NAME is defined, symbols must be

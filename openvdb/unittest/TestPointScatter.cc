@@ -48,8 +48,8 @@ class TestPointScatter: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointScatter);
     CPPUNIT_TEST(testUniformPointScatter);
@@ -216,7 +216,7 @@ TestPointScatter::testUniformPointScatter()
     AttributeHandle<Vec3f, NullCodec>::Ptr pHandle =
         AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.5f);
         CPPUNIT_ASSERT(P[0] <= 0.5f);
         CPPUNIT_ASSERT(P[1] >=-0.5f);
@@ -242,9 +242,9 @@ TestPointScatter::testUniformPointScatter()
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
 
     const Vec3f secondPosition = pHandle->get(0);
-    CPPUNIT_ASSERT(firstPosition[0] != secondPosition[0]);
-    CPPUNIT_ASSERT(firstPosition[1] != secondPosition[1]);
-    CPPUNIT_ASSERT(firstPosition[2] != secondPosition[2]);
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[0], secondPosition[0]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[1], secondPosition[1]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[2], secondPosition[2]));
 
     // Test spread
 
@@ -261,7 +261,7 @@ TestPointScatter::testUniformPointScatter()
 
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.2f);
         CPPUNIT_ASSERT(P[0] <= 0.2f);
         CPPUNIT_ASSERT(P[1] >=-0.2f);
@@ -463,7 +463,7 @@ TestPointScatter::testDenseUniformPointScatter()
     AttributeHandle<Vec3f, NullCodec>::Ptr pHandle =
         AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.5f);
         CPPUNIT_ASSERT(P[0] <= 0.5f);
         CPPUNIT_ASSERT(P[1] >=-0.5f);
@@ -489,9 +489,9 @@ TestPointScatter::testDenseUniformPointScatter()
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
 
     const Vec3f secondPosition = pHandle->get(0);
-    CPPUNIT_ASSERT(firstPosition[0] != secondPosition[0]);
-    CPPUNIT_ASSERT(firstPosition[1] != secondPosition[1]);
-    CPPUNIT_ASSERT(firstPosition[2] != secondPosition[2]);
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[0], secondPosition[0]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[1], secondPosition[1]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[2], secondPosition[2]));
 
     // Test spread
 
@@ -508,7 +508,7 @@ TestPointScatter::testDenseUniformPointScatter()
 
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.2f);
         CPPUNIT_ASSERT(P[0] <= 0.2f);
         CPPUNIT_ASSERT(P[1] >=-0.2f);
@@ -636,7 +636,7 @@ TestPointScatter::testNonUniformPointScatter()
     AttributeHandle<Vec3f, NullCodec>::Ptr pHandle =
         AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.5f);
         CPPUNIT_ASSERT(P[0] <= 0.5f);
         CPPUNIT_ASSERT(P[1] >=-0.5f);
@@ -662,9 +662,9 @@ TestPointScatter::testNonUniformPointScatter()
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
 
     const Vec3f secondPosition = pHandle->get(0);
-    CPPUNIT_ASSERT(firstPosition[0] != secondPosition[0]);
-    CPPUNIT_ASSERT(firstPosition[1] != secondPosition[1]);
-    CPPUNIT_ASSERT(firstPosition[2] != secondPosition[2]);
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[0], secondPosition[0]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[1], secondPosition[1]));
+    CPPUNIT_ASSERT(!math::isExactlyEqual(firstPosition[2], secondPosition[2]));
 
     // Test spread
 
@@ -681,7 +681,7 @@ TestPointScatter::testNonUniformPointScatter()
 
     pHandle = AttributeHandle<Vec3f, NullCodec>::create(*array);
     for (size_t i = 0; i < size; ++i) {
-        const Vec3f P = pHandle->get(i);
+        const Vec3f P = pHandle->get(Index(i));
         CPPUNIT_ASSERT(P[0] >=-0.2f);
         CPPUNIT_ASSERT(P[0] <= 0.2f);
         CPPUNIT_ASSERT(P[1] >=-0.2f);
@@ -696,7 +696,7 @@ TestPointScatter::testNonUniformPointScatter()
 
     // tets negative values equate to 0
     countGrid.tree().setValueOn(Coord(0), -1);
-    for (size_t i = 1; i < 8; ++i) {
+    for (int i = 1; i < 8; ++i) {
         countGrid.tree().setValueOn(Coord(i), i);
     }
 
@@ -706,11 +706,11 @@ TestPointScatter::testNonUniformPointScatter()
     CPPUNIT_ASSERT_EQUAL(Index64(7), points->activeVoxelCount());
     CPPUNIT_ASSERT_EQUAL(Index64(pointsPerVoxel * 28), pointCount(points->tree()));
 
-    for (size_t i = 1; i < 8; ++i) {
+    for (int i = 1; i < 8; ++i) {
         CPPUNIT_ASSERT(points->tree().isValueOn(Coord(i)));
         auto& value = points->tree().getValue(Coord(i));
         Index32 expected(0);
-        for (size_t j = i; j > 0; --j) expected += j;
+        for (Index32 j = i; j > 0; --j) expected += j;
         CPPUNIT_ASSERT_EQUAL(Index32(expected * pointsPerVoxel), Index32(value));
     }
 

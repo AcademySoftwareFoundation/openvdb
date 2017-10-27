@@ -76,13 +76,16 @@ endif
 # library makefile)
 DESTDIR := /tmp/OpenVDB
 
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
+
 # The directory into which to install Houdini SOPs
 HOUDINI_DESTDIR := $(HIH)/dso
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(DESTDIR)/lib
+OPENVDB_LIB_DIR := $(DESTDIR_LIB_DIR)
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
@@ -507,14 +510,14 @@ install: houdinilib houdinisops mantradsos
 	    $(DESTDIR)/include/houdini_utils/
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBHOUDINI) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR_LIB_DIR)
+	@echo "Created $(DESTDIR_LIB_DIR)"
+	cp -f $(LIBHOUDINI) $(DESTDIR_LIB_DIR)
+	pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
 	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb_houdini to $(DESTDIR_LIB_DIR)"
 
 install: install_lib houdinisops
 

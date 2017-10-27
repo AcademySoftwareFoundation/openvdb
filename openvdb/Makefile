@@ -87,6 +87,7 @@
 # The directory into which to install libraries, executables and header files
 DESTDIR := /tmp/OpenVDB
 
+# The directory into which to install libraries (e.g., for Linux multiarch support)
 DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The parent directory of the boost/ header directory
@@ -662,7 +663,7 @@ else
 LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
 LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
-LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBOPENVDB_SONAME)
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBOPENVDB_SONAME)
 endif
 
 # TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
@@ -677,7 +678,7 @@ else
 LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
 LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
 LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
-LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBVIEWER_SONAME)
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb
@@ -693,7 +694,7 @@ ifeq (no,$(strip $(shared)))
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
     LIBVIEWER := $(LIBVIEWER_SHARED)
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR_LIB_DIR)
 endif # shared
 
 DEPEND := dependencies
