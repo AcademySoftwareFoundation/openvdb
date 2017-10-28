@@ -14,19 +14,30 @@ Version 5.0.0 - In development
     New features:
     - Added a getLibraryAbiVersionString() function, which returns a
       string such as "5.0.0abi3".
+    - Added a WeakPtr type alias for ABI compatibility.
+    - Added a DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
+      [Contributed by Mathieu Malaterre]
     - Added tools to create potential flow fields, as described in the
-      2017 SIGGRAPH OpenVDB course notes.
+      2017 SIGGRAPH OpenVDB course.
       [Contributed by Double Negative]
+    - Added tools to scatter OpenVDB points randomly throughout a volume.
+      [Contributed by Nick Avramoussis]
 
     Bug fixes:
     - Fixed bugs in tools::ClosestSurfacePoint's distance calculations
       that caused searches to produce incorrect results.
+    - Fixed a locking issue that affected multithreaded access to
+      PointDataLeafNodes when delayed loading was in effect.
+      [Contributed by Dan Bailey]
 
     ABI changes:
     - Made tree::InternalNode's destructor non-virtual.
     - The fix for a delayed-loading race condition in the LeafBuffer class
       that was only partially rolled out in the previous release is now
       enabled on all platforms.
+    - Replaced a points::AttributeArray bit flag with an atomic integer
+      to address a threading issue during delayed loading.
+      [Contributed by Dan Bailey]
     - Deprecated the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE
       macros in favor of a new OPENVDB_ABI_VERSION_NUMBER macro.
       The new macro defaults to the library major version number but can be
@@ -42,10 +53,10 @@ Version 5.0.0 - In development
     - Removed methods that were deprecated in version 4.0.0 or earlier,
       including io::File::readGridPartial(), points::initialize(),
       points::uninitialize() and util::PagedArray::pop_back().
-    - Changed the naming scheme for the library namespace from openvdb::vX_Y_Z
-      to openvdb::vX_Y_ZabiN (where X, Y, Z and N are the major, minor, patch
-      and ABI version numbers, respectively), but only when the library
-      is built using an older ABI version.
+    - Changed the naming scheme for the library namespace from
+      openvdb::vX_Y_Z to openvdb::vX_YabiN, where X, Y and N are the major,
+      minor and ABI version numbers, respectively.  The abiN suffix is
+      added only when the library is built using an older ABI version.
 
     Python:
     - Reimplemented NumPy support for Boost 1.65 compatibility.
@@ -65,6 +76,8 @@ Version 5.0.0 - In development
       method for the creation of menus of attributes.
     - Added a Potential Flow SOP.
       [Contributed by Double Negative]
+    - Added point data grid support to the Scatter SOP.
+      [Contributed by Nick Avramoussis]
 
 
 Version 4.0.2 - July 28, 2017

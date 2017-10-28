@@ -23,16 +23,26 @@ New features:
 - Added a @vdblink::getLibraryAbiVersionString()
   getLibraryAbiVersionString@endlink function, which returns a
   string such as <TT>"5.0.0abi3"</TT>.
+- Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI compatibility.
+- Added a @c DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
+  <I>[Contributed&nbsp;by&nbsp;Mathieu&nbsp;Malaterre]</I>
 - Added tools to create @link tools/PotentialFlow.h potential flow@endlink
-  fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB
-  <A HREF="http://www.openvdb.org/documentation/">course&nbsp;notes</A>.
+  fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB course.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @link points/PointScatter.h tools@endlink to scatter
+  @ref secPtOverview "OpenVDB points" randomly throughout a volume.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 @par
 Bug fixes:
 - Fixed bugs in the
   @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink tool&rsquo;s
   distance calculations that caused searches to produce incorrect results.
+- Fixed a locking issue that affected multithreaded access to
+  @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink&zwj;s
+  when delayed loading was in effect.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
 
 @anchor v5_0_0_ABI_changes
 @par
@@ -42,6 +52,10 @@ ABI changes:
 - The @ref v4_0_2_delayed_load_fix "fix" for a delayed-loading race condition
   in the @vdblink::tree::LeafBuffer LeafBuffer@endlink class that was only
   partially rolled out in the previous release is now enabled on all platforms.
+- Replaced a bit flag with an atomic integer in
+  @vdblink::points::AttributeArray points::AttributeArray@endlink
+  to address a threading issue during delayed loading.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Deprecated the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
   macros in favor of a new @c OPENVDB_ABI_VERSION_NUMBER macro.
   The new macro defaults to the library major version number but can be
@@ -61,12 +75,13 @@ API changes:
   including @b io::File::readGridPartial, @b points::initialize,
   @b points::uninitialize and @b util::PagedArray::pop_back.
 - Changed the naming scheme for the
-  @link OPENVDB_VERSION_NAME library namespace@endlink from
-  <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I> to
-  <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I><B>abi</B><I>N</I>
-  (where @e X, @e Y, @e Z and @e N are the major, minor, patch
-  and ABI version numbers, respectively), but only when the library
-  is built using an older ABI version.
+  @link OPENVDB_VERSION_NAME library namespace@endlink
+  from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
+  to <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>abi</B><I>N</I>,
+  where @e X, @e Y, @e Z and @e N are the major, minor, patch and ABI
+  version numbers, respectively.
+  The <B>abi</B><I>N</I> suffix is added only when the library is built
+  using an older ABI version.
 
 @par
 Python:
@@ -88,6 +103,8 @@ Houdini:
   method for the creation of menus of attributes.
 - Added a Potential&nbsp;Flow&nbsp;SOP.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added point data grid support to the Scatter&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 
 @htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly

@@ -37,7 +37,7 @@
 #ifndef OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
+#include <openvdb/Platform.h>
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
@@ -52,7 +52,7 @@
 
 #include <cmath> // for std::isfinite()
 #include <map>
-#include <memory> // for auto_ptr/unique_ptr
+#include <memory>
 #include <set>
 #include <type_traits>
 #include <vector>
@@ -197,18 +197,20 @@ struct VolumeToMesh
 
     //////////
 
+    /// @{
     // Mesh data accessors
-
-	const size_t& pointListSize() const;
-	PointList& pointList();
-	const PointList& pointList() const;
-
-    const size_t& polygonPoolListSize() const;
-    PolygonPoolList& polygonPoolList();
-    const PolygonPoolList& polygonPoolList() const;
-
-    std::vector<uint8_t>& pointFlags();
-    const std::vector<uint8_t>& pointFlags() const;
+    
+    size_t pointListSize() const { return mPointListSize; }
+    PointList& pointList() { return mPoints; }
+    const PointList& pointList() const { return mPoints; }
+    
+    size_t polygonPoolListSize() const { return mPolygonPoolListSize; }
+    PolygonPoolList& polygonPoolList() { return mPolygons; }
+    const PolygonPoolList& polygonPoolList() const { return mPolygons; }
+    
+    std::vector<uint8_t>& pointFlags() { return mPointFlags; }
+    const std::vector<uint8_t>& pointFlags() const { return mPointFlags; }
+    /// @}
 
 
     //////////
@@ -4831,50 +4833,7 @@ VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity, bool relaxDisorie
     , mRelaxDisorientedTriangles(relaxDisorientedTriangles)
     , mQuantizedSeamPoints(nullptr)
     , mPointFlags(0)
-{
-}
-
-
-inline PointList&
-VolumeToMesh::pointList()
-{
-    return mPoints;
-}
-
-
-inline const PointList&
-VolumeToMesh::pointList() const
-{
-	return mPoints;
-}
-
-
-inline const size_t&
-VolumeToMesh::pointListSize() const
-{
-    return mPointListSize;
-}
-
-
-inline PolygonPoolList&
-VolumeToMesh::polygonPoolList()
-{
-    return mPolygons;
-}
-
-
-inline const PolygonPoolList&
-VolumeToMesh::polygonPoolList() const
-{
-    return mPolygons;
-}
-
-
-inline const size_t&
-VolumeToMesh::polygonPoolListSize() const
-{
-    return mPolygonPoolListSize;
-}
+{}
 
 
 inline void
@@ -4910,20 +4869,6 @@ inline void
 VolumeToMesh::setAdaptivityMask(const TreeBase::ConstPtr& tree)
 {
    mAdaptivityMaskTree = tree;
-}
-
-
-inline std::vector<uint8_t>&
-VolumeToMesh::pointFlags()
-{
-    return mPointFlags;
-}
-
-
-inline const std::vector<uint8_t>&
-VolumeToMesh::pointFlags() const
-{
-    return mPointFlags;
 }
 
 

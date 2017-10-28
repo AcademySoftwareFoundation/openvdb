@@ -40,8 +40,8 @@ PROJECT_NAME           = "OpenVDB"
 
 PROJECT_NUMBER         = 5.0.0
 
-ALIASES += vdbnamespace="openvdb::v5_0_0"
-PREDEFINED = OPENVDB_VERSION_NAME=v5_0_0
+ALIASES += vdbnamespace="openvdb::v5_0"
+PREDEFINED = OPENVDB_VERSION_NAME=v5_0
 PREDEFINED += OPENVDB_ABI_VERSION_NUMBER=5
 
 PREDEFINED += __declspec(x):= __attribute__(x):=

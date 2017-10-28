@@ -61,13 +61,16 @@ endif
 # library makefile)
 DESTDIR := /tmp/OpenVDB
 
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
+
 # The directory into which to install Maya plugins, scripts, etc.
 MAYA_DESTDIR := $(DESTDIR)/maya
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(DESTDIR)/lib
+OPENVDB_LIB_DIR := $(DESTDIR_LIB_DIR)
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
