@@ -44,6 +44,7 @@
 #include "AttributeSet.h"
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
+#include "PointCount.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
