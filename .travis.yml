@@ -42,6 +42,12 @@ os: linux
 # Build with Clang only as GCC is slower and consumes more memory during compilation
 compiler: clang
 
+# Enable ccache for faster re-builds
+cache:
+  ccache: true
+  directories:
+    - $HOME/.ccache
+
 # Setup environment variables for different concurrent builds
 env:
   # Build and run unit tests for ABI={3,4,5}
