@@ -86,10 +86,10 @@ template<typename T> struct GAHandleTraits    { using RW = GA_RWHandleF; using R
 template<> struct GAHandleTraits<bool>        { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int16_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int32_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
-template<> struct GAHandleTraits<int64_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
-template<> struct GAHandleTraits<half>        { using RW = GA_RWHandleF; using RO = GA_ROHandleF; };
+template<> struct GAHandleTraits<int64_t>     { using RW = GA_RWHandleID; using RO = GA_ROHandleID; };
+template<> struct GAHandleTraits<half>        { using RW = GA_RWHandleH; using RO = GA_ROHandleH; };
 template<> struct GAHandleTraits<float>       { using RW = GA_RWHandleF; using RO = GA_ROHandleF; };
-template<> struct GAHandleTraits<double>      { using RW = GA_RWHandleF; using RO = GA_ROHandleF; };
+template<> struct GAHandleTraits<double>      { using RW = GA_RWHandleD; using RO = GA_ROHandleD; };
 template<> struct GAHandleTraits<std::string> { using RW = GA_RWHandleS; using RO = GA_ROHandleS; };
 template<>
 struct GAHandleTraits<openvdb::math::Vec3<int>> { using RW=GA_RWHandleV3; using RO=GA_ROHandleV3; };
@@ -179,9 +179,11 @@ inline openvdb::math::Mat4<float>
 readAttributeValue(const GA_ROHandleM4& handle, const GA_Offset offset,
     const openvdb::Index component)
 {
+    // read transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
     const UT_Matrix4F value(handle.get(offset, component));
     openvdb::math::Mat4<float> dstValue(value.data());
-    return dstValue;
+    return dstValue.transpose();
 }
 
 template<>
@@ -189,9 +191,11 @@ inline openvdb::math::Mat4<double>
 readAttributeValue(const GA_ROHandleM4D& handle, const GA_Offset offset,
     const openvdb::Index component)
 {
+    // read transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
     const UT_Matrix4D value(handle.get(offset, component));
     openvdb::math::Mat4<double> dstValue(value.data());
-    return dstValue;
+    return dstValue.transpose();
 }
 
 template<>
@@ -259,11 +263,13 @@ inline void
 writeAttributeValue(const GA_RWHandleM4& handle, const GA_Offset offset,
     const openvdb::Index component, const openvdb::math::Mat4<float>& value)
 {
+    // write transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
     const float* data(value.asPointer());
-    handle.set(offset, component, UT_Matrix4F(data[0], data[1], data[2], data[3],
-                                              data[4], data[5], data[6], data[7],
-                                              data[8], data[9], data[10], data[11],
-                                              data[12], data[13], data[14], data[15]));
+    handle.set(offset, component, UT_Matrix4F(data[0], data[4], data[8], data[12],
+                                              data[1], data[5], data[9], data[13],
+                                              data[2], data[6], data[10], data[14],
+                                              data[3], data[7], data[11], data[15]));
 }
 
 template<>
@@ -271,11 +277,13 @@ inline void
 writeAttributeValue(const GA_RWHandleM4D& handle, const GA_Offset offset,
     const openvdb::Index component, const openvdb::math::Mat4<double>& value)
 {
+    // write transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
     const double* data(value.asPointer());
-    handle.set(offset, component, UT_Matrix4D(data[0], data[1], data[2], data[3],
-                                              data[4], data[5], data[6], data[7],
-                                              data[8], data[9], data[10], data[11],
-                                              data[12], data[13], data[14], data[15]));
+    handle.set(offset, component, UT_Matrix4D(data[0], data[4], data[8], data[12],
+                                              data[1], data[5], data[9], data[13],
+                                              data[2], data[6], data[10], data[14],
+                                              data[3], data[7], data[11], data[15]));
 }
 
 template<>
