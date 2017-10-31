@@ -187,38 +187,69 @@ TestMetaMap::testIO()
     MetaMap meta2;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
+#if OPENVDB_ABI_VERSION_NUMBER < 5
     CPPUNIT_ASSERT_EQUAL(0, int(meta2.metaCount()));
+#else
+    CPPUNIT_ASSERT_EQUAL(3, int(meta2.metaCount()));
+
+    // Verify that writing metadata of unknown type (i.e., UnknownMetadata) is possible.
+    std::ostringstream ostrUnknown(std::ios_base::binary);
+    meta2.writeMeta(ostrUnknown);
+#endif
 
     // Register just one of the three types, then reread and verify that
     // the value of the registered type can be retrieved.
     Int32Metadata::registerType();
     istr.seekg(0, std::ios_base::beg);
     CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-    CPPUNIT_ASSERT_EQUAL(size_t(1), meta2.metaCount());
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+    CPPUNIT_ASSERT_EQUAL(3, int(meta2.metaCount()));
+#else
+    CPPUNIT_ASSERT_EQUAL(1, int(meta2.metaCount()));
+#endif
     CPPUNIT_ASSERT_EQUAL(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
 
     // Register the remaining types.
     StringMetadata::registerType();
     DoubleMetadata::registerType();
 
-    // Now seek to beginning and read again.
-    istr.seekg(0, std::ios_base::beg);
-    meta2.clearMetadata();
+    {
+        // Now seek to beginning and read again.
+        istr.seekg(0, std::ios_base::beg);
+        meta2.clearMetadata();
 
-    CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-    CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
+        CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
+        CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
 
-    std::string val = meta.metaValue<std::string>("meta1");
-    std::string val2 = meta2.metaValue<std::string>("meta1");
-    CPPUNIT_ASSERT_EQUAL(0, val.compare(val2));
+        std::string val = meta.metaValue<std::string>("meta1");
+        std::string val2 = meta2.metaValue<std::string>("meta1");
+        CPPUNIT_ASSERT_EQUAL(0, val.compare(val2));
 
-    int intval = meta.metaValue<int>("meta2");
-    int intval2 = meta2.metaValue<int>("meta2");
-    CPPUNIT_ASSERT_EQUAL(intval, intval2);
+        int intval = meta.metaValue<int>("meta2");
+        int intval2 = meta2.metaValue<int>("meta2");
+        CPPUNIT_ASSERT_EQUAL(intval, intval2);
 
-    double dval = meta.metaValue<double>("meta3");
-    double dval2 = meta2.metaValue<double>("meta3");
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(dval, dval2,0);
+        double dval = meta.metaValue<double>("meta3");
+        double dval2 = meta2.metaValue<double>("meta3");
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dval, dval2,0);
+    }
+    {
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+        // Verify that metadata that was written as UnknownMetadata can
+        // be read as typed metadata once the underlying types are registered.
+        std::istringstream istrUnknown(ostrUnknown.str(), std::ios_base::binary);
+
+        meta2.clearMetadata();
+        CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istrUnknown));
+
+        CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
+        CPPUNIT_ASSERT_EQUAL(
+            meta.metaValue<std::string>("meta1"), meta2.metaValue<std::string>("meta1"));
+        CPPUNIT_ASSERT_EQUAL(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            meta.metaValue<double>("meta3"), meta2.metaValue<double>("meta3"), 0.0);
+#endif
+    }
 
     // Clear the registry once the test is done.
     Metadata::clearRegistry();

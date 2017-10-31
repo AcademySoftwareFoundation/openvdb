@@ -24,6 +24,9 @@ New features:
   getLibraryAbiVersionString@endlink function, which returns a
   string such as <TT>"5.0.0abi3"</TT>.
 - Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI compatibility.
+- Metadata fields of unregistered types are no longer discarded after
+  being read from a <TT>.vdb</TT> file, and although their values are not
+  printable, they can be written back to disk.
 - Added a @c DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
   <I>[Contributed&nbsp;by&nbsp;Mathieu&nbsp;Malaterre]</I>
 - Added tools to create @link tools/PotentialFlow.h potential flow@endlink
@@ -32,6 +35,12 @@ New features:
 - Added @link points/PointScatter.h tools@endlink to scatter
   @ref secPtOverview "OpenVDB points" randomly throughout a volume.
   <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+
+@par
+Improvements:
+- Significantly improved the performance of point data grid
+  @vdblink::points::MultiGroupFilter group filters@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 @par
 Bug fixes:
@@ -74,6 +83,8 @@ API changes:
 - Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
   including @b io::File::readGridPartial, @b points::initialize,
   @b points::uninitialize and @b util::PagedArray::pop_back.
+- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
+  in favor of @vdblink::ValueError ValueError@endlink.
 - Changed the naming scheme for the
   @link OPENVDB_VERSION_NAME library namespace@endlink
   from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>

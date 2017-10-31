@@ -15,6 +15,9 @@ Version 5.0.0 - In development
     - Added a getLibraryAbiVersionString() function, which returns a
       string such as "5.0.0abi3".
     - Added a WeakPtr type alias for ABI compatibility.
+    - Metadata fields of unregistered types are no longer discarded after
+      being read from a .vdb file, and although their values are not printable,
+      they can be written back to disk.
     - Added a DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
       [Contributed by Mathieu Malaterre]
     - Added tools to create potential flow fields, as described in the
@@ -22,6 +25,10 @@ Version 5.0.0 - In development
       [Contributed by Double Negative]
     - Added tools to scatter OpenVDB points randomly throughout a volume.
       [Contributed by Nick Avramoussis]
+
+    Improvements:
+    - Significantly improved the performance of point data grid group filters.
+      [Contributed by Double Negative]
 
     Bug fixes:
     - Fixed bugs in tools::ClosestSurfacePoint's distance calculations
@@ -53,10 +60,12 @@ Version 5.0.0 - In development
     - Removed methods that were deprecated in version 4.0.0 or earlier,
       including io::File::readGridPartial(), points::initialize(),
       points::uninitialize() and util::PagedArray::pop_back().
+    - Deprecated IllegalValueException in favor of ValueError.
     - Changed the naming scheme for the library namespace from
-      openvdb::vX_Y_Z to openvdb::vX_YabiN, where X, Y and N are the major,
-      minor and ABI version numbers, respectively.  The abiN suffix is
-      added only when the library is built using an older ABI version.
+      openvdb::vX_Y_Z to openvdb::vX_YabiN, where X, Y, Z and N are
+      the major, minor, patch and ABI version numbers, respectively.
+      The abiN suffix is added only when the library is built using
+      an older ABI version.
 
     Python:
     - Reimplemented NumPy support for Boost 1.65 compatibility.
