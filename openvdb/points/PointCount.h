@@ -236,7 +236,11 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 template <typename PointDataTreeT>
 Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilter groupFilter(name);
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    GroupFilter groupFilter(name, iter->attributeSet());
     return point_count_internal::filterPointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
@@ -244,7 +248,11 @@ Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool
 template <typename PointDataTreeT>
 Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilter groupFilter(name);
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    GroupFilter groupFilter(name, iter->attributeSet());
     return point_count_internal::filterActivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
@@ -252,7 +260,11 @@ Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, cons
 template <typename PointDataTreeT>
 Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilter groupFilter(name);
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    GroupFilter groupFilter(name, iter->attributeSet());
     return point_count_internal::filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
@@ -284,7 +296,7 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
 
         if (useGroup) {
             auto iter = leaf.beginValueOn();
-            MultiGroupFilter filter(includeGroups, excludeGroups);
+            MultiGroupFilter filter(includeGroups, excludeGroups, leaf.attributeSet());
             filter.reset(leaf);
             IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter> filterIndexIter(iter, filter);
             pointOffset += iterCount(filterIndexIter);

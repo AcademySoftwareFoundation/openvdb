@@ -1119,7 +1119,10 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
 {
-    GroupFilter filter(groupName);
+    if (!this->attributeSet().descriptor().hasGroup(groupName)) {
+        return Index64(0);
+    }
+    GroupFilter filter(groupName, this->attributeSet());
     return iterCount(this->beginIndexAll(filter));
 }
 

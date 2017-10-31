@@ -89,30 +89,19 @@ inline void deleteFromGroup(PointDataTree& pointTree, const std::string& group,
 namespace point_delete_internal {
 
 
-template <typename PointDataTreeT>
-struct DeleteGroupsOp
+template <typename PointDataTreeT, typename FilterT>
+struct DeleteByFilterOp
 {
     using LeafManagerT = tree::LeafManager<PointDataTreeT>;
     using LeafRangeT = typename LeafManagerT::LeafRange;
     using LeafNodeT = typename PointDataTreeT::LeafNodeType;
     using ValueType = typename LeafNodeT::ValueType;
 
-    DeleteGroupsOp(const std::vector<std::string>& groupNames, bool invert)
-        : mGroupNames(groupNames)
-        , mInvert(invert) { }
+    DeleteByFilterOp(const FilterT& filter)
+        : mFilter(filter) { }
 
     void operator()(const LeafRangeT& range) const
     {
-        // based on the invert parameter reverse the include and exclude arguments
-
-        std::unique_ptr<MultiGroupFilter> filter;
-        if (mInvert) {
-            filter.reset(new MultiGroupFilter(mGroupNames, std::vector<std::string>()));
-        }
-        else {
-            filter.reset(new MultiGroupFilter(std::vector<std::string>(), mGroupNames));
-        }
-
         for (auto leaf = range.begin(); leaf != range.end(); ++leaf)
         {
             // early-exit if the leaf has no points
@@ -120,7 +109,7 @@ struct DeleteGroupsOp
             if (size == 0)    continue;
 
             const size_t newSize =
-                iterCount(leaf->template beginIndexAll<MultiGroupFilter>(*filter));
+                iterCount(leaf->template beginIndexAll<FilterT>(mFilter));
 
             // if all points are being deleted, clear the leaf attributes
             if (newSize == 0) {
@@ -151,7 +140,7 @@ struct DeleteGroupsOp
             // now construct new attribute arrays which exclude data from deleted points
 
             for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
-                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), *filter); iter; ++iter) {
+                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter); iter; ++iter) {
                     for (size_t i = 0; i < attributeSetSize; i++) {
                         newAttributeArrays[i]->set(static_cast<Index>(attributeIndex),
                             *(existingAttributeArrays[i]), *iter);
@@ -167,9 +156,8 @@ struct DeleteGroupsOp
     }
 
 private:
-    const std::vector<std::string>& mGroupNames;
-    bool mInvert;
-}; // struct DeleteGroupsOp
+    const FilterT& mFilter;
+}; // struct DeleteByFilterOp
 
 } // namespace point_delete_internal
 
@@ -200,8 +188,17 @@ inline void deleteFromGroups(PointDataTreeT& pointTree, const std::vector<std::s
 
     if (availableGroups.empty())    return;
 
+    std::vector<std::string> empty;
+    std::unique_ptr<MultiGroupFilter> filter;
+    if (invert) {
+        filter.reset(new MultiGroupFilter(groups, empty, leafIter->attributeSet()));
+    }
+    else {
+        filter.reset(new MultiGroupFilter(empty, groups, leafIter->attributeSet()));
+    }
+
     tree::LeafManager<PointDataTreeT> leafManager(pointTree);
-    point_delete_internal::DeleteGroupsOp<PointDataTreeT> deleteOp(availableGroups, invert);
+    point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(*filter);
     tbb::parallel_for(leafManager.leafRange(), deleteOp);
 
     // drop the now-empty groups (unless invert = true)
