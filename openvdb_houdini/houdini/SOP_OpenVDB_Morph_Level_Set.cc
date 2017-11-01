@@ -39,6 +39,8 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
 #include <boost/algorithm/string/join.hpp>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -52,7 +54,7 @@ namespace {
 
 struct MorphingParms {
     MorphingParms()
-        : mLSGroup(NULL)
+        : mLSGroup(nullptr)
         , mAdvectSpatial(openvdb::math::UNKNOWN_BIAS)
         , mRenormSpatial(openvdb::math::UNKNOWN_BIAS)
         , mAdvectTemporal(openvdb::math::UNKNOWN_TIS)
@@ -121,15 +123,15 @@ class SOP_OpenVDB_Morph_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Morph_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Morph_Level_Set() {}
+    ~SOP_OpenVDB_Morph_Level_Set() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i > 0); }
+    int isRefInput(unsigned i ) const override { return (i > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
     OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
 
@@ -143,7 +145,7 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     using namespace openvdb::math;
 
@@ -151,29 +153,46 @@ newSopOperator(OP_OperatorTable* table)
 
     // Level set grid
     parms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Source Level Set")
-              .setHelpText("Level set grid(s) to morph.")
-              .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setDocumentation(
+            "A subset of the input level set VDBs to be morphed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // Target grid
     parms.add(hutil::ParmFactory(PRM_STRING, "targetGroup", "Target Level Set")
-              .setHelpText("Velocity grid")
-              .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setDocumentation(
+            "The target level set VDB (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
-              .setDefault(PRMoneDefaults)
-              .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-              .setHelpText("Enable / disable the mask."));
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("Enable / disable the mask.")
+        .setDocumentation(nullptr));
 
     // Alpha grid
     parms.add(hutil::ParmFactory(PRM_STRING, "maskGroup", "Alpha Mask")
-         .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-        .setChoiceList(&hutil::PrimGroupMenuInput3));
+        .setChoiceList(&hutil::PrimGroupMenuInput3)
+        .setTooltip(
+            "An optional scalar VDB to be used for alpha masking"
+            " (see [specifying volumes|/model/volumes#group])\n\n"
+            "Voxel values are assumed to be between 0 and 1."));
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "morphingHeading", "Morphing"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "morphingHeading", "Morphing").
+        setDocumentation(
+            "These parameters control how the SDF moves from the source to the target."));
 
     // Advect: timestep
     parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
-        .setDefault(1, "1.0/$FPS"));
+        .setDefault(1, "1.0/$FPS")
+        .setDocumentation(
+            "The number of seconds of movement to apply to the input points\n\n"
+            "The default is `1/$FPS` (one frame's worth of time).\n\n"
+            "TIP:\n"
+            "    This parameter can be animated through time using the `$T`\n"
+            "    expression. To control how fast the morphing is done, multiply `$T`\n"
+            "    by a scale factor. For example, to animate it twice as fast, use\n"
+            "    the expression, `$T*2`.\n"));
 
     // Advect: spatial menu
     {
@@ -188,7 +207,11 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "advectSpatial", "Spatial Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
-            .setHelpText("Set the spatial finite difference scheme."));
+            .setTooltip("Set the spatial finite difference scheme.")
+            .setDocumentation(
+                "How accurately the gradients of the signed distance field\n"
+                "are computed during advection\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     // Advect: temporal menu
@@ -203,15 +226,22 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "advectTemporal", "Temporal Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
-            .setHelpText("Set the temporal integration scheme."));
+            .setTooltip("Set the temporal integration scheme.")
+            .setDocumentation(
+                "How accurately time is evolved within each advection step\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", "Renormalization"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", "Renormalization")
+        .setDocumentation(
+            "After morphing the signed distance field, it will often no longer\n"
+            "contain valid distances.  A number of renormalization passes can be\n"
+            "performed to convert it back into a proper signed distance field."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Steps")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("The number of normalizations performed after each CFL iteration."));
+        .setTooltip("The number of times to renormalize between each substep."));
 
     // Renorm: spatial menu
     {
@@ -225,7 +255,11 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
-            .setHelpText("Set the spatial finite difference scheme."));
+            .setTooltip("Set the spatial finite difference scheme.")
+            .setDocumentation(
+                "How accurately the gradients of the signed distance field\n"
+                "are computed during renormalization\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     // Renorm: temporal menu
@@ -238,9 +272,12 @@ newSopOperator(OP_OperatorTable* table)
         }
 
         parms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Scheme")
-                  .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-                  .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
-                  .setHelpText("Set the temporal integration scheme."));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
+            .setTooltip("Set the temporal integration scheme.")
+            .setDocumentation(
+                "How accurately time is evolved during renormalization\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
 
@@ -248,19 +285,19 @@ newSopOperator(OP_OperatorTable* table)
 
     //Invert mask.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
-              .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+        .setTooltip("Invert the optional mask so that alpha value 0 maps to 1 and 1 maps to 0."));
 
     // Min mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-              .setHelpText("Value below which the mask values map to zero")
-              .setDefault(PRMzeroDefaults)
-              .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+        .setTooltip("Threshold below which to clamp mask values to zero"));
 
     // Max mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-              .setHelpText("Value above which the mask values map to one")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+        .setTooltip("Threshold above which to clamp mask values to one"));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -273,7 +310,27 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Source SDF VDBs to Morph")
         .addInput("Target SDF VDB")
-        .addOptionalInput("Optional VDB Alpha Mask");
+        .addOptionalInput("Optional VDB Alpha Mask")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Blend between source and target level set VDBs.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node advects a source narrow-band signed distance field\n\
+towards a target narrow-band signed distance field.\n\
+\n\
+@related\n\
+- [OpenVDB Advect|Node:sop/DW_OpenVDBAdvect]\n\
+- [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
+- [Node:sop/vdbmorphsdf]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -399,7 +456,7 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = evalInt("normSteps", 0, now);
+    parms.mNormCount = static_cast<int>(evalInt("normSteps", 0, now));
 
     const GU_Detail* targetGeo = inputGeo(1);
 
@@ -426,7 +483,7 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         return UT_ERROR_ABORT;
     }
 
-    const GU_Detail* maskGeo = evalInt("mask", 0, now) ? inputGeo(2) : NULL;
+    const GU_Detail* maskGeo = evalInt("mask", 0, now) ? inputGeo(2) : nullptr;
 
     if (maskGeo) {
         evalString(str, "maskGroup", 0, now);

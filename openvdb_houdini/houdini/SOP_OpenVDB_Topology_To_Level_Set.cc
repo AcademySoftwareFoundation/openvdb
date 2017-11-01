@@ -48,6 +48,9 @@
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 
+#include <stdexcept>
+#include <string>
+
 
 namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
@@ -58,14 +61,14 @@ class SOP_OpenVDB_Topology_To_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Topology_To_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Topology_To_Level_Set() {}
+    ~SOP_OpenVDB_Topology_To_Level_Set() override {}
 
-    virtual bool updateParmsFlags();
+    bool updateParmsFlags() override;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
@@ -124,70 +127,95 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input grids.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenu)
+        .setTooltip("Specify a subset of the input VDBs to be processed.")
+        .setDocumentation(
+            "A subset of the input VDB grids to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     {
-        const char* items[] = {
-            "keep",     "Keep Incoming VDB Names",
-            "append",   "Custom Append",
-            "replace",   "Custom Replace",
-            NULL
+        char const * const items[] = {
+            "keep",     "Keep Original Name",
+            "append",   "Add Suffix",
+            "replace",  "Custom Name",
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("Rename output grid(s)")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Output VDB naming scheme")
+            .setDocumentation(
+                "Give the output VDB the same name as the input VDB,"
+                " or add a suffix to the input name, or use a custom name."));
 
         parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
-            .setHelpText("Used to rename the input grids"));
+            .setTooltip("The suffix or custom name to be used"));
     }
 
     /// Narrow-band width {
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
+        .setDocumentation(
+            "If enabled, specify the width of the narrow band in world units,"
+            " otherwise specify it in voxels.  Voxel units work with all scales of geometry."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "bandWidth", "Half-Band in Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the half width of the narrow band. "
-            "(3 voxel units is optimal for level set operations.)"));
+        .setTooltip(
+            "Specify the half width of the narrow band in voxels."
+            " Three voxels is optimal for many level set operations."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band in World")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-        .setHelpText("Specify the half width of the narrow band."));
+        .setTooltip("Specify the half width of the narrow band in world units."));
 
     /// }
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilation", "Voxel Dilation")
-              .setDefault(PRMzeroDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-              .setHelpText("Expands the filled voxel region by the specified "
-                  "number of voxels."));
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("Expand the filled voxel region by the specified number of voxels."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "closingwidth", "Closing Width")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-              .setHelpText("First expand the filled voxel region, then shrink it "
-                  "by the specified number of voxels. This causes holes "
-                  "and valleys to be filled."));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+        .setTooltip(
+            "First expand the filled voxel region, then shrink it by the specified "
+            "number of voxels. This causes holes and valleys to be filled."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "smoothingsteps", "Smoothing Steps")
-              .setDefault(PRMzeroDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-              .setHelpText("Number of smoothing interations"));
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("Number of smoothing iterations"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Topology To Level Set",
         SOP_OpenVDB_Topology_To_Level_Set::factory, parms, *table)
         .addAlias("OpenVDB From Mask")
-        .addInput("VDB Grids");
+        .addInput("VDB Grids")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Create a level set VDB based on the active voxels of another VDB.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node creates a narrow-band level set VDB that conforms to the active voxels\n\
+of the input VDB.  This forms a shell or wrapper that can be used\n\
+to conservatively enclose the input volume.\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -244,7 +272,7 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
         gdp->clearAndDestroy();
 
         const GU_Detail* inputGeoPt = inputGeo(0);
-        if(inputGeoPt == NULL) return error();
+        if (inputGeoPt == nullptr) return error();
 
         hvdb::Interrupter boss;
 
@@ -257,11 +285,11 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
         Converter converter(*gdp, boss);
         converter.worldSpaceUnits = evalInt("worldSpaceUnits", 0, time) != 0;
         converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
-        converter.bandWidthVoxels = evalInt("bandWidth", 0, time);
-        converter.closingWidth = evalInt("closingwidth", 0, time);
-        converter.dilation = evalInt("dilation", 0, time);
-        converter.smoothingSteps = evalInt("smoothingsteps", 0, time);
-        converter.outputName = evalInt("outputName", 0, time);
+        converter.bandWidthVoxels = static_cast<int>(evalInt("bandWidth", 0, time));
+        converter.closingWidth = static_cast<int>(evalInt("closingwidth", 0, time));
+        converter.dilation = static_cast<int>(evalInt("dilation", 0, time));
+        converter.smoothingSteps = static_cast<int>(evalInt("smoothingsteps", 0, time));
+        converter.outputName = static_cast<int>(evalInt("outputName", 0, time));
         converter.customName = customName.toStdString();
 
         // Process VDB primitives

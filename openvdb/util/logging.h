@@ -33,6 +33,7 @@
 
 #ifdef OPENVDB_USE_LOG4CPLUS
 
+#include <openvdb/version.h>
 #include <log4cplus/appender.h>
 #include <log4cplus/configurator.h>
 #include <log4cplus/consoleappender.h>

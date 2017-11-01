@@ -237,6 +237,15 @@ inline void
 setStreamingMode(PointDataTreeT& tree, bool on = true);
 
 
+/// @brief  Sequentially pre-fetch all delayed-load voxel and attribute data from disk in order
+///         to accelerate subsequent random access.
+///
+/// @param  tree the PointDataTree.
+template <typename PointDataTreeT>
+inline void
+prefetch(PointDataTreeT& tree);
+
+
 ////////////////////////////////////////
 
 
@@ -1171,6 +1180,16 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
 {
     struct Local
     {
+        static void destroyPagedStream(const io::StreamMetadata::AuxDataMap& auxData, const Index index)
+        {
+            // if paged stream exists, delete it
+            std::string key("paged:" + std::to_string(index));
+            auto it = auxData.find(key);
+            if (it != auxData.end()) {
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
+            }
+        }
+
         static compression::PagedInputStream& getOrInsertPagedStream(   const io::StreamMetadata::AuxDataMap& auxData,
                                                                         const Index index)
         {
@@ -1232,9 +1251,10 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
         OPENVDB_THROW(IoError, "Cannot read in a PointDataLeaf without StreamMetadata.");
     }
 
-    const Index pass = meta->pass();
+    const Index pass(static_cast<uint16_t>(meta->pass()));
+    const Index maximumPass(static_cast<uint16_t>(meta->pass() >> 16));
 
-    const Index attributes = (this->buffers() - 4) / 2;
+    const Index attributes = (maximumPass - 4) / 2;
 
     if (pass == 0) {
         // pass 0 - voxel data sizes
@@ -1261,7 +1281,8 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
     else if (pass < (attributes + 2)) {
         // pass 2...n+2 - attribute uniform values
         const size_t attributeIndex = pass - 2;
-        AttributeArray* array = mAttributeSet->get(attributeIndex);
+        AttributeArray* array = attributeIndex < mAttributeSet->size() ?
+            mAttributeSet->get(attributeIndex) : nullptr;
         if (array) {
             compression::PagedInputStream& pagedStream =
                 Local::getOrInsertPagedStream(meta->auxData(), static_cast<Index>(attributeIndex));
@@ -1273,6 +1294,8 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
     else if (pass == attributes + 2) {
         // pass n+2 - voxel data
 
+        const Index passValue(meta->pass());
+
         // StreamMetadata pass variable used to temporarily store voxel buffer size
         io::StreamMetadata& nonConstMeta = const_cast<io::StreamMetadata&>(*meta);
         nonConstMeta.setPass(mVoxelBufferSize);
@@ -1281,12 +1304,13 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
         BaseLeaf::readBuffers(is, fromHalf);
 
         // pass now reset to original value
-        nonConstMeta.setPass(pass);
+        nonConstMeta.setPass(passValue);
     }
     else if (pass < (attributes*2 + 3)) {
         // pass n+2..2n+2 - attribute buffers
         const Index attributeIndex = pass - attributes - 3;
-        AttributeArray* array = mAttributeSet->get(attributeIndex);
+        AttributeArray* array = attributeIndex < mAttributeSet->size() ?
+            mAttributeSet->get(attributeIndex) : nullptr;
         if (array) {
             compression::PagedInputStream& pagedStream =
                 Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
@@ -1294,6 +1318,15 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             pagedStream.setSizeOnly(false);
             array->readPagedBuffers(pagedStream);
         }
+        // cleanup paged stream reference in auxiliary metadata
+        if (pass > attributes + 3) {
+            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+        }
+    }
+    else if (pass < buffers()) {
+        // pass 2n+3 - cleanup last paged stream
+        const Index attributeIndex = pass - attributes - 4;
+        Local::destroyPagedStream(meta->auxData(), attributeIndex);
     }
 }
 
@@ -1397,7 +1430,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         OPENVDB_THROW(IoError, "Cannot write out a PointDataLeaf without StreamMetadata.");
     }
 
-    const Index pass = meta->pass();
+    const Index pass(static_cast<uint16_t>(meta->pass()));
 
     // leaf traversal analysis deduces the number of passes to perform for this leaf
     // then updates the leaf traversal value to ensure all passes will be written
@@ -1410,7 +1443,8 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         return;
     }
 
-    const Index attributes = (this->buffers() - 4) / 2;
+    const Index maximumPass(static_cast<uint16_t>(meta->pass() >> 16));
+    const Index attributes = (maximumPass - 4) / 2;
 
     if (pass == 0) {
         // pass 0 - voxel data sizes
@@ -1445,7 +1479,8 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         if (pass > 2) {
             Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
         }
-        const AttributeArray* array = mAttributeSet->getConst(attributeIndex);
+        const AttributeArray* array = attributeIndex < mAttributeSet->size() ?
+            mAttributeSet->getConst(attributeIndex) : nullptr;
         if (array) {
             compression::PagedOutputStream& pagedStream =
                 Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
@@ -1467,7 +1502,8 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         if (pass > attributes + 2) {
             Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
         }
-        const AttributeArray* array = mAttributeSet->getConst(attributeIndex);
+        const AttributeArray* array = attributeIndex < mAttributeSet->size() ?
+            mAttributeSet->getConst(attributeIndex) : nullptr;
         if (array) {
             compression::PagedOutputStream& pagedStream =
                 Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
@@ -1575,11 +1611,53 @@ setStreamingMode(PointDataTreeT& tree, bool on)
 }
 
 
+template <typename PointDataTreeT>
+inline void
+prefetch(PointDataTreeT& tree)
+{
+    // sequential pre-fetch of out-of-core data for faster performance
+
+    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    if (leafIter) {
+        const size_t attributes = leafIter->attributeSet().size();
+        // load voxel buffer data
+        for ( ; leafIter; ++leafIter) {
+            const PointDataTree::LeafNodeType::Buffer& buffer = leafIter->buffer();
+            buffer.data();
+        }
+        // load attribute data
+        for (size_t pos = 0; pos < attributes; pos++) {
+            leafIter = tree.cbeginLeaf();
+            for ( ; leafIter; ++leafIter) {
+                if (leafIter->hasAttribute(pos)) {
+                    const AttributeArray& array = leafIter->constAttributeArray(pos);
+                    array.loadData();
+                }
+            }
+        }
+    }
+}
+
+
+namespace internal {
+
 /// @brief Global registration of point data-related types
+/// @note This is called from @c openvdb::initialize, so there is
+/// no need to call it directly.
 void initialize();
 
 /// @brief Global deregistration of point data-related types
+/// @note This is called from @c openvdb::uninitialize, so there is
+/// no need to call it directly.
 void uninitialize();
+
+}
+
+
+/// @deprecated See internal::initialize()
+OPENVDB_DEPRECATED void initialize();
+/// @deprecated See internal::uninitialize()
+OPENVDB_DEPRECATED void uninitialize();
 
 } // namespace points
 

@@ -40,12 +40,17 @@
 
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/GridTransformer.h>
 
 #include <UT/UT_Interrupt.h>
 #if (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
 #include <GEO/GEO_PrimVDB.h> // for GEOvdbProcessTypedGridScalar(), etc.
 #endif
+
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
@@ -56,11 +61,11 @@ class SOP_OpenVDB_Analysis: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Analysis(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Analysis() {}
+    ~SOP_OpenVDB_Analysis() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i == 1); }
+    int isRefInput(unsigned i) const override { return (i == 1); }
 
     static const char* sOpName[];
 
@@ -76,8 +81,8 @@ public:
     };
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -102,18 +107,20 @@ const char* SOP_OpenVDB_Analysis::sOpName[] = {
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of VDBs to analyze (see [specifying volumes|/model/volumes#group])"));
 
     // Operator
     {
-        const char* items[] = {
+        char const * const items[] = {
             "gradient",     "Gradient       (Scalar->Vector)",
             "curvature",    "Curvature     (Scalar->Scalar)",
             "laplacian",    "Laplacian      (Scalar->Scalar)",
@@ -122,32 +129,77 @@ newSopOperator(OP_OperatorTable* table)
             "curl",         "Curl             (Vector->Vector)",
             "length",       "Length         (Vector->Scalar)",
             "normalize",    "Normalize     (Vector->Vector)",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "operator", "Operator")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDocumentation("\
+What to compute\n\
+\n\
+The labels on the items in the menu indicate what datatype\n\
+the incoming VDB volume must be and the datatype of the output volume.\n\
+\n\
+Gradient (scalar -> vector):\n\
+    The gradient of a scalar field\n\
+\n\
+Curvature (scalar -> scalar):\n\
+    The mean curvature of a scalar field\n\
+\n\
+Laplacian (scalar -> scalar):\n\
+    The Laplacian of a scalar field\n\
+\n\
+Closest Point (scalar -> vector):\n\
+    The location, at each voxel, of the closest point on a surface\n\
+    defined by the incoming signed distance field\n\
+\n\
+    You can use the resulting field with the\n\
+    [OpenVDB Advect Points node|Node:sop/DW_OpenVDBAdvectPoints]\n\
+    to stick points to the surface.\n\
+\n\
+Divergence (vector -> scalar):\n\
+    The divergence of a vector field\n\
+\n\
+Curl (vector -> vector):\n\
+    The curl of a vector field\n\
+\n\
+Magnitude (vector -> scalar):\n\
+    The length of the vectors in a vector field\n\
+\n\
+Normalize (vector -> vector):\n\
+    The vectors in a vector field divided by their lengths\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Mask VDB")
-        .setHelpText("VDB (from the second input) used to define the iteration space")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("VDB (from the second input) used to define the iteration space")
+        .setDocumentation(
+            "A VDB from the second input used to define the iteration space"
+            " (see [specifying volumes|/model/volumes#group])\n\n"
+            "The selected __Operator__ will be applied only where the mask VDB has"
+            " [active|http://www.openvdb.org/documentation/doxygen/overview.html#subsecInactive]"
+            " voxels or, if the mask VDB is a level set, only in the interior of the level set."));
 
     { // Output name
-        const char* items[] = {
+        char const * const items[] = {
             "keep",     "Keep Incoming VDB Names",
             "append",   "Append Operation Name",
             "custom",   "Custom Name",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("Rename output grid(s)")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Rename output grid(s)")
+            .setDocumentation(
+                "How to name the generated VDB volumes\n\n"
+                "If you choose __Keep Incoming VDB Names__, the generated fields"
+                " will replace the input fields."));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
-        .setHelpText("Renames all output grids with this custom name"));
+        .setTooltip("Rename all output grids with this custom name")
+        .setDocumentation("If this is not blank, the output VDB will use this name."));
 
 
     // Obsolete parameters
@@ -158,7 +210,30 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Analysis", SOP_OpenVDB_Analysis::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Analyze")
-        .addOptionalInput("Optional VDB mask input");
+        .addOptionalInput("Optional VDB mask input")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Compute an analytic property of a VDB volume, such as gradient or curvature.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node computes certain properties from the values of VDB volumes,\n\
+and generates new VDB volumes where the voxel values are the computed results.\n\
+Using the __Output Name__ parameter you can choose whether the generated\n\
+volumes replace the original volumes.\n\
+\n\
+@related\n\
+\n\
+- [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
+- [Node:sop/volumeanalysis]\n\
+- [Node:sop/vdbanalysis]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -187,7 +262,7 @@ namespace {
 template<template<typename GridT, typename MaskType, typename InterruptT> class ToolT>
 struct ToolOp
 {
-    ToolOp(bool t, hvdb::Interrupter& boss, const cvdb::BoolGrid *mask = NULL)
+    ToolOp(bool t, hvdb::Interrupter& boss, const cvdb::BoolGrid *mask = nullptr)
         : mMaskGrid(mask)
         , mThreaded(t)
         , mBoss(boss)
@@ -202,7 +277,8 @@ struct ToolOp
             // match transform
             cvdb::BoolGrid regionMask;
             regionMask.setTransform(inGrid.transform().copy());
-            openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(*mMaskGrid, regionMask, mBoss);
+            openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(
+                *mMaskGrid, regionMask, mBoss);
 
             ToolT<GridType, cvdb::BoolGrid, hvdb::Interrupter> tool(inGrid, regionMask, &mBoss);
             mOutGrid = tool.process(mThreaded);
@@ -223,16 +299,7 @@ struct ToolOp
 struct MaskOp
 {
     template<typename GridType>
-    void operator()(const GridType& grid)
-    {
-        if (openvdb::GRID_LEVEL_SET == grid.getGridClass()) {
-            mMaskGrid = openvdb::tools::sdfInteriorMask(grid);
-        } else {
-            mMaskGrid = cvdb::BoolGrid::create(false);
-            mMaskGrid->setTransform(grid.transform().copy());
-            mMaskGrid->tree().topologyUnion(grid.tree());
-        }
-    }
+    void operator()(const GridType& grid) { mMaskGrid = cvdb::tools::interiorMask(grid); }
 
     cvdb::BoolGrid::Ptr mMaskGrid;
 };
@@ -283,7 +350,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
-        const int whichOp = evalInt("operator", 0, time);
+        const int whichOp = static_cast<int>(evalInt("operator", 0, time));
         if (whichOp < 0 || whichOp > 7) {
             std::ostringstream ostr;
             ostr << "expected 0 <= operator <= 7, got " << whichOp;
@@ -315,7 +382,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
-                UTvdbProcessTypedGridScalar(maskIt->getStorageType(), maskIt->getGrid(), op);
+                UTvdbProcessTypedGridTopology(maskIt->getStorageType(), maskIt->getGrid(), op);
                 maskGrid = op.mMaskGrid;
             }
 
@@ -411,7 +478,7 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
 
             // Rename grid
             std::string gridName = vdb->getGridName();
-            const int renaming = evalInt("outputName", 0, time);
+            const auto renaming = evalInt("outputName", 0, time);
             if (renaming == 1) {
                 if (operationName.size() > 0) gridName += operationName;
             } else if (renaming == 2) {

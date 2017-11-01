@@ -108,7 +108,7 @@ initialize()
 
     // Register types associated with point data grids.
 //#ifdef OPENVDB_ENABLE_POINTS
-    points::initialize();
+    points::internal::initialize();
 //#endif
 
 #ifdef OPENVDB_USE_BLOSC
@@ -155,7 +155,7 @@ __pragma(warning(default:1711))
     math::MapRegistry::clear();
 
 //#ifdef OPENVDB_ENABLE_POINTS
-    points::uninitialize();
+    points::internal::uninitialize();
 //#endif
 
 #ifdef OPENVDB_USE_BLOSC

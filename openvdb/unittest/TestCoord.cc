@@ -202,7 +202,7 @@ TestCoord::testCoordBBox()
         CPPUNIT_ASSERT_EQUAL(openvdb::Vec3d(3.5, 6.0, 9.0), b.getCenter());
     }
     {// a volume that overflows Int32.
-        typedef openvdb::Int32  Int32;
+        using Int32 = openvdb::Int32;
         Int32 maxInt32 = std::numeric_limits<Int32>::max();
         const openvdb::Coord min(Int32(0), Int32(0), Int32(0));
         const openvdb::Coord max(maxInt32-Int32(2), Int32(2), Int32(2));
@@ -274,28 +274,30 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox b(min, max);
         const size_t count = b.volume();
         size_t n = 0;
-        openvdb::CoordBBox::Iterator<true> ijk(b);
+        openvdb::CoordBBox::ZYXIterator ijk(b);
         for (int i=min[0]; i<=max[0]; ++i) {
             for (int j=min[1]; j<=max[1]; ++j) {
                 for (int k=min[2]; k<=max[2]; ++k, ++ijk, ++n) {
-                    CPPUNIT_ASSERT( ijk );
-                    CPPUNIT_ASSERT_EQUAL( openvdb::Coord(i,j,k), *ijk );
+                    CPPUNIT_ASSERT(ijk);
+                    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(i,j,k), *ijk);
                 }
             }
         }
         CPPUNIT_ASSERT_EQUAL(count, n);
-        CPPUNIT_ASSERT( !ijk );
+        CPPUNIT_ASSERT(!ijk);
         ++ijk;
-        CPPUNIT_ASSERT( !ijk );
+        CPPUNIT_ASSERT(!ijk);
     }
-    
+
     {// ZYX Iterator 2
         const openvdb::Coord min(-1,-2,3), max(2,3,5);
         const openvdb::CoordBBox b(min, max);
         const size_t count = b.volume();
         size_t n = 0;
-        for (openvdb::CoordBBox::Iterator<true> ijk(b); ijk; ++ijk) {
-            CPPUNIT_ASSERT( ++n <= count );
+        openvdb::Coord::ValueType unused = 0;
+        for (const auto& ijk: b) {
+            unused += ijk[0];
+            CPPUNIT_ASSERT(++n <= count);
         }
         CPPUNIT_ASSERT_EQUAL(count, n);
     }
@@ -305,7 +307,7 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox b(min, max);
         const size_t count = b.volume();
         size_t n = 0;
-        openvdb::CoordBBox::Iterator<false> ijk(b);
+        openvdb::CoordBBox::XYZIterator ijk(b);
         for (int k=min[2]; k<=max[2]; ++k) {
             for (int j=min[1]; j<=max[1]; ++j) {
                 for (int i=min[0]; i<=max[0]; ++i, ++ijk, ++n) {
@@ -325,7 +327,7 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox b(min, max);
         const size_t count = b.volume();
         size_t n = 0;
-        for (openvdb::CoordBBox::Iterator<false> ijk(b); ijk; ++ijk) {
+        for (auto ijk = b.beginXYZ(); ijk; ++ijk) {
             CPPUNIT_ASSERT( ++n <= count );
         }
         CPPUNIT_ASSERT_EQUAL(count, n);
@@ -345,7 +347,7 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox bbox(1, 2, 3, 4, 5, 6);
         openvdb::Coord a[10];
         bbox.getCornerPoints(a);
-        //for (int i=0; i<8; ++i) { 
+        //for (int i=0; i<8; ++i) {
         //    std::cerr << "#"<<i<<" = ("<<a[i][0]<<","<<a[i][1]<<","<<a[i][2]<<")\n";
         //}
         CPPUNIT_ASSERT_EQUAL( a[0], openvdb::Coord(1, 2, 3) );

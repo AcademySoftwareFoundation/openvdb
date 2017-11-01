@@ -37,7 +37,6 @@
 #ifndef OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
-
 #include <openvdb/math/Vec3.h>
 #include <openvdb/Types.h>
 #include <openvdb/points/AttributeArrayString.h>
@@ -50,6 +49,7 @@
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Iterator.h>
+#include <PRM/PRM_ChoiceList.h>
 
 
 namespace openvdb_houdini {
@@ -501,9 +501,9 @@ private:
 template <typename T>
 struct HoudiniReadAttribute
 {
-    typedef T value_type;
-    typedef T PosType;
-    typedef typename GAHandleTraits<T>::RO ReadHandleType;
+    using value_type = T;
+    using PosType = T;
+    using ReadHandleType = typename GAHandleTraits<T>::RO;
 
     explicit HoudiniReadAttribute(const GA_Attribute& attribute,
         OffsetListPtr offsets = OffsetListPtr())
@@ -594,6 +594,22 @@ void convertPointDataGridToHoudini(
 
 /// @brief If the given grid is a PointDataGrid, add node specific info text to the stream provided
 void pointDataGridSpecificInfoText(std::ostream&, const openvdb::GridBase&);
+
+
+///////////////////////////////////////
+
+
+// VDB Points group name drop-down menu
+
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenuInput1;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenuInput2;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenuInput3;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenuInput4;
+
+/// @note   Use this if you have more than 4 inputs, otherwise use
+///         the input specific menus instead which automatically
+///         handle the appropriate spare data settings.
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenu;
 
 } // namespace openvdb_houdini
 

@@ -3045,8 +3045,8 @@ traceExteriorBoundaries(FloatTreeT& tree)
     boost::scoped_array<bool> changedNodeMaskB(new bool[numLeafNodes]);
     boost::scoped_array<bool> changedVoxelMask(new bool[numVoxels]);
 
-    memset(changedNodeMaskA.get(), 1, sizeof(bool) * numLeafNodes);
-    memset(changedNodeMaskB.get(), 0, sizeof(bool) * numLeafNodes);
+    mesh_to_volume_internal::fillArray(changedNodeMaskA.get(), true, numLeafNodes);
+    mesh_to_volume_internal::fillArray(changedNodeMaskB.get(), false, numLeafNodes);
     mesh_to_volume_internal::fillArray(changedVoxelMask.get(), false, numVoxels);
 
     const tbb::blocked_range<size_t> nodeRange(0, numLeafNodes);
@@ -3401,6 +3401,9 @@ meshToVolume(
 ////////////////////////////////////////
 
 
+//{
+/// @cond OPENVDB_MESH_TO_VOLUME_INTERNAL
+
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>
 inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
@@ -3489,6 +3492,9 @@ doMeshConversion(
     OPENVDB_THROW(TypeError,
         "mesh to volume conversion is supported only for scalar floating-point grids");
 }
+
+/// @endcond
+//}
 
 
 ////////////////////////////////////////

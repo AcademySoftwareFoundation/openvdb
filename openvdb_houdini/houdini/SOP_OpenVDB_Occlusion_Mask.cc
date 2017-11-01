@@ -45,6 +45,8 @@
 
 #include <OBJ/OBJ_Camera.h>
 
+#include <cmath> // for std::floor()
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -53,14 +55,13 @@ class SOP_OpenVDB_Occlusion_Mask: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Occlusion_Mask(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Occlusion_Mask() {}
+    ~SOP_OpenVDB_Occlusion_Mask() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-
-    virtual OP_ERROR cookMyGuide1(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookMyGuide1(OP_Context&) override;
 
 private:
     openvdb::math::Transform::Ptr mFrustum;
@@ -74,45 +75,73 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Grids")
-        .setHelpText("Specify a subset of the input VDB grids to be clip.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
-        .setHelpText("Reference camera path")
         .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
-        .setSpareData(&PRM_SpareData::objCameraPath));
+        .setSpareData(&PRM_SpareData::objCameraPath)
+        .setTooltip("Reference camera path")
+        .setDocumentation("The path to the camera (e.g., `/obj/cam1`)"));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel count")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel Count")
         .setDefault(PRM100Defaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 200)
-        .setHelpText("Horizontal voxel count for the near plane."));
+        .setTooltip("The desired width in voxels of the camera's near plane"));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel depth size")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel Depth Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
-        .setHelpText("The voxel depth (uniform z-size) in world units."));
+        .setTooltip("The depth of a voxel in world units (all voxels have equal depth)"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "depth", "Mask Depth")
         .setDefault(100)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 1000.0)
-        .setHelpText("Specify mask depth"));
+        .setTooltip(
+            "The desired depth of the mask in world units"
+            " from the near plane to the far plane"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "erode", "Erode")
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("The number of voxels by which to shrink the mask"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "zoffset", "Z Offset")
         .setRange(PRM_RANGE_UI, -10, PRM_RANGE_UI, 10)
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("The number of voxels by which to offset the near plane"));
 
     hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask",
         SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
-        .addInput("VDBs");
+        .addInput("VDBs")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Identify voxels of a VDB volume that are in shadow from a given camera.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node outputs a VDB volume whose active voxels denote the voxels\n\
+of an input volume inside a camera frustum that would be occluded\n\
+when viewed through the camera.\n\
+\n\
+@related\n\
+- [OpenVDB Clip|Node:sop/DW_OpenVDBClip]\n\
+- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -140,7 +169,7 @@ SOP_OpenVDB_Occlusion_Mask::cookMyGuide1(OP_Context&)
     myGuide1->clearAndDestroy();
     if (mFrustum) {
         UT_Vector3 color(0.9f, 0.0f, 0.0f);
-        hvdb::drawFrustum(*myGuide1, *mFrustum, &color, NULL, false, false);
+        hvdb::drawFrustum(*myGuide1, *mFrustum, &color, nullptr, false, false);
     }
     return error();
 }
@@ -156,7 +185,7 @@ template<typename BoolTreeT>
 class VoxelShadow
 {
 public:
-    typedef openvdb::tree::LeafManager<const BoolTreeT> BoolLeafManagerT;
+    using BoolLeafManagerT = openvdb::tree::LeafManager<const BoolTreeT>;
 
     //////////
 
@@ -267,7 +296,7 @@ struct ConstructShadow
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        typedef typename GridType::TreeType TreeType;
+        using TreeType = typename GridType::TreeType;
 
         const TreeType& tree = grid.tree();
 
@@ -395,7 +424,7 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
             const float nearPlane = static_cast<float>(cam->getNEAR(time));
             const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
             const float voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
-            const int voxelCount = evalInt("voxelCount", 0, time);
+            const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
 
             mFrustum = hvdb::frustumTransformFromCamera(*this, context, *cam,
                 0, nearPlane, farPlane, voxelDepthSize, voxelCount);
@@ -406,7 +435,8 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
 
 
         ConstructShadow shadowOp(*mFrustum,
-            evalInt("erode", 0, time), evalInt("zoffset", 0, time));
+            static_cast<int>(evalInt("erode", 0, time)),
+            static_cast<int>(evalInt("zoffset", 0, time)));
 
 
         // Get the group of grids to surface.

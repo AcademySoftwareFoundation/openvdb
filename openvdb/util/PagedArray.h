@@ -718,6 +718,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// Non-const std-compliant iterator
 // Public member-class of PagedArray
 template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
 class PagedArray<ValueT, Log2PageSize, TableT>::

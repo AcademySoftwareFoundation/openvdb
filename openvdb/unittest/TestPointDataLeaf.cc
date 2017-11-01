@@ -325,7 +325,8 @@ TestPointDataLeaf::testOffsets()
         // empty Descriptor should throw on leaf node initialize
         auto emptyDescriptor = std::make_shared<Descriptor>();
         LeafType* emptyLeafNode = new LeafType();
-        CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5), openvdb::IndexError);
+        CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5),
+            openvdb::IndexError);
 
         // create a non-empty Descriptor
         Descriptor::Ptr descriptor = Descriptor::create(AttributeVec3s::attributeType());
@@ -339,7 +340,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->initializeAttributes(descriptor, numAttributes);
 
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
-            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(),
+                descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes;
@@ -372,7 +374,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->initializeAttributes(descriptor, numAttributes);
 
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
-            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(),
+                descriptor, descriptor->find("density"));
 
             AttributeSet* newSet = new AttributeSet(leafNode->attributeSet(), numAttributes);
             newSet->replace("density", AttributeS::create(numAttributes+1));
@@ -397,7 +400,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->initializeAttributes(descriptor, numAttributes);
 
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
-            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(),
+                descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes - 1;
@@ -417,7 +421,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->initializeAttributes(descriptor, numAttributes);
 
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
-            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(),
+                descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes + 1;
@@ -570,19 +575,28 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT(!leaf.hasAttribute(/*pos*/2));
     CPPUNIT_ASSERT(!leaf.hasAttribute("test"));
 
-    // test underlying attributeArray can be accessed by name and index, and that their types are as expected.
+    // test underlying attributeArray can be accessed by name and index,
+    // and that their types are as expected.
 
     const LeafType* constLeaf = &leaf;
 
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(), AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(), AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/1).type(), AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(), AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(),
+        AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(),
+        AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/1).type(),
+        AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(),
+        AttributeI::attributeType()));
 
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(), AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(), AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/1).type(), AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(), AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(),
+        AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(),
+        AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/1).type(),
+        AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(),
+        AttributeI::attributeType()));
 
     // check invalid pos or name throws
 
@@ -744,7 +758,8 @@ TestPointDataLeaf::testEquivalence()
 
     // manually change some values in the density array
 
-    TypedAttributeArray<float>& attr = TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
+    TypedAttributeArray<float>& attr =
+        TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
 
     attr.set(0, 5.0f);
     attr.set(50, 2.0f);
@@ -759,7 +774,8 @@ TestPointDataLeaf::testEquivalence()
         CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
 
         CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), leaf2.attributeSet().size());
-        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().get(0)->size(), leaf2.attributeSet().get(0)->size());
+        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().get(0)->size(),
+            leaf2.attributeSet().get(0)->size());
     }
 
     // check equivalence
@@ -826,19 +842,25 @@ TestPointDataLeaf::testIterators()
     { // test index on
         LeafType::IndexOnIter iterOn(leaf.beginIndexOn());
         CPPUNIT_ASSERT_EQUAL(iterCount(iterOn), Index64(size/2));
-        for (int i = 0; iterOn; ++iterOn, i += 2)       CPPUNIT_ASSERT_EQUAL(*iterOn, Index32(i));
+        for (int i = 0; iterOn; ++iterOn, i += 2) {
+            CPPUNIT_ASSERT_EQUAL(*iterOn, Index32(i));
+        }
     }
 
     { // test index off
         LeafType::IndexOffIter iterOff(leaf.beginIndexOff());
         CPPUNIT_ASSERT_EQUAL(iterCount(iterOff), Index64(size/2));
-        for (int i = 1; iterOff; ++iterOff, i += 2)     CPPUNIT_ASSERT_EQUAL(*iterOff, Index32(i));
+        for (int i = 1; iterOff; ++iterOff, i += 2) {
+            CPPUNIT_ASSERT_EQUAL(*iterOff, Index32(i));
+        }
     }
 
     { // test index all
         LeafType::IndexAllIter iterAll(leaf.beginIndexAll());
         CPPUNIT_ASSERT_EQUAL(iterCount(iterAll), Index64(size));
-        for (int i = 0; iterAll; ++iterAll, ++i)        CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
+        for (int i = 0; iterAll; ++iterAll, ++i) {
+            CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
+        }
     }
 
 }
@@ -876,7 +898,8 @@ TestPointDataLeaf::testReadWriteCompression()
         }
 
         const char* charBuffer = reinterpret_cast<const char*>(srcBuf.get());
-        size_t referenceBytes = compression::bloscCompressedSize(charBuffer, count*sizeof(PointDataIndex32));
+        size_t referenceBytes =
+            compression::bloscCompressedSize(charBuffer, count*sizeof(PointDataIndex32));
 
         {
             ss.str("");
@@ -948,7 +971,8 @@ TestPointDataLeaf::testReadWriteCompression()
             ssInvalid.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
 
             std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(), count, valueMask, false), RuntimeError);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(),
+                count, valueMask, false), RuntimeError);
         }
 #endif
 
@@ -958,11 +982,13 @@ TestPointDataLeaf::testReadWriteCompression()
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count+1, valueMask, false), RuntimeError);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(),
+                count+1, valueMask, false), RuntimeError);
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), 1, valueMask, false), RuntimeError);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(),
+                1, valueMask, false), RuntimeError);
         }
 #endif
 
@@ -1008,7 +1034,8 @@ TestPointDataLeaf::testReadWriteCompression()
         PointDataIndex32* buf = nullptr;
         Index count = std::numeric_limits<uint16_t>::max();
 
-        CPPUNIT_ASSERT_THROW(io::writeCompressedValues(ss, buf, count, valueMask, childMask, false), IoError);
+        CPPUNIT_ASSERT_THROW(io::writeCompressedValues(ss, buf, count, valueMask, childMask, false),
+            IoError);
         CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, buf, count, valueMask, false), IoError);
     }
 }
@@ -1044,7 +1071,8 @@ TestPointDataLeaf::testIO()
 
     // manually change some values in the density array
 
-    TypedAttributeArray<float>& attr = TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
+    TypedAttributeArray<float>& attr =
+        TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
 
     attr.set(0, 5.0f);
     attr.set(50, 2.0f);
@@ -1085,7 +1113,8 @@ TestPointDataLeaf::testIO()
         io::setDataCompression(ostr, io::COMPRESS_BLOSC);
         leaf.writeTopology(ostr);
         for (Index b = 0; b < leaf.buffers(); b++) {
-            streamMetadata->setPass(b);
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
             leaf.writeBuffers(ostr);
         }
         { // error checking
@@ -1107,7 +1136,8 @@ TestPointDataLeaf::testIO()
 
         leaf2.readTopology(istr);
         for (Index b = 0; b < leaf.buffers(); b++) {
-            streamMetadata->setPass(b);
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
             leaf2.readBuffers(istr);
         }
 
@@ -1141,23 +1171,148 @@ TestPointDataLeaf::testIO()
             file.close();
         }
 
-        // read grids from file (using delayed loading)
+        { // read grids from file (using delayed loading)
+            PointDataGrid::Ptr gridFromDisk;
 
-        PointDataGrid::Ptr gridFromDisk;
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
 
-        {
-            io::File file("leaf.vdb");
-            file.open();
-            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-            file.close();
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
 
-            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            CPPUNIT_ASSERT(leaf == *leafFromDisk);
         }
 
-        LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-        CPPUNIT_ASSERT(leafFromDisk);
+        { // read grids from file and pre-fetch
+            PointDataGrid::Ptr gridFromDisk;
 
-        CPPUNIT_ASSERT(leaf == *leafFromDisk);
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            const AttributeF& attribute(
+                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
+
+            CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
+
+#if OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(attribute.isOutOfCore());
+#else
+            // delayed-loading is only available on attribute arrays when using Blosc
+            CPPUNIT_ASSERT(!attribute.isOutOfCore());
+#endif
+
+            prefetch(gridFromDisk->tree());
+
+            // ensure out-of-core data is now in-core after pre-fetching
+
+            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
+            CPPUNIT_ASSERT(!attribute.isOutOfCore());
+        }
+
+        remove("leaf.vdb");
+    }
+
+    { // test multi-buffer IO with varying attribute storage per-leaf
+        // create a new grid with three leaf nodes
+
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+
+        Descriptor::Ptr descrB = Descriptor::create(AttributeVec3s::attributeType());
+
+        // create leaf nodes and initialize attributes using this descriptor
+
+        LeafType leaf0(openvdb::Coord(0, 0, 0));
+        LeafType leaf1(openvdb::Coord(0, 8, 0));
+        LeafType leaf2(openvdb::Coord(0, 0, 8));
+
+        leaf0.initializeAttributes(descrB, /*arrayLength=*/2);
+        leaf1.initializeAttributes(descrB, /*arrayLength=*/2);
+        leaf2.initializeAttributes(descrB, /*arrayLength=*/2);
+
+        descrB = descrB->duplicateAppend("density", AttributeF::attributeType());
+        size_t index = descrB->find("density");
+
+        // append density attribute to leaf 0 and leaf 2 (not leaf 1)
+
+        leaf0.appendAttribute(leaf0.attributeSet().descriptor(), descrB, index);
+        leaf2.appendAttribute(leaf2.attributeSet().descriptor(), descrB, index);
+
+        // manually change some values in the density array for leaf 0 and leaf 2
+
+        TypedAttributeArray<float>& attr0 =
+            TypedAttributeArray<float>::cast(leaf0.attributeArray("density"));
+
+        attr0.set(0, 2.0f);
+        attr0.set(1, 2.0f);
+
+        attr0.compact();
+
+        // compact only the attribute array in the second leaf
+
+        TypedAttributeArray<float>& attr2 =
+            TypedAttributeArray<float>::cast(leaf2.attributeArray("density"));
+
+        attr2.set(0, 5.0f);
+        attr2.set(1, 5.0f);
+
+        attr2.compact();
+
+        CPPUNIT_ASSERT(attr0.isUniform());
+        CPPUNIT_ASSERT(attr2.isUniform());
+
+        grid->tree().addLeaf(new LeafType(leaf0));
+        grid->tree().addLeaf(new LeafType(leaf1));
+        grid->tree().addLeaf(new LeafType(leaf2));
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        { // write to file
+            io::File file("leaf.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        { // read grids from file (using delayed loading)
+            PointDataGrid::Ptr gridFromDisk;
+
+            {
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf0 == *leafFromDisk);
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 8, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf1 == *leafFromDisk);
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 8));
+            CPPUNIT_ASSERT(leafFromDisk);
+            CPPUNIT_ASSERT(leaf2 == *leafFromDisk);
+        }
 
         remove("leaf.vdb");
     }
@@ -1213,7 +1368,8 @@ TestPointDataLeaf::testSwap()
 
     CPPUNIT_ASSERT_THROW(leaf.replaceAttributeSet(nullptr), openvdb::ValueError);
 
-    // ensure we refuse to swap when the descriptors do not match, unless we explicitly allow a mismatch.
+    // ensure we refuse to swap when the descriptors do not match,
+    // unless we explicitly allow a mismatch.
 
     Descriptor::Ptr descrB = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet* attributeSet = new AttributeSet(descrB, newArrayLength);

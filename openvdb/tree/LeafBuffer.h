@@ -34,9 +34,12 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
+#include <tbb/atomic.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
+#include <cstddef> // for offsetof()
 #include <iostream>
+#include <memory>
 #include <type_traits>
 
 
@@ -47,6 +50,46 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
+namespace {
+
+/// @internal For delayed loading to be threadsafe, LeafBuffer::mOutOfCore must be
+/// memory-fenced when it is set in LeafBuffer::doLoad(), otherwise that operation
+/// could be reordered ahead of others in doLoad(), with the possible result that
+/// other threads could see the buffer as in-core before it has been fully loaded.
+/// Making mOutOfCore a TBB atomic solves the problem, since TBB atomics are release-fenced
+/// by default (unlike STL atomics, which are not even guaranteed to be lock-free).
+/// However, TBB atomics have stricter alignment requirements than their underlying value_types,
+/// so a LeafBuffer with an atomic mOutOfCore is potentially ABI-incompatible with
+/// its non-atomic counterpart.
+/// This helper class conditionally declares mOutOfCore as an atomic only if doing so
+/// doesn't break ABI compatibility.
+/// @todo Remove this for ABI 5.
+template<typename T>
+struct LeafBufferFlags
+{
+    // These structs need to have the same data members as LeafBuffer.
+    struct Atomic { union { T* data; void* ptr; }; tbb::atomic<Index32> i; tbb::spin_mutex mutex; };
+    struct NonAtomic { union { T* data; void* ptr; }; Index32 i; tbb::spin_mutex mutex; };
+
+#ifndef __INTEL_COMPILER
+    /// @c true if LeafBuffer::mOutOfCore is atomic, @c false otherwise
+    static constexpr bool IsAtomic = ((sizeof(Atomic) == sizeof(NonAtomic))
+         && (offsetof(Atomic, i) == offsetof(NonAtomic, i)));
+#else
+    // We can't use offsetof() with ICC, because it requires the arguments
+    // to be POD types.  (C++11 requires only that they be standard layout types,
+    // which Atomic and NonAtomic are.)
+    static constexpr bool IsAtomic = (sizeof(Atomic) == sizeof(NonAtomic));
+#endif
+    /// The size of a LeafBuffer when LeafBuffer::mOutOfCore is atomic
+    static constexpr size_t size = sizeof(Atomic);
+    /// The type of LeafBuffer::mOutOfCore
+    using type = typename std::conditional<IsAtomic, tbb::atomic<Index32>, Index32>::type;
+};
+
+} // unnamed namespace
+
+
 /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
 /// the voxel values of a LeafNode
 template<typename T, Index Log2Dim>
@@ -54,6 +97,7 @@ class LeafBuffer
 {
 public:
     using ValueType = T;
+    using StorageType = ValueType;
     using NodeMaskType = util::NodeMask<Log2Dim>;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
@@ -170,11 +214,13 @@ private:
 #ifdef OPENVDB_2_ABI_COMPATIBLE
     ValueType* mData;
 #else
+    using FlagsType = typename LeafBufferFlags<ValueType>::type;
+
     union {
         ValueType* mData;
         FileInfo*  mFileInfo;
     };
-    Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
+    FlagsType mOutOfCore; // interpreted as bool; extra bits reserved for future use
     tbb::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
 
@@ -184,7 +230,6 @@ private:
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
     template<typename, Index> friend class LeafNode;
-
 }; // class LeafBuffer
 
 
@@ -192,12 +237,10 @@ private:
 
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
+
 template<typename T, Index Log2Dim>
 const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
-#endif
 
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
 
 template<typename T, Index Log2Dim>
 inline
@@ -237,6 +280,8 @@ LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
         while (n--) *target++ = *source++;
     }
 }
+
+#endif // !OPENVDB_2_ABI_COMPATIBLE
 
 
 template<typename T, Index Log2Dim>
@@ -403,6 +448,8 @@ LeafBuffer<T, Log2Dim>::deallocate()
 }
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+
 template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::doLoad() const
@@ -454,7 +501,7 @@ LeafBuffer<T, Log2Dim>::detachFromFile()
     return false;
 }
 
-#endif // OPENVDB_2_ABI_COMPATIBLE
+#endif // !OPENVDB_2_ABI_COMPATIBLE
 
 
 ////////////////////////////////////////
@@ -467,6 +514,8 @@ class LeafBuffer<bool, Log2Dim>
 public:
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using WordType = typename NodeMaskType::Word;
+    using ValueType = bool;
+    using StorageType = WordType;
 
     static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
     static const Index SIZE = 1 << 3 * Log2Dim;

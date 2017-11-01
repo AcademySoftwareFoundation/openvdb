@@ -52,6 +52,14 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <PRM/PRM_Parm.h>
 
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility> // for std::pair
+#include <vector>
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -63,7 +71,7 @@ class ParticleList
 {
 public:
     // Required by @c openvdb::tools::PointPartitioner
-    typedef openvdb::Vec3R  PosType;
+    using PosType = openvdb::Vec3R;
 
     ParticleList(const GU_Detail* gdp,
                  openvdb::Real radiusMult = 1,
@@ -152,11 +160,11 @@ inline void
 sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     const PRM_SpareData* spare, const PRM_Parm*)
 {
-    if (data == NULL || menuEntries == NULL || spare == NULL) return;
+    if (data == nullptr || menuEntries == nullptr || spare == nullptr) return;
 
     SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
 
-    if (sop == NULL) {
+    if (sop == nullptr) {
         // terminate and quit
         menuEntries[0].setToken(0);
         menuEntries[0].setLabel(0);
@@ -219,20 +227,20 @@ class SOP_OpenVDB_From_Particles: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_From_Particles(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_From_Particles() {}
+    ~SOP_OpenVDB_From_Particles() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i > 0); }
+    int isRefInput(unsigned i ) const override { return (i > 0); }
 
     int convertUnits();
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
 private:
-    virtual void resolveObsoleteParms(PRM_ParmList*);
+    void resolveObsoleteParms(PRM_ParmList*) override;
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, hvdb::Interrupter&);
     void convertWithAttributes(
         openvdb::FloatGrid::Ptr, ParticleList&, const GU_Detail&, hvdb::Interrupter&);
@@ -270,7 +278,7 @@ int
 convertUnitsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 {
     SOP_OpenVDB_From_Particles* sop = static_cast<SOP_OpenVDB_From_Particles*>(data);
-    if (sop == NULL) return 0;
+    if (sop == nullptr) return 0;
     return sop->convertUnits();
 }
 
@@ -280,77 +288,114 @@ convertUnitsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "distancevdb", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Compute a narrow-band signed distance / level set grid "
-            "from the input points."));
+        .setTooltip("Compute a narrow-band signed distance/level set grid from the input points.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "distancevdbname", "Distance VDB")
         .setDefault("surface")
-        .setHelpText("Distance grid name"));
+        .setTooltip("Distance grid name")
+        .setDocumentation(
+            "If enabled, output a narrow-band signed distance field with the given name."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogvdb", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Compute a fog volume grid by remapping the level set "
+        .setTooltip(
+            "Compute a fog volume grid by remapping the level set "
             "volume to [0, 1] range.  The interior region is marked active "
             "and set to one, the interior portion of the active narrow-band "
             "is remapped to (0, 1] range to produce a smooth gradient and "
-            "all exterior regions are set to zero, marked inactive and pruned."));
+            "all exterior regions are set to zero, marked inactive and pruned.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "fogvdbname", "Fog VDB")
         .setDefault("density")
-        .setHelpText("Fog volume grid name"));
+        .setTooltip("Fog volume grid name")
+        .setDocumentation(
+            "If enabled, output a fog volume with the given name.\n\n"
+            "Voxels inside particles have value one, and voxels outside"
+            " have value zero.  Within a narrow band centered on particle surfaces,"
+            " voxel values vary linearly from zero to one."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "maskvdb", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Compute an alpha mask grid that can be used in subsequent "
-            "filtering nodes to constrain smoothing operations and preserve "
-            "surface features."));
+        .setTooltip(
+            "Output an alpha mask grid that can be used to constrain"
+            " smoothing operations and preserve surface features.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskvdbname", "Mask VDB")
         .setDefault("boundingvolume")
-        .setHelpText("Mask grid name"));
+        .setTooltip("Mask grid name")
+        .setDocumentation(
+            "If enabled, output an alpha mask with the given name.\n\n"
+            "The alpha mask is a fog volume derived from the CSG difference"
+            " between a level set surface with a maximum radius of the particles"
+            " and a level set surface with a minimum radius of the particles."
+            " This mask can be used to constrain level set smoothing so as to"
+            " prevent surface details from being completely smoothed away."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "boundinglimit", "Bounding Limit")
-              .setDefault(0.25)
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 1)
-              .setHelpText("Percentage to increase and decrease the "
-                  "particle radius.  Used to define the maximum and minimum "
-                  "limit surfaces for the alpha mask construction."));
+        .setDefault(0.25)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 1)
+        .setTooltip(
+            "Percentage to increase and decrease the particle radius.\n"
+            "Used to define the maximum and minimum limit surfaces"
+            " for the alpha mask construction.")
+        .setTooltip(
+            "Percentage by which to increase and decrease the particle radii"
+            " used to define the limit surfaces for the alpha mask"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "referencevdb", "Reference VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setHelpText("VDB grid that defines the output transform.  "
-            "The half-band width is matched if the input grid is a level set."));
+        .setTooltip(
+            "A VDB primitive that defines the output transform\n\n"
+            "The half-band width is matched if the input grid is a level set.")
+        .setDocumentation(
+            "Give the output VDB the same orientation and voxel size as"
+            " the selected VDB (see [specifying volumes|/model/volumes#group])"
+            " and match the narrow band width if the reference VDB is a level set."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "merge", "Merge With Reference VDB"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "merge", "Merge with Reference VDB")
+        .setDocumentation(
+            "If a reference VDB is provided, union the new particles into it.\n\n"
+            "This allows one to use the particles to specify only the surface detail"
+            " and use a coarse, offset volume for the main bulk."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
-        .setHelpText("Uniform voxel edge length in world units.  "
-            "Decrease the voxel size to increase the volume resolution."));
+        .setTooltip(
+            "Uniform voxel edge length in world units.  "
+            "Decrease the voxel size to increase the volume resolution.")
+        .setDocumentation(
+            "The desired voxel size in world units\n\n"
+            "Points smaller than this will not be represented in the output VDB."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "useworldspace", "Use World Space for Band")
         .setCallbackFunc(&convertUnitsCB)
-        .setHelpText("Switch between voxel and world space units for "
-            "the half-band width."));
+        .setTooltip(
+            "If enabled, specify the narrow band width in world units, otherwise in voxels."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "halfbandvoxels", "Half-Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("Half the width of the narrow band in voxel units.  "
-            "The default value 3 is recommended for level set volumes."));
+        .setTooltip(
+            "Half the width of the narrow band in voxels\n"
+            "Many level set operations require a minimum of three voxels.")
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "halfband", "Half-Band")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-        .setHelpText("Half the width of the narrow band in world space units."));
+        .setTooltip("Half the width of the narrow band in world space units.")
+        .setDocumentation("Half the width of the narrow band in world units"));
 
 
     parms.beginExclusiveSwitcher("conversion", "Conversion");
@@ -359,43 +404,61 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "particlescale", "Particle Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
-        .setHelpText("The pscale point attribute, which defines the world space "
+        .setTooltip(
+            "The pscale point attribute, which defines the world space "
             "particle radius, will be scaled by this.  A value of one is assumed "
-            "if the pscale attribute is missing."));
+            "if the pscale attribute is missing.")
+        .setDocumentation(
+            "Multiplier for the `pscale` point attribute, which defines"
+            " the world space particle radius\n\n"
+            "If the `pscale` attribute is missing, it is assumed to have a value of one."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Minimum Radius")
         .setDefault(1.5)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
-        .setHelpText("Minimum radius in voxel units after scaling.  "
-            "Particles smaller than this limit are ignored."));
+        .setTooltip(
+            "Minimum radius in voxel units after scaling\n\n"
+            "Particles smaller than this limit are ignored.\n"
+            "Particles with radius smaller than 1.5 voxels will likely cause"
+            " aliasing artifacts, so this should not be set lower than 1.5."));
 
      parms.add(hutil::ParmFactory(PRM_TOGGLE, "velocitytrails", "Velocity Trails")
-        .setHelpText("Velocity trail splatting toggle.  Note this feature "
-            "requires a velocity point attribute named 'v' of 3fv type."));
+        .setTooltip(
+            "Generate multiple spheres for each point, trailing off"
+            " in the direction of the point's velocity attribute.")
+        .setDocumentation(
+            "Generate multiple spheres for each point, trailing off"
+            " in the direction of the point's velocity attribute.\n\n"
+            "This may be useful for visualization.\n\n"
+            "The velocity attribute must be named `v` and be of type 3fv."));
 
      parms.add(hutil::ParmFactory(PRM_FLT_J, "velocityscale", "Velocity Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
-        .setHelpText("Scales the velocity point attribute 'v'.  Use "
-            "this parameter to control the length of the velocity trails."));
+        .setTooltip(
+            "When velocity trails are enabled, scale the lengths of the trails by this amount."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "trailresolution", "Trail Resolution")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.2, PRM_RANGE_UI, 2.0)
-        .setHelpText("Defines the distance between particle instances.  Use this "
-            "parameter to control aliasing and number of particle instances."));
+        .setTooltip(
+            "When velocity trails are enabled, separate the component spheres"
+            " of each trail by this distance.\n\n"
+            "Use this parameter to control aliasing and limit the number"
+            " of particle instances."));
 
     hutil::ParmList transferParms;
 
     transferParms.add(hutil::ParmFactory(PRM_STRING, "attribute#", "Attribute")
         .setChoiceList(&PrimAttrMenu)
         .setSpareData(&SOP_Node::theFirstInput)
-        .setHelpText("Select a point attribute to transfer.  Supports integer "
-            "and floating point attributes of arbitrary precisions and tuple sizes."));
+        .setTooltip(
+            "A point attribute from which to create a VDB\n\n"
+            "Supports integer and floating point attributes of arbitrary"
+            " precision and tuple size."));
 
     transferParms.add(hutil::ParmFactory(PRM_STRING, "attributeGridName#", "VDB Name")
-        .setHelpText("The attribute name is used as the output grid name by default.  "
-            "A different grid name can be specified in this field if desired."));
+        .setTooltip("The name for this VDB primitive (leave blank to use the attribute's name)"));
 
     {
         std::vector<std::string> items;
@@ -406,32 +469,40 @@ newSopOperator(OP_OperatorTable* table)
 
         transferParms.add(hutil::ParmFactory(PRM_ORD, "vecType#", "Vector Type")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("How vector values should be interpreted"));
     }
 
     parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Attributes")
-        .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(transferParms)
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip(
+            "Generate additional VDB primitives that store the values of point attributes.")
+        .setDocumentation(
+            "Generate additional VDB primitives that store the values of point"
+            " [attributes|/model/attributes].\n\n"
+            "Only voxels in the narrow band around the surface will be set."));
 
 
     parms.addFolder("Points");
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilation", "Dilation")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-              .setHelpText("Number of morphological dilation iterations "
-                  "used to expand the active voxel region."));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip(
+            "Number of morphological dilation iterations "
+            "used to expand the active voxel region"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "closing", "Closing")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-              .setHelpText("Number of morphological closing iterations "
-                  "used to fill gaps in the active voxel region."));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip(
+            "Number of morphological closing iterations "
+            "used to fill gaps in the active voxel region"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "smoothing", "Smoothing")
-              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-              .setHelpText("Number of surface smoothing interations."));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("Number of surface smoothing iterations"));
 
     parms.endSwitcher();
 
@@ -469,7 +540,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "particleHeading", "Conversion settings"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Level Set"));
     {
-        const char* items[] = { "sphere", "Spherical", "trail",  "Velocity Trail", NULL };
+        const char* items[] = { "sphere", "Spherical", "trail",  "Velocity Trail", nullptr };
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "footprint", "Particle Footprint")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -484,7 +555,46 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Points to convert")
         .addOptionalInput("Optional VDB grid that defines the output transform. "
-            "The half-band width is matched if the input grid is a level set.");
+            "The half-band width is matched if the input grid is a level set.")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Convert point clouds and/or point attributes into VDB volumes.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node can create signed or unsigned distance fields\n\
+and/or density fields (\"fog volumes\") from point clouds.\n\
+\n\
+Since the resulting VDB volumes store only the voxels around each point,\n\
+they can have a much a higher effective resolution than a traditional\n\
+Houdini volume.\n\
+\n\
+NOTE:\n\
+    This node uses the point scale attribute (`pscale`) on the input points\n\
+    to convert them to spherical densities.\n\
+    This attribute is set by the [Attribute|Node:pop/attribute] POP\n\
+    or the [Point|Node:sop/point] SOP.\n\
+\n\
+    Points smaller than 1.5 voxels cannot be resolved and will not appear in the VDB.\n\
+\n\
+    You can also scale all sizes using the __Particle Scale__ parameter.\n\
+\n\
+Connect a VDB to the second input to automatically use that VDB's\n\
+orientation and voxel size (see the __Reference VDB__ parameter).\n\
+\n\
+@related\n\
+- [Node:sop/scatter]\n\
+- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
+- [OpenVDB From Polygons|Node:sop/DW_OpenVDBFromPolygons]\n\
+- [Node:sop/isooffset]\n\
+- [Node:sop/vdbfromparticles]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -533,7 +643,7 @@ SOP_OpenVDB_From_Particles::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms || obsoleteParms->allDefaults() != 0) return;
 
-    typedef std::pair<std::string, std::string> StringPair;
+    using StringPair = std::pair<std::string, std::string>;
 
     const fpreal time = CHgetEvalTime();
 
@@ -620,8 +730,8 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
 {
     bool changed = false;
 
-    changed |= enableParm("distancevdbname", evalInt("distancevdb", 0, 0));
-    changed |= enableParm("fogvdbname", evalInt("fogvdb", 0, 0));
+    changed |= enableParm("distancevdbname", bool(evalInt("distancevdb", 0, 0)));
+    changed |= enableParm("fogvdbname", bool(evalInt("fogvdb", 0, 0)));
 
     bool useMask = evalInt("maskvdb", 0, 0) == 1;
     changed |= enableParm("boundinglimit", useMask);
@@ -645,7 +755,7 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
     GA_ROAttributeRef attrRef;
     const GU_Detail* ptGeo = this->getInputLastGeo(0, CHgetEvalTime());
     if (ptGeo) {
-        for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
+        for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, 0)); i <= N; ++i) {
 
             evalStringInst("attribute#", &i, attrName, 0, 0);
             bool isVector = false;
@@ -692,7 +802,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
         const GU_Detail* ptGeo = inputGeo(0, context);
         const GU_Detail* refGeo = inputGeo(1, context);
-        bool refexists = refGeo != NULL;
+        bool refexists = refGeo != nullptr;
 
         mTime = context.getTime();
         mVoxelSize = float(evalFloat("voxelsize", 0, mTime));
@@ -751,8 +861,8 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
                 // match the narrow band width
                 if (isLevelSet && refPrim->getGrid().type() == openvdb::FloatGrid::gridType()) {
-                    background =
-                        openvdb::gridConstPtrCast<openvdb::FloatGrid>(refPrim->getGridPtr())->background();
+                    background = openvdb::gridConstPtrCast<openvdb::FloatGrid>(
+                        refPrim->getGridPtr())->background();
                     addMessage(SOP_MESSAGE, "Note: Matching reference level set half-band width "
                         " and background value.  (UI half-band parameter is ignored.)");
                 }
@@ -793,16 +903,18 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             const bool doSphereConversion = evalInt("conversion",  0, mTime) == 0;
 
             // Point topology conversion settings
-            int dilation = evalInt("dilation", 0, mTime);
-            int closing = evalInt("closing", 0, mTime);
-            int smoothing = evalInt("smoothing", 0, mTime);
+            int dilation = static_cast<int>(evalInt("dilation", 0, mTime));
+            int closing = static_cast<int>(evalInt("closing", 0, mTime));
+            int smoothing = static_cast<int>(evalInt("smoothing", 0, mTime));
             int bandWidth = int(std::ceil(background / mVoxelSize));
             openvdb::MaskGrid::Ptr pointMaskGrid;
 
             if (doSphereConversion) {
 
                 if (evalInt("velocitytrails", 0, mTime) != 0 && !paList.hasVelocity()) {
-                    addWarning(SOP_MESSAGE, "Velocity trails require a velocity point attribute named 'v' of 3fv type.");
+                    addWarning(SOP_MESSAGE,
+                        "Velocity trails require a velocity point attribute"
+                        " named 'v' of type 3fv.");
                 }
 
                 if (outputAttributeGrid) {
@@ -939,8 +1051,8 @@ SOP_OpenVDB_From_Particles::convert(
 
 
 void
-SOP_OpenVDB_From_Particles::convertWithAttributes(
-    openvdb::FloatGrid::Ptr outputGrid, ParticleList& paList, const GU_Detail& ptGeo, hvdb::Interrupter& boss)
+SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr outputGrid,
+    ParticleList& paList, const GU_Detail& ptGeo, hvdb::Interrupter& boss)
 {
     openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Int32, hvdb::Interrupter>
         raster(*outputGrid, &boss);
@@ -1006,7 +1118,7 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
     int closestPointIndexInstance = -1;
 
     // for each selected attribute
-    for (int i = 1, N = evalInt("attrList", 0, mTime); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, mTime)); i <= N; ++i) {
 
         evalStringInst("attribute#", &i, attrName, 0, mTime);
 
@@ -1031,7 +1143,7 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
         evalStringInst("attributeGridName#", &i, attrName, 0, mTime);
         std::string customName = attrName.toStdString();
 
-        int vecType = evalIntInst("vecType#", &i, 0, mTime);
+        int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, mTime));
 
         const GA_Attribute *attr = attrRef.getAttribute();
         if (!attr) {
@@ -1099,7 +1211,7 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
 }
 
 
-template <class ValueType>
+template<class ValueType>
 void
 SOP_OpenVDB_From_Particles::addAttributeDetails(
     hvdb::AttributeDetailList &attributeList,
@@ -1110,12 +1222,10 @@ SOP_OpenVDB_From_Particles::addAttributeDetails(
     std::string& customName,
     int vecType)
 {
-
     // Defines a new type of a tree having the same hierarchy as the incoming
     // Int32Grid's tree but potentially a different value type.
-    typedef typename openvdb::Int32Grid::TreeType::ValueConverter<ValueType>::Type TreeType;
-    typedef typename openvdb::Grid<TreeType> GridType;
-
+    using TreeType = typename openvdb::Int32Grid::TreeType::ValueConverter<ValueType>::Type;
+    using GridType = typename openvdb::Grid<TreeType>;
 
     if (vecType != -1) { // Vector grid
          // Get the attribute's default value.
@@ -1186,4 +1296,3 @@ SOP_OpenVDB_From_Particles::transferAttributes(
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-

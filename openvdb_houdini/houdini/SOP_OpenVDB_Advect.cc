@@ -48,10 +48,12 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/smart_ptr/scoped_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/join.hpp>
+
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -65,7 +67,7 @@ namespace {
 
 struct AdvectionParms {
     AdvectionParms()
-        : mGroup(NULL)
+        : mGroup(nullptr)
         , mAdvectSpatial(openvdb::math::UNKNOWN_BIAS)
         , mRenormSpatial(openvdb::math::UNKNOWN_BIAS)
         , mAdvectTemporal(openvdb::math::UNKNOWN_TIS)
@@ -106,7 +108,7 @@ public:
     template<typename GridT, typename SamplerT>
     void process(GridT& grid)
     {
-        typedef openvdb::tools::DiscreteField<VelocityGridT, SamplerT> FieldT;
+        using FieldT = openvdb::tools::DiscreteField<VelocityGridT, SamplerT>;
         const FieldT field(mVelGrid);
 
         openvdb::tools::LevelSetAdvection<GridT, FieldT, hvdb::Interrupter>
@@ -136,7 +138,7 @@ public:
 private:
     AdvectOp(const AdvectOp&);// undefined
     AdvectOp& operator=(const AdvectOp&);// undefined
-    
+
     AdvectionParms& mParms;
     const VelocityGridT& mVelGrid;
     hvdb::Interrupter& mBoss;
@@ -153,16 +155,16 @@ class SOP_OpenVDB_Advect: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Advect(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Advect() {}
+    ~SOP_OpenVDB_Advect() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i > 0); }
+    int isRefInput(unsigned i ) const override { return (i > 0); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
@@ -177,7 +179,7 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     using namespace openvdb::math;
 
@@ -185,80 +187,97 @@ newSopOperator(OP_OperatorTable* table)
 
     // Level set grid
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("VDB grid(s) to advect.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("VDB grid(s) to advect.")
+        .setDocumentation(
+            "A subset of VDBs in the first input to move using the velocity field"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // Velocity grid
     parms.add(hutil::ParmFactory(PRM_STRING, "velGroup", "Velocity")
-        .setHelpText("Velocity grid")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Velocity grid")
+        .setDocumentation(
+            "The name of a VDB primitive in the second input to use as"
+            " the velocity field (see [specifying volumes|/model/volumes#group])\n\n"
+            "This must be a vector-valued VDB primitive."
+            " You can use the [Vector Merge node|Node:sop/DW_OpenVDBVectorMerge]"
+            " to turn a `vel.[xyz]` triple into a single primitive."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "respectclass", "Respect Grid Class")
         .setDefault(PRMoneDefaults)
-        .setHelpText("If disabled, advect level sets using general "
-            "advection scheme."));
+        .setTooltip("If disabled, advect level sets using general advection scheme.")
+        .setDocumentation(
+            "When this option is disabled, all VDBs will use a general numerical"
+            " advection scheme, otherwise level set VDBs will be advected using"
+            " a spatial finite-difference scheme."));
 
     // Advect: timestep
     parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
-        .setDefault(1, "1.0/$FPS"));
+        .setDefault(1, "1.0/$FPS")
+        .setDocumentation(
+            "Number of seconds of movement to apply to the input points\n\n"
+            "The default is `1/$FPS` (one frame's worth of time)."
+            " You can use negative values to move the points backwards through"
+            " the velocity field."));
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "general", "General Advection"));
-
+    parms.add(hutil::ParmFactory(PRM_HEADING, "general", "General Advection")
+         .setDocumentation(
+             "These control how VDBs that are not level sets are moved through the velocity field."
+             " If the grid class is not being respected, all grids will be advected"
+             " using general advection regardless of whether they are level sets or not."));
 
     // SubSteps
-    parms.add(hutil::ParmFactory(PRM_INT_J, "substeps", "Sub-steps")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "substeps", "Substeps")
          .setDefault(1)
          .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-         .setHelpText("The number of substeps per integration step. The only "
-                      "reason to increase it above its default value of one "
-                      "is to reduce the memory-footprint from dilations "
-                      "- likely at the cost of more smoothing!"));
-
+         .setTooltip(
+             "The number of substeps per integration step.\n"
+             "The only reason to increase it above its default value of one"
+             " is to reduce the memory footprint from dilations--likely at the cost"
+             " of more smoothing!")
+         .setDocumentation(
+            "The number of substeps per integration step\n\n"
+            "The only reason to increase this above its default value of one is to reduce"
+            " the memory footprint from dilations&mdash;likely at the cost of more smoothing."));
 
     // Advection Scheme
     {
-        std::vector<std::string> items;
-        items.push_back("semi");
-        items.push_back("Semi-Lagrangian");
-        items.push_back("mid");
-        items.push_back("Mid-Point");
-        items.push_back("rk3");
-        items.push_back("3rd order Runge-Kutta");
-        items.push_back("rk4");
-        items.push_back("4th order Runge-Kutta");
-        items.push_back("mac");
-        items.push_back("MacCormack");
-        items.push_back("bfecc");
-        items.push_back("BFECC");
-
+        char const * const items[] = {
+            "semi",   "Semi-Lagrangian",
+            "mid",    "Mid-Point",
+            "rk3",    "3rd order Runge-Kutta",
+            "rk4",    "4th order Runge-Kutta",
+            "mac",    "MacCormack",
+            "bfecc",  "BFECC",
+            nullptr
+        };
         parms.add(hutil::ParmFactory(PRM_STRING, "advection", "Advection Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(0, ::strdup("semi"))
-            .setHelpText("Set the numerical advection scheme."));
+            .setDefault("semi")
+            .setTooltip("Set the numerical advection scheme."));
     }
 
     // Limiter Scheme
     {
-        std::vector<std::string> items;
-        items.push_back("none");
-        items.push_back("No limiter");
-        items.push_back("clamp");
-        items.push_back("Clamp to extrema");
-        items.push_back("revert");
-        items.push_back("Revert to 1st order");
-
+        char const * const items[] = {
+            "none",     "No limiter",
+            "clamp",    "Clamp to extrema",
+            "revert",   "Revert to 1st order",
+            nullptr
+        };
         parms.add(hutil::ParmFactory(PRM_STRING, "limiter", "Limiter Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(2, ::strdup("revert"))
-            .setHelpText("Set the limiter scheme use to stabalize the 2nd "
-                         "order schemes MacCormack and BFECC."));
+            .setDefault("revert")
+            .setTooltip(
+                "Set the limiter scheme used to stabilize the second-order"
+                " MacCormack and BFECC schemes."));
     }
 
-
-
-
-
-    parms.add(hutil::ParmFactory(PRM_HEADING, "advectionHeading", "Level Set Advection"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "advectionHeading", "Level Set Advection")
+        .setDocumentation(
+            "These control how level set VDBs are moved through the velocity field."
+            " If the grid class is not being respected, these options are not used."));
 
     // Advect: spatial menu
     {
@@ -269,11 +288,13 @@ newSopOperator(OP_OperatorTable* table)
         items.push_back(biasedGradientSchemeToString(HJWENO5_BIAS));
         items.push_back(biasedGradientSchemeToMenuName(HJWENO5_BIAS));
 
-
         parms.add(hutil::ParmFactory(PRM_STRING, "advectSpatial", "Spatial Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
-            .setHelpText("Set the spatial finite difference scheme."));
+            .setTooltip("Set the spatial finite difference scheme.")
+            .setDocumentation(
+                "How accurately the gradients of the signed distance field are computed\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     // Advect: temporal menu
@@ -288,13 +309,20 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "advectTemporal", "Temporal Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
-            .setHelpText("Set the temporal integration scheme."));
+            .setTooltip("Set the temporal integration scheme.")
+            .setDocumentation(
+                "How accurately time is evolved within the timestep\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Renormalization Steps")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("The number of normalizations performed after each CFL iteration."));
+        .setTooltip("The number of normalizations performed after each CFL iteration.")
+        .setDocumentation(
+            "After advection, a signed distance field will often no longer contain correct"
+            " distances.  A number of renormalization passes can be performed between"
+            " every substep to convert it back into a proper signed distance field."));
 
     // Renorm: spatial menu
     {
@@ -308,7 +336,10 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Renormalization")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
-            .setHelpText("Set the spatial finite difference scheme."));
+            .setTooltip("Set the spatial finite difference scheme.")
+            .setDocumentation(
+                "How accurately the gradients of the signed distance field are computed\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     // Renorm: temporal menu
@@ -323,7 +354,10 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Renormalization")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(items[0].c_str()))
-            .setHelpText("Set the temporal integration scheme."));
+            .setTooltip("Set the temporal integration scheme.")
+            .setDocumentation(
+                "How accurately time is evolved within the renormalization stage\n\n"
+                "The later choices are more accurate but take more time."));
     }
 
     // Obsolete parameters
@@ -341,7 +375,44 @@ newSopOperator(OP_OperatorTable* table)
         .addAlias("OpenVDB Advect Level Set")
         .addAlias("OpenVDB Advect Density")
         .addInput("VDBs to Advect")
-        .addInput("Velocity VDB");
+        .addInput("Velocity VDB")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Move VDBs in the input geometry along a VDB velocity field.\"\"\"\n\
+\n\
+@overview\n\
+The OpenVDB Advect operation will advect VDB volumes according to\n\
+a velocity field defined in a vector VDB.\n\
+\n\
+@animation Animating advection\n\
+\n\
+*This node is not a feedback loop*.\n\
+\n\
+It moves the fields it finds in the input geometry.\n\
+It _cannot_ modify the fields over time.\n\
+(That is, if you hook this node up to do advection and press play,\n\
+the fields will not animate.)\n\
+\n\
+To set up a feedback loop, where the advection at each frame affects\n\
+the advected field from the previous frame, do one of the following:\n\
+* Do the advection inside a [SOP Solver|Node:sop/solver].\n\
+* Set the __Time Step__ to `$T`\n\
+\n\
+  This will cause the node to recalculate, _at every frame_, the path\n\
+  of every particle through _every previous frame_ to get the current one.\n\
+  This is obviously not very practical.\n\
+\n\
+@related\n\
+- [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
+- [OpenVDB Morph Level Set|Node:sop/DW_OpenVDBMorphLevelSet]\n\
+- [Node:sop/vdbadvectsdf]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -502,7 +573,7 @@ SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parm
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = evalInt("normSteps", 0, now);
+    parms.mNormCount = static_cast<int>(evalInt("normSteps", 0, now));
 
     const GU_Detail* velGeo = inputGeo(1);
 
@@ -581,8 +652,9 @@ template <typename VelocityGridT, bool StaggeredVelocity>
 bool
 SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
 {
-    typedef openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity, hvdb::Interrupter> VolumeAdvection;
-    typedef typename VelocityGridT::ConstPtr  VelocityGridCPtr;
+    using VolumeAdvection =
+        openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity, hvdb::Interrupter>;
+    using VelocityGridCPtr = typename VelocityGridT::ConstPtr;
 
     VelocityGridCPtr velGrid = hvdb::Grid::constGrid<VelocityGridT>(parms.mVelocityGrid);
     if (!velGrid) return false;

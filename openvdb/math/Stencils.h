@@ -1194,6 +1194,18 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
+namespace { // anonymous namespace for stencil-layout map
+
+    // the seven point stencil with a different layout from SevenPt
+    template<int i, int j, int k> struct GradPt {};
+    template<> struct GradPt< 0, 0, 0> { enum { idx = 0 }; };
+    template<> struct GradPt< 1, 0, 0> { enum { idx = 2 }; };
+    template<> struct GradPt< 0, 1, 0> { enum { idx = 4 }; };
+    template<> struct GradPt< 0, 0, 1> { enum { idx = 6 }; };
+    template<> struct GradPt<-1, 0, 0> { enum { idx = 1 }; };
+    template<> struct GradPt< 0,-1, 0> { enum { idx = 3 }; };
+    template<> struct GradPt< 0, 0,-1> { enum { idx = 5 }; };
+}
 
 /// This is a simple 7-point nearest neighbor stencil that supports
 /// gradient by second-order central differencing, first-order upwinding,
@@ -1234,7 +1246,7 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad() const
     {
-        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > 0,
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > zeroVal<ValueType>(),
                                                 mStencil[0] - mStencil[1],
                                                 mStencil[2] - mStencil[0],
                                                 mStencil[0] - mStencil[3],
@@ -1300,20 +1312,24 @@ public:
                                      ijk[2] - d*(mStencil[6] - mStencil[5]));
     }
 
+    /// Return linear offset for the specified stencil point relative to its center
+    template<int i, int j, int k>
+    unsigned int pos() const { return GradPt<i,j,k>::idx; }
+    
 private:
-
+    
     inline void init(const Coord& ijk)
     {
-        mStencil[1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
-        mStencil[2] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
-        mStencil[3] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
-        mStencil[4] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        BaseType::template setValue< 0,-1, 0>(mCache.getValue(ijk.offsetBy( 0,-1, 0)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
 
-        mStencil[5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
-        mStencil[6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
-
+    
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
@@ -1361,7 +1377,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType normSqGrad() const
+    inline ValueType normSqGrad(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
         const typename BaseType::BufferType& v = mStencil;
 #ifdef DWA_OPENVDB
@@ -1376,7 +1392,7 @@ public:
             dP_m = math::WENO5(v1, v2, v3, v4, v5, mDx2),
             dP_p = math::WENO5(v6, v5, v4, v3, v2, mDx2);
 
-        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > 0, dP_m, dP_p);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > isoValue, dP_m, dP_p);
 #else
         const Real
             dP_xm = math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
@@ -1386,7 +1402,7 @@ public:
             dP_zm = math::WENO5(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
             dP_zp = math::WENO5(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
         return static_cast<ValueType>(
-            mInvDx2*math::GodunovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp));
+            mInvDx2*math::GodunovsNormSqrd(v[0]>isoValue, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp));
 #endif
     }
 

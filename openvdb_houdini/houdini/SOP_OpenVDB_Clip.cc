@@ -35,11 +35,14 @@
 /// @brief Clip grids
 
 #include <houdini_utils/ParmFactory.h>
+#include <openvdb_houdini/GeometryUtil.h> // for drawFrustum(), frustumTransformFromCamera()
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/Clip.h> // for tools::clip()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
 #include <openvdb/points/PointDataGrid.h>
+#include <OBJ/OBJ_Camera.h>
+#include <exception>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -56,8 +59,15 @@ public:
     int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
+    void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
+    OP_ERROR cookMyGuide1(OP_Context&) override;
     OP_ERROR cookMySop(OP_Context&) override;
+
+private:
+    void getFrustum(OP_Context&);
+
+    openvdb::math::Transform::Ptr mFrustum;
 };
 
 
@@ -72,29 +82,114 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
-        .setHelpText("Specify a subset of the input VDB grids to be clipped.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of VDBs from the first input to be clipped.")
+        .setDocumentation(
+            "A subset of VDBs from the first input to be clipped"
+            " (see [specifying volumes|/model/volumes#group])"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "")
-        .setHelpText(
-            "If disabled, use the bounding box of the reference geometry\n"
-            "as the clipping region.")
-        .setDefault(PRMzeroDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+    {
+        char const * const items[] = {
+            "camera",   "Camera",
+            "geometry", "Geometry",
+            "mask",     "Mask VDB",
+            nullptr
+        };
+        parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("geometry")
+            .setTooltip("Specify how the clipping region should be defined.")
+            .setDocumentation("\
+How to define the clipping region\n\
+\n\
+Camera:\n\
+    Use a camera frustum as the clipping region.\n\
+Geometry:\n\
+    Use the bounding box of geometry from the second input as the clipping region.\n\
+Mask VDB:\n\
+    Use the active voxels of a VDB volume from the second input as a clipping mask.\n"));
+    }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
-        .setHelpText("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Specify a VDB whose active voxels are to be used as a clipping mask.")
+        .setDocumentation(
+            "A VDB from the second input whose active voxels are to be used as a clipping mask"
+            " (see [specifying volumes|/model/volumes#group])"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
+        .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
+        .setSpareData(&PRM_SpareData::objCameraPath)
+        .setTooltip("Specify the path to a reference camera")
+        .setDocumentation(
+            "The path to the camera whose frustum is to be used as a clipping region"
+            " (e.g., `/obj/cam1`)"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "inside", "Keep Inside")
-        .setHelpText(
+        .setDefault(PRMoneDefaults)
+        .setTooltip(
             "If enabled, keep voxels that lie inside the clipping region.\n"
             "If disabled, keep voxels that lie outside the clipping region.")
-        .setDefault(PRMoneDefaults));
+        .setDocumentation(
+            "If enabled, keep voxels that lie inside the clipping region,"
+            " otherwise keep voxels that lie outside the clipping region."));
+
+
+    // Obsolete parameters
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "").setDefault(PRMzeroDefaults));
+
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
-        .addInput("Mask VDB or bounding geometry");
+        .addOptionalInput("Mask VDB or bounding geometry")
+        .setObsoleteParms(obsoleteParms)
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Clip VDB volumes using a camera frustum, a bounding box, or another VDB as a mask.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node clips VDB volumes, that is, it removes voxels that lie outside\n\
+(or, optionally, inside) a given region by deactivating them and setting them\n\
+to the background value.\n\
+The clipping region may be one of the following:\n\
+* the frustum of a camera\n\
+* the bounding box of reference geometry\n\
+* the active voxels of another VDB.\n\
+\n\
+When the clipping region is defined by a VDB, the operation\n\
+is similar to [activity intersection|Node:sop/DW_OpenVDBCombine],\n\
+except that clipped voxels are not only deactivated but also set\n\
+to the background value.\n\
+\n\
+@related\n\
+\n\
+- [OpenVDB Combine|Node:sop/DW_OpenVDBCombine]\n\
+- [OpenVDB Occlusion Mask|Node:sop/DW_OpenVDBOcclusionMask]\n\
+- [Node:sop/vdbactivate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
+}
+
+
+void
+SOP_OpenVDB_Clip::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    auto* parm = obsoleteParms->getParmPtr("usemask");
+    if (parm && !parm->isFactoryDefault()) { // factory default was Off
+        setString("clipper", CH_STRING_LITERAL, "mask", 0, 0.0);
+    }
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -102,7 +197,13 @@ bool
 SOP_OpenVDB_Clip::updateParmsFlags()
 {
     bool changed = false;
-    changed |= enableParm("mask", evalInt("usemask", 0, 0) != 0);
+
+    UT_String clipper;
+    evalString(clipper, "clipper", 0, 0);
+
+    changed |= enableParm("camera", clipper == "camera");
+    changed |= enableParm("mask", clipper == "mask");
+
     return changed;
 }
 
@@ -129,6 +230,7 @@ SOP_OpenVDB_Clip::SOP_OpenVDB_Clip(OP_Network* net,
 
 
 namespace {
+
 
 struct LevelSetMaskOp
 {
@@ -157,6 +259,28 @@ struct BBoxClipOp
     openvdb::BBoxd bbox;
     hvdb::GridPtr outputGrid;
     bool inside = true;
+};
+
+
+struct FrustumClipOp
+{
+    FrustumClipOp(const openvdb::math::Transform::Ptr& frustum_, bool inside_ = true):
+        frustum(frustum_), inside(inside_)
+    {}
+
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        openvdb::math::NonlinearFrustumMap::ConstPtr mapPtr;
+        if (frustum) mapPtr = frustum->constMap<openvdb::math::NonlinearFrustumMap>();
+        if (mapPtr) {
+            outputGrid = openvdb::tools::clip(grid, *mapPtr, inside);
+        }
+    }
+
+    const openvdb::math::Transform::ConstPtr frustum;
+    const bool inside = true;
+    hvdb::GridPtr outputGrid;
 };
 
 
@@ -209,36 +333,106 @@ struct MaskClipOp
 ////////////////////////////////////////
 
 
+/// Get the selected camera's frustum transform.
+void
+SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
+{
+    mFrustum.reset();
+
+    const auto time = context.getTime();
+
+    UT_String cameraPath;
+    evalString(cameraPath, "camera", 0, time);
+    if (!cameraPath.isstring()) {
+        throw std::runtime_error{"no camera path was specified"};
+    }
+
+    OBJ_Camera* camera = nullptr;
+    if (auto* obj = findOBJNode(cameraPath)) {
+        camera = obj->castToOBJCamera();
+    }
+    if (!camera) {
+        throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
+    }
+    this->addExtraInput(camera, OP_INTEREST_DATA);
+
+    OBJ_CameraParms cameraParms;
+    camera->getCameraParms(cameraParms, time);
+    if (cameraParms.projection != OBJ_PROJ_PERSPECTIVE) {
+        throw std::runtime_error{cameraPath.toStdString() + " is not a perspective camera"};
+        /// @todo support ortho and other cameras?
+    }
+
+    const float
+        nearPlane = static_cast<float>(camera->getNEAR(time)),
+        farPlane = static_cast<float>(camera->getFAR(time));
+    mFrustum = hvdb::frustumTransformFromCamera(*this, context, *camera,
+        /*offset=*/0.f, nearPlane, farPlane, /*voxelDepth=*/1.f, /*voxelCountX=*/100);
+
+    if (!mFrustum || !mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()) {
+        throw std::runtime_error{
+            "failed to compute frustum bounds for camera " + cameraPath.toStdString()};
+    }
+}
+
+
+////////////////////////////////////////
+
+
+OP_ERROR
+SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
+{
+    myGuide1->clearAndDestroy();
+    if (mFrustum) {
+        const UT_Vector3 color{0.9f, 0.0f, 0.0f};
+        hvdb::drawFrustum(*myGuide1, *mFrustum, &color,
+            /*tickColor=*/nullptr, /*shaded=*/false, /*ticks=*/false);
+    }
+    return error();
+}
+
+
 OP_ERROR
 SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
 {
     try {
-        hutil::ScopedInputLock lock(*this, context);
+        hutil::ScopedInputLock lock{*this, context};
         const fpreal time = context.getTime();
+
+        UT_AutoInterrupt progress{"Clipping VDBs"};
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
 
         const GU_Detail* maskGeo = inputGeo(1);
 
+        UT_String clipper;
+        evalString(clipper, "clipper", 0, time);
+
         const bool
-            useMask = evalInt("usemask", 0, time),
+            useCamera = (clipper == "camera"),
+            useMask = (clipper == "mask"),
             inside = evalInt("inside", 0, time);
 
-        openvdb::BBoxd bbox;
+        mFrustum.reset();
+
+        openvdb::BBoxd clipBox;
         hvdb::GridCPtr maskGrid;
-        if (maskGeo) {
+
+        if (useCamera) {
+            getFrustum(context);
+        } else if (maskGeo) {
             if (useMask) {
                 UT_String maskStr;
                 evalString(maskStr, "mask", 0, time);
 #if (UT_MAJOR_VERSION_INT >= 15)
                 const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
-                    maskStr.buffer(), GroupCreator(maskGeo));
+                    maskStr.buffer(), GroupCreator{maskGeo});
 #else
                 const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
                     maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
 #endif
-                hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
+                hvdb::VdbPrimCIterator maskIt{maskGeo, maskGroup};
                 if (maskIt) {
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         // If the mask grid is a level set, extract an interior mask from it.
@@ -257,13 +451,16 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
                 UT_BoundingBox box;
                 maskGeo->computeQuickBounds(box);
 
-                bbox.min()[0] = box.xmin();
-                bbox.min()[1] = box.ymin();
-                bbox.min()[2] = box.zmin();
-                bbox.max()[0] = box.xmax();
-                bbox.max()[1] = box.ymax();
-                bbox.max()[2] = box.zmax();
+                clipBox.min()[0] = box.xmin();
+                clipBox.min()[1] = box.ymin();
+                clipBox.min()[2] = box.zmin();
+                clipBox.max()[0] = box.xmax();
+                clipBox.max()[1] = box.ymax();
+                clipBox.max()[2] = box.zmax();
             }
+        } else {
+            addError(SOP_MESSAGE, "Not enough sources specified.");
+            return error();
         }
 
         // Get the group of grids to process.
@@ -272,28 +469,44 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
         int numLevelSets = 0;
-        for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
-            if (it->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
+        for (hvdb::VdbPrimIterator it{gdp, group}; it; ++it) {
+            if (progress.wasInterrupted()) { throw std::runtime_error{"interrupted"}; }
+
+            const auto& inGrid = it->getConstGrid();
+
+            hvdb::GridPtr outGrid;
+
+            if (inGrid.getGridClass() == openvdb::GRID_LEVEL_SET) {
                 ++numLevelSets;
             }
 
-            hvdb::GridPtr outGrid;
+            progress.getInterrupt()->setAppTitle(
+                ("Clipping VDB " + it.getPrimitiveIndexAndName().toStdString()).c_str());
+
             if (maskGrid) {
-                MaskClipOp op(maskGrid, inside);
+                MaskClipOp op{maskGrid, inside};
                 if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
                     outGrid = op.outputGrid;
-                } else if (it->getConstGrid().isType<openvdb::points::PointDataGrid>()) {
+                } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
+                    addWarning(SOP_MESSAGE,
+                        "only bounding box clipping is currently supported for point data grids");
+                }
+            } else if (useCamera) {
+                FrustumClipOp op{mFrustum, inside};
+                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                    outGrid = op.outputGrid;
+                } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     addWarning(SOP_MESSAGE,
                         "only bounding box clipping is currently supported for point data grids");
                 }
             } else {
-                BBoxClipOp op(bbox, inside);
+                BBoxClipOp op{clipBox, inside};
                 if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
                     outGrid = op.outputGrid;
-                } else if (it->getConstGrid().isType<openvdb::points::PointDataGrid>()) {
+                } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     if (inside) {
-                        outGrid = it->getConstGrid().deepCopyGrid();
-                        outGrid->clipGrid(bbox);
+                        outGrid = inGrid.deepCopyGrid();
+                        outGrid->clipGrid(clipBox);
                     } else {
                         addWarning(SOP_MESSAGE,
                             "only Keep Inside mode is currently supported for point data grids");

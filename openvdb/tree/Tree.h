@@ -505,16 +505,24 @@ public:
     }
     //@}
 
-    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
     /// @param value   the value to which to set voxels within the box.
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive.
-    ///
-    /// @note This operation generates a dense representation of the
-    ///       filled box. This implies that active tiles are voxelized, i.e. only active
-    ///       voxels are generated from this fill operation.
+    /// @sa voxelizeActiveTiles()
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    ///
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    ///
+    /// @warning This method can explode the tree's memory footprint, especially if it
+    /// contains active tiles at the upper levels (in particular the root level)!
+    ///
+    /// @sa denseFill()
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
@@ -682,14 +690,6 @@ public:
 
     /// Min and max are both inclusive.
     void getIndexRange(CoordBBox& bbox) const override { mRoot.getIndexRange(bbox); }
-
-    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
-    ///
-    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
-    ///
-    /// @warning This method can explode the tree's memory footprint, especially if it
-    /// contains active tiles at the upper levels, e.g. root level!
-    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Efficiently merge another tree into this tree using one of several schemes.
     /// @details This operation is primarily intended to combine trees that are mostly
@@ -1815,18 +1815,28 @@ Tree<RootNodeType>::unallocatedLeafCount() const
 
 template<typename RootNodeType>
 inline void
+Tree<RootNodeType>::sparseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    this->clearAllAccessors();
+    return mRoot.sparseFill(bbox, value, active);
+}
+
+
+template<typename RootNodeType>
+inline void
 Tree<RootNodeType>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     this->clearAllAccessors();
     return mRoot.denseFill(bbox, value, active);
 }
 
+
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::sparseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+Tree<RootNodeType>::voxelizeActiveTiles(bool threaded)
 {
     this->clearAllAccessors();
-    return mRoot.sparseFill(bbox, value, active);
+    mRoot.voxelizeActiveTiles(threaded);
 }
 
 
@@ -1848,15 +1858,6 @@ Tree<RootNodeType>::getBackgroundValue() const
 
 
 ////////////////////////////////////////
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::voxelizeActiveTiles(bool threaded)
-{
-    this->clearAllAccessors();
-    mRoot.voxelizeActiveTiles(threaded);
-}
 
 
 template<typename RootNodeType>
@@ -2275,7 +2276,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     if (verboseLevel > 3) {
         // This forces loading of all non-resident nodes.
         this->evalMinMax(minVal, maxVal);
-    }    
+    }
 
     std::vector<Index64> nodeCount(dims.size());
     for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);

@@ -38,6 +38,8 @@
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -47,20 +49,20 @@ class SOP_OpenVDB_Read: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Read(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Read() {}
+    ~SOP_OpenVDB_Read() override {}
 
-    virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
+    void getDescriptiveParmName(UT_String& s) const override { s = "file_name"; }
 
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
-    virtual int isRefInput(unsigned input) const { return (input == 0); }
+    int isRefInput(unsigned input) const override { return (input == 0); }
 #endif
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -78,7 +80,7 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
     choicenames[0].setLabel(0);
 
     hvdb::SOP_NodeVDB* sop = static_cast<hvdb::SOP_NodeVDB*>(data);
-    if (sop == NULL) return;
+    if (sop == nullptr) return;
 
     // Get the parameters from the GUI
     // The file name of the vdb we would like to load
@@ -128,7 +130,7 @@ int
 reloadCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 {
     SOP_OpenVDB_Read* sop = static_cast<SOP_OpenVDB_Read*>(data);
-    if (NULL != sop) {
+    if (nullptr != sop) {
         sop->forceRecook();
         return 1; // request a refresh of the parameter pane
     }
@@ -145,42 +147,41 @@ reloadCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Metadata-only toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "metadata_only", "Read Metadata Only")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
-            "If enabled, output empty grids populated with\n"
-            "their metadata and transforms only.\n"));
+        .setTooltip(
+            "If enabled, output empty grids populated with"
+            " their metadata and transforms only.\n"));
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     // Clipping toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "clip", "Clip to Reference Bounds")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Clip grids to the bounding box of the reference geometry."));
+        .setTooltip("Clip grids to the bounding box of the reference geometry."));
 #endif
 
     // Filename
     parms.add(hutil::ParmFactory(PRM_FILE, "file_name", "File Name")
         .setDefault(0, "./filename.vdb")
-        .setHelpText("Select a VDB file."));
+        .setTooltip("Select a VDB file."));
 
     // Grid name mask
     parms.add(hutil::ParmFactory(PRM_STRING, "grids",  "Grid(s)")
         .setDefault(0, "*")
         .setChoiceList(new PRM_ChoiceList(PRM_CHOICELIST_TOGGLE, populateGridMenu))
-        .setHelpText("Grid names separated by white space (wildcards allowed)"));
+        .setTooltip("Grid names separated by white space (wildcards allowed)"));
 
     // Toggle to enable/disable grouping
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enable_grouping", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setDefault(PRMoneDefaults)
-        .setHelpText(
-            "If enabled, create a group with the given name\n"
-            "that comprises the selected grids.\n"
+        .setTooltip(
+            "If enabled, create a group with the given name that comprises the selected grids.\n"
             "If disabled, do not group the selected grids."));
 
     // Name for the output group
@@ -189,28 +190,28 @@ newSopOperator(OP_OperatorTable* table)
             "import os.path\n"
             "return os.path.splitext(os.path.basename(ch('file_name')))[0]",
             CH_PYTHON_EXPRESSION)
-        .setHelpText("Specify a name for this group of grids."));
+        .setTooltip("Specify a name for this group of grids."));
 
     // Missing Frame menu
     {
-        const char* items[] = {
+        char const * const items[] = {
             "error",    "Report Error",
             "empty",    "No Geometry",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "missingframe", "Missing Frame")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
-                "If the specified file does not exist on disk, either report an error\n"
-                "(Report Error) or warn and continue (No Geometry)."));
+            .setTooltip(
+                "If the specified file does not exist on disk, either report an error"
+                " (Report Error) or warn and continue (No Geometry)."));
     }
 
     // Reload button
     parms.add(hutil::ParmFactory(PRM_CALLBACK, "reload",  "Reload File")
         .setCallbackFunc(&reloadCB)
-        .setHelpText("Reread the VDB file."));
+        .setTooltip("Reread the VDB file."));
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
@@ -218,9 +219,9 @@ newSopOperator(OP_OperatorTable* table)
     // Delayed loading
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "delayload", "Delay Loading")
         .setDefault(PRMoneDefaults)
-        .setHelpText(
-            "Don't allocate memory for or read voxel values until the values\n"
-            "are actually accessed.\n\n"
+        .setTooltip(
+            "Don't allocate memory for or read voxel values until the values"
+            " are actually accessed.\n\n"
             "Delayed loading can significantly lower memory usage, but\n"
             "note that viewport visualization of a volume usually requires\n"
             "the entire volume to be loaded into memory."));
@@ -230,13 +231,19 @@ newSopOperator(OP_OperatorTable* table)
         "copylimit", "Copy if smaller than")
         .setDefault(0.5f)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setHelpText(
+        .setTooltip(
             "When delayed loading is enabled, a file must not be modified on disk before\n"
             "it has been fully read.  For safety, files smaller than the given size (in GB)\n"
             "will be copied to a private, temporary location (either $OPENVDB_TEMP_DIR,\n"
-            "$TMPDIR or a system default temp directory)."));
+            "$TMPDIR or a system default temp directory).")
+        .setDocumentation(
+            "When delayed loading is enabled, a file must not be modified on disk before"
+            " it has been fully read.  For safety, files smaller than the given size (in GB)"
+            " will be copied to a private, temporary location (either `$OPENVDB_TEMP_DIR`,"
+            " `$TMPDIR` or a system default temp directory)."));
 
-    parms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB"));
+    parms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB")
+        .setDocumentation(nullptr));
 #endif
 
     // Register this operator.
@@ -244,7 +251,32 @@ newSopOperator(OP_OperatorTable* table)
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         .addOptionalInput("Optional Bounding Geometry")
 #endif
-        .addAlias("OpenVDB Reader");
+        .addAlias("OpenVDB Reader")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Read a `.vdb` file from disk.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node reads VDB volumes from a `.vdb` file.\n\
+It is usually preferable to use Houdini's native [File|Node:sop/file] node,\n\
+however unlike the native node, this node allows one to take advantage of\n\
+delayed loading, meaning that only those portions of a volume that are\n\
+actually accessed in a scene get loaded into memory.\n\
+Delayed loading can significantly reduce memory usage when working\n\
+with large volumes (but note that viewport visualization of a volume\n\
+usually requires the entire volume to be loaded into memory).\n\
+\n\
+@related\n\
+- [OpenVDB Write|Node:sop/DW_OpenVDBWrite]\n\
+- [Node:sop/file]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -276,7 +308,7 @@ SOP_OpenVDB_Read::updateParmsFlags()
     bool changed = false;
     float t = 0.0;
 
-    changed |= enableParm("group", evalInt("enable_grouping", 0, t));
+    changed |= enableParm("group", bool(evalInt("enable_grouping", 0, t)));
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     const bool delayedLoad = evalInt("delayload", 0, t);
@@ -386,7 +418,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
         }
 
         // Create a group for the grid primitives.
-        GA_PrimitiveGroup* group = NULL;
+        GA_PrimitiveGroup* group = nullptr;
         if (groupStr.isstring()) {
             group = gdp->newPrimitiveGroup(groupStr.buffer());
         }

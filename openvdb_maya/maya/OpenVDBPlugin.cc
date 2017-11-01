@@ -144,7 +144,7 @@ NodeRegistry::deregisterNodes(MFnPlugin& plugin, MStatus& status)
 
             const NodeInfo& node = (*gNodes)[n];
 
-            status = plugin.deregisterData(node.typeId);
+            status = plugin.deregisterNode(node.typeId);
 
             if (!status) {
                 const std::string msg = "Failed to deregister '" +
@@ -192,13 +192,13 @@ uninitializePlugin(MObject obj)
     MStatus status;
     MFnPlugin plugin(obj);
 
+    openvdb_maya::NodeRegistry::deregisterNodes(plugin, status);
+
     status = plugin.deregisterData(OpenVDBData::id);
     if (!status) {
         status.perror("Failed to deregister 'OpenVDBData'");
         return status;
     }
-
-    openvdb_maya::NodeRegistry::deregisterNodes(plugin, status);
 
     return status;
 }

@@ -27,20 +27,47 @@
 
 PROJECT ( OpenVDB_Houdini )
 
+OPTION ( OPENVDB_HOUDINI_SUBDIR "Install plugins to <prefix>/houdini/<version> instead of <prefix>/houdini<version>" OFF)
+OPTION ( OPENVDB_HOUDINI_SHORT_VERSION "User major.minor as <version> instead of major.minor.patch" ON )
+OPTION ( OPENVDB_HOUDINI_INSTALL_LIBRARY "Install headers and place the shared library in a lib directory." OFF)
 FIND_PACKAGE ( HDK REQUIRED )
+
+IF ( NOT OPENVDB_BUILD_CORE )
+  FIND_PACKAGE ( OpenVDB REQUIRED )
+
+  # Set the variables that are otherwise defined in the core module.
+  SET ( OPENVDB_MAJOR_VERSION_NUMBER ${OpenVDB_MAJOR_VERSION} )
+  SET ( OPENVDB_MINOR_VERSION_NUMBER ${OpenVDB_MINOR_VERSION} )
+  SET ( OPENVDB_PATCH_VERSION_NUMBER ${OpenVDB_PATCH_VERSION} )
+
+  # Use the library installed
+  SET ( OPENVDB_SHARED_LIB ${OpenVDB_OPENVDB_LIBRARY} )
+ELSE ()
+  # Use the target
+  SET ( OPENVDB_SHARED_LIB openvdb_shared)
+ENDIF ( NOT OPENVDB_BUILD_CORE )
 
 # This is to work around DWA way of doing stuff - REPEATED WITH VARIATION
 FILE ( GLOB HOUDINI_UTILS_HEADER RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} houdini/*.h )
 
-# This is to work around DWA way of doing stuff
+# Copy the files belonging to houdini_utils
 SET  ( OPENVDB_HOUDINI_UTILS_DIR ${PROJECT_BINARY_DIR}/houdini_utils )
 FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_UTILS_DIR} )
-FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_UTILS_DIR} )
+FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_UTILS_DIR}
+  FILES_MATCHING
+  PATTERN "geometry.h" 
+  PATTERN "ParmFactory.h"
+  PATTERN "OP_NodeChain.h"
+  )
 
-# This is to work around DWA way of doing stuff
+# Copy the files not belonging to houdini_utils to openvdb_houdini
 SET  ( OPENVDB_HOUDINI_LOCAL_DIR ${PROJECT_BINARY_DIR}/openvdb_houdini )
 FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR} )
-FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_LOCAL_DIR} )
+FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_LOCAL_DIR} 
+  PATTERN "geometry.h" EXCLUDE
+  PATTERN "ParmFactory.h" EXCLUDE
+  PATTERN "OP_NodeChain.h" EXCLUDE
+  )
 
 
 INCLUDE_DIRECTORIES (
@@ -48,9 +75,9 @@ INCLUDE_DIRECTORIES (
   ${OPENVDB_HOUDINI_UTILS_DIR}
   ${OPENVDB_HOUDINI_LOCAL_DIR}
   ${PROJECT_BINARY_DIR}
-  ${HDK_INCLUDE_DIR}
   )
 
+INCLUDE_DIRECTORIES ( SYSTEM ${HDK_INCLUDE_DIR} )
 # MESSAGE ( "HDK_DEFINITIONS = ${HDK_DEFINITIONS}" )
 
 IF (NOT WIN32)
@@ -58,7 +85,7 @@ IF (NOT WIN32)
 ENDIF ()
 
 SET ( OPENVDB_HFS_INSTALL_BASE_DIR
-  ${CMAKE_INSTALL_PREFIX}/houdini${HDK_VERSION_MAJOR}.${HDK_VERSION_MINOR}
+  ${CMAKE_INSTALL_PREFIX}/houdini$<$<BOOL:${OPENVDB_HOUDINI_SUBDIR}>:/>${HDK_VERSION_MAJOR}.${HDK_VERSION_MINOR}$<$<NOT:$<BOOL:${OPENVDB_HOUDINI_SHORT_VERSION}>>:.${HDK_VERSION_BUILD}>
   )
 
 # RPath handling
@@ -69,9 +96,12 @@ IF ( OPENVDB_ENABLE_RPATH )
   SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
   # Use $ORIGIN for relative referencing
-  # The second $ORIGIN is present because there is another shared library
-  # specific to the SOPs that is not use elsewhere
-  SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN")
+  # The second $ORIGIN is present for the openvdb_houdini shared library.
+  IF( OPENVDB_HOUDINI_INSTALL_LIBRARY )
+    SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN/../lib")
+  ELSE ()
+    SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN")
+  ENDIF ()
   # SET(CMAKE_INSTALL_RPATH "$ORIGIN")
 
 ENDIF ( OPENVDB_ENABLE_RPATH )
@@ -91,14 +121,19 @@ ADD_LIBRARY ( openvdb_houdini SHARED
   )
 
 TARGET_LINK_LIBRARIES ( openvdb_houdini
-  openvdb_shared
+  ${OPENVDB_SHARED_LIB}
+  HoudiniPRM
+  HoudiniGEO
+  HoudiniUT
+  HoudiniOP2
+  HoudiniOP3
   )
 
 SET_TARGET_PROPERTIES(
   openvdb_houdini
   PROPERTIES
   SOVERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}
-  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_BUILD_VERSION_NUMBER}
+  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
   )
 
 SET ( OPENVDB_SOP_NAMES "" )
@@ -156,7 +191,7 @@ FOREACH ( SOP_NAME ${OPENVDB_SOP_NAMES} )
 
   TARGET_LINK_LIBRARIES ( ${SOP_NAME}
     openvdb_houdini
-    openvdb_shared
+    ${OPENVDB_SHARED_LIB}
     )
 
   INSTALL ( TARGETS
@@ -168,15 +203,31 @@ FOREACH ( SOP_NAME ${OPENVDB_SOP_NAMES} )
 ENDFOREACH ()
 
 # Installation
-INSTALL ( TARGETS
-  openvdb_houdini
-  DESTINATION
-  ${OPENVDB_HFS_INSTALL_BASE_DIR}/dso
-  )
-
 INSTALL ( FILES
   houdini/DW_OpenVDBRasterizePoints.cmd
   DESTINATION
   ${OPENVDB_HFS_INSTALL_BASE_DIR}/scripts/sop
   )
 
+IF( OPENVDB_HOUDINI_INSTALL_LIBRARY )
+  # Install the openvdb_houdini as a proper library
+  INSTALL ( DIRECTORY 
+    ${OPENVDB_HOUDINI_UTILS_DIR}
+    ${OPENVDB_HOUDINI_LOCAL_DIR}
+    DESTINATION ${OPENVDB_HFS_INSTALL_BASE_DIR}/include
+    )
+
+  INSTALL ( TARGETS
+    openvdb_houdini
+    DESTINATION
+    ${OPENVDB_HFS_INSTALL_BASE_DIR}/lib
+    )
+
+ELSE ()
+  
+  INSTALL ( TARGETS
+    openvdb_houdini
+    DESTINATION
+    ${OPENVDB_HFS_INSTALL_BASE_DIR}/dso
+    )
+ENDIF ()

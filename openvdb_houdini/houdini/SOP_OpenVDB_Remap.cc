@@ -48,8 +48,11 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <boost/scoped_array.hpp>
+#include <boost/mpl/at.hpp>
 
+#include <algorithm>
+#include <cmath>
+#include <map>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -108,7 +111,7 @@ maxComponent(const openvdb::math::Vec3<T>& v) {
 template<typename NodeType>
 struct NodeMinMax
 {
-    typedef typename NodeType::ValueType    ValueType;
+    using ValueType = typename NodeType::ValueType;
 
     NodeMinMax(const std::vector<const NodeType*>& nodes, ValueType background)
         : mNodes(&nodes[0]), mBackground(background), mMin(background), mMax(background)
@@ -147,7 +150,7 @@ struct NodeMinMax
 template<typename NodeType>
 struct Deactivate
 {
-    typedef typename NodeType::ValueType    ValueType;
+    using ValueType = typename NodeType::ValueType;
 
     Deactivate(std::vector<NodeType*>& nodes, ValueType background)
         : mNodes(&nodes[0]), mBackground(background)
@@ -180,7 +183,7 @@ evalMinMax(const TreeType& tree,
     maxVal = tree.background();
 
     { // eval voxels
-        typedef typename TreeType::LeafNodeType   LeafNodeType;
+        using LeafNodeType = typename TreeType::LeafNodeType;
         std::vector<const LeafNodeType*> nodes;
         tree.getNodes(nodes);
 
@@ -192,9 +195,9 @@ evalMinMax(const TreeType& tree,
     }
 
     { // eval first tiles
-        typedef typename TreeType::RootNodeType                                     RootNodeType;
-        typedef typename RootNodeType::NodeChainType                                NodeChainType;
-        typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type  InternalNodeType;
+        using RootNodeType = typename TreeType::RootNodeType;
+        using NodeChainType = typename RootNodeType::NodeChainType;
+        using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
 
         std::vector<const InternalNodeType*> nodes;
         tree.getNodes(nodes);
@@ -226,7 +229,7 @@ void
 deactivateBackgroundValues(TreeType& tree)
 {
     { // eval voxels
-        typedef typename TreeType::LeafNodeType   LeafNodeType;
+        using LeafNodeType = typename TreeType::LeafNodeType;
         std::vector<LeafNodeType*> nodes;
         tree.getNodes(nodes);
 
@@ -235,9 +238,9 @@ deactivateBackgroundValues(TreeType& tree)
     }
 
     { // eval first tiles
-        typedef typename TreeType::RootNodeType                                     RootNodeType;
-        typedef typename RootNodeType::NodeChainType                                NodeChainType;
-        typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type  InternalNodeType;
+        using RootNodeType = typename TreeType::RootNodeType;
+        using NodeChainType = typename RootNodeType::NodeChainType;
+        using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
 
         std::vector<InternalNodeType*> nodes;
         tree.getNodes(nodes);
@@ -247,7 +250,7 @@ deactivateBackgroundValues(TreeType& tree)
     }
 
     { // eval remaining tiles
-        typedef typename TreeType::ValueType  ValueType;
+        using ValueType = typename TreeType::ValueType;
         const ValueType
             background(tree.background()),
             delta = openvdb::math::Tolerance<ValueType>::value();
@@ -273,7 +276,7 @@ struct RemapGridValues {
 
     RemapGridValues(Extrapolation belowExt, Extrapolation aboveExt, UT_Ramp& ramp,
         const fpreal inMin, const fpreal inMax, const fpreal outMin, const fpreal outMax,
-        bool deactivate, UT_ErrorManager* errorManager = NULL)
+        bool deactivate, UT_ErrorManager* errorManager = nullptr)
         : mBelowExtrapolation(belowExt)
         , mAboveExtrapolation(aboveExt)
         , mRamp(&ramp)
@@ -302,8 +305,8 @@ struct RemapGridValues {
     template<typename GridType>
     void operator()(GridType& grid)
     {
-        typedef typename GridType::ValueType                ValueType;
-        typedef typename GridType::TreeType::LeafNodeType   LeafNodeType;
+        using ValueType = typename GridType::ValueType;
+        using LeafNodeType = typename GridType::TreeType::LeafNodeType;
 
         std::vector<LeafNodeType*> leafnodes;
         grid.tree().getNodes(leafnodes);
@@ -352,8 +355,9 @@ struct RemapGridValues {
 
 private:
     template<typename GridType>
-    struct ValueTransform {
-        typedef typename GridType::TreeType::LeafNodeType LeafNodeType;
+    struct ValueTransform
+    {
+        using LeafNodeType = typename GridType::TreeType::LeafNodeType;
 
         ValueTransform(const UT_Ramp& utramp, std::vector<LeafNodeType*>& leafnodes,
             Extrapolation belowExt, Extrapolation aboveExt, const fpreal inMin,
@@ -447,7 +451,7 @@ struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB {
     int sortOutputRange();
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
@@ -459,7 +463,7 @@ int
 inputRangeCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 {
    SOP_OpenVDB_Remap* sop = static_cast<SOP_OpenVDB_Remap*>(data);
-   if (sop == NULL) return 0;
+   if (sop == nullptr) return 0;
    return sop->sortInputRange();
 }
 
@@ -467,7 +471,7 @@ int
 outputRangeCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
 {
    SOP_OpenVDB_Remap* sop = static_cast<SOP_OpenVDB_Remap*>(data);
-   if (sop == NULL) return 0;
+   if (sop == nullptr) return 0;
    return sop->sortOutputRange();
 }
 
@@ -503,39 +507,58 @@ SOP_OpenVDB_Remap::sortOutputRange()
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input grids.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenu)
+        .setTooltip("Specify a subset of the input grids.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     { // Extrapolation
-        const char* items[] = {
+        char const * const items[] = {
             "clamp",        "Clamp",
             "preserve",     "Preserve",
             "extrapolate",  "Extrapolate",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "below", "Below Minimum")
             .setDefault(PRMzeroDefaults)
-            .setHelpText(
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip(
                 "Specify how to handle input values below the input range minimum:"
                 " either by clamping to the output minimum (Clamp),"
                 " leaving out-of-range values intact (Preserve),"
                 " or extrapolating linearly from the output minimum (Extrapolate).")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setDocumentation(
+                "How to handle input values below the input range minimum\n\n"
+                "Clamp:\n"
+                "    Clamp values to the output minimum.\n"
+                "Preserve:\n"
+                "    Leave out-of-range values intact.\n"
+                "Extrapolate:\n"
+                "    Extrapolate values linearly from the output minimum.\n"));
 
         parms.add(hutil::ParmFactory(PRM_ORD, "above", "Above Maximum")
             .setDefault(PRMzeroDefaults)
-            .setHelpText(
-                "Specify how to handle output values above the output range maximum:"
-                " either by clamping to the output maximum (Clamp),"
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip(
+                "Specify how to handle input values above the input range maximum:"
+                " either by clamping to the input maximum (Clamp),"
                 " leaving out-of-range values intact (Preserve),"
-                " or extrapolating linearly from the output maximum (Extrapolate).")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+                " or extrapolating linearly from the input maximum (Extrapolate).")
+            .setDocumentation(
+                "How to handle output values above the input range maximum\n\n"
+                "Clamp:\n"
+                "    Clamp values to the input maximum.\n"
+                "Preserve:\n"
+                "    Leave out-of-range values intact.\n"
+                "Extrapolate:\n"
+                "    Extrapolate values linearly from the input maximum.\n"));
     }
 
     std::vector<fpreal> defaultRange;
@@ -545,13 +568,13 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "inrange", "Input Range")
         .setDefault(defaultRange)
         .setVectorSize(2)
-        .setHelpText("Input min/max value range")
+        .setTooltip("Input min/max value range")
         .setCallbackFunc(&inputRangeCB));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "outrange", "Output Range")
         .setDefault(defaultRange)
         .setVectorSize(2)
-        .setHelpText("Output min/max value range")
+        .setTooltip("Output min/max value range")
         .setCallbackFunc(&outputRangeCB));
 
     {
@@ -565,17 +588,40 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_MULTITYPE_RAMP_FLT, "function", "Transfer Function")
             .setDefault(PRMtwoDefaults)
             .setSpareData(rampSpare)
-            .setHelpText("X Axis: 0 = input range minimum, 1 = input range maximum.\n"
-                "Y Axis: 0 = output range minimum, 1 = output range maximum.\n"));
+            .setTooltip("X Axis: 0 = input range minimum, 1 = input range maximum.\n"
+                "Y Axis: 0 = output range minimum, 1 = output range maximum.\n")
+            .setDocumentation(
+                "Map values through a transfer function where _x_ = 0 corresponds to"
+                " the input range minimum, _x_ = 1 to the input range maximum,"
+                " _y_ = 0 to the output range minimum, and _y_ = 1 to the"
+                " output range maximum."));
     }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "deactivate", "Deactivate Background Voxels")
-        .setHelpText("Deactivate voxels with values equal to the remapped background value."));
+        .setTooltip("Deactivate voxels with values equal to the remapped background value."));
 
 
     hvdb::OpenVDBOpFactory("OpenVDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
-        .addInput("VDB Grids");
+        .addInput("VDB Grids")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Perform a remapping of the voxel values in a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node remaps voxel values to a new range, optionally through\n\
+a user-specified transfer function.\n\
+\n\
+@related\n\
+- [Node:sop/volumevop]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 OP_Node*
@@ -608,10 +654,9 @@ SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
         RemapGridValues::Extrapolation belowExtrapolation = RemapGridValues::CLAMP;
         RemapGridValues::Extrapolation aboveExtrapolation = RemapGridValues::CLAMP;
 
-        int extrapolation = evalInt("below", 0, time);
+        auto extrapolation = evalInt("below", 0, time);
         if (extrapolation == 1) belowExtrapolation = RemapGridValues::PRESERVE;
         else if (extrapolation == 2) belowExtrapolation = RemapGridValues::EXTRAPOLATE;
-
 
         extrapolation = evalInt("above", 0, time);
         if (extrapolation == 1) aboveExtrapolation = RemapGridValues::PRESERVE;

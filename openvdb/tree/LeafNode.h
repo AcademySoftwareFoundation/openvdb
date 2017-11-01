@@ -38,6 +38,7 @@
 #include "LeafBuffer.h"
 #include <iostream>
 #include <memory>
+#include <algorithm>// for std::nth_element
 #include <type_traits>
 
 
@@ -496,6 +497,11 @@ public:
 
     /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
+    /// Set all voxels within an axis-aligned box to the specified value and active state.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->fill(bbox, value, active);
+    }
 
     /// Set all voxels to the specified value but don't change their active states.
     void fill(const ValueType& value);
@@ -797,6 +803,55 @@ public:
     ///                  approximatly constant.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+
+    /// @brief Computes the median value of all the active AND inactive voxels in this node.
+    /// @return The median value of all values in this node.
+    ///
+    /// @param tmp Optional temporary storage that can hold at least NUM_VALUES values
+    ///            Use of this temporary storage can improve performance
+    ///            when this method is called multiple times.
+    ///
+    /// @note If tmp = this->buffer().data() then the median
+    ///       value is computed very efficiently (in place) but
+    ///       the voxel values in this node are re-shuffeled!
+    ///
+    /// @warning If tmp != nullptr then it is the responsibility of
+    ///          the client code that it points to enough memory to
+    ///          hold NUM_VALUES elements of type ValueType.
+    ValueType medianAll(ValueType *tmp = nullptr) const;
+
+    /// @brief Computes the median value of all the active voxels in this node.
+    /// @return The number of active voxels.
+    ///
+    /// @param value If the return value is non zero @a value is updated
+    ///              with the median value.
+    ///
+    /// @param tmp Optional temporary storage that can hold at least
+    ///            as many values as there are active voxels in this node.
+    ///            Use of this temporary storage can improve performance
+    ///            when this method is called multiple times.
+    ///
+    /// @warning If tmp != nullptr then it is the responsibility of
+    ///          the client code that it points to enough memory to
+    ///          hold the number of active voxels of type ValueType.
+    Index medianOn(ValueType &value, ValueType *tmp = nullptr) const;
+
+    /// @brief Computes the median value of all the inactive voxels in this node.
+    /// @return The number of inactive voxels.
+    ///
+    /// @param value If the return value is non zero @a value is updated
+    ///              with the median value.
+    ///
+    /// @param tmp Optional temporary storage that can hold at least
+    ///            as many values as there are inactive voxels in this node.
+    ///            Use of this temporary storage can improve performance
+    ///            when this method is called multiple times.
+    ///
+    /// @warning If tmp != nullptr then it is the responsibility of
+    ///          the client code that it points to enough memory to
+    ///          hold the number of inactive voxels of type ValueType.
+    Index medianOff(ValueType &value, ValueType *tmp = nullptr) const;
 
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
@@ -1148,11 +1203,15 @@ LeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool a
     if (!this->allocate()) return;
 #endif
 
-    for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    for (Int32 x = clippedBBox.min().x(); x <= clippedBBox.max().x(); ++x) {
         const Index offsetX = (x & (DIM-1u)) << 2*Log2Dim;
-        for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+        for (Int32 y = clippedBBox.min().y(); y <= clippedBBox.max().y(); ++y) {
             const Index offsetXY = offsetX + ((y & (DIM-1u)) << Log2Dim);
-            for (Int32 z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+            for (Int32 z = clippedBBox.min().z(); z <= clippedBBox.max().z(); ++z) {
                 const Index offset = offsetXY + (z & (DIM-1u));
                 mBuffer[offset] = value;
                 mValueMask.set(offset, active);
@@ -1477,6 +1536,72 @@ LeafNode<T, Log2Dim>::isConstant(ValueType& minValue,
         }
     }
     return true;
+}
+
+template<typename T, Index Log2Dim>
+inline T
+LeafNode<T, Log2Dim>::medianAll(T *tmp) const
+{
+    std::unique_ptr<T[]> data(nullptr);
+    if (tmp == nullptr) {//allocate temporary storage
+        data.reset(new T[NUM_VALUES]);
+        tmp = data.get();
+    }
+    if (tmp != mBuffer.data()) {
+        const T* src = mBuffer.data();
+        for (T* dst = tmp; dst-tmp < NUM_VALUES;) *dst++ = *src++;
+    }
+    static const size_t midpoint = (NUM_VALUES - 1) >> 1;
+    std::nth_element(tmp, tmp + midpoint, tmp + NUM_VALUES);
+    return tmp[midpoint];
+}
+
+template<typename T, Index Log2Dim>
+inline Index
+LeafNode<T, Log2Dim>::medianOn(T &value, T *tmp) const
+{
+    const Index count = mValueMask.countOn();
+    if (count == NUM_VALUES) {//special case: all voxels are active
+        value = this->medianAll(tmp);
+        return NUM_VALUES;
+    } else if (count == 0) {
+        return 0;
+    }
+    std::unique_ptr<T[]> data(nullptr);
+    if (tmp == nullptr) {//allocate temporary storage
+        data.reset(new T[count]);// 0 < count < NUM_VALUES
+        tmp = data.get();
+    }
+    for (auto iter=this->cbeginValueOn(); iter; ++iter) *tmp++ = *iter;
+    T *begin = tmp - count;
+    const size_t midpoint = (count - 1) >> 1;
+    std::nth_element(begin, begin + midpoint, tmp);
+    value = begin[midpoint];
+    return count;
+}
+
+template<typename T, Index Log2Dim>
+inline Index
+LeafNode<T, Log2Dim>::medianOff(T &value, T *tmp) const
+{
+    const Index count = mValueMask.countOff();
+    if (count == NUM_VALUES) {//special case: all voxels are inactive
+        value = this->medianAll(tmp);
+        return NUM_VALUES;
+    } else if (count == 0) {
+        return 0;
+    }
+    std::unique_ptr<T[]> data(nullptr);
+    if (tmp == nullptr) {//allocate temporary storage
+        data.reset(new T[count]);// 0 < count < NUM_VALUES
+        tmp = data.get();
+    }
+    for (auto iter=this->cbeginValueOff(); iter; ++iter) *tmp++ = *iter;
+    T *begin = tmp - count;
+    const size_t midpoint = (count - 1) >> 1;
+    std::nth_element(begin, begin + midpoint, tmp);
+    value = begin[midpoint];
+    return count;
 }
 
 ////////////////////////////////////////

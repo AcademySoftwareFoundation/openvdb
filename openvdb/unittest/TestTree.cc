@@ -2029,7 +2029,9 @@ TestTree::testFill()
     using TreeT = openvdb::tree::Tree<RootT>;
 
     const float outside = 2.0f, inside = -outside;
-    const openvdb::CoordBBox bbox(openvdb::Coord(-3,-50,30), openvdb::Coord(13,11,323));
+    const openvdb::CoordBBox
+        bbox{openvdb::Coord{-3, -50, 30}, openvdb::Coord{13, 11, 323}},
+        otherBBox{openvdb::Coord{400, 401, 402}, openvdb::Coord{600}};
 
     {// sparse fill
          openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
@@ -2039,7 +2041,7 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.sparseFill(bbox, inside, /*state*/true);
+         tree.sparseFill(bbox, inside, /*active=*/true);
          CPPUNIT_ASSERT(tree.hasActiveTiles());
          CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
           for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
@@ -2054,10 +2056,36 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.denseFill(bbox, inside, /*state*/true);
-         CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
+
+         // Add some active tiles.
+         tree.sparseFill(otherBBox, inside, /*active=*/true);
+         CPPUNIT_ASSERT(tree.hasActiveTiles());
+         CPPUNIT_ASSERT_EQUAL(otherBBox.volume(), tree.activeVoxelCount());
+
+         tree.denseFill(bbox, inside, /*active=*/true);
+
+         // In OpenVDB 4.0.0 and earlier, denseFill() densified active tiles
+         // throughout the tree.  Verify that it no longer does that.
+         CPPUNIT_ASSERT(tree.hasActiveTiles()); // i.e., otherBBox
+
+         CPPUNIT_ASSERT_EQUAL(bbox.volume() + otherBBox.volume(), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
+         }
+
+         tree.clear();
+         CPPUNIT_ASSERT(!tree.hasActiveTiles());
+         tree.sparseFill(otherBBox, inside, /*active=*/true);
+         CPPUNIT_ASSERT(tree.hasActiveTiles());
+         tree.denseFill(bbox, inside, /*active=*/false);
+         CPPUNIT_ASSERT(tree.hasActiveTiles()); // i.e., otherBBox
+         CPPUNIT_ASSERT_EQUAL(otherBBox.volume(), tree.activeVoxelCount());
+
+         // In OpenVDB 4.0.0 and earlier, denseFill() filled sparsely if given
+         // an inactive fill value.  Verify that it now fills densely.
+         const int leafDepth = int(tree.treeDepth()) - 1;
+         for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             CPPUNIT_ASSERT_EQUAL(leafDepth, tree.getValueDepth(*ijk));
              ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
          }
     }

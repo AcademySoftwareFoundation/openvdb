@@ -1497,6 +1497,62 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrB.get(0), 0);
         }
 
+        // read in and write out using delayed load to check writing out-of-core attributes
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.readMetadata(filein);
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrB.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrB.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            std::string filename2 = tempDir + "/openvdb_delayed5";
+            std::ofstream fileout2(filename2.c_str(), std::ios_base::binary);
+            io::setStreamMetadataPtr(fileout2, streamMetadata);
+            io::setDataCompression(fileout2, io::COMPRESS_BLOSC);
+
+            attrB.writeMetadata(fileout2, false, /*paged=*/true);
+            compression::PagedOutputStream outputStreamSize(fileout2);
+            outputStreamSize.setSizeOnly(true);
+            attrB.writePagedBuffers(outputStreamSize, false);
+            outputStreamSize.flush();
+            compression::PagedOutputStream outputStream(fileout2);
+            outputStream.setSizeOnly(false);
+            attrB.writePagedBuffers(outputStream, false);
+            outputStream.flush();
+
+            fileout2.close();
+
+            AttributeArrayI attrB2;
+
+            std::ifstream filein2(filename2.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein2, streamMetadata);
+            io::setMappedFilePtr(filein2, mappedFile);
+
+            attrB2.readMetadata(filein2);
+            compression::PagedInputStream inputStream2(filein2);
+            inputStream2.setSizeOnly(true);
+            attrB2.readPagedBuffers(inputStream2);
+            inputStream2.setSizeOnly(false);
+            attrB2.readPagedBuffers(inputStream2);
+
+            CPPUNIT_ASSERT(attrB2.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrB.get(i), attrB2.get(i));
+            }
+
+            filein2.close();
+        }
+
         // Clean up temp files.
         std::remove(mappedFile->filename().c_str());
         std::remove(filename.c_str());
@@ -1794,6 +1850,48 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isCompressed());
         }
 #endif
+
+        // Clean up temp files.
+        std::remove(mappedFile->filename().c_str());
+        std::remove(filename.c_str());
+
+        // write out invalid serialization flags as metadata to a temp file
+        {
+            filename = tempDir + "/openvdb_delayed5";
+            std::ofstream fileout(filename.c_str(), std::ios_base::binary);
+            io::setStreamMetadataPtr(fileout, streamMetadata);
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            // write out unknown serialization flags to check forwards-compatibility
+
+            Index64 bytes(0);
+            uint8_t flags(0);
+            uint8_t serializationFlags(Int16(0x10));
+            Index size(0);
+
+            fileout.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
+            fileout.write(reinterpret_cast<const char*>(&flags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&serializationFlags), sizeof(uint8_t));
+            fileout.write(reinterpret_cast<const char*>(&size), sizeof(Index));
+
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+
+        // read in using delayed load and check metadata fail due to serialization flags
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            CPPUNIT_ASSERT_THROW(attrB.readMetadata(filein), openvdb::IoError);
+        }
 
         // cleanup temp files
 

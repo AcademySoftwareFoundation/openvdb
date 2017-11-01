@@ -34,11 +34,11 @@
 #ifndef OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-#include <math.h>
-#include <iostream>
-#include <boost/format.hpp>
-#include <openvdb/Exceptions.h>
 #include "Math.h"
+#include <openvdb/Exceptions.h>
+#include <boost/format.hpp>
+#include <cmath>
+#include <iostream>
 
 
 namespace openvdb {
@@ -148,9 +148,42 @@ public:
     /// Return the maximum of the absolute of all elements in this matrix
     T absMax() const {
         T x = static_cast<T>(std::fabs(mm[0]));
-        for (int i = 1; i < SIZE*SIZE; ++i)
+        for (unsigned i = 1; i < numElements(); ++i) {
             x = std::max(x, static_cast<T>(std::fabs(mm[i])));
+        }
         return x;
+    }
+
+    /// True if a Nan is present in this matrix
+    bool isNan() const { 
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isnan(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if an Inf is present in this matrix
+    bool isInfinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isinf(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if no Nan or Inf values are present
+    bool isFinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!std::isfinite(mm[i])) return false;
+        }
+        return true;
+    }
+
+    /// True if all elements are exactly zero
+    bool isZero() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!isZero(mm[i])) return false;
+        }
+        return true;
     }
 
 protected:

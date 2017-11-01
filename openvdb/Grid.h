@@ -37,6 +37,7 @@
 #include "io/io.h"
 #include "math/Transform.h"
 #include "tree/Tree.h"
+#include "util/logging.h"
 #include "util/Name.h"
 #include <cassert>
 #include <iostream>
@@ -692,14 +693,12 @@ public:
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
     //@}
 
-    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
     /// @param value   the value to which to set voxels within the box.
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive.
-    /// @note This operation generates a dense representation of the filled box.
-    /// This implies that active tiles are voxelized, i.e., only active voxels
-    /// are generated from this fill operation.
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// Reduce the memory footprint of this grid by increasing its sparseness.
@@ -852,7 +851,14 @@ public:
     /// Return @c true if this grid type is registered.
     static bool isRegistered() { return GridBase::isRegistered(Grid::gridType()); }
     /// Register this grid type along with a factory function.
-    static void registerGrid() { GridBase::registerGrid(Grid::gridType(), Grid::factory); }
+    static void registerGrid()
+    {
+        GridBase::registerGrid(Grid::gridType(), Grid::factory);
+        if (!tree::LeafBufferFlags<ValueType>::IsAtomic) { ///< @todo remove this for ABI 5
+            OPENVDB_LOG_WARN("delayed loading of grids of type " << Grid::gridType()
+                << " might not be threadsafe on this platform");
+        }
+    }
     /// Remove this grid type from the registry.
     static void unregisterGrid() { GridBase::unregisterGrid(Grid::gridType()); }
 
@@ -1460,7 +1466,8 @@ Grid<TreeT>::readBuffers(std::istream& is)
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
         assert(bool(meta));
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().readBuffers(is, saveFloatAsHalf());
         }
@@ -1483,7 +1490,8 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
         assert(bool(meta));
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().readBuffers(is, saveFloatAsHalf());
         }
@@ -1523,7 +1531,8 @@ Grid<TreeT>::writeBuffers(std::ostream& os) const
         meta->setCountingPasses(false);
 
         // Save out the data blocks of the grid.
-        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+        for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
+            uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
             tree().writeBuffers(os, saveFloatAsHalf());
         }

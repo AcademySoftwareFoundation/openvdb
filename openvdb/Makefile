@@ -38,6 +38,7 @@
 #   pytest              unit tests for the Python module
 #   pydoc               HTML documentation for the Python module
 #                       (doc/html/python/index.html)
+#   vdb_lod             command-line tool to generate volume mipmaps
 #   vdb_print           command-line tool to inspect OpenVDB files
 #   vdb_render          command-line tool to ray-trace OpenVDB files
 #   vdb_view            command-line tool to view OpenVDB files
@@ -45,6 +46,8 @@
 #
 #   all                 [default target] all of the above
 #   install             install all of the above except vdb_test
+#                       into subdirectories of DESTDIR
+#   install_lib         install just the OpenVDB library and its headers
 #                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
 #   clean               delete generated files from the local directory
@@ -100,9 +103,9 @@ endif
 #
 # To build the OpenVDB Python module, you will need local distributions of
 # Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
-# includes versions 2.5 and 2.6 of Python as well as the Boost.Python headers.
-# Unfortunately, it does not include the libboost_python library, nor does it
-# include NumPy, so both Boost.Python and NumPy have to be built separately.
+# includes Python 2.x as well as the Boost.Python headers.  Unfortunately,
+# it does not include the libboost_python library, nor does it include NumPy,
+# so both Boost.Python and NumPy have to be built separately.
 # Point the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
 # $(NUMPY_INCL_DIR) below to your local distributions of those libraries.
 #
@@ -524,6 +527,7 @@ INCLUDE_NAMES := \
     points/PointConversion.h \
     points/PointCount.h \
     points/PointDataGrid.h \
+    points/PointDelete.h \
     points/PointGroup.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
@@ -686,6 +690,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
@@ -717,7 +722,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVolumeToSpheres.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/python.txt
+DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/points.txt doc/python.txt
 DOC_INDEX := doc/html/index.html
 DOC_PDF := doc/latex/refman.pdf
 
@@ -1066,7 +1071,6 @@ vdb_test$(EXE_SUFFIX): $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
 		$(CPPUNIT_RPATH) \
 		$(LIBS_RPATH) $(LIBOPENVDB_RPATH) \
 		$(ALLOC_LIBS_RPATH))
-
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_test: vdb_test$(EXE_SUFFIX)
 endif

@@ -38,11 +38,13 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/LevelSetUtil.h>
-#include <boost/random/mersenne_twister.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -52,14 +54,14 @@ class SOP_OpenVDB_Scatter: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Scatter(OP_Network* net, const char* name, OP_Operator* op);
-    virtual ~SOP_OpenVDB_Scatter() {}
+    ~SOP_OpenVDB_Scatter() override {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -70,93 +72,104 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // Export VDBs
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep input VDB grids")
-        .setHelpText("The output will contain the input VDB grids.")
-        .setDefault(PRMzeroDefaults));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Input VDBs")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("If enabled, the output will contain the input VDB grids."));
 
     // Group scattered points
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dogroup", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Add scattered points to the group with the given name.")
         .setDefault(PRMzeroDefaults));
 
     // Scatter group name
     parms.add(hutil::ParmFactory(PRM_STRING, "sgroup", "Scatter Group")
-        .setHelpText("Name of the group to which to add scattered points")
-        .setDefault(0, "scatter"));
+        .setDefault(0, "scatter")
+        .setTooltip("If enabled, add scattered points to the group with the given name."));
 
     // Random seed
     parms.add(hutil::ParmFactory(PRM_INT_J, "seed", "Random Seed")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Specify the random number seed."));
 
-    // Spread           
+    // Spread
     parms.add(hutil::ParmFactory(PRM_FLT_J, "spread", "Spread")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Defines how far each point may be displaced from the center "
-              "of its voxel or tile. A value of zero means that the point is "
-              "placed exactly at the center. A value of one means that the "
-              "point can be placed randomly anywhere inside the voxel or tile.")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
+        .setTooltip(
+            "How far each point may be displaced from the center of its voxel or tile\n\n"
+            "A value of zero means that the point is placed exactly at the center."
+            " A value of one means that the point can be placed randomly anywhere"
+            " inside the voxel or tile."));
 
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
 
     // Mode for point scattering
-    const char* items[] = {
-        "count",            "count =",
-        "density",          "density =",
-        "pointspervoxel",   "points per voxel =",
-        NULL
+    char const * const items[] = {
+        "count",            "Point Total",
+        "density",          "Point Density",
+        "pointspervoxel",   "Points Per Voxel",
+        nullptr
     };
     parms.add(hutil::ParmFactory(PRM_ORD, "pointmode", "Mode")
-        .setHelpText(
-            "Specify how many points to scatter.\n"
-            "Point Total: specify a fixed, total point count\n"
-            "Point Density: specify the number of points per unit volume\n"
-            "Points Per Voxel: specify the number of points per voxel")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+        .setTooltip(
+            "How to determine the number of points to scatter\n\n"
+            "Point Total:\n"
+            "    Specify a fixed, total point count.\n"
+            "Point Density:\n"
+            "    Specify the number of points per unit volume.\n"
+            "Points Per Voxel:\n"
+            "    Specify the number of points per voxel."));
 
     // Point count
     parms.add(hutil::ParmFactory(PRM_INT_J, "count", "Count")
         .setDefault(5000)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10000));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10000)
+        .setTooltip("Specify the total number of points to scatter."));
 
     // Point density
     parms.add(hutil::ParmFactory(PRM_FLT_J, "density", "Density")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("The number of points per unit volume (when __Mode__ is Point Density)"));
 
     // Toggle to use voxel value as local point density multiplier
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "multiply", "Scale density by voxel values")
-        .setHelpText("Use voxel values as local multipliers for the point density.")
-        .setDefault(PRMzeroDefaults) /* off by default */);
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "multiply", "Scale Density by Voxel Values")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("If enabled, use voxel values as local multipliers for the point density."));
 
     // Points per voxel
     parms.add(hutil::ParmFactory(PRM_FLT_J , "ppv", "Count")
-         .setDefault(8)
-         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+        .setDefault(8)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("Specify the number of points per voxel."));
 
     // Toggle to scatter inside level sets
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "interior", "Scatter points inside level set grids")
-        .setHelpText("Toggle to scatter points in the interior region of a level set. "
-            "(Instead of the narrow band region used by default.)")
-        .setDefault(PRMzeroDefaults) /* off by default */);
-
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "interior", "Scatter Points Inside Level Sets")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip(
+            "If enabled, scatter points in the interior region of a level set."
+            " Otherwise, scatter points only in the narrow band."));
 
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", ""));
 
     // Verbose output toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("If enabled, print the sequence of operations to the terminal."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -165,7 +178,31 @@ newSopOperator(OP_OperatorTable* table)
     // Register the SOP.
     hvdb::OpenVDBOpFactory("OpenVDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addInput("VDB on which points will be scattered");
+        .addInput("VDB on which points will be scattered")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Scatter points on a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node scatters points randomly on or inside a VDB volume.\n\
+The number of points generated can be specified either by fixed count\n\
+or by global or local point density.\n\
+\n\
+For level set VDBs, points can be scattered either throughout the interior\n\
+of the volume or only in the\n\
+[narrow band|http://www.openvdb.org/documentation/doxygen/overview.html#secGrid]\n\
+region surrounding the zero crossing.\n\
+\n\
+@related\n\
+- [Node:sop/scatter]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -185,14 +222,14 @@ bool
 SOP_OpenVDB_Scatter::updateParmsFlags()
 {
     bool changed = false;
-    const int pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
+    const auto pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
 
     changed |= setVisibleState("count",    (0 == pmode));
     changed |= setVisibleState("density",  (1 == pmode));
     changed |= setVisibleState("multiply", (1 == pmode));
     changed |= setVisibleState("ppv",      (2 == pmode));
 
-    const int dogroup = evalInt("dogroup", 0, 0);
+    const auto dogroup = evalInt("dogroup", 0, 0);
     changed |= enableParm("sgroup", 1 == dogroup);
 
     return changed;
@@ -243,7 +280,7 @@ processLSInterior(UT_VDBType gridType, const openvdb::GridBase& gridRef, OpType&
 {
     if (gridType == UT_VDB_FLOAT) {
         const openvdb::FloatGrid* grid = static_cast<const openvdb::FloatGrid*>(&gridRef);
-        if (grid == NULL) return false;
+        if (grid == nullptr) return false;
 
         typename openvdb::Grid<typename openvdb::FloatTree::template ValueConverter<bool>::Type>::Ptr maskGrid;
         maskGrid = openvdb::tools::sdfInteriorMask(*grid);
@@ -253,7 +290,7 @@ processLSInterior(UT_VDBType gridType, const openvdb::GridBase& gridRef, OpType&
 
     } else if (gridType == UT_VDB_DOUBLE) {
         const openvdb::DoubleGrid* grid = static_cast<const openvdb::DoubleGrid*>(&gridRef);
-        if (grid == NULL) return false;
+        if (grid == nullptr) return false;
 
         typename openvdb::Grid<typename openvdb::DoubleTree::template ValueConverter<bool>::Type>::Ptr maskGrid;
         maskGrid = openvdb::tools::sdfInteriorMask(*grid);
@@ -279,7 +316,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         gdp->clearAndDestroy();
 
-        const int seed = evalInt("seed", /*idx=*/0, time);
+        const int seed = static_cast<int>(evalInt("seed", /*idx=*/0, time));
         const double spread = evalFloat("spread", 0, time);
         const bool verbose   = evalInt("verbose", /*idx=*/0, time) != 0;
         const openvdb::Index64 pointCount = evalInt("count", 0, time);
@@ -299,10 +336,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         // Choose a fast random generator with a long period. Drawback here for
         // mt11213b is that it requires 352*sizeof(uint32) bytes.
-        typedef boost::mt11213b RandGen;
+        using RandGen = std::mersenne_twister_engine<uint32_t, 32, 351, 175, 19,
+            0xccab8ee7, 11, 0xffffffff, 7, 0x31b6ab00, 15, 0xffe50000, 17, 1812433253>; // mt11213b
         RandGen mtRand(seed);
 
-        const int pmode = evalInt("pointmode", 0, time);
+        const auto pmode = evalInt("pointmode", 0, time);
 
         std::vector<std::string> emptyGrids;
 

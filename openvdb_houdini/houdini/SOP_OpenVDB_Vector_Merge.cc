@@ -45,11 +45,12 @@
 #include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_String.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/regex.hpp>
+#include <functional>
+#include <memory>
 #include <set>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace hvdb = openvdb_houdini;
@@ -67,13 +68,13 @@ class SOP_OpenVDB_Vector_Merge: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Vector_Merge(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Vector_Merge() {}
+    ~SOP_OpenVDB_Vector_Merge() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual OP_ERROR cookMySop(OP_Context&);
+    bool updateParmsFlags() override;
+    OP_ERROR cookMySop(OP_Context&) override;
 
     static void addWarningMessage(SOP_OpenVDB_Vector_Merge* self, const char* msg)
         { if (self && msg) self->addWarning(SOP_MESSAGE, msg); }
@@ -83,14 +84,14 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Group of X grids
     parms.add(hutil::ParmFactory(PRM_STRING, "scalar_x_group", "X Group")
-        .setDefault(0, "@name=*.x")
-        .setHelpText(
+        .setDefault("@name=*.x")
+        .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
             "as the x components of the merged vector grids.\n"
             "Each x grid will be paired with a y and a z grid\n"
@@ -99,8 +100,8 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group of Y grids
     parms.add(hutil::ParmFactory(PRM_STRING, "scalar_y_group", "Y Group")
-        .setDefault(0, "@name=*.y")
-        .setHelpText(
+        .setDefault("@name=*.y")
+        .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
             "as the y components of the merged vector grids.\n"
             "Each y grid will be paired with an x and a z grid\n"
@@ -109,8 +110,8 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group of Z grids
     parms.add(hutil::ParmFactory(PRM_STRING, "scalar_z_group", "Z Group")
-        .setDefault(0, "@name=*.z")
-        .setHelpText(
+        .setDefault("@name=*.z")
+        .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
             "as the z components of the merged vector grids.\n"
             "Each z grid will be paired with an x and a y grid\n"
@@ -118,20 +119,26 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Use X name
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usexname",  "Use Basename of X VDB")
-#ifndef SESI_OPENVDB
-        .setDefault(PRMzeroDefaults));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usexname", "Use Basename of X VDB")
+#ifdef SESI_OPENVDB
+        .setDefault(PRMoneDefaults)
 #else
-        .setDefault(PRMoneDefaults));
+        .setDefault(PRMzeroDefaults)
 #endif
+        .setDocumentation(
+            "Use the base name of the __X Group__ as the name for the output VDB."
+            " For example, if __X Group__ is `Cd.x`, the generated vector VDB"
+            " will be named `Cd`.\n\n"
+            "If this option is disabled or if the __X__ primitive has no `name` attribute,"
+            " the output VDB will be given the __Merged VDB Name__."));
 
     // Output vector grid name
-    parms.add(hutil::ParmFactory(PRM_STRING, "merge_name",  "Merged VDB Name")
-        .setDefault(0, "merged#")
-        .setHelpText(
+    parms.add(hutil::ParmFactory(PRM_STRING, "merge_name", "Merged VDB Name")
+        .setDefault("merged#")
+        .setTooltip(
             "Specify a name for the merged vector grids.\n"
-            "Include '#' in the name to number the output grids\n"
-            "in the order that they are processed."));
+            "Include a '#' character in the name to number the output grids\n"
+            "(starting from 1) in the order that they are processed."));
 
     {
         // Output grid's vector type (invariant, covariant, etc.)
@@ -142,7 +149,25 @@ newSopOperator(OP_OperatorTable* table)
         }
         parms.add(hutil::ParmFactory(PRM_ORD, "vectype", "Vector Type")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDocumentation("\
+Specify how the output VDB's vector values should be affected by transforms:\n\
+\n\
+Tuple / Color / UVW:\n\
+    No transformation\n\
+\n\
+Gradient / Normal:\n\
+    Inverse-transpose transformation, ignoring translation\n\
+\n\
+Unit Normal:\n\
+    Inverse-transpose transformation, ignoring translation,\n\
+    followed by renormalization\n\
+\n\
+Displacement / Velocity / Acceleration:\n\
+    \"Regular\" transformation, ignoring translation\n\
+\n\
+Position:\n\
+    \"Regular\" transformation with translation\n"));
     }
 
 #if HAVE_MERGE_GROUP
@@ -150,23 +175,23 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enable_grouping", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("If disabled, don't group merged vector grids."));
+        .setTooltip("If enabled, create a group for all merged vector grids."));
 
     // Output vector grid group name
     parms.add(hutil::ParmFactory(PRM_STRING, "group",  "Merge Group")
-        .setHelpText("Specify a name for the output group of merged vector grids."));
+        .setTooltip("Specify a name for the output group of merged vector grids."));
 #endif
 
     // Toggle to keep/remove source grids
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "remove_sources", "Remove Source VDBs")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Remove scalar grids that have been merged."));
+        .setTooltip("Remove scalar grids that have been merged."));
 
     // Toggle to copy inactive values in addition to active values
     parms.add(
         hutil::ParmFactory(PRM_TOGGLE, "copyinactive", "Copy Inactive Values")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
+        .setTooltip(
             "If enabled, merge the values of both active and inactive voxels.\n"
             "If disabled, merge the values of active voxels only, treating\n"
             "inactive voxels as active background voxels wherever\n"
@@ -174,13 +199,40 @@ newSopOperator(OP_OperatorTable* table)
 
 #ifndef SESI_OPENVDB
     // Verbosity toggle
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
+        .setDocumentation("If enabled, print debugging information to the terminal."));
 #endif
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
-        .addInput("Scalar VDBs to merge into vector");
+        .addInput("Scalar VDBs to merge into vector")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Merge three scalar VDB primitives into one vector VDB primitive.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node will create a vector-valued VDB volume using the values of\n\
+corresponding voxels from up to three scalar VDBs as the vector components.\n\
+The scalar VDBs must have the same voxel size and transform; if they do not,\n\
+use the [OpenVDB Resample node|Node:sop/DW_OpenVDBResample] to resample\n\
+two of the VDBs to match the third.\n\
+\n\
+TIP:\n\
+    To reverse the merge (i.e., to split a vector VDB into three scalar VDBs),\n\
+    use the [OpenVDB Vector Split node|Node:sop/DW_OpenVDBVectorSplit].\n\
+\n\
+@related\n\
+- [OpenVDB Vector Split|Node:sop/DW_OpenVDBVectorSplit]\n\
+- [Node:sop/vdbvectormerge]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -218,18 +270,18 @@ SOP_OpenVDB_Vector_Merge::SOP_OpenVDB_Vector_Merge(OP_Network* net,
 namespace {
 
 // Mapping from scalar ValueTypes to Vec3::value_types of registered vector-valued Grid types
-template<typename T> struct VecValueTypeMap { typedef T Type; static const bool Changed = false; };
+template<typename T> struct VecValueTypeMap { using Type = T; static const bool Changed = false; };
 //template<> struct VecValueTypeMap<bool> {
-//    typedef int32_t Type; static const bool Changed = true;
+//    using Type = int32_t; static const bool Changed = true;
 //};
 //template<> struct VecValueTypeMap<uint32_t> {
-//    typedef int32_t Type; static const bool Changed = true;
+//    using Type = int32_t; static const bool Changed = true;
 //};
 //template<> struct VecValueTypeMap<int64_t> {
-//    typedef int32_t Type; static const bool Changed = true;
+//    using Type = int32_t; static const bool Changed = true;
 //};
 //template<> struct VecValueTypeMap<uint64_t> {
-//    typedef int32_t Type; static const bool Changed = true;
+//    using Type = int32_t; static const bool Changed = true;
 //};
 
 
@@ -242,9 +294,9 @@ template<typename VectorTreeT, typename ScalarTreeT>
 class MergeActiveOp
 {
 public:
-    typedef typename VectorTreeT::ValueType  VectorValueT;
-    typedef typename ScalarTreeT::ValueType  ScalarValueT;
-    typedef typename openvdb::tree::ValueAccessor<const ScalarTreeT>  ScalarAccessor;
+    using VectorValueT = typename VectorTreeT::ValueType;
+    using ScalarValueT = typename ScalarTreeT::ValueType;
+    using ScalarAccessor = typename openvdb::tree::ValueAccessor<const ScalarTreeT>;
 
     MergeActiveOp(const ScalarTreeT* xTree, const ScalarTreeT* yTree, const ScalarTreeT* zTree,
         UT_Interrupt* interrupt)
@@ -285,7 +337,7 @@ public:
     }
 
 private:
-    boost::shared_ptr<const ScalarTreeT> mDummyTree;
+    std::shared_ptr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     UT_Interrupt* mInterrupt;
 }; // MergeActiveOp
@@ -296,11 +348,11 @@ private:
 template<typename VectorTreeT, typename ScalarTreeT>
 struct MergeInactiveOp
 {
-    typedef typename VectorTreeT::ValueType    VectorValueT;
-    typedef typename VectorValueT::value_type  VectorElemT;
-    typedef typename ScalarTreeT::ValueType    ScalarValueT;
-    typedef typename openvdb::tree::ValueAccessor<VectorTreeT>        VectorAccessor;
-    typedef typename openvdb::tree::ValueAccessor<const ScalarTreeT>  ScalarAccessor;
+    using VectorValueT = typename VectorTreeT::ValueType;
+    using VectorElemT = typename VectorValueT::value_type;
+    using ScalarValueT = typename ScalarTreeT::ValueType;
+    using VectorAccessor = typename openvdb::tree::ValueAccessor<VectorTreeT>;
+    using ScalarAccessor = typename openvdb::tree::ValueAccessor<const ScalarTreeT>;
 
     MergeInactiveOp(const ScalarTreeT* xTree, const ScalarTreeT* yTree, const ScalarTreeT* zTree,
         VectorTreeT& vecTree, UT_Interrupt* interrupt)
@@ -368,7 +420,7 @@ struct MergeInactiveOp
     }
 
 private:
-    boost::shared_ptr<const ScalarTreeT> mDummyTree;
+    std::shared_ptr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     mutable VectorAccessor mVecAcc;
     UT_Interrupt* mInterrupt;
@@ -381,12 +433,12 @@ private:
 class ScalarGridMerger
 {
 public:
-    typedef boost::function<void (const char*)> WarnFunc;
+    using WarnFunc = std::function<void (const char*)>;
 
     ScalarGridMerger(
         const hvdb::Grid* x, const hvdb::Grid* y, const hvdb::Grid* z,
         const std::string& outGridName, bool copyInactiveValues,
-        WarnFunc warn, UT_Interrupt* interrupt = NULL):
+        WarnFunc warn, UT_Interrupt* interrupt = nullptr):
         mOutGridName(outGridName),
         mCopyInactiveValues(copyInactiveValues),
         mWarn(warn),
@@ -402,10 +454,10 @@ public:
     {
         if (!mInGrid[0] && !mInGrid[1] && !mInGrid[2]) return;
 
-        typedef typename ScalarGridT::TreeType ScalarTreeT;
+        using ScalarTreeT = typename ScalarGridT::TreeType;
 
         // Retrieve a scalar tree from each input grid.
-        const ScalarTreeT* inTree[3] = { NULL, NULL, NULL };
+        const ScalarTreeT* inTree[3] = { nullptr, nullptr, nullptr };
         if (mInGrid[0]) inTree[0] = &UTvdbGridCast<ScalarGridT>(mInGrid[0])->tree();
         if (mInGrid[1]) inTree[1] = &UTvdbGridCast<ScalarGridT>(mInGrid[1])->tree();
         if (mInGrid[2]) inTree[2] = &UTvdbGridCast<ScalarGridT>(mInGrid[2])->tree();
@@ -413,15 +465,15 @@ public:
 
         // Get the type of the output vector tree.
         // 1. ScalarT is the input scalar tree's value type.
-        typedef typename ScalarTreeT::ValueType                             ScalarT;
+        using ScalarT = typename ScalarTreeT::ValueType;
         // 2. VecT is Vec3<ScalarT>, provided that there is a registered Tree with that
         //    value type.  If not, use the closest match (e.g., vec3i when ScalarT = bool).
-        typedef VecValueTypeMap<ScalarT>                                    MappedVecT;
-        typedef openvdb::math::Vec3<typename MappedVecT::Type>              VecT;
+        using MappedVecT = VecValueTypeMap<ScalarT>;
+        using VecT = openvdb::math::Vec3<typename MappedVecT::Type>;
         // 3. VecTreeT is the type of a tree with the same height and node dimensions
         //    as the input scalar tree, but with value type VecT instead of ScalarT.
-        typedef typename ScalarTreeT::template ValueConverter<VecT>::Type   VecTreeT;
-        typedef typename openvdb::Grid<VecTreeT>                            VecGridT;
+        using VecTreeT = typename ScalarTreeT::template ValueConverter<VecT>::Type;
+        using VecGridT = typename openvdb::Grid<VecTreeT>;
 
         if (MappedVecT::Changed && mWarn) {
             std::ostringstream ostr;
@@ -434,7 +486,7 @@ public:
 
         // Determine the background value and the transform.
         VecT bkgd(0, 0, 0);
-        const openvdb::math::Transform* xform = NULL;
+        const openvdb::math::Transform* xform = nullptr;
         for (int i = 0; i < 3; ++i) {
             if (inTree[i]) bkgd[i] = inTree[i]->background();
             if (mInGrid[i] && !xform) xform = &(mInGrid[i]->transform());
@@ -558,7 +610,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
 
         openvdb::VecType vecType = openvdb::VEC_INVARIANT;
         {
-            const int vtype = evalInt("vectype", 0, time);
+            const int vtype = static_cast<int>(evalInt("vectype", 0, time));
             if (vtype >= 0 && vtype < openvdb::NUM_VEC_TYPES) {
                 vecType = static_cast<openvdb::VecType>(vtype);
             }
@@ -579,11 +631,11 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
 
         UT_AutoInterrupt progress("Merging VDB grids");
 
-        typedef std::set<GEO_PrimVDB*> PrimVDBSet;
+        using PrimVDBSet = std::set<GEO_PrimVDB*>;
         PrimVDBSet primsToRemove;
 
         // Get the groups of x, y and z scalar grids to merge.
-        const GA_PrimitiveGroup *xGroup = NULL, *yGroup = NULL, *zGroup = NULL;
+        const GA_PrimitiveGroup *xGroup = nullptr, *yGroup = nullptr, *zGroup = nullptr;
         {
             UT_String groupStr;
             evalString(groupStr, "scalar_x_group", 0, time);
@@ -594,25 +646,26 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             zGroup = matchGroup(*gdp, groupStr.toStdString());
         }
 
-        typedef std::vector<GEO_PrimVDB*> PrimVDBVec;
+        using PrimVDBVec = std::vector<GEO_PrimVDB*>;
         PrimVDBVec primsToGroup;
 
         // Iterate over VDB primitives in the selected groups.
         hvdb::VdbPrimIterator
-            xIt(xGroup ? gdp : NULL, xGroup),
-            yIt(yGroup ? gdp : NULL, yGroup),
-            zIt(zGroup ? gdp : NULL, zGroup);
+            xIt(xGroup ? gdp : nullptr, xGroup),
+            yIt(yGroup ? gdp : nullptr, yGroup),
+            zIt(zGroup ? gdp : nullptr, zGroup);
         for (int i = 1; xIt || yIt || zIt; ++xIt, ++yIt, ++zIt, ++i) {
             if (progress.wasInterrupted()) return error();
 
-            GU_PrimVDB *xVdb = *xIt, *yVdb = *yIt, *zVdb = *zIt, *nonNullVdb = NULL;
+            GU_PrimVDB *xVdb = *xIt, *yVdb = *yIt, *zVdb = *zIt, *nonNullVdb = nullptr;
 
             // Extract grids from the VDB primitives and find one that is non-null.
             // Process the primitives in ZYX order to ensure the X grid is preferred.
             /// @todo nonNullGrid's ValueType determines the ValueType of the
             /// output grid's vectors, so ideally nonNullGrid should be the
             /// grid with the highest-precision ValueType.
-            const hvdb::Grid *xGrid = NULL, *yGrid = NULL, *zGrid = NULL, *nonNullGrid = NULL;
+            const hvdb::Grid *xGrid = nullptr, *yGrid = nullptr, *zGrid = nullptr,
+                *nonNullGrid = nullptr;
             if (zVdb) { zGrid = nonNullGrid = &zVdb->getGrid(); nonNullVdb = zVdb; }
             if (yVdb) { yGrid = nonNullGrid = &yVdb->getGrid(); nonNullVdb = yVdb; }
             if (xVdb) { xGrid = nonNullGrid = &xVdb->getGrid(); nonNullVdb = xVdb; }
@@ -637,7 +690,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             // Merge the input grids into an output grid.
             // This does not support a partial set so we quit early in that case.
             ScalarGridMerger op(xGrid, yGrid, zGrid, outGridName, copyInactiveValues,
-                boost::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage, this, _1));
+                std::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage,this,std::placeholders::_1));
             UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {
@@ -670,10 +723,10 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
         if (!primsToGroup.empty() && mergeGroupStr.isstring()) {
             GA_PrimitiveGroup* mergeGroup =
                 gdp->findPrimitiveGroup(mergeGroupStr.buffer());
-            if (mergeGroup == NULL) {
+            if (mergeGroup == nullptr) {
                 mergeGroup = gdp->newPrimitiveGroup(mergeGroupStr.buffer());
             }
-            if (mergeGroup != NULL) {
+            if (mergeGroup != nullptr) {
                 for (PrimVDBVec::iterator i = primsToGroup.begin(), e = primsToGroup.end();
                     i != e; ++i)
                 {
@@ -685,7 +738,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
 
         if (removeSourceGrids) {
             // Remove scalar grids that were merged.
-            primsToRemove.erase(NULL);
+            primsToRemove.erase(nullptr);
             for (PrimVDBSet::iterator i = primsToRemove.begin(), e = primsToRemove.end();
                 i != e; ++i)
             {

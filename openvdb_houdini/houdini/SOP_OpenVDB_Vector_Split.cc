@@ -49,53 +49,84 @@ class SOP_OpenVDB_Vector_Split: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Vector_Split(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Vector_Split() {}
+    ~SOP_OpenVDB_Vector_Split() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Input vector grid group name
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText(
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip(
             "Specify a subset of the input VDB grids to be split.\n"
             "Vector-valued grids will be split into component scalar grids;\n"
             "all other grids will be unchanged.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setDocumentation(
+            "A subset of the input VDBs to be split"
+            " (see [specifying volumes|/model/volumes#group])\n\n"
+            "Vector-valued VDBs are split into component scalar VDBs;"
+            " VDBs of other types are passed through unchanged."));
 
     // Toggle to keep/remove source grids
     parms.add(
         hutil::ParmFactory(PRM_TOGGLE, "remove_sources", "Remove Source VDBs")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Remove vector grids that have been split."));
+        .setTooltip("Remove vector grids that have been split.")
+        .setDocumentation("If enabled, delete vector grids that have been split."));
 
     // Toggle to copy inactive values in addition to active values
     parms.add(
         hutil::ParmFactory(PRM_TOGGLE, "copyinactive", "Copy Inactive Values")
         .setDefault(PRMzeroDefaults)
-        .setHelpText(
+        .setTooltip(
             "If enabled, split the values of both active and inactive voxels.\n"
             "If disabled, split the values of active voxels only."));
 
 #ifndef SESI_OPENVDB
     // Verbosity toggle
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
+        .setDocumentation("If enabled, print debugging information to the terminal."));
 #endif
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
         SOP_OpenVDB_Vector_Split::factory, parms, *table)
-        .addInput("Vector VDBs to split into scalar VDBs");
+        .addInput("Vector VDBs to split into scalar VDBs")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Split a vector VDB primitive into three scalar VDB primitives.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node will create three new scalar primitives named `<<input>>.x`,\n\
+`<<input>>.y`, and `<<input>>.z`.\n\
+\n\
+TIP:\n\
+    To reverse the split (i.e., to merge three scalar VDBs into a vector VDB),\n\
+    use the [OpenVDB Vector Merge node|Node:sop/DW_OpenVDBVectorMerge]\n\
+    and set the groups to `@name=*.x`, `@name=*.y`, and `@name=*.z`.\n\
+\n\
+@related\n\
+- [OpenVDB Vector Merge|Node:sop/DW_OpenVDBVectorMerge]\n\
+- [Node:sop/vdbvectorsplit]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -139,11 +170,11 @@ public:
     {
         const std::string gridName = mInVdb.getGridName();
 
-        typedef typename VecGridT::ValueType        VecT;
-        typedef typename VecGridT::TreeType::template ValueConverter<
-            typename VecT::value_type>::Type        ScalarTreeT;
-        typedef typename openvdb::Grid<ScalarTreeT> ScalarGridT;
-        typedef typename ScalarGridT::Ptr           ScalarGridPtr;
+        using VecT = typename VecGridT::ValueType;
+        using ScalarTreeT = typename VecGridT::TreeType::template
+            ValueConverter<typename VecT::value_type>::Type;
+        using ScalarGridT = typename openvdb::Grid<ScalarTreeT>;
+        using ScalarGridPtr = typename ScalarGridT::Ptr;
 
         const VecT bkgd = vecGrid.background();
 
@@ -239,11 +270,11 @@ SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
 
         UT_AutoInterrupt progress("Splitting VDB grids");
 
-        typedef std::set<GEO_PrimVDB*> PrimVDBSet;
+        using PrimVDBSet = std::set<GEO_PrimVDB*>;
         PrimVDBSet primsToRemove;
 
         // Get the group of grids to split.
-        const GA_PrimitiveGroup* splitGroup = NULL;
+        const GA_PrimitiveGroup* splitGroup = nullptr;
         {
             UT_String groupStr;
             evalString(groupStr, "group", 0, time);

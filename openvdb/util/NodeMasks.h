@@ -56,13 +56,17 @@ CountOn(Byte v)
 #ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
     static
 #endif
+    /// @todo Move this table and others into, say, Util.cc
     const Byte numBits[256] = {
-#   define B2(n)  n,     n+1,     n+1,     n+2
-#   define B4(n)  B2(n), B2(n+1), B2(n+1), B2(n+2)
-#   define B6(n)  B4(n), B4(n+1), B4(n+1), B4(n+2)
-           B6(0), B6(1), B6(1),   B6(2)
+#define COUNTONB2(n)  n,            n+1,            n+1,            n+2
+#define COUNTONB4(n)  COUNTONB2(n), COUNTONB2(n+1), COUNTONB2(n+1), COUNTONB2(n+2)
+#define COUNTONB6(n)  COUNTONB4(n), COUNTONB4(n+1), COUNTONB4(n+1), COUNTONB4(n+2)
+        COUNTONB6(0), COUNTONB6(1), COUNTONB6(1),   COUNTONB6(2)
     };
     return numBits[v];
+#undef COUNTONB6
+#undef COUNTONB4
+#undef COUNTONB2
 
     // Sequentially clear least significant bits
     //Index32 c;
@@ -72,6 +76,7 @@ CountOn(Byte v)
     // This version is only fast on CPUs with fast "%" and "*" operations
     //return (v * UINT64_C(0x200040008001) & UINT64_C(0x111111111111111)) % 0xF;
 }
+
 /// Return the number of off bits in the given 8-bit value.
 inline Index32 CountOff(Byte v) { return CountOn(static_cast<Byte>(~v)); }
 

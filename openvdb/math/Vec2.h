@@ -375,15 +375,6 @@ public:
     /// e.g.   v.normalize(); Vec2f n = Vec2f::getArbPerpendicular(v);
     Vec2<T> getArbPerpendicular() const { return Vec2<T>(-this->mm[1], this->mm[0]); }
 
-    /// True if a Nan is present in vector
-    bool isNan() const { return isnan(this->mm[0]) || isnan(this->mm[1]); }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const { return isinf(this->mm[0]) || isinf(this->mm[1]); }
-
-    /// True if all no Nan or Inf values present
-    bool isFinite() const { return finite(this->mm[0]) && finite(this->mm[1]); }
-
     /// Predefined constants, e.g.   Vec2f v = Vec2f::xNegAxis();
     static Vec2<T> zero() { return Vec2<T>(0, 0); }
     static Vec2<T> ones() { return Vec2<T>(1, 1); }
@@ -495,21 +486,6 @@ isApproxEqual(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& eps)
 {
     return isApproxEqual(a.x(), b.x(), eps.x()) &&
            isApproxEqual(a.y(), b.y(), eps.y());
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec2<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]);
-}
-
-/// Return @c true if all components are exactly equal to zero.
-template<typename T>
-inline bool
-isZero(const Vec2<T>& v)
-{
-    return isZero(v[0]) && isZero(v[1]);
 }
 
 template<typename T>

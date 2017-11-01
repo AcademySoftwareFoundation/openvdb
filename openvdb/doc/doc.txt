@@ -8,8 +8,8 @@ VDB, which was developed by Ken Museth at DreamWorks Animation, and it
 offers an effectively infinite 3D index space, compact storage (both in
 memory and on disk), fast data access (both random and sequential), and
 a collection of algorithms specifically optimized for the data structure
-for common tasks such as filtering, CSG, compositing, sampling and 
-voxelization from other geometric representations. The technical details 
+for common tasks such as filtering, CSG, compositing, sampling and
+voxelization from other geometric representations. The technical details
 of VDB are described in the paper <a href="http://www.museth.org/Ken/Publications.html">&ldquo;VDB:&nbsp;High-Resolution Sparse Volumes with Dynamic Topology&rdquo;</a>.
 
 @b OpenVDB is maintained by
@@ -20,6 +20,9 @@ and was developed primarily by
 - Mihai Ald&eacute;n
 - David Hill
 
+See the @subpage changes "Release Notes" for what&rsquo;s new in this version
+of @b OpenVDB.
+
 See the @subpage overview "Overview" for an introduction to the library.
 
 See @subpage transformsAndMaps "Transforms and Maps" for more
@@ -29,11 +32,10 @@ See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
 
 See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
 
-See @subpage python "Using OpenVDB in Python" to get started with the @b OpenVDB
-Python module.
+See @subpage points "OpenVDB Points" to store point data using @b OpenVDB.
 
-See the @subpage changes "Release Notes" for what's new in this version
-of @b OpenVDB.
+See @subpage python "Using OpenVDB in Python" to get started with the
+@b OpenVDB Python module.
 
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".
@@ -108,15 +110,15 @@ This is accomplished, as the name suggests, via a tree-based acceleration
 structure comprising a @vdblink::tree::RootNode RootNode@endlink,
 @vdblink::tree::LeafNode LeafNodes@endlink and usually one or more levels
 of @vdblink::tree::InternalNode InternalNodes@endlink with prescribed
-branching factors. 
-  
+branching factors.
+
 @subsection subsecTreeConfig Tree Configuration
 
 The tree-based acceleration structure can be configured in various ways,
 but with the restriction that for a given tree all the <TT>LeafNode</TT>s
 are at the same depth.  Conceptually, the @c RootNode and
 @c InternalNodes increasingly subdivide the three-dimensional index
-space, and the <TT>LeafNode</TT>s hold the actual unique voxels.  
+space, and the <TT>LeafNode</TT>s hold the actual unique voxels.
 
 The type of a @c Tree encodes both the type of the data to be
 stored in the tree (<TT>float</TT>, <TT>bool</TT>, etc.) and the
@@ -145,21 +147,21 @@ configuration; it in turn indexes a @f$2^5\times2^5\times2^5 =
 and so the @c InternalNode at level 2 subsumes a three-dimensional
 block of voxels of size @f$32\times16\times8 = 4096@f$ on a side.  Unlike
 the <TT>InternalNode</TT>s and <TT>LeafNode</TT>s, the @c RootNode ("level
-3" for the default configuration) is not explicitly restricted in the number 
-of children it may have, so the overall index space is limited only by the 
-range of the integer indices, which are 32-bit by default. 
+3" for the default configuration) is not explicitly restricted in the number
+of children it may have, so the overall index space is limited only by the
+range of the integer indices, which are 32-bit by default.
 
 
 @section secSparsity Sparse Values and Voxels
 
 Like a tree's node configuration, the type of data held by a tree is
-determined at compile time. Conceptually the tree itself 
+determined at compile time. Conceptually the tree itself
 employs two different notions of data sparsity to reduce the memory footprint
-and at the same time accelerate access to its contents.  The first is largely 
-hidden from the user and concerns ways in which large regions of uniform values 
-are compactly represented, and the second allows for fast sequential iteration, 
-skipping user-specified "uninteresting" regions (that may or may not have 
-uniform values). 
+and at the same time accelerate access to its contents.  The first is largely
+hidden from the user and concerns ways in which large regions of uniform values
+are compactly represented, and the second allows for fast sequential iteration,
+skipping user-specified "uninteresting" regions (that may or may not have
+uniform values).
 
 @subsection subsecValues Tile, Voxel, and Background Values
 
@@ -174,11 +176,11 @@ voxels subsumed by a given node.  (For example, a tile Value belonging to an
 @c InternalNode at level 1 is equivalent to a constant-value cube of voxels
 of the same size, @f$8\times8\times8@f$, as a @c LeafNode.)  The tile value
 is returned when a request is made for the data associated with any @ijk
-location within the uniform tile.  The background value is a unique value 
-(stored at the root level) that is returned when accessing any @ijk location 
-that does not resolve to either a tile or a @c LeafNode. 
+location within the uniform tile.  The background value is a unique value
+(stored at the root level) that is returned when accessing any @ijk location
+that does not resolve to either a tile or a @c LeafNode.
 
- 
+
 @subsection subsecInactive Active and Inactive Voxels
 
 Any voxel or tile can be classified as either @b active or @b inactive.
@@ -190,8 +192,8 @@ well as iterators over inactive values, all values, and general topology).
 An example of active vs. inactive: the voxels used to store the distance
 values of a narrow-band level set (i.e., close to a given surface) will be
 marked as active while the other ("far") voxel locations will be marked as
-inactive and will generally represent regions of space with constant distance 
-values (e.g., two constant distance values of opposite sign to distinguish 
+inactive and will generally represent regions of space with constant distance
+values (e.g., two constant distance values of opposite sign to distinguish
 the enclosed inside region from the infinite outside or background embedding).
 
 The @vdblink::tree::Tree::prune() prune()@endlink method replaces
@@ -205,7 +207,7 @@ The sampled data in the tree is accessed using signed <B>index coordinates</B>
 @ijk, but associating each indicial coordinate with a specific physical
 location is a job for a @c Transform. A simple linear transform assumes
 a lattice-like structure with a fixed physical distance @f$\Delta@f$ between
-indices, so that @f$(x,y,z) = (\Delta i, \Delta j, \Delta k)@f$.   
+indices, so that @f$(x,y,z) = (\Delta i, \Delta j, \Delta k)@f$.
 
 @subsection subsecVoxSpace Index Space
 
@@ -229,15 +231,15 @@ physical locations in world space.  @c Transform methods such as
 @vdblink::math::Transform::indexToWorld() indexToWorld() @endlink
 and its inverse @vdblink::math::Transform::worldToIndex()
 worldToIndex() @endlink
-may be used to relate coordinates in the two continuous spaces. In 
+may be used to relate coordinates in the two continuous spaces. In
 addition, methods such as @vdblink::math::Transform::worldToIndexCellCentered()
-worldToIndexCellCentered()@endlink actually return lattice points. 
+worldToIndexCellCentered()@endlink actually return lattice points.
 
 @subsection subsecTrans Transforms and Maps
 A @vdblink::math::Transform Transform @endlink provides a context for
 interpreting the information held in a tree by associating a location
 in world space with each entry in the tree.
-The actual implementation of the @c Transform is managed by a 
+The actual implementation of the @c Transform is managed by a
 @vdblink::math::MapBase Map@endlink object, which is an
 encapsulation of a continuous, mostly invertible function of three
 variables.  A @c Map is required to provide

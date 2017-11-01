@@ -71,6 +71,7 @@ public:
     CPPUNIT_TEST(testCsg);
 #endif
     CPPUNIT_TEST(testCsgCopy);
+    CPPUNIT_TEST(testCompActiveLeafVoxels);
     CPPUNIT_TEST_SUITE_END();
 
     void testCombine();
@@ -85,6 +86,7 @@ public:
     void testBoolTree();
     void testCsg();
     void testCsgCopy();
+    void testCompActiveLeafVoxels();
 
 private:
     template<class TreeT, typename TreeComp, typename ValueComp>
@@ -913,6 +915,154 @@ TestTreeCombine::testCsgCopy()
 
     CPPUNIT_ASSERT(differenceGrid->tree().getValue(ijkA) < 0.0f);
     CPPUNIT_ASSERT(!(differenceGrid->tree().getValue(ijkB) < 0.0f));
+}
+
+
+////////////////////////////////////////
+
+void
+TestTreeCombine::testCompActiveLeafVoxels()
+{
+    {//replace float tree (default argument)
+        openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
+
+        dstTree.setValue(openvdb::Coord(1,1,1), 1.0f);
+        srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
+        srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
+
+        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+
+        openvdb::tools::compActiveLeafVoxels(srcTree, dstTree);
+
+        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+    }
+    {//replace float tree (lambda expression)
+        openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
+
+        dstTree.setValue(openvdb::Coord(1,1,1), 1.0f);
+        srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
+        srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
+
+        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+
+        openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](float &d, float s){d=s;});
+
+        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+    }
+    {//add float tree
+        openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
+
+        dstTree.setValue(openvdb::Coord(1,1,1), 1.0f);
+        srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
+        srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
+
+        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+
+        openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](float &d, float s){d+=s;});
+
+        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+    }
+    {
+        using BufferT = openvdb::FloatTree::LeafNodeType::Buffer;
+        //std::cout << "FloatTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
+        CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+    }
+    {
+        using BufferT = openvdb::Vec3fTree::LeafNodeType::Buffer;
+        //std::cout << "Vec3fTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
+        CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+    }
+    {
+        using BufferT = openvdb::BoolTree::LeafNodeType::Buffer;
+        //std::cout << "BoolTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
+        CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+    }
+    {
+        using BufferT = openvdb::MaskTree::LeafNodeType::Buffer;
+        //std::cout << "MaskTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
+        CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+    }
+    {//replace bool tree
+        openvdb::BoolTree srcTree(false), dstTree(false);
+
+        dstTree.setValue(openvdb::Coord(1,1,1), true);
+        srcTree.setValue(openvdb::Coord(1,1,1), false);
+        srcTree.setValue(openvdb::Coord(8,8,8), true);
+        //(9,8,8) is inactive but true so it should have no effect
+        srcTree.setValueOnly(openvdb::Coord(9,8,8), true);
+
+        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT_EQUAL(true, srcTree.getValue(openvdb::Coord(9, 8, 8)));
+        CPPUNIT_ASSERT(!srcTree.isValueOn(openvdb::Coord(9, 8, 8)));
+
+        using Word = openvdb::BoolTree::LeafNodeType::Buffer::WordType;
+        openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](Word &d, Word s){d=s;});
+
+        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+    }
+    {// mask tree
+        openvdb::MaskTree srcTree(false), dstTree(false);
+
+        dstTree.setValueOn(openvdb::Coord(1,1,1));
+        srcTree.setValueOn(openvdb::Coord(1,1,1));
+        srcTree.setValueOn(openvdb::Coord(8,8,8));
+
+        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+
+        openvdb::tools::compActiveLeafVoxels(srcTree, dstTree);
+
+        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
+        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+    }
 }
 
 
