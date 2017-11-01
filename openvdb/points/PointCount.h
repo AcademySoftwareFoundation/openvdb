@@ -38,10 +38,11 @@
 #define OPENVDB_POINTS_POINT_COUNT_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
-#include "AttributeSet.h"
+
 #include "PointDataGrid.h"
-#include "PointAttribute.h"
+#include "PointMask.h" // GridCombinerOp
 #include "IndexFilter.h"
+
 #include <tbb/parallel_reduce.h>
 
 
@@ -91,7 +92,8 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
 /// @param name group name.
 /// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
+Index64 groupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = false);
 
 
 /// @brief Total active points in the group in the PointDataTree
@@ -99,7 +101,8 @@ Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool
 /// @param name group name.
 /// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
+Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = false);
 
 
 /// @brief Total inactive points in the group in the PointDataTree
@@ -107,7 +110,41 @@ Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, cons
 /// @param name group name.
 /// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
+Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = false);
+
+
+/// @brief Generate a new grid with voxel values to store the number of points per voxel
+/// @param grid             the PointDataGrid to use to compute the count grid
+/// @param includeGroups    a vector of VDB Points groups to be included (default is all).
+/// @param excludeGroups    a vector of VDB Points groups to be excluded (default is none).
+/// @note this method is only available for integer or floating point grid types
+template <typename PointDataGridT,
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
+inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
+                                std::is_floating_point<typename GridT::ValueType>::value,
+    typename GridT::Ptr>::type
+pointCountGrid(const PointDataGridT& grid,
+    const std::vector<Name>& includeGroups = std::vector<Name>(),
+    const std::vector<Name>& excludeGroups = std::vector<Name>());
+
+
+/// @brief Generate a new grid that uses the supplied transform with voxel values to store the
+///        number of points per voxel.
+/// @param grid             the PointDataGrid to use to compute the count grid
+/// @param transform        the transform to use to compute the count grid
+/// @param includeGroups    a vector of VDB Points groups to be included (default is all).
+/// @param excludeGroups    a vector of VDB Points groups to be excluded (default is none).
+/// @note this method is only available for integer or floating point grid types
+template <typename PointDataGridT,
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
+inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
+                                std::is_floating_point<typename GridT::ValueType>::value,
+    typename GridT::Ptr>::type
+pointCountGrid(const PointDataGridT& grid,
+    const openvdb::math::Transform& transform,
+    const std::vector<Name>& includeGroups = std::vector<Name>(),
+    const std::vector<Name>& excludeGroups = std::vector<Name>());
 
 
 ////////////////////////////////////////
@@ -192,6 +229,9 @@ Index64 filterInactivePointCount(   const PointDataTreeT& tree,
 
 
 } // namespace point_count_internal
+
+
+////////////////////////////////////////
 
 
 template <typename PointDataTreeT>
@@ -307,6 +347,33 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
         pointOffsets.push_back(pointOffset);
     }
     return pointOffset;
+}
+
+
+template <typename PointDataGridT, typename GridT>
+inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
+                                std::is_floating_point<typename GridT::ValueType>::value,
+    typename GridT::Ptr>::type
+pointCountGrid(const PointDataGridT& points,
+                                   const std::vector<Name>& includeGroups,
+                                   const std::vector<Name>& excludeGroups)
+{
+    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
+        points, includeGroups, excludeGroups);
+}
+
+
+template <typename PointDataGridT, typename GridT>
+inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
+                                std::is_floating_point<typename GridT::ValueType>::value,
+    typename GridT::Ptr>::type
+pointCountGrid(const PointDataGridT& points,
+    const openvdb::math::Transform& transform,
+    const std::vector<Name>& includeGroups,
+    const std::vector<Name>& excludeGroups)
+{
+    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
+        points, transform, includeGroups, excludeGroups);
 }
 
 
