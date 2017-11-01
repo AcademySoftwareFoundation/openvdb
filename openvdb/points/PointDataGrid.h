@@ -1283,9 +1283,29 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             uint8_t header;
             is.read(reinterpret_cast<char*>(&header), sizeof(uint8_t));
             mAttributeSet->readDescriptor(is);
-            if (header == uint8_t(1)) {
+            if (header & uint8_t(1)) {
                 AttributeSet::DescriptorPtr descriptor = mAttributeSet->descriptorPtr();
                 Local::insertDescriptor(meta->auxData(), descriptor);
+            }
+            // a forwards-compatibility mechanism for future use,
+            // if a 0x2 bit is set, read and skip over a specific number of bytes
+            if (header & uint8_t(2)) {
+                uint64_t bytesToSkip;
+                is.read(reinterpret_cast<char*>(&bytesToSkip), sizeof(uint64_t));
+                if (bytesToSkip > uint64_t(0)) {
+                    auto metadata = io::getStreamMetadataPtr(is);
+                    if (metadata && metadata->seekable()) {
+                        is.seekg(bytesToSkip, std::ios_base::cur);
+                    }
+                    else {
+                        std::vector<uint8_t> tempData(bytesToSkip);
+                        is.read(reinterpret_cast<char*>(&tempData[0]), bytesToSkip);
+                    }
+                }
+            }
+            // this reader is only able to read headers with 0x1 and 0x2 bits set
+            if (header > uint8_t(3)) {
+                OPENVDB_THROW(IoError, "Unrecognised header flags in PointDataLeafNode");
             }
         }
         mAttributeSet->readMetadata(is);
