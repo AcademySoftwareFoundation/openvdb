@@ -36,6 +36,9 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointMask.h>
 
+#include <string>
+#include <vector>
+
 using namespace openvdb;
 using namespace openvdb::points;
 
@@ -67,8 +70,9 @@ TestPointMask::testMask()
 
     const PointAttributeVector<Vec3s> pointList(positions);
 
-    const float voxelSize(0.1);
-    openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
+    const float voxelSize = 0.1f;
+    openvdb::math::Transform::Ptr transform(
+        openvdb::math::Transform::createLinearTransform(voxelSize));
 
     tools::PointIndexGrid::Ptr pointIndexGrid =
         tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, *transform);
@@ -76,7 +80,6 @@ TestPointMask::testMask()
     PointDataGrid::Ptr points =
             createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
                                                           pointList, *transform);
-    PointDataTree& tree = points->tree();
 
     { // simple topology copy
         auto mask = convertPointsToMask(*points);

@@ -37,6 +37,7 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cmath>
 #include <cstdio> // for std::remove()
 #include <cstdlib> // for std::getenv()
 #include <string>
@@ -636,12 +637,13 @@ TestPointCount::testOffsets()
 namespace {
 
 // sum all voxel values
-template <typename GridT>
-static Index64 voxelSum(const GridT& grid)
+template<typename GridT>
+inline Index64
+voxelSum(const GridT& grid)
 {
     Index64 total = 0;
     for (auto iter = grid.cbeginValueOn(); iter; ++iter) {
-        total += *iter;
+        total += static_cast<Index64>(*iter);
     }
     return total;
 }
@@ -660,8 +662,6 @@ genPoints(std::vector<Vec3R>& positions, const int numPoints, const double scale
     Vec3R pos;
 
     positions.reserve(n*n);
-
-    int i = 0;
 
     // loop over a [0 to n) x [0 to n) grid.
     for (int a = 0; a < n; ++a) {

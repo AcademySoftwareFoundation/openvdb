@@ -45,6 +45,9 @@
 
 #include <tbb/parallel_reduce.h>
 
+#include <type_traits>
+#include <vector>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

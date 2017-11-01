@@ -23,7 +23,8 @@ New features:
 - Added a @vdblink::getLibraryAbiVersionString()
   getLibraryAbiVersionString@endlink function, which returns a
   string such as <TT>"5.0.0abi3"</TT>.
-- Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI compatibility.
+- Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI
+  compatibility.
 - Metadata fields of unregistered types are no longer discarded after
   being read from a <TT>.vdb</TT> file, and although their values are not
   printable, they can be written back to disk.
@@ -32,6 +33,10 @@ New features:
 - Added tools to create @link tools/PotentialFlow.h potential flow@endlink
   fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB course.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @link points/PointMask.h tools@endlink to create mask grids from
+  point data grids and to compute
+  @vdblink::points::pointCountGrid() point counts@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Added @link points/PointScatter.h tools@endlink to scatter
   @ref secPtOverview "OpenVDB points" randomly throughout a volume.
   <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
@@ -116,6 +121,9 @@ Houdini:
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Added point data grid support to the Scatter&nbsp;SOP.
   <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Added mask and point count output options to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 
 
 @htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly

@@ -23,6 +23,9 @@ Version 5.0.0 - In development
     - Added tools to create potential flow fields, as described in the
       2017 SIGGRAPH OpenVDB course.
       [Contributed by Double Negative]
+    - Added tools to create mask grids from point data grids and to compute
+      point counts.
+      [Contributed by Dan Bailey]
     - Added tools to scatter OpenVDB points randomly throughout a volume.
       [Contributed by Nick Avramoussis]
 
@@ -87,6 +90,8 @@ Version 5.0.0 - In development
       [Contributed by Double Negative]
     - Added point data grid support to the Scatter SOP.
       [Contributed by Nick Avramoussis]
+    - Added mask and point count output options to the Points Convert SOP.
+      [Contributed by Dan Bailey]
 
 
 Version 4.0.2 - July 28, 2017

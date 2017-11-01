@@ -45,6 +45,12 @@
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_ChoiceList.h>
 
+#include <iosfwd>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 
 #ifdef SESI_OPENVDB
     #ifdef OPENVDB_HOUDINI_API
@@ -89,7 +95,7 @@ class Interrupter;
 ///
 /// @param  detail           GU_Detail to compute the voxel size from
 /// @param  pointsPerVoxel   the target number of points per voxel, must be positive and non-zero
-/// @param  transform        voxel size will be computed using this transform
+/// @param  matrix           voxel size will be computed using this transform
 /// @param  decimalPlaces    for readability, truncate voxel size to this number of decimals
 /// @param  interrupter      a Houdini interrupter
 OPENVDB_HOUDINI_API

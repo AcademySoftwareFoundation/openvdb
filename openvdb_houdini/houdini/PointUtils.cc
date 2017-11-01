@@ -31,8 +31,9 @@
 /// @file PointUtils.cc
 /// @authors Dan Bailey, Nick Avramoussis, Richard Kwok
 
-#include "AttributeTransferUtil.h"
 #include "PointUtils.h"
+
+#include "AttributeTransferUtil.h"
 #include "Utils.h"
 
 #include <openvdb/openvdb.h>
@@ -48,6 +49,15 @@
 #include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
+
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 
 using namespace openvdb;

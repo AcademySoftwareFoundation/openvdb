@@ -46,6 +46,11 @@
 #include "PointAttribute.h"
 #include "PointCount.h"
 
+#include <algorithm>
+#include <random>
+#include <string>
+#include <vector>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
