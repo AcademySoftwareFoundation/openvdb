@@ -101,6 +101,21 @@ TestMath::testAll()
         CPPUNIT_ASSERT( math::isNegative(-1));
         CPPUNIT_ASSERT(!math::isNegative( 1));
     }
+    {// zeroVal
+        CPPUNIT_ASSERT_EQUAL(zeroVal<bool>(), false);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<int>(), int(0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<float>(), 0.0f);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<double>(), 0.0);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3i>(), Vec3i(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3s>(), Vec3s(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3d>(), Vec3d(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quatd>(), Quats::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quats>(), Quatd::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3s>(), Mat3s::identity());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3d>(), Mat3d::identity());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat4s>(), Mat4s::identity());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat4d>(), Mat4d::identity());
+    }
 }
 
 
