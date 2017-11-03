@@ -1426,7 +1426,7 @@ convertMetadataToHoudini(GU_Detail& detail,
 ////////////////////////////////////////
 
 
-inline int16_t
+int16_t
 attributeTupleSize(const GA_Attribute* const attribute)
 {
     if (!attribute) return int16_t(0);
@@ -1449,7 +1449,7 @@ attributeTupleSize(const GA_Attribute* const attribute)
 }
 
 
-inline GA_Storage
+GA_Storage
 attributeStorageType(const GA_Attribute* const attribute)
 {
     if (!attribute) return GA_STORE_INVALID;
