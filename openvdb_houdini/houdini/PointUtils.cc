@@ -83,6 +83,8 @@ gaStorageFromAttrString(const openvdb::Name& type)
     else if (type == "vec3d")       return GA_STORE_REAL64;
     else if (type == "quats")       return GA_STORE_REAL32;
     else if (type == "quatd")       return GA_STORE_REAL64;
+    else if (type == "mat3s")       return GA_STORE_REAL32;
+    else if (type == "mat3d")       return GA_STORE_REAL64;
     else if (type == "mat4s")       return GA_STORE_REAL32;
     else if (type == "mat4d")       return GA_STORE_REAL64;
 
@@ -107,6 +109,10 @@ template<>
 struct GAHandleTraits<openvdb::Vec3s> { using RW = GA_RWHandleV3; using RO = GA_ROHandleV3; };
 template<>
 struct GAHandleTraits<openvdb::Vec3d> { using RW = GA_RWHandleV3D; using RO = GA_ROHandleV3D; };
+template<>
+struct GAHandleTraits<openvdb::math::Mat3s> { using RW = GA_RWHandleM3; using RO = GA_ROHandleM3; };
+template<>
+struct GAHandleTraits<openvdb::math::Mat3d> { using RW = GA_RWHandleM3D; using RO = GA_ROHandleM3D; };
 template<>
 struct GAHandleTraits<openvdb::Mat4s> { using RW = GA_RWHandleM4; using RO = GA_ROHandleM4; };
 template<>
@@ -182,6 +188,30 @@ readAttributeValue(const GA_ROHandleQD& handle, const GA_Offset offset,
     const UT_QuaternionD value(handle.get(offset, component));
     dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2]; dstValue[3] = value[3];
     return dstValue;
+}
+
+template<>
+inline openvdb::math::Mat3<float>
+readAttributeValue(const GA_ROHandleM3& handle, const GA_Offset offset,
+    const openvdb::Index component)
+{
+    // read transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
+    const UT_Matrix3F value(handle.get(offset, component));
+    openvdb::math::Mat3<float> dstValue(value.data());
+    return dstValue.transpose();
+}
+
+template<>
+inline openvdb::math::Mat3<double>
+readAttributeValue(const GA_ROHandleM3D& handle, const GA_Offset offset,
+    const openvdb::Index component)
+{
+    // read transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
+    const UT_Matrix3D value(handle.get(offset, component));
+    openvdb::math::Mat3<double> dstValue(value.data());
+    return dstValue.transpose();
 }
 
 template<>
@@ -266,6 +296,32 @@ writeAttributeValue(const GA_RWHandleQD& handle, const GA_Offset offset,
     const openvdb::Index component, const openvdb::math::Quat<double>& value)
 {
     handle.set(offset, component, UT_QuaternionD(value.x(), value.y(), value.z(), value.w()));
+}
+
+template<>
+inline void
+writeAttributeValue(const GA_RWHandleM3& handle, const GA_Offset offset,
+    const openvdb::Index component, const openvdb::math::Mat3<float>& value)
+{
+    // write transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
+    const float* data(value.asPointer());
+    handle.set(offset, component, UT_Matrix3F(data[0], data[3], data[6],
+                                              data[1], data[4], data[7],
+                                              data[2], data[5], data[8]));
+}
+
+template<>
+inline void
+writeAttributeValue(const GA_RWHandleM3D& handle, const GA_Offset offset,
+    const openvdb::Index component, const openvdb::math::Mat3<double>& value)
+{
+    // write transposed matrix because Houdini uses column-major order so as
+    // to be compatible with OpenGL
+    const double* data(value.asPointer());
+    handle.set(offset, component, UT_Matrix3D(data[0], data[3], data[6],
+                                              data[1], data[4], data[7],
+                                              data[2], data[5], data[8]));
 }
 
 template<>
@@ -499,7 +555,8 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
                                          typeInfo == GA_TYPE_NORMAL ||
                                          typeInfo == GA_TYPE_COLOR);
     const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
-    const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
+    const bool isMatrix3 = width == 9 && (typeInfo == GA_TYPE_TRANSFORM);
+    const bool isMatrix4 = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
     if (isVector)
     {
@@ -564,7 +621,27 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
             throw std::runtime_error(ss.str());
         }
     }
-    else if (isMatrix)
+    else if (isMatrix3)
+    {
+        if (storage == GA_STORE_REAL16)
+        {
+            // implicitly convert 16-bit float into 32-bit float
+
+            convertAttributeFromHoudini<Mat3<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL32)
+        {
+            convertAttributeFromHoudini<Mat3<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            convertAttributeFromHoudini<Mat3<double>>(tree, indexTree, name, attribute, defaults);
+        }
+        else {
+            std::stringstream ss; ss << "Unknown matrix3 attribute type - " << name;
+            throw std::runtime_error(ss.str());
+        }
+    }
+    else if (isMatrix4)
     {
         if (storage == GA_STORE_REAL16)
         {
@@ -580,7 +657,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
             convertAttributeFromHoudini<Mat4<double>>(tree, indexTree, name, attribute, defaults);
         }
         else {
-            std::stringstream ss; ss << "Unknown matrix attribute type - " << name;
+            std::stringstream ss; ss << "Unknown matrix4 attribute type - " << name;
             throw std::runtime_error(ss.str());
         }
     }
@@ -704,6 +781,24 @@ void getValues(fpreal64* values, const openvdb::math::Quat<double>& value)
 }
 
 template<>
+void getValues(fpreal32* values, const openvdb::math::Mat3<float>& value)
+{
+    const float* data = value.asPointer();
+    for (unsigned i = 0; i < 9; ++i) {
+        values[i] = data[i];
+    }
+}
+
+template<>
+void getValues(fpreal64* values, const openvdb::math::Mat3<double>& value)
+{
+    const double* data = value.asPointer();
+    for (unsigned i = 0; i < 9; ++i) {
+        values[i] = data[i];
+    }
+}
+
+template<>
 void getValues(fpreal32* values, const openvdb::math::Mat4<float>& value)
 {
     const float* data = value.asPointer();
@@ -768,6 +863,10 @@ gaDefaultsFromDescriptor(const openvdb::points::AttributeSet::Descriptor& descri
          return gaDefaultsFromDescriptorTyped<openvdb::math::Quats, fpreal32>(descriptor, name);
     } else if (type == "quatd") {
          return gaDefaultsFromDescriptorTyped<openvdb::math::Quatd, fpreal64>(descriptor, name);
+    } else if (type == "mat3s") {
+         return gaDefaultsFromDescriptorTyped<openvdb::math::Mat3s, fpreal32>(descriptor, name);
+    } else if (type == "mat3d") {
+         return gaDefaultsFromDescriptorTyped<openvdb::math::Mat3d, fpreal64>(descriptor, name);
     } else if (type == "mat4s") {
          return gaDefaultsFromDescriptorTyped<openvdb::math::Mat4s, fpreal32>(descriptor, name);
     } else if (type == "mat4d") {
@@ -1051,10 +1150,12 @@ convertPointDataGridToHoudini(
             unsigned width = stride;
             const bool isVector = valueType.compare(0, 4, "vec3") == 0;
             const bool isQuaternion = valueType.compare(0, 4, "quat") == 0;
+            const bool isMatrix3 = valueType.compare(0, 4, "mat3") == 0;
             const bool isMatrix4 = valueType.compare(0, 4, "mat4") == 0;
 
             if (isVector)               width = 3;
             else if (isQuaternion)      width = 4;
+            else if (isMatrix3)         width = 9;
             else if (isMatrix4)         width = 16;
 
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
@@ -1072,7 +1173,7 @@ convertPointDataGridToHoudini(
                 attributeRef->getOptions().setTypeInfo(GA_TYPE_QUATERNION);
             }
 
-            if (isMatrix4) {
+            if (isMatrix4 || isMatrix3) {
                 attributeRef->getOptions().setTypeInfo(GA_TYPE_TRANSFORM);
             }
 
@@ -1145,6 +1246,16 @@ convertPointDataGridToHoudini(
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
                 includeGroups, excludeGroups, inCoreOnly);
         }
+        else if (valueType == "mat3s") {
+            HoudiniWriteAttribute<Mat3<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
+        }
+        else if (valueType == "mat3d") {
+            HoudiniWriteAttribute<Mat3<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
+                includeGroups, excludeGroups, inCoreOnly);
+        }
         else if (valueType == "mat4s") {
             HoudiniWriteAttribute<Mat4<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
@@ -1206,7 +1317,8 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                                              typeInfo == GA_TYPE_NORMAL ||
                                              typeInfo == GA_TYPE_COLOR);
         const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
-        const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
+        const bool isMatrix3 = width == 9 && (typeInfo == GA_TYPE_TRANSFORM);
+        const bool isMatrix4 = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
         if (isVector) {
             if (storage == GA_STORE_REAL16) {
@@ -1238,7 +1350,21 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 warnings.push_back(ss.str().c_str());
                 continue;
             }
-        } else if (isMatrix) {
+        } else if (isMatrix3) {
+            if (storage == GA_STORE_REAL16) {
+                metadata = createTypedMetadataFromAttribute<Mat3<float>>(attribute);
+            } else if (storage == GA_STORE_REAL32) {
+                metadata = createTypedMetadataFromAttribute<Mat3<float>>(attribute);
+            } else if (storage == GA_STORE_REAL64) {
+                metadata = createTypedMetadataFromAttribute<Mat3<double>>(attribute);
+            } else {
+                std::stringstream ss;
+                ss << "Detail attribute \"" << attribute->getName() << "\" " <<
+                    "unsupported matrix3 type for metadata conversion.";
+                warnings.push_back(ss.str().c_str());
+                continue;
+            }
+        } else if (isMatrix4) {
             if (storage == GA_STORE_REAL16) {
                 metadata = createTypedMetadataFromAttribute<Mat4<float>>(attribute);
             } else if (storage == GA_STORE_REAL32) {
@@ -1248,7 +1374,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
             } else {
                 std::stringstream ss;
                 ss << "Detail attribute \"" << attribute->getName() << "\" " <<
-                    "unsupported matrix type for metadata conversion.";
+                    "unsupported matrix4 type for metadata conversion.";
                 warnings.push_back(ss.str().c_str());
                 continue;
             }

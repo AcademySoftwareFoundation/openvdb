@@ -342,6 +342,36 @@ evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
     return quat;
 }
 
+template <> inline openvdb::math::Mat3<float>
+evalAttrDefault<openvdb::math::Mat3<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<float> mat;
+    fpreal64 value;
+    float* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = float(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat3<double>
+evalAttrDefault<openvdb::math::Mat3<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<double> mat;
+    fpreal64 value;
+    double* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = double(value);
+    }
+
+    return mat;
+}
+
 template <> inline openvdb::math::Mat4<float>
 evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
 {

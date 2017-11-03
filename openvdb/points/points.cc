@@ -56,6 +56,8 @@ internal::initialize()
     StringAttributeArray::registerType();
 
     // Register attribute arrays with matrix and quaternion attributes
+    TypedAttributeArray<math::Mat3<float>>::registerType();
+    TypedAttributeArray<math::Mat3<double>>::registerType();
     TypedAttributeArray<math::Mat4<float>>::registerType();
     TypedAttributeArray<math::Mat4<double>>::registerType();
     TypedAttributeArray<math::Quat<float>>::registerType();
