@@ -282,6 +282,10 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
     }
 
+    { // attempt to add an attribute with an unregistered type (Vec2R)
+        CPPUNIT_ASSERT_THROW(appendAttribute<Vec2R>(tree, "unregistered"), openvdb::KeyError);
+    }
+
     { // append attributes marked as hidden, transient, group and string
         appendAttribute<float>(tree, "testHidden", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), true, false);
         appendAttribute<float>(tree, "testTransient", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, true);
