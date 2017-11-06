@@ -550,6 +550,7 @@ INCLUDE_NAMES := \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
+    tools/Mask.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
     tools/MultiResGrid.h \
