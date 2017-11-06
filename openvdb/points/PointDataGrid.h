@@ -782,9 +782,7 @@ PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
 
     // zero voxel values
 
-    for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-        this->setOffsetOnly(n, 0);
-    }
+    this->buffer().fill(ValueType(0));
 
     // if updateValueMask, also de-activate all voxels
 

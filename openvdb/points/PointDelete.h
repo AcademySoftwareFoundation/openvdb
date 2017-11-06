@@ -42,6 +42,7 @@
 #include "IndexIterator.h"
 #include "IndexFilter.h"
 
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 
 namespace openvdb {
@@ -102,11 +103,7 @@ struct DeleteByFilterOp
 
     void operator()(const LeafRangeT& range) const
     {
-        for (auto leaf = range.begin(); leaf != range.end(); ++leaf)
-        {
-            // early-exit if the leaf has no points
-            const size_t size = iterCount(leaf->beginIndexAll());
-            if (size == 0)    continue;
+        for (auto leaf = range.begin(); leaf != range.end(); ++leaf) {
 
             const size_t newSize =
                 iterCount(leaf->template beginIndexAll<FilterT>(mFilter));
@@ -200,6 +197,10 @@ inline void deleteFromGroups(PointDataTreeT& pointTree, const std::vector<std::s
     tree::LeafManager<PointDataTreeT> leafManager(pointTree);
     point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(*filter);
     tbb::parallel_for(leafManager.leafRange(), deleteOp);
+
+    // remove empty leaf nodes
+
+    tools::pruneInactive(pointTree);
 
     // drop the now-empty groups (unless invert = true)
 
