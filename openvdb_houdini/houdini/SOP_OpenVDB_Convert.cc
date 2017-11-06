@@ -105,11 +105,7 @@ class SOP_OpenVDB_Convert: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Convert(OP_Network*, const char* name, OP_Operator*);
-<<<<<<< HEAD
-    virtual ~SOP_OpenVDB_Convert() {};
-=======
     ~SOP_OpenVDB_Convert() override {}
->>>>>>> v4.0.2
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
