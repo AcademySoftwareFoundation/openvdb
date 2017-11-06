@@ -199,15 +199,15 @@ struct VolumeToMesh
 
     /// @{
     // Mesh data accessors
-
+    
     size_t pointListSize() const { return mPointListSize; }
     PointList& pointList() { return mPoints; }
     const PointList& pointList() const { return mPoints; }
-
+    
     size_t polygonPoolListSize() const { return mPolygonPoolListSize; }
     PolygonPoolList& polygonPoolList() { return mPolygons; }
     const PolygonPoolList& polygonPoolList() const { return mPolygons; }
-
+    
     std::vector<uint8_t>& pointFlags() { return mPointFlags; }
     const std::vector<uint8_t>& pointFlags() const { return mPointFlags; }
     /// @}
@@ -4833,8 +4833,7 @@ VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity, bool relaxDisorie
     , mRelaxDisorientedTriangles(relaxDisorientedTriangles)
     , mQuantizedSeamPoints(nullptr)
     , mPointFlags(0)
-{
-}
+{}
 
 
 inline void
