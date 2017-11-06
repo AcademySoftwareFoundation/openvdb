@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.0.0</B> - <I>In development</I>
+<B>Version 5.0.0</B> - <I>November 6, 2017</I>
 
 @par
 <BLOCKQUOTE>
