@@ -114,6 +114,11 @@ struct DeleteByFilterOp
                 continue;
             }
 
+            // early exit if no points are being deleted
+
+            const size_t currentSize = leaf->getLastValue();
+            if (newSize == currentSize) continue;
+
             const AttributeSet& existingAttributeSet = leaf->attributeSet();
             AttributeSet* newAttributeSet = new AttributeSet(
                 existingAttributeSet, static_cast<Index>(newSize));
