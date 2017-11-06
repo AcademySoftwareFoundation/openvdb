@@ -990,7 +990,10 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
             if (velocityType == UT_VDB_VEC3F || velocityType == UT_VDB_VEC3D) {
                 // Found a vector-valued input grid.
                 ++numGridsProcessed;
+
+		parms.velocityGrid.reset();
                 vdbIt->makeGridUnique();
+		parms.velocityGrid = vdbIt->getGridPtr();
 
                 const openvdb::math::Transform& xform = parms.velocityGrid->constTransform();
 
