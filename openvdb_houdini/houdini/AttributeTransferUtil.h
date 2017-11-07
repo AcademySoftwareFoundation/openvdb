@@ -314,6 +314,64 @@ evalAttrDefault<openvdb::Vec3d>(const GA_Defaults& defaults, int)
     return vec;
 }
 
+template <> inline openvdb::math::Quat<float>
+evalAttrDefault<openvdb::math::Quat<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Quat<float> quat;
+    fpreal32 value;
+
+    for (int i = 0; i < 4; i++) {
+        defaults.get(i, value);
+        quat[i] = float(value);
+    }
+
+    return quat;
+}
+
+template <> inline openvdb::math::Quat<double>
+evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Quat<double> quat;
+    fpreal64 value;
+
+    for (int i = 0; i < 4; i++) {
+        defaults.get(i, value);
+        quat[i] = double(value);
+    }
+
+    return quat;
+}
+
+template <> inline openvdb::math::Mat4<float>
+evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat4<float> mat;
+    fpreal64 value;
+    float* data = mat.asPointer();
+
+    for (int i = 0; i < 16; i++) {
+        defaults.get(i, value);
+        data[i] = float(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat4<double>
+evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat4<double> mat;
+    fpreal64 value;
+    double* data = mat.asPointer();
+
+    for (int i = 0; i < 16; i++) {
+        defaults.get(i, value);
+        data[i] = double(value);
+    }
+
+    return mat;
+}
+
 
 ////////////////////////////////////////
 
@@ -1143,7 +1201,9 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
     GA_Offset start, end, source, target, v0, v1, v2;
     const GA_Primitive * primRef = nullptr;
+#if UT_MAJOR_VERSION_INT <= 15
     GA_Primitive::const_iterator vtxIt;
+#endif
 
     typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();

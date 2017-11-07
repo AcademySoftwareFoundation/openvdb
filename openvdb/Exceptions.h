@@ -80,7 +80,6 @@ public: \
 
 
 OPENVDB_EXCEPTION(ArithmeticError);
-OPENVDB_EXCEPTION(IllegalValueException);
 OPENVDB_EXCEPTION(IndexError);
 OPENVDB_EXCEPTION(IoError);
 OPENVDB_EXCEPTION(KeyError);
@@ -91,8 +90,16 @@ OPENVDB_EXCEPTION(RuntimeError);
 OPENVDB_EXCEPTION(TypeError);
 OPENVDB_EXCEPTION(ValueError);
 
-
 #undef OPENVDB_EXCEPTION
+
+
+/// @deprecated Use ValueError instead.
+class OPENVDB_API IllegalValueException: public Exception {
+public:
+    OPENVDB_DEPRECATED IllegalValueException() noexcept: Exception("IllegalValueException") {}
+    OPENVDB_DEPRECATED explicit IllegalValueException(const std::string& msg) noexcept:
+        Exception("IllegalValueException", &msg) {}
+};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

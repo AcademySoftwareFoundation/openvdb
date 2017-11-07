@@ -83,7 +83,7 @@ struct File::Impl
         file.Archive::readGrid(grid, gd, file.inputStream());
     }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     static void unarchive(const File& file, GridBase::Ptr& grid,
         const GridDescriptor& gd, const CoordBBox& indexBBox)
     {
@@ -532,7 +532,7 @@ File::readAllGridMetadata()
         // have already been streamed in and stored in mGrids.
         for (size_t i = 0, N = mImpl->mGrids->size(); i < N; ++i) {
             // Return copies of the grids, but with empty trees.
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
             ret->push_back((*mImpl->mGrids)[i]->copyGrid(/*treePolicy=*/CP_NEW));
 #else
             ret->push_back((*mImpl->mGrids)[i]->copyGridWithNewTree());
@@ -547,7 +547,7 @@ File::readAllGridMetadata()
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGridPartial(), but shallow
             // copying the grids helps to ensure future compatibility.)
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
             ret->push_back(grid->copyGrid(/*treePolicy=*/CP_NEW));
 #else
             ret->push_back(grid->copyGridWithNewTree());
@@ -580,59 +580,11 @@ File::readGridMetadata(const Name& name)
         const GridDescriptor& gd = it->second;
         ret = readGridPartial(gd, /*readTopology=*/false);
     }
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
     return ret->copyGrid(/*treePolicy=*/CP_NEW);
 #else
     return ret->copyGridWithNewTree();
 #endif
-}
-
-
-////////////////////////////////////////
-
-
-GridBase::ConstPtr
-File::readGridPartial(const Name& name)
-{
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading.");
-    }
-
-    GridBase::ConstPtr ret;
-    if (!inputHasGridOffsets()) {
-        // Retrieve the grid from mGrids, which should already contain
-        // the entire contents of the file.
-        if (GridBase::Ptr grid = readGrid(name)) {
-            ret = ConstPtrCast<const GridBase>(grid);
-        }
-    } else {
-        NameMapCIter it = findDescriptor(name);
-        if (it == gridDescriptors().end()) {
-            OPENVDB_THROW(KeyError, filename() << " has no grid named \"" << name << "\"");
-        }
-
-        // Seek to and read in the grid from the file.
-        const GridDescriptor& gd = it->second;
-        ret = readGridPartial(gd, /*readTopology=*/true);
-
-        if (gd.isInstance()) {
-            NameMapCIter parentIt =
-                findDescriptor(GridDescriptor::nameAsString(gd.instanceParentName()));
-            if (parentIt == gridDescriptors().end()) {
-                OPENVDB_THROW(KeyError, "missing instance parent \""
-                    << GridDescriptor::nameAsString(gd.instanceParentName())
-                    << "\" for grid " << GridDescriptor::nameAsString(gd.uniqueName())
-                    << " in file " << filename());
-            }
-            if (GridBase::ConstPtr parent =
-                readGridPartial(parentIt->second, /*readTopology=*/true))
-            {
-                ConstPtrCast<GridBase>(ret)->setTree(
-                    ConstPtrCast<GridBase>(parent)->baseTreePtr());
-            }
-        }
-    }
-    return ret;
 }
 
 
@@ -646,7 +598,7 @@ File::readGrid(const Name& name)
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const Name& name, const BBoxd& bbox)
 {
@@ -655,7 +607,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
 #endif
 
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
 GridBase::Ptr
 File::readGridByName(const Name& name, const BBoxd&)
 #else
@@ -667,7 +619,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
     }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const bool clip = bbox.isSorted();
 #endif
 
@@ -676,7 +628,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
     // doesn't support random access), retrieve and return it.
     GridBase::Ptr grid = retrieveCachedGrid(name);
     if (grid) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (clip) {
             grid = grid->deepCopyGrid();
             grid->clipGrid(bbox);
@@ -692,7 +644,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
 
     // Seek to and read in the grid from the file.
     const GridDescriptor& gd = it->second;
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     grid = readGrid(gd);
 #else
     grid = (clip ? readGrid(gd, bbox) : readGrid(gd));
@@ -710,7 +662,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
         }
 
         GridBase::Ptr parent;
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
         parent = readGrid(parentIt->second);
 #else
         if (clip) {
@@ -872,7 +824,7 @@ File::readGrid(const GridDescriptor& gd) const
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const GridDescriptor& gd, const BBoxd& bbox) const
 {

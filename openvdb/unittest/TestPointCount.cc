@@ -37,6 +37,12 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cmath>
+#include <cstdio> // for std::remove()
+#include <cstdlib> // for std::getenv()
+#include <string>
+#include <vector>
+
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
@@ -48,18 +54,20 @@ class TestPointCount: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointCount);
     CPPUNIT_TEST(testCount);
     CPPUNIT_TEST(testGroup);
     CPPUNIT_TEST(testOffsets);
+    CPPUNIT_TEST(testCountGrid);
     CPPUNIT_TEST_SUITE_END();
 
     void testCount();
     void testGroup();
     void testOffsets();
+    void testCountGrid();
 
 }; // class TestPointCount
 
@@ -360,7 +368,7 @@ TestPointCount::testGroup()
 
             PointDataTree& inputTree = inputGrid->tree();
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
             CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
             CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
@@ -595,7 +603,7 @@ TestPointCount::testOffsets()
 
         Index64 total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
         CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
         CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(0));
@@ -623,6 +631,232 @@ TestPointCount::testOffsets()
         CPPUNIT_ASSERT_EQUAL(total, Index64(5));
     }
     std::remove(filename.c_str());
+}
+
+
+namespace {
+
+// sum all voxel values
+template<typename GridT>
+inline Index64
+voxelSum(const GridT& grid)
+{
+    Index64 total = 0;
+    for (auto iter = grid.cbeginValueOn(); iter; ++iter) {
+        total += static_cast<Index64>(*iter);
+    }
+    return total;
+}
+
+// Generate random points by uniformly distributing points on a unit-sphere.
+inline void
+genPoints(std::vector<Vec3R>& positions, const int numPoints, const double scale)
+{
+    // init
+    math::Random01 randNumber(0);
+    const int n = int(std::sqrt(double(numPoints)));
+    const double xScale = (2.0 * M_PI) / double(n);
+    const double yScale = M_PI / double(n);
+
+    double x, y, theta, phi;
+    Vec3R pos;
+
+    positions.reserve(n*n);
+
+    // loop over a [0 to n) x [0 to n) grid.
+    for (int a = 0; a < n; ++a) {
+        for (int b = 0; b < n; ++b) {
+
+            // jitter, move to random pos. inside the current cell
+            x = double(a) + randNumber();
+            y = double(b) + randNumber();
+
+            // remap to a lat/long map
+            theta = y * yScale; // [0 to PI]
+            phi   = x * xScale; // [0 to 2PI]
+
+            // convert to cartesian coordinates on a unit sphere.
+            // spherical coordinate triplet (r=1, theta, phi)
+            pos[0] = static_cast<float>(std::sin(theta)*std::cos(phi)*scale);
+            pos[1] = static_cast<float>(std::sin(theta)*std::sin(phi)*scale);
+            pos[2] = static_cast<float>(std::cos(theta)*scale);
+
+            positions.push_back(pos);
+        }
+    }
+}
+
+} // namespace
+
+
+void
+TestPointCount::testCountGrid()
+{
+    using namespace openvdb::math;
+
+    { // five points
+        std::vector<Vec3s> positions{   {1, 1, 1},
+                                        {1, 101, 1},
+                                        {2, 101, 1},
+                                        {101, 1, 1},
+                                        {101, 101, 1}};
+
+        { // in five voxels
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(1.0f));
+            PointDataGrid::Ptr points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+            // generate a count grid with the same transform
+
+            Int32Grid::Ptr count = pointCountGrid(*points);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), points->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count->evalActiveVoxelBoundingBox(), points->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), pointCount(points->tree()));
+        }
+
+        { // in four voxels
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(10.0f));
+            PointDataGrid::Ptr points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+            // generate a count grid with the same transform
+
+            Int32Grid::Ptr count = pointCountGrid(*points);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), points->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count->evalActiveVoxelBoundingBox(), points->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), pointCount(points->tree()));
+        }
+
+        { // in one voxel
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(1000.0f));
+            PointDataGrid::Ptr points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+            // generate a count grid with the same transform
+
+            Int32Grid::Ptr count = pointCountGrid(*points);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), points->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count->evalActiveVoxelBoundingBox(), points->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), pointCount(points->tree()));
+        }
+
+        { // in four voxels, Int64 grid
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(10.0f));
+            PointDataGrid::Ptr points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+            // generate a count grid with the same transform
+
+            Int64Grid::Ptr count = pointCountGrid<PointDataGrid, Int64Grid>(*points);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), points->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count->evalActiveVoxelBoundingBox(), points->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), pointCount(points->tree()));
+        }
+
+        { // in four voxels, float grid
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(10.0f));
+            PointDataGrid::Ptr points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+            // generate a count grid with the same transform
+
+            FloatGrid::Ptr count = pointCountGrid<PointDataGrid, FloatGrid>(*points);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), points->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count->evalActiveVoxelBoundingBox(), points->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), pointCount(points->tree()));
+        }
+
+        { // in four voxels
+
+            math::Transform::Ptr transform(math::Transform::createLinearTransform(10.0f));
+            const PointAttributeVector<Vec3s> pointList(positions);
+            tools::PointIndexGrid::Ptr pointIndexGrid =
+                tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, *transform);
+
+            PointDataGrid::Ptr points =
+                    createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
+                                                                  pointList, *transform);
+
+            // assign point 3 to new group "test"
+
+            appendGroup(points->tree(), "test");
+
+            std::vector<short> groups{0,0,1,0,0};
+
+            setGroup(points->tree(), pointIndexGrid->tree(), groups, "test");
+
+            std::vector<std::string> includeGroups{"test"};
+            std::vector<std::string> excludeGroups;
+
+            // generate a count grid with the same transform
+
+            Int32Grid::Ptr count = pointCountGrid(*points, includeGroups, excludeGroups);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), Index64(1));
+
+            count = pointCountGrid(*points, excludeGroups, includeGroups);
+
+            CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), Index64(4));
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count), Index64(4));
+        }
+
+        // TODO: test include and exclude groups
+    }
+
+    { // 40,000 points on a unit sphere
+        std::vector<Vec3R> positions;
+        const size_t total = 40000;
+        genPoints(positions, total, /*scale=*/100.0);
+        CPPUNIT_ASSERT_EQUAL(positions.size(), total);
+
+        math::Transform::Ptr transform1(math::Transform::createLinearTransform(1.0f));
+        math::Transform::Ptr transform5(math::Transform::createLinearTransform(5.0f));
+
+        PointDataGrid::Ptr points1 =
+            createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform1);
+        PointDataGrid::Ptr points5 =
+            createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform5);
+
+        CPPUNIT_ASSERT(points1->activeVoxelCount() != points5->activeVoxelCount());
+        CPPUNIT_ASSERT(points1->evalActiveVoxelBoundingBox() != points5->evalActiveVoxelBoundingBox());
+        CPPUNIT_ASSERT_EQUAL(pointCount(points1->tree()), pointCount(points5->tree()));
+
+        { // generate count grids with the same transform
+
+            Int32Grid::Ptr count1 = pointCountGrid(*points1);
+
+            CPPUNIT_ASSERT_EQUAL(count1->activeVoxelCount(), points1->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count1->evalActiveVoxelBoundingBox(), points1->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count1), pointCount(points1->tree()));
+
+            Int32Grid::Ptr count5 = pointCountGrid(*points5);
+
+            CPPUNIT_ASSERT_EQUAL(count5->activeVoxelCount(), points5->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count5->evalActiveVoxelBoundingBox(), points5->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count5), pointCount(points5->tree()));
+        }
+
+        { // generate count grids with differing transforms
+
+            Int32Grid::Ptr count1 = pointCountGrid(*points5, *transform1);
+
+            CPPUNIT_ASSERT_EQUAL(count1->activeVoxelCount(), points1->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count1->evalActiveVoxelBoundingBox(), points1->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count1), pointCount(points5->tree()));
+
+            Int32Grid::Ptr count5 = pointCountGrid(*points1, *transform5);
+
+            CPPUNIT_ASSERT_EQUAL(count5->activeVoxelCount(), points5->activeVoxelCount());
+            CPPUNIT_ASSERT_EQUAL(count5->evalActiveVoxelBoundingBox(), points5->evalActiveVoxelBoundingBox());
+            CPPUNIT_ASSERT_EQUAL(voxelSum(*count5), pointCount(points1->tree()));
+        }
+    }
 }
 
 

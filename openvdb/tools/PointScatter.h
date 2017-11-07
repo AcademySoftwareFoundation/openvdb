@@ -30,7 +30,7 @@
 //
 /// @author Ken Museth
 ///
-/// @file PointScatter.h
+/// @file tools/PointScatter.h
 ///
 /// @brief We offer three different algorithms (each in its own class)
 ///        for scattering of points in active voxels:
@@ -55,7 +55,9 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <tbb/parallel_sort.h>
 #include <tbb/parallel_for.h>
-#include <boost/scoped_array.hpp>
+#include <iostream>
+#include <memory>
+#include <string>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -88,9 +90,9 @@ class BasePointScatter;
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 ///};
 /// @endcode
 ///
@@ -114,13 +116,13 @@ class UniformPointScatter : public BasePointScatter<PointAccessorType,
                                                     InterruptType>
 {
 public:
-    typedef BasePointScatter<PointAccessorType, RandomGenerator, InterruptType> BaseT;
+    using BaseT = BasePointScatter<PointAccessorType, RandomGenerator, InterruptType>;
 
     UniformPointScatter(PointAccessorType& points,
                         Index64 pointCount,
                         RandomGenerator& randGen,
                         double spread = 1.0,
-                        InterruptType* interrupt = NULL)
+                        InterruptType* interrupt = nullptr)
         : BaseT(points, randGen, spread, interrupt)
         , mTargetPointCount(pointCount)
         , mPointsPerVolume(0.0f)
@@ -130,7 +132,7 @@ public:
                         float pointsPerVolume,
                         RandomGenerator& randGen,
                         double spread = 1.0,
-                        InterruptType* interrupt = NULL)
+                        InterruptType* interrupt = nullptr)
         : BaseT(points, randGen, spread, interrupt)
         , mTargetPointCount(0)
         , mPointsPerVolume(pointsPerVolume)
@@ -155,18 +157,18 @@ public:
             return false;
         }
 
-        boost::scoped_array<Index64> list(new Index64[mTargetPointCount]);
+        std::unique_ptr<Index64[]> idList{new Index64[mTargetPointCount]};
         math::RandInt<Index64, RandomGenerator> rand(BaseT::mRand01.engine(), 0, mVoxelCount-1);
-        for (Index64 i=0; i<mTargetPointCount; ++i) list[i] = rand();
-        tbb::parallel_sort(list.get(), list.get() + mTargetPointCount);
-        
+        for (Index64 i=0; i<mTargetPointCount; ++i) idList[i] = rand();
+        tbb::parallel_sort(idList.get(), idList.get() + mTargetPointCount);
+
         CoordBBox bbox;
         const Vec3R offset(0.5, 0.5, 0.5);
         typename GridT::ValueOnCIter valueIter = grid.cbeginValueOn();
-        
+
         for (Index64 i=0, n=valueIter.getVoxelCount() ; i != mTargetPointCount; ++i) {
             if (BaseT::interrupt()) return false;
-            const Index64 voxelId = list[i];
+            const Index64 voxelId = idList[i];
             while ( n <= voxelId ) {
                 ++valueIter;
                 n += valueIter.getVoxelCount();
@@ -175,9 +177,9 @@ public:
                 BaseT::addPoint(grid, valueIter.getCoord() - offset);
             } else {// tiles contain multiple (virtual) voxels
                 valueIter.getBoundingBox(bbox);
-                BaseT::addPoint(grid, bbox.min() - offset, bbox.extents()); 
+                BaseT::addPoint(grid, bbox.min() - offset, bbox.extents());
             }
-        }//loop over all the active voxels and tiles 
+        }//loop over all the active voxels and tiles
         //}
 
         BaseT::end();
@@ -188,7 +190,7 @@ public:
     // the operator() method was called
     void print(const std::string &name, std::ostream& os = std::cout) const
     {
-        os << "Uniformely scattered " << mPointCount << " points into " << mVoxelCount
+        os << "Uniformly scattered " << mPointCount << " points into " << mVoxelCount
            << " active voxels in \"" << name << "\" corresponding to "
            << mPointsPerVolume << " points per volume." << std::endl;
     }
@@ -215,13 +217,13 @@ class DenseUniformPointScatter : public BasePointScatter<PointAccessorType,
                                                          InterruptType>
 {
 public:
-    typedef BasePointScatter<PointAccessorType, RandomGenerator, InterruptType> BaseT;
+    using BaseT = BasePointScatter<PointAccessorType, RandomGenerator, InterruptType>;
 
     DenseUniformPointScatter(PointAccessorType& points,
                              float pointsPerVoxel,
                              RandomGenerator& randGen,
                              double spread = 1.0,
-                             InterruptType* interrupt = NULL)
+                             InterruptType* interrupt = nullptr)
         : BaseT(points, randGen, spread, interrupt)
         , mPointsPerVoxel(pointsPerVoxel)
     {
@@ -231,7 +233,7 @@ public:
     template<typename GridT>
     bool operator()(const GridT& grid)
     {
-        typedef typename GridT::ValueOnCIter ValueIter;
+        using ValueIter = typename GridT::ValueOnCIter;
         if (mPointsPerVoxel < 1.0e-6) return false;
         mVoxelCount = grid.activeVoxelCount();
         if (mVoxelCount == 0) return false;
@@ -242,7 +244,7 @@ public:
         const int ppv = math::Floor(mPointsPerVoxel);
         const double delta = mPointsPerVoxel - ppv;
         const bool fractional = !math::isApproxZero(delta, 1.0e-6);
-        
+
         for (ValueIter iter = grid.cbeginValueOn(); iter; ++iter) {
             if (BaseT::interrupt()) return false;
             if (iter.isVoxelValue()) {// a majority is expected to be voxels
@@ -297,13 +299,13 @@ class NonUniformPointScatter : public BasePointScatter<PointAccessorType,
                                                        InterruptType>
 {
 public:
-    typedef BasePointScatter<PointAccessorType, RandomGenerator, InterruptType> BaseT;
+    using BaseT = BasePointScatter<PointAccessorType, RandomGenerator, InterruptType>;
 
     NonUniformPointScatter(PointAccessorType& points,
                            float pointsPerVolume,
                            RandomGenerator& randGen,
                            double spread = 1.0,
-                           InterruptType* interrupt = NULL)
+                           InterruptType* interrupt = nullptr)
         : BaseT(points, randGen, spread, interrupt)
         , mPointsPerVolume(pointsPerVolume)//note this is merely a
                                            //multiplier for the local point density
@@ -376,7 +378,7 @@ protected:
     PointAccessorType&        mPoints;
     InterruptType*            mInterrupter;
     Index64                   mPointCount;
-    Index64                   mVoxelCount; 
+    Index64                   mVoxelCount;
     Index64                   mInterruptCount;
     const double              mSpread;
     math::Rand01<double, RandomGenerator> mRand01;
@@ -385,7 +387,7 @@ protected:
     BasePointScatter(PointAccessorType& points,
                      RandomGenerator& randGen,
                      double spread,
-                     InterruptType* interrupt = NULL)
+                     InterruptType* interrupt = nullptr)
         : mPoints(points)
         , mInterrupter(interrupt)
         , mPointCount(0)
@@ -417,7 +419,7 @@ protected:
 
     /// @brief Return a random floating point number between 0.5 -+ mSpread/2
     inline double getRand() { return 0.5 + mSpread * (mRand01() - 0.5); }
-   
+
     template <typename GridT>
     inline void addPoint(const GridT &grid, const Vec3R &dmin)
     {
@@ -427,7 +429,7 @@ protected:
         mPoints.add(grid.indexToWorld(pos));
         ++mPointCount;
     }
-   
+
     template <typename GridT>
     inline void addPoint(const GridT &grid, const Vec3R &dmin, const Coord &size)
     {

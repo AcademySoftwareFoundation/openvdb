@@ -41,7 +41,10 @@
 #include <openvdb/io/io.h> // for io::getFormatVersion()
 #include <openvdb/util/Name.h>
 #include <openvdb/Types.h>
+#include <cmath> // for std::abs()
+#include <iostream>
 #include <map>
+#include <string>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -824,7 +827,7 @@ public:
 
     //@{
     /// @brief Return the lengths of the images of the segments
-    /// \f$(0,0,0)-(1,0,0)\f$, \f$(0,0,0)-(0,1,0)\f$, \f$(0,0,0)-(0,0,1)\f$
+    /// (0,0,0) &minus; 1,0,0), (0,0,0) &minus; (0,1,0) and (0,0,0) &minus; (0,0,1).
     /// @details This is equivalent to the absolute values of the scale values
     Vec3d voxelSize() const override { return mVoxelSize; }
     Vec3d voxelSize(const Vec3d&) const override { return voxelSize(); }
@@ -1077,9 +1080,9 @@ public:
     /// Return @c 1
     double determinant() const override { return 1.0; }
 
-    /// Return \f$ (1,1,1) \f$
+    /// Return (1,1,1).
     Vec3d voxelSize() const override { return Vec3d(1,1,1);}
-    /// Return \f$ (1,1,1) \f$
+    /// Return (1,1,1).
     Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
 
     /// Return the translation vector
@@ -1789,12 +1792,12 @@ public:
     double determinant() const override { return mAffineMap.determinant(); }
 
 
-    /// @brief Returns the lengths of the images
-    /// of the segments
-    /// \f$(0,0,0)-(1,0,0)\f$, \f$(0,0,0)-(0,1,0)\f$,
-    /// \f$(0,0,0)-(0,0,1)\f$
+    /// @{
+    /// @brief Returns the lengths of the images of the segments
+    /// (0,0,0) &minus; (1,0,0), (0,0,0) &minus; (0,1,0) and (0,0,0) &minus; (0,0,1).
     Vec3d voxelSize() const override { return mAffineMap.voxelSize();}
     Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
+    /// @}
 
     /// read serialization
     void read(std::istream& is) override

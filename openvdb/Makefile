@@ -54,8 +54,9 @@
 #   test                run tests
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -121,6 +122,9 @@ LOCAL_INCLUDE	:= $(prefix)/include
 LOCAL_LIB	:= $(prefix)/lib
 
 BOOST_VERSION	?= 1_55
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
+
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR	:= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
 # The directory containing libboost_iostreams, libboost_system, etc.
@@ -434,8 +438,10 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
@@ -529,6 +535,8 @@ INCLUDE_NAMES := \
     points/PointDataGrid.h \
     points/PointDelete.h \
     points/PointGroup.h \
+    points/PointMask.h \
+    points/PointScatter.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
     tools/Clip.h \
@@ -562,6 +570,7 @@ INCLUDE_NAMES := \
     tools/PointScatter.h \
     tools/PointsToMask.h \
     tools/PoissonSolver.h \
+    tools/PotentialFlow.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -694,9 +703,12 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
+    unittest/TestPointMask.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointScatter.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
+    unittest/TestPotentialFlow.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
@@ -847,7 +859,25 @@ LIBOPENVDB_IMPORT := $(IMPORTLIB_PREFIX)$(LIBOPENVDB_NAME)$(IMPORTLIB_SUFFIX)
 ifdef LINUX
 LIBOPENVDB_SONAME_FLAGS := -Wl,-soname,$(LIBOPENVDB_SONAME)
 else
-LIBOPENVDB_SONAME_FLAGS :=
+LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
+LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
+LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBOPENVDB_SONAME)
+endif
+
+# TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
+LIBVIEWER_NAME=libopenvdb_viewer
+LIBVIEWER_STATIC := $(LIBVIEWER_NAME).a
+ifndef MBSD
+LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).so
+LIBVIEWER_SHARED := $(LIBVIEWER_NAME).so.$(LIB_VERSION)
+LIBVIEWER_SONAME := $(LIBVIEWER_NAME).so.$(SO_VERSION)
+LIBVIEWER_SONAME_FLAGS := -Wl,-soname,$(LIBVIEWER_SONAME)
+else
+LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
+LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
+LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb
@@ -869,6 +899,8 @@ else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
   endif
   LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib $(LIBOPENVDB)
+    LIBVIEWER := $(LIBVIEWER_SHARED)
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR_LIB_DIR)
 endif # shared
 
 CPPUNIT_RPATH := -Wl,-rpath,$(CPPUNIT_LIB_DIR) $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)

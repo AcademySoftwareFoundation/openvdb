@@ -878,6 +878,10 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
     // grid data
 
     PointDataTree& tree = outputGrid.tree();
+    if (!tree.beginLeaf())  {
+        return;
+    }
+
     openvdb::math::Transform& transform = outputGrid.transform();
     const std::string groupName = parms.mGroupName;
 
@@ -887,9 +891,11 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
             (parms.mPercent * static_cast<double>(pointCount(tree))) / 100.0));
     }
 
+    const AttributeSet& attributeSet = tree.beginLeaf()->attributeSet();
+
     // build filter data
 
-    MultiGroupFilter groupFilter(parms.mIncludeGroups, parms.mExcludeGroups);
+    MultiGroupFilter groupFilter(parms.mIncludeGroups, parms.mExcludeGroups, attributeSet);
     BBoxFilter bboxFilter(transform, parms.mBBox);
     HashIFilter hashIFilter(parms.mHashAttributeIndex, parms.mPercent);
     HashLFilter hashLFilter(parms.mHashAttributeIndex, parms.mPercent);

@@ -34,6 +34,9 @@
 #define OPENVDB_UTIL_MAPSUTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/math/Maps.h>
+#include <algorithm> // for std::min(), std::max()
+#include <cmath>
+#include <vector>
 
 
 namespace openvdb {
@@ -133,9 +136,10 @@ calculateBounds(const MapType& map, const Vec3d& center, const Real radius, BBox
 namespace { // anonymous namespace for this helper function
 
 /// @brief Find the intersection of a line passing through the point
-/// \f$ (x=0, z=-1/g)\f$ with the circle \f$ (x-xo)^2 + (z-zo)^2 = r^2 \f$
+/// (<I>x</I>=0,&nbsp;<I>z</I>=&minus;1/<I>g</I>) with the circle
+/// (<I>x</I> &minus; <I>xo</I>)&sup2; + (<I>z</I> &minus; <I>zo</I>)&sup2; = <I>r</I>&sup2;
 /// at a point tangent to the circle.
-/// @return 0 if the focal point (0, -1/g) is inside the circle,
+/// @return 0 if the focal point (0, -1/<I>g</I>) is inside the circle,
 /// 1 if the focal point touches the circle, or 2 when both points are found.
 inline int
 findTangentPoints(const double g, const double xo, const double zo,

@@ -37,6 +37,7 @@
 #include "Stencils.h"
 #include "Maps.h"
 #include "Transform.h"
+#include <cmath> // for std::sqrt()
 
 
 namespace openvdb {
@@ -554,10 +555,10 @@ struct ISCurl
 template<DDScheme DiffScheme2, DScheme DiffScheme1>
 struct ISMeanCurvature
 {
-    /// @brief random access version
-    /// @return true if the gradient is none-zero, in which case the
-    /// mean curvature is computed as two parts: @c alpha is the numerator in
-    /// @f$\nabla \cdot (\nabla \phi / |\nabla \phi|)@f$, and @c beta is @f$|\nabla \phi|@f$.
+    /// @brief Random access version
+    /// @return @c true if the gradient is nonzero, in which case the mean curvature
+    /// is returned in two parts, @a alpha and @a beta, where @a alpha is the numerator
+    /// in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|) and @a beta is |&nabla;&Phi;|.
     template<typename Accessor>
     static bool result(const Accessor& grid, const Coord& ijk,
                        typename Accessor::ValueType& alpha,
@@ -592,10 +593,10 @@ struct ISMeanCurvature
         return true;
     }
 
-    /// @brief stencil access version
-    /// @return true if the gradient is none-zero, in which case the
-    /// mean curvature is computed as two parts: @c alpha is the numerator in
-    /// @f$\nabla \cdot (\nabla \phi / |\nabla \phi|)@f$, and @c beta is @f$|\nabla \phi|@f$.
+    /// @brief Stencil access version
+    /// @return @c true if the gradient is nonzero, in which case the mean curvature
+    /// is returned in two parts, @a alpha and @a beta, where @a alpha is the numerator
+    /// in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|) and @a beta is |&nabla;&Phi;|.
     template<typename StencilT>
     static bool result(const StencilT& stencil,
                        typename StencilT::ValueType& alpha,
@@ -1745,15 +1746,16 @@ struct CPT_RANGE
 
 
 /// @brief Compute the mean curvature.
-/// @return the mean curvature in two parts: @c alpha is the numerator in
-/// @f$\nabla \cdot (\nabla \phi / |\nabla \phi|)@f$, and @c beta is @f$|\nabla \phi|@f$.
+/// @details The mean curvature is returned in two parts, @a alpha and @a beta,
+/// where @a alpha is the numerator in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|)
+/// and @a beta is |&nabla;&Phi;|.
 template<typename MapType, DDScheme DiffScheme2, DScheme DiffScheme1>
 struct MeanCurvature
 {
-    /// @brief random access version
-    /// @return true if the gradient is none-zero, in which case the
-    /// mean curvature is computed as two parts: @c alpha is the numerator in
-    /// @f$\nabla \cdot (\nabla \phi / |\nabla \phi|)@f$, and @c beta is @f$|\nabla \phi|@f$.
+    /// @brief Random access version
+    /// @return @c true if the gradient is nonzero, in which case the mean curvature
+    /// is returned in two parts, @a alpha and @a beta, where @a alpha is the numerator
+    /// in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|) and @a beta is |&nabla;&Phi;|.
     template<typename Accessor>
     static bool compute(const MapType& map, const Accessor& grid, const Coord& ijk,
                         double& alpha, double& beta)
@@ -1829,10 +1831,10 @@ struct MeanCurvature
                ValueType(alpha/(2. *math::Pow2(beta))) : 0;
     }
 
-    /// @brief stencil access version
-    /// @return true if the gradient is none-zero, in which case the
-    /// mean curvature is computed as two parts: @c alpha is the numerator in
-    /// @f$\nabla \cdot (\nabla \phi / |\nabla \phi|)@f$, and @c beta is @f$|\nabla \phi|@f$.
+    /// @brief Stencil access version
+    /// @return @c true if the gradient is nonzero, in which case the mean curvature
+    /// is returned in two parts, @a alpha and @a beta, where @a alpha is the numerator
+    /// in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|) and @a beta is |&nabla;&Phi;|.
     template<typename StencilT>
     static bool compute(const MapType& map, const StencilT& stencil,
                         double& alpha, double& beta)

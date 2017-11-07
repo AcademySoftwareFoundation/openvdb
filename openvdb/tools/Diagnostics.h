@@ -46,9 +46,13 @@
 #include <openvdb/tree/LeafManager.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
+#include <cmath> // for std::isnan(), std::isfinite()
 #include <set>
-#include <boost/math/special_functions/fpclassify.hpp>
-#include <boost/utility/enable_if.hpp>
+#include <sstream>
+#include <string>
+#include <type_traits>
+#include <vector>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -127,24 +131,24 @@ uniqueInactiveValues(const GridType& grid,
 ////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks NaN values
-template <typename GridT,
-          typename TreeIterT = typename GridT::ValueOnCIter>
+template<typename GridT, typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckNan
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<
+        typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>::template
+            NodeConverter<typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Default constructor
     CheckNan() {}
 
     /// Return true if the scalar value is NaN
-    inline bool operator()(const ElementType& v) const { return boost::math::isnan(v); }
+    inline bool operator()(const ElementType& v) const { return std::isnan(v); }
 
     /// @brief This allows for vector values to be checked component-wise
-    template <typename T>
-    inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const
     {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;//should unroll
@@ -169,19 +173,21 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckInf
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Default constructor
     CheckInf() {}
 
     /// Return true if the value is infinite
-    inline bool operator()(const ElementType& v) const { return boost::math::isinf(v); }
+    inline bool operator()(const ElementType& v) const { return std::isinf(v); }
 
     /// Return true if any of the vector components are infinite.
-    template <typename T> inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const
     {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
@@ -205,20 +211,21 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckFinite
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Default constructor
     CheckFinite() {}
 
     /// Return true if the value is NOT finite, i.e. it's NaN or infinite
-    inline bool operator()(const ElementType& v) const { return !boost::math::isfinite(v); }
+    inline bool operator()(const ElementType& v) const { return !std::isfinite(v); }
 
     /// Return true if any of the vector components are NaN or infinite.
-    template <typename T>
-    inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
         return false;
@@ -242,10 +249,11 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOffCIter>
 struct CheckMagnitude
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Default constructor
     CheckMagnitude(const ElementType& a,
@@ -262,7 +270,8 @@ struct CheckMagnitude
     }
 
     /// Return true if any of the vector components are infinite.
-    template <typename T> inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const
     {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
@@ -295,10 +304,11 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckRange
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     // @brief Constructor taking a range to be tested against.
     CheckRange(const ElementType& _min, const ElementType& _max) : minVal(_min), maxVal(_max)
@@ -316,8 +326,8 @@ struct CheckRange
     }
 
     /// Return true if any of the vector components are out of range.
-    template <typename T>
-    inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
         return false;
@@ -348,10 +358,11 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckMin
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     // @brief Constructor taking a minimum to be tested against.
     CheckMin(const ElementType& _min) : minVal(_min) {}
@@ -360,8 +371,8 @@ struct CheckMin
     inline bool operator()(const ElementType& v) const { return v<minVal; }
 
     /// Return true if any of the vector components are smaller than min.
-    template <typename T>
-    inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
         return false;
@@ -391,10 +402,11 @@ template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckMax
 {
-    typedef typename VecTraits<typename GridT::ValueType>::ElementType ElementType;
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ElementType = typename VecTraits<typename GridT::ValueType>::ElementType;
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Constructor taking a maximum to be tested against.
     CheckMax(const ElementType& _max) : maxVal(_max) {}
@@ -403,8 +415,8 @@ struct CheckMax
     inline bool operator()(const ElementType& v) const { return v>maxVal; }
 
     /// Return true if any of the vector components are larger than max.
-    template <typename T>
-    inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
+    template<typename T>
+    inline typename std::enable_if<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
         for (int i=0; i<VecTraits<T>::Size; ++i) if ((*this)(v[i])) return true;
         return false;
@@ -429,21 +441,24 @@ struct CheckMax
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// @brief Checks the norm of the gradient against a range, i.e. @f$|\nabla\phi|\in[min,max]@f$
+/// @brief Checks the norm of the gradient against a range, i.e.,
+/// |&nabla;&Phi;| &isin; [min, max]
 ///
-/// @note Internally the test is performed as @f$|\nabla\phi|^2\in[min^2,max^2]@f$
-/// for optimization reasons.  
+/// @note Internally the test is performed as
+/// |&nabla;&Phi;|&sup2; &isin; [min&sup2;, max&sup2;] for optimization reasons.
 template<typename GridT,
          typename TreeIterT = typename GridT::ValueOnCIter,
          math::BiasedGradientScheme GradScheme = math::FIRST_BIAS>//math::WENO5_BIAS>
 struct CheckNormGrad
 {
-    typedef typename GridT::ValueType ValueType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
-    typedef typename GridT::ConstAccessor AccT;
+    using ValueType = typename GridT::ValueType;
+    static_assert(std::is_floating_point<ValueType>::value,
+        "openvdb::tools::CheckNormGrad requires a scalar, floating-point grid");
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
+    using AccT = typename GridT::ConstAccessor;
 
     /// @brief Constructor taking a grid and a range to be tested against.
     CheckNormGrad(const GridT&  grid, const ValueType& _min, const ValueType& _max)
@@ -506,11 +521,13 @@ template<typename GridT,
          typename StencilT  = math::WenoStencil<GridT> >//math::GradStencil<GridT>
 struct CheckEikonal
 {
-    typedef typename GridT::ValueType ValueType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+    using ValueType = typename GridT::ValueType;
+    static_assert(std::is_floating_point<ValueType>::value,
+        "openvdb::tools::CheckEikonal requires a scalar, floating-point grid");
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT> ::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
 
     /// @brief Constructor taking a grid and a range to be tested against.
     CheckEikonal(const GridT&  grid, const ValueType& _min, const ValueType& _max)
@@ -565,13 +582,15 @@ template<typename GridT,
          math::DScheme DiffScheme = math::CD_2ND>
 struct CheckDivergence
 {
-    typedef typename GridT::ValueType ValueType;
-    typedef typename VecTraits<ValueType>::ElementType ElementType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ElementType>::value);
-    typedef TreeIterT TileIterT;
-    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
-    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
-    typedef typename GridT::ConstAccessor AccT;
+    using ValueType = typename GridT::ValueType;
+    using ElementType = typename VecTraits<ValueType>::ElementType;
+    static_assert(std::is_floating_point<ElementType>::value,
+        "openvdb::tools::CheckDivergence requires a floating-point vector grid");
+    using TileIterT = TreeIterT;
+    using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
+        typename TreeIterT::ValueIterT>::template NodeConverter<
+            typename GridT::TreeType::LeafNodeType>::Type;
+    using AccT = typename GridT::ConstAccessor;
 
     /// @brief Constructor taking a grid and a range to be tested against.
     CheckDivergence(const GridT&  grid,
@@ -623,8 +642,8 @@ struct CheckDivergence
 template <typename GridT>
 class Diagnose
 {
-  public:
-    typedef typename GridT::template ValueConverter<bool>::Type  MaskType;
+public:
+    using MaskType = typename GridT::template ValueConverter<bool>::Type;
 
     Diagnose(const GridT& grid) : mGrid(&grid), mMask(new MaskType()), mCount(0)
     {
@@ -638,7 +657,7 @@ class Diagnose
                       bool checkTiles = true,
                       bool checkBackground = true)
     {
-        typename MaskType::TreeType* mask = updateMask ? &(mMask->tree()) : NULL;
+        typename MaskType::TreeType* mask = updateMask ? &(mMask->tree()) : nullptr;
         CheckValues<CheckT> cc(mask, mGrid, check);
         std::ostringstream ss;
         if (checkBackground) ss << cc.checkBackground();
@@ -684,9 +703,9 @@ private:
     template <typename CheckT>
     struct CheckValues
     {
-        typedef typename MaskType::TreeType MaskT;
-        typedef typename GridT::TreeType::LeafNodeType LeafT;
-        typedef typename tree::LeafManager<const typename GridT::TreeType> LeafManagerT;
+        using MaskT = typename MaskType::TreeType;
+        using LeafT = typename GridT::TreeType::LeafNodeType;
+        using LeafManagerT = typename tree::LeafManager<const typename GridT::TreeType>;
         const bool      mOwnsMask;
         MaskT*          mMask;
         const GridT*    mGrid;
@@ -703,7 +722,7 @@ private:
         }
         CheckValues(CheckValues& other, tbb::split)
             : mOwnsMask(true)
-            , mMask(other.mMask ? new MaskT() : NULL)
+            , mMask(other.mMask ? new MaskT() : nullptr)
             , mGrid(other.mGrid)
             , mCheck(other.mCheck)
             , mCount(0)
@@ -752,14 +771,14 @@ private:
 
         void operator()(const typename LeafManagerT::LeafRange& r)
         {
-            typedef typename CheckT::VoxelIterT VoxelIterT;
+            using VoxelIterT = typename CheckT::VoxelIterT;
             if (mMask) {
                 for (typename LeafManagerT::LeafRange::Iterator i=r.begin(); i; ++i) {
-                    typename MaskT::LeafNodeType* maskLeaf = NULL;
+                    typename MaskT::LeafNodeType* maskLeaf = nullptr;
                     for (VoxelIterT j = tree::IterTraits<LeafT, VoxelIterT>::begin(*i); j; ++j) {
                         if (mCheck(j)) {
                             ++mCount;
-                            if (maskLeaf == NULL) maskLeaf = mMask->touchLeaf(j.getCoord());
+                            if (maskLeaf == nullptr) maskLeaf = mMask->touchLeaf(j.getCoord());
                             maskLeaf->setValueOn(j.pos(), true);
                         }
                     }
@@ -791,8 +810,8 @@ template<class GridType>
 class CheckLevelSet
 {
 public:
-    typedef typename GridType::ValueType ValueType;
-    typedef typename GridType::template ValueConverter<bool>::Type  MaskType;
+    using ValueType = typename GridType::ValueType;
+    using MaskType = typename GridType::template ValueConverter<bool>::Type;
 
     CheckLevelSet(const GridType& grid) : mDiagnose(grid) {}
 
@@ -824,7 +843,7 @@ public:
     /// @note No run-time overhead
     static std::string checkValueType()
     {
-        static const bool test = boost::is_floating_point<ValueType>::value;
+        static const bool test = std::is_floating_point<ValueType>::value;
         return test ? "" : "Value type is not floating point\n";
     }
 
@@ -967,8 +986,8 @@ template<class GridType>
 class CheckFogVolume
 {
 public:
-    typedef typename GridType::ValueType ValueType;
-    typedef typename GridType::template ValueConverter<bool>::Type  MaskType;
+    using ValueType = typename GridType::ValueType;
+    using MaskType = typename GridType::template ValueConverter<bool>::Type;
 
     CheckFogVolume(const GridType& grid) : mDiagnose(grid) {}
 
@@ -1000,7 +1019,7 @@ public:
     /// @note No run-time overhead
     static std::string checkValueType()
     {
-        static const bool test = boost::is_floating_point<ValueType>::value;
+        static const bool test = std::is_floating_point<ValueType>::value;
         return test ? "" : "Value type is not floating point";
     }
 
@@ -1107,9 +1126,9 @@ template<typename TreeType>
 class InactiveVoxelValues
 {
 public:
-    typedef tree::LeafManager<TreeType> LeafArray;
-    typedef typename TreeType::ValueType ValueType;
-    typedef std::set<ValueType> SetType;
+    using LeafArray = tree::LeafManager<TreeType>;
+    using ValueType = typename TreeType::ValueType;
+    using SetType = std::set<ValueType>;
 
     InactiveVoxelValues(LeafArray&, size_t numValues);
 
@@ -1201,9 +1220,9 @@ template<typename TreeType>
 class InactiveTileValues
 {
 public:
-    typedef tree::IteratorRange<typename TreeType::ValueOffCIter> IterRange;
-    typedef typename TreeType::ValueType ValueType;
-    typedef std::set<ValueType> SetType;
+    using IterRange = tree::IteratorRange<typename TreeType::ValueOffCIter>;
+    using ValueType = typename TreeType::ValueType;
+    using SetType = std::set<ValueType>;
 
     InactiveTileValues(size_t numValues);
 
@@ -1295,10 +1314,9 @@ bool
 uniqueInactiveValues(const GridType& grid,
     std::vector<typename GridType::ValueType>& values, size_t numValues)
 {
-
-    typedef typename GridType::TreeType TreeType;
-    typedef typename GridType::ValueType ValueType;
-    typedef std::set<ValueType> SetType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
+    using SetType = std::set<ValueType>;
 
     SetType uniqueValues;
 

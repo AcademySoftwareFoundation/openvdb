@@ -2,6 +2,130 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 5.0.0</B> - <I>November 6, 2017</I>
+
+@par
+<BLOCKQUOTE>
+Some changes in this release (see @ref v5_0_0_ABI_changes "ABI changes" below)
+alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
+the OpenVDB library, such as the ones built into Houdini up to and including
+Houdini&nbsp;16.
+To preserve ABI compatibility, when compiling OpenVDB or any dependent code
+define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
+for example, <I>N</I> is 3 for Houdini&nbsp;15, 15.5 and&nbsp;16 and 4
+for the upcoming release.
+</BLOCKQUOTE>
+
+@par
+New features:
+- Added a @vdblink::getLibraryAbiVersionString()
+  getLibraryAbiVersionString@endlink function, which returns a
+  string such as <TT>"5.0.0abi3"</TT>.
+- Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI
+  compatibility.
+- Metadata fields of unregistered types are no longer discarded after
+  being read from a <TT>.vdb</TT> file, and although their values are not
+  printable, they can be written back to disk.
+- Added a @c DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
+  <I>[Contributed&nbsp;by&nbsp;Mathieu&nbsp;Malaterre]</I>
+- Added tools to create @link tools/PotentialFlow.h potential flow@endlink
+  fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB course.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @link points/PointMask.h tools@endlink to create mask grids from
+  point data grids and to compute
+  @vdblink::points::pointCountGrid() point counts@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added @link points/PointScatter.h tools@endlink to scatter
+  @ref secPtOverview "OpenVDB points" randomly throughout a volume.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+
+@par
+Improvements:
+- Significantly improved the performance of point data grid
+  @vdblink::points::MultiGroupFilter group filters@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Bug fixes:
+- Fixed bugs in the
+  @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink tool&rsquo;s
+  distance calculations that caused searches to produce incorrect results.
+- Fixed a locking issue that affected multithreaded access to
+  @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink&zwj;s
+  when delayed loading was in effect.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+
+@anchor v5_0_0_ABI_changes
+@par
+ABI changes:
+- Made @vdblink::tree::InternalNode InternalNode@endlink&rsquo;s destructor
+  non-virtual.
+- The @ref v4_0_2_delayed_load_fix "fix" for a delayed-loading race condition
+  in the @vdblink::tree::LeafBuffer LeafBuffer@endlink class that was only
+  partially rolled out in the previous release is now enabled on all platforms.
+- Replaced a bit flag with an atomic integer in
+  @vdblink::points::AttributeArray points::AttributeArray@endlink
+  to address a threading issue during delayed loading.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Deprecated the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
+  macros in favor of a new @c OPENVDB_ABI_VERSION_NUMBER macro.
+  The new macro defaults to the library major version number but can be
+  set at compile time to an earlier version number to disable ABI changes
+  since that version.
+  (Older ABIs will not be supported indefinitely, however.)
+  For example, compile OpenVDB and any dependent code with
+  <TT>-DOPENVDB_ABI_VERSION_NUMBER=4</TT> to use the 4.x&nbsp;ABI.
+
+@par
+API changes:
+- Replaced @b tools::ClosestSurfacePoint::initialize with
+  @vdblink::tools::ClosestSurfacePoint::create()
+  tools::ClosestSurfacePoint::create@endlink,
+  which returns a newly-allocated and properly initialized object.
+- Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
+  including @b io::File::readGridPartial, @b points::initialize,
+  @b points::uninitialize and @b util::PagedArray::pop_back.
+- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
+  in favor of @vdblink::ValueError ValueError@endlink.
+- Changed the naming scheme for the
+  @link OPENVDB_VERSION_NAME library namespace@endlink
+  from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
+  to <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>abi</B><I>N</I>,
+  where @e X, @e Y, @e Z and @e N are the major, minor, patch and ABI
+  version numbers, respectively.
+  The <B>abi</B><I>N</I> suffix is added only when the library is built
+  using an older ABI version.
+
+@par
+Python:
+- Reimplemented NumPy support for Boost&nbsp;1.65 compatibility.
+
+@par
+Houdini:
+- Fixed bugs that caused the Ray&nbsp;SOP&rsquo;s closest surface point
+  searches to produce incorrect results.
+- Changed the @b VdbPrimCIterator::FilterFunc type from @b boost::function
+  to @b std::function.
+- Changed the @b houdini_utils::OpPolicyPtr type from @b boost:shared_ptr
+  to @b std::shared_ptr.
+- Debug-level log messages generated by OpenVDB are no longer forwarded
+  to Houdini&rsquo;s error manager.
+- Fixed a bug in the Read&nbsp;SOP that made it impossible to select among
+  grids of the same name in a file.
+- Added @b houdini_utils::ParmFactory::setAttrChoiceList, a convenience
+  method for the creation of menus of attributes.
+- Added a Potential&nbsp;Flow&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added point data grid support to the Scatter&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Added mask and point count output options to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+
 @htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.2</B> - <I>July 28, 2017</I>
@@ -48,7 +172,8 @@ Improvements:
 
 @par
 Bug fixes:
-- Fixed a delayed-loading race condition that could result in crashes.
+- @anchor v4_0_2_delayed_load_fix
+  Fixed a delayed-loading race condition that could result in crashes.
   <I>[Reported&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
   <BLOCKQUOTE>
   @b Note: To preserve ABI compatibility, this fix is currently enabled
@@ -300,7 +425,7 @@ Bug fixes:
   returns an empty list of spheres instead of crashing when the user selects
   an isosurface that lies outside the bounding volume&rsquo;s narrow band.
 - Fixed a null pointer dereference when copying grids that were loaded
-  with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
+  with @c io::File::readGridPartial.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 @anchor v4_0_0_ABI_changes
@@ -333,10 +458,8 @@ API changes:
 - Made @c LeafNode::Buffer a top-level class and renamed it to
   @vdblink::tree::LeafBuffer LeafBuffer@endlink.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
-- Deprecated @vdblink::io::File::readGridPartial()
-  io::File::readGridPartial@endlink in favor of delayed loading.
-- @vdblink::tools::ClosestSurfacePoint::initialize()
-  tools::ClosestSurfacePoint::initialize@endlink now returns a boolean
+- Deprecated @c io::File::readGridPartial in favor of delayed loading.
+- @c tools::ClosestSurfacePoint::initialize now returns a boolean
   indicating whether initialization was successful.
 - Dropped the @c CopyPolicy enum and added
   @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
@@ -554,8 +677,7 @@ Bug fixes:
 
 @par
 API changes:
-- Deprecated @vdblink::math::Mat3::setBasis Mat3::setBasis@endlink and
-  @vdblink::math::Mat4::setBasis Mat4::setBasis@endlink.
+- Deprecated @c math::Mat3::setBasis and @c math::Mat4::setBasis.
 - Renamed @c GudonovsNormSqrd to
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
@@ -875,9 +997,9 @@ Houdini:
   an index-space bounding box.
 - Added @vdblink::tools::clip() tools::clip@endlink, which clips a grid
   either against a bounding box or against the active voxels of a mask grid.
-- @vdblink::io::File::readGridPartial() File::readGridPartial@endlink
-  allocates the nodes of a grid&rsquo;s tree as before, but it now allocates
-  leaf nodes without data buffers.  (This feature is mainly for internal use.
+- @c io::File::readGridPartial allocates the nodes of a grid&rsquo;s tree
+  as before, but it now allocates leaf nodes without data buffers.
+  (This feature is mainly for internal use.
   Partially-read grids should be used with care if at all, and they should
   be treated as read-only.)
 - Grid names retrieved using a

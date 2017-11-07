@@ -31,7 +31,10 @@
 #ifndef OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
+#include <algorithm> // for std::min(), std::max()
 #include <array> // for std::array
+#include <iostream>
+#include <limits>
 #include <openvdb/Platform.h>
 #include "Math.h"
 #include "Vec3.h"
@@ -454,7 +457,8 @@ public:
         mMin.minComponent(min);
         mMax.maxComponent(min.offsetBy(dim-1));
     }
-    /// Translate this bounding box by @f$(t_x, t_y, t_z)@f$.
+    /// Translate this bounding box by
+    /// (<i>t<sub>x</sub></i>, <i>t<sub>y</sub></i>, <i>t<sub>z</sub></i>).
     void translate(const Coord& t) { mMin += t; mMax += t; }
 
     /// @brief Populates an array with the eight corner points of this bounding box.

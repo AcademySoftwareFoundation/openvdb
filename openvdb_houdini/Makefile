@@ -44,8 +44,9 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -103,6 +104,9 @@ endif
 # library makefile)
 DESTDIR := $(prefix)
 include ../openvdb/platform.mk
+
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The directory into which to install Houdini SOPs
 HOUDINI_DESTDIR := ./dso
@@ -294,9 +298,12 @@ ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
     HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
-    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
+    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
@@ -392,6 +399,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Points_Convert.cc \
     houdini/SOP_OpenVDB_Points_Delete.cc \
     houdini/SOP_OpenVDB_Points_Group.cc \
+    houdini/SOP_OpenVDB_Potential_Flow.cc \
     houdini/SOP_OpenVDB_Prune.cc \
     houdini/SOP_OpenVDB_Rasterize_Points.cc \
     houdini/SOP_OpenVDB_Ray.cc \
@@ -638,7 +646,7 @@ install: houdinilib houdinisops mantradsos
 	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
 	        $(LN) $(LIBHOUDINI_SHARED_VERSIONED) $(LIBHOUDINI_SHARED); fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb_houdini to $(DESTDIR_LIB_DIR)"
 
 install: install_lib houdinisops
 

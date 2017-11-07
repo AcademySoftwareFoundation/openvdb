@@ -498,7 +498,7 @@ struct FillGPUBuffersPosition {
 
             openvdb::Index64 offset = 0;
 
-            if (useGroup) {
+            if (useGroup && leaf->attributeSet().has_group(mGroupName)) {
                 GroupFilter filter(mGroupName);
 
                 auto iter = leaf->beginIndexOn(filter);

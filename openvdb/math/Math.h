@@ -250,7 +250,7 @@ ClampTest01(Type &x)
     return true;
 }
 
-/// @brief Return 0 if @a x < @a 0, 1 if @a x > 1 or else @f$(3-2x)x^2@f$.
+/// @brief Return 0 if @a x < @a 0, 1 if @a x > 1 or else (3 &minus; 2 @a x) @a x&sup2;.
 template<typename Type>
 inline Type
 SmoothUnitStep(Type x)
@@ -258,8 +258,8 @@ SmoothUnitStep(Type x)
     return x > 0 ? x < 1 ? (3-2*x)*x*x : Type(1) : Type(0);
 }
 
-/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else @f$(3-2t)t^2@f$,
-/// where @f$t = (x-min)/(max-min)@f$.
+/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else (3 &minus; 2 @a t) @a t&sup2;,
+/// where @a t = (@a x &minus; @a min)/(@a max &minus; @a min).
 template<typename Type>
 inline Type
 SmoothUnitStep(Type x, Type min, Type max)
@@ -493,19 +493,19 @@ isUlpsEqual(const float aLeft, const float aRight, const int32_t aUnitsInLastPla
 
 // ==========> Pow <==================
 
-/// Return @f$ x^2 @f$.
+/// Return @a x<sup>2</sup>.
 template<typename Type>
 inline Type Pow2(Type x) { return x*x; }
 
-/// Return @f$ x^3 @f$.
+/// Return @a x<sup>3</sup>.
 template<typename Type>
 inline Type Pow3(Type x) { return x*x*x; }
 
-/// Return @f$ x^4 @f$.
+/// Return @a x<sup>4</sup>.
 template<typename Type>
 inline Type Pow4(Type x) { return Pow2(Pow2(x)); }
 
-/// Return @f$ x^n @f$.
+/// Return @a x<sup>@a n</sup>.
 template<typename Type>
 Type
 Pow(Type x, int n)
@@ -520,7 +520,7 @@ Pow(Type x, int n)
 }
 
 //@{
-/// Return @f$ b^e @f$.
+/// Return @a b<sup>@a e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -655,14 +655,14 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 // ============> Exp <==================
 
-/// Return @f$ e^x @f$.
+/// Return @a e<sup>@a x</sup>.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
 
 // ============> Sin <==================
 
 //@{
-/// Return @f$ sin(x) @f$.
+/// Return sin @a x.
 inline float Sin(const float& x) { return std::sin(x); }
 
 inline double Sin(const double& x) { return std::sin(x); }
@@ -671,7 +671,7 @@ inline double Sin(const double& x) { return std::sin(x); }
 // ============> Cos <==================
 
 //@{
-/// Return @f$ cos(x) @f$.
+/// Return cos @a x.
 inline float Cos(const float& x) { return std::cos(x); }
 
 inline double Cos(const double& x) { return std::cos(x); }

@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-/// @file NodeManager.h
+/// @file tree/NodeManager.h
 ///
 /// @author Ken Museth
 ///
@@ -41,10 +41,11 @@
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
+#include <openvdb/Types.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-#include <openvdb/Types.h>
 #include <deque>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -67,8 +68,8 @@ template<typename NodeT>
 class NodeList
 {
 public:
-    typedef NodeT* value_type;
-    typedef std::deque<value_type> ListT;
+    using value_type = NodeT*;
+    using ListT = std::deque<value_type>;
 
     NodeList() {}
 
@@ -287,18 +288,6 @@ public:
     }
 
     template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
         mNext.reduceBottomUp(op, threaded, grainSize);
@@ -321,8 +310,8 @@ protected:
 ////////////////////////////////////////
 
 
+/// @private
 /// @brief Specialization that terminates the chain of cached tree nodes
-///
 /// @note It is for internal use and should rarely be used directly.
 template<typename NodeT>
 class NodeManagerLink<NodeT, 0>
@@ -352,18 +341,6 @@ public:
     void foreachTopDown(const NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
     }
 
     template<typename NodeOp>
@@ -407,9 +384,10 @@ class NodeManager
 {
 public:
     static const Index LEVELS = _LEVELS;
-    BOOST_STATIC_ASSERT(LEVELS > 0);//special implementation below
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL >= LEVELS);
+    static_assert(LEVELS > 0,
+        "expected instantiation of template specialization"); // see specialization below
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
 
@@ -451,9 +429,9 @@ public:
     /// template<typename TreeType>
     /// struct OffsetOp
     /// {
-    ///     typedef typename TreeT::ValueType    ValueT;
-    ///     typedef typename TreeT::RootNodeType RootT;
-    ///     typedef typename TreeT::LeafNodeType LeafT;
+    ///     using ValueT = typename TreeT::ValueType;
+    ///     using RootT = typename TreeT::RootNodeType;
+    ///     using LeafT = typename TreeT::LeafNodeType;
     ///     OffsetOp(const ValueT& v) : mOffset(v) {}
     ///
     ///     // Processes the root node. Required by the NodeManager
@@ -482,7 +460,7 @@ public:
     /// nodes.foreachBottomUp(op);
     ///
     /// // or if a LeafManager already exists
-    /// typedef tree::LeafManager<FloatTree> T;
+    /// using T = tree::LeafManager<FloatTree>;
     /// OffsetOp<T> op(3.0f);
     /// tree::NodeManager<T> nodes(leafManager);
     /// nodes.foreachBottomUp(op);
@@ -494,22 +472,14 @@ public:
         mChain.foreachBottomUp(op, threaded, grainSize);
         op(mRoot);
     }
+
     template<typename NodeOp>
     void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mChain.foreachTopDown(op, threaded, grainSize);
     }
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
+
     //@}
 
     //@{
@@ -564,7 +534,7 @@ public:
     ///
     /// // or if a LeafManager already exists
     /// NodeCountOp<FloatTree> op;
-    /// typedef tree::LeafManager<FloatTree> T;
+    /// using T = tree::LeafManager<FloatTree>;
     /// T leafManager(tree);
     /// tree::NodeManager<T> nodes(leafManager);
     /// nodes.reduceBottomUp(op);
@@ -597,12 +567,13 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with no caching of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 0>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static const Index LEVELS = 0;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
@@ -623,12 +594,6 @@ public:
     Index64 nodeCount() const { return 0; }
 
     Index64 nodeCount(Index) const { return 0; }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool, size_t) { op(mRoot); }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool, size_t) { op(mRoot); }
 
     template<typename NodeOp>
     void foreachBottomUp(const NodeOp& op, bool, size_t) { op(mRoot); }
@@ -653,13 +618,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with one level of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 0);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -705,17 +671,6 @@ public:
         op(mRoot);
         mList0.foreach(op, threaded, grainSize);
     }
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
 
     template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
@@ -732,9 +687,9 @@ public:
     }
 
 protected:
-    typedef RootNodeType                   NodeT1;
-    typedef typename NodeT1::ChildNodeType NodeT0;
-    typedef NodeList<NodeT0>               ListT0;
+    using NodeT1 = RootNodeType;
+    using NodeT0 = typename NodeT1::ChildNodeType;
+    using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
     ListT0 mList0;
@@ -747,13 +702,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with two levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 1);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -813,18 +769,6 @@ public:
     }
 
     template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.reduce(op, threaded, grainSize);
@@ -841,12 +785,12 @@ public:
     }
 
 protected:
-    typedef RootNodeType                   NodeT2;
-    typedef typename NodeT2::ChildNodeType NodeT1;//upper level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    using NodeT2 = RootNodeType;
+    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
 
-    typedef NodeList<NodeT1>               ListT1;//upper level
-    typedef NodeList<NodeT0>               ListT0;//lower level
+    using ListT1 = NodeList<NodeT1>; // upper level
+    using ListT0 = NodeList<NodeT0>; // lower level
 
     NodeT2& mRoot;
     ListT1 mList1;
@@ -860,13 +804,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with three levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 2);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -931,18 +876,6 @@ public:
     }
 
     template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.reduce(op, threaded, grainSize);
@@ -961,14 +894,14 @@ public:
     }
 
 protected:
-    typedef RootNodeType                   NodeT3;
-    typedef typename NodeT3::ChildNodeType NodeT2;//upper level
-    typedef typename NodeT2::ChildNodeType NodeT1;//mid level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    using NodeT3 = RootNodeType;
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
+    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
 
-    typedef NodeList<NodeT2>               ListT2;//upper level of internal nodes
-    typedef NodeList<NodeT1>               ListT1;//lower level of internal nodes
-    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
+    using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
 
     NodeT3& mRoot;
     ListT2 mList2;
@@ -983,13 +916,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with four levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 3);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -1062,18 +996,6 @@ public:
     }
 
     template<typename NodeOp>
-    OPENVDB_DEPRECATED void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachBottomUp<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
-    OPENVDB_DEPRECATED void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
-    {
-        this->foreachTopDown<NodeOp>(op, threaded, grainSize);
-    }
-
-    template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.reduce(op, threaded, grainSize);
@@ -1094,16 +1016,16 @@ public:
     }
 
 protected:
-    typedef RootNodeType                   NodeT4;
-    typedef typename NodeT4::ChildNodeType NodeT3;//upper level
-    typedef typename NodeT3::ChildNodeType NodeT2;//upper mid level
-    typedef typename NodeT2::ChildNodeType NodeT1;//lower mid level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    using NodeT4 = RootNodeType;
+    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
+    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
 
-    typedef NodeList<NodeT3>               ListT3;//upper level of internal nodes
-    typedef NodeList<NodeT2>               ListT2;//upper mid level of internal nodes
-    typedef NodeList<NodeT1>               ListT1;//lower mid level of internal nodes
-    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
+    using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
+    using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower mid level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
 
     NodeT4& mRoot;
     ListT3  mList3;

@@ -30,7 +30,7 @@
 
 /// @author Ken Museth
 ///
-/// @file LevelSetTracker.h
+/// @file tools/LevelSetTracker.h
 ///
 /// @brief Performs multi-threaded interface tracking of narrow band
 /// level sets. This is the building-block for most level set
@@ -40,9 +40,6 @@
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <type_traits>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -56,6 +53,9 @@
 #include "ChangeBackground.h"// for changeLevelSetBackground
 #include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
+#include <functional>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -67,14 +67,14 @@ template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetTracker
 {
 public:
-    typedef GridT                                GridType;
-    typedef typename GridT::TreeType             TreeType;
-    typedef typename TreeType::LeafNodeType      LeafType;
-    typedef typename TreeType::ValueType         ValueType;
-    typedef typename tree::LeafManager<TreeType> LeafManagerType; // leafs + buffers
-    typedef typename LeafManagerType::LeafRange  LeafRange;
-    typedef typename LeafManagerType::BufferType BufferType;
-    typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskTreeType;
+    using GridType = GridT;
+    using TreeType = typename GridT::TreeType;
+    using LeafType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafManagerType = typename tree::LeafManager<TreeType>; // leafs + buffers
+    using LeafRange = typename LeafManagerType::LeafRange;
+    using BufferType = typename LeafManagerType::BufferType;
+    using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
     static_assert(std::is_floating_point<ValueType>::value,
         "LevelSetTracker requires a level set grid with floating-point values");
 
@@ -209,11 +209,12 @@ private:
              typename MaskT>
     struct Normalizer
     {
-        typedef math::BIAS_SCHEME<SpatialScheme>                             SchemeT;
-        typedef typename SchemeT::template ISStencil<GridType>::StencilType  StencilT;
-        typedef typename MaskT::LeafNodeType MaskLeafT;
-        typedef typename MaskLeafT::ValueOnCIter MaskIterT;
-        typedef typename LeafType::ValueOnCIter VoxelIterT;
+        using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
+        using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+        using MaskLeafT = typename MaskT::LeafNodeType;
+        using MaskIterT = typename MaskLeafT::ValueOnCIter;
+        using VoxelIterT = typename LeafType::ValueOnCIter;
+
         Normalizer(LevelSetTracker& tracker, const MaskT* mask);
         void normalize();
         void operator()(const LeafRange& r) const {mTask(const_cast<Normalizer*>(this), r);}
@@ -229,7 +230,7 @@ private:
         LevelSetTracker& mTracker;
         const MaskT*     mMask;
         const ValueType  mDt, mInvDx;
-        typename boost::function<void (Normalizer*, const LeafRange&)> mTask;
+        typename std::function<void (Normalizer*, const LeafRange&)> mTask;
     }; // Normalizer struct
 
     template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
@@ -458,7 +459,7 @@ inline void
 LevelSetTracker<GridT, InterruptT>::
 Trim::operator()(const LeafRange& range) const
 {
-    typedef typename LeafType::ValueOnIter VoxelIterT;
+    using VoxelIterT = typename LeafType::ValueOnIter;
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
 
@@ -502,6 +503,8 @@ LevelSetTracker<GridT, InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 normalize()
 {
+    namespace ph = std::placeholders;
+
     /// Make sure we have enough temporal auxiliary buffers
     mTracker.mLeafs->rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
 
@@ -512,7 +515,7 @@ normalize()
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(0) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK1", 1);
@@ -520,14 +523,14 @@ normalize()
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK1 (step 1 of 2)", 1);
 
             // Convex combine explicit Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler12, _1, _2);
+            mTask = std::bind(&Normalizer::euler12, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook("Normalizing level set using TVD_RK1 (step 2 of 2)", 1);
@@ -535,21 +538,21 @@ normalize()
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK3 (step 1 of 3)", 1);
 
             // Convex combine explicit Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler34, _1, _2);
+            mTask = std::bind(&Normalizer::euler34, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook("Normalizing level set using TVD_RK3 (step 2 of 3)", 2);
 
             // Convex combine explicit Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
-            mTask = boost::bind(&Normalizer::euler13, _1, _2);
+            mTask = std::bind(&Normalizer::euler13, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook("Normalizing level set using TVD_RK3 (step 3 of 3)", 2);
@@ -596,7 +599,7 @@ LevelSetTracker<GridT, InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 {
-    typedef typename math::ISGradientNormSqrd<SpatialScheme> GradientT;
+    using GradientT = typename math::ISGradientNormSqrd<SpatialScheme>;
     static const ValueType alpha = ValueType(Nominator)/ValueType(Denominator);
     static const ValueType beta  = ValueType(1) - alpha;
 
@@ -618,7 +621,7 @@ LevelSetTracker<GridT,InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 {
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
+    using VoxelIterT = typename LeafType::ValueOnCIter;
 
     mTracker.checkInterrupter();
 

@@ -129,18 +129,14 @@ bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t buff
         if (_compressedBytes < 0) ostr << " (internal error " << _compressedBytes << ")";
         OPENVDB_LOG_DEBUG(ostr.str());
         compressedBytes = 0;
-        compressedBuffer = nullptr;
         return;
     }
 
     compressedBytes = _compressedBytes;
 
     // fail if compression does not result in a smaller buffer
-
     if (compressedBytes >= uncompressedBytes) {
         compressedBytes = 0;
-        compressedBuffer = nullptr;
-        return;
     }
 }
 

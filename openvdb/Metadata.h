@@ -31,6 +31,7 @@
 #ifndef OPENVDB_METADATA_HAS_BEEN_INCLUDED
 #define OPENVDB_METADATA_HAS_BEEN_INCLUDED
 
+#include "version.h"
 #include "Exceptions.h"
 #include "Types.h"
 #include "math/Math.h" // for math::isZero()
@@ -38,6 +39,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <vector>
 
 
 namespace openvdb {
@@ -53,6 +55,10 @@ public:
 
     Metadata() {}
     virtual ~Metadata() {}
+
+    // Disallow copying of instances of this class.
+    Metadata(const Metadata&) = delete;
+    Metadata& operator=(const Metadata&) = delete;
 
     /// Return the type name of the metadata.
     virtual Name typeName() const = 0;
@@ -106,31 +112,58 @@ protected:
     virtual void readValue(std::istream&, Index32 numBytes) = 0;
     /// Write the metadata to a stream.
     virtual void writeValue(std::ostream&) const = 0;
-
-private:
-    // Disallow copying of instances of this class.
-    Metadata(const Metadata&);
-    Metadata& operator=(const Metadata&);
 };
 
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+
+/// @brief Subclass to hold raw data of an unregistered type
+class OPENVDB_API UnknownMetadata: public Metadata
+{
+public:
+    using ByteVec = std::vector<uint8_t>;
+
+    explicit UnknownMetadata(const Name& typ = "<unknown>"): mTypeName(typ) {}
+
+    Name typeName() const override { return mTypeName; }
+    Metadata::Ptr copy() const override;
+    void copy(const Metadata&) override;
+    std::string str() const override { return (mBytes.empty() ? "" : "<binary data>"); }
+    bool asBool() const override { return !mBytes.empty(); }
+    Index32 size() const override { return static_cast<Index32>(mBytes.size()); }
+
+    void setValue(const ByteVec& bytes) { mBytes = bytes; }
+    const ByteVec& value() const { return mBytes; }
+
+protected:
+    void readValue(std::istream&, Index32 numBytes) override;
+    void writeValue(std::ostream&) const override;
+
+private:
+    Name mTypeName;
+    ByteVec mBytes;
+};
+
+#else // if OPENVDB_ABI_VERSION_NUMBER < 5
 
 /// @brief Subclass to read (and ignore) data of an unregistered type
 class OPENVDB_API UnknownMetadata: public Metadata
 {
 public:
     UnknownMetadata() {}
-    virtual ~UnknownMetadata() {}
-    virtual Name typeName() const { return "<unknown>"; }
-    virtual Metadata::Ptr copy() const { OPENVDB_THROW(TypeError, "Metadata has unknown type"); }
-    virtual void copy(const Metadata&) { OPENVDB_THROW(TypeError, "Destination has unknown type"); }
-    virtual std::string str() const { return "<unknown>"; }
-    virtual bool asBool() const { return false; }
-    virtual Index32 size() const { return 0; }
+    Name typeName() const override { return "<unknown>"; }
+    Metadata::Ptr copy() const override { OPENVDB_THROW(TypeError, "Metadata has unknown type"); }
+    void copy(const Metadata&) override {OPENVDB_THROW(TypeError, "Destination has unknown type");}
+    std::string str() const override { return "<unknown>"; }
+    bool asBool() const override { return false; }
+    Index32 size() const override { return 0; }
 
 protected:
-    virtual void readValue(std::istream&s, Index32 numBytes);
-    virtual void writeValue(std::ostream&) const;
+    void readValue(std::istream&, Index32 numBytes) override;
+    void writeValue(std::ostream&) const override;
 };
+
+#endif
 
 
 /// @brief Templated metadata class to hold specific types.
@@ -144,14 +177,14 @@ public:
     TypedMetadata();
     TypedMetadata(const T& value);
     TypedMetadata(const TypedMetadata<T>& other);
-    virtual ~TypedMetadata();
+    ~TypedMetadata() override;
 
-    virtual Name typeName() const;
-    virtual Metadata::Ptr copy() const;
-    virtual void copy(const Metadata& other);
-    virtual std::string str() const;
-    virtual bool asBool() const;
-    virtual Index32 size() const { return static_cast<Index32>(sizeof(T)); }
+    Name typeName() const override;
+    Metadata::Ptr copy() const override;
+    void copy(const Metadata& other) override;
+    std::string str() const override;
+    bool asBool() const override;
+    Index32 size() const override { return static_cast<Index32>(sizeof(T)); }
 
     /// Set this metadata's value.
     void setValue(const T&);
@@ -171,8 +204,8 @@ public:
     static bool isRegisteredType();
 
 protected:
-    virtual void readValue(std::istream&, Index32 numBytes);
-    virtual void writeValue(std::ostream&) const;
+    void readValue(std::istream&, Index32 numBytes) override;
+    void writeValue(std::ostream&) const override;
 
 private:
     T mValue;

@@ -265,6 +265,21 @@ private:
 ////////////////////////////////////////
 
 
+/// A container for ABI=5 to help ease introduction of upcoming features
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+namespace future {
+    class Container
+    {
+        class Element { };
+        std::vector<std::shared_ptr<Element>> mElements;
+    };
+}
+#endif
+
+
+////////////////////////////////////////
+
+
 /// @brief  An immutable object that stores name, type and AttributeSet position
 ///         for a constant collection of attribute arrays.
 /// @note   The attribute name is actually mutable, but the attribute type
@@ -391,6 +406,23 @@ public:
     /// Return a unique name for a group based on given name
     const Name uniqueGroupName(const Name& name) const;
 
+    //@{
+    /// @brief Return the group offset from the name or index of the group
+    /// A group attribute array is a single byte (8-bit), each bit of which
+    /// can denote a group. The group offset is the position of the bit that
+    /// denotes the requested group if all group attribute arrays in the set
+    /// (and only attribute arrays marked as group) were to be laid out linearly
+    /// according to their order in the set.
+    size_t groupOffset(const Name& groupName) const;
+    size_t groupOffset(const GroupIndex& index) const;
+    //@}
+
+    /// Return the group index from the name of the group
+    GroupIndex groupIndex(const Name& groupName) const;
+    /// Return the group index from the offset of the group
+    /// @note see offset description for groupOffset()
+    GroupIndex groupIndex(const size_t offset) const;
+
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
 
@@ -436,7 +468,15 @@ private:
     std::vector<NamePair>       mTypes;
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+    // as this change is part of an ABI change, there's no good reason to reduce the reserved
+    // space aside from keeping the memory size of an AttributeSet the same for convenience
+    // (note that this assumes a typical three-pointer implementation for std::vector)
+    future::Container           mFutureContainer;   // occupies 3 reserved slots
+    int64_t                     mReserved[5];       // for future use
+#else
     int64_t                     mReserved[8];       // for future use
+#endif
 }; // class Descriptor
 
 } // namespace points

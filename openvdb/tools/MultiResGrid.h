@@ -66,14 +66,15 @@
 #include "SignedFloodFill.h"
 #include "ValueTransformer.h"
 
+#include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_scheduler_init.h>
-#include <tbb/tbb_thread.h>
+#include <tbb/parallel_for.h>
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -84,17 +85,16 @@ template<typename TreeType>
 class MultiResGrid: public MetaMap
 {
 public:
+    using Ptr = SharedPtr<MultiResGrid>;
+    using ConstPtr = SharedPtr<const MultiResGrid>;
 
-    typedef boost::shared_ptr<MultiResGrid>         Ptr;
-    typedef boost::shared_ptr<const MultiResGrid>   ConstPtr;
-
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::ValueOnCIter         ValueOnCIter;
-    typedef typename TreeType::ValueOnIter          ValueOnIter;
-    typedef typename TreeType::Ptr                  TreePtr;
-    typedef typename TreeType::ConstPtr             ConstTreePtr;
-    typedef typename Grid<TreeType>::Ptr            GridPtr;
-    typedef typename Grid<TreeType>::ConstPtr       ConstGridPtr;
+    using ValueType = typename TreeType::ValueType;
+    using ValueOnCIter = typename TreeType::ValueOnCIter;
+    using ValueOnIter = typename TreeType::ValueOnIter;
+    using TreePtr = typename TreeType::Ptr;
+    using ConstTreePtr = typename TreeType::ConstPtr;
+    using GridPtr = typename Grid<TreeType>::Ptr;
+    using ConstGridPtr = typename Grid<TreeType>::ConstPtr;
 
     //////////////////////////////////////////////////////////////////////
 
@@ -350,8 +350,8 @@ private:
     MultiResGrid& operator=(const MultiResGrid& other);//disallow copy assignment
 
     // For optimal performance we disable registration of the ValueAccessor
-    typedef tree::ValueAccessor<TreeType, false>       Accessor;
-    typedef tree::ValueAccessor<const TreeType, false> ConstAccessor;
+    using Accessor = tree::ValueAccessor<TreeType, false>;
+    using ConstAccessor = tree::ValueAccessor<const TreeType, false>;
 
     void topDownRestrict(bool useInjection);
 
@@ -376,7 +376,7 @@ private:
 
     // Array of shared pointer to trees, level 0 has the highest resolution.
     std::vector<TreePtr> mTrees;
-    // Shared point to a transform associated with the finest level grid
+    // Shared pointer to a transform associated with the finest level grid
     typename math::Transform::Ptr mTransform;
 };// MultiResGrid
 
@@ -701,11 +701,11 @@ topDownRestrict(bool useInjection)
 template<typename TreeType>
 struct MultiResGrid<TreeType>::MaskOp
 {
-    typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskT;
-    typedef tbb::enumerable_thread_specific<TreeType> PoolType;
-    typedef tree::LeafManager<const MaskT>  ManagerT;
-    typedef typename ManagerT::LeafRange RangeT;
-    typedef typename ManagerT::LeafNodeType::ValueOnCIter VoxelIterT;
+    using MaskT = typename TreeType::template ValueConverter<ValueMask>::Type;
+    using PoolType = tbb::enumerable_thread_specific<TreeType>;
+    using ManagerT = tree::LeafManager<const MaskT>;
+    using RangeT = typename ManagerT::LeafRange;
+    using VoxelIterT = typename ManagerT::LeafNodeType::ValueOnCIter;
 
     MaskOp(const TreeType& fineTree, TreeType& coarseTree, size_t grainSize = 1)
         : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as examplar
@@ -723,7 +723,7 @@ struct MultiResGrid<TreeType>::MaskOp
         tbb::parallel_for(leafs.leafRange( grainSize ), *this);
 
         // multithreaded union of thread-local coarse tree masks with the coarse tree
-        typedef typename PoolType::const_iterator IterT;
+        using IterT = typename PoolType::const_iterator;
         for (IterT it=mPool->begin(); it!=mPool->end(); ++it) coarseTree.topologyUnion( *it );
         delete mPool;
     }
@@ -745,20 +745,20 @@ template<typename TreeType>
 template<Index Order>
 struct MultiResGrid<TreeType>::FractionOp
 {
-    typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskT;
-    typedef tbb::enumerable_thread_specific<MaskT>        PoolType;
-    typedef typename PoolType::iterator                   PoolIterT;
-    typedef tree::LeafManager<const TreeType>             Manager1;
-    typedef tree::LeafManager<TreeType>                   Manager2;
-    typedef typename Manager1::LeafRange                  Range1;
-    typedef typename Manager2::LeafRange                  Range2;
+    using MaskT = typename TreeType::template ValueConverter<ValueMask>::Type;
+    using PoolType = tbb::enumerable_thread_specific<MaskT>;
+    using PoolIterT = typename PoolType::iterator;
+    using Manager1 = tree::LeafManager<const TreeType>;
+    using Manager2 = tree::LeafManager<TreeType>;
+    using Range1 = typename Manager1::LeafRange;
+    using Range2 = typename Manager2::LeafRange;
 
     FractionOp(const MultiResGrid& parent,
                TreeType& midTree,
                float level,
                size_t grainSize = 1)
         : mLevel( level )
-        , mPool( NULL )
+        , mPool(nullptr)
         , mTree0( &*(parent.mTrees[size_t(floorf(level))]) )//high-resolution
         , mTree1( &*(parent.mTrees[size_t(ceilf(level))]) ) //low-resolution
     {
@@ -788,7 +788,7 @@ struct MultiResGrid<TreeType>::FractionOp
     }
     void operator()(const Range1& range) const
     {
-        typedef typename Manager1::LeafNodeType::ValueOnCIter VoxelIter;
+        using VoxelIter = typename Manager1::LeafNodeType::ValueOnCIter;
         // Let mLevel = level + frac, where
         // level is integer part of mLevel and frac is the fractional part
         // low-res voxel size in world units = dx1 = 2^(level + 1)
@@ -817,7 +817,7 @@ struct MultiResGrid<TreeType>::FractionOp
     }
     void operator()(const Range2 &r) const
     {
-        typedef typename TreeType::LeafNodeType::ValueOnIter VoxelIter;
+        using VoxelIter = typename TreeType::LeafNodeType::ValueOnIter;
         // Let mLevel = level + frac, where
         // level is integer part of mLevel and frac is the fractional part
         // high-res voxel size in world units = dx0 = 2^(level)
@@ -853,8 +853,8 @@ template<typename TreeType>
 template<typename OperatorType>
 struct MultiResGrid<TreeType>::CookOp
 {
-    typedef tree::LeafManager<TreeType>  ManagerT;
-    typedef typename ManagerT::LeafRange RangeT;
+    using ManagerT = tree::LeafManager<TreeType>;
+    using RangeT = typename ManagerT::LeafRange;
 
     CookOp(const TreeType& srcTree, TreeType& dstTree, size_t grainSize): acc(srcTree)
     {

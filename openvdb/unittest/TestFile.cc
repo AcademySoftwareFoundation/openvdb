@@ -51,6 +51,7 @@
 #include <memory>
 #include <set>
 #include <sstream>
+#include <string>
 #include <vector>
 #include <sys/types.h> // for stat()
 #include <sys/stat.h>
@@ -85,9 +86,8 @@ public:
     CPPUNIT_TEST(testReadAll);
     CPPUNIT_TEST(testWriteOpenFile);
     CPPUNIT_TEST(testReadGridMetadata);
-    CPPUNIT_TEST(testReadGridPartial);
     CPPUNIT_TEST(testReadGrid);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     CPPUNIT_TEST(testReadClippedGrid);
 #endif
     CPPUNIT_TEST(testMultiPassIO);
@@ -116,9 +116,8 @@ public:
     void testReadAll();
     void testWriteOpenFile();
     void testReadGridMetadata();
-    void testReadGridPartial();
     void testReadGrid();
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void testReadClippedGrid();
 #endif
     void testMultiPassIO();
@@ -130,25 +129,6 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     void testBlosc();
 #endif
-
-private:
-    static openvdb::GridBase::ConstPtr
-    doReadGridPartial(openvdb::io::File& file, const std::string& gridName)
-    {
-        /// @todo io::File::readGridPartial() is deprecated as of OpenVDB 4.0.
-        /// For now, suppress deprecation warnings, but once readGridPartial()
-        /// is actually retired, remove this function.
-#ifdef __INTEL_COMPILER
-  _Pragma("warning (push)")
-  _Pragma("warning (disable:1478)")
-#elif defined(__clang__) || defined(__GNUC__)
-  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-        return file.readGridPartial(gridName);
-#ifdef __INTEL_COMPILER
-  _Pragma("warning (pop)")
-#endif
-    }
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
@@ -709,7 +689,7 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     CPPUNIT_ASSERT(density.get() != nullptr);
-#if !defined(OPENVDB_2_ABI_COMPATIBLE) && !defined(OPENVDB_3_ABI_COMPATIBLE)
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
     CPPUNIT_ASSERT(density->unallocatedLeafCount() > 0);
     CPPUNIT_ASSERT_EQUAL(density->leafCount(), density->unallocatedLeafCount());
 #endif
@@ -887,18 +867,11 @@ TestFile::testGridNaming()
 
             CPPUNIT_ASSERT(file.hasGrid(name));
 
-            // Partially read the current grid.
-            GridBase::ConstPtr grid = doReadGridPartial(file, name);
+            // Read the current grid.
+            GridBase::ConstPtr grid = file.readGrid(name);
             CPPUNIT_ASSERT(grid.get() != nullptr);
 
             // Verify that the grid is named "grid".
-            CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
-
-            CPPUNIT_ASSERT_EQUAL((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
-
-            // Fully read the current grid.
-            grid = file.readGrid(name);
-            CPPUNIT_ASSERT(grid.get() != nullptr);
             CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
             CPPUNIT_ASSERT_EQUAL((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
         }
@@ -1565,91 +1538,6 @@ TestFile::testReadGridMetadata()
 
 
 void
-TestFile::testReadGridPartial()
-{
-    using namespace openvdb;
-
-    using FloatGrid = openvdb::FloatGrid;
-    using IntGrid = openvdb::Int32Grid;
-    using FloatTree = FloatGrid::TreeType;
-    using IntTree = Int32Grid::TreeType;
-
-    // Create grids
-    IntGrid::Ptr grid = createGrid<IntGrid>(/*bg=*/1);
-    IntTree& tree = grid->tree();
-    grid->setName("density");
-
-    FloatGrid::Ptr grid2 = createGrid<FloatGrid>(/*bg=*/2.0);
-    FloatTree& tree2 = grid2->tree();
-    grid2->setName("temperature");
-
-    // Create transforms
-    math::Transform::Ptr trans = math::Transform::createLinearTransform(0.1);
-    math::Transform::Ptr trans2 = math::Transform::createLinearTransform(0.1);
-    grid->setTransform(trans);
-    grid2->setTransform(trans2);
-
-    // Set some values
-    tree.setValue(Coord(0, 0, 0), 5);
-    tree.setValue(Coord(100, 0, 0), 6);
-    tree2.setValue(Coord(0, 0, 0), 10);
-    tree2.setValue(Coord(0, 100, 0), 11);
-
-    MetaMap meta;
-    meta.insertMeta("author", StringMetadata("Einstein"));
-    meta.insertMeta("year", Int32Metadata(2009));
-
-    GridPtrVec grids;
-    grids.push_back(grid);
-    grids.push_back(grid2);
-
-    // Register grid and transform.
-    openvdb::initialize();
-
-    // Write the vdb out to a file.
-    io::File vdbfile("something.vdb2");
-    vdbfile.write(grids, meta);
-
-    io::File vdbfile2("something.vdb2");
-
-    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "density"), openvdb::IoError);
-
-    vdbfile2.open();
-
-    CPPUNIT_ASSERT(vdbfile2.isOpen());
-
-    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "noname"), openvdb::KeyError);
-
-    GridBase::ConstPtr density = doReadGridPartial(vdbfile2, "density");
-
-    CPPUNIT_ASSERT(density.get() != nullptr);
-
-    IntTree::ConstPtr typedDensity = gridConstPtrCast<IntGrid>(density)->treePtr();
-
-    CPPUNIT_ASSERT(typedDensity.get() != nullptr);
-
-    // the following should cause a compiler error.
-    // typedDensity->setValue(0, 0, 0, 0);
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
-
-    vdbfile2.close();
-
-    remove("something.vdb2");
-
-    // A partially-read grid should be copyable, although
-    // none of its leaf buffers are allocated.
-    const auto copyOfDensity = density->deepCopyGrid();
-    CPPUNIT_ASSERT(copyOfDensity.get() != nullptr);
-    CPPUNIT_ASSERT(!copyOfDensity->empty());
-    CPPUNIT_ASSERT_EQUAL(density->activeVoxelCount(), copyOfDensity->activeVoxelCount());
-}
-
-
-void
 TestFile::testReadGrid()
 {
     using namespace openvdb;
@@ -1699,13 +1587,9 @@ TestFile::testReadGrid()
 
     io::File vdbfile2("something.vdb2");
 
-    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "density"), openvdb::IoError);
-
     vdbfile2.open();
 
     CPPUNIT_ASSERT(vdbfile2.isOpen());
-
-    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "noname"), openvdb::KeyError);
 
     // Get Temperature
     GridBase::Ptr temperature = vdbfile2.readGrid("temperature");
@@ -1745,7 +1629,7 @@ TestFile::testReadGrid()
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 template<typename GridT>
 void
@@ -1858,7 +1742,7 @@ TestFile::testReadClippedGrid()
     }
 }
 
-#endif // !defined(OPENVDB_2_ABI_COMPATIBLE)
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
 
 ////////////////////////////////////////
@@ -1901,7 +1785,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
 
     MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
         : BaseLeaf(coords, value, active) {}
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     MultiPassLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value,
         bool active = false): BaseLeaf(openvdb::PartialCreate(), coords, value, active) {}
 #endif
@@ -2048,6 +1932,7 @@ TestFile::testMultiPassIO()
         CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
         CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
     }
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
     {
         // Verify that when using multi-pass and bbox clipping that each leaf node
         // is still being read before being clipped
@@ -2065,6 +1950,7 @@ TestFile::testMultiPassIO()
         ++leafIter;
         CPPUNIT_ASSERT(!leafIter); // second leaf node has now been clipped
     }
+#endif
 
     // Clear the pass data.
     writePasses.clear();

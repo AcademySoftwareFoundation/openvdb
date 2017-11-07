@@ -42,9 +42,16 @@ os: linux
 # Build with Clang only as GCC is slower and consumes more memory during compilation
 compiler: clang
 
+# Enable ccache for faster re-builds
+cache:
+  ccache: true
+  directories:
+    - $HOME/.ccache
+
 # Setup environment variables for different concurrent builds
 env:
-  # Build and run unit tests for ABI=3 and ABI=4
+  # Build and run unit tests for ABI={3,4,5}
+  - ABI=5 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
 
@@ -53,13 +60,16 @@ env:
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.5
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.0
 
-  # Build and run unit tests for ABI=3 and ABI=4 with Blosc disabled
+  # Build and run unit tests for ABI={3,4,5} with Blosc disabled
+  - ABI=5 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
   - ABI=4 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
   - ABI=3 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
 
-  # Build (but don't run) unit tests in debug mode for ABI=3 and ABI=4 with and without Blosc
+  # Build (but don't run) unit tests in debug mode for ABI={3,4,5} with and without Blosc
+  - ABI=5 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none
   - ABI=4 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none
   - ABI=3 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none
+  - ABI=5 BLOSC=no RELEASE=no HOUDINI_MAJOR=none
   - ABI=4 BLOSC=no RELEASE=no HOUDINI_MAJOR=none
   - ABI=3 BLOSC=no RELEASE=no HOUDINI_MAJOR=none
 

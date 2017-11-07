@@ -32,7 +32,7 @@
 //
 /// @author Ken Museth
 ///
-/// @file VolumeAdvect.h
+/// @file tools/VolumeAdvect.h
 ///
 /// @brief Sparse hyperbolic advection of volumes, e.g. a density or
 ///        velocity (vs a level set interface).
@@ -41,8 +41,6 @@
 #define OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
@@ -51,56 +49,57 @@
 #include "Morphology.h"//for dilateActiveValues and dilateVoxels
 #include "Prune.h"// for prune
 #include "Statistics.h" // for extrema
+#include <functional>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {      
+namespace tools {
 
-   
 namespace Scheme {
     /// @brief Numerical advections schemes.
     enum SemiLagrangian { SEMI, MID, RK3, RK4, MAC, BFECC };
     /// @brief Flux-limiters employed to stabalize the second-order
     /// advection schemes MacCormack and BFECC.
-    enum Limiter { NO_LIMITER, CLAMP, REVERT }; 
+    enum Limiter { NO_LIMITER, CLAMP, REVERT };
 }
-    
+
 /// @brief Performs advections of an arbitrary type of volume in a
 ///        static velocity field. The advections are performed by means
 ///        of various derivatives of Semi-Lagrangian integration, i.e.
 ///        backwards tracking along the hyperbolic characteristics
-///        followed by interpolation.     
+///        followed by interpolation.
 ///
 /// @note  Optionally a limiter can be combined with the higher-order
 ///        integration schemes MacCormack and BFECC. There are two
 ///        types of limiters (CLAMP and REVERT) that supress
 ///        non-physical oscillations by means of either claminging or
 ///        reverting to a first-order schemes when the function is not
-///        bounded by the cell values used for tri-linear interpolation. 
-///    
+///        bounded by the cell values used for tri-linear interpolation.
+///
 /// @verbatim The supported integrations schemes:
-///    
+///
 ///    ================================================================
 ///    |  Lable | Accuracy |  Integration Scheme   |  Interpolations  |
 ///    |        |Time/Space|                       |  velocity/volume |
-///    ================================================================    
-///    |  SEMI  |   1/1    | Semi-Lagrangian       |        1/1       | 
+///    ================================================================
+///    |  SEMI  |   1/1    | Semi-Lagrangian       |        1/1       |
 ///    |  MID   |   2/1    | Mid-Point             |        2/1       |
 ///    |  RK3   |   3/1    | 3rd Order Runge-Kutta |        3/1       |
 ///    |  RK4   |   4/1    | 4th Order Runge-Kutta |        4/1       |
 ///    |  MAC   |   2/2    | MacCormack            |        2/2       |
-///    |  BFECC |   2/2    | BFECC                 |        3/2       |           
+///    |  BFECC |   2/2    | BFECC                 |        3/2       |
 ///    ================================================================
 /// @endverbatim
-    
+
 template<typename VelocityGridT = Vec3fGrid,
          bool StaggeredVelocity = false,
          typename InterrupterType = util::NullInterrupter>
 class VolumeAdvection
 {
 public:
-    
+
     /// @brief Constructor
     ///
     /// @param velGrid     Velocity grid responsible for the (passive) advection.
@@ -108,7 +107,7 @@ public:
     ///
     /// @note The velocity field is assumed to be constant for the duration of the
     ///       advection.
-    VolumeAdvection(const VelocityGridT& velGrid, InterrupterType* interrupter = NULL)
+    VolumeAdvection(const VelocityGridT& velGrid, InterrupterType* interrupter = nullptr)
         : mVelGrid(velGrid)
         , mInterrupter(interrupter)
         , mIntegrator( Scheme::SEMI )
@@ -129,7 +128,7 @@ public:
     ///
     /// @note This is the optimal order in smooth regions. In
     /// non-smooth regions the flux-limiter will drop the order of
-    /// accuracy to add numerical dissipation. 
+    /// accuracy to add numerical dissipation.
     int spatialOrder() const { return (mIntegrator == Scheme::MAC ||
                                        mIntegrator == Scheme::BFECC) ? 2 : 1; }
 
@@ -166,7 +165,7 @@ public:
     /// the current settings.
     bool isLimiterOn() const { return this->spatialOrder()>1 &&
                                       mLimiter != Scheme::NO_LIMITER; }
-    
+
     /// @return the grain-size used for multi-threading
     /// @note A grainsize of 0 implies serial execution
     size_t getGrainSize() const { return mGrainSize; }
@@ -245,7 +244,7 @@ public:
             this->template cook<VolumeGridT, VolumeSamplerT>(*tmpGrid, *outGrid, dt);
             outGrid.swap( tmpGrid );
         }
-        
+
         return outGrid;
     }
 
@@ -318,7 +317,7 @@ private:
     void stop() const
     {
         if (mInterrupter) mInterrupter->end();
-    }      
+    }
     bool interrupt() const
     {
         if (mInterrupter && util::wasInterrupted(mInterrupter)) {
@@ -327,7 +326,7 @@ private:
         }
         return false;
     }
-    
+
     template<typename VolumeGridT, typename VolumeSamplerT>
     void cook(VolumeGridT& outGrid, const VolumeGridT& inGrid, double dt)
     {
@@ -361,7 +360,7 @@ private:
             Advect<VolumeGridT, 1, VolumeSamplerT> adv(inGrid, *this);
             adv.cook(outGrid, dt);
             break;
-        } 
+        }
         default:
             OPENVDB_THROW(ValueError, "Spatial difference scheme not supported!");
         }
@@ -380,22 +379,22 @@ private:
     size_t                 mGrainSize;
     int                    mSubSteps;
 };//end of VolumeAdvection class
-    
+
 // Private class that implements the multi-threaded advection
 template<typename VelocityGridT, bool StaggeredVelocity, typename InterrupterType>
 template<typename VolumeGridT, size_t OrderRK, typename SamplerT>
 struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advect
 {
-    typedef typename VolumeGridT::TreeType      TreeT;
-    typedef typename VolumeGridT::ConstAccessor AccT;
-    typedef typename TreeT::ValueType            ValueT;
-    typedef typename tree::LeafManager<TreeT>    LeafManagerT;
-    typedef typename LeafManagerT::LeafNodeType  LeafNodeT;
-    typedef typename LeafManagerT::LeafRange     LeafRangeT;
-    typedef VelocityIntegrator<VelocityGridT, StaggeredVelocity> VelocityIntegratorT;
-    typedef typename VelocityIntegratorT::ElementType RealT;
-    typedef typename TreeT::LeafNodeType::ValueOnIter VoxelIterT;
-    
+    using TreeT = typename VolumeGridT::TreeType;
+    using AccT = typename VolumeGridT::ConstAccessor;
+    using ValueT = typename TreeT::ValueType;
+    using LeafManagerT = typename tree::LeafManager<TreeT>;
+    using LeafNodeT = typename LeafManagerT::LeafNodeType;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
+    using VelocityIntegratorT = VelocityIntegrator<VelocityGridT, StaggeredVelocity>;
+    using RealT = typename VelocityIntegratorT::ElementType;
+    using VoxelIterT = typename TreeT::LeafNodeType::ValueOnIter;
+
     Advect(const VolumeGridT& inGrid, const VolumeAdvection& parent)
         : mTask(0)
         , mInGrid(&inGrid)
@@ -418,37 +417,39 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     }
     void cook(VolumeGridT& outGrid, double time_step)
     {
+        namespace ph = std::placeholders;
+
         mParent->start("Advecting volume");
         LeafManagerT manager(outGrid.tree(), mParent->spatialOrder()==2 ? 1 : 0);
         const LeafRangeT range = manager.leafRange(mParent->mGrainSize);
         const RealT dt = static_cast<RealT>(-time_step);//method of characteristics backtracks
         if (mParent->mIntegrator == Scheme::MAC) {
-            mTask = boost::bind(&Advect::rk,  _1, _2, dt, 0, mInGrid);//out[0]=forward 
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2, dt, 0, mInGrid);//out[0]=forward
             this->cook(range);
-            mTask = boost::bind(&Advect::rk,  _1, _2,-dt, 1, &outGrid);//out[1]=backward
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2,-dt, 1, &outGrid);//out[1]=backward
             this->cook(range);
-            mTask = boost::bind(&Advect::mac, _1, _2);//out[0] = out[0] + (in[0] - out[1])/2
+            mTask = std::bind(&Advect::mac, ph::_1, ph::_2);//out[0] = out[0] + (in[0] - out[1])/2
             this->cook(range);
         } else if (mParent->mIntegrator == Scheme::BFECC) {
-            mTask = boost::bind(&Advect::rk, _1, _2, dt, 0, mInGrid);//out[0]=forward
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2, dt, 0, mInGrid);//out[0]=forward
             this->cook(range);
-            mTask = boost::bind(&Advect::rk, _1, _2,-dt, 1, &outGrid);//out[1]=backward
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2,-dt, 1, &outGrid);//out[1]=backward
             this->cook(range);
-            mTask = boost::bind(&Advect::bfecc, _1, _2);//out[0] = (3*in[0] - out[1])/2
+            mTask = std::bind(&Advect::bfecc, ph::_1, ph::_2);//out[0] = (3*in[0] - out[1])/2
             this->cook(range);
-            mTask = boost::bind(&Advect::rk, _1, _2, dt, 1, &outGrid);//out[1]=forward
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2, dt, 1, &outGrid);//out[1]=forward
             this->cook(range);
             manager.swapLeafBuffer(1);// out[0] = out[1]
         } else {// SEMI, MID, RK3 and RK4
-            mTask = boost::bind(&Advect::rk, _1, _2,  dt, 0, mInGrid);//forward
+            mTask = std::bind(&Advect::rk, ph::_1, ph::_2,  dt, 0, mInGrid);//forward
             this->cook(range);
         }
 
         if (mParent->spatialOrder()==2) manager.removeAuxBuffers();
-        
-        mTask = boost::bind(&Advect::limiter, _1, _2, dt);// out[0] = limiter( out[0] ) 
+
+        mTask = std::bind(&Advect::limiter, ph::_1, ph::_2, dt);// out[0] = limiter( out[0] )
         this->cook(range);
-        
+
         mParent->stop();
     }
     // Last step of the MacCormack scheme: out[0] = out[0] + (in[0] - out[1])/2
@@ -461,7 +462,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
             ValueT* out0 = leafIter.buffer( 0 ).data();// forward
             const ValueT* out1 = leafIter.buffer( 1 ).data();// backward
             const LeafNodeT* leaf = acc.probeConstLeaf( leafIter->origin() );
-            if (leaf !=NULL) {
+            if (leaf != nullptr) {
                 const ValueT* in0 = leaf->buffer().data();
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
@@ -485,7 +486,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
             ValueT* out0 = leafIter.buffer( 0 ).data();// forward
             const ValueT* out1 = leafIter.buffer( 1 ).data();// backward
             const LeafNodeT* leaf = acc.probeConstLeaf(leafIter->origin());
-            if (leaf !=NULL) {
+            if (leaf != nullptr) {
                 const ValueT* in0 = leaf->buffer().data();
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
@@ -544,7 +545,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                         value = BoxSampler::trilinearInterpolation( data, iPos );
                     }
                 }
-                
+
                 if (math::isApproxEqual(value, backg, math::Delta<ValueT>::value())) {
                     value = backg;
                     leafIter->setValueOff( voxelIter.pos() );
@@ -553,13 +554,13 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         }//loop over leaf nodes
     }
     // Public member data of the private Advect class
-    
-    typename boost::function<void (Advect*, const LeafRangeT&)> mTask;
+
+    typename std::function<void (Advect*, const LeafRangeT&)> mTask;
     const VolumeGridT*        mInGrid;
     const VelocityIntegratorT mVelocityInt;// lightweight!
     const VolumeAdvection*    mParent;
-};// end of private member class Advect    
-    
+};// end of private member class Advect
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
