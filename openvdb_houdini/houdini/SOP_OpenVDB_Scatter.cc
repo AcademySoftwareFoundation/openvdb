@@ -336,6 +336,7 @@ struct BaseScatter
         , mSeed(seed)
         , mSpread(spread)
         , mInterrupter(interrupter) {}
+    virtual ~BaseScatter() {}
 
     /// @brief Print information about the scattered points
     /// @parm name  A name to insert into the printed info
