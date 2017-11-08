@@ -47,6 +47,7 @@
 #include <type_traits>
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #endif
 
 
