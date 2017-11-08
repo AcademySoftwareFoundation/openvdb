@@ -103,7 +103,10 @@ protected:
     /// @throw std::runtime_error if the pattern is nonempty but doesn't match any group.
     /// @todo This is a wrapper for SOP_Node::parsePrimitiveGroups(), so it needs access
     /// to a SOP_Node instance.  But it probably doesn't need to be a SOP_NodeVDB method.
+    ///@{
     const GA_PrimitiveGroup* matchGroup(GU_Detail&, const std::string& pattern);
+    const GA_PrimitiveGroup* matchGroup(const GU_Detail&, const std::string& pattern);
+    ///@}
 
     //@{
     /// @brief Evaluate a vector-valued parameter.

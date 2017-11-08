@@ -847,7 +847,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             evalString(groupStr, "referencevdb", 0, mTime);
 
             const GA_PrimitiveGroup *group =
-                matchGroup(const_cast<GU_Detail&>(*refGeo), groupStr.toStdString());
+                matchGroup(*refGeo, groupStr.toStdString());
 
             hvdb::VdbPrimCIterator it(refGeo, group);
             const hvdb::GU_PrimVDB* refPrim = *it;

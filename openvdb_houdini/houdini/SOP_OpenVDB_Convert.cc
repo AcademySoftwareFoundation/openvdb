@@ -1524,7 +1524,7 @@ SOP_OpenVDB_Convert::convertToPoly(
             evalString(maskStr, "adaptivityfieldname", 0, time);
 
             const GA_PrimitiveGroup *maskGroup =
-                matchGroup(const_cast<GU_Detail&>(*maskGeo), maskStr.toStdString());
+                matchGroup(*maskGeo, maskStr.toStdString());
 
             if (!maskGroup && maskStr.length() > 0) {
                 addWarning(SOP_MESSAGE, "Adaptivity field not found.");

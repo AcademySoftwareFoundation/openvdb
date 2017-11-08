@@ -344,7 +344,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
     evalString(groupStr, "group", 0, time);
 
     const GA_PrimitiveGroup* group =
-        matchGroup(const_cast<GU_Detail&>(*bGdp), groupStr.toStdString());
+        matchGroup(*bGdp, groupStr.toStdString());
 
     // scratch variables used in the loop
     GA_Defaults defaultFloat(0.0), defaultInt(0);

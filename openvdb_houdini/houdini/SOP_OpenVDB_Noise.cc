@@ -543,7 +543,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
             evalString(groupStr, "maskGroup", 0, time);
 
             const GA_PrimitiveGroup* maskGroup =
-                matchGroup(const_cast<GU_Detail&>(*refGdp), groupStr.toStdString());
+                matchGroup(*refGdp, groupStr.toStdString());
 
             hvdb::VdbPrimCIterator gridIter(refGdp, maskGroup);
 

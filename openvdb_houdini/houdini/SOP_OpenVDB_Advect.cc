@@ -584,7 +584,7 @@ SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parm
 
     evalString(str, "velGroup", 0, now);
     const GA_PrimitiveGroup *velGroup =
-        matchGroup(const_cast<GU_Detail&>(*velGeo), str.toStdString());
+        matchGroup(*velGeo, str.toStdString());
 
     hvdb::VdbPrimCIterator it(velGeo, velGroup);
     if (it) {

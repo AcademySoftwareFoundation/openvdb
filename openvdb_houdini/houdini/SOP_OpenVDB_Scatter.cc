@@ -604,7 +604,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         UT_String tmp;
         evalString(tmp, "group", 0, time);
         const GA_PrimitiveGroup* group
-            = this->matchGroup(const_cast<GU_Detail&>(*vdbgeo), tmp.toStdString());
+            = this->matchGroup(*vdbgeo, tmp.toStdString());
 
         evalString(tmp, "customname", 0, time);
         const std::string customName = tmp.toStdString();
