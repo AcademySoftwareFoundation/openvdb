@@ -294,8 +294,7 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
 
         // Process VDB primitives
 
-        const GA_PrimitiveGroup* group =
-            matchGroup(const_cast<GU_Detail&>(*inputGeoPt), groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*inputGeoPt, groupStr.toStdString());
 
         hvdb::VdbPrimCIterator vdbIt(inputGeoPt, group);
 

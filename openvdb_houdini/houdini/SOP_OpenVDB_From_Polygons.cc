@@ -779,7 +779,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
             UT_String groupStr;
             evalString(groupStr, "group", 0, time);
 
-            const GA_PrimitiveGroup *refGroup = matchGroup(const_cast<GU_Detail&>(*refGdp),
+            const GA_PrimitiveGroup *refGroup = matchGroup(*refGdp,
                 groupStr.toStdString());
 
             hvdb::VdbPrimCIterator gridIter(refGdp, refGroup);
