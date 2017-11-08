@@ -445,6 +445,7 @@ $(MANTRA_VRAY_OBJ_NAMES): $(LIBHOUDINI)
 
 houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
 houdini/VRAY_OpenVDB_Points.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniRAY
+endif
 
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
