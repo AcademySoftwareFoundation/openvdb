@@ -1003,7 +1003,7 @@ SOP_OpenVDB_Create::getReferenceVdb(OP_Context &context)
     UT_String refGroupStr;
     evalString(refGroupStr, "reference", 0, context.getTime());
     const GA_PrimitiveGroup* refGroup =
-        matchGroup(const_cast<GU_Detail&>(*refGdp), refGroupStr.toStdString());
+        matchGroup(*refGdp, refGroupStr.toStdString());
 
     hvdb::VdbPrimCIterator vdbIter(refGdp, refGroup);
     const GU_PrimVDB* refVdb = *vdbIter;

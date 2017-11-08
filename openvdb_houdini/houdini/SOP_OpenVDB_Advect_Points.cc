@@ -941,7 +941,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
 
         evalString(str, "velGroup", 0, now);
         const GA_PrimitiveGroup *velGroup =
-            matchGroup(const_cast<GU_Detail&>(*velGeo), str.toStdString());
+            matchGroup(*velGeo, str.toStdString());
 
         hvdb::VdbPrimCIterator it(velGeo, velGroup);
         parms.mVelPrim = *it;
@@ -988,7 +988,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
 
         evalString(str, "cptGroup", 0, now);
         const GA_PrimitiveGroup *cptGroup =
-            matchGroup(const_cast<GU_Detail&>(*cptGeo), str.toStdString());
+            matchGroup(*cptGeo, str.toStdString());
 
         hvdb::VdbPrimCIterator it(cptGeo, cptGroup);
         parms.mCptPrim = *it;

@@ -265,7 +265,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group =
-            matchGroup(const_cast<GU_Detail&>(*vdbGeo), groupStr.toStdString());
+            matchGroup(*vdbGeo, groupStr.toStdString());
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {

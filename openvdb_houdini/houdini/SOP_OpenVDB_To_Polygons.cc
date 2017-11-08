@@ -715,7 +715,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group =
-            matchGroup(const_cast<GU_Detail&>(*vdbGeo), groupStr.toStdString());
+            matchGroup(*vdbGeo, groupStr.toStdString());
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {
@@ -778,7 +778,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
                 evalString(maskStr, "adaptivityfieldname", 0, time);
 
                 const GA_PrimitiveGroup *maskGroup =
-                    matchGroup(const_cast<GU_Detail&>(*maskGeo), maskStr.toStdString());
+                    matchGroup(*maskGeo, maskStr.toStdString());
 
                 if (!maskGroup && maskStr.length() > 0) {
                     addWarning(SOP_MESSAGE, "Adaptivity field not found.");
@@ -934,7 +934,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     // Check for reference VDB
     {
         const GA_PrimitiveGroup *refGroup =
-            matchGroup(const_cast<GU_Detail&>(*refGeo), "");
+            matchGroup(*refGeo, "");
         hvdb::VdbPrimCIterator refIt(refGeo, refGroup);
         if (refIt) {
             const openvdb::GridClass refClass = refIt->getGrid().getGridClass();

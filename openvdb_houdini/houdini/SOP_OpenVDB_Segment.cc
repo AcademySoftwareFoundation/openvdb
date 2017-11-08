@@ -304,7 +304,7 @@ SOP_OpenVDB_Segment::cookMySop(OP_Context& context)
         {
             UT_String str;
             evalString(str, "group", 0, time);
-            group = matchGroup(const_cast<GU_Detail&>(*inputGeoPt), str.toStdString());
+            group = matchGroup(*inputGeoPt, str.toStdString());
         }
 
 
