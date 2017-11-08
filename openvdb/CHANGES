@@ -1,6 +1,12 @@
 OpenVDB Version History
 =======================
 
+Version 5.1.0 - In development
+
+    Houdini:
+    - Added output grid naming options to the Points Convert SOP.
+
+
 Version 5.0.0 - November 6, 2017
 
       Some changes in this release (see "ABI changes" below) alter

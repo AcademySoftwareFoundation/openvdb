@@ -220,6 +220,7 @@ MAYA_SRC_NAMES := \
 #
 MAYA_INCLUDE_NAMES := \
     maya/OpenVDBData.h \
+    maya/OpenVDBPlugin.h \
     maya/OpenVDBUtil.h \
 #
 

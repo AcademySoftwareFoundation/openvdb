@@ -96,6 +96,13 @@ public:
         MODE_COUNT_POINTS,
     };
 
+    enum OUTPUT_NAME_MODE
+    {
+        NAME_KEEP = 0,
+        NAME_APPEND,
+        NAME_REPLACE
+    };
+
     SOP_OpenVDB_Points_Convert(OP_Network*, const char* name, OP_Operator*);
     ~SOP_OpenVDB_Points_Convert() override = default;
 
@@ -104,11 +111,12 @@ public:
     int isRefInput(unsigned i ) const override { return (i == 1); }
 
 protected:
-
     OP_ERROR cookMySop(OP_Context&) override;
     bool updateParmsFlags() override;
 
 private:
+    OUTPUT_NAME_MODE getOutputNameMode(fpreal time = 0);
+
     hvdb::Interrupter mBoss;
 }; // class SOP_OpenVDB_Points_Convert
 
@@ -243,33 +251,31 @@ newSopOperator(OP_OperatorTable* table)
     //  point grid name
     parms.add(hutil::ParmFactory(PRM_STRING, "name", "VDB Name")
         .setDefault("points")
-        .setTooltip("The name of the VDB Points primitive to be created"));
+        .setTooltip("The name of the VDB Points primitive to be created")
+        .setDocumentation(nullptr));
 
     // VDB points grid name
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "outputname", "Output Name")
+        .setDefault("keep")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "keep",     "Keep Original Name",
             "append",   "Add Suffix",
             "replace",  "Custom Name",
-            nullptr
-        };
+        })
+        .setTooltip("Output VDB naming scheme")
+        .setDocumentation(
+            "Give the output VDB Points the same name as the input VDB,"
+            " or add a suffix to the input name, or use a custom name."));
 
-        parms.add(hutil::ParmFactory(PRM_ORD, "outputname", "Output Name")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Output VDB naming scheme")
-            .setDocumentation(
-                "Give the output VDB Points the same name as the input VDB,"
-                " or add a suffix to the input name, or use a custom name."));
+    parms.add(hutil::ParmFactory(PRM_STRING, "countname", "VDB Name")
+        .setDefault("count")
+        .setTooltip("The name of the VDB count primitive to be created")
+        .setDocumentation(nullptr));
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "countname", "VDB Name")
-            .setDefault("count")
-            .setTooltip("The name of the VDB count primitive to be created"));
-
-        parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "VDB Name")
-            .setDefault("mask")
-            .setTooltip("The name of the VDB mask primitive to be created"));
-    }
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "VDB Name")
+        .setDefault("mask")
+        .setTooltip("The name of the VDB mask primitive to be created")
+        .setDocumentation("The name of the VDB primitive to be created"));
 
     {   // Transform
         const char* items[] = {
@@ -544,7 +550,7 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= enableParm("outputname", toCount || toMask);
     changed |= setVisibleState("outputname", toCount || toMask);
 
-    const bool useCustomName = evalInt("outputname", 0, 0) != 0;
+    const bool useCustomName = (getOutputNameMode() != NAME_KEEP);
 
     changed |= enableParm("countname", useCustomName && toCount);
     changed |= setVisibleState("countname", toCount);
@@ -585,6 +591,20 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= setVisibleState("colorcompression", toVdbPoints && convertAll);
 
     return changed;
+}
+
+
+////////////////////////////////////////
+
+
+SOP_OpenVDB_Points_Convert::OUTPUT_NAME_MODE
+SOP_OpenVDB_Points_Convert::getOutputNameMode(fpreal time)
+{
+    UT_String str;
+    evalString(str, "outputname", 0, time);
+    if (str == "append") return NAME_APPEND;
+    if (str == "replace") return NAME_REPLACE;
+    return NAME_KEEP;
 }
 
 
@@ -709,7 +729,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         if (conversion == MODE_GENERATE_MASK || conversion == MODE_COUNT_POINTS) {
 
-            const int outputName = static_cast<int>(evalInt("outputname", 0, time));
+            const auto outputName = getOutputNameMode(time);
 
             // Process each VDB primitive independently
             for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
@@ -739,10 +759,11 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                     std::string customName = nameStr.toStdString();
 
                     std::string vdbName;
-                    if (outputName == 0)        vdbName = gridName;
-                    else if (outputName == 1)   vdbName = gridName + customName;
-                    else                        vdbName = customName;
-
+                    switch (outputName) {
+                        case NAME_KEEP:    vdbName = gridName; break;
+                        case NAME_APPEND:  vdbName = gridName + customName; break;
+                        case NAME_REPLACE: vdbName = customName; break;
+                    }
                     hvdb::createVdbPrimitive(*gdp, maskGrid, vdbName.c_str());
                 }
                 else {
@@ -761,10 +782,11 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                     std::string customName = nameStr.toStdString();
 
                     std::string vdbName;
-                    if (outputName == 0)        vdbName = gridName;
-                    else if (outputName == 1)   vdbName = gridName + customName;
-                    else                        vdbName = customName;
-
+                    switch (outputName) {
+                        case NAME_KEEP:    vdbName = gridName; break;
+                        case NAME_APPEND:  vdbName = gridName + customName; break;
+                        case NAME_REPLACE: vdbName = customName; break;
+                    }
                     hvdb::createVdbPrimitive(*gdp, countGrid, vdbName.c_str());
                 }
             }
