@@ -721,13 +721,13 @@ ALL_PRODUCTS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend doc install lib pdfdoc pydoc pytest python test viewerlib
+.PHONY: all clean depend doc install lib pdfdoc pydoc pytest python test viewerlib no_indirect_includes
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: lib python vdb_lod vdb_print vdb_render vdb_test depend
+all: lib python vdb_lod vdb_print vdb_render vdb_test depend no_indirect_includes
 
 $(OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
@@ -984,6 +984,12 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES) openvdb_viewer
 	fi
 
 depend: $(DEPEND)
+
+# Compile an implicit translation unit for each header to identify any indirect includes
+INDIRECT_INCLUDE_NAMES := $(addprefix indirect-,${INCLUDE_NAMES})
+${INDIRECT_INCLUDE_NAMES}: indirect-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(CXXFLAGS) -fPIC -o /dev/null -
+no_indirect_includes: ${INDIRECT_INCLUDE_NAMES}
 
 clean:
 	$(RM) $(OBJ_NAMES) $(ALL_PRODUCTS) $(DEPEND)
