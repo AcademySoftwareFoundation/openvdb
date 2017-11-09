@@ -481,8 +481,33 @@ GEO_PrimVDB::conditionMatrix(UT_Matrix4D &mat4)
     const double tol = 4.0 * openvdb::math::Tolerance<double>::value();
     const double min_diag = SYScbrt(tol);
     if (!SYSequalZero(mat4.determinant3(), tol))
+    {
+	// openvdb::math::simplify uses openvdb::math::isApproxEqual to detect
+	// uniform scaling, which has a more stringent tolerance than SYSisEqual.
+	// As a result we often have uniform voxel / axis aligned Volumes being
+	// converted to VDBs with Maps that are simplified to ScaleTranslate
+	// rather than UniformScaleTranslate.  The latter is more correct, plus
+	// some operations (e.g. LevelSetMorph) don't work with non-Uniform
+	// scales.  So we unify the diagonal if the diagonals are SYSisEqual,
+	// but not exactly equal.
+	if (SYSisEqual(mat4(0, 0), mat4(1, 1)) && 
+	    SYSisEqual(mat4(0, 0), mat4(2, 2)) &&
+	    !(mat4(0, 0) == mat4(1,1) && mat4(0, 0) == mat4(2,2)))
+	{
+	    // Unify to mat(0, 0) like openvdb::math::simplify.
+	    mat4(1, 1) = mat4(2, 2) = mat4(0, 0);
+	    return true;
+	}
+	if (SYSalmostEqual((float)mat4(0, 0), (float)mat4(1, 1)) && 
+	    SYSalmostEqual((float)mat4(0, 0), (float)mat4(2, 2)) &&
+	    !(mat4(0, 0) == mat4(1,1) && mat4(0, 0) == mat4(2,2)))
+	{
+	    // Unify to mat(0, 0) like openvdb::math::simplify.
+	    mat4(1, 1) = mat4(2, 2) = mat4(0, 0);
+	    return true;
+	}
 	return false;
-
+    }
     UT_MatrixSolverD solver;
     UT_Matrix3D mat3(mat4);
     const int N = 3;
