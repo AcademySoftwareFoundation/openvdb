@@ -203,7 +203,9 @@ public:
     Interrupter(const char* title = nullptr):
         mUTI(UTgetInterrupt()), mRunning(false)
     {
-        if (title) mUTI->setAppTitle(title);
+	// Do not set the app title as this will remain stuck to
+	// this for all further idalogs.
+        // if (title) mUTI->setAppTitle(title);
     }
     ~Interrupter() { if (mRunning) this->end(); }
 
