@@ -357,7 +357,7 @@ struct HoudiniReadAttribute
         , mAttribute(attribute)
         , mOffsets(offsets) { }
 
-    static void get(const GA_Attribute& attribute, T& value, const size_t offset,
+    static void get(const GA_Attribute& attribute, T& value, const GA_Offset offset,
         const openvdb::Index component)
     {
         const ReadHandleType handle(&attribute);
@@ -641,7 +641,7 @@ createTypedMetadataFromAttribute(const GA_Attribute* const attribute, const uint
     using HoudiniAttribute = HoudiniReadAttribute<ValueType>;
 
     ValueType value;
-    HoudiniAttribute::get(*attribute, value, /*offset*/0, component);
+    HoudiniAttribute::get(*attribute, value, GA_Offset(0), component);
     return openvdb::TypedMetadata<ValueType>(value).copy();
 }
 
@@ -900,7 +900,7 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
         GA_Offset start, end;
         GA_Range range(**it);
         for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
-            end = std::min(end, numPoints);
+            end = std::min(end, GA_Offset(numPoints));
             for (GA_Offset off = start; off < end; ++off) {
                 assert(off < numPoints);
                 inGroup[off] = short(1);
