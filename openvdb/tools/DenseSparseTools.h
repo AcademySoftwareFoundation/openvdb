@@ -846,7 +846,7 @@ public:
         // Parallelize within each tile.
 
         typename MaskTreeT::ValueOnCIter citer = maskTree.cbeginValueOn();
-        citer.setMaxDepth(MaskTree::ValueOnCIter::LEAF_DEPTH - 1);
+        citer.setMaxDepth(MaskTreeT::ValueOnCIter::LEAF_DEPTH - 1);
 
         if (!citer) return;
 

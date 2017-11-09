@@ -54,6 +54,7 @@
 
 #include <tbb/parallel_reduce.h>
 #include <openvdb/Platform.h>
+#include <openvdb/openvdb.h>
 #include "Interpolation.h" // for Sampler, etc.
 #include <openvdb/math/FiniteDifference.h>
 #include <boost/math/constants/constants.hpp>
