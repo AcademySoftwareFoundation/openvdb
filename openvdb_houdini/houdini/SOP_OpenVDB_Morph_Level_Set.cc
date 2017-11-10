@@ -466,8 +466,7 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
     }
 
     evalString(str, "targetGroup", 0, now);
-    const GA_PrimitiveGroup *targetGroup =
-        matchGroup(*targetGeo, str.toStdString());
+    const GA_PrimitiveGroup *targetGroup = matchGroup(*targetGeo, str.toStdString());
 
     hvdb::VdbPrimCIterator it(targetGeo, targetGroup);
     if (it) {
@@ -487,8 +486,7 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
 
     if (maskGeo) {
         evalString(str, "maskGroup", 0, now);
-        const GA_PrimitiveGroup *maskGroup =
-            matchGroup(*maskGeo, str.toStdString());
+        const GA_PrimitiveGroup *maskGroup = matchGroup(*maskGeo, str.toStdString());
 
         hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
         if (maskIt) {

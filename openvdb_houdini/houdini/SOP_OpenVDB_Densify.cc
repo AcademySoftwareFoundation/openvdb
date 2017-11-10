@@ -154,8 +154,7 @@ SOP_OpenVDB_Densify::cookMySop(OP_Context& context)
         // Get the group of grids to process.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group =
-            this->matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
 
         // Construct a functor to process grids of arbitrary type.
         const DensifyOp densifyOp;

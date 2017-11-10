@@ -1125,14 +1125,14 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
         const fpreal time = context.getTime();
         gdp->clearAndDestroy();
 
-        hvdb::Interrupter boss("Visualizer");
+        hvdb::Interrupter boss("Visualizing VDBs");
 
         const GU_Detail* refGdp = inputGeo(0);
-        if(refGdp == nullptr) return error();
+        if (refGdp == nullptr) return error();
 
         // Get the group of grids to visualize.
         const GA_PrimitiveGroup* group =
-            matchGroup(const_cast<GU_Detail&>(*refGdp), this->evalStdString("group", 0, time));
+            matchGroup(*refGdp, this->evalStdString("group", 0, time));
 
 
         // Evaluate the UI parameters.

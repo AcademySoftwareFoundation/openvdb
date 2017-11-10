@@ -1523,8 +1523,7 @@ SOP_OpenVDB_Convert::convertToPoly(
             UT_String maskStr;
             evalString(maskStr, "adaptivityfieldname", 0, time);
 
-            const GA_PrimitiveGroup *maskGroup =
-                matchGroup(*maskGeo, maskStr.toStdString());
+            const GA_PrimitiveGroup *maskGroup = matchGroup(*maskGeo, maskStr.toStdString());
 
             if (!maskGroup && maskStr.length() > 0) {
                 addWarning(SOP_MESSAGE, "Adaptivity field not found.");
@@ -1663,7 +1662,7 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, gdp);
 #endif
 
-        hvdb::Interrupter interrupter("Convert");
+        hvdb::Interrupter interrupter("Converting VDBs");
 
         switch (evalInt("conversion",  0, t))
         {

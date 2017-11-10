@@ -423,7 +423,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         duplicateSource(0, context);
 
-        hvdb::Interrupter boss("OpenVDB Ray");
+        hvdb::Interrupter boss("Computing VDB ray intersections");
 
         const GU_Detail* vdbGeo = inputGeo(1);
         if (vdbGeo == nullptr) return error();
@@ -431,8 +431,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         // Get the group of grids to surface.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group =
-            matchGroup(*vdbGeo, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*vdbGeo, groupStr.toStdString());
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {

@@ -256,7 +256,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         gdp->clearAndDestroy();
 
-        hvdb::Interrupter boss("OpenVDB to Spheres");
+        hvdb::Interrupter boss("Filling VDBs with spheres");
 
         const GU_Detail* vdbGeo = inputGeo(0);
         if (vdbGeo == nullptr) return error();
@@ -264,8 +264,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         // Get the group of grids to surface.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group =
-            matchGroup(*vdbGeo, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*vdbGeo, groupStr.toStdString());
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {

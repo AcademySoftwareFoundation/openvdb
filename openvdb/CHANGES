@@ -5,6 +5,9 @@ Version 5.1.0 - In development
 
     Houdini:
     - Added output grid naming options to the Points Convert SOP.
+    - Added a SOP_NodeVDB::matchGroup() overload that eliminates the need
+      to const_cast the GU_Detail.
+      [Contributed by Jeff Lait]
 
 
 Version 5.0.0 - November 6, 2017

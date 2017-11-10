@@ -623,8 +623,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup *group = conversion != MODE_CONVERT_TO_VDB ?
-            matchGroup(const_cast<GU_Detail&>(*gdp), groupStr.toStdString()) : nullptr;
+        const GA_PrimitiveGroup *group = (conversion != MODE_CONVERT_TO_VDB) ?
+            matchGroup(*gdp, groupStr.toStdString()) : nullptr;
 
         // Extract VDB Point groups to filter
 
@@ -713,8 +713,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             UT_String refvdbStr;
             evalString(refvdbStr, "refvdb", 0, time);
 
-            const GA_PrimitiveGroup *group =
-                matchGroup(const_cast<GU_Detail&>(*refGeo), refvdbStr.toStdString());
+            const GA_PrimitiveGroup *group = matchGroup(*refGeo, refvdbStr.toStdString());
 
             hvdb::VdbPrimCIterator it(refGeo, group);
             const hvdb::GU_PrimVDB* refPrim = *it;

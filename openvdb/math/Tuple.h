@@ -37,6 +37,7 @@
 #include "Math.h"
 #include <cmath>
 #include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -53,8 +54,8 @@ struct Conversion {};
 template<int SIZE, typename T>
 class Tuple {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
 
     static const int size = SIZE;
 
@@ -161,7 +162,7 @@ public:
     }
 
     /// True if a Nan is present in this tuple
-    bool isNan() const { 
+    bool isNan() const {
         for (int i = 0; i < SIZE; ++i) {
             if (std::isnan(mm[i])) return true;
         }
@@ -179,7 +180,7 @@ public:
     /// True if no Nan or Inf values are present
     bool isFinite() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (!std::isfinite((double)mm[i])) return false;
+            if (!math::isFinite(mm[i])) return false;
         }
         return true;
     }

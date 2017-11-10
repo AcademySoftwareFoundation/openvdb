@@ -224,7 +224,7 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
 const GA_PrimitiveGroup*
 SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
 {
-    const GA_PrimitiveGroup* group = NULL;
+    const GA_PrimitiveGroup* group = nullptr;
     if (!pattern.empty()) {
         // If a pattern was provided, try to match it.
 #if (UT_MAJOR_VERSION_INT >= 15)

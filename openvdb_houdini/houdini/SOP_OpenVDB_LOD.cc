@@ -298,7 +298,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
 
         std::vector<std::string> skipped;
 
-        hvdb::Interrupter boss("LOD");
+        hvdb::Interrupter boss("Creating VDB LoD pyramid");
 
         const auto lodMode = evalInt("lod", 0, 0);
         if (lodMode == 0) {

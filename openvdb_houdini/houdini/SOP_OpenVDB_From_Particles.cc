@@ -797,7 +797,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
 
-        hvdb::Interrupter boss("From Particles");
+        hvdb::Interrupter boss("Creating VDBs from particles");
 
 
         const GU_Detail* ptGeo = inputGeo(0, context);
@@ -846,8 +846,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             UT_String groupStr;
             evalString(groupStr, "referencevdb", 0, mTime);
 
-            const GA_PrimitiveGroup *group =
-                matchGroup(*refGeo, groupStr.toStdString());
+            const GA_PrimitiveGroup *group = matchGroup(*refGeo, groupStr.toStdString());
 
             hvdb::VdbPrimCIterator it(refGeo, group);
             const hvdb::GU_PrimVDB* refPrim = *it;

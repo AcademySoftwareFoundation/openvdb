@@ -200,7 +200,7 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
 
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("OpenVDB Platonic");
+        hvdb::Interrupter boss("Creating VDB platonic solid");
 
         // Read GUI parameters and generate narrow-band level set of sphere
         const float radius = static_cast<float>(evalFloat("scalarRadius", 0, time));

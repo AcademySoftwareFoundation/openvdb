@@ -214,8 +214,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
         // Get the group of grids to process.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group =
-            this->matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
 
         // Get other UI parameters.
         UT_String modeStr;

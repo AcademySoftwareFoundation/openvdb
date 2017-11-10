@@ -652,8 +652,7 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
         evalString(aGroupStr, "groupA", 0, getTime());
         evalString(bGroupStr, "groupB", 0, getTime());
 
-        const auto* bGroup = (!bGdp ?
-            nullptr : matchGroup(*bGdp, bGroupStr.toStdString()));
+        const auto* bGroup = (!bGdp ?  nullptr : matchGroup(*bGdp, bGroupStr.toStdString()));
 
         // In Flatten A Groups mode, treat space-separated subpatterns
         // as specifying distinct groups to be processed independently.

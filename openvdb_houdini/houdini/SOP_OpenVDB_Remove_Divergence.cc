@@ -984,16 +984,13 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
 
             if (interrupter.wasInterrupted()) break;
 
-            parms.velocityGrid = vdbIt->getGridPtr();
-            const UT_VDBType velocityType = UTvdbGetGridType(*parms.velocityGrid);
-
+            const UT_VDBType velocityType = vdbIt->getStorageType();
             if (velocityType == UT_VDB_VEC3F || velocityType == UT_VDB_VEC3D) {
                 // Found a vector-valued input grid.
                 ++numGridsProcessed;
 
-		parms.velocityGrid.reset();
-                vdbIt->makeGridUnique();
-		parms.velocityGrid = vdbIt->getGridPtr();
+                vdbIt->makeGridUnique(); // ensure that the grid's tree is not shared
+                parms.velocityGrid = vdbIt->getGridPtr();
 
                 const openvdb::math::Transform& xform = parms.velocityGrid->constTransform();
 
@@ -1031,6 +1028,7 @@ SOP_OpenVDB_Remove_Divergence::cookMySop(OP_Context& context)
                         << " with error " << parms.outputState.absoluteError;
                 }
             }
+            parms.velocityGrid.reset();
         }
 
         if (!interrupter.wasInterrupted()) {

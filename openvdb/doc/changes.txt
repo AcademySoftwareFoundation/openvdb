@@ -9,6 +9,9 @@
 @par
 Houdini:
 - Added output grid naming options to the Points&nbsp;Convert&nbsp;SOP.
+- Added a @b SOP_NodeVDB::matchGroup overload that eliminates the need
+  to @c const_cast the @b GU_Detail.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
 
 
 @htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly

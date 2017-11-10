@@ -604,13 +604,12 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         // Get the group of grids to process.
         UT_String tmp;
         evalString(tmp, "group", 0, time);
-        const GA_PrimitiveGroup* group
-            = this->matchGroup(*vdbgeo, tmp.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*vdbgeo, tmp.toStdString());
 
         evalString(tmp, "customname", 0, time);
         const std::string customName = tmp.toStdString();
 
-        hvdb::Interrupter boss("OpenVDB Scatter");
+        hvdb::Interrupter boss("Scattering points on VDBs");
 
         // Choose a fast random generator with a long period. Drawback here for
         // mt11213b is that it requires 352*sizeof(uint32) bytes.

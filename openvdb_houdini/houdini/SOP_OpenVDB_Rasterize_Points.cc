@@ -3448,7 +3448,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         if (exportPointMask || createDensity || !scalarAttribNames.empty()
             || !vectorAttribNames.empty())
         {
-            hvdb::Interrupter boss("Rasterize Points");
+            hvdb::Interrupter boss("Rasterizing points");
 
             // Set rasterization settings
 
