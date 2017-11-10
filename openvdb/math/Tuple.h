@@ -179,7 +179,7 @@ public:
     /// True if no Nan or Inf values are present
     bool isFinite() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (!std::isfinite(mm[i])) return false;
+            if (!std::isfinite((double)mm[i])) return false;
         }
         return true;
     }

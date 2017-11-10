@@ -344,7 +344,7 @@ template<> inline bool isNegative<bool>(const bool&) { return false; }
 /// Return @c true if @a x is finite.
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
-isFinite(const Type& x) { return std::isfinite(x); }
+isFinite(const Type& x) { return std::isfinite((double)x); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
