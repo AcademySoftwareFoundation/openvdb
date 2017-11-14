@@ -625,6 +625,8 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         std::vector<openvdb::points::PointDataGrid::Ptr> pointGrids;
         PointAccessor pointAccessor(gdp);
 
+        const GA_Offset firstOffset = gdp->getNumPointOffsets();
+
         // Process each VDB primitive (with a non-null grid pointer)
         // that belongs to the selected group.
         for (hvdb::VdbPrimCIterator primIter(vdbgeo, group); primIter; ++primIter) {
@@ -766,8 +768,10 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             evalString(scatterStr, "sgroup", 0, time);
             GA_PointGroup* ptgroup = gdp->newPointGroup(scatterStr);
 
-            // add ALL the points to this group
-            ptgroup->addRange(gdp->getPointRange());
+            // add the scattered points to this group
+
+            const GA_Offset lastOffset = gdp->getNumPointOffsets();
+            ptgroup->addRange(GA_Range(gdp->getPointMap(), firstOffset, lastOffset));
 
             const std::string groupName(scatterStr.toStdString());
             for (auto& pointGrid : pointGrids) {
