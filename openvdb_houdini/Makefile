@@ -240,6 +240,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/ParmFactory.h \
     houdini/PointUtils.h \
     houdini/SOP_NodeVDB.h \
+    houdini/SOP_VDBVerbUtils.h \
     houdini/UT_VDBTools.h \
     houdini/UT_VDBUtils.h \
     houdini/Utils.h \

@@ -46,13 +46,17 @@
 #include <OP/OP_NodeInfoParms.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_Type.h>
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#if UT_MAJOR_VERSION_INT >= 13
 #include <SOP/SOP_Cache.h> // for stealable
 #endif
 #include <UT/UT_InfoTree.h>
 #include <tbb/mutex.h>
+#include <algorithm>
+#include <iostream>
+#include <map>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 
 
 namespace openvdb_houdini {
@@ -328,12 +332,16 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 #endif
 }
 
+
+////////////////////////////////////////
+
+
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
 {
 
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#if UT_MAJOR_VERSION_INT >= 13
 
     // traverse upstream nodes, if unload is not possible, duplicate the source
     if (!isSourceStealable(index, context)) {
@@ -390,7 +398,7 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
 bool
 SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#if UT_MAJOR_VERSION_INT >= 13
     struct Local {
         static inline OP_Node* nextStealableInput(
             const unsigned idx, const fpreal now, const OP_Node* node)
@@ -427,7 +435,7 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#if UT_MAJOR_VERSION_INT >= 13
     return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
 #else
     duplicateSource(index, context, gdp, true);
@@ -436,6 +444,21 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
     return error();
 #endif
 }
+
+
+////////////////////////////////////////
+
+
+#if UT_MAJOR_VERSION_INT >= 16
+const SOP_NodeVerb*
+SOP_NodeVDB::cookVerb() const
+{
+    if (const auto* verb = SOP_NodeVerb::lookupVerb(getOperator()->getName())) {
+        return verb; ///< @todo consider caching this
+    }
+    return SOP_Node::cookVerb();
+}
+#endif
 
 
 ////////////////////////////////////////
@@ -548,6 +571,15 @@ SOP_NodeVDB::evalVec2i(const char *name, fpreal time) const
     using ValueT = openvdb::Vec2i::value_type;
     return openvdb::Vec2i(static_cast<ValueT>(evalInt(name, 0, time)),
                           static_cast<ValueT>(evalInt(name, 1, time)));
+}
+
+
+std::string
+SOP_NodeVDB::evalStdString(const char* name, fpreal time, int index) const
+{
+    UT_String str;
+    evalString(str, name, index, time);
+    return str.toStdString();
 }
 
 

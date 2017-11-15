@@ -5,8 +5,20 @@ Version 5.1.0 - In development
 
     Houdini:
     - Added output grid naming options to the Points Convert SOP.
+    - Added a SOP_NodeVDB::evalStdString() method that facilitates
+      string parameter evaluation in expressions, e.g.,
+      matchGroup(*gdp, evalStdString("group", time)).
     - Added a SOP_NodeVDB::matchGroup() overload that eliminates the need
       to const_cast the GU_Detail.
+      [Contributed by Jeff Lait]
+    - Grid transforms are now more aggressively simplified, making it
+      less likely to produce nonuniform voxels erroneously.
+      [Contributed by Jeff Lait]
+    - Added a houdini_utils::OpFactory::setVerb() method to register
+      compilable SOPs.
+    - Added SOP_VDBCacheOptions, a convenience base class for compilable SOPs.
+      [Contributed by Jeff Lait]
+    - The Advect SOP is now a compilable SOP.
       [Contributed by Jeff Lait]
 
 

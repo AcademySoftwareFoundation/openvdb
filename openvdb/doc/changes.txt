@@ -9,8 +9,22 @@
 @par
 Houdini:
 - Added output grid naming options to the Points&nbsp;Convert&nbsp;SOP.
+- Added a @b SOP_NodeVDB::evalStdString method that facilitates
+  string parameter evaluation in expressions, e.g.,
+  <TT>matchGroup(*gdp,&nbsp;evalStdString("group",&nbsp;time))</TT>.
 - Added a @b SOP_NodeVDB::matchGroup overload that eliminates the need
   to @c const_cast the @b GU_Detail.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Grid transforms are now more aggressively simplified, making it less likely
+  to produce nonuniform voxels erroneously.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Added a @b houdini_utils::OpFactory::setVerb method to register
+  <A HREF="http://www.sidefx.com/docs/houdini/model/compile">
+  compilable</A>&nbsp;SOPs.
+- Added @b SOP_VDBCacheOptions, a convenience base class for
+  compilable&nbsp;SOPs.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- The Advect SOP is now a compilable SOP.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
 
 
