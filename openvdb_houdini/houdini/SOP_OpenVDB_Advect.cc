@@ -55,6 +55,16 @@
 #include <string>
 #include <vector>
 
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+#define SESI_VERBIFY	1
+#endif
+
+#if SESI_VERBIFY
+#include <SOP/SOP_NodeParmsOptions.h>
+#include "SOP_VDBVerbUtils.h"
+using namespace UT::Literal;
+#endif
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -154,6 +164,9 @@ private:
 class SOP_OpenVDB_Advect: public hvdb::SOP_NodeVDB
 {
 public:
+#if SESI_VERBIFY
+    const SOP_NodeVerb	*cookVerb() const;
+#endif
     SOP_OpenVDB_Advect(OP_Network*, const char* name, OP_Operator*);
     ~SOP_OpenVDB_Advect() override {}
 
@@ -166,6 +179,22 @@ protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 
+#if SESI_VERBIFY
+};
+
+class SOP_OpenVDB_AdvectCache : public SOP_VDBCacheOptions
+{
+public:
+	    SOP_OpenVDB_AdvectCache() 
+		{}
+    virtual ~SOP_OpenVDB_AdvectCache() {}
+
+protected:
+    virtual OP_ERROR	cookMySop(OP_Context &context);
+#else
+    // All one class in this case.
+#endif
+
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
     template <typename VelocityGridT, bool StaggeredVelocity>
@@ -175,6 +204,8 @@ protected:
 ////////////////////////////////////////
 
 // Build UI and register this operator
+
+static PRM_Template	*theParmTemplates = 0;
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -413,6 +444,8 @@ the advected field from the previous frame, do one of the following:\n\
 \n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
+
+    theParmTemplates = parms.get();
 }
 
 
@@ -490,13 +523,28 @@ SOP_OpenVDB_Advect::updateParmsFlags()
 ////////////////////////////////////////
 
 
+#if SESI_VERBIFY
+
+DEFINE_VERB_IMPLEMENTATION(SOP_OpenVDB_Advect, hdk_vdbadvectsdf, COOK_INPLACE);
+
+#define SOP_CLASS SOP_OpenVDB_AdvectCache
+
+#else
+
+#define SOP_CLASS SOP_OpenVDB_Advect
+
+#endif
+
 OP_ERROR
-SOP_OpenVDB_Advect::cookMySop(OP_Context& context)
+SOP_CLASS::cookMySop(OP_Context& context)
 {
     try {
+#if SESI_VERBIFY
+#else
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
         duplicateSourceStealable(0, context);
+#endif
 
         // Evaluate UI parameters
         AdvectionParms parms;
@@ -525,7 +573,7 @@ SOP_OpenVDB_Advect::cookMySop(OP_Context& context)
 
 
 OP_ERROR
-SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parms)
+SOP_CLASS::evalAdvectionParms(OP_Context& context, AdvectionParms& parms)
 {
     fpreal now = context.getTime();
     UT_String str;
@@ -649,7 +697,7 @@ SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parm
 
 template <typename VelocityGridT, bool StaggeredVelocity>
 bool
-SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
+SOP_CLASS::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
 {
     using VolumeAdvection =
         openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity, hvdb::Interrupter>;
