@@ -398,7 +398,7 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
         // if the SOP is a cache SOP we don't want to try and alter its data without a deep copy
         if (dynamic_cast<SOP_Cache*>(node))  return false;
 
-        if (node->getUnload())
+        if (node->getUnload() != 0)
 	    return true;
         else
 	    return false;
