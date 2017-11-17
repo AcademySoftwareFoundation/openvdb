@@ -109,8 +109,8 @@ TestMath::testAll()
         CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3i>(), Vec3i(0,0,0));
         CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3s>(), Vec3s(0,0,0));
         CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3d>(), Vec3d(0,0,0));
-        CPPUNIT_ASSERT_EQUAL(zeroVal<Quatd>(), Quats::zero());
-        CPPUNIT_ASSERT_EQUAL(zeroVal<Quats>(), Quatd::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quats>(), Quats::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quatd>(), Quatd::zero());
         CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3s>(), Mat3s::identity());
         CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3d>(), Mat3d::identity());
         CPPUNIT_ASSERT_EQUAL(zeroVal<Mat4s>(), Mat4s::identity());
