@@ -277,10 +277,10 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("The name of the VDB mask primitive to be created")
         .setDocumentation("The name of the VDB primitive to be created"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keepnonvdbgeo", "Keep Non-VDB Geometry")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Original Geometry")
         .setDefault(PRMoneDefaults)
-        .setTooltip("Enable to keep non-VDB geometry")
-        .setDocumentation("Enable to keep non-VDB geometry"));
+        .setTooltip("The incoming geometry will not be deleted if this is set.")
+        .setDocumentation("The incoming geometry will not be deleted if this is set."));
 
     {   // Transform
         const char* items[] = {
@@ -563,8 +563,8 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= enableParm("maskname", useCustomName && toMask);
     changed |= setVisibleState("maskname", toMask);
 
-    changed |= enableParm("keepnonvdbgeo", !toVdbPoints);
-    changed |= setVisibleState("keepnonvdbgeo", !toVdbPoints);
+    changed |= enableParm("keep", !toVdbPoints);
+    changed |= setVisibleState("keep", !toVdbPoints);
 
     const int refexists = (this->nInputs() == 2);
 
@@ -628,7 +628,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         const fpreal time = context.getTime();
 
         const int conversion = static_cast<int>(evalInt("conversion", 0, time));
-        const bool keepNonVDBGeo = evalInt("keepnonvdbgeo", 0, time) == 1;
+        const bool keepOriginalGeo = evalInt("keep", 0, time) == 1;
 
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
@@ -679,7 +679,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             UT_Array<GEO_Primitive*> primsToDelete;
             primsToDelete.clear();
 
-            if (keepNonVDBGeo) {
+            if (keepOriginalGeo) {
                 // Duplicate primary (left) input geometry
 
                 if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
@@ -704,7 +704,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             std::vector<PointDataGrid::ConstPtr> pointGrids;
             std::vector<std::string> pointNames;
 
-            const GU_Detail* sourceGdp = keepNonVDBGeo ? gdp : inputGeo(0, context);
+            const GU_Detail* sourceGdp = keepOriginalGeo ? gdp : inputGeo(0, context);
 
             for (hvdb::VdbPrimCIterator vdbIt(sourceGdp, group); vdbIt; ++vdbIt) {
                 openvdb::GridBase::ConstPtr gridBase = vdbIt->getConstGridPtr();
@@ -721,7 +721,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 }
             }
 
-            if (keepNonVDBGeo) {
+            if (keepOriginalGeo) {
                 gdp->deletePrimitives(primsToDelete, true);
             }
 
