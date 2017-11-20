@@ -43,7 +43,7 @@
 #
 # Author: Dan Bailey
 
-set -x
+set -ex
 
 TASK="$1"
 ABI="$2"
