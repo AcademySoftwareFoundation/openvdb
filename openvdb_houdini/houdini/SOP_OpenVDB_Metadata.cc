@@ -36,9 +36,16 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -52,9 +59,15 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
 protected:
     bool updateParmsFlags() override;
-    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
@@ -151,6 +164,9 @@ Other:\n\
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
         .addInput("Input with VDBs")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Metadata::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -210,15 +226,17 @@ SOP_OpenVDB_Metadata::SOP_OpenVDB_Metadata(OP_Network* net,
 
 
 OP_ERROR
-SOP_OpenVDB_Metadata::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Metadata)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-
-        const fpreal time = context.getTime();
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         // Get UI parameter values.
         const bool
@@ -230,22 +248,14 @@ SOP_OpenVDB_Metadata::cookMySop(OP_Context& context)
             setworld = evalInt("setworld", 0, time),
             world = evalInt("world", 0, time);
 
-        UT_String s;
-        evalString(s, "creator", 0, time);
-        const std::string creator = s.toStdString();
-
-        evalString(s, "class", 0, time);
+        const std::string creator = evalStdString("creator", time);
         const openvdb::GridClass gridclass =
-            openvdb::GridBase::stringToGridClass(s.toStdString());
-
-        evalString(s, "vectype", 0, time);
+            openvdb::GridBase::stringToGridClass(evalStdString("class", time));
         const openvdb::VecType vectype =
-            openvdb::GridBase::stringToVecType(s.toStdString());
+            openvdb::GridBase::stringToVecType(evalStdString("vectype", time));
 
         // Get the group of grids to be modified.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         UT_AutoInterrupt progress("Set VDB grid metadata");
 

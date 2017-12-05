@@ -43,6 +43,7 @@
 #include <UT/UT_DSOVersion.h>
 #endif
 #include <UT/UT_Version.h>
+#include "SOP_VDBVerbUtils.h"
 #include <iosfwd>
 #include <string>
 
@@ -101,10 +102,6 @@ public:
     const SOP_NodeVerb* cookVerb() const override;
 #endif
 
-protected:
-    OP_ERROR cookMyGuide1(OP_Context&) override;
-    //OP_ERROR cookMyGuide2(OP_Context&) override;
-
     /// @brief Retrieve a group from a geometry detail by parsing a pattern
     /// (typically, the value of a Group parameter belonging to this node).
     /// @throw std::runtime_error if the pattern is nonempty but doesn't match any group.
@@ -137,14 +134,27 @@ protected:
     /// @endcode
     std::string evalStdString(const char* name, fpreal time, int index = 0) const;
 
+    /// @}
+
+protected:
+    /// @{
+    /// @brief To facilitate compilable SOPs, cookMySop() is now final.
+    /// Instead, either override SOP_NodeVDB::cookVDBSop() (for a non-compilable SOP)
+    /// or override SOP_VDBCacheOptions::cookVDBSop() (for a compilable SOP).
+    OP_ERROR cookMySop(OP_Context&) override final;
+
+    virtual OP_ERROR cookVDBSop(OP_Context&) { return UT_ERROR_NONE; }
+    /// @}
+
+    OP_ERROR cookMyGuide1(OP_Context&) override;
+    //OP_ERROR cookMyGuide2(OP_Context&) override;
+
     /// @brief Transfer the value of an obsolete parameter that was renamed
     /// to the parameter with the new name.
     /// @details This convenience method is intended to be called from
     /// @c resolveObsoleteParms(), when that function is implemented.
     void resolveRenamedParm(PRM_ParmList& obsoleteParms,
         const char* oldName, const char* newName);
-
-    /// @}
 
     /// @name Input stealing
     /// @{

@@ -47,12 +47,32 @@
 #include <UT/UT_Interrupt.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/scoped_array.hpp>
+#ifdef SESI_OPENVDB
+  #include <hboost/mpl/at.hpp>
+  namespace boostmpl = hboost::mpl;
+#else
+  #include <boost/mpl/at.hpp>
+  namespace boostmpl = boost::mpl;
+#endif
 
+#include <memory>
 #include <string>
 #include <sstream>
 #include <type_traits>
 #include <vector>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+  #include <UT/UT_UniquePtr.h>
+#else
+  template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -220,7 +240,7 @@ struct Visitor
     using LeafNodeType = typename TreeType::LeafNodeType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
+    using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
 
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     using BoolTreePtr = typename BoolTreeType::Ptr;
@@ -483,7 +503,7 @@ struct GetPoints
 template<typename BoolTreeType>
 inline size_t
 getPoints(const openvdb::math::Transform& xform, const BoolTreeType& mask,
-    boost::scoped_array<UT_Vector3>& points)
+    UT_UniquePtr<UT_Vector3[]>& points)
 {
     using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
@@ -494,7 +514,7 @@ getPoints(const openvdb::math::Transform& xform, const BoolTreeType& mask,
     size_t voxelCount = 0, totalCount = tileCount;
 
     if (!nodes.empty()) {
-        boost::scoped_array<size_t> offsetTable(new size_t[nodes.size()]);
+        UT_UniquePtr<size_t[]> offsetTable(new size_t[nodes.size()]);
 
         for (size_t n = 0, N = nodes.size(); n < N; ++n) {
             offsetTable[n] = voxelCount;
@@ -533,17 +553,11 @@ getPoints(const openvdb::math::Transform& xform, const BoolTreeType& mask,
 
 
 inline GA_Offset
-transferPoints(GU_Detail& detail, const boost::scoped_array<UT_Vector3>& points, size_t pointCount)
+transferPoints(GU_Detail& detail, const UT_UniquePtr<UT_Vector3[]>& points, size_t pointCount)
 {
     const GA_Offset startOffset = detail.getNumPointOffsets();
 
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-    for (size_t n = 0, N = pointCount; n < N; ++n) {
-        detail.appendPointOffset();
-    }
-#else
-     detail.appendPointBlock(pointCount);
-#endif
+    detail.appendPointBlock(pointCount);
 
     GA_Offset offset = startOffset;
     for (size_t n = 0, N = pointCount; n < N; ++n) {
@@ -597,7 +611,7 @@ template<typename TreeType>
 inline size_t
 getValues(const TreeType& tree,
     const typename TreeType::template ValueConverter<bool>::Type& mask,
-    boost::scoped_array<typename TreeType::ValueType>& values)
+    UT_UniquePtr<typename TreeType::ValueType[]>& values)
 {
     using ValueType = typename TreeType::ValueType;
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
@@ -611,7 +625,7 @@ getValues(const TreeType& tree,
 
     if (!nodes.empty()) {
 
-        boost::scoped_array<size_t> offsetTable(new size_t[nodes.size()]);
+        UT_UniquePtr<size_t[]> offsetTable(new size_t[nodes.size()]);
 
         for (size_t n = 0, N = nodes.size(); n < N; ++n) {
             offsetTable[n] = voxelCount;
@@ -647,7 +661,7 @@ getValues(const TreeType& tree,
 template<typename ValueType>
 inline void
 transferValues(GU_Detail& detail, const std::string& name, GA_Offset startOffset,
-    const boost::scoped_array<ValueType>& values, size_t pointCount)
+    const UT_UniquePtr<ValueType[]>& values, size_t pointCount)
 {
     GA_RWAttributeRef attr = detail.addFloatTuple(
         GA_ATTRIB_POINT, (name + "_scalar").c_str(), 1, GA_Defaults(0));
@@ -661,7 +675,7 @@ transferValues(GU_Detail& detail, const std::string& name, GA_Offset startOffset
 template<typename ValueType>
 inline void
 transferValues(GU_Detail& detail, const std::string& name, GA_Offset startOffset,
-    const boost::scoped_array<openvdb::math::Vec3<ValueType> >& values, size_t pointCount)
+    const UT_UniquePtr<openvdb::math::Vec3<ValueType>[]>& values, size_t pointCount)
 {
     GA_RWAttributeRef attr = detail.addFloatTuple(
         GA_ATTRIB_POINT, (name + "_vector").c_str(), 3, GA_Defaults(0));
@@ -995,7 +1009,7 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
 
             if (interupter.wasInterrupted()) return;
 
-            boost::scoped_array<UT_Vector3> points;
+            UT_UniquePtr<UT_Vector3[]> points;
             const size_t totalPointCount = getPoints(grid.transform(), mask, points);
 
             if (interupter.wasInterrupted()) return;
@@ -1004,7 +1018,7 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
                 const GA_Offset startOffset = transferPoints(detail, points, totalPointCount);
                 points.reset(); // clear
 
-                boost::scoped_array<ValueType> values;
+                UT_UniquePtr<ValueType[]> values;
                 getValues(tree, mask, values);
 
                 if (interupter.wasInterrupted()) return;
@@ -1373,11 +1387,22 @@ public:
     int selectOperationTests();
     int validateOperationTests();
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+        OP_ERROR cookVDBSop(OP_Context&) override;
+        TestData getTestData(const fpreal time) const;
+    };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
-    bool updateParmsFlags() override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     TestData getTestData(const fpreal time) const;
+#endif
+
+protected:
+    bool updateParmsFlags() override;
 };
+
 
 int
 SOP_OpenVDB_Diagnostics::selectOperationTests()
@@ -1817,6 +1842,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
         .addInput("VDB Volumes")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1907,8 +1935,9 @@ SOP_OpenVDB_Diagnostics::updateParmsFlags()
     return changed;
 }
 
+
 TestData
-SOP_OpenVDB_Diagnostics::getTestData(const fpreal time) const
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::getTestData(const fpreal time) const
 {
     TestData test;
 
@@ -1968,20 +1997,21 @@ SOP_OpenVDB_Diagnostics::getTestData(const fpreal time) const
 
 
 OP_ERROR
-SOP_OpenVDB_Diagnostics::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Performing diagnostics");
 
         TestCollection tests(getTestData(time), *gdp, boss, UTgetErrorManager());
 
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         size_t vdbPrimCount = 0;
 
@@ -1992,11 +2022,7 @@ SOP_OpenVDB_Diagnostics::cookMySop(OP_Context& context)
             tests.setPrimitiveName(it.getPrimitiveName().toStdString());
             tests.setPrimitiveIndex(int(it.getIndex()));
 
-#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
-            GEOvdbProcessTypedGrid(**it, tests, /*makeUnique=*/false);
-#else
             GEOvdbProcessTypedGridTopology(**it, tests, /*makeUnique=*/false);
-#endif
 
             if (tests.replacementGrid()) {
                 hvdb::replaceVdbPrimitive(*gdp, tests.replacementGrid(), **it, true,

@@ -42,7 +42,6 @@
 
 #include <GU/GU_Detail.h>
 #include <UT/UT_Version.h>
-#include <boost/shared_ptr.hpp>
 
 #include <algorithm> // for std::max/min()
 #include <memory>
@@ -97,16 +96,6 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail&, const GA_PrimitiveGroup&);
 
 
 ////////////////////////////////////////
-
-
-/// @brief Convert geometry to quads and triangles.
-/// @return a pointer to a new GU_Detail object if the geometry was
-/// converted or subdivided, otherwise a null pointer
-/// @deprecated Use convertGeometry() instead.
-OPENVDB_HOUDINI_API
-OPENVDB_DEPRECATED
-boost::shared_ptr<GU_Detail>
-validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter*);
 
 
 /// @brief Convert geometry to quads and triangles.

@@ -44,17 +44,37 @@
 #include <openvdb/tools/GridTransformer.h>
 
 #include <UT/UT_Interrupt.h>
-#if (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
+#include <UT/UT_Version.h>
 #include <GEO/GEO_PrimVDB.h> // for GEOvdbProcessTypedGridScalar(), etc.
-#endif
 
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 namespace cvdb = openvdb;
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+
+namespace {
+
+enum OpId {
+    OP_GRADIENT   = 0,
+    OP_CURVATURE  = 1,
+    OP_LAPLACIAN  = 2,
+    OP_CPT        = 3,
+    OP_DIVERGENCE = 4,
+    OP_CURL       = 5,
+    OP_MAGNITUDE  = 6,
+    OP_NORMALIZE  = 7
+};
+
+}
 
 
 class SOP_OpenVDB_Analysis: public hvdb::SOP_NodeVDB
@@ -69,20 +89,16 @@ public:
 
     static const char* sOpName[];
 
-    enum OpId {
-        OP_GRADIENT   = 0,
-        OP_CURVATURE  = 1,
-        OP_LAPLACIAN  = 2,
-        OP_CPT        = 3,
-        OP_DIVERGENCE = 4,
-        OP_CURL       = 5,
-        OP_MAGNITUDE  = 6,
-        OP_NORMALIZE  = 7
-    };
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
     bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -119,8 +135,9 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of VDBs to analyze (see [specifying volumes|/model/volumes#group])"));
 
     // Operator
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "operator", "Operator")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "gradient",     "Gradient       (Scalar->Vector)",
             "curvature",    "Curvature     (Scalar->Scalar)",
             "laplacian",    "Laplacian      (Scalar->Scalar)",
@@ -128,13 +145,9 @@ newSopOperator(OP_OperatorTable* table)
             "divergence",   "Divergence    (Vector->Scalar)",
             "curl",         "Curl             (Vector->Vector)",
             "length",       "Length         (Vector->Scalar)",
-            "normalize",    "Normalize     (Vector->Vector)",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "operator", "Operator")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDocumentation("\
+            "normalize",    "Normalize     (Vector->Vector)"
+        })
+        .setDocumentation("\
 What to compute\n\
 \n\
 The labels on the items in the menu indicate what datatype\n\
@@ -168,7 +181,6 @@ Magnitude (vector -> scalar):\n\
 \n\
 Normalize (vector -> vector):\n\
     The vectors in a vector field divided by their lengths\n"));
-    }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -180,24 +192,21 @@ Normalize (vector -> vector):\n\
             " [active|http://www.openvdb.org/documentation/doxygen/overview.html#subsecInactive]"
             " voxels or, if the mask VDB is a level set, only in the interior of the level set."));
 
-    { // Output name
-        char const * const items[] = {
+    // Output name
+    parms.add(hutil::ParmFactory(PRM_STRING, "outputname", "Output Name")
+        .setDefault("keep")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "keep",     "Keep Incoming VDB Names",
             "append",   "Append Operation Name",
-            "custom",   "Custom Name",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Rename output grid(s)")
-            .setDocumentation(
-                "How to name the generated VDB volumes\n\n"
-                "If you choose __Keep Incoming VDB Names__, the generated fields"
-                " will replace the input fields."));
-    }
+            "custom",   "Custom Name"
+        })
+        .setTooltip("Rename output grid(s)")
+        .setDocumentation(
+            "How to name the generated VDB volumes\n\n"
+            "If you choose __Keep Incoming VDB Names__, the generated fields"
+            " will replace the input fields."));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
+    parms.add(hutil::ParmFactory(PRM_STRING, "customname", "Custom Name")
         .setTooltip("Rename all output grids with this custom name")
         .setDocumentation("If this is not blank, the output VDB will use this name."));
 
@@ -205,12 +214,24 @@ Normalize (vector -> vector):\n\
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "threaded", "Multithreaded"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "keep",     "Keep Incoming VDB Names",
+            "append",   "Append Operation Name",
+            "custom",   "Custom Name"
+        }));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name"));
+
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Analysis", SOP_OpenVDB_Analysis::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Analyze")
         .addOptionalInput("Optional VDB mask input")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Analysis::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -304,7 +325,6 @@ struct MaskOp
     cvdb::BoolGrid::Ptr mMaskGrid;
 };
 
-
 } // unnamed namespace
 
 
@@ -317,11 +337,11 @@ SOP_OpenVDB_Analysis::updateParmsFlags()
 {
     bool changed = false;
 
-    bool useCustomName = evalInt("outputName", 0, 0) == 2;
+    bool useCustomName = (evalStdString("outputname", 0) == "custom");
 
-    changed |= enableParm("customName", useCustomName);
+    changed |= enableParm("customname", useCustomName);
 #ifndef SESI_OPENVDB
-    changed |= setVisibleState("customName", useCustomName);
+    changed |= setVisibleState("customname", useCustomName);
 #endif
 
     const bool hasMask = (2 == nInputs());
@@ -331,24 +351,49 @@ SOP_OpenVDB_Analysis::updateParmsFlags()
 }
 
 
+void
+SOP_OpenVDB_Analysis::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    const fpreal time = 0.0;
+
+    if (PRM_Parm* parm = obsoleteParms->getParmPtr("outputName")) {
+        if (!parm->isFactoryDefault()) {
+            std::string val{"keep"};
+            switch (obsoleteParms->evalInt("outputName", 0, time)) {
+                case 0: val = "keep"; break;
+                case 1: val = "append"; break;
+                case 2: val = "custom"; break;
+            }
+            setString(val.c_str(), CH_STRING_LITERAL, "outputname", 0, time);
+        }
+    }
+
+    resolveRenamedParm(*obsoleteParms, "customName", "customname");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 ////////////////////////////////////////
 
 
 OP_ERROR
-SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Analysis)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        duplicateSource(0, context);
+#endif
 
         const fpreal time = context.getTime();
 
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
-
         // Get the group of grids to be transformed.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         const int whichOp = static_cast<int>(evalInt("operator", 0, time));
         if (whichOp < 0 || whichOp > 7) {
@@ -368,17 +413,8 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
         cvdb::BoolGrid::Ptr maskGrid;
 
         if (maskGeo) {
-
-            UT_String maskStr;
-            evalString(maskStr, "maskname", 0, time);
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskStr.buffer(), GroupCreator(maskGeo));
-#else
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-#endif
+            const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
+                evalStdString("maskname", time).c_str(), GroupCreator(maskGeo));
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
@@ -478,13 +514,12 @@ SOP_OpenVDB_Analysis::cookMySop(OP_Context& context)
 
             // Rename grid
             std::string gridName = vdb->getGridName();
-            const auto renaming = evalInt("outputName", 0, time);
-            if (renaming == 1) {
+            const auto renaming = evalStdString("outputname", time);
+            if (renaming == "append") {
                 if (operationName.size() > 0) gridName += operationName;
-            } else if (renaming == 2) {
-                UT_String customName;
-                evalString(customName, "customName", 0, time);
-                if (customName.length() > 0) gridName = customName.toStdString();
+            } else if (renaming == "custom") {
+                const auto customName = evalStdString("customname", time);
+                if (!customName.empty()) gridName = customName;
             }
 
             // Replace the original VDB primitive with a new primitive that contains

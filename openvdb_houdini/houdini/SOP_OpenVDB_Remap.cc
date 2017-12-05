@@ -48,7 +48,14 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <boost/mpl/at.hpp>
+#ifdef SESI_OPENVDB
+  #include <hboost/mpl/at.hpp>
+  namespace boostmpl = hboost::mpl;
+#else
+  #include <boost/mpl/at.hpp>
+  namespace boostmpl = boost::mpl;
+#endif
+
 
 #include <algorithm>
 #include <cmath>
@@ -197,7 +204,7 @@ evalMinMax(const TreeType& tree,
     { // eval first tiles
         using RootNodeType = typename TreeType::RootNodeType;
         using NodeChainType = typename RootNodeType::NodeChainType;
-        using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
+        using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
 
         std::vector<const InternalNodeType*> nodes;
         tree.getNodes(nodes);
@@ -240,7 +247,7 @@ deactivateBackgroundValues(TreeType& tree)
     { // eval first tiles
         using RootNodeType = typename TreeType::RootNodeType;
         using NodeChainType = typename RootNodeType::NodeChainType;
-        using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1>>::type;
+        using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
 
         std::vector<InternalNodeType*> nodes;
         tree.getNodes(nodes);
@@ -451,7 +458,7 @@ struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB {
     int sortOutputRange();
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
 };
 
 
@@ -636,7 +643,7 @@ SOP_OpenVDB_Remap::SOP_OpenVDB_Remap(OP_Network* net, const char* name, OP_Opera
 }
 
 OP_ERROR
-SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
+SOP_OpenVDB_Remap::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -665,9 +672,7 @@ SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
         UT_Ramp ramp;
         updateRampFromMultiParm(time, getParm("function"), ramp);
 
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         size_t vdbPrimCount = 0;
 

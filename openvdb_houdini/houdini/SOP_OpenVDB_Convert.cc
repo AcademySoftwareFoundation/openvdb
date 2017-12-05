@@ -50,53 +50,46 @@
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_ConvertParms.h>
 #include <GU/GU_PrimPoly.h>
+#include <GU/GU_PrimPolySoup.h>
+#include <SYS/SYS_Math.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_VoxelArray.h>
-#include <SYS/SYS_Math.h>
 
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
 
 #include <limits>
 #include <list>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
-#define HAVE_POLYSOUP 1
-#include <GU/GU_PrimPolySoup.h>
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
 #else
-#define HAVE_POLYSOUP 0
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
-#define HAVE_SPLITTING 1
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
 #else
-#define HAVE_SPLITTING 0
-#endif
-
-#if (UT_VERSION_INT >= 0x0e05005b) // 14.5.91 or later
-#define HAVE_ACTIVATEINSIDE 1
-#else
-#define HAVE_ACTIVATEINSIDE 0
-#endif
-
-#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
-// GA_RWHandleV3 fails to initialize its member variables in some cases.
-#pragma GCC diagnostic ignored "-Wuninitialized"
+#define VDB_COMPILABLE_SOP 0
 #endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 namespace {
-#if HAVE_POLYSOUP
-enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP /*, SIMDATA*/ };
-#else
-enum ConvertTo { HVOLUME, OPENVDB, POLYGONS /*, SIMDATA*/ };
-#endif
+enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP };
 enum ConvertClass { CLASS_NO_CHANGE, CLASS_SDF, CLASS_FOG_VOLUME };
 }
 
@@ -114,33 +107,43 @@ public:
     int isRefInput(unsigned idx) const override { return (idx == 1); }
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
     bool updateParmsFlags() override;
 
-private:
-    void convertVDBType(
-        GU_Detail&,
-        GA_PrimitiveGroup*,
-        const UT_String& newTypeStr,
-        const UT_String& newPrecisionStr,
-        hvdb::Interrupter&);
+#if VDB_COMPILABLE_SOP
+public:
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
 
-    void convertToPoly(
-        fpreal time,
-        GA_PrimitiveGroup*,
-        bool buildpolysoup,
-        hvdb::Interrupter&);
+    private:
+        void convertVDBType(
+            GU_Detail&,
+            GA_PrimitiveGroup*,
+            const UT_String& newTypeStr,
+            const UT_String& newPrecisionStr,
+            hvdb::Interrupter&);
 
-    template <class GridType>
-    void referenceMeshing(
-        std::list<openvdb::GridBase::ConstPtr>& grids,
-        std::list<const GU_PrimVDB*> vdbs,
-        GA_PrimitiveGroup *group,
-        openvdb::tools::VolumeToMesh& mesher,
-        const GU_Detail* refGeo,
-        bool computeNormals,
-        hvdb::Interrupter& boss,
-        const fpreal time);
+        void convertToPoly(
+            fpreal time,
+            GA_PrimitiveGroup*,
+            bool buildpolysoup,
+            hvdb::Interrupter&);
+
+        template<class GridType>
+        void referenceMeshing(
+            std::list<openvdb::GridBase::ConstPtr>& grids,
+            std::list<const GU_PrimVDB*> vdbs,
+            GA_PrimitiveGroup *group,
+            openvdb::tools::VolumeToMesh& mesher,
+            const GU_Detail* refGeo,
+            bool computeNormals,
+            hvdb::Interrupter& boss,
+            const fpreal time);
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
 };
 
 
@@ -160,21 +163,16 @@ newSopOperator(OP_OperatorTable* table)
             " (see [specifying volumes|/model/volumes#group])"));
 
 
-    { // Convert To Menu
-        char const * const items[] = {
+    // Convert To Menu
+    parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "volume",   "Volume",
             "vdb",      "VDB",
             "poly",     "Polygons",
-#if HAVE_POLYSOUP
-            "polysoup", "Polygon Soup",
-#endif
-            nullptr
-        };
-
-        parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-        .setDocumentation("\
+            "polysoup", "Polygon Soup"
+        })
+    .setDocumentation("\
 The type of conversion to perform\n\
 \n\
 Volume:\n\
@@ -182,12 +180,8 @@ Volume:\n\
 \n\
     This allows legacy tools to operate on the primitive,\n\
     however the memory requirements of dense volumes with effective\n\
-    resolutions over 1000<sup>3</sup> might be prohibitive.\n"
-#if HAVE_SPLITTING
-"\
-    Consider using the __Split Disjoint Volumes__ option.\n"
-#endif
-"\
+    resolutions over 1000<sup>3</sup> might be prohibitive.\n\
+    Consider using the __Split Disjoint Volumes__ option.\n\
 \n\
 VDB:\n\
     Convert a Houdini volume into a VDB volume.\n\
@@ -196,81 +190,63 @@ VDB:\n\
     so a fog volume becomes a fog VDB and an SDF volume becomes an SDF VDB.\n\
 \n\
 Polygons:\n\
-    Generate a polygonal mesh representing an isosurface of a VDB volume.\n"
-#if HAVE_POLYSOUP
-"\
+    Generate a polygonal mesh representing an isosurface of a VDB volume.\n\
+\n\
 Polygon Soup:\n\
     Generate a polygonal mesh representing an isosurface of a VDB volume.\n\
 \n\
     The mesh is stored as a polygon soup, which is more compact than\n\
-    an ordinary mesh but does not support most editing operations.\n"
-#endif
-        ));
-    }
+    an ordinary mesh but does not support most editing operations.\n"));
 
-    { // Grid Class Menu
-        char const * const class_items[] = {
+    // Grid Class Menu
+    parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "none", "No Change",
             "sdf",  "Convert Fog to SDF",
-            "fog",  "Convert SDF to Fog",
-            nullptr
-        };
+            "fog",  "Convert SDF to Fog"
+        })
+        .setTooltip("Convert fog volumes to signed distance fields or vice versa."));
 
-        parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items)
-            .setTooltip("Convert fog volumes to signed distance fields or vice versa."));
-    }
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbtype", "VDB Type")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "none",   "No Change",
             "float",  "Float",
             "int",    "Integer",
             "bool",   "Bool",
             "vec3f",  "Vector Float",
-            "vec3i",  "Vector Integer",
-            nullptr,
-        };
+            "vec3i",  "Vector Integer"
+        })
+        .setDefault("none")
+        .setTooltip("Change the type of value stored at each voxel.")
+        .setDocumentation(
+            "Change the type of value stored at each voxel.\n\n"
+            "When converting from a scalar type to a vector type, the scalar value\n"
+            "is copied to each vector component.\n\n"
+            "When converting from a vector type to a scalar type, voxel values are\n"
+            "lost&mdash;only voxel topology is preserved.\n\n"
+            "This option is not available when VDB class conversion is enabled,\n"
+            "since SDFs and fog volumes always have scalar, floating-point values.\n"));
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "vdbtype", "VDB Type")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("none")
-            .setTooltip("Change the type of value stored at each voxel.")
-            .setDocumentation(
-                "Change the type of value stored at each voxel.\n\n"
-                "When converting from a scalar type to a vector type, the scalar value\n"
-                "is copied to each vector component.\n\n"
-                "When converting from a vector type to a scalar type, voxel values are\n"
-                "lost&mdash;only voxel topology is preserved.\n\n"
-                "This option is not available when VDB class conversion is enabled,\n"
-                "since SDFs and fog volumes always have scalar, floating-point values.\n"));
-    }
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbprecision", "VDB Precision")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "none", "No Change",
             "32",   "32-bit",
-            "64",   "64-bit",
-            nullptr,
-        };
-
-        parms.add(hutil::ParmFactory(PRM_STRING, "vdbprecision", "VDB Precision")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("none")
-            .setTooltip("Change the numerical precision of the value stored at each voxel."));
-    }
+            "64",   "64-bit"
+        })
+        .setDefault("none")
+        .setTooltip("Change the numerical precision of the value stored at each voxel."));
 
     //////////
 
     // Parms for converting to volumes
 
-#if HAVE_SPLITTING
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "splitdisjointvolumes", "Split Disjoint Volumes")
         .setTooltip(
             "When converting to volumes, where possible create a separate"
             " volume primitive for each connected component of a VDB."
             " This allows very large and sparse VDBs to be converted"
             " with a reduced memory footprint."));
-#endif
 
     //////////
 
@@ -419,7 +395,6 @@ Polygon Soup:\n\
             "NOTE:\n"
             "    This option is ignored when converting native fog volumes to VDBs.\n"));
 
-#if HAVE_ACTIVATEINSIDE
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "activateinsidesdf", "Activate Interior Voxels")
         .setDefault(PRMoneDefaults)
         .setTooltip("Activate all voxels inside a converted level set.")
@@ -431,7 +406,6 @@ Polygon Soup:\n\
             "band of an incoming SDF if it has one, saving memory and downstream processing.\n\n"
             "This toggle has no effect for non-SDF volumes, or if\n"
             "__Signed-Flood Fill Output__ is disabled."));
-#endif
 
     //////////
 
@@ -451,6 +425,9 @@ Polygon Soup:\n\
             "to transfer attributes, sharpen features and to "
             "eliminate seams from fractured pieces.")
         .addOptionalInput("Optional VDB masks")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_DUPLICATE, []() { return new SOP_OpenVDB_Convert::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -511,31 +488,14 @@ namespace {
 /// @return @c true if all grids were successfully converted, @c false if one
 /// or more grids were skipped due to unrecognized grid types.
 void
-convertToVolumes(
-    GU_Detail& dst,
-    GA_PrimitiveGroup* group,
-#if HAVE_SPLITTING
-    bool split_disjoint = false
-#else
-    bool = false
-#endif
-)
+convertToVolumes(GU_Detail& dst, GA_PrimitiveGroup* group, bool split_disjoint = false)
 {
     GU_ConvertParms parms;
-
-#if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
-    parms.toType = GEO_PrimTypeCompat::GEOPRIMVOLUME;
-#else
     parms.setToType(GEO_PrimTypeCompat::GEOPRIMVOLUME);
-#endif
     parms.primGroup = group;
     parms.preserveGroups = true;
-#if HAVE_SPLITTING
     GU_PrimVDB::convertVDBs(dst, dst, parms,
         /*adaptivity=*/0, /*keep_original*/false , split_disjoint);
-#else
-    GU_PrimVDB::convertVDBs(dst, dst, parms, /*adaptivity=*/0, /*keep_original*/false);
-#endif
 }
 
 
@@ -554,12 +514,8 @@ convertToOpenVDB(
     GU_ConvertParms parms;
     parms.primGroup = group;
     parms.preserveGroups = true;
-    GU_PrimVDB::convertVolumesToVDBs(
-        dst, dst, parms, flood, prune, tolerance, /*keep_original*/false
-#if HAVE_ACTIVATEINSIDE
-        , activateinsidesdf
-#endif
-        );
+    GU_PrimVDB::convertVolumesToVDBs(dst, dst, parms, flood, prune, tolerance,
+        /*keep_original*/false, activateinsidesdf);
 }
 
 
@@ -673,17 +629,9 @@ void
 copyMesh(
     GU_Detail& detail,
     const GU_PrimVDB* srcvdb,
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-    GA_PrimitiveGroup* /*delgroup*/,
-#else
     GA_PrimitiveGroup* delgroup,
-#endif
     openvdb::tools::VolumeToMesh& mesher,
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-    bool /*toPolySoup*/,
-#else
     bool toPolySoup,
-#endif
     GA_PrimitiveGroup* surfaceGroup = nullptr,
     GA_PrimitiveGroup* interiorGroup = nullptr,
     GA_PrimitiveGroup* seamGroup = nullptr,
@@ -700,75 +648,6 @@ copyMesh(
         seamPointGroup = nullptr;
     }
 
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-
-    bool groupSeamPoints = seamPointGroup && !mesher.pointFlags().empty();
-
-    const GA_Offset lastIdx(detail.getNumPoints());
-    for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
-        GA_Offset ptoff = detail.appendPointOffset();
-        detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
-
-        if (groupSeamPoints && mesher.pointFlags()[n]) {
-            seamPointGroup->addOffset(ptoff);
-        }
-    }
-
-    GU_ConvertMarker marker(detail);
-
-    for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
-
-        openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
-
-        // Copy quads
-        for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
-
-            openvdb::Vec4I& quad = polygons.quad(i);
-            GEO_PrimPoly& prim = *GU_PrimPoly::build(&detail, 4, GU_POLY_CLOSED, 0);
-
-            for (int v = 0; v < 4; ++v) {
-                prim(v).setPointOffset(lastIdx + quad[v]);
-            }
-
-            const bool surfacePrim = polygons.quadFlags(i) & exteriorFlag;
-            if (surfaceGroup && surfacePrim) surfaceGroup->add(&prim);
-            else if (interiorGroup && !surfacePrim) interiorGroup->add(&prim);
-
-            if (seamGroup && (polygons.quadFlags(i) & seamLineFlag)) {
-                seamGroup->add(&prim);
-            }
-        }
-
-
-        // Copy triangles (if adaptive mesh.)
-        for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
-
-            openvdb::Vec3I& triangle = polygons.triangle(i);
-            GEO_PrimPoly& prim = *GU_PrimPoly::build(&detail, 3, GU_POLY_CLOSED, 0);
-
-            for (int v = 0; v < 3; ++v) {
-                prim(v).setPointOffset(lastIdx + triangle[v]);
-            }
-
-            const bool surfacePrim = (polygons.triangleFlags(i) & exteriorFlag);
-            if (surfaceGroup && surfacePrim) surfaceGroup->add(&prim);
-            else if (interiorGroup && !surfacePrim) interiorGroup->add(&prim);
-
-            if (seamGroup && (polygons.triangleFlags(i) & seamLineFlag)) {
-                seamGroup->add(&prim);
-            }
-        }
-    }
-
-    GA_Range primRange = marker.getPrimitives();
-    GA_Range pntRange = marker.getPoints();
-    GU_ConvertParms parms;
-    parms.preserveGroups = true;
-    GUconvertCopySingleVertexPrimAttribsAndGroups(parms,
-        *srcvdb->getParent(), srcvdb->getMapOffset(), detail,
-        primRange, pntRange);
-
-#else // 12.5.245 or later
     GA_Size npoints = mesher.pointListSize();
     const GA_Offset startpt = detail.appendPointBlock(npoints);
     UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
@@ -815,11 +694,7 @@ copyMesh(
     };
     UT_IntArray verts[4];
     for (int flags = 0; flags < 4; ++flags) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
         verts[flags].setCapacity(nverts[flags]);
-#else
-        verts[flags].resize(nverts[flags]);
-#endif
         verts[flags].entries(nverts[flags]);
     }
 
@@ -872,11 +747,7 @@ copyMesh(
         if (nquads[flags]) sizelist.append(4, nquads[flags]);
         if (ntris[flags])  sizelist.append(3, ntris[flags]);
 
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
         GA_Detail::OffsetMarker marker(detail);
-#else
-        GU_ConvertMarker marker(detail);
-#endif
 
         if (toPolySoup) {
             GU_PrimPolySoup::build(
@@ -885,13 +756,8 @@ copyMesh(
             GU_PrimPoly::buildBlock(&detail, startpt, npoints, sizelist, verts[flags].array());
         }
 
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
         GA_Range range(marker.primitiveRange());
         GA_Range pntRange(marker.pointRange());
-#else
-        GA_Range range(marker.getPrimitives());
-        GA_Range pntRange(marker.getPoints());
-#endif
         GU_ConvertParms parms;
         parms.preserveGroups = true;
         GUconvertCopySingleVertexPrimAttribsAndGroups(parms,
@@ -903,7 +769,6 @@ copyMesh(
         if (surfaceGroup && (flags & 2))    surfaceGroup->addRange(range);
         if (interiorGroup && !(flags & 2))  interiorGroup->addRange(range);
     }
-#endif // 12.5.245 or later
 }
 
 
@@ -962,6 +827,9 @@ getVDBTypeFromNameAndPrecision(const UT_String& name, int bits)
     }
     return UT_VDB_INVALID;
 }
+
+
+////////////////////////////////////////
 
 
 // Functor for use with GEOvdbProcessTypedGrid*() to create a copy of a grid,
@@ -1084,18 +952,10 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     const fpreal time = CHgetEvalTime();
 
     ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
-#if HAVE_SPLITTING
     const bool toVolume = (target == HVOLUME);
-#endif
     const bool toOpenVDB = (target == OPENVDB);
-#if HAVE_POLYSOUP
     const bool toPolySoup = (target == POLYSOUP);
     const bool toPoly = toPolySoup || (target == POLYGONS);
-#else
-    const bool toPolySoup = false;
-    const bool toPoly = (target == POLYGONS);
-#endif
-
     const bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
     const bool toFog = (evalInt("vdbclass", 0, time) == CLASS_FOG_VOLUME);
 
@@ -1144,9 +1004,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     //
     // Show/hide
     //
-#if HAVE_SPLITTING
     changed |= setVisibleState("splitdisjointvolumes", toVolume);
-#endif
 
     changed |= setVisibleState("adaptivity", toPoly);
     changed |= setVisibleState("isoValue", toPoly);
@@ -1176,12 +1034,10 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= setVisibleState("vdbtype", toOpenVDB && !(toSDF || toFog));
     changed |= setVisibleState("vdbprecision", toOpenVDB && !toFixedPrecision);
 
-#if HAVE_ACTIVATEINSIDE
     changed |= setVisibleState("activateinsidesdf", toOpenVDB);
     if (toOpenVDB) {
         changed |= enableParm("activateinsidesdf", bool(evalInt("flood",  0, time)));
     }
-#endif
 
     return changed;
 }
@@ -1192,7 +1048,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
 // Convert all VDB primitives in the given group to have a new storage type (where possible).
 void
-SOP_OpenVDB_Convert::convertVDBType(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertVDBType(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
     const UT_String& outTypeStr,
@@ -1230,7 +1086,7 @@ SOP_OpenVDB_Convert::convertVDBType(
 
 template <class GridType>
 void
-SOP_OpenVDB_Convert::referenceMeshing(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::referenceMeshing(
     std::list<openvdb::GridBase::ConstPtr>& grids,
     std::list<const GU_PrimVDB*> vdbs,
     GA_PrimitiveGroup* delgroup,
@@ -1268,7 +1124,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
 
-    std::unique_ptr<GU_Detail> geoPtr;
+    UT_UniquePtr<GU_Detail> geoPtr;
     if (!refGrid) {
         std::string warningStr;
         geoPtr = hvdb::convertGeometry(*refGeo, warningStr, &boss);
@@ -1346,29 +1202,29 @@ SOP_OpenVDB_Convert::referenceMeshing(
     GA_PointGroup* seamPointGroup = nullptr;
 
     {
-        UT_String newGropStr;
-        evalString(newGropStr, "surfacegroup", 0, time);
-        if(newGropStr.length() > 0) {
-            surfaceGroup = gdp->findPrimitiveGroup(newGropStr);
-            if (!surfaceGroup) surfaceGroup = gdp->newPrimitiveGroup(newGropStr);
+        UT_String newGroupStr;
+        evalString(newGroupStr, "surfacegroup", 0, time);
+        if (newGroupStr.length() > 0) {
+            surfaceGroup = gdp->findPrimitiveGroup(newGroupStr);
+            if (!surfaceGroup) surfaceGroup = gdp->newPrimitiveGroup(newGroupStr);
         }
 
-        evalString(newGropStr, "interiorgroup", 0, time);
-        if(newGropStr.length() > 0) {
-            interiorGroup = gdp->findPrimitiveGroup(newGropStr);
-            if (!interiorGroup) interiorGroup = gdp->newPrimitiveGroup(newGropStr);
+        evalString(newGroupStr, "interiorgroup", 0, time);
+        if (newGroupStr.length() > 0) {
+            interiorGroup = gdp->findPrimitiveGroup(newGroupStr);
+            if (!interiorGroup) interiorGroup = gdp->newPrimitiveGroup(newGroupStr);
         }
 
-        evalString(newGropStr, "seamlinegroup", 0, time);
-        if(newGropStr.length() > 0) {
-            seamGroup = gdp->findPrimitiveGroup(newGropStr);
-            if (!seamGroup) seamGroup = gdp->newPrimitiveGroup(newGropStr);
+        evalString(newGroupStr, "seamlinegroup", 0, time);
+        if (newGroupStr.length() > 0) {
+            seamGroup = gdp->findPrimitiveGroup(newGroupStr);
+            if (!seamGroup) seamGroup = gdp->newPrimitiveGroup(newGroupStr);
         }
 
-        evalString(newGropStr, "seampoints", 0, time);
-        if(newGropStr.length() > 0) {
-            seamPointGroup = gdp->findPointGroup(newGropStr);
-            if (!seamPointGroup) seamPointGroup = gdp->newPointGroup(newGropStr);
+        evalString(newGroupStr, "seampoints", 0, time);
+        if (newGroupStr.length() > 0) {
+            seamPointGroup = gdp->findPointGroup(newGroupStr);
+            if (!seamPointGroup) seamPointGroup = gdp->newPointGroup(newGroupStr);
         }
     }
 
@@ -1406,12 +1262,8 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     for (size_t i = 0, I = fragments.size(); i < I; ++i) {
         mesher(*fragments[i]);
-#if HAVE_POLYSOUP
         ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
         bool toPolySoup = (target == POLYSOUP);
-#else
-        bool toPolySoup = false;
-#endif
         copyMesh(*gdp, fragment_vdbs[i], delgroup, mesher, toPolySoup,
             surfaceGroup, interiorGroup, seamGroup, seamPointGroup);
     }
@@ -1443,47 +1295,45 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     if (!badTransformList.empty()) {
         std::string s = "The following grids were skipped: '" +
-            boost::algorithm::join(badTransformList, ", ") +
+            hboost::algorithm::join(badTransformList, ", ") +
             "' because they don't match the transform of the first grid.";
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
     if (!badBackgroundList.empty()) {
         std::string s = "The following grids were skipped: '" +
-            boost::algorithm::join(badBackgroundList, ", ") +
+            hboost::algorithm::join(badBackgroundList, ", ") +
             "' because they don't match the background value of the first grid.";
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
     if (!badTypeList.empty()) {
         std::string s = "The following grids were skipped: '" +
-            boost::algorithm::join(badTypeList, ", ") +
+            hboost::algorithm::join(badTypeList, ", ") +
             "' because they don't have the same data type as the first grid.";
         addWarning(SOP_MESSAGE, s.c_str());
     }
 }
 
+
 void
-SOP_OpenVDB_Convert::convertToPoly(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertToPoly(
     fpreal time,
     GA_PrimitiveGroup *group,
     bool buildpolysoup,
     hvdb::Interrupter &boss)
 {
-
     hvdb::VdbPrimCIterator vdbIt(gdp, group);
     if (!vdbIt) {
         addWarning(SOP_MESSAGE, "No VDB primitives found.");
         return;
     }
 
-
     const bool      computeNormals = !buildpolysoup && (evalInt("computenormals", 0, time) != 0);
     const bool      invertmask = evalInt("invertmask", 0, time);
     const fpreal    adaptivity = evalFloat("adaptivity", 0, time);
     const fpreal    iso = evalFloat("isoValue", 0, time);
     const fpreal    maskoffset = evalFloat("surfacemaskoffset", 0, time);
-
 
     openvdb::tools::VolumeToMesh mesher(iso, adaptivity);
 
@@ -1492,17 +1342,10 @@ SOP_OpenVDB_Convert::convertToPoly(
     if (maskGeo) {
 
         if (evalInt("surfacemask", 0, time)) {
-            UT_String maskStr;
-            evalString(maskStr, "surfacemaskname", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskStr.buffer(), GroupCreator(maskGeo));
-#else
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-#endif
-
-            if (!maskGroup && maskStr.length() > 0) {
+            const auto maskStr = evalStdString("surfacemaskname", time);
+            const GA_PrimitiveGroup* maskGroup =
+                parsePrimitiveGroups(maskStr.c_str(), GroupCreator(maskGeo));
+            if (!maskGroup && !maskStr.empty()) {
                 addWarning(SOP_MESSAGE, "Surface mask not found.");
             } else {
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
@@ -1520,12 +1363,9 @@ SOP_OpenVDB_Convert::convertToPoly(
         }
 
         if (evalInt("adaptivityfield", 0, time)) {
-            UT_String maskStr;
-            evalString(maskStr, "adaptivityfieldname", 0, time);
-
-            const GA_PrimitiveGroup *maskGroup = matchGroup(*maskGeo, maskStr.toStdString());
-
-            if (!maskGroup && maskStr.length() > 0) {
+            const auto maskStr = evalStdString("adaptivityfieldname", time);
+            const GA_PrimitiveGroup* maskGroup = matchGroup(*maskGeo, maskStr);
+            if (!maskGroup && !maskStr.empty()) {
                 addWarning(SOP_MESSAGE, "Adaptivity field not found.");
             } else {
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
@@ -1571,13 +1411,13 @@ SOP_OpenVDB_Convert::convertToPoly(
         if (!nonLevelSetList.empty()) {
             std::string s = "Reference meshing is only supported for "
                 "Level Set grids, the following grids were skipped: '" +
-                boost::algorithm::join(nonLevelSetList, ", ") + "'.";
+                hboost::algorithm::join(nonLevelSetList, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         if (!nonLinearList.empty()) {
             std::string s = "The following grids were skipped: '" +
-                boost::algorithm::join(nonLinearList, ", ") +
+                hboost::algorithm::join(nonLinearList, ", ") +
                 "' because they don't have a linear/affine transform.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
@@ -1604,12 +1444,8 @@ SOP_OpenVDB_Convert::convertToPoly(
 
     } else {
 
-#if HAVE_POLYSOUP
         ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
         bool toPolySoup = (target == POLYSOUP);
-#else
-        bool toPolySoup = false;
-#endif
 
         // Mesh each VDB primitive independently
         for (; vdbIt; ++vdbIt) {
@@ -1641,46 +1477,34 @@ SOP_OpenVDB_Convert::convertToPoly(
 
 
 OP_ERROR
-SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
 
         // We are intentionally not performing a duplicateSourceStealable() here due to
         // specific implementation in this SOP which causes undesirable behavior when
         // attempting to "steal" the geometry
         duplicateSource(0, context);
+#endif
 
         const fpreal t = context.getTime();
 
-        UT_String group_str;
-        evalString(group_str, "group", 0, t);
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-        GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, GroupCreator(gdp));
-#else
-        GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, gdp);
-#endif
+        GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(
+            evalStdString("group", t).c_str(), GroupCreator(gdp));
 
         hvdb::Interrupter interrupter("Converting VDBs");
 
         switch (evalInt("conversion",  0, t))
         {
             case HVOLUME: {
-#if HAVE_SPLITTING
                 const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
-#else
-                const bool splitDisjointVols = false;
-#endif
                 convertToVolumes(*gdp, group, splitDisjointVols);
                 break;
             }
             case OPENVDB: {
-#if HAVE_ACTIVATEINSIDE
                 const bool activateinside = (evalInt("activateinsidesdf", 0, t) != 0);
-#else
-                const bool activateinside = true;
-#endif
                 convertToOpenVDB(*gdp, group,
                     (evalInt("flood", 0, t) != 0),
                     (evalInt("prune", 0, t) != 0),
@@ -1715,14 +1539,10 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                 convertToPoly(t, group, false, interrupter);
                 break;
             }
-
-#if HAVE_POLYSOUP
             case POLYSOUP: {
                 convertToPoly(t, group, true, interrupter);
                 break;
             }
-#endif
-
             default: {
                 addWarning(SOP_MESSAGE, "Unrecognized conversion type");
                 break;

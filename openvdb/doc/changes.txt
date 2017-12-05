@@ -12,6 +12,8 @@ Houdini:
 - Added a @b SOP_NodeVDB::evalStdString method that facilitates
   string parameter evaluation in expressions, e.g.,
   <TT>matchGroup(*gdp,&nbsp;evalStdString("group",&nbsp;time))</TT>.
+- Removed the deprecated @b openvdb_houdini::validateGeometry function.
+  Use @b convertGeometry instead.
 - Added a @b SOP_NodeVDB::matchGroup overload that eliminates the need
   to @c const_cast the @b GU_Detail.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
@@ -21,11 +23,20 @@ Houdini:
 - Added a @b houdini_utils::OpFactory::setVerb method to register
   <A HREF="http://www.sidefx.com/docs/houdini/model/compile">
   compilable</A>&nbsp;SOPs.
+- Made @b SOP_NodeVDB::cookMySop @c final (that is, non-overridable)
+  to facilitate the implementation of compilable SOPs.
+  Override @b SOP_NodeVDB::cookVDBSop instead.
+  (In most cases, it suffices to rename @b cookMySop to @b cookVDBSop.)
+- Renamed some parameters on the following SOPs to match the equivalent
+  native Houdini nodes: Advect, Advect&nbsp;Points, Analysis, Combine, Filter,
+  Fracture, From&nbsp;Particles, From&nbsp;Polygons, Morph&nbsp;Level&nbsp;Set,
+  Occlusion&nbsp;Mask, Offset&nbsp;Level&nbsp;Set, Points&nbsp;Group, Resample,
+  Resize&nbsp;Narrow&nbsp;Band, Smooth&nbsp;Level&nbsp;Set,
+  Topology&nbsp;To&nbsp;Level&nbsp;Set, Vector&nbsp;Merge, and Visualize.
 - Added @b SOP_VDBCacheOptions, a convenience base class for
   compilable&nbsp;SOPs.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
-- The Advect SOP is now a compilable SOP.
-  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Converted most SOPs into compilable SOPs.
 
 
 @htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly

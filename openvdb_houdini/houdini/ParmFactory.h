@@ -38,10 +38,11 @@
 #define HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 
 #include <UT/UT_Version.h>
+#include <GA/GA_Attribute.h>
+#include <OP/OP_AutoLockInputs.h>
 #include <OP/OP_Operator.h>
 #include <PRM/PRM_Include.h>
 #include <PRM/PRM_SpareData.h>
-#include <GA/GA_Attribute.h>
 #include <SOP/SOP_Node.h>
 #if UT_MAJOR_VERSION_INT >= 16
 #include <SOP/SOP_NodeVerb.h>
@@ -579,17 +580,23 @@ public:
 class OPENVDB_HOUDINI_API ScopedInputLock
 {
 public:
-    ScopedInputLock(SOP_Node& node, OP_Context& context): mNode(&node)
+    ScopedInputLock(SOP_Node& node, OP_Context& context)
     {
-        if (mNode->lockInputs(context) >= UT_ERROR_ABORT) {
+        mLock.setNode(&node);
+        if (mLock.lock(context) >= UT_ERROR_ABORT) {
             throw std::runtime_error("failed to lock inputs");
         }
     }
+    ~ScopedInputLock() {}
 
-    ~ScopedInputLock() { mNode->unlockInputs(); }
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+    void markInputUnlocked(exint input) { mLock.markInputUnlocked(input); }
+#else
+    void markInputUnlocked(exint) {}
+#endif
 
 private:
-    SOP_Node* mNode;
+    OP_AutoLockInputs mLock;
 };
 
 

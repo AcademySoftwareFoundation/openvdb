@@ -35,6 +35,8 @@
 /// @brief Scatter points on a VDB grid, either by fixed count or by
 /// global or local point density.
 
+#include <UT/UT_Assert.h>
+#include <UT/UT_Version.h>
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -45,6 +47,11 @@
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <boost/algorithm/string/join.hpp>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
+#include <boost/algorithm/string/join.hpp>
+#endif
 #include <iostream>
 #include <random>
 #include <stdexcept>
@@ -53,6 +60,9 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 class SOP_OpenVDB_Scatter: public hvdb::SOP_NodeVDB
@@ -64,7 +74,7 @@ public:
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 };
@@ -353,7 +363,7 @@ struct BaseScatter
 
     inline openvdb::points::PointDataGrid::Ptr points()
     {
-        assert(mPoints);
+        UT_ASSERT(mPoints);
         return mPoints;
     }
 
@@ -519,7 +529,7 @@ process(const UT_VDBType type, const openvdb::GridBase& grid, OpType& op, const 
 
 
 // Method to extract the interior mask before scattering points.
-openvdb::GridBase::ConstPtr
+inline openvdb::GridBase::ConstPtr
 extractInteriorMask(const openvdb::GridBase::ConstPtr grid, const float offset)
 {
     if (grid->isType<openvdb::FloatGrid>()) {
@@ -573,7 +583,7 @@ cullVDBPoints(openvdb::points::PointDataTree& tree,
 
 
 OP_ERROR
-SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
+SOP_OpenVDB_Scatter::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -602,12 +612,9 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         const int outputName = static_cast<int>(evalInt("outputname", 0, time));
 
         // Get the group of grids to process.
-        UT_String tmp;
-        evalString(tmp, "group", 0, time);
-        const GA_PrimitiveGroup* group = this->matchGroup(*vdbgeo, tmp.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*vdbgeo, evalStdString("group", time));
 
-        evalString(tmp, "customname", 0, time);
-        const std::string customName = tmp.toStdString();
+        const std::string customName = evalStdString("customname", time);
 
         hvdb::Interrupter boss("Scattering points on VDBs");
 
@@ -624,6 +631,8 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         std::vector<std::string> emptyGrids;
         std::vector<openvdb::points::PointDataGrid::Ptr> pointGrids;
         PointAccessor pointAccessor(gdp);
+
+        const GA_Offset firstOffset = gdp->getNumPointOffsets();
 
         // Process each VDB primitive (with a non-null grid pointer)
         // that belongs to the selected group.
@@ -756,20 +765,20 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         if (!emptyGrids.empty()) {
             std::string s = "The following grids were empty: "
-                + boost::algorithm::join(emptyGrids, ", ");
+                + hboost::algorithm::join(emptyGrids, ", ");
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         // add points to a group if requested
         if (1 == evalInt("dogroup", 0, time)) {
-            UT_String scatterStr;
-            evalString(scatterStr, "sgroup", 0, time);
-            GA_PointGroup* ptgroup = gdp->newPointGroup(scatterStr);
+            const std::string groupName = evalStdString("sgroup", time);
+            GA_PointGroup* ptgroup = gdp->newPointGroup(groupName.c_str());
 
-            // add ALL the points to this group
-            ptgroup->addRange(gdp->getPointRange());
+            // add the scattered points to this group
 
-            const std::string groupName(scatterStr.toStdString());
+            const GA_Offset lastOffset = gdp->getNumPointOffsets();
+            ptgroup->addRange(GA_Range(gdp->getPointMap(), firstOffset, lastOffset));
+
             for (auto& pointGrid : pointGrids) {
                 openvdb::points::appendGroup(pointGrid->tree(), groupName);
                 openvdb::points::setGroup(pointGrid->tree(), groupName);

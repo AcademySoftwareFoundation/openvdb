@@ -42,6 +42,7 @@
 #include <openvdb/points/PointDataGrid.h>
 
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
 #include <GA/GA_Iterator.h>
@@ -50,6 +51,12 @@
 
 #include <stdexcept>
 #include <string>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 
 namespace cvdb = openvdb;
@@ -67,8 +74,15 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -80,9 +94,9 @@ namespace {
 struct Converter
 {
     float bandWidthWorld;
-    int bandWidthVoxels, closingWidth, dilation, smoothingSteps, outputName;
+    int bandWidthVoxels, closingWidth, dilation, smoothingSteps;
     bool worldSpaceUnits;
-    std::string customName;
+    std::string outputName, customName;
 
     Converter(GU_Detail& geo, hvdb::Interrupter& boss)
         : bandWidthWorld(0)
@@ -90,8 +104,8 @@ struct Converter
         , closingWidth(1)
         , dilation(0)
         , smoothingSteps(0)
-        , outputName(0)
         , worldSpaceUnits(false)
+        , outputName("keep")
         , customName("vdb")
         , mGeoPt(&geo)
         , mBossPt(&boss)
@@ -110,8 +124,8 @@ struct Converter
            grid, bandWidth, closingWidth, dilation, smoothingSteps, mBossPt);
 
         std::string name = grid.getName();
-        if (outputName == 1) name += customName;
-        else if (outputName == 2) name = customName;
+        if (outputName == "append") name += customName;
+        else if (outputName == "replace") name = customName;
 
         hvdb::createVdbPrimitive(*mGeoPt, sdfGrid, name.c_str());
     }
@@ -138,40 +152,35 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDB grids to be processed"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "outputname", "Output Name")
+        .setDefault("keep")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "keep",     "Keep Original Name",
             "append",   "Add Suffix",
             "replace",  "Custom Name",
-            nullptr
-        };
+        })
+        .setTooltip("Output VDB naming scheme")
+        .setDocumentation(
+            "Give the output VDB the same name as the input VDB,"
+            " or add a suffix to the input name, or use a custom name."));
 
-        parms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Output VDB naming scheme")
-            .setDocumentation(
-                "Give the output VDB the same name as the input VDB,"
-                " or add a suffix to the input name, or use a custom name."));
-
-        parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
-            .setTooltip("The suffix or custom name to be used"));
-    }
+    parms.add(hutil::ParmFactory(PRM_STRING, "customname", "Custom Name")
+        .setTooltip("The suffix or custom name to be used"));
 
     /// Narrow-band width {
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldspaceunits", "Use World Space for Band")
         .setDocumentation(
             "If enabled, specify the width of the narrow band in world units,"
             " otherwise specify it in voxels.  Voxel units work with all scales of geometry."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "bandWidth", "Half-Band in Voxels")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "bandwidth", "Half-Band in Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
         .setTooltip(
             "Specify the half width of the narrow band in voxels."
             " Three voxels is optimal for many level set operations."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band in World")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "bandwidthws", "Half-Band in World")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
         .setTooltip("Specify the half width of the narrow band in world units."));
@@ -195,11 +204,34 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
         .setTooltip("Number of smoothing iterations"));
 
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "keep",     "Keep Original Name",
+            "append",   "Add Suffix",
+            "replace",  "Custom Name",
+        }));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name"));
+    obsoleteParms.add(
+        hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "bandWidth", "Half-Band in Voxels")
+        .setDefault(PRMthreeDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band in World")
+        .setDefault(PRMoneDefaults));
+
+
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Topology To Level Set",
         SOP_OpenVDB_Topology_To_Level_Set::factory, parms, *table)
         .addAlias("OpenVDB From Mask")
         .addInput("VDB Grids")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR,
+            []() { return new SOP_OpenVDB_Topology_To_Level_Set::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -243,20 +275,47 @@ SOP_OpenVDB_Topology_To_Level_Set::updateParmsFlags()
 {
     bool changed = false;
     const fpreal time = 0;
-    const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, time));
+    const bool wsUnits = bool(evalInt("worldspaceunits", 0, time));
 
-    changed |= enableParm("bandWidth", !wsUnits);
-    changed |= enableParm("bandWidthWS", wsUnits);
-    changed |= enableParm("bandWidth", !wsUnits);
-    changed |= enableParm("bandWidthWS", wsUnits);
+    changed |= enableParm("bandwidth", !wsUnits);
+    changed |= enableParm("bandwidthws", wsUnits);
 
-    changed |= setVisibleState("bandWidth", !wsUnits);
-    changed |= setVisibleState("bandWidthWS", wsUnits);
+    changed |= setVisibleState("bandwidth", !wsUnits);
+    changed |= setVisibleState("bandwidthws", wsUnits);
 
-    const bool useCustomName = evalInt("outputName", 0, time) != 0;
-    changed |= enableParm("customName", useCustomName);
+    const auto outputName = evalStdString("outputname", time);
+    changed |= enableParm("customname", (outputName != "keep"));
 
     return changed;
+}
+
+
+void
+SOP_OpenVDB_Topology_To_Level_Set::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    const fpreal time = 0.0;
+
+    if (PRM_Parm* parm = obsoleteParms->getParmPtr("outputName")) {
+        if (!parm->isFactoryDefault()) {
+            std::string val{"keep"};
+            switch (obsoleteParms->evalInt("outputName", 0, time)) {
+                case 0: val = "keep"; break;
+                case 1: val = "append"; break;
+                case 2: val = "replace"; break;
+            }
+            setString(val.c_str(), CH_STRING_LITERAL, "outputname", 0, time);
+        }
+    }
+
+    resolveRenamedParm(*obsoleteParms, "customName", "customname");
+    resolveRenamedParm(*obsoleteParms, "worldSpaceUnits", "worldspaceunits");
+    resolveRenamedParm(*obsoleteParms, "bandWidth", "bandwidth");
+    resolveRenamedParm(*obsoleteParms, "bandWidthWS", "bandwidthws");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -264,12 +323,16 @@ SOP_OpenVDB_Topology_To_Level_Set::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Topology_To_Level_Set)::cookVDBSop(
+    OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
         gdp->clearAndDestroy();
+#endif
+
+        const fpreal time = context.getTime();
 
         const GU_Detail* inputGeoPt = inputGeo(0);
         if (inputGeoPt == nullptr) return error();
@@ -278,23 +341,19 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
 
         // Get UI settings
 
-        UT_String customName, groupStr;
-        evalString(customName, "customName", 0, time);
-        evalString(groupStr, "group", 0, time);
-
         Converter converter(*gdp, boss);
-        converter.worldSpaceUnits = evalInt("worldSpaceUnits", 0, time) != 0;
+        converter.worldSpaceUnits = evalInt("worldspaceunits", 0, time) != 0;
         converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
         converter.bandWidthVoxels = static_cast<int>(evalInt("bandWidth", 0, time));
         converter.closingWidth = static_cast<int>(evalInt("closingwidth", 0, time));
         converter.dilation = static_cast<int>(evalInt("dilation", 0, time));
         converter.smoothingSteps = static_cast<int>(evalInt("smoothingsteps", 0, time));
-        converter.outputName = static_cast<int>(evalInt("outputName", 0, time));
-        converter.customName = customName.toStdString();
+        converter.outputName = evalStdString("outputname", time);
+        converter.customName = evalStdString("customname", time);
 
         // Process VDB primitives
 
-        const GA_PrimitiveGroup* group = matchGroup(*inputGeoPt, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*inputGeoPt, evalStdString("group", time));
 
         hvdb::VdbPrimCIterator vdbIt(inputGeoPt, group);
 
@@ -310,6 +369,15 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
             const GU_PrimVDB *vdb = *vdbIt;
 
             if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) {
+#if UT_VERSION_INT >= 0x100001d0 // 16.0.464 or later
+                if (!GEOvdbProcessTypedGridPoint(*vdb, converter)) {
+                    if (vdb->getGrid().isType<cvdb::MaskGrid>()) {
+                        cvdb::MaskGrid::ConstPtr grid =
+                            cvdb::gridConstPtrCast<cvdb::MaskGrid>(vdb->getGridPtr());
+                        converter(*grid);
+                    }
+                }
+#else
                 // Handle grid types that are not natively supported by Houdini.
                 if (vdb->getGrid().isType<cvdb::tools::PointIndexGrid>()) {
                     cvdb::tools::PointIndexGrid::ConstPtr grid =
@@ -324,6 +392,7 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
                         cvdb::gridConstPtrCast<cvdb::MaskGrid>(vdb->getGridPtr());
                     converter(*grid);
                 }
+#endif
             }
         }
 

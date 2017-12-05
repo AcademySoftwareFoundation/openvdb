@@ -46,27 +46,42 @@
 #include <openvdb_houdini/DW_VDBUtils.h>
 #endif
 
+#include <GA/GA_Handle.h>
+#include <GA/GA_Types.h>
+#include <GU/GU_ConvertParms.h>
+#include <GU/GU_Detail.h>
+#include <GU/GU_PolyReduce.h>
+#include <GU/GU_Surfacer.h>
+#include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
 #include <UT/UT_Version.h>
-#include <GA/GA_Types.h>
-#include <GA/GA_Handle.h>
-#include <GU/GU_ConvertParms.h>
-#include <GU/GU_Detail.h>
-#include <GU/GU_Surfacer.h>
-#include <GU/GU_PolyReduce.h>
-#include <PRM/PRM_Parm.h>
 
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/type_traits/is_arithmetic.hpp>
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <vector>
 
-namespace boost {
-template<> struct is_integral<openvdb::PointIndex32>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointIndex64>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointDataIndex32>: public boost::true_type {};
-template<> struct is_integral<openvdb::PointDataIndex64>: public boost::true_type {};
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+#include <memory>
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
+namespace std {
+template<> struct is_integral<openvdb::PointIndex32>: public true_type {};
+template<> struct is_integral<openvdb::PointIndex64>: public true_type {};
+template<> struct is_integral<openvdb::PointDataIndex32>: public true_type {};
+template<> struct is_integral<openvdb::PointDataIndex64>: public true_type {};
 }
 
 namespace hvdb = openvdb_houdini;
@@ -79,10 +94,6 @@ namespace hutil = houdini_utils;
 #define HAVE_SURFACING_PARM 1
 #endif
 
-#if (UT_VERSION_INT < 0x0c050000) // before 12.5.0
-using UT_Vector3i = UT_Vector3T<int32>;
-#endif
-
 
 enum RenderStyle { STYLE_NONE = 0, STYLE_POINTS, STYLE_WIRE_BOX, STYLE_SOLID_BOX };
 
@@ -93,29 +104,33 @@ class SOP_OpenVDB_Visualize: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Visualize(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Visualize() override {}
+    ~SOP_OpenVDB_Visualize() override = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
     int isRefInput(unsigned i) const override { return (i == 1); }
 
-    static UT_Vector3 colorLevel(int level) { return mColors[std::max(3-level,0)]; }
-    static const UT_Vector3& colorSign(bool negative) { return mColors[negative ? 5 : 4]; }
+    static UT_Vector3 colorLevel(int level) { return sColors[std::max(3-level,0)]; }
+    static const UT_Vector3& colorSign(bool negative) { return sColors[negative ? 5 : 4]; }
 
-    std::string evalStdString(const char* parmName, int vn, fpreal time) const;
-    RenderStyle evalRenderStyle(const char* toggleParmName, const char* modeParmName,
-        fpreal time = 0.0);
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
-    static UT_Vector3 mColors[];
+
+private:
+    static const UT_Vector3 sColors[];
 };
 
 
 // Same color scheme as the VDB TOG paper.
-UT_Vector3 SOP_OpenVDB_Visualize::mColors[] = {
+const UT_Vector3 SOP_OpenVDB_Visualize::sColors[] = {
     UT_Vector3(0.045f, 0.045f, 0.045f),         // 0. Root
     UT_Vector3(0.0432f, 0.33f, 0.0411023f),     // 1. First internal node level
     UT_Vector3(0.871f, 0.394f, 0.01916f),       // 2. Intermediate internal node levels
@@ -189,7 +204,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "Specify whether to generate geometry with the `Cd` color attribute."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewFrustum", "Frustum")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewfrustum", "Frustum")
         .setTooltip(
             "Specify whether to draw the camera frustums\n"
             "of grids with frustum transforms.")
@@ -341,6 +356,7 @@ newSopOperator(OP_OperatorTable* table)
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "voxels", "Active Voxels")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "previewFrustum", "Frustum"));
 
 #ifndef DWA_OPENVDB
     // We probably need this to share hip files.
@@ -352,6 +368,9 @@ newSopOperator(OP_OperatorTable* table)
         .addAlias("OpenVDB Visualizer")
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs to visualize")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -492,6 +511,8 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
         }
     }
 
+    resolveRenamedParm(*obsoleteParms, "previewFrustum", "previewfrustum");
+
     // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
@@ -514,9 +535,9 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
     changed |= enableParm("isoValue", extractMesh);
 #endif
 
-    std::string
-        tileMode = this->evalStdString("tilemode", 0, time),
-        voxelMode = this->evalStdString("voxelmode", 0, time);
+    const std::string
+        tileMode = evalStdString("tilemode", time),
+        voxelMode = evalStdString("voxelmode", time);
     const bool
         drawVoxels = bool(evalInt("drawvoxels", 0, time)),
         drawTiles = bool(evalInt("drawtiles", 0, time)),
@@ -538,21 +559,13 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
 ////////////////////////////////////////
 
 
-std::string
-SOP_OpenVDB_Visualize::evalStdString(const char* parmName, int vn, fpreal time) const
-{
-    UT_String s;
-    evalString(s, parmName, vn, time);
-    return s.toStdString();
-}
-
-
-RenderStyle
-SOP_OpenVDB_Visualize::evalRenderStyle(const char* toggleName, const char* modeName, fpreal time)
+template<typename OpType>
+inline RenderStyle
+evalRenderStyle(OpType& op, const char* toggleName, const char* modeName, fpreal time)
 {
     RenderStyle style = STYLE_NONE;
-    if (evalInt(toggleName, 0, time)) {
-        std::string mode = this->evalStdString(modeName, 0, time);
+    if (op.evalInt(toggleName, 0, time)) {
+        const std::string mode = op.evalStdString(modeName, time);
         if (mode == "points") {
             style = STYLE_POINTS;
         } else if (mode == "wirebox") {
@@ -668,15 +681,15 @@ private:
     GA_Offset createPoint(const openvdb::CoordBBox&, const UT_Vector3& color);
 
     template<typename ValType>
-    typename boost::enable_if<boost::is_integral<ValType>, void>::type
+    typename std::enable_if<std::is_integral<ValType>::value>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
-    typename boost::enable_if<boost::is_floating_point<ValType>, void>::type
+    typename std::enable_if<std::is_floating_point<ValType>::value>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
-    typename boost::disable_if<boost::is_arithmetic<ValType>, void>::type
+    typename std::enable_if<!std::is_arithmetic<ValType>::value>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType v, bool staggered);
 
     void addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, bool staggered);
@@ -831,17 +844,10 @@ TreeVisualizer::operator()(const GridType& grid)
     }
 
     if (mParms.addColor) {
-#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
         mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT));
         if (!mCdHandle.isValid()) {
             mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT));
         }
-#else
-        mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
-        if (!mCdHandle.isValid()) {
-            mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
-        }
-#endif
     }
 
     const bool staggered = !mParms.ignoreStaggeredVectors &&
@@ -901,7 +907,7 @@ TreeVisualizer::createPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::enable_if<boost::is_integral<ValType>, void>::type
+typename std::enable_if<std::is_integral<ValType>::value>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType s, bool)
 {
@@ -910,7 +916,7 @@ TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::enable_if<boost::is_floating_point<ValType>, void>::type
+typename std::enable_if<std::is_floating_point<ValType>::value>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType s, bool)
 {
@@ -919,7 +925,7 @@ TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename boost::disable_if<boost::is_arithmetic<ValType>, void>::type
+typename std::enable_if<!std::is_arithmetic<ValType>::value>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType v, bool staggered)
 {
@@ -1118,12 +1124,15 @@ GridSurfacer::operator()(const GridType& grid)
 
 
 OP_ERROR
-SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
         gdp->clearAndDestroy();
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Visualizing VDBs");
 
@@ -1131,15 +1140,13 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
         if (refGdp == nullptr) return error();
 
         // Get the group of grids to visualize.
-        const GA_PrimitiveGroup* group =
-            matchGroup(*refGdp, this->evalStdString("group", 0, time));
-
+        const GA_PrimitiveGroup* group = matchGroup(*refGdp, evalStdString("group", time));
 
         // Evaluate the UI parameters.
         MeshMode meshing = MESH_NONE;
 #if HAVE_SURFACING_PARM
         if (evalInt("drawsurface", 0, time)) {
-            std::string s = this->evalStdString("mesher", 0, time);
+            std::string s = evalStdString("mesher", time);
             meshing = (s == "houdini") ? MESH_HOUDINI : MESH_OPENVDB;
         }
         const double adaptivity = evalFloat("adaptivity", 0, time);
@@ -1147,10 +1154,10 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
 #endif
 
         TreeParms treeParms;
-        treeParms.internalStyle = evalRenderStyle("drawinternalnodes", "internalmode", time);
-        treeParms.tileStyle = evalRenderStyle("drawtiles", "tilemode", time);
-        treeParms.leafStyle = evalRenderStyle("drawleafnodes", "leafmode", time);
-        treeParms.voxelStyle = evalRenderStyle("drawvoxels", "voxelmode", time);
+        treeParms.internalStyle = evalRenderStyle(*this, "drawinternalnodes", "internalmode", time);
+        treeParms.tileStyle = evalRenderStyle(*this, "drawtiles", "tilemode", time);
+        treeParms.leafStyle = evalRenderStyle(*this, "drawleafnodes", "leafmode", time);
+        treeParms.voxelStyle = evalRenderStyle(*this, "drawvoxels", "voxelmode", time);
         treeParms.addColor = bool(evalInt("addcolor", 0, time));
         treeParms.addValue = bool(evalInt("addvalue", 0, time));
         treeParms.addIndexCoord = bool(evalInt("addindexcoord", 0, time));
@@ -1159,7 +1166,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
 
         const bool drawTree = (treeParms.internalStyle || treeParms.tileStyle
             || treeParms.leafStyle || treeParms.voxelStyle);
-        const bool showFrustum = bool(evalInt("previewFrustum", 0, time));
+        const bool showFrustum = bool(evalInt("previewfrustum", 0, time));
 #ifdef DWA_OPENVDB
         const bool showROI = bool(evalInt("previewroi", 0, time));
 #else
@@ -1181,18 +1188,21 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
         // mesh using OpenVDB mesher
         if (meshing == MESH_OPENVDB) {
             GU_ConvertParms parms;
-#if (UT_VERSION_INT < 0x0d0000b1) // before 13.0.177
-            parms.toType = GEO_PrimTypeCompat::GEOPRIMPOLY;
-#else
             parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
-#endif
             parms.myOffset = static_cast<float>(iso);
             parms.preserveGroups = false;
+#if UT_MAJOR_VERSION_INT < 16
             parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);
-            GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms,
-                adaptivity, /*keep_original*/true);
-        }
+#else
+            // parms.primGroup might be modified, so make a copy.
+            UT_UniquePtr<GA_PrimitiveGroup> groupDeleter;
+            parms.primGroup = new GA_PrimitiveGroup(*refGdp);
+            groupDeleter.reset(parms.primGroup);
+            parms.primGroup->copyMembership(*group);
 #endif
+            GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms, adaptivity, /*keep_original*/true);
+        }
+#endif // HAVE_SURFACING_PARM
 
         if (!boss.wasInterrupted()
             && (meshing == MESH_HOUDINI || drawTree || showFrustum || showROI))
@@ -1218,6 +1228,9 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
                     TreeVisualizer draw(*gdp, treeParms, &boss);
 
                     if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
+#if UT_VERSION_INT >= 0x100001d0 // 16.0.464 or later
+                        GEOvdbProcessTypedGridPoint(*vdb, draw);
+#else
                         // Handle grid types that are not natively supported by Houdini.
                         if (vdb->getGrid().isType<openvdb::tools::PointIndexGrid>()) {
                             openvdb::tools::PointIndexGrid::ConstPtr grid =
@@ -1230,6 +1243,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
                                      vdb->getGridPtr());
                             draw(*grid);
                         }
+#endif
                     }
                 }
 

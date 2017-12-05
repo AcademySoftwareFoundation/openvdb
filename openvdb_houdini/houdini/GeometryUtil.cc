@@ -37,20 +37,27 @@
 #include <houdini_utils/geometry.h> // for createBox()
 #include <openvdb/tools/VolumeToMesh.h>
 
-#include <UT/UT_ScopedPtr.h>
-#include <UT/UT_String.h>
-#include <UT/UT_BoundingBox.h>
-#include <UT/UT_Version.h>
-#include <GU/GU_PrimPoly.h>
-#include <GU/GU_ConvertParms.h>
 #include <GA/GA_ElementWrangler.h>
 #include <GA/GA_PageIterator.h>
 #include <GA/GA_SplittableRange.h>
 #include <GA/GA_Types.h>
+#include <GU/GU_ConvertParms.h>
+#include <GU/GU_PrimPoly.h>
 #include <OBJ/OBJ_Camera.h>
+#include <UT/UT_BoundingBox.h>
+#include <UT/UT_String.h>
+#include <UT/UT_Version.h>
 
 #include <cmath>
 #include <stdexcept>
+#include <vector>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+#include <memory>
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
 
 
 namespace openvdb_houdini {
@@ -134,11 +141,7 @@ drawFrustum(
         size_t total_count = 0;
 
         if (tickColor) {
-#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
             cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT));
-#else
-            cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
-#endif
         }
 
         for (double z = bbox.min()[2] + 1, Z = bbox.max()[2]; z < Z; ++z) {
@@ -234,11 +237,7 @@ frustumTransformFromCamera(
     float offset, float nearPlaneDist, float farPlaneDist,
     float voxelDepthSize, int voxelCountX)
 {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     cam.addInterestOnCameraParms(&node);
-#else
-    cam.addInterestsOnIFDParms(&node);
-#endif
 
     const fpreal time = context.getTime();
 
@@ -360,7 +359,7 @@ convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* bo
     {
         if (boss && boss->wasInterrupted()) return geoPtr;
 
-        if (prim->getPrimitiveId() & GEO_PrimTypeCompat::GEOPRIMPOLY) {
+        if (prim->getTypeId() == GA_PRIMPOLY) {
 
             const GEO_PrimPoly *poly = static_cast<const GEO_PrimPoly*>(prim);
 
@@ -387,16 +386,11 @@ convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* bo
 
     if (needconvert) {
         GU_ConvertParms parms;
-#if (UT_VERSION_INT < 0x0d0000b1) // before 13.0.177
-        parms.fromType = GEO_PrimTypeCompat::GEOPRIMALL;
-        parms.toType = GEO_PrimTypeCompat::GEOPRIMPOLY;
-#else
         parms.setFromType(GEO_PrimTypeCompat::GEOPRIMALL);
         parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
         // We don't want interior tetrahedron faces as they will just
         // distract us and fill up the vdb.
         parms.setSharedFaces(false);
-#endif
         geoPtr->convert(parms);
     }
 
@@ -452,14 +446,6 @@ convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* bo
 }
 
 
-boost::shared_ptr<GU_Detail>
-validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* boss)
-{
-    auto geoPtr = convertGeometry(geometry, warning, boss);
-    return boost::shared_ptr<GU_Detail>{geoPtr.release()};
-}
-
-
 ////////////////////////////////////////
 
 
@@ -512,7 +498,6 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 {
     openvdb::Vec4I prim;
     GA_Offset start, end;
-    GA_Size vtxn;
 
     // Iterate over pages in the range
     for (GA_PageIterator pit = r.beginPages(); !pit.atEnd(); ++pit) {
@@ -522,14 +507,14 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
             for (GA_Offset i = start; i < end; ++i) {
 
                 const GA_Primitive* primRef =  mGdp->getPrimitiveList().get(i);
-                vtxn = primRef->getVertexCount();
+                const GA_Size vtxn = primRef->getVertexCount();
 
                 if (primRef->getTypeId() == GEO_PRIMPOLY && (3 == vtxn || 4 == vtxn)) {
 
 #if UT_MAJOR_VERSION_INT >= 16
-                    for (int vtx = 0, vtxN = int(primRef->getVertexCount()); vtx < vtxN; ++vtx) {
+                    for (int vtx = 0; vtx < int(vtxn); ++vtx) {
                         prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
-                            mGdp->pointIndex(primRef->getPointOffset(vtx)));
+                            primRef->getPointIndex(vtx));
                     }
 #else
                     GA_Primitive::const_iterator vit;
@@ -577,10 +562,7 @@ VertexNormalOp::VertexNormalOp(GU_Detail& detail,
 void
 VertexNormalOp::operator()(const GA_SplittableRange& range) const
 {
-    GA_Offset start, end, vtxOffset, primOffset;
-#if UT_MAJOR_VERSION_INT < 16
-    GA_Primitive::const_iterator it;
-#endif
+    GA_Offset start, end, primOffset;
     UT_Vector3 primN, avgN, tmpN;
     bool interiorPrim = false;
     const GA_Primitive* primRef = nullptr;
@@ -597,7 +579,8 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
 #if UT_MAJOR_VERSION_INT >= 16
                 for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
                     avgN = primN;
-                    vtxOffset = mDetail.pointVertex(primRef->getPointOffset(vtx));
+                    const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
+                    GA_Offset vtxOffset = mDetail.pointVertex(mDetail.vertexPoint(vtxoff));
                     while (GAisValid(vtxOffset)) {
                         primOffset = mDetail.vertexPrimitive(vtxOffset);
                         if (interiorPrim == isInteriorPrim(primOffset)) {
@@ -607,12 +590,13 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
                         vtxOffset = mDetail.vertexToNextVertex(vtxOffset);
                     }
                     avgN.normalize();
-                    mNormalHandle.set(primRef->getVertexOffset(vtx), avgN);
+                    mNormalHandle.set(vtxoff, avgN);
                 }
 #else
+                GA_Primitive::const_iterator it;
                 for (primRef->beginVertex(it); !it.atEnd(); ++it) {
                     avgN = primN;
-                    vtxOffset = mDetail.pointVertex(it.getPointOffset());
+                    GA_Offset vtxOffset = mDetail.pointVertex(it.getPointOffset());
                     while (GAisValid(vtxOffset)) {
                         primOffset = mDetail.vertexPrimitive(vtxOffset);
                         if (interiorPrim == isInteriorPrim(primOffset)) {
@@ -654,7 +638,7 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
     openvdb::tools::MeshToVoxelEdgeData::Accessor acc = mEdgeData.getAccessor();
 
     using BoolAccessor = openvdb::tree::ValueAccessor<const openvdb::BoolTree>;
-    std::unique_ptr<BoolAccessor> maskAcc;
+    UT_UniquePtr<BoolAccessor> maskAcc;
 
     if (mMaskTree) {
         maskAcc.reset(new BoolAccessor(*mMaskTree));
@@ -767,103 +751,7 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
     }
 }
 
-
 } // namespace openvdb_houdini
-
-
-////////////////////////////////////////
-
-
-#if (UT_VERSION_INT < 0x0c0500F5) // Prior to 12.5.245
-
-// Symbols in namespace GU_Convert_H12_5 were added to GU_ConvertParms.h in 12.5.245
-
-namespace GU_Convert_H12_5 {
-
-// Implementation which uses un-cached wranglers for H12.1, in H12.5 these
-// wranglers are cached across all primitives with GU_ConvertParms itself.
-void
-GUconvertCopySingleVertexPrimAttribsAndGroups(
-    GU_ConvertParms &/*parms*/,
-    const GA_Detail &src,
-    GA_Offset src_primoff,
-    GA_Detail &dst,
-    const GA_Range &dst_prims,
-    const GA_Range &dst_points)
-{
-    UT_ScopedPtr<GA_ElementWranglerCache> cache;
-#if 0
-    if (parms.preserveGroups)
-        cache.reset(new GA_ElementWranglerCache(dst, src,
-            GA_AttributeFilter::selectGroup()));
-    else
-#endif
-        cache.reset(new GA_ElementWranglerCache(dst, src,
-            GA_PointWrangler::EXCLUDE_P));
-
-    const GA_Primitive& src_prim = *(src.getPrimitiveList().get(src_primoff));
-    GA_Offset           src_vtxoff = src_prim.getVertexOffset(0);
-    GA_Offset           src_ptoff = src_prim.getPointOffset(0);
-    GA_ElementWranglerCache&    wranglers = *cache;
-    GA_PrimitiveWrangler&       prim_wrangler = wranglers.getPrimitive();
-    GA_VertexWrangler&          vtx_wrangler = wranglers.getVertex();
-    GA_PointWrangler&           pt_wrangler = wranglers.getPoint();
-    GA_PrimitiveWrangler*       prim_group_wrangler = nullptr;
-    GA_PointWrangler*           pt_group_wrangler = nullptr;
-
-#if 1
-    bool have_vtx_attribs = true;
-    bool have_pt_attribs = true;
-#else
-    // This is only optimization available in H12.5
-    bool have_vtx_attribs = (vtx_wrangler.getNumAttributes() > 0);
-    bool have_pt_attribs = (pt_wrangler.getNumAttributes() > 0);
-#endif
-
-#if 0
-    if (parms.preserveGroups)
-    {
-        prim_group_wrangler = &parms.getGroupWranglers(dst,&src).getPrimitive();
-        if (prim_group_wrangler->getNumAttributes() <= 0)
-            prim_group_wrangler = nullptr;
-        pt_group_wrangler = &parms.getGroupWranglers(dst,&src).getPoint();
-        if (pt_group_wrangler->getNumAttributes() <= 0)
-            pt_group_wrangler = nullptr;
-    }
-#endif
-
-    UT_ASSERT(src_prim.getVertexCount() == 1);
-    for (GA_Iterator i(dst_prims); !i.atEnd(); ++i)
-    {
-        if (prim_group_wrangler)
-            prim_group_wrangler->copyAttributeValues(*i, src_primoff);
-        if (have_pt_attribs)
-            prim_wrangler.copyAttributeValues(*i, src_primoff);
-        if (have_vtx_attribs)
-        {
-            GA_Primitive &dst_prim = *(dst.getPrimitiveList().get(*i));
-            GA_Size nvtx = dst_prim.getVertexCount();
-            for (GA_Size j = 0; j < nvtx; ++j)
-            {
-                vtx_wrangler.copyAttributeValues(
-                    dst_prim.getVertexOffset(j),
-                    src_vtxoff);
-            }
-        }
-    }
-
-    for (GA_Iterator i(dst_points); !i.atEnd(); ++i)
-    {
-        if (pt_group_wrangler)
-            pt_group_wrangler->copyAttributeValues(*i, src_ptoff);
-        if (have_pt_attribs)
-            pt_wrangler.copyAttributeValues(*i, src_ptoff);
-    }
-}
-
-} // namespace GU_Convert_H12_5
-
-#endif // Prior to 12.5.245
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

@@ -109,11 +109,7 @@ VdbPrimCIterator::getPrimitive() const
 {
     if (mIter) {
         if (GA_Primitive* prim = mIter->getPrimitive()) {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
             const GA_PrimitiveTypeId primVdbTypeId = GA_PRIMVDB;
-#else
-            const GA_PrimitiveTypeId primVdbTypeId = GU_PrimVDB::theTypeId();
-#endif
             if (prim->getTypeId() == primVdbTypeId) {
                 GU_PrimVDB* vdb = UTverify_cast<GU_PrimVDB*>(prim);
                 if (mFilter && !mFilter(*vdb)) return nullptr;

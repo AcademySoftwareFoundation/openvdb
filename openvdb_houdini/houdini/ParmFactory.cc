@@ -1264,8 +1264,7 @@ OpFactory::setOperatorTable(const std::string& name)
 
 #if UT_MAJOR_VERSION_INT >= 16
 OpFactory&
-OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode,
-    const CacheAllocFunc& allocator)
+OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator)
 {
     if (flavor() != SOP) {
         throw std::runtime_error{"expected operator of type SOP, got " + flavorToString(flavor())};

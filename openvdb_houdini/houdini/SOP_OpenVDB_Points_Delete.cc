@@ -44,6 +44,18 @@
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
 
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 using namespace openvdb;
 using namespace openvdb::points;
 using namespace openvdb::math;
@@ -63,11 +75,12 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
-
-private:
-    hvdb::Interrupter mBoss;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 }; // class SOP_OpenVDB_Points_Delete
 
 
@@ -103,6 +116,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Points Delete",
         SOP_OpenVDB_Points_Delete::factory, parms, *table)
         .addInput("VDB Points")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Delete::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -148,17 +164,16 @@ SOP_OpenVDB_Points_Delete::SOP_OpenVDB_Points_Delete(OP_Network* net,
 
 
 OP_ERROR
-SOP_OpenVDB_Points_Delete::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        lock.markInputUnlocked(0);
         if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
+#endif
 
-        UT_String groupStr;
-        evalString(groupStr, "vdbpointsgroups", 0, context.getTime());
-
-        const std::string groups(groupStr.toStdString());
+        const std::string groups = evalStdString("vdbpointsgroups", context.getTime());
 
         // early exit if the VDB points group field is empty
         if (groups.empty()) return error();
@@ -168,11 +183,8 @@ SOP_OpenVDB_Points_Delete::cookMySop(OP_Context& context)
         const bool invert = evalInt("invert", 0, context.getTime());
 
         // select Houdini primitive groups we wish to use
-        UT_String houdiniPrimGroups;
-        evalString(houdiniPrimGroups, "group", 0, context.getTime());
-
         const GA_PrimitiveGroup *group =
-            matchGroup(*gdp, houdiniPrimGroups.toStdString());
+            matchGroup(*gdp, evalStdString("group", context.getTime()));
 
         hvdb::VdbPrimIterator vdbIt(gdp, group);
 

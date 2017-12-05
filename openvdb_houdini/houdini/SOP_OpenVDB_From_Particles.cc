@@ -51,14 +51,22 @@
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <PRM/PRM_Parm.h>
+#include <UT/UT_Assert.h>
+#include <UT/UT_Version.h>
 
 #include <algorithm>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <utility> // for std::pair
 #include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -87,14 +95,14 @@ public:
     }
 
     // Do the particles have non-constant radius
-    bool hasRadius()   const { return mHasRadius;}
+    bool hasRadius() const { return mHasRadius;}
 
     // Do the particles have velocity
     bool hasVelocity() const { return mHasVelocity;}
 
     // Multiplier for the radius
-    openvdb::Real& radiusMult() { return mRadiusMult; }
-    const openvdb::Real& radiusMult() const { return mRadiusMult; }
+    openvdb::Real radiusMult() const { return mRadiusMult; }
+    void setRadiusMult(openvdb::Real mult) { mRadiusMult = mult; }
 
     // The public methods below are the only ones required
     // by tools::ParticlesToLevelSet
@@ -111,7 +119,7 @@ public:
     // This is required by ParticlesToLevelSet::rasterizeSpheres(*this)
     void getPosRad(size_t n, openvdb::Vec3R& xyz, openvdb::Real& rad) const
     {
-        assert(mHasRadius);
+        UT_ASSERT(mHasRadius);
         const GA_Offset m = mGdp->pointOffset(n);
         const UT_Vector3 p = mGdp->getPos3(m);
         xyz[0] = p[0], xyz[1] = p[1], xyz[2] = p[2];
@@ -122,7 +130,7 @@ public:
     void getPosRadVel(size_t n, openvdb::Vec3R& xyz,
                       openvdb::Real& rad, openvdb::Vec3R& vel) const
     {
-        assert(mHasVelocity);
+        UT_ASSERT(mHasVelocity);
         const GA_Offset m = mGdp->pointOffset(n);
         const UT_Vector3 p = mGdp->getPos3(m);
         xyz[0] = p[0], xyz[1] = p[1], xyz[2] = p[2];
@@ -134,7 +142,6 @@ public:
     void getAtt(size_t n, openvdb::Int32& att) const { att = openvdb::Int32(n); }
 
 protected:
-
     const GU_Detail*    mGdp;
     GA_ROHandleF        mScaleHandle;
     GA_ROHandleV3       mVelHandle;
@@ -142,6 +149,30 @@ protected:
     openvdb::Real       mRadiusMult; // multiplier for radius
     const openvdb::Real mVelocityMult; // multiplier for velocity
 };// ParticleList
+
+
+////////////////////////////////////////
+
+
+template<class ValueType>
+void
+addAttributeDetails(
+    hvdb::AttributeDetailList&,
+    const GA_Attribute*,
+    const GA_AIFTuple*,
+    const int attrTupleSize,
+    const openvdb::Int32Grid& closestPtnIdxGrid,
+    std::string& customName,
+    int vecType = -1);
+
+
+void
+transferAttributes(
+    hvdb::AttributeDetailList&,
+    const openvdb::Int32Grid& closestPtnIdxGrid,
+    openvdb::math::Transform::Ptr&,
+    const GU_Detail& pointGeo,
+    GU_Detail& outputGeo);
 
 
 ////////////////////////////////////////
@@ -227,47 +258,52 @@ class SOP_OpenVDB_From_Particles: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_From_Particles(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_From_Particles() override {}
+    ~SOP_OpenVDB_From_Particles() override = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned i ) const override { return (i > 0); }
+    int isRefInput(unsigned i) const override { return (i > 0); }
 
     int convertUnits();
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        float voxelSize() const { return mVoxelSize; }
+
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+
+    private:
+        void convert(
+            fpreal time,
+            openvdb::FloatGrid::Ptr,
+            ParticleList&,
+            hvdb::Interrupter&);
+
+        void convertWithAttributes(
+            fpreal time,
+            openvdb::FloatGrid::Ptr,
+            ParticleList&,
+            const GU_Detail&,
+            hvdb::Interrupter&);
+
+        int constructGenericAtttributeList(
+            fpreal time,
+            hvdb::AttributeDetailList&,
+            const GU_Detail&,
+            const openvdb::Int32Grid& closestPtnIdxGrid);
+
+        float mVoxelSize = 0.1f;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
-    bool updateParmsFlags() override;
-
-private:
     void resolveObsoleteParms(PRM_ParmList*) override;
-    void convert(openvdb::FloatGrid::Ptr, ParticleList&, hvdb::Interrupter&);
-    void convertWithAttributes(
-        openvdb::FloatGrid::Ptr, ParticleList&, const GU_Detail&, hvdb::Interrupter&);
-
-    int constructGenericAtttributeList(
-        hvdb::AttributeDetailList &pointAttributes,
-        const GU_Detail&,
-        const openvdb::Int32Grid& closestPtnIdxGrid);
-
-    template <class ValueType>
-    void addAttributeDetails(
-        hvdb::AttributeDetailList &attributeList,
-        const GA_Attribute *attribute,
-        const GA_AIFTuple *tupleAIF,
-        const int attrTupleSize,
-        const openvdb::Int32Grid& closestPtnIdxGrid,
-        std::string& customName,
-        int vecType = -1);
-
-    void transferAttributes(
-        hvdb::AttributeDetailList &pointAttributes,
-        const openvdb::Int32Grid&,
-        openvdb::math::Transform::Ptr& transform,
-        const GU_Detail&);
-
-    float mVoxelSize;
-    fpreal mTime;
+    bool updateParmsFlags() override;
 };
 
 
@@ -292,19 +328,19 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "distancevdb", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "builddistance", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip("Compute a narrow-band signed distance/level set grid from the input points.")
         .setDocumentation(nullptr));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "distancevdbname", "Distance VDB")
+    parms.add(hutil::ParmFactory(PRM_STRING, "distancename", "Distance VDB")
         .setDefault("surface")
         .setTooltip("Distance grid name")
         .setDocumentation(
             "If enabled, output a narrow-band signed distance field with the given name."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogvdb", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "buildfog", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip(
             "Compute a fog volume grid by remapping the level set "
@@ -314,7 +350,7 @@ newSopOperator(OP_OperatorTable* table)
             "all exterior regions are set to zero, marked inactive and pruned.")
         .setDocumentation(nullptr));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "fogvdbname", "Fog VDB")
+    parms.add(hutil::ParmFactory(PRM_STRING, "fogname", "Fog VDB")
         .setDefault("density")
         .setTooltip("Fog volume grid name")
         .setDocumentation(
@@ -323,14 +359,14 @@ newSopOperator(OP_OperatorTable* table)
             " have value zero.  Within a narrow band centered on particle surfaces,"
             " voxel values vary linearly from zero to one."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "maskvdb", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "buildmask", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip(
             "Output an alpha mask grid that can be used to constrain"
             " smoothing operations and preserve surface features.")
         .setDocumentation(nullptr));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "maskvdbname", "Mask VDB")
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Mask VDB")
         .setDefault("boundingvolume")
         .setTooltip("Mask grid name")
         .setDocumentation(
@@ -516,10 +552,11 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "transformHeading", "Transform"));
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "outputHeading", "Output grids"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "threading", "Threading"));
-    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "matchlevelset", "Match reference level set band"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "matchlevelset", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "levelSet", "").setDefault(PRMoneDefaults));
     obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "gridName", "").setDefault("surface"));
-    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "fogVolumeGridName", "").setDefault("density"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "fogVolumeGridName", "")
+        .setDefault("density"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "fogVolume", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "maskVolume", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "maskVolumeGridName", "").setDefault("mask"));
@@ -531,7 +568,8 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxWidth", "Max Half-width"));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "Rmax", "Max Radius In Voxels"));
-    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "").setDefault(PRMpointOneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "")
+        .setDefault(PRMpointOneDefaults));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "dR", "").setDefault(PRMoneDefaults));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "Rmin", "").setDefault(1.5));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "dV", "").setDefault(PRMoneDefaults));
@@ -539,23 +577,32 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute transfer"));
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "particleHeading", "Conversion settings"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Level Set"));
-    {
-        const char* items[] = { "sphere", "Spherical", "trail",  "Velocity Trail", nullptr };
-        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "footprint", "Particle Footprint")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "footprint", ""));
     // temporary parameters used in the 3.2 beta
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "dilate", "").setDefault(PRMoneDefaults));
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "erode", "").setDefault(PRMoneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "distancevdb", "")
+        .setDefault(PRMoneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "distancevdbname", "").setDefault("surface"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "fogvdb", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "fogvdbname", "").setDefault("density"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "maskvdb", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "maskvdbname", "")
+        .setDefault("boundingvolume"));
+
+    /// @todo obsoleteAttrParms
 
 
     hvdb::OpenVDBOpFactory("OpenVDB From Particles",
         SOP_OpenVDB_From_Particles::factory, parms, *table)
-        .addAlias("OpenVDB Particle Voxelizer")
-        .setObsoleteParms(obsoleteParms)
         .addInput("Points to convert")
         .addOptionalInput("Optional VDB grid that defines the output transform. "
             "The half-band width is matched if the input grid is a level set.")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR,
+            []() { return new SOP_OpenVDB_From_Particles::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -612,8 +659,6 @@ SOP_OpenVDB_From_Particles::factory(OP_Network* net,
 SOP_OpenVDB_From_Particles::SOP_OpenVDB_From_Particles(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mVoxelSize(0.1f)
-    , mTime(0.0)
 {
 }
 
@@ -626,12 +671,20 @@ SOP_OpenVDB_From_Particles::convertUnits()
 {
     const fpreal time = CHgetEvalTime();
 
+    float voxSize = 0.1f;
+#if VDB_COMPILABLE_SOP
+    // Attempt to extract the voxel size from our cache.
+    if (const auto* cache = dynamic_cast<SOP_OpenVDB_From_Particles::Cache*>(myNodeVerbCache)) {
+        voxSize = cache->voxelSize();
+    }
+#else
+    voxSize = voxelSize();
+#endif
+
     if (evalInt("useworldspace", 0, time) != 0) {
-        setFloat("halfband", 0, time,
-            evalFloat("halfbandvoxels", 0, time) * mVoxelSize);
+        setFloat("halfband", 0, time, evalFloat("halfbandvoxels", 0, time) * voxSize);
     } else {
-        setFloat("halfbandvoxels", 0, time,
-            evalFloat("halfband", 0, time) / mVoxelSize);
+        setFloat("halfbandvoxels", 0, time, evalFloat("halfband", 0, time) / voxSize);
     }
 
     return 1;
@@ -643,78 +696,35 @@ SOP_OpenVDB_From_Particles::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms || obsoleteParms->allDefaults() != 0) return;
 
-    using StringPair = std::pair<std::string, std::string>;
-
-    const fpreal time = CHgetEvalTime();
-
     PRM_Parm* parm = obsoleteParms->getParmPtr("footprint");
     if (parm && !parm->isFactoryDefault()) {
-        setInt("velocitytrails", 0, time, 1);
+        setInt("velocitytrails", 0, 0.0, 1);
     }
 
-    // Note this function is only evaluated once.
+    resolveRenamedParm(*obsoleteParms, "dR", "particlescale");
+    resolveRenamedParm(*obsoleteParms, "Rmin", "minradius");
+    resolveRenamedParm(*obsoleteParms, "dV", "velocityscale");
+    resolveRenamedParm(*obsoleteParms, "dX", "trailresolution");
+    resolveRenamedParm(*obsoleteParms, "voxelSize", "voxelsize");
+    resolveRenamedParm(*obsoleteParms, "maskWidth", "boundinglimit");
+    resolveRenamedParm(*obsoleteParms, "bandWidth", "halfbandvoxels");
+    resolveRenamedParm(*obsoleteParms, "bandWidthWS", "halfband");
+    resolveRenamedParm(*obsoleteParms, "levelSet", "builddistance");
+    resolveRenamedParm(*obsoleteParms, "fogVolume", "buildfog");
+    resolveRenamedParm(*obsoleteParms, "maskVolume", "buildmask");
+    resolveRenamedParm(*obsoleteParms, "writeintoref", "merge");
+    resolveRenamedParm(*obsoleteParms, "worldSpaceUnits", "useworldspace");
+    resolveRenamedParm(*obsoleteParms, "gridName", "distancename");
+    resolveRenamedParm(*obsoleteParms, "fogVolumeGridName", "fogname");
+    resolveRenamedParm(*obsoleteParms, "maskVolumeGridName", "maskname");
+    resolveRenamedParm(*obsoleteParms, "group", "referencevdb");
 
-    std::vector<StringPair> floatAttributes;
-    floatAttributes.push_back(StringPair("dR", "particlescale"));
-    floatAttributes.push_back(StringPair("Rmin", "minradius"));
-    floatAttributes.push_back(StringPair("dV", "velocityscale"));
-    floatAttributes.push_back(StringPair("dX", "trailresolution"));
-    floatAttributes.push_back(StringPair("voxelSize", "voxelsize"));
-    floatAttributes.push_back(StringPair("maskWidth", "boundinglimit"));
-    floatAttributes.push_back(StringPair("bandWidth", "halfbandvoxels"));
-    floatAttributes.push_back(StringPair("bandWidthWS", "halfband"));
-
-    for (size_t n = 0, N = floatAttributes.size(); n < N; ++n) {
-
-        const char* oldName = floatAttributes[n].first.c_str();
-        const char* newName = floatAttributes[n].second.c_str();
-
-        parm = obsoleteParms->getParmPtr(oldName);
-        if (parm && !parm->isFactoryDefault()) {
-            setFloat(newName, 0, time, obsoleteParms->evalFloat(oldName, 0, time));
-        }
-    }
-
-
-    std::vector<StringPair> intAttributes;
-    intAttributes.push_back(StringPair("levelSet", "distancevdb"));
-    intAttributes.push_back(StringPair("fogVolume", "fogvdb"));
-    intAttributes.push_back(StringPair("maskVolume", "maskvdb"));
-    intAttributes.push_back(StringPair("writeintoref", "merge"));
-    intAttributes.push_back(StringPair("worldSpaceUnits", "useworldspace"));
-
-    for (size_t n = 0, N = intAttributes.size(); n < N; ++n) {
-
-        const char* oldName = intAttributes[n].first.c_str();
-        const char* newName = intAttributes[n].second.c_str();
-
-        parm = obsoleteParms->getParmPtr(oldName);
-        if (parm && !parm->isFactoryDefault()) {
-            setInt(newName, 0, time, obsoleteParms->evalInt(oldName, 0, time));
-        }
-    }
-
-
-    std::vector<StringPair> strAttributes;
-    strAttributes.push_back(StringPair("gridName", "distancevdbname"));
-    strAttributes.push_back(StringPair("fogVolumeGridName", "fogvdbname"));
-    strAttributes.push_back(StringPair("maskVolumeGridName", "maskvdbname"));
-    strAttributes.push_back(StringPair("group", "referencevdb"));
-
-    for (size_t n = 0, N = strAttributes.size(); n < N; ++n) {
-
-        const char* oldName = strAttributes[n].first.c_str();
-        const char* newName = strAttributes[n].second.c_str();
-
-        parm = obsoleteParms->getParmPtr(oldName);
-        if (parm && !parm->isFactoryDefault()) {
-            UT_String str;
-            obsoleteParms->evalString(str, oldName, 0, time);
-            if (str.length() > 0) {
-                setString(str, CH_STRING_LITERAL, newName, 0, time);
-            }
-        }
-    }
+    resolveRenamedParm(*obsoleteParms, "distancevdb", "builddistance");
+    resolveRenamedParm(*obsoleteParms, "distancevdbname", "distancename");
+    resolveRenamedParm(*obsoleteParms, "fogvdb", "buildfog");
+    resolveRenamedParm(*obsoleteParms, "fogvdbname", "fogname");
+    resolveRenamedParm(*obsoleteParms, "maskvdb", "buildmask");
+    resolveRenamedParm(*obsoleteParms, "maskvdbname", "maskname");
 
     // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
@@ -730,12 +740,12 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
 {
     bool changed = false;
 
-    changed |= enableParm("distancevdbname", bool(evalInt("distancevdb", 0, 0)));
-    changed |= enableParm("fogvdbname", bool(evalInt("fogvdb", 0, 0)));
+    changed |= enableParm("distancename", bool(evalInt("builddistance", 0, 0)));
+    changed |= enableParm("fogname", bool(evalInt("buildfog", 0, 0)));
 
-    bool useMask = evalInt("maskvdb", 0, 0) == 1;
+    bool useMask = evalInt("buildmask", 0, 0) == 1;
     changed |= enableParm("boundinglimit", useMask);
-    changed |= enableParm("maskvdbname", useMask);
+    changed |= enableParm("maskname", useMask);
 
     bool hasRefInput = this->nInputs() == 2;
     changed |= enableParm("referencevdb", hasRefInput);
@@ -791,21 +801,22 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
+#endif
 
         hvdb::Interrupter boss("Creating VDBs from particles");
-
 
         const GU_Detail* ptGeo = inputGeo(0, context);
         const GU_Detail* refGeo = inputGeo(1, context);
         bool refexists = refGeo != nullptr;
 
-        mTime = context.getTime();
-        mVoxelSize = float(evalFloat("voxelsize", 0, mTime));
+        const fpreal time = context.getTime();
+        mVoxelSize = float(evalFloat("voxelsize", 0, time));
 
         if (mVoxelSize < 1e-5) {
             std::ostringstream ostr;
@@ -814,10 +825,10 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             return error();
         }
 
-        const bool outputLevelSetGrid   = bool(evalInt("distancevdb",   0, mTime));
-        const bool outputFogVolumeGrid  = bool(evalInt("fogvdb",  0, mTime));
-        const bool outputMaskVolumeGrid = bool(evalInt("maskvdb", 0, mTime));
-        const bool outputAttributeGrid  = bool(evalInt("attrList",   0, mTime) > 0);
+        const bool outputLevelSetGrid   = bool(evalInt("builddistance", 0, time));
+        const bool outputFogVolumeGrid  = bool(evalInt("buildfog", 0, time));
+        const bool outputMaskVolumeGrid = bool(evalInt("buildmask", 0, time));
+        const bool outputAttributeGrid  = bool(evalInt("attrList", 0, time) > 0);
 
         if (!outputFogVolumeGrid && !outputLevelSetGrid && !outputAttributeGrid) {
              addWarning(SOP_MESSAGE, "No output selected");
@@ -825,14 +836,14 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         }
 
         ParticleList paList(ptGeo,
-            evalFloat("particlescale", 0, mTime), evalFloat("velocityscale", 0, mTime));
+            evalFloat("particlescale", 0, time), evalFloat("velocityscale", 0, time));
 
         float background = 0.0;
 
-        if (evalInt("useworldspace", 0, mTime) != 0) {
-            background = float(evalFloat("halfband", 0, mTime));
+        if (evalInt("useworldspace", 0, time) != 0) {
+            background = float(evalFloat("halfband", 0, time));
         } else {
-            background = mVoxelSize * float(evalFloat("halfbandvoxels", 0, mTime));
+            background = mVoxelSize * float(evalFloat("halfbandvoxels", 0, time));
         }
 
         openvdb::math::Transform::Ptr transform =
@@ -842,11 +853,8 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
         // Optionally copy reference grid and/or transform.
         if (refexists) {
-
-            UT_String groupStr;
-            evalString(groupStr, "referencevdb", 0, mTime);
-
-            const GA_PrimitiveGroup *group = matchGroup(*refGeo, groupStr.toStdString());
+            const GA_PrimitiveGroup *group = matchGroup(
+                *refGeo, evalStdString("referencevdb", time));
 
             hvdb::VdbPrimCIterator it(refGeo, group);
             const hvdb::GU_PrimVDB* refPrim = *it;
@@ -866,7 +874,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                         " and background value.  (UI half-band parameter is ignored.)");
                 }
 
-                if (evalInt("merge", 0, mTime) != 0) {
+                if (evalInt("merge", 0, time) != 0) {
 
                     if (isLevelSet) {
                         outputGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
@@ -899,27 +907,27 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             outputGrid->setGridClass(openvdb::GRID_LEVEL_SET);
             outputGrid->setTransform(transform);
 
-            const bool doSphereConversion = evalInt("conversion",  0, mTime) == 0;
+            const bool doSphereConversion = evalInt("conversion",  0, time) == 0;
 
             // Point topology conversion settings
-            int dilation = static_cast<int>(evalInt("dilation", 0, mTime));
-            int closing = static_cast<int>(evalInt("closing", 0, mTime));
-            int smoothing = static_cast<int>(evalInt("smoothing", 0, mTime));
+            int dilation = static_cast<int>(evalInt("dilation", 0, time));
+            int closing = static_cast<int>(evalInt("closing", 0, time));
+            int smoothing = static_cast<int>(evalInt("smoothing", 0, time));
             int bandWidth = int(std::ceil(background / mVoxelSize));
             openvdb::MaskGrid::Ptr pointMaskGrid;
 
             if (doSphereConversion) {
 
-                if (evalInt("velocitytrails", 0, mTime) != 0 && !paList.hasVelocity()) {
+                if (evalInt("velocitytrails", 0, time) != 0 && !paList.hasVelocity()) {
                     addWarning(SOP_MESSAGE,
                         "Velocity trails require a velocity point attribute"
                         " named 'v' of type 3fv.");
                 }
 
                 if (outputAttributeGrid) {
-                    this->convertWithAttributes(outputGrid, paList, *ptGeo, boss);
+                    this->convertWithAttributes(time, outputGrid, paList, *ptGeo, boss);
                 } else {
-                    this->convert(outputGrid, paList, boss);
+                    this->convert(time, outputGrid, paList, boss);
                 }
 
             } else {
@@ -935,7 +943,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             if (outputMaskVolumeGrid) {
 
                 openvdb::Real radiusScale = paList.radiusMult();
-                openvdb::Real offset = openvdb::Real(evalFloat("boundinglimit", 0,  mTime));
+                openvdb::Real offset = openvdb::Real(evalFloat("boundinglimit", 0,  time));
                 offset = std::min(std::max(offset, 0.0), 1.0); // clamp to zero-one range.
 
                 openvdb::FloatGrid::Ptr maxGrid = openvdb::FloatGrid::create(background);
@@ -950,11 +958,11 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
                     if (doSphereConversion) {
 
-                        paList.radiusMult() = radiusScale * (1.0 + offset);
-                        this->convert(maxGrid, paList, boss);
+                        paList.setRadiusMult(radiusScale * (1.0 + offset));
+                        this->convert(time, maxGrid, paList, boss);
 
-                        paList.radiusMult() = radiusScale * (1.0 - offset);
-                        this->convert(minGrid, paList, boss);
+                        paList.setRadiusMult(radiusScale * (1.0 - offset));
+                        this->convert(time, minGrid, paList, boss);
 
                     } else {
 
@@ -977,16 +985,12 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                 openvdb::tools::csgDifference(*maxGrid, *minGrid);
                 openvdb::tools::sdfToFogVolume(*maxGrid);
 
-                UT_String name = "";
-                evalString(name, "maskvdbname", 0, mTime);
-                maxGrid->setName(name.toStdString());
+                maxGrid->setName(evalStdString("maskname", time));
                 hvdb::createVdbPrimitive(*gdp, maxGrid);
             }
 
             if (outputLevelSetGrid) {
-                UT_String name = "";
-                evalString(name, "distancevdbname", 0, mTime);
-                outputGrid->setName(name.toStdString());
+                outputGrid->setName(evalStdString("distancename", time));
                 hvdb::createVdbPrimitive(*gdp, outputGrid);
             }
 
@@ -1000,9 +1004,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
                 openvdb::tools::sdfToFogVolume(*outputGrid);
 
-                UT_String name = "";
-                evalString(name, "fogvdbname", 0, mTime);
-                outputGrid->setName(name.toStdString());
+                outputGrid->setName(evalStdString("fogname", time));
                 hvdb::createVdbPrimitive(*gdp, outputGrid);
             }
         }
@@ -1017,20 +1019,24 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
 ////////////////////////////////////////
 
+
 void
-SOP_OpenVDB_From_Particles::convert(
-    openvdb::FloatGrid::Ptr outputGrid, ParticleList& paList, hvdb::Interrupter& boss)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convert(
+    fpreal time,
+    openvdb::FloatGrid::Ptr outputGrid,
+    ParticleList& paList,
+    hvdb::Interrupter& boss)
 {
     openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, void, hvdb::Interrupter>
         raster(*outputGrid, &boss);
 
-    raster.setRmin(evalFloat("minradius", 0,  mTime));
+    raster.setRmin(evalFloat("minradius", 0,  time));
     raster.setRmax(1e15f);
 
-    bool velocityTrails = evalInt("velocitytrails", 0, mTime) == 1;
+    bool velocityTrails = evalInt("velocitytrails", 0, time) == 1;
 
     if (velocityTrails && paList.hasVelocity()) {
-        raster.rasterizeTrails(paList, float(evalFloat("trailresolution", 0,  mTime)));
+        raster.rasterizeTrails(paList, float(evalFloat("trailresolution", 0,  time)));
     } else if (paList.hasRadius()){
         raster.rasterizeSpheres(paList);
     } else {
@@ -1050,19 +1056,23 @@ SOP_OpenVDB_From_Particles::convert(
 
 
 void
-SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr outputGrid,
-    ParticleList& paList, const GU_Detail& ptGeo, hvdb::Interrupter& boss)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convertWithAttributes(
+    fpreal time,
+    openvdb::FloatGrid::Ptr outputGrid,
+    ParticleList& paList,
+    const GU_Detail& ptGeo,
+    hvdb::Interrupter& boss)
 {
     openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Int32, hvdb::Interrupter>
         raster(*outputGrid, &boss);
 
-    raster.setRmin(evalFloat("minradius", 0,  mTime));
+    raster.setRmin(evalFloat("minradius", 0,  time));
     raster.setRmax(1e15f);
 
-    bool velocityTrails = evalInt("velocitytrails", 0, mTime) == 1;
+    bool velocityTrails = evalInt("velocitytrails", 0, time) == 1;
 
     if (velocityTrails && paList.hasVelocity()) {
-        raster.rasterizeTrails(paList, float(evalFloat("trailresolution", 0,  mTime)));
+        raster.rasterizeTrails(paList, float(evalFloat("trailresolution", 0,  time)));
     } else if (paList.hasRadius()){
         raster.rasterizeSpheres(paList);
     } else {
@@ -1084,18 +1094,18 @@ SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr output
     if (boss.wasInterrupted()) return;
 
     // Transfer point attributes.
-    if (evalInt("attrList", 0, mTime) > 0) {
+    if (evalInt("attrList", 0, time) > 0) {
         hvdb::AttributeDetailList pointAttributes;
 
         int closestPointIndexInstance =
-            constructGenericAtttributeList(pointAttributes, ptGeo, *closestPtnIdxGrid);
+            constructGenericAtttributeList(time, pointAttributes, ptGeo, *closestPtnIdxGrid);
 
         openvdb::math::Transform::Ptr transform = outputGrid->transformPtr();
-        transferAttributes(pointAttributes, *closestPtnIdxGrid, transform, ptGeo);
+        transferAttributes(pointAttributes, *closestPtnIdxGrid, transform, ptGeo, *gdp);
 
         if (closestPointIndexInstance > -1) { // Export the closest point idx grid.
             UT_String gridNameStr;
-            evalStringInst("attributeGridName#", &closestPointIndexInstance, gridNameStr, 0, mTime);
+            evalStringInst("attributeGridName#", &closestPointIndexInstance, gridNameStr, 0, time);
             if (gridNameStr.length() == 0) gridNameStr = "point_list_index";
             hvdb::createVdbPrimitive(*gdp, closestPtnIdxGrid, gridNameStr.toStdString().c_str());
         }
@@ -1106,7 +1116,8 @@ SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr output
 // Helper methods for point attribute transfer
 
 int
-SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::constructGenericAtttributeList(
+    fpreal time,
     hvdb::AttributeDetailList &pointAttributes,
     const GU_Detail& ptGeo,
     const openvdb::Int32Grid& closestPtnIdxGrid)
@@ -1117,9 +1128,9 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
     int closestPointIndexInstance = -1;
 
     // for each selected attribute
-    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, mTime)); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
 
-        evalStringInst("attribute#", &i, attrName, 0, mTime);
+        evalStringInst("attribute#", &i, attrName, 0, time);
 
         if (attrName.length() == 0) continue;
 
@@ -1139,10 +1150,10 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
             continue;
         }
 
-        evalStringInst("attributeGridName#", &i, attrName, 0, mTime);
+        evalStringInst("attributeGridName#", &i, attrName, 0, time);
         std::string customName = attrName.toStdString();
 
-        int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, mTime));
+        int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
         const GA_Attribute *attr = attrRef.getAttribute();
         if (!attr) {
@@ -1210,12 +1221,17 @@ SOP_OpenVDB_From_Particles::constructGenericAtttributeList(
 }
 
 
+////////////////////////////////////////
+
+
+namespace {
+
 template<class ValueType>
 void
-SOP_OpenVDB_From_Particles::addAttributeDetails(
-    hvdb::AttributeDetailList &attributeList,
-    const GA_Attribute *attribute,
-    const GA_AIFTuple *tupleAIF,
+addAttributeDetails(
+    hvdb::AttributeDetailList& attributeList,
+    const GA_Attribute* attribute,
+    const GA_AIFTuple* tupleAIF,
     const int attrTupleSize,
     const openvdb::Int32Grid& closestPtnIdxGrid,
     std::string& customName,
@@ -1272,11 +1288,12 @@ SOP_OpenVDB_From_Particles::addAttributeDetails(
 
 
 void
-SOP_OpenVDB_From_Particles::transferAttributes(
-    hvdb::AttributeDetailList &pointAttributes,
+transferAttributes(
+    hvdb::AttributeDetailList& pointAttributes,
     const openvdb::Int32Grid& closestPtnIdxGrid,
     openvdb::math::Transform::Ptr& transform,
-    const GU_Detail& ptGeo)
+    const GU_Detail& ptGeo,
+    GU_Detail& outputGeo)
 {
     // Threaded attribute transfer.
     hvdb::PointAttrTransfer transferOp(pointAttributes, closestPtnIdxGrid, ptGeo);
@@ -1288,9 +1305,11 @@ SOP_OpenVDB_From_Particles::transferAttributes(
         std::ostringstream gridName;
         gridName << attrDetail->name();
         attrDetail->grid()->setTransform(transform);
-        hvdb::createVdbPrimitive(*gdp, attrDetail->grid(), gridName.str().c_str());
+        hvdb::createVdbPrimitive(outputGeo, attrDetail->grid(), gridName.str().c_str());
     }
 }
+
+} // unnamed namespace
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

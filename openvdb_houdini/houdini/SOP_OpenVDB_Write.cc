@@ -40,6 +40,9 @@
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -59,7 +62,7 @@ public:
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
 
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
 
     void writeOnNextCook(bool write = true) { mWriteOnNextCook = write; }
 
@@ -130,21 +133,17 @@ newSopOperator(OP_OperatorTable* table)
 #endif
     }
 
-    {   // Write mode (manual/auto)
-
-        char const * const items[] = {
+    // Write mode (manual/auto)
+    parms.add(hutil::ParmFactory(PRM_ORD, "writeMode", "Write Mode")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "manual",   "Manual",
-            "auto",     "Automatic",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "writeMode", "Write Mode")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "In Manual mode, click the Write Now button\n"
-                "to write the output file.\n"
-                "In Automatic mode, the file is written\n"
-                "each time this node cooks."));
-    }
+            "auto",     "Automatic"
+        })
+        .setTooltip(
+            "In Manual mode, click the Write Now button\n"
+            "to write the output file.\n"
+            "In Automatic mode, the file is written\n"
+            "each time this node cooks."));
 
     // "Write Now" button
     parms.add(hutil::ParmFactory(PRM_CALLBACK, "write", "Write Now")
@@ -301,7 +300,7 @@ SOP_OpenVDB_Write::reportFloatPrecisionConflicts(const StringSet& conflicts)
 
 
 OP_ERROR
-SOP_OpenVDB_Write::cookMySop(OP_Context& context)
+SOP_OpenVDB_Write::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -322,9 +321,7 @@ void
 SOP_OpenVDB_Write::doCook(const fpreal time)
 {
     // Get the filename of the output file.
-    UT_String fileNameStr;
-    evalString(fileNameStr, "file_name", 0, time);
-    const std::string filename = fileNameStr.toStdString();
+    const std::string filename = evalStdString("file_name", time);
     if (filename.empty()) {
         addWarning(SOP_MESSAGE, "no name given for the output file");
         return;

@@ -61,7 +61,7 @@ public:
 #endif
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
 };
 
@@ -84,8 +84,7 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
 
     // Get the parameters from the GUI
     // The file name of the vdb we would like to load
-    UT_String file_name;
-    sop->evalString(file_name, "file_name", 0, 0);
+    const auto file_name = sop->evalStdString("file_name", 0);
 
      // Keep track of how many names we have entered
     int count = 0;
@@ -97,7 +96,7 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
     try {
         // Open the file and read the header, but don't read in any grids.
         // An exception is thrown if the file is not a valid VDB file.
-        openvdb::io::File file(file_name.toStdString());
+        openvdb::io::File file(file_name);
         file.open();
 
         // Loop over the names of all of the grids in the file.
@@ -342,7 +341,7 @@ SOP_OpenVDB_Read::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Read::cookMySop(OP_Context& context)
+SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -356,12 +355,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             missingFrameIsError = (0 == evalInt("missingframe", 0, t));
 
         // Get the file name string from the UI.
-        std::string filename;
-        {
-            UT_String s;
-            evalString(s, "file_name", 0, t);
-            filename = s.toStdString();
-        }
+        const std::string filename = evalStdString("file_name", t);
 
         // Get the grid mask string.
         UT_String gridStr;

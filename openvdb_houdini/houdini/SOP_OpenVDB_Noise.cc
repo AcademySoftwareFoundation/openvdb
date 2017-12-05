@@ -46,6 +46,13 @@
 #include <sstream>
 #include <stdexcept>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 namespace cvdb = openvdb;
@@ -53,9 +60,9 @@ namespace cvdb = openvdb;
 
 namespace { // anon namespace
 
-struct FractalBoltzmanGenerator
+struct FractalBoltzmannGenerator
 {
-    FractalBoltzmanGenerator(float freq, float amp, int octaves, float gain,
+    FractalBoltzmannGenerator(float freq, float amp, int octaves, float gain,
         float lacunarity, float roughness, int mode):
         mOctaves(octaves), mNoiseMode(mode), mFreq(freq), mAmp(amp), mGain(gain),
         mLacunarity(lacunarity), mRoughness(roughness)
@@ -131,19 +138,25 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+    private:
+        // Process the given grid and return the output grid.
+        // Can be applied to FloatGrid or DoubleGrid
+        // this contains the majority of the work
+        template<typename GridType>
+        void applyNoise(hvdb::Grid& grid, const FractalBoltzmannGenerator&,
+            const NoiseSettings&, const hvdb::Grid* maskGrid) const;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
     bool updateParmsFlags() override;
-
-private:
-    // Process the given grid and return the output grid.
-    // Can be applied to FloatGrid or DoubleGrid
-    // this contains the majority of the work
-    template<typename GridType>
-    void applyNoise(hvdb::Grid& grid, const FractalBoltzmanGenerator&,
-        const NoiseSettings&, const hvdb::Grid* maskGrid) const;
-
-    bool mSecondInputConnected;
 };
 
 
@@ -212,18 +225,15 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setTooltip("An offset for the noise in world units"));
 
-    {   // Noise Mode
-        char const * const items[] = {
+    // Noise Mode
+    parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Noise Mode")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "straight", "Straight",
             "abs",      "Absolute",
-            "invabs",   "Inverse Absolute",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Noise Mode")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("The noise mode: either Straight, Absolute, or Inverse Absolute"));
-    }
+            "invabs",   "Inverse Absolute"
+        })
+        .setTooltip("The noise mode: either Straight, Absolute, or Inverse Absolute"));
 
     // Mask {
     parms.add(hutil::ParmFactory(PRM_HEADING, "maskHeading", "Mask"));
@@ -235,19 +245,17 @@ newSopOperator(OP_OperatorTable* table)
             "A scalar VDB from the second input to be used as a mask"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {   // Use mask
-        char const * const items[] = {
+    // Use mask
+    parms.add(hutil::ParmFactory(PRM_ORD, "mask", "Mask")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "maskless",       "No noise if mask < threshold",
             "maskgreater",    "No noise if mask > threshold",
             "maskgreaternml", "No noise if mask > threshold & normals align",
-            "maskisfreqmult", "Use mask as frequency multiplier",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "mask", "Mask")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("How to interpret the mask")
-            .setDocumentation("\
+            "maskisfreqmult", "Use mask as frequency multiplier"
+        })
+        .setTooltip("How to interpret the mask")
+        .setDocumentation("\
 How to interpret the mask\n\
 \n\
 No noise if mask < threshold:\n\
@@ -262,7 +270,6 @@ No noise if mask > threshold & normals align:\n\
     of the level set at that voxel aligns with the gradient of the mask.\n\
 Use mask as frequency multiplier:\n\
     Add noise to every voxel, but multiply the noise frequency by the mask.\n"));
-    }
 
     // mask threshold
     parms.add(hutil::ParmFactory(PRM_FLT_J, "thres", "Mask Threshold")
@@ -281,6 +288,9 @@ Use mask as frequency multiplier:\n\
         .addAlias("OpenVDB LevelSet Noise")
         .addInput("VDB grids to noise")
         .addOptionalInput("Optional VDB grid to use as mask")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Noise::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -315,8 +325,7 @@ SOP_OpenVDB_Noise::factory(OP_Network* net, const char* name, OP_Operator *op)
 
 
 SOP_OpenVDB_Noise::SOP_OpenVDB_Noise(OP_Network* net, const char* name, OP_Operator* op):
-    SOP_NodeVDB(net, name, op),
-    mSecondInputConnected(false)
+    SOP_NodeVDB(net, name, op)
 {
     UT_PNoise::initNoise();
 }
@@ -331,10 +340,13 @@ SOP_OpenVDB_Noise::updateParmsFlags()
 
     bool changed = false;
 
-    changed |= enableParm("maskGroup", mSecondInputConnected);
-    changed |= enableParm("mask", mSecondInputConnected);
-    changed |= enableParm("thres", mSecondInputConnected);
-    changed |= enableParm("fall", mSecondInputConnected);
+    const GU_Detail* refGdp = this->getInputLastGeo(1, /*time=*/0.0);
+    const bool hasSecondInput = (refGdp != nullptr);
+
+    changed |= enableParm("maskGroup", hasSecondInput);
+    changed |= enableParm("mask", hasSecondInput);
+    changed |= enableParm("thres", hasSecondInput);
+    changed |= enableParm("fall", hasSecondInput);
 
     return changed;
 }
@@ -345,9 +357,9 @@ SOP_OpenVDB_Noise::updateParmsFlags()
 
 template<typename GridType>
 void
-SOP_OpenVDB_Noise::applyNoise(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Noise)::applyNoise(
     hvdb::Grid& grid,
-    const FractalBoltzmanGenerator& fbGenerator,
+    const FractalBoltzmannGenerator& fbGenerator,
     const NoiseSettings& settings,
     const hvdb::Grid* mask) const
 {
@@ -504,18 +516,21 @@ SOP_OpenVDB_Noise::applyNoise(
 
 
 OP_ERROR
-SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Noise)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        lock.markInputUnlocked(0);
+        duplicateSourceStealable(0, context);
+#endif
 
         const fpreal time = context.getTime();
 
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSourceStealable(0, context);
-
-        // Evaluate the FractalBoltzman noise parameters from UI
-        FractalBoltzmanGenerator fbGenerator(
+        // Evaluate the FractalBoltzmann noise parameters from UI
+        FractalBoltzmannGenerator fbGenerator(
             static_cast<float>(evalFloat("freq", 0, time)),
             static_cast<float>(evalFloat("amp", 0, time)),
             static_cast<int>(evalInt("oct", 0, time)),
@@ -535,14 +550,9 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
 
         // Mask
         const openvdb::GridBase* maskGrid = nullptr;
-        const GU_Detail* refGdp = inputGeo(1);
-        mSecondInputConnected = refGdp != nullptr;
-        UT_String groupStr;
-
-        if (mSecondInputConnected) {
-            evalString(groupStr, "maskGroup", 0, time);
-
-            const GA_PrimitiveGroup* maskGroup = matchGroup(*refGdp, groupStr.toStdString());
+        if (const GU_Detail* refGdp = inputGeo(1)) {
+            const GA_PrimitiveGroup* maskGroup =
+                matchGroup(*refGdp, evalStdString("maskGroup", time));
 
             hvdb::VdbPrimCIterator gridIter(refGdp, maskGroup);
 
@@ -556,9 +566,8 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
             }
 
             if (gridIter) {
-                std::ostringstream ostr;
-                ostr << "Found more than one grid in the mask group; the first grid will be used.";
-                addWarning(SOP_MESSAGE, ostr.str().c_str());
+                addWarning(SOP_MESSAGE,
+                    "Found more than one grid in the mask group; the first grid will be used.");
             }
         }
 
@@ -566,8 +575,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         UT_AutoInterrupt progress("OpenVDB LS Noise");
 
         // Get the group of grids to process.
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         // For each VDB primitive in the selected group.
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {

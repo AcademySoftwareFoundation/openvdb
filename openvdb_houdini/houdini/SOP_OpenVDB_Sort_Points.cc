@@ -39,18 +39,32 @@
 
 #include <openvdb/tools/PointPartitioner.h>
 
-#include <UT/UT_Version.h>
+#include <GA/GA_AttributeFilter.h>
+#include <GA/GA_ElementWrangler.h>
+#include <GA/GA_PageIterator.h>
+#include <GA/GA_SplittableRange.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
-#include <GA/GA_SplittableRange.h>
-#include <GA/GA_PageIterator.h>
-#include <GA/GA_ElementWrangler.h>
-#include <GA/GA_AttributeFilter.h>
+#include <UT/UT_Version.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
-#include <boost/scoped_array.hpp>
+#include <memory>
+#include <stdexcept>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -116,14 +130,19 @@ struct SetOffsets
 
 // SOP Implementation
 
-struct SOP_OpenVDB_Sort_Points: public hvdb::SOP_NodeVDB {
-
+struct SOP_OpenVDB_Sort_Points: public hvdb::SOP_NodeVDB
+{
     SOP_OpenVDB_Sort_Points(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 };
+
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -144,6 +163,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Sort Points",
         SOP_OpenVDB_Sort_Points::factory, parms, *table)
         .addInput("points")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Sort_Points::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -163,42 +185,39 @@ See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
 }
 
+
 OP_Node*
 SOP_OpenVDB_Sort_Points::factory(OP_Network* net, const char* name, OP_Operator* op)
 {
     return new SOP_OpenVDB_Sort_Points(net, name, op);
 }
 
+
 SOP_OpenVDB_Sort_Points::SOP_OpenVDB_Sort_Points(OP_Network* net, const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
 {
 }
 
+
 OP_ERROR
-SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sort_Points)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
 
         gdp->stashAll();
+#endif
 
         const fpreal time = context.getTime();
         const GU_Detail* srcGeo = inputGeo(0);
 
-        boost::scoped_array<GA_Offset> srcOffsetArray;
+        UT_UniquePtr<GA_Offset[]> srcOffsetArray;
         size_t numPoints = 0;
 
         { // partition points and construct ordered offset list
-            UT_String groupStr;
-            evalString(groupStr, "pointgroup", 0, time);
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-            const GA_PointGroup* pointGroup =
-                parsePointGroups(groupStr, GroupCreator(srcGeo));
-#else
-            const GA_PointGroup* pointGroup =
-                parsePointGroups(groupStr, const_cast<GU_Detail*>(srcGeo));
-#endif
+            const GA_PointGroup* pointGroup = parsePointGroups(
+                evalStdString("pointgroup", time).c_str(), GroupCreator(srcGeo));
 
             const fpreal voxelSize = evalFloat("binsize", 0, time);
             const openvdb::math::Transform::Ptr transform =
@@ -218,11 +237,7 @@ SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
 
         // order point attributes
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
         gdp->appendPointBlock(numPoints);
-#else
-        for (size_t n = 0; n < numPoints; ++n) gdp->appendPointOffset();
-#endif
 
         gdp->cloneMissingAttributes(*srcGeo, GA_ATTRIB_POINT, GA_AttributeFilter::selectPublic());
 
@@ -231,7 +246,9 @@ SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
             CopyElements(ptWrangler, srcOffsetArray.get()));
 
+#if !VDB_COMPILABLE_SOP
         gdp->destroyStashed();
+#endif
 
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

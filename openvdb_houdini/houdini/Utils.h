@@ -37,10 +37,10 @@
 
 #include "GU_PrimVDB.h"
 #include <OP/OP_Node.h> // for OP_OpTypeId
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
 #include <functional>
-#include <memory>
 #include <type_traits>
 
 
@@ -134,7 +134,7 @@ protected:
     VdbPrimCIterator(const GEO_Detail*, GA_Range::safedeletions,
         const GA_PrimitiveGroup* = nullptr, FilterFunc = FilterFunc());
 
-    std::shared_ptr<GA_GBPrimitiveIterator> mIter;
+    UT_SharedPtr<GA_GBPrimitiveIterator> mIter;
     FilterFunc mFilter;
 }; // class VdbPrimCIterator
 

@@ -44,6 +44,20 @@
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
 
+#include <algorithm> // for std::find()
+#include <limits>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 using namespace openvdb;
 using namespace openvdb::points;
 using namespace openvdb::math;
@@ -109,20 +123,26 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
-    bool updateParmsFlags() override;
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        OP_ERROR evalGroupParms(OP_Context&, GroupParms&);
+        OP_ERROR evalGridGroupParms(const PointDataGrid&, OP_Context&, GroupParms&);
 
-    OP_ERROR evalGroupParms(OP_Context&, GroupParms&);
-    OP_ERROR evalGridGroupParms(const PointDataGrid& grid, OP_Context& context, GroupParms& parms);
-
-    void performGroupFiltering(PointDataGrid& outputGrid, const GroupParms& parms);
-    void setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms);
-    void removeViewportMetadata(PointDataGrid& outputGrid);
+        void performGroupFiltering(PointDataGrid&, const GroupParms&);
+        void setViewportMetadata(PointDataGrid&, const GroupParms&);
+        void removeViewportMetadata(PointDataGrid&);
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
-
-private:
-    hvdb::Interrupter mBoss;
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 }; // class SOP_OpenVDB_Points_Group
 
 
@@ -150,14 +170,13 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDB Points primitives to be processed"
             " (see [specifying volumes|/model/volumes#group])"));
 
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
+        .setTooltip(
+            "Create a new VDB points group as a subset of an existing VDB points group(s)."));
+
     parms.beginSwitcher("tabMenu1");
     parms.addFolder("Create");
-
-    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "Filter by VDB Group")
-        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
-        .setTooltip("Create a new VDB points group as a subset of an existing VDB points group(s)."));
-
-    parms.add(houdini_utils::ParmFactory(PRM_LABEL, "spacer1", ""));
 
     // Toggle to enable creation
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablecreate", "Enable")
@@ -175,17 +194,12 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setTooltip("Enable filtering by number."));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "numbermode", "Mode")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "percentage",   "Percentage",
-            "total",        "Total",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "numbermode", "Mode")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "Specify how to filter out a subset of the points inside the VDB Points."));
-    }
+            "total",        "Total"
+        })
+        .setTooltip("Specify how to filter out a subset of the points inside the VDB Points."));
 
     parms.add(hutil::ParmFactory(PRM_FLT, "pointpercent", "Percent")
         .setDefault(PRMtenDefaults)
@@ -214,15 +228,11 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setTooltip("Enable filtering by bounding box."));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "boundingmode", "Mode")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "boundingbox",      "Bounding Box",
-            "boundingobject",   "Bounding Object",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "boundingmode", "Mode")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
+            "boundingobject",   "Bounding Object"
+        }));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "boundingname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -240,15 +250,15 @@ newSopOperator(OP_OperatorTable* table)
     parms.endSwitcher();
 
     parms.beginSwitcher("tabMenu4");
-    parms.addFolder("Level Set");
+    parms.addFolder("SDF");
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablelevelset", "Enable")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdf", "Enable")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Enable filtering by level set."));
+        .setTooltip("Enable filtering by SDF."));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "levelsetname", "Name")
+    parms.add(hutil::ParmFactory(PRM_STRING, "sdfname", "Name")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
-        .setTooltip("The name of the level set"));
+        .setTooltip("The name of the SDF"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enablesdfmin", "Enable")
         .setDefault(PRMoneDefaults)
@@ -280,8 +290,10 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "deletegroups", "Point Groups")
         .setDefault(0, "")
-        .setHelpText("A space-delimited list of groups to delete.  This will delete the selected groups but \
-                     will not delete the points contained in them.")
+        .setHelpText(
+            "A space-delimited list of groups to delete.\n\n"
+            "This will delete the selected groups but will not delete"
+            " the points contained in them.")
         .setChoiceList(&hvdb::VDBPointsGroupMenuInput1));
 
     parms.addFolder("Viewport");
@@ -296,22 +308,26 @@ newSopOperator(OP_OperatorTable* table)
             "NOTE:\n"
             "    Only one group can be tagged as a viewport group.\n"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "viewportoperation", "Operation")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "addviewportgroup",      "Add Viewport Group",
-            "removeviewportgroup",   "Remove Viewport Group",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "viewportoperation", "Operation")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Specify whether to add or remove the viewport group."));
-    }
+            "removeviewportgroup",   "Remove Viewport Group"
+        })
+        .setTooltip("Specify whether to add or remove the viewport group."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "viewportgroupname", "Name")
         .setDefault("chs(\"groupname\")", CH_OLD_EXPRESSION)
         .setTooltip("Display only this group in the viewport."));
 
     parms.endSwitcher();
+
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(houdini_utils::ParmFactory(PRM_LABEL, "spacer1", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "enablelevelset", "Enable")
+        .setDefault(PRMzeroDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "levelsetname", "Name"));
+
 
     //////////
     // Register this operator.
@@ -320,6 +336,10 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Points_Group::factory, parms, *table)
         .addInput("VDB Points")
         .addOptionalInput("Optional bounding geometry or level set")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Group::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -345,6 +365,19 @@ and usage examples.\n");
 }
 
 
+void
+SOP_OpenVDB_Points_Group::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "enablelevelset", "enablesdf");
+    resolveRenamedParm(*obsoleteParms, "levelsetname", "sdfname");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 bool
 SOP_OpenVDB_Points_Group::updateParmsFlags()
 {
@@ -357,7 +390,7 @@ SOP_OpenVDB_Points_Group::updateParmsFlags()
     const bool bounding = evalInt("enableboundingbox", 0, 0) != 0;
     const bool boundingobject = evalInt("boundingmode", 0, 0) == 1;
     const bool viewport = evalInt("enableviewport", 0, 0) != 0;
-    const bool levelset = evalInt("enablelevelset", 0, 0);
+    const bool levelset = evalInt("enablesdf", 0, 0);
     const bool sdfmin = evalInt("enablesdfmin", 0, 0);
     const bool sdfmax = evalInt("enablesdfmax", 0, 0);
     const bool viewportadd = evalInt("viewportoperation", 0, 0) == 0;
@@ -377,7 +410,7 @@ SOP_OpenVDB_Points_Group::updateParmsFlags()
     changed |= enableParm("center", creation && bounding && !boundingobject);
     changed |= enableParm("viewportoperation", viewport);
     changed |= enableParm("viewportgroupname", viewport && viewportadd);
-    changed |= enableParm("levelsetname", levelset);
+    changed |= enableParm("sdfname", levelset);
     changed |= enableParm("enablesdfmin", levelset);
     changed |= enableParm("enablesdfmax", levelset);
     changed |= enableParm("sdfmin", levelset && sdfmin);
@@ -410,12 +443,14 @@ SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
 
 
 OP_ERROR
-SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        lock.markInputUnlocked(0);
         if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
+#endif
 
         // Evaluate UI parameters
         GroupParms parms;
@@ -532,7 +567,8 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
 
 OP_ERROR
-SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGroupParms(
+    OP_Context& context, GroupParms& parms)
 {
     const fpreal time = context.getTime();
 
@@ -543,7 +579,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     const bool percentAttribute = evalInt("enablepercentattribute", 0, time);
     const bool bounding = evalInt("enableboundingbox", 0, time);
     const bool boundingObject = evalInt("boundingmode", 0, time) == 1;
-    const bool levelSet = evalInt("enablelevelset", 0, time);
+    const bool levelSet = evalInt("enablesdf", 0, time);
 
     parms.mCountMode = countMode;
     parms.mHashMode = number && !countMode && percentAttribute;
@@ -552,9 +588,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     parms.mOpLS = levelSet;
 
     // Get the grids to group.
-    UT_String groupStr;
-    evalString(groupStr, "group", 0, time);
-    parms.mGroup = matchGroup(*gdp, groupStr.toStdString());
+    parms.mGroup = matchGroup(*gdp, evalStdString("group", time));
 
     hvdb::VdbPrimIterator vdbIt(gdp, parms.mGroup);
 
@@ -565,12 +599,8 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     }
 
     // Get and parse the vdb points groups
-
-    UT_String pointsGroupStr;
-    evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
-    const std::string pointsGroup = pointsGroupStr.toStdString();
-
-    AttributeSet::Descriptor::parseNames(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
+    AttributeSet::Descriptor::parseNames(
+        parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroup", time));
 
     if (parms.mIncludeGroups.size() > 0 || parms.mExcludeGroups.size() > 0) {
         parms.mOpGroup = true;
@@ -584,15 +614,11 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
     parms.mEnable = evalInt("enablecreate", 0, time);
 
-    UT_String groupNameStr;
-    evalString(groupNameStr, "groupname", 0, time);
-    std::string groupName = groupNameStr.toStdString();
-
-    if (groupName == "") {
+    std::string groupName = evalStdString("groupname", time);
+    if (groupName.empty()) {
         addWarning(SOP_MESSAGE, "Cannot create a group with an empty name, changing to _");
         groupName = "_";
-    }
-    else if (!AttributeSet::Descriptor::validName(groupName)) {
+    } else if (!AttributeSet::Descriptor::validName(groupName)) {
         addError(SOP_MESSAGE, ("Group name contains invalid characters - " + groupName).c_str());
         return error();
     }
@@ -604,10 +630,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     if (number) {
         parms.mPercent = static_cast<float>(evalFloat("pointpercent", 0, time));
         parms.mCount = evalInt("pointcount", 0, time);
-
-        UT_String percentAttributeStr;
-        evalString(percentAttributeStr, "percentattribute", 0, time);
-        parms.mHashAttribute = percentAttributeStr.toStdString();
+        parms.mHashAttribute = evalStdString("percentattribute", time);
     }
 
     // bounds
@@ -621,16 +644,8 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
             // retrieve bounding object
 
-            const GA_PrimitiveGroup* boundsGroup = nullptr;
-            UT_String boundingObjectStr;
-            evalString(boundingObjectStr, "boundingname", 0, time);
-    #if (UT_MAJOR_VERSION_INT >= 15)
-            boundsGroup = parsePrimitiveGroups(
-                boundingObjectStr.buffer(), GroupCreator(refGdp));
-    #else
-            boundsGroup = parsePrimitiveGroups(
-                boundingObjectStr.buffer(), const_cast<GU_Detail*>(refGdp));
-    #endif
+            const GA_PrimitiveGroup* boundsGroup = parsePrimitiveGroups(
+                evalStdString("boundingname", time).c_str(), GroupCreator(refGdp));
 
             // compute bounds of bounding object
 
@@ -676,16 +691,8 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
         // retrieve level set grid
 
-        UT_String levelSetStr;
-        const GA_PrimitiveGroup* levelSetGroup = nullptr;
-        evalString(levelSetStr, "levelsetname", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
-        levelSetGroup = parsePrimitiveGroups(
-            levelSetStr.buffer(), GroupCreator(refGdp));
-#else
-        levelSetGroup = parsePrimitiveGroups(
-            levelSetStr.buffer(), const_cast<GU_Detail*>(refGdp));
-#endif
+        const GA_PrimitiveGroup* levelSetGroup = parsePrimitiveGroups(
+            evalStdString("sdfname", time).c_str(), GroupCreator(refGdp));
         for (hvdb::VdbPrimCIterator vdbRefIt(refGdp, levelSetGroup); vdbRefIt; ++vdbRefIt) {
             if (vdbRefIt->getStorageType() == UT_VDB_FLOAT &&
                 vdbRefIt->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
@@ -732,9 +739,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     parms.mEnableViewport = evalInt("enableviewport", 0, time);
     parms.mAddViewport = evalInt("viewportoperation", 0, time) == 0;
 
-    UT_String viewportGroupNameStr;
-    evalString(viewportGroupNameStr, "viewportgroupname", 0, time);
-    std::string viewportGroupName = viewportGroupNameStr.toStdString();
+    std::string viewportGroupName = evalStdString("viewportgroupname", time);
     if (viewportGroupName == "") {
         addWarning(SOP_MESSAGE, "Cannot create a viewport group with an empty name, changing to _");
         viewportGroupName = "_";
@@ -744,11 +749,8 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
     // group deletion
 
-    UT_String groupsToDropNamesStr;
-    evalString(groupsToDropNamesStr, "deletegroups", 0, time);
-
     AttributeSet::Descriptor::parseNames(parms.mDropIncludeGroups, parms.mDropExcludeGroups,
-        parms.mDropAllGroups, groupsToDropNamesStr.toStdString());
+        parms.mDropAllGroups, evalStdString("deletegroups", time));
 
     if (parms.mDropAllGroups) {
         // include groups only apply if not also deleting all groups
@@ -771,8 +773,8 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
 
 OP_ERROR
-SOP_OpenVDB_Points_Group::evalGridGroupParms(const PointDataGrid& grid,
-    OP_Context&, GroupParms& parms)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGridGroupParms(
+    const PointDataGrid& grid, OP_Context&, GroupParms& parms)
 {
     auto leafIter = grid.tree().cbeginLeaf();
 
@@ -842,7 +844,8 @@ SOP_OpenVDB_Points_Group::evalGridGroupParms(const PointDataGrid& grid,
 
 
 void
-SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const GroupParms& parms)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::performGroupFiltering(
+    PointDataGrid& outputGrid, const GroupParms& parms)
 {
     // filter typedefs
 
@@ -975,7 +978,8 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 
 
 void
-SOP_OpenVDB_Points_Group::setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::setViewportMetadata(
+    PointDataGrid& outputGrid, const GroupParms& parms)
 {
     outputGrid.insertMeta(openvdb_houdini::META_GROUP_VIEWPORT,
         StringMetadata(parms.mViewportGroupName));
@@ -983,7 +987,8 @@ SOP_OpenVDB_Points_Group::setViewportMetadata(PointDataGrid& outputGrid, const G
 
 
 void
-SOP_OpenVDB_Points_Group::removeViewportMetadata(PointDataGrid& outputGrid)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::removeViewportMetadata(
+    PointDataGrid& outputGrid)
 {
     outputGrid.removeMeta(openvdb_houdini::META_GROUP_VIEWPORT);
 }

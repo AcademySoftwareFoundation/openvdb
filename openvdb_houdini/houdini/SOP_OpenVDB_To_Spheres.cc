@@ -49,15 +49,30 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
 
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <limits> // std::numeric_limits
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -75,8 +90,14 @@ public:
 
     void checkActivePart(float time);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
 };
 
@@ -185,6 +206,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
         .addInput("VDBs to convert")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_To_Spheres::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -248,13 +272,15 @@ SOP_OpenVDB_To_Spheres::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_To_Spheres)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
-
         gdp->clearAndDestroy();
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Filling VDBs with spheres");
 
@@ -415,7 +441,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         if (!skippedGrids.empty()) {
             std::string s = "Only scalar (float/double) grids are supported, the following "
-                "were skipped: '" + boost::algorithm::join(skippedGrids, ", ") + "'.";
+                "were skipped: '" + hboost::algorithm::join(skippedGrids, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 

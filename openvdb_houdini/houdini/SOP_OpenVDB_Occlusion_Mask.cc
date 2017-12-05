@@ -44,8 +44,16 @@
 #include <openvdb/tools/Morphology.h>
 
 #include <OBJ/OBJ_Camera.h>
+#include <UT/UT_Version.h>
 
 #include <cmath> // for std::floor()
+#include <stdexcept>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -54,22 +62,42 @@ namespace hutil = houdini_utils;
 class SOP_OpenVDB_Occlusion_Mask: public hvdb::SOP_NodeVDB
 {
 public:
-    SOP_OpenVDB_Occlusion_Mask(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Occlusion_Mask() override {}
+    SOP_OpenVDB_Occlusion_Mask(OP_Network* net, const char* name, OP_Operator* op):
+        hvdb::SOP_NodeVDB(net, name, op) {}
+    ~SOP_OpenVDB_Occlusion_Mask() override = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+    private:
+        openvdb::math::Transform::Ptr mFrustum;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
+
     OP_ERROR cookMyGuide1(OP_Context&) override;
-
-private:
-    openvdb::math::Transform::Ptr mFrustum;
-};
-
+}; // class SOP_OpenVDB_Occlusion_Mask
 
 
 ////////////////////////////////////////
+
+
+OP_Node*
+SOP_OpenVDB_Occlusion_Mask::factory(OP_Network* net,
+    const char* name, OP_Operator* op)
+{
+    return new SOP_OpenVDB_Occlusion_Mask(net, name, op);
+}
 
 
 void
@@ -79,7 +107,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Grids")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("Specify a subset of the input VDB grids to be processed.")
         .setDocumentation(
@@ -92,12 +120,12 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Reference camera path")
         .setDocumentation("The path to the camera (e.g., `/obj/cam1`)"));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel Count")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelcount", "Voxel Count")
         .setDefault(PRM100Defaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 200)
         .setTooltip("The desired width in voxels of the camera's near plane"));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel Depth Size")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxeldepthsize", "Voxel Depth Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
         .setTooltip("The depth of a voxel in world units (all voxels have equal depth)"));
@@ -119,9 +147,21 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setTooltip("The number of voxels by which to offset the near plane"));
 
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel Count")
+        .setDefault(PRM100Defaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "voxelDepthSize", "Voxel Depth Size")
+        .setDefault(PRMoneDefaults));
+
+
     hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask",
         SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
         .addInput("VDBs")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Occlusion_Mask::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -145,31 +185,40 @@ and usage examples.\n");
 }
 
 
+void
+SOP_OpenVDB_Occlusion_Mask::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "voxelCount", "voxelcount");
+    resolveRenamedParm(*obsoleteParms, "voxelDepthSize", "voxeldepthsize");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 ////////////////////////////////////////
 
-
-OP_Node*
-SOP_OpenVDB_Occlusion_Mask::factory(OP_Network* net,
-    const char* name, OP_Operator* op)
-{
-    return new SOP_OpenVDB_Occlusion_Mask(net, name, op);
-}
-
-
-SOP_OpenVDB_Occlusion_Mask::SOP_OpenVDB_Occlusion_Mask(OP_Network* net,
-    const char* name, OP_Operator* op):
-    hvdb::SOP_NodeVDB(net, name, op)
-    , mFrustum()
-{
-}
 
 OP_ERROR
 SOP_OpenVDB_Occlusion_Mask::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
-    if (mFrustum) {
+
+    openvdb::math::Transform::ConstPtr frustum;
+#if !VDB_COMPILABLE_SOP
+    frustum = mFrustum;
+#else
+    // Attempt to extract the frustum from our cache.
+    if (auto* cache = dynamic_cast<SOP_OpenVDB_Occlusion_Mask::Cache*>(myNodeVerbCache)) {
+        frustum = cache->frustum();
+    }
+#endif
+
+    if (frustum) {
         UT_Vector3 color(0.9f, 0.0f, 0.0f);
-        hvdb::drawFrustum(*myGuide1, *mFrustum, &color, nullptr, false, false);
+        hvdb::drawFrustum(*myGuide1, *frustum, &color, nullptr, false, false);
     }
     return error();
 }
@@ -387,15 +436,16 @@ private:
 
 
 OP_ERROR
-SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Occlusion_Mask)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
-
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
+#endif
 
+        const fpreal time = context.getTime();
 
         // Camera reference
         mFrustum.reset();
@@ -405,8 +455,14 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
         cameraPath.harden();
 
         if (cameraPath.isstring()) {
+#if VDB_COMPILABLE_SOP
+            OBJ_Node* camobj = cookparms()->getCwd()->findOBJNode(cameraPath);
+            OP_Node* self = cookparms()->getCwd();
+#else
+            OBJ_Node* camobj = findOBJNode(cameraPath);
+            OP_Node* self = this;
+#endif
 
-            OBJ_Node *camobj = findOBJNode(cameraPath);
             if (!camobj) {
                 addError(SOP_MESSAGE, "Camera not found");
                 return error();
@@ -423,10 +479,10 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
 
             const float nearPlane = static_cast<float>(cam->getNEAR(time));
             const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
-            const float voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
-            const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
+            const float voxelDepthSize = static_cast<float>(evalFloat("voxeldepthsize", 0, time));
+            const int voxelCount = static_cast<int>(evalInt("voxelcount", 0, time));
 
-            mFrustum = hvdb::frustumTransformFromCamera(*this, context, *cam,
+            mFrustum = hvdb::frustumTransformFromCamera(*self, context, *cam,
                 0, nearPlane, farPlane, voxelDepthSize, voxelCount);
         } else {
             addError(SOP_MESSAGE, "No camera referenced.");
@@ -440,9 +496,7 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
 
 
         // Get the group of grids to surface.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
@@ -451,10 +505,13 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
 
             // Replace the original VDB primitive with a new primitive that contains
             // the output grid and has the same attributes and group membership.
-            hvdb::replaceVdbPrimitive(*gdp, shadowOp.grid(), **it, true);
+            if (GU_PrimVDB* prim = hvdb::replaceVdbPrimitive(*gdp, shadowOp.grid(), **it, true)) {
+                // Visualize our bool grids as "smoke", not whatever the input
+                // grid was, which can be a levelset.
+                prim->setVisualization(GEO_VOLUMEVIS_SMOKE, prim->getVisIso(),
+                    prim->getVisDensity());
+            }
         }
-
-
 
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

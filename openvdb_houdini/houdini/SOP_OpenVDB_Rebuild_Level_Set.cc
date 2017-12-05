@@ -44,10 +44,30 @@
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
 
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -61,8 +81,14 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 };
@@ -150,6 +176,10 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Rebuild_Level_Set::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDB grids to process")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE,
+            []() { return new SOP_OpenVDB_Rebuild_Level_Set::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -246,20 +276,22 @@ SOP_OpenVDB_Rebuild_Level_Set::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Rebuild_Level_Set)::cookVDBSop(
+    OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
 
         // This does a deep copy of native Houdini primitives
         // but only a shallow copy of VDB grids.
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, evalStdString("group", time));
 
         // Get other UI parameters.
 
@@ -332,7 +364,7 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
 
         if (!skippedGrids.empty()) {
             std::string s = "The following non-floating-point grids were skipped: " +
-                boost::algorithm::join(skippedGrids, ", ") + ".";
+                hboost::algorithm::join(skippedGrids, ", ") + ".";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 

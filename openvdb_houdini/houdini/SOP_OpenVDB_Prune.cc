@@ -39,6 +39,16 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
+#include <stdexcept>
+#include <string>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -52,8 +62,14 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
 };
 
@@ -76,30 +92,26 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDBs to be pruned"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Mode")
+        .setDefault("value")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "value",    "Value",
             "inactive", "Inactive",
-            "levelset", "Level Set",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Mode")
-            .setDefault("value")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "Value:\n"
-                "    Collapse regions in which all voxels have the same\n"
-                "    value and active state into tiles with those values\n"
-                "    and active states.\n"
-                "Inactive:\n"
-                "    Collapse regions in which all voxels are inactive\n"
-                "    into inactive background tiles.\n"
-                "Level Set:\n"
-                "    Collapse regions in which all voxels are inactive\n"
-                "    into inactive tiles with either the inside or\n"
-                "    the outside background value, depending on\n"
-                "    the signs of the voxel values.\n"));
-    }
+            "levelset", "Level Set"
+        })
+        .setTooltip(
+            "Value:\n"
+            "    Collapse regions in which all voxels have the same\n"
+            "    value and active state into tiles with those values\n"
+            "    and active states.\n"
+            "Inactive:\n"
+            "    Collapse regions in which all voxels are inactive\n"
+            "    into inactive background tiles.\n"
+            "Level Set:\n"
+            "    Collapse regions in which all voxels are inactive\n"
+            "    into inactive tiles with either the inside or\n"
+            "    the outside background value, depending on\n"
+            "    the signs of the voxel values.\n"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Tolerance")
         .setDefault(PRMzeroDefaults)
@@ -110,6 +122,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
         .addInput("Grids to process")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Prune::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -163,10 +178,7 @@ SOP_OpenVDB_Prune::updateParmsFlags()
 {
     bool changed = false;
 
-    UT_String modeStr;
-    evalString(modeStr, "mode", 0, 0);
-
-    changed |= enableParm("tolerance", modeStr == "value");
+    changed |= enableParm("tolerance", evalStdString("mode", 0) == "value");
 
     return changed;
 }
@@ -200,29 +212,28 @@ struct PruneOp {
 
 
 OP_ERROR
-SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Prune)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-
-        const fpreal time = context.getTime();
 
         // This does a deep copy of native Houdini primitives
         // but only a shallow copy of OpenVDB grids.
+        lock.markInputUnlocked(0);
         duplicateSourceStealable(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, evalStdString("group", time));
 
         // Get other UI parameters.
-        UT_String modeStr;
-        evalString(modeStr, "mode", 0, time);
         const fpreal tolerance = evalFloat("tolerance", 0, time);
 
         // Construct a functor to process grids of arbitrary type.
-        const PruneOp pruneOp(modeStr.toStdString(), tolerance);
+        const PruneOp pruneOp(evalStdString("mode", time), tolerance);
 
         UT_AutoInterrupt progress("Pruning OpenVDB grids");
 

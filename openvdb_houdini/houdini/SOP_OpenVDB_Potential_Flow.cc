@@ -48,7 +48,14 @@
 #include <cmath>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -67,12 +74,20 @@ struct SOP_OpenVDB_Potential_Flow: public hvdb::SOP_NodeVDB
 
     int isRefInput(unsigned i) const override { return (i == 1); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
 }; // SOP_OpenVDB_Potential_Flow
 
-// using namespace openvdb;
+
+////////////////////////////////////////
+
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -99,15 +114,12 @@ newSopOperator(OP_OperatorTable* table)
         " will be solved.  The domain can either be restricted to the VDB input, or excluded"
         " from expanding in the VDB input."));
 
-    char const * const items[] = {
-        "intersection",  "Intersection",
-        "difference",   "Difference",
-        nullptr
-    };
-
     parms.add(hutil::ParmFactory(PRM_ORD, "masktype", "Domain Mask Type")
         .setDefault(PRMzeroDefaults)
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "intersection",  "Intersection",
+            "difference",   "Difference"
+        })
         .setTooltip("Mode for applying the domain modification mask (second input)")
         .setDocumentation("Modify the constructed domain using the second input VDB mask for"
         " calculating the potential flow velocity.  __Intersection__ causes the created"
@@ -220,6 +232,10 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Potential_Flow::factory, parms, *table)
         .addInput("VDB Surface and optional velocity VDB")
         .addOptionalInput("Optional VDB Mask")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE,
+            []() { return new SOP_OpenVDB_Potential_Flow::Cache; })
+#endif
         .setDocumentation(
     "#icon: COMMON/openvdb\n"
     "#tags: vdb\n"
@@ -385,28 +401,23 @@ private:
 
 
 OP_ERROR
-SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Potential_Flow)::cookVDBSop(OP_Context& context)
 {
-
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        lock.markInputUnlocked(0);
         duplicateSourceStealable(0, context);
+#endif
 
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Computing Potential Flow");
 
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
-
-        UT_String velocityStr;
-        evalString(velocityStr, "velocity", 0, time);
-        const GA_PrimitiveGroup *velocityGroup =
-            matchGroup(*gdp, velocityStr.toStdString());
-
-        const std::string velocity = velocityStr.toStdString();
+        const std::string velocity = evalStdString("velocity", time);
+        const GA_PrimitiveGroup* velocityGroup = matchGroup(*gdp, velocity);
 
         // SOP currently only supports float level sets
         using SdfGridT = openvdb::FloatGrid;
@@ -482,17 +493,8 @@ SOP_OpenVDB_Potential_Flow::cookMySop(OP_Context& context)
             MaskGridT::Ptr mask;
 
             if (maskGeo) {
-
-                UT_String maskStr;
-                evalString(maskStr, "maskvdbname", 0, time);
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-                const GA_PrimitiveGroup * maskGroup =
-                    parsePrimitiveGroups(maskStr.buffer(), GroupCreator(maskGeo));
-#else
-                const GA_PrimitiveGroup * maskGroup =
-                    parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-#endif
+                const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
+                    evalStdString("maskvdbname", time).c_str(), GroupCreator(maskGeo));
 
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
