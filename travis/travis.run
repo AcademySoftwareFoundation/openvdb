@@ -37,13 +37,13 @@
 # ABI (3/4/5) - the ABI version of OpenVDB
 # BLOSC (yes/no) - to build with Blosc support
 # RELEASE (yes/no) - to build in release or debug mode
-# HOUDINI_MAJOR (15.0/15.5/16.0) - the major version of Houdini
+# HOUDINI_MAJOR (15.0/15.5/16.0/16.5) - the major version of Houdini
 #
 # (Note Travis instances allow only 7.5GB of memory per VM, so limit concurrent builds to 4)
 #
 # Author: Dan Bailey
 
-set -x
+set -ex
 
 TASK="$1"
 ABI="$2"
@@ -78,6 +78,8 @@ HOUDINI_BLOSC_ARGS="    BLOSC_INCL_DIR=/test/hou/toolkit/include\
                         BLOSC_LIB_DIR=/test/hou/dsolib"
 NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
                         BLOSC_LIB_DIR="
+
+HOUDINI_HAS_BOOST=$(echo "$HOUDINI_MAJOR < 16.5" | bc -l)
 
 # introduce wrapper to clang++ that uses ccache, this is mainly
 # for use in hcustom where changing the compiler is hard
@@ -124,6 +126,13 @@ if [ "$TASK" = "install" ]; then
         cd hou
         tar -xzf houdini.tar.gz
         cd -
+        # boost no longer shipped with Houdini from 16.5 onwards
+        if [ $HOUDINI_HAS_BOOST -eq 0 ]; then
+            sudo apt-get install -y libboost-all-dev
+            cp -r /usr/include/boost /test/hou/toolkit/include
+            cp /usr/lib/x86_64-linux-gnu/libboost_iostreams.so* /test/hou/dsolib
+            cp /usr/lib/x86_64-linux-gnu/libboost_system.so* /test/hou/dsolib
+        fi
     fi
 elif [ "$TASK" = "script" ]; then
     if [ "$HOUDINI_MAJOR" = "none" ]; then
