@@ -56,13 +56,19 @@
   namespace boostmpl = boost::mpl;
 #endif
 
-
 #include <algorithm>
 #include <cmath>
 #include <map>
 #include <string>
 #include <sstream>
 #include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -449,16 +455,25 @@ private:
 
 // SOP Implementation
 
-struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB {
-
+struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB
+{
     SOP_OpenVDB_Remap(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
     int sortInputRange();
     int sortOutputRange();
 
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        void evalRamp(UT_Ramp&, fpreal time);
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
 };
 
 
@@ -510,6 +525,20 @@ SOP_OpenVDB_Remap::sortOutputRange()
 
     return 1;
 }
+
+
+void
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remap)::evalRamp(UT_Ramp& ramp, fpreal time)
+{
+#if !VDB_COMPILABLE_SOP
+    updateRampFromMultiParm(time, getParm("function"), ramp);
+#else
+    const auto rampStr = evalStdString("function", time);
+    UT_IStream strm(rampStr.c_str(), rampStr.size(), UT_ISTREAM_ASCII);
+    ramp.load(strm);
+#endif
+}
+
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -611,6 +640,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
         .addInput("VDB Grids")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Remap::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -643,12 +675,15 @@ SOP_OpenVDB_Remap::SOP_OpenVDB_Remap(OP_Network* net, const char* name, OP_Opera
 }
 
 OP_ERROR
-SOP_OpenVDB_Remap::cookVDBSop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remap)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
         duplicateSourceStealable(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Remapping values");
 
@@ -669,13 +704,12 @@ SOP_OpenVDB_Remap::cookVDBSop(OP_Context& context)
         if (extrapolation == 1) aboveExtrapolation = RemapGridValues::PRESERVE;
         else if (extrapolation == 2) aboveExtrapolation = RemapGridValues::EXTRAPOLATE;
 
-        UT_Ramp ramp;
-        updateRampFromMultiParm(time, getParm("function"), ramp);
-
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         size_t vdbPrimCount = 0;
 
+        UT_Ramp ramp;
+        evalRamp(ramp, time);
         RemapGridValues remap(belowExtrapolation, aboveExtrapolation, ramp,
             inMin, inMax, outMin, outMax, deactivate, UTgetErrorManager());
 

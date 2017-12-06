@@ -58,6 +58,13 @@
 #include <string>
 #include <vector>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 #if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
@@ -73,8 +80,14 @@ public:
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
     OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 };
@@ -229,6 +242,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDB on which points will be scattered")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -583,23 +599,34 @@ cullVDBPoints(openvdb::points::PointDataTree& tree,
 
 
 OP_ERROR
-SOP_OpenVDB_Scatter::cookVDBSop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Context& context)
 {
     try {
-        hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
+        hvdb::Interrupter boss("Scattering points on VDBs");
 
-        const GU_Detail* vdbgeo;
-        if (1 == evalInt("keep", 0, time)) {
-            // This does a deep copy of native Houdini primitives
-            // but only a shallow copy of OpenVDB grids.
+        const fpreal time = context.getTime();
+        const bool keepGrids = (0 != evalInt("keep", 0, time));
+
+#if VDB_COMPILABLE_SOP
+        const auto* vdbgeo = inputGeo(0);
+        if (keepGrids && vdbgeo) {
+            gdp->replaceWith(*vdbgeo);
+        } else {
+            gdp->stashAll();
+        }
+#else
+        hutil::ScopedInputLock lock(*this, context);
+
+        const GU_Detail* vdbgeo = nullptr;
+        if (keepGrids) {
+            lock.markInputUnlocked(0);
             duplicateSourceStealable(0, context);
             vdbgeo = gdp;
-        }
-        else {
+        } else {
             vdbgeo = inputGeo(0);
             gdp->clearAndDestroy();
         }
+#endif
 
         const int seed = static_cast<int>(evalInt("seed", 0, time));
         const auto spread = static_cast<float>(evalFloat("spread", 0, time));
@@ -610,13 +637,10 @@ SOP_OpenVDB_Scatter::cookVDBSop(OP_Context& context)
         const float density = static_cast<float>(evalFloat("density", 0, time));
         const bool multiplyDensity = evalInt("multiply", 0, time) != 0;
         const int outputName = static_cast<int>(evalInt("outputname", 0, time));
-
-        // Get the group of grids to process.
-        const GA_PrimitiveGroup* group = this->matchGroup(*vdbgeo, evalStdString("group", time));
-
         const std::string customName = evalStdString("customname", time);
 
-        hvdb::Interrupter boss("Scattering points on VDBs");
+        // Get the group of grids to process.
+        const GA_PrimitiveGroup* group = matchGroup(*vdbgeo, evalStdString("group", time));
 
         // Choose a fast random generator with a long period. Drawback here for
         // mt11213b is that it requires 352*sizeof(uint32) bytes.
