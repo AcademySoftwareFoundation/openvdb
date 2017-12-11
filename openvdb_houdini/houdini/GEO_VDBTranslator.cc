@@ -66,6 +66,8 @@
 #include <UT/UT_EnvControl.h>
 #endif
 
+#include <UT/UT_Error.h>
+#include <UT/UT_ErrorManager.h>
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>
@@ -102,7 +104,7 @@ public:
     virtual const char *formatName() const;
 
     virtual int		checkExtension(const char *name);
-    virtual void    getFileExtensions(UT_StringArray &extensions) const;
+    virtual void	getFileExtensions(UT_StringArray &extensions) const;
 
     virtual int		checkMagicNumber(unsigned magic);
 
@@ -274,7 +276,9 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
 	    createVdbPrimitive(*gdp, grid);
         }
     } catch (std::exception &e) {
-        cerr << "Load failure: " << e.what() << "\n";
+	// Add a warning here instead of an error or else the File SOP's
+	// Missing Frame parameter won't be able to suppress cook errors.
+        UTaddCommonWarning(UT_ERROR_JUST_STRING, e.what());
         ok = false;
     }
 
@@ -366,14 +370,14 @@ template <typename FileT, typename OutputT>
 bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 {
-    GU_Detail *gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
+    const GU_Detail *gdp = static_cast<const GU_Detail*>(geogdp);
     if (!gdp) return false;
 
     try {
         // Populate an output GridMap with VDB grid primitives found in the
         // geometry.
         openvdb::GridPtrVec outGrids;
-        for (VdbPrimIterator it(gdp); it; ++it) {
+        for (VdbPrimCIterator it(gdp); it; ++it) {
             const GU_PrimVDB* vdb = *it;
 
             // Create a new grid that shares the primitive's tree and transform
@@ -459,10 +463,8 @@ new_VDBGeometryIO(void *)
 {
     GU_Detail::registerIOTranslator(new GEO_VDBTranslator());
 
-    UT_ExtensionList		*geoextension;
-    geoextension = UTgetGeoExtensions();
-    if (!geoextension->findExtension("vdb"))
-	geoextension->addExtension("vdb");
+    // addExtension() will ignore if vdb is already in the list of extensions
+    UTgetGeoExtensions()->addExtension("vdb");
 }
 
 #ifndef SESI_OPENVDB

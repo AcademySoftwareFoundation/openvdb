@@ -36,6 +36,7 @@
 
 #ifdef _WIN32
 #define BOOST_REGEX_NO_LIB
+#define HBOOST_REGEX_NO_LIB
 #endif
 
 #include <houdini_utils/ParmFactory.h>
@@ -44,19 +45,36 @@
 #include <openvdb/tools/ValueTransformer.h> // for tools::foreach()
 #include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_String.h>
+#include <UT/UT_Version.h>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/regex.hpp>
+#else
 #include <boost/regex.hpp>
+#endif
 #include <functional>
 #include <memory>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
-// HAVE_MERGE_GROUP is disabled in H12.5
+// HAVE_MERGE_GROUP is disabled in Houdini
 #ifdef SESI_OPENVDB
 #define HAVE_MERGE_GROUP 0
 #else
@@ -72,9 +90,16 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
 protected:
     bool updateParmsFlags() override;
-    OP_ERROR cookMySop(OP_Context&) override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 
     static void addWarningMessage(SOP_OpenVDB_Vector_Merge* self, const char* msg)
         { if (self && msg) self->addWarning(SOP_MESSAGE, msg); }
@@ -89,7 +114,7 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     // Group of X grids
-    parms.add(hutil::ParmFactory(PRM_STRING, "scalar_x_group", "X Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "xgroup", "X Group")
         .setDefault("@name=*.x")
         .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
@@ -99,7 +124,7 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Group of Y grids
-    parms.add(hutil::ParmFactory(PRM_STRING, "scalar_y_group", "Y Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "ygroup", "Y Group")
         .setDefault("@name=*.y")
         .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
@@ -109,7 +134,7 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Group of Z grids
-    parms.add(hutil::ParmFactory(PRM_STRING, "scalar_z_group", "Z Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "zgroup", "Z Group")
         .setDefault("@name=*.z")
         .setTooltip(
             "Specify a group of scalar input VDB grids to be used\n"
@@ -203,10 +228,22 @@ Position:\n\
         .setDocumentation("If enabled, print debugging information to the terminal."));
 #endif
 
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "scalar_x_group", "X Group")
+        .setDefault("@name=*.x"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "scalar_y_group", "Y Group")
+        .setDefault("@name=*.y"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "scalar_z_group", "Z Group")
+        .setDefault("@name=*.z"));
+
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
         .addInput("Scalar VDBs to merge into vector")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Merge::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -233,6 +270,23 @@ TIP:\n\
 \n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
+}
+
+
+void
+SOP_OpenVDB_Vector_Merge::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    for (auto axis: { "x", "y", "z" }) {
+        const std::string
+            oldName = "scalar_" + (axis + std::string{"_group"}),
+            newName = axis + std::string{"group"};
+        resolveRenamedParm(*obsoleteParms, oldName.c_str(), newName.c_str());
+    }
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -337,7 +391,7 @@ public:
     }
 
 private:
-    std::shared_ptr<const ScalarTreeT> mDummyTree;
+    UT_SharedPtr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     UT_Interrupt* mInterrupt;
 }; // MergeActiveOp
@@ -420,7 +474,7 @@ struct MergeInactiveOp
     }
 
 private:
-    std::shared_ptr<const ScalarTreeT> mDummyTree;
+    UT_SharedPtr<const ScalarTreeT> mDummyTree;
     ScalarAccessor mXAcc, mYAcc, mZAcc;
     mutable VectorAccessor mVecAcc;
     UT_Interrupt* mInterrupt;
@@ -591,14 +645,15 @@ private:
 
 
 OP_ERROR
-SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Merge)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        duplicateSource(0, context);
+#endif
 
         const fpreal time = context.getTime();
-
-        duplicateSource(0, context);
 
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);
         const bool removeSourceGrids = evalInt("remove_sources", 0, time);
@@ -638,11 +693,11 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup *xGroup = nullptr, *yGroup = nullptr, *zGroup = nullptr;
         {
             UT_String groupStr;
-            evalString(groupStr, "scalar_x_group", 0, time);
+            evalString(groupStr, "xgroup", 0, time);
             xGroup = matchGroup(*gdp, groupStr.toStdString());
-            evalString(groupStr, "scalar_y_group", 0, time);
+            evalString(groupStr, "ygroup", 0, time);
             yGroup = matchGroup(*gdp, groupStr.toStdString());
-            evalString(groupStr, "scalar_z_group", 0, time);
+            evalString(groupStr, "zgroup", 0, time);
             zGroup = matchGroup(*gdp, groupStr.toStdString());
         }
 
@@ -675,8 +730,8 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             std::string outGridName;
             if (mergeName.isstring()) {
                 UT_String s; s.itoa(i);
-                outGridName = boost::regex_replace(
-                    mergeName.toStdString(), boost::regex("#+"), s.toStdString());
+                outGridName = hboost::regex_replace(
+                    mergeName.toStdString(), hboost::regex("#+"), s.toStdString());
             }
 
             if (useXName && nonNullVdb) {
@@ -690,7 +745,7 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             // Merge the input grids into an output grid.
             // This does not support a partial set so we quit early in that case.
             ScalarGridMerger op(xGrid, yGrid, zGrid, outGridName, copyInactiveValues,
-                std::bind(&SOP_OpenVDB_Vector_Merge::addWarningMessage,this,std::placeholders::_1));
+                [this](const char* msg) { addWarning(SOP_MESSAGE, msg); });
             UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {

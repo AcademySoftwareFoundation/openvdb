@@ -42,13 +42,13 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDataGrid.h>
 
+#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Iterator.h>
-
-#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
+#include <UT/UT_Version.h>
 
 #include <algorithm>
 #include <map>
@@ -59,6 +59,11 @@
 #include <type_traits>
 #include <vector>
 
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -474,7 +479,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     }
 
     const int16_t width(hvdb::attributeTupleSize(attribute));
-    assert(width > 0);
+    UT_ASSERT(width > 0);
 
     // explicitly handle string attributes
 
@@ -728,7 +733,7 @@ gaDefaultsFromDescriptorTyped(const openvdb::points::AttributeSet::Descriptor& d
 {
     const int size = SizeTraits<ValueType>::Size;
 
-    std::unique_ptr<HoudiniType[]> values(new HoudiniType[size]);
+    UT_UniquePtr<HoudiniType[]> values(new HoudiniType[size]);
     ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
 
     getValues<ValueType, HoudiniType>(values.get(), defaultValue);
@@ -902,7 +907,7 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
         for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
             end = std::min(end, GA_Offset(numPoints));
             for (GA_Offset off = start; off < end; ++off) {
-                assert(off < numPoints);
+                UT_ASSERT(off < GA_Offset(numPoints));
                 inGroup[off] = short(1);
             }
         }
@@ -1166,7 +1171,7 @@ convertPointDataGridToHoudini(
     for (const auto& namePos : groupMap) {
         const Name& name = namePos.first;
 
-        assert(!name.empty());
+        UT_ASSERT(!name.empty());
 
         GA_PointGroup* pointGroup = detail.findPointGroup(name.c_str());
         if (!pointGroup) pointGroup = detail.newPointGroup(name.c_str());
@@ -1222,7 +1227,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 warnings.push_back(ss.str().c_str());
                 continue;
             }
-            assert(metadata);
+            UT_ASSERT(metadata);
             grid.insertMeta(name, *metadata);
         } else if (isQuaternion) {
             if (storage == GA_STORE_REAL16) {
@@ -1277,7 +1282,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                     warnings.push_back(ss.str().c_str());
                     continue;
                 }
-                assert(metadata);
+                UT_ASSERT(metadata);
                 if (width > 1) {
                     const Name arrayName(name + Name("[") + std::to_string(i) + Name("]"));
                     grid.insertMeta(arrayName, *metadata);
@@ -1401,7 +1406,7 @@ convertMetadataToHoudini(GU_Detail& detail,
         const Name& type = metaMap[key]->typeName();
 
         GA_RWAttributeRef attrib = detail.findGlobalAttribute(name);
-        assert(!attrib.isInvalid());
+        UT_ASSERT(!attrib.isInvalid());
 
         if (type == openvdb::typeNameAsString<bool>())                 populateHoudiniDetailAttribute<bool>(attrib, metaMap, key, index);
         else if (type == openvdb::typeNameAsString<int16_t>())         populateHoudiniDetailAttribute<int16_t>(attrib, metaMap, key, index);

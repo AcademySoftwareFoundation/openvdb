@@ -52,22 +52,39 @@
 #include <GEO/GEO_PointClassifier.h>
 #include <GU/GU_ConvertParms.h>
 #include <UT/UT_Quaternion.h>
-#include <UT/UT_ScopedPtr.h>
 #include <UT/UT_ValArray.h>
 #include <UT/UT_Version.h>
 
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#include <hboost/math/constants/constants.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
 #include <boost/math/constants/constants.hpp>
+#endif
 
+#include <cmath>
 #include <iostream>
-#include <string>
-#include <sstream>
 #include <limits>
-#include <vector>
 #include <list>
+#include <random>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -83,18 +100,29 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-protected:
-    OP_ERROR cookMySop(OP_Context&) override;
-    bool updateParmsFlags() override;
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
 
-    template <class GridType>
-    void process(
-        std::list<openvdb::GridBase::Ptr>& grids,
-        const GU_Detail* cutterGeo,
-        const GU_Detail* pointGeo,
-        hvdb::Interrupter&,
-        const fpreal time);
-};
+        template<class GridType>
+        void process(
+            std::list<openvdb::GridBase::Ptr>& grids,
+            const GU_Detail* cutterGeo,
+            const GU_Detail* pointGeo,
+            hvdb::Interrupter&,
+            const fpreal time);
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
+protected:
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
+}; // class SOP_OpenVDB_Fracture
+
 
 ////////////////////////////////////////
 
@@ -110,7 +138,7 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Input options
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "inputgroup", "Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("Select a subset of the input OpenVDB grids to fracture.")
         .setDocumentation(
@@ -190,12 +218,21 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "inputgroup", "Group"));
+
+    //////////
+
     hvdb::OpenVDBOpFactory("OpenVDB Fracture", SOP_OpenVDB_Fracture::factory, parms, *table)
         .addInput("OpenVDB grids to fracture\n"
             "(Required to have matching transforms and narrow band widths)")
         .addInput("Cutter objects (geometry).")
         .addOptionalInput("Optional points to instance the cutter object onto\n"
             "(The cutter object is used in place if no points are provided.)")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fracture::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -263,6 +300,18 @@ SOP_OpenVDB_Fracture::SOP_OpenVDB_Fracture(OP_Network* net,
 ////////////////////////////////////////
 
 
+void
+SOP_OpenVDB_Fracture::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "inputgroup", "group");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 // Enable or disable parameters in the UI.
 bool
 SOP_OpenVDB_Fracture::updateParmsFlags()
@@ -287,12 +336,16 @@ SOP_OpenVDB_Fracture::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
+        lock.markInputUnlocked(0);
         duplicateSourceStealable(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Converting geometry to volume");
 
@@ -315,12 +368,7 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
 
         const GU_Detail* pointGeo = inputGeo(2);
 
-        const GA_PrimitiveGroup* group = nullptr;
-        {
-            UT_String str;
-            evalString(str, "inputgroup", 0, time);
-            group = matchGroup(*gdp, str.toStdString());
-        }
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         std::list<openvdb::GridBase::Ptr> grids;
         std::vector<GU_PrimVDB*> origvdbs;
@@ -357,13 +405,13 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
 
         if (!nonLevelSetList.empty()) {
             std::string s = "The following non level set grids were skipped: '" +
-                boost::algorithm::join(nonLevelSetList, ", ") + "'.";
+                hboost::algorithm::join(nonLevelSetList, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         if (!nonLinearList.empty()) {
             std::string s = "The following grids were skipped: '" +
-                boost::algorithm::join(nonLinearList, ", ") +
+                hboost::algorithm::join(nonLinearList, ", ") +
                 "' because they don't have a linear/affine transform.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
@@ -404,9 +452,9 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
 ////////////////////////////////////////
 
 
-template <class GridType>
+template<class GridType>
 void
-SOP_OpenVDB_Fracture::process(
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
     std::list<openvdb::GridBase::Ptr>& grids,
     const GU_Detail* cutterGeo,
     const GU_Detail* pointGeo,
@@ -463,7 +511,7 @@ SOP_OpenVDB_Fracture::process(
             using RandGen = std::mt19937;
             RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
             std::uniform_real_distribution<float> uniform01;
-            const float two_pi = 2.0f * boost::math::constants::pi<float>();
+            const float two_pi = 2.0f * hboost::math::constants::pi<float>();
             UT_DMatrix4 xform;
             UT_Vector3 trans;
             UT_DMatrix3 rotmat;
@@ -551,7 +599,7 @@ SOP_OpenVDB_Fracture::process(
             using RandGen = std::mt19937;
             RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
             std::uniform_real_distribution<float> uniform01;
-            const float two_pi = 2.0 * boost::math::constants::pi<float>();
+            const float two_pi = 2.0 * hboost::math::constants::pi<float>();
             for (size_t n = 0, N = instanceRotations.size(); n < N; ++n) {
 
                 const float u  = uniform01(rng);
@@ -650,21 +698,21 @@ SOP_OpenVDB_Fracture::process(
 
         if (!badTransformList.empty()) {
             std::string s = "The following grids were skipped: '" +
-                boost::algorithm::join(badTransformList, ", ") +
+                hboost::algorithm::join(badTransformList, ", ") +
                 "' because they don't match the transform of the first grid.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         if (!badBackgroundList.empty()) {
             std::string s = "The following grids were skipped: '" +
-                boost::algorithm::join(badBackgroundList, ", ") +
+                hboost::algorithm::join(badBackgroundList, ", ") +
                 "' because they don't match the background value of the first grid.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         if (!badTypeList.empty()) {
             std::string s = "The following grids were skipped: '" +
-                boost::algorithm::join(badTypeList, ", ") +
+                hboost::algorithm::join(badTypeList, ", ") +
                 "' because they don't have the same data type as the first grid.";
             addWarning(SOP_MESSAGE, s.c_str());
         }

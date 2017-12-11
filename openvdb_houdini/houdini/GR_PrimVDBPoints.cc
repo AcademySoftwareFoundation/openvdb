@@ -65,8 +65,23 @@
 #include <RE/RE_ShaderHandle.h>
 #include <RE/RE_VertexArray.h>
 #include <UT/UT_DSOVersion.h>
+#include <UT/UT_Version.h>
 
 #include <tbb/mutex.h>
+
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+#include <memory>
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
 
 
 ////////////////////////////////////////
@@ -195,8 +210,8 @@ protected:
     void removeBuffer(const std::string& name);
 
 private:
-    std::unique_ptr<RE_Geometry> myGeo;
-    std::unique_ptr<RE_Geometry> myWire;
+    UT_UniquePtr<RE_Geometry> myGeo;
+    UT_UniquePtr<RE_Geometry> myWire;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
     openvdb::BBoxd mBbox;
@@ -896,7 +911,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(),
                         includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-        std::unique_ptr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
+        UT_UniquePtr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
 
         PositionAttribute positionAttribute(pdata.get(), mCentroid, static_cast<Index>(stride));
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
@@ -997,7 +1012,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
         // fill the wire data
 
-        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
+        UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<openvdb::Coord> coords;
 
@@ -1157,7 +1172,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         }
         const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
 
-        std::unique_ptr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
+        UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;

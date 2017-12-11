@@ -44,6 +44,13 @@
 #include <OBJ/OBJ_Camera.h>
 #include <exception>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -58,16 +65,26 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+    private:
+        void getFrustum(OP_Context&);
+
+        openvdb::math::Transform::Ptr mFrustum;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
     OP_ERROR cookMyGuide1(OP_Context&) override;
-    OP_ERROR cookMySop(OP_Context&) override;
-
-private:
-    void getFrustum(OP_Context&);
-
-    openvdb::math::Transform::Ptr mFrustum;
 };
 
 
@@ -81,25 +98,22 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("Specify a subset of VDBs from the first input to be clipped.")
         .setDocumentation(
             "A subset of VDBs from the first input to be clipped"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "camera",   "Camera",
             "geometry", "Geometry",
-            "mask",     "Mask VDB",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("geometry")
-            .setTooltip("Specify how the clipping region should be defined.")
-            .setDocumentation("\
+            "mask",     "Mask VDB"
+        })
+        .setDefault("geometry")
+        .setTooltip("Specify how the clipping region should be defined.")
+        .setDocumentation("\
 How to define the clipping region\n\
 \n\
 Camera:\n\
@@ -108,7 +122,6 @@ Geometry:\n\
     Use the bounding box of geometry from the second input as the clipping region.\n\
 Mask VDB:\n\
     Use the active voxels of a VDB volume from the second input as a clipping mask.\n"));
-    }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -144,6 +157,9 @@ Mask VDB:\n\
         .addInput("VDBs")
         .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Clip::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -230,7 +246,6 @@ SOP_OpenVDB_Clip::SOP_OpenVDB_Clip(OP_Network* net,
 
 
 namespace {
-
 
 struct LevelSetMaskOp
 {
@@ -335,7 +350,7 @@ struct MaskClipOp
 
 /// Get the selected camera's frustum transform.
 void
-SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::getFrustum(OP_Context& context)
 {
     mFrustum.reset();
 
@@ -348,13 +363,22 @@ SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
     }
 
     OBJ_Camera* camera = nullptr;
+#if VDB_COMPILABLE_SOP
+    if (auto* obj = cookparms()->getCwd()->findOBJNode(cameraPath)) {
+        camera = obj->castToOBJCamera();
+    }
+    OP_Node* self = cookparms()->getCwd();
+#else
     if (auto* obj = findOBJNode(cameraPath)) {
         camera = obj->castToOBJCamera();
     }
+    OP_Node* self = this;
+#endif
+
     if (!camera) {
         throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
     }
-    this->addExtraInput(camera, OP_INTEREST_DATA);
+    self->addExtraInput(camera, OP_INTEREST_DATA);
 
     OBJ_CameraParms cameraParms;
     camera->getCameraParms(cameraParms, time);
@@ -366,7 +390,7 @@ SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
     const float
         nearPlane = static_cast<float>(camera->getNEAR(time)),
         farPlane = static_cast<float>(camera->getFAR(time));
-    mFrustum = hvdb::frustumTransformFromCamera(*this, context, *camera,
+    mFrustum = hvdb::frustumTransformFromCamera(*self, context, *camera,
         /*offset=*/0.f, nearPlane, farPlane, /*voxelDepth=*/1.f, /*voxelCountX=*/100);
 
     if (!mFrustum || !mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()) {
@@ -383,9 +407,20 @@ OP_ERROR
 SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
-    if (mFrustum) {
+
+    openvdb::math::Transform::ConstPtr frustum;
+#if !VDB_COMPILABLE_SOP
+    frustum = mFrustum;
+#else
+    // Attempt to extract the frustum from our cache.
+    if (auto* cache = dynamic_cast<SOP_OpenVDB_Clip::Cache*>(myNodeVerbCache)) {
+        frustum = cache->frustum();
+    }
+#endif
+
+    if (frustum) {
         const UT_Vector3 color{0.9f, 0.0f, 0.0f};
-        hvdb::drawFrustum(*myGuide1, *mFrustum, &color,
+        hvdb::drawFrustum(*myGuide1, *frustum, &color,
             /*tickColor=*/nullptr, /*shaded=*/false, /*ticks=*/false);
     }
     return error();
@@ -393,16 +428,19 @@ SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
 
 
 OP_ERROR
-SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock{*this, context};
-        const fpreal time = context.getTime();
-
-        UT_AutoInterrupt progress{"Clipping VDBs"};
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
+
+        UT_AutoInterrupt progress{"Clipping VDBs"};
 
         const GU_Detail* maskGeo = inputGeo(1);
 
@@ -423,15 +461,8 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             getFrustum(context);
         } else if (maskGeo) {
             if (useMask) {
-                UT_String maskStr;
-                evalString(maskStr, "mask", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
                 const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
-                    maskStr.buffer(), GroupCreator{maskGeo});
-#else
-                const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
-                    maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-#endif
+                    evalStdString("mask", time).c_str(), GroupCreator{maskGeo});
                 hvdb::VdbPrimCIterator maskIt{maskGeo, maskGroup};
                 if (maskIt) {
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
@@ -464,9 +495,7 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
         }
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         int numLevelSets = 0;
         for (hvdb::VdbPrimIterator it{gdp, group}; it; ++it) {

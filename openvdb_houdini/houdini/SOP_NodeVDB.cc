@@ -46,43 +46,21 @@
 #include <OP/OP_NodeInfoParms.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_Type.h>
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
 #include <SOP/SOP_Cache.h> // for stealable
-#endif
 #include <UT/UT_InfoTree.h>
+#include <UT/UT_SharedPtr.h>
 #include <tbb/mutex.h>
+#include <algorithm>
+#include <iostream>
+#include <map>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 
 
 namespace openvdb_houdini {
 
 namespace node_info_text {
-
-#if (UT_MAJOR_VERSION_INT < 14)
-/// @brief The default information text returned for VDB grids when no
-/// override for the grid type has been found
-static void
-defaultNodeSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
-{
-    const openvdb::Coord dim = grid.evalActiveVoxelDim();
-
-    infoStr << " voxel size: " << grid.transform().voxelSize()[0] << ",";
-    infoStr << " type: "<< grid.valueType() << ",";
-
-    if (grid.activeVoxelCount() != 0) {
-        infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2];
-    } else {
-        infoStr << " <empty>";
-    }
-
-    const openvdb::GridClass gClass = grid.getGridClass();
-    if (openvdb::GRID_LEVEL_SET == gClass || openvdb::GRID_FOG_VOLUME == gClass) {
-        infoStr <<" (" << grid.gridClassToMenuName(gClass) << ")";
-    }
-}
-#endif
-
 
 using Mutex = tbb::mutex;
 using Lock = Mutex::scoped_lock;
@@ -152,11 +130,7 @@ getGridSpecificInfoText(const std::string& gridType)
         registry->mApplyGridSpecificInfoTextMap.find(gridType);
 
     if (iter == registry->mApplyGridSpecificInfoTextMap.end() || iter->second == nullptr) {
-#if (UT_MAJOR_VERSION_INT >= 14)
         return nullptr; // Native prim info is sufficient
-#else
-        return &defaultNodeSpecificInfoText;
-#endif
     }
 
     return iter->second;
@@ -208,11 +182,7 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
     const GA_PrimitiveGroup* group = nullptr;
     if (!pattern.empty()) {
         // If a pattern was provided, try to match it.
-#if (UT_MAJOR_VERSION_INT >= 15)
         group = parsePrimitiveGroups(pattern.c_str(), GroupCreator(&aGdp, false));
-#else
-        group = parsePrimitiveGroups(pattern.c_str(), &aGdp);
-#endif
         if (!group) {
             // Report an error if the pattern didn't match.
             throw std::runtime_error(("Invalid group (" + pattern + ")").c_str());
@@ -227,11 +197,7 @@ SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
     const GA_PrimitiveGroup* group = nullptr;
     if (!pattern.empty()) {
         // If a pattern was provided, try to match it.
-#if (UT_MAJOR_VERSION_INT >= 15)
         group = parsePrimitiveGroups(pattern.c_str(), GroupCreator(&aGdp));
-#else
-        group = parsePrimitiveGroups(pattern.c_str(), const_cast<GU_Detail*>(&aGdp));
-#endif
         if (!group) {
             // Report an error if the pattern didn't match.
             throw std::runtime_error(("Invalid group (" + pattern + ")").c_str());
@@ -328,13 +294,14 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 #endif
 }
 
+
+////////////////////////////////////////
+
+
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
 {
-
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
-
     // traverse upstream nodes, if unload is not possible, duplicate the source
     if (!isSourceStealable(index, context)) {
         duplicateSource(index, context, *pgdp, clean);
@@ -363,7 +330,7 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     // explicitly copying the input onto the gdp
     if (!(unloadSuccessful && soleReference)) {
         const GU_Detail *src = inputgdh.readLock();
-        assert(src);
+        UT_ASSERT(src);
         if (src)  (*pgdp)->copy(*src);
         inputgdh.unlock(src);
         return error();
@@ -375,14 +342,6 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     gdh = inputgdh;
     *pgdp = gdh.writeLock();
 
-#else // earlier than 13.0
-
-    duplicateSource(index, context, *pgdp, clean);
-    // inputs are unlocked to match SOP state in Houdini 13.0 or later functionality
-    unlockInput(index);
-
-#endif
-
     return error();
 }
 
@@ -390,7 +349,6 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
 bool
 SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     struct Local {
         static inline OP_Node* nextStealableInput(
             const unsigned idx, const fpreal now, const OP_Node* node)
@@ -418,25 +376,45 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
         if (dynamic_cast<SOP_Cache*>(node))  return false;
 
         if (node->getUnload() != 0)
-	    return true;
+            return true;
         else
-	    return false;
+            return false;
     }
-#endif
     return false;
 }
 
 
 OP_ERROR
-SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
+{
     return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
-#else
-    duplicateSource(index, context, gdp, true);
-    // inputs are unlocked to match SOP state in Houdini 13.0 or later functionality
-    unlockInput(index);
-    return error();
+}
+
+
+////////////////////////////////////////
+
+
+#if UT_MAJOR_VERSION_INT >= 16
+const SOP_NodeVerb*
+SOP_NodeVDB::cookVerb() const
+{
+    if (const auto* verb = SOP_NodeVerb::lookupVerb(getOperator()->getName())) {
+        return verb; ///< @todo consider caching this
+    }
+    return SOP_Node::cookVerb();
+}
 #endif
+
+
+OP_ERROR
+SOP_NodeVDB::cookMySop(OP_Context& context)
+{
+#if UT_MAJOR_VERSION_INT >= 16
+    if (cookVerb()) {
+        return cookMyselfAsVerb(context);
+    }
+#endif
+    return cookVDBSop(context);
 }
 
 
@@ -465,7 +443,7 @@ createEmptyGridGlyph(GU_Detail& gdp, GridCRef grid)
     lines[4] = xform.indexToWorld(lines[4]);
     lines[5] = xform.indexToWorld(lines[5]);
 
-    std::shared_ptr<GU_Detail> tmpGDP(new GU_Detail);
+    UT_SharedPtr<GU_Detail> tmpGDP(new GU_Detail);
 
     UT_Vector3 color(0.1f, 1.0f, 0.1f);
     tmpGDP->addFloatTuple(GA_ATTRIB_POINT, "Cd", 3, GA_Defaults(color.data(), 3));
@@ -550,6 +528,15 @@ SOP_NodeVDB::evalVec2i(const char *name, fpreal time) const
     using ValueT = openvdb::Vec2i::value_type;
     return openvdb::Vec2i(static_cast<ValueT>(evalInt(name, 0, time)),
                           static_cast<ValueT>(evalInt(name, 1, time)));
+}
+
+
+std::string
+SOP_NodeVDB::evalStdString(const char* name, fpreal time, int index) const
+{
+    UT_String str;
+    evalString(str, name, index, time);
+    return str.toStdString();
 }
 
 

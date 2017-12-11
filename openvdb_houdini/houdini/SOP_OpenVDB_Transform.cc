@@ -37,11 +37,24 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/math/constants/constants.hpp>
+#else
 #include <boost/math/constants/constants.hpp>
+#endif
 #include <stdexcept>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 class SOP_OpenVDB_Transform: public hvdb::SOP_NodeVDB
@@ -52,8 +65,12 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 };
 
 
@@ -122,6 +139,9 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
         .addInput("Input with VDB grids to transform")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Transform::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -177,18 +197,21 @@ struct VecXformOp
 
 
 OP_ERROR
-SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Transform)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
+        hutil::ScopedInputLock lock(*this, context);
+
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        lock.markInputUnlocked(0);
+        duplicateSourceStealable(0, context);
+#endif
+
         using AffineMap = openvdb::math::AffineMap;
         using Transform = openvdb::math::Transform;
 
-        hutil::ScopedInputLock lock(*this, context);
-
         const fpreal time = context.getTime();
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSourceStealable(0, context);
 
         // Get UI parameters
         openvdb::Vec3R t(evalVec3R("t", time)), r(evalVec3R("r", time)),
@@ -208,7 +231,7 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
         UT_AutoInterrupt progress("Transform");
 
         // Build up the transform matrix from the UI parameters
-        const double deg2rad = boost::math::constants::pi<double>() / 180.0;
+        const double deg2rad = hboost::math::constants::pi<double>() / 180.0;
 
         openvdb::Mat4R mat(openvdb::Mat4R::identity());
         mat.preTranslate(p);

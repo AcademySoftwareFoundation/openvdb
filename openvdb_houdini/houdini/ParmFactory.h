@@ -37,11 +37,16 @@
 #ifndef HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 #define HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 
+#include <UT/UT_Version.h>
+#include <GA/GA_Attribute.h>
+#include <OP/OP_AutoLockInputs.h>
 #include <OP/OP_Operator.h>
 #include <PRM/PRM_Include.h>
 #include <PRM/PRM_SpareData.h>
-#include <GA/GA_Attribute.h>
 #include <SOP/SOP_Node.h>
+#if UT_MAJOR_VERSION_INT >= 16
+#include <SOP/SOP_NodeVerb.h>
+#endif
 #if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
   // OPENVDB_HOUDINI_API, which has no meaning in a DWA build environment but
   // must at least exist, is normally defined by including openvdb/Platform.h.
@@ -131,7 +136,7 @@ private:
 
     PrmTemplateVec mParmVec;
     SwitcherStack mSwitchers;
-};
+}; // class ParmList
 
 
 ////////////////////////////////////////
@@ -343,7 +348,7 @@ private:
     // For internal use only, and soon to be removed:
     ParmFactory& doSetChoiceList(PRM_ChoiceListType, const std::vector<std::string>&, bool);
     ParmFactory& doSetChoiceList(PRM_ChoiceListType, const char* const* items, bool);
-};
+}; // class ParmFactory
 
 
 ////////////////////////////////////////
@@ -409,6 +414,9 @@ public:
     /// Register the operator.
     ~OpFactory();
 
+    OpFactory(const OpFactory&) = delete;
+    OpFactory& operator=(const OpFactory&) = delete;
+
     /// @brief Return the new operator's flavor (SOP, POP, etc.).
     /// @details This accessor is mainly for use by OpPolicy objects.
     OpFlavor flavor() const;
@@ -468,16 +476,31 @@ public:
     OpFactory& setInternalName(const std::string& name);
     OpFactory& setOperatorTable(const std::string& name);
 
-private:
-    OpFactory(const OpFactory&);
-    OpFactory& operator=(const OpFactory&);
+#if UT_MAJOR_VERSION_INT >= 16
+    /// @brief Functor that returns newly-allocated node caches
+    /// for instances of this operator
+    /// @details A node cache encapsulates a SOP's cooking logic for thread safety.
+    /// Input geometry and parameter values are baked into the cache.
+    using CacheAllocFunc = std::function<SOP_NodeCache* (void)>;
 
+    /// @brief Register this operator as a
+    /// <A HREF="http://www.sidefx.com/docs/houdini/model/compile">compilable</A>&nbsp;SOP.
+    /// @details "Verbifying" a SOP separates its input and parameter management
+    /// from its cooking logic so that cooking can be safely threaded.
+    /// @param cookMode   how to initialize the output detail
+    /// @param allocator  a node cache allocator for instances of this operator
+    /// @throw std::runtime_error if this operator is not a SOP
+    /// @throw std::invalid_argument if @a allocator is empty
+    OpFactory& setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator);
+#endif
+
+private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
         ParmList&, OP_OperatorTable&, OpFlavor);
 
     struct Impl;
     std::shared_ptr<Impl> mImpl;
-};
+}; // class OpFactory
 
 
 ////////////////////////////////////////
@@ -557,17 +580,23 @@ public:
 class OPENVDB_HOUDINI_API ScopedInputLock
 {
 public:
-    ScopedInputLock(SOP_Node& node, OP_Context& context): mNode(&node)
+    ScopedInputLock(SOP_Node& node, OP_Context& context)
     {
-        if (mNode->lockInputs(context) >= UT_ERROR_ABORT) {
+        mLock.setNode(&node);
+        if (mLock.lock(context) >= UT_ERROR_ABORT) {
             throw std::runtime_error("failed to lock inputs");
         }
     }
+    ~ScopedInputLock() {}
 
-    ~ScopedInputLock() { mNode->unlockInputs(); }
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+    void markInputUnlocked(exint input) { mLock.markInputUnlocked(input); }
+#else
+    void markInputUnlocked(exint) {}
+#endif
 
 private:
-    SOP_Node* mNode;
+    OP_AutoLockInputs mLock;
 };
 
 

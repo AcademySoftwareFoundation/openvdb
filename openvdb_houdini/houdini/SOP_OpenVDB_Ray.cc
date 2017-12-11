@@ -41,24 +41,36 @@
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/VolumeToSpheres.h> // for ClosestSurfacePoint
 
-#include <UT/UT_Interrupt.h>
-#include <UT/UT_ParallelUtil.h>
-#include <UT/UT_Version.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_SplittableRange.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
-#include <GU/GU_PrimSphere.h>
+#include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
 
-#include <sstream>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -74,8 +86,14 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
 };
 
@@ -95,17 +113,14 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "A subset of VDBs to process (see [specifying volumes|/model/volumes#group])"));
 
-    { // Method
-        char const * const items[] = {
+    // Method
+    parms.add(hutil::ParmFactory(PRM_ORD, "method", "Method")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Projection method")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "rayintersection",  "Ray Intersection",
-            "closestpoint",     "Closest Surface Point",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "method", "Method")
-            .setDefault(PRMzeroDefaults)
-            .setTooltip("Projection method")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
+            "closestpoint",     "Closest Surface Point"
+        }));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
@@ -153,6 +168,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Ray", SOP_OpenVDB_Ray::factory, parms, *table)
         .addInput("points")
         .addInput("level set grids")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Ray::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -415,13 +433,15 @@ private:
 
 
 OP_ERROR
-SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Ray)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
-
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Computing VDB ray intersections");
 
@@ -429,9 +449,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         if (vdbGeo == nullptr) return error();
 
         // Get the group of grids to surface.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*vdbGeo, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*vdbGeo, evalStdString("group", time));
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {
@@ -451,13 +469,8 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         GA_ROAttributeRef attributeRef = gdp->findPointAttribute("N");
         if (attributeRef.isValid()) {
-#if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
             gdp->getAttributeAsArray(
                 attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
-#else
-            gdp->getPointAttributeAsArray(
-                attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
-#endif
         } else {
             gdp->normal(pointNormals, /*use_internaln=*/false);
         }
@@ -516,21 +529,15 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
             if (!aRef.isValid()) {
                 aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0.0));
             }
-#if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
             gdp->setAttributeFromArray(aRef.getAttribute(), gdp->getPointRange(), distances);
-#else
-            gdp->setPointAttributeFromArray(aRef.getAttribute(), gdp->getPointRange(), distances);
-#endif
         }
 
         if (rayIntersection && bool(evalInt("creategroup", 0, time))) { // group intersecting points
 
-            groupStr = "";
-            evalString(groupStr, "hitgrp", 0, time);
-
-            if(groupStr.length() > 0) {
-                GA_PointGroup *pointGroup = gdp->findPointGroup(groupStr);
-                if (!pointGroup) pointGroup = gdp->newPointGroup(groupStr);
+            const auto groupStr = evalStdString("hitgrp", time);
+            if (!groupStr.empty()) {
+                GA_PointGroup *pointGroup = gdp->findPointGroup(groupStr.c_str());
+                if (!pointGroup) pointGroup = gdp->newPointGroup(groupStr.c_str());
 
                 for (size_t n = 0; n < numPoints; ++n) {
                     if (intersections[n]) pointGroup->addIndex(n);
@@ -540,7 +547,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         if (!skippedGrids.empty()) {
             std::string s = "Only level set grids are supported, the following "
-                "were skipped: '" + boost::algorithm::join(skippedGrids, ", ") + "'.";
+                "were skipped: '" + hboost::algorithm::join(skippedGrids, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 

@@ -65,13 +65,12 @@
 #include <OP/OP_VexFunction.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_WorkArgs.h>
 #include <VEX/VEX_Error.h>
 #include <VOP/VOP_CodeCompilerArgs.h>
 #include <VOP/VOP_CodeGenerator.h>
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 #include <VOP/VOP_ExportedParmsManager.h>
-#endif
 #include <VOP/VOP_LanguageContextTypeList.h>
 
 #include <tbb/atomic.h>
@@ -81,19 +80,39 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/task_group.h>
 
-#include <boost/algorithm/string/classification.hpp> // is_any_of
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+  #include <hboost/algorithm/string/classification.hpp> // is_any_of
+  #include <hboost/algorithm/string/join.hpp>
+  #include <hboost/algorithm/string/split.hpp>
+  #ifdef SESI_OPENVDB
+    #include <hboost/mpl/at.hpp>
+    namespace boostmpl = hboost::mpl;
+  #else
+    #include <boost/mpl/at.hpp>
+    namespace boostmpl = boost::mpl;
+  #endif
+#else
+  #include <boost/algorithm/string/classification.hpp> // is_any_of
+  #include <boost/algorithm/string/join.hpp>
+  #include <boost/algorithm/string/split.hpp>
+  #include <boost/mpl/at.hpp>
+  namespace hboost = boost;
+  namespace boostmpl = boost::mpl;
+#endif
 
 #include <algorithm> // std::sort
-#include <math.h> // trigonometric functions
+#include <cmath> // trigonometric functions
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+  #include <UT/UT_UniquePtr.h>
+#else
+  template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -121,14 +140,14 @@ getMaskVDB(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = nullptr)
 }
 
 
-inline boost::shared_ptr<openvdb::BBoxd>
+inline UT_SharedPtr<openvdb::BBoxd>
 getMaskGeoBBox(const GU_Detail * geoPt)
 {
     if (geoPt) {
         UT_BoundingBox box;
         geoPt->computeQuickBounds(box);
 
-        boost::shared_ptr<openvdb::BBoxd> bbox(new openvdb::BBoxd());
+        UT_SharedPtr<openvdb::BBoxd> bbox(new openvdb::BBoxd());
         bbox->min()[0] = box.xmin();
         bbox->min()[1] = box.ymin();
         bbox->min()[2] = box.zmin();
@@ -139,7 +158,7 @@ getMaskGeoBBox(const GU_Detail * geoPt)
         return bbox;
     }
 
-    return boost::shared_ptr<openvdb::BBoxd>();
+    return UT_SharedPtr<openvdb::BBoxd>();
 }
 
 
@@ -320,7 +339,7 @@ private:
 ///@brief Utility structure that caches commonly used point attributes
 struct PointCache
 {
-    using Ptr = boost::shared_ptr<PointCache>;
+    using Ptr = UT_SharedPtr<PointCache>;
     using PosType = openvdb::Vec3s;
     using ScalarType = PosType::value_type;
 
@@ -435,9 +454,9 @@ private:
     struct IFOCopyPointData {
         IFOCopyPointData(
             const std::vector<unsigned>& indices,
-            boost::scoped_array<GA_Offset>& offsets,
-            boost::scoped_array<float>& radius,
-            boost::scoped_array<openvdb::Vec3s>& pos,
+            UT_UniquePtr<GA_Offset[]>& offsets,
+            UT_UniquePtr<float[]>& radius,
+            UT_UniquePtr<openvdb::Vec3s[]>& pos,
             const PointCache& PointCache)
             : mIndices(&indices[0])
             , mOffsets(offsets.get())
@@ -470,8 +489,8 @@ private:
     struct IFOCachePointData
     {
         IFOCachePointData(const GU_Detail& detail,
-            boost::scoped_array<float>& radius,
-            boost::scoped_array<openvdb::Vec3s>& pos,
+            UT_UniquePtr<float[]>& radius,
+            UT_UniquePtr<openvdb::Vec3s[]>& pos,
             float radiusScale = 1.0)
             : mDetail(&detail)
             , mRadiusData(radius.get())
@@ -526,10 +545,10 @@ private:
 
     struct IFOCachePointGroupData
     {
-        IFOCachePointGroupData(const boost::scoped_array<GA_Offset>& offsets,
+        IFOCachePointGroupData(const UT_UniquePtr<GA_Offset[]>& offsets,
             const GU_Detail& detail,
-            boost::scoped_array<float>& radius,
-            boost::scoped_array<openvdb::Vec3s>& pos,
+            UT_UniquePtr<float[]>& radius,
+            UT_UniquePtr<openvdb::Vec3s[]>& pos,
             float radiusScale = 1.0)
             : mOffsets(offsets.get())
             , mDetail(&detail)
@@ -617,11 +636,11 @@ private:
 
     //////////
 
-    GA_IndexMap const * const           mIndexMap;
-    size_t                              mSize;
-    boost::scoped_array<GA_Offset>      mOffsets;
-    boost::scoped_array<float>          mRadius;
-    boost::scoped_array<openvdb::Vec3s> mPos;
+    GA_IndexMap const * const       mIndexMap;
+    size_t                          mSize;
+    UT_UniquePtr<GA_Offset[]>       mOffsets;
+    UT_UniquePtr<float[]>           mRadius;
+    UT_UniquePtr<openvdb::Vec3s[]>  mPos;
 }; // struct PointCache
 
 
@@ -750,7 +769,7 @@ private:
 
     std::vector<PointCache::Ptr>        mPointCacheArray;
     std::vector<PointIndexGrid::Ptr>    mIdxGridArray;
-    boost::scoped_array<float>          mMinRadiusArray, mMaxRadiusArray;
+    UT_UniquePtr<float[]>               mMinRadiusArray, mMaxRadiusArray;
 }; // struct PointIndexGridCollection
 
 
@@ -953,7 +972,7 @@ struct ConstructCandidateVoxelMask
 
         using BoolRootNodeType = BoolTreeType::RootNodeType;
         using BoolNodeChainType = BoolRootNodeType::NodeChainType;
-        using BoolInternalNodeType = boost::mpl::at<BoolNodeChainType, boost::mpl::int_<1>>::type;
+        using BoolInternalNodeType = boostmpl::at<BoolNodeChainType, boostmpl::int_<1>>::type;
 
         for (size_t n = 0, N = rhsLeafNodes.size(); n < N; ++n) {
             const openvdb::Coord& ijk = rhsLeafNodes[n]->origin();
@@ -1140,9 +1159,9 @@ struct CullFrustumLeafNodes
 
         using PointIndexTree = openvdb::tools::PointIndexGrid::TreeType;
         using IndexTreeAccessor = openvdb::tree::ValueAccessor<const PointIndexTree>;
-        using IndexTreeAccessorPtr = boost::scoped_ptr<IndexTreeAccessor>;
+        using IndexTreeAccessorPtr = UT_SharedPtr<IndexTreeAccessor>;
 
-        boost::scoped_array<IndexTreeAccessorPtr> accessorList(
+        UT_UniquePtr<IndexTreeAccessorPtr[]> accessorList(
             new IndexTreeAccessorPtr[mIdxGridCollection->size()]);
 
         for (size_t i = 0; i < mIdxGridCollection->size(); ++i) {
@@ -1220,7 +1239,7 @@ maskRegionOfInterest(PointIndexGridCollection::BoolTreeType& mask,
 {
     using BoolLeafNodeType = PointIndexGridCollection::BoolTreeType::LeafNodeType;
 
-    boost::shared_ptr<openvdb::CoordBBox> frustumClipBox;
+    UT_SharedPtr<openvdb::CoordBBox> frustumClipBox;
 
     if (clipToFrustum && !volumeTransform.isLinear()) {
         using MapType = openvdb::math::NonlinearFrustumMap;
@@ -1413,8 +1432,8 @@ struct WeightedAverageOp
 {
     enum { LOG2DIM = openvdb::tools::PointIndexTree::LeafNodeType::LOG2DIM };
 
-    using Ptr = boost::shared_ptr<WeightedAverageOp>;
-    using ConstPtr = boost::shared_ptr<const WeightedAverageOp>;
+    using Ptr = UT_SharedPtr<WeightedAverageOp>;
+    using ConstPtr = UT_SharedPtr<const WeightedAverageOp>;
 
     using ValueType = _ValueType;
     using LeafNodeType = openvdb::tree::LeafNode<ValueType, LOG2DIM>;
@@ -1423,7 +1442,7 @@ struct WeightedAverageOp
 
     /////
 
-    WeightedAverageOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
+    WeightedAverageOp(const GA_Attribute& attrib, UT_UniquePtr<LeafNodeType*[]>& nodes)
         : mHandle(&attrib), mNodes(nodes.get()), mNode(nullptr), mNodeVoxelData(nullptr)
         , mNodeOffset(0), mValue(ScalarType(0.0)), mVaryingDataBuffer(nullptr), mVaryingData(false)
     {
@@ -1500,7 +1519,7 @@ private:
     ValueType *                         mNodeVoxelData;
     size_t                              mNodeOffset;
     ValueType                           mValue;
-    boost::scoped_array<HoudiniType>    mVaryingDataBuffer;
+    UT_UniquePtr<HoudiniType[]>         mVaryingDataBuffer;
     bool                                mVaryingData;
 }; // struct WeightedAverageOp
 
@@ -1511,15 +1530,15 @@ struct DensityOp
 {
     enum { LOG2DIM = openvdb::tools::PointIndexTree::LeafNodeType::LOG2DIM };
 
-    using Ptr = boost::shared_ptr<DensityOp>;
-    using ConstPtr = boost::shared_ptr<const DensityOp>;
+    using Ptr = UT_SharedPtr<DensityOp>;
+    using ConstPtr = UT_SharedPtr<const DensityOp>;
 
     using ValueType = _ValueType;
     using LeafNodeType = openvdb::tree::LeafNode<ValueType, LOG2DIM>;
 
     /////
 
-    DensityOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
+    DensityOp(const GA_Attribute& attrib, UT_UniquePtr<LeafNodeType*[]>& nodes)
         : mPosHandle(&attrib), mNodes(nodes.get()), mNode(nullptr), mNodeOffset(0)
     {
     }
@@ -1570,8 +1589,8 @@ struct Attribute
 {
     enum { LOG2DIM = openvdb::tools::PointIndexTree::LeafNodeType::LOG2DIM };
 
-    using Ptr = boost::shared_ptr<Attribute>;
-    using ConstPtr = boost::shared_ptr<const Attribute>;
+    using Ptr = UT_SharedPtr<Attribute>;
+    using ConstPtr = UT_SharedPtr<const Attribute>;
 
     using OperatorType = _OperatorType;
     using ValueType = _ValueType;
@@ -1774,7 +1793,7 @@ private:
     GA_Attribute const * const          mAttrib;
     const std::string                   mName;
     size_t                              mNodeCount;
-    boost::scoped_array<LeafNodeType*>  mNodes;
+    UT_UniquePtr<LeafNodeType*[]>       mNodes;
     std::vector<LeafNodeType*>          mOutputNodes;
     openvdb::math::Transform            mTransform;
 }; // struct Attribute
@@ -1784,7 +1803,7 @@ private:
 
 template<typename AttributeType>
 inline void
-initializeAttributeBuffers(boost::shared_ptr<AttributeType>& attr, size_t nodeCount)
+initializeAttributeBuffers(UT_SharedPtr<AttributeType>& attr, size_t nodeCount)
 {
     if (attr) attr->initNodeBuffer(nodeCount);
 }
@@ -1792,7 +1811,7 @@ initializeAttributeBuffers(boost::shared_ptr<AttributeType>& attr, size_t nodeCo
 
 template<typename AttributeType>
 inline void
-initializeAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr, size_t nodeCount)
+initializeAttributeBuffers(std::vector<UT_SharedPtr<AttributeType> >& attr, size_t nodeCount)
 {
     for (size_t n = 0, N = attr.size(); n < N; ++n) {
         attr[n]->initNodeBuffer(nodeCount);
@@ -1802,7 +1821,7 @@ initializeAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr,
 
 template<typename AttributeType>
 inline void
-cacheAttributeBuffers(boost::shared_ptr<AttributeType>& attr)
+cacheAttributeBuffers(UT_SharedPtr<AttributeType>& attr)
 {
     if (attr) attr->cacheNodes();
 }
@@ -1810,7 +1829,7 @@ cacheAttributeBuffers(boost::shared_ptr<AttributeType>& attr)
 
 template<typename AttributeType>
 inline void
-cacheAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr)
+cacheAttributeBuffers(std::vector<UT_SharedPtr<AttributeType> >& attr)
 {
     for (size_t n = 0, N = attr.size(); n < N; ++n) {
         attr[n]->cacheNodes();
@@ -1820,7 +1839,7 @@ cacheAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr)
 
 template<typename AttributeType, typename LeafNodeType>
 inline void
-cacheFrustumAttributeBuffers(boost::shared_ptr<AttributeType>& attr,
+cacheFrustumAttributeBuffers(UT_SharedPtr<AttributeType>& attr,
     std::vector<const LeafNodeType*>& nodes, double voxelSize)
 {
     if (attr) attr->cacheFrustumNodes(nodes, voxelSize);
@@ -1829,7 +1848,7 @@ cacheFrustumAttributeBuffers(boost::shared_ptr<AttributeType>& attr,
 
 template<typename AttributeType, typename LeafNodeType>
 inline void
-cacheFrustumAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr,
+cacheFrustumAttributeBuffers(std::vector<UT_SharedPtr<AttributeType> >& attr,
     std::vector<const LeafNodeType*>& nodes, double voxelSize)
 {
     for (size_t n = 0, N = attr.size(); n < N; ++n) {
@@ -1840,7 +1859,7 @@ cacheFrustumAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& att
 
 template<typename AttributeType>
 inline void
-exportAttributeGrid(boost::shared_ptr<AttributeType>& attr,
+exportAttributeGrid(UT_SharedPtr<AttributeType>& attr,
     std::vector<openvdb::GridBase::Ptr>& outputGrids)
 {
     if (attr) attr->exportGrid(outputGrids);
@@ -1849,7 +1868,7 @@ exportAttributeGrid(boost::shared_ptr<AttributeType>& attr,
 
 template<typename AttributeType>
 inline void
-exportAttributeGrid(std::vector<boost::shared_ptr<AttributeType> >& attr,
+exportAttributeGrid(std::vector<UT_SharedPtr<AttributeType> >& attr,
     std::vector<openvdb::GridBase::Ptr>& outputGrids)
 {
     for (size_t n = 0, N = attr.size(); n < N; ++n) {
@@ -1864,13 +1883,10 @@ exportAttributeGrid(std::vector<boost::shared_ptr<AttributeType> >& attr,
 
 struct VEXProgram {
 
-    using Ptr = boost::shared_ptr<VEXProgram>;
+    using Ptr = UT_SharedPtr<VEXProgram>;
 
-    VEXProgram(OP_Caller& opcaller, const UT_WorkArgs& vexArgs, fpreal time, size_t maxArraySize
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
-        , GU_VexGeoInputs& geoinputs
-#endif
-              )
+    VEXProgram(OP_Caller& opcaller, const UT_WorkArgs& vexArgs,
+        fpreal time, size_t maxArraySize, GU_VexGeoInputs& geoinputs)
         : mCVEX()
         , mRunData()
         , mMaxArraySize(maxArraySize)
@@ -1881,9 +1897,7 @@ struct VEXProgram {
     {
         mRunData.setOpCaller(&opcaller);
         mRunData.setTime(time);
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
         mRunData.setGeoInputs(&geoinputs);
-#endif
 
         // array attributes
         mCVEX.addInput("voxelpos", CVEX_TYPE_VECTOR3, true);
@@ -1897,21 +1911,12 @@ struct VEXProgram {
         mCVEX.addInput("pradius", CVEX_TYPE_FLOAT, false);
         mCVEX.addInput("pindex", CVEX_TYPE_INTEGER, false);
 
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
         mVEXLoaded = mCVEX.load(vexArgs.getArgc(), vexArgs.getArgv());
-#else
-        mVEXLoaded = mCVEX.load(vexArgs.getArgc(), const_cast<UT_WorkArgs&>(vexArgs).getArgv());
-#endif
     }
 
     void run(size_t arraySize) {
         if (mVEXLoaded) {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
             mRunData.setTimeDependent(false);
-#else
-            mRunData.myTimeDependent = false;
-#endif
-
             mCVEX.run(int(arraySize), false, &mRunData);
             mIsTimeDependant = mRunData.isTimeDependent();
         }
@@ -1944,8 +1949,8 @@ private:
     CVEX_Context mCVEX;
     CVEX_RunData mRunData;
     const size_t mMaxArraySize;
-    boost::scoped_array<UT_Vector3> mWorldCoordBuffer;
-    boost::scoped_array<fpreal32> mNoiseBuffer;
+    UT_UniquePtr<UT_Vector3[]> mWorldCoordBuffer;
+    UT_UniquePtr<fpreal32[]> mNoiseBuffer;
     bool mVEXLoaded, mIsTimeDependant;
 }; // struct VEXProgram
 
@@ -1962,9 +1967,7 @@ struct VEXContext {
         , mTimeInc(0.0f)
         , mFrame(0.0f)
         , mIsTimeDependant()
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
         , mVexInputs()
-#endif
     {
         mIsTimeDependant = 0;
         mVexScript.parse(mVexArgs);
@@ -1974,18 +1977,12 @@ struct VEXContext {
         mTime = time; mTimeInc = timeinc; mFrame = frame;
     }
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     void setInput(int idx,  const GU_Detail *geo) { mVexInputs.setInput(idx, geo); }
-#endif
 
     VEXProgram& getThereadLocalVEXProgram() {
         VEXProgram::Ptr& ptr = mThreadLocalTable.local();
         if (!ptr) {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
             ptr.reset(new VEXProgram(*mCaller, mVexArgs, mTime, mMaxArraySize, mVexInputs));
-#else
-            ptr.reset(new VEXProgram(*mCaller, mVexArgs, mTime, mMaxArraySize));
-#endif
         }
 
         return *ptr;
@@ -2006,9 +2003,7 @@ private:
     const size_t mMaxArraySize;
     fpreal mTime, mTimeInc, mFrame;
     tbb::atomic<int> mIsTimeDependant;
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     GU_VexGeoInputs mVexInputs;
-#endif
 };
 
 
@@ -2127,9 +2122,9 @@ struct RasterizePoints
         openvdb::tools::PointIndexIterator<PointIndexTree> pointIndexIter;
 
         using IndexTreeAccessor = openvdb::tree::ValueAccessor<const PointIndexTree>;
-        using IndexTreeAccessorPtr = boost::scoped_ptr<IndexTreeAccessor>;
+        using IndexTreeAccessorPtr = UT_SharedPtr<IndexTreeAccessor>;
 
-        boost::scoped_array<IndexTreeAccessorPtr> accessorList(
+        UT_UniquePtr<IndexTreeAccessorPtr[]> accessorList(
             new IndexTreeAccessorPtr[mIdxGridCollection->size()]);
 
         for (size_t i = 0; i < mIdxGridCollection->size(); ++i) {
@@ -2138,7 +2133,7 @@ struct RasterizePoints
         }
 
         // scratch space
-        boost::scoped_array<float> voxelWeightArray(new float[BoolLeafNodeType::SIZE]);
+        UT_UniquePtr<float[]> voxelWeightArray(new float[BoolLeafNodeType::SIZE]);
         std::vector<DensitySample> densitySamples;
         densitySamples.reserve(BoolLeafNodeType::SIZE);
 
@@ -2234,7 +2229,7 @@ private:
         DensityAttribute::OperatorType::Ptr& densityAttribute,
         std::vector<Vec3sAttribute::OperatorType::Ptr>& vecAttributes,
         std::vector<FloatAttribute::OperatorType::Ptr>& floatAttributes,
-        boost::scoped_array<float>& voxelWeightArray,
+        UT_UniquePtr<float[]>& voxelWeightArray,
         std::vector<DensitySample>& densitySamples) const
     {
         const bool hasPointDensity = densityHandle.isValid();
@@ -2424,79 +2419,46 @@ private:
                 pointRef[1] = float(ws[1]);
                 pointRef[2] = float(ws[2]);
             }
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(data, numValues);
-#else
-            val->setData(data, numValues);
-#endif
         }
 
         UT_Vector3 particleCenter(point[0], point[1], point[2]);
         if (CVEX_Value* val = cvex.findInput("pcenter", CVEX_TYPE_VECTOR3)) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&particleCenter, 1);
-#else
-            val->setData(&particleCenter, numValues);
-#endif
         }
 
         fpreal32 particleRadius(radius);
         if (CVEX_Value* val = cvex.findInput("pradius", CVEX_TYPE_FLOAT)) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&particleRadius, 1);
-#else
-            val->setData(&particleRadius, numValues);
-#endif
         }
 
         int particleIndex = 0;
         if (CVEX_Value* val = cvex.findInput("pindex", CVEX_TYPE_INTEGER)) {
             particleIndex = int(mDetail->pointIndex(pointOffset));
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&particleIndex, 1);
-#else
-            val->setData(&particleIndex, numValues);
-#endif
         }
 
         fpreal32 voxelSize(1.0f);
         if (CVEX_Value* val = cvex.findInput("voxelsize", CVEX_TYPE_FLOAT)) {
             voxelSize = fpreal32(mVolumeXform.voxelSize()[0]);
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&voxelSize, 1);
-#else
-            val->setData(&voxelSize, numValues);
-#endif
         }
 
         fpreal32 time = fpreal32(mVEXContext->time());
         if (CVEX_Value* val = cvex.findInput("Time", CVEX_TYPE_FLOAT)) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&time, 1);
-#else
-            val->setData(&time, numValues);
-#endif
             timeDependantVEX = true;
         }
 
         fpreal32 timeInc = fpreal32(mVEXContext->timeInc());
         if (CVEX_Value* val = cvex.findInput("TimeInc", CVEX_TYPE_FLOAT)) {
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&timeInc, 1);
-#else
-            val->setData(&timeInc, numValues);
-#endif
             timeDependantVEX = true;
         }
 
         fpreal32 frame = fpreal32(mVEXContext->frame());
         if (CVEX_Value* val = cvex.findInput("Frame", CVEX_TYPE_FLOAT)) {
-
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(&frame, 1);
-#else
-            val->setData(&frame, numValues);
-#endif
             timeDependantVEX = true;
         }
 
@@ -2510,11 +2472,7 @@ private:
                 runProcess = true;
                 densityScales = cvex.getNoiseBuffer();
                 for (int n = 0; n < numValues; ++n) densityScales[n] = 1.0f;
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
                 val->setTypedData(densityScales, numValues);
-#else
-                val->setData(densityScales, numValues);
-#endif
             }
         }
 
@@ -2522,11 +2480,7 @@ private:
         for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
             if (CVEX_Value* val = cvex.findOutput(vecAttributes[i]->getName(), CVEX_TYPE_VECTOR3)) {
                 runProcess = true;
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
                 val->setTypedData(vecAttributes[i]->varyingData(), numValues);
-#else
-                val->setData(vecAttributes[i]->varyingData(), numValues);
-#endif
             }
         }
 
@@ -2534,11 +2488,7 @@ private:
         for (size_t i = 0, I = floatAttributes.size(); i < I; ++i) {
             if (CVEX_Value* val = cvex.findOutput(floatAttributes[i]->getName(), CVEX_TYPE_FLOAT)) {
                 runProcess = true;
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
                 val->setTypedData(floatAttributes[i]->varyingData(), numValues);
-#else
-                val->setData(floatAttributes[i]->varyingData(), numValues);
-#endif
             }
         }
 
@@ -2628,7 +2578,7 @@ struct RasterizationSettings
     std::vector<std::string>                  scalarAttributeNames;
     std::vector<std::string>                  vectorAttributeNames;
     hvdb::GridCPtr                            maskGrid;
-    boost::shared_ptr<openvdb::BBoxd>         maskBBox;
+    UT_SharedPtr<openvdb::BBoxd>              maskBBox;
 
 private:
     float frustumQuality;
@@ -2904,7 +2854,7 @@ getAttributeNames(
     }
 
     std::vector<std::string> allNames;
-    boost::algorithm::split(allNames, attributeNames, boost::is_any_of(", "));
+    hboost::algorithm::split(allNames, attributeNames, hboost::is_any_of(", "));
 
     std::set<std::string> uniqueNames(allNames.begin(), allNames.end());
 
@@ -2930,7 +2880,7 @@ getAttributeNames(
 
     if (!skipped.empty() && log) {
         log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, ("Unable to rasterize attribute(s): " +
-            boost::algorithm::join(skipped, ", ")).c_str());
+            hboost::algorithm::join(skipped, ", ")).c_str());
         log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, "Only supporting point-rate attributes "
             "of scalar or vector type with floating-point values.");
     }
@@ -2999,14 +2949,9 @@ populateMeshMenu(void* data, PRM_Name* choicenames, int themenusize,
 
                     const int tupleSize = attrib->getTupleSize();
 
-#if (UT_VERSION_INT >= 0x0f000000) // 15.0 or later
                     const UT_StringHolder& attribName = attrib->getName();
                     if (tupleSize == 1) scalarNames.push_back(attribName.buffer());
                     else if (tupleSize == 3) vectorNames.push_back(attribName.buffer());
-#else
-                    if (tupleSize == 1) scalarNames.push_back(attrib->getName());
-                    else if (tupleSize == 3) vectorNames.push_back(attrib->getName());
-#endif
                 }
             }
 
@@ -3063,25 +3008,21 @@ struct SOP_OpenVDB_Rasterize_Points: public hvdb::SOP_NodeVDB
     VOP_CodeGenerator* getVopCodeGenerator() override { return &mCodeGenerator; }
     void opChanged(OP_EventType reason, void *data = 0) override;
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     bool hasVexShaderParameter(const char* name) override {
         return mCodeGenerator.hasShaderParameter(name);
     }
-#endif
 
     int isRefInput(unsigned i) const override { return i > 0; }
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
 
     /// VOP and VEX functions
     void finishedLoadingNetwork(bool is_child_call = false) override;
     void addNode(OP_Node *node, int notify = 1, int explicitly = 1) override;
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     void ensureSpareParmsAreUpdatedSubclass() override;
-#endif
 
     VOP_CodeGenerator mCodeGenerator;
     int mInitialParmNum;
@@ -3123,21 +3064,17 @@ SOP_OpenVDB_Rasterize_Points::addNode(OP_Node *node, int notify, int explicitly)
     mCodeGenerator.afterAddNode(node);
 }
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
+
 void
 SOP_OpenVDB_Rasterize_Points::ensureSpareParmsAreUpdatedSubclass()
 {
     // Check if the spare parameter templates are out-of-date.
     if (getVopCodeGenerator() && eventMicroNode(OP_SPAREPARM_MODIFIED).requiresUpdate(0.0)) {
         // Call into the code generator to update the spare parameter templates.
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
         getVopCodeGenerator()->exportedParmsManager()->updateOwnerSpareParmLayout();
-#else
-        getVopCodeGenerator()->updateExportedParameterLayout();
-#endif
     }
 }
-#endif
+
 
 ////////////////////////////////////////
 
@@ -3303,15 +3240,8 @@ SOP_OpenVDB_Rasterize_Points::updateParmsFlags()
     changed |= enableParm("compositing", bool(evalInt("createdensity", 0, 0)));
 
     const bool createDensity = evalInt("createdensity", 0, 0) != 0;
-
-    bool transferAttributes = false;
-    {
-        UT_String attributeNameStr;
-        evalString(attributeNameStr, "attributes", 0, 0);
-        transferAttributes = attributeNameStr.length() > 0;
-    }
-
-    bool enableVEX = createDensity || transferAttributes;
+    const bool transferAttributes = !evalStdString("attributes", 0).empty();
+    const bool enableVEX = createDensity || transferAttributes;
 
     changed |= enableParm("modeling", enableVEX);
 
@@ -3352,7 +3282,7 @@ SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
 
 
 OP_ERROR
-SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
+SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -3381,29 +3311,15 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         const fpreal frustumQuality = (evalFloat("frustumquality", 0, time) - 1.0) / 9.0;
 
         const GU_Detail* pointsGeo = inputGeo(0);
-        const GA_PointGroup* pointGroup = nullptr;
-
-        {
-            UT_String groupStr;
-            evalString(groupStr, "pointgroup", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
-            pointGroup = parsePointGroups(groupStr, GroupCreator(pointsGeo));
-#else
-            pointGroup = parsePointGroups(groupStr, const_cast<GU_Detail*>(pointsGeo));
-#endif
-        }
+        const GA_PointGroup* pointGroup = parsePointGroups(
+            evalStdString("pointgroup", time).c_str(), GroupCreator(pointsGeo));
 
         const GU_Detail* refGeo = inputGeo(1);
         const GA_PrimitiveGroup* refGroup = nullptr;
 
         if (refGeo) {
-            UT_String groupStr;
-            evalString(groupStr, "transformvdb", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
-            refGroup = parsePrimitiveGroups(groupStr, GroupCreator(refGeo));
-#else
-            refGroup = parsePrimitiveGroups(groupStr, const_cast<GU_Detail*>(refGeo));
-#endif
+            refGroup = parsePrimitiveGroups(
+                evalStdString("transformvdb", time).c_str(), GroupCreator(refGeo));
         }
 
         const GU_Detail* maskGeo = inputGeo(2);
@@ -3411,18 +3327,11 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         bool expectingVDBMask = false;
 
         if (maskGeo) {
-            UT_String groupStr;
-            evalString(groupStr, "maskvdb", 0, time);
-
-            if (groupStr.length() > 0) {
+            const auto groupStr = evalStdString("maskvdb", time);
+            if (!groupStr.empty()) {
                 expectingVDBMask = true;
             }
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-            maskGroup = parsePrimitiveGroups(groupStr, GroupCreator(maskGeo));
-#else
-            maskGroup = parsePrimitiveGroups(groupStr, const_cast<GU_Detail*>(maskGeo));
-#endif
+            maskGroup = parsePrimitiveGroups(groupStr.c_str(), GroupCreator(maskGeo));
         }
 
         const bool exportPointMask = 0 != evalInt("exportpointmask", 0, time);
@@ -3437,13 +3346,8 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         std::vector<std::string> scalarAttribNames;
         std::vector<std::string> vectorAttribNames;
 
-        {
-            UT_String attributeNameStr;
-            evalString(attributeNameStr, "attributes", 0, time);
-
-            getAttributeNames(attributeNameStr.toStdString(), *pointsGeo,
-                scalarAttribNames, vectorAttribNames, createVelocityAttribute, log);
-        }
+        getAttributeNames(evalStdString("attributes", time), *pointsGeo,
+            scalarAttribNames, vectorAttribNames, createVelocityAttribute, log);
 
         if (exportPointMask || createDensity || !scalarAttribNames.empty()
             || !vectorAttribNames.empty())
@@ -3456,7 +3360,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             if (xform) voxelSize = float(xform->voxelSize().x());
 
 
-            boost::shared_ptr<openvdb::BBoxd> maskBBox;
+            UT_SharedPtr<openvdb::BBoxd> maskBBox;
             hvdb::GridCPtr maskGrid = getMaskVDB(maskGeo, maskGroup);
 
             if (!maskGrid) {
@@ -3492,7 +3396,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             // Setup VEX context
 
             OP_Caller caller(this);
-            boost::shared_ptr<VEXContext> vexContextPtr;
+            UT_SharedPtr<VEXContext> vexContextPtr;
 
             if (applyVEX) {
                 UT_String shoppath = "", script = "op:";
@@ -3504,10 +3408,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
                     PointIndexGridCollection::BoolTreeType::LeafNodeType::SIZE));
 
                 vexContextPtr->setTime(time, timeinc, frame);
-
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
                 vexContextPtr->setInput(0, pointsGeo);
-#endif
             }
 
             settings.vexContext = vexContextPtr.get();

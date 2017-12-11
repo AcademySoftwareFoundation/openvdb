@@ -35,6 +35,8 @@
 /// @brief Scatter points on a VDB grid, either by fixed count or by
 /// global or local point density.
 
+#include <UT/UT_Assert.h>
+#include <UT/UT_Version.h>
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -45,14 +47,29 @@
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <boost/algorithm/string/join.hpp>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
+#include <boost/algorithm/string/join.hpp>
+#endif
 #include <iostream>
 #include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 class SOP_OpenVDB_Scatter: public hvdb::SOP_NodeVDB
@@ -63,8 +80,14 @@ public:
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 };
@@ -219,6 +242,9 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDB on which points will be scattered")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -353,7 +379,7 @@ struct BaseScatter
 
     inline openvdb::points::PointDataGrid::Ptr points()
     {
-        assert(mPoints);
+        UT_ASSERT(mPoints);
         return mPoints;
     }
 
@@ -519,7 +545,7 @@ process(const UT_VDBType type, const openvdb::GridBase& grid, OpType& op, const 
 
 
 // Method to extract the interior mask before scattering points.
-openvdb::GridBase::ConstPtr
+inline openvdb::GridBase::ConstPtr
 extractInteriorMask(const openvdb::GridBase::ConstPtr grid, const float offset)
 {
     if (grid->isType<openvdb::FloatGrid>()) {
@@ -573,23 +599,34 @@ cullVDBPoints(openvdb::points::PointDataTree& tree,
 
 
 OP_ERROR
-SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Context& context)
 {
     try {
-        hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
+        hvdb::Interrupter boss("Scattering points on VDBs");
 
-        const GU_Detail* vdbgeo;
-        if (1 == evalInt("keep", 0, time)) {
-            // This does a deep copy of native Houdini primitives
-            // but only a shallow copy of OpenVDB grids.
+        const fpreal time = context.getTime();
+        const bool keepGrids = (0 != evalInt("keep", 0, time));
+
+#if VDB_COMPILABLE_SOP
+        const auto* vdbgeo = inputGeo(0);
+        if (keepGrids && vdbgeo) {
+            gdp->replaceWith(*vdbgeo);
+        } else {
+            gdp->stashAll();
+        }
+#else
+        hutil::ScopedInputLock lock(*this, context);
+
+        const GU_Detail* vdbgeo = nullptr;
+        if (keepGrids) {
+            lock.markInputUnlocked(0);
             duplicateSourceStealable(0, context);
             vdbgeo = gdp;
-        }
-        else {
+        } else {
             vdbgeo = inputGeo(0);
             gdp->clearAndDestroy();
         }
+#endif
 
         const int seed = static_cast<int>(evalInt("seed", 0, time));
         const auto spread = static_cast<float>(evalFloat("spread", 0, time));
@@ -600,16 +637,10 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         const float density = static_cast<float>(evalFloat("density", 0, time));
         const bool multiplyDensity = evalInt("multiply", 0, time) != 0;
         const int outputName = static_cast<int>(evalInt("outputname", 0, time));
+        const std::string customName = evalStdString("customname", time);
 
         // Get the group of grids to process.
-        UT_String tmp;
-        evalString(tmp, "group", 0, time);
-        const GA_PrimitiveGroup* group = this->matchGroup(*vdbgeo, tmp.toStdString());
-
-        evalString(tmp, "customname", 0, time);
-        const std::string customName = tmp.toStdString();
-
-        hvdb::Interrupter boss("Scattering points on VDBs");
+        const GA_PrimitiveGroup* group = matchGroup(*vdbgeo, evalStdString("group", time));
 
         // Choose a fast random generator with a long period. Drawback here for
         // mt11213b is that it requires 352*sizeof(uint32) bytes.
@@ -758,22 +789,20 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         if (!emptyGrids.empty()) {
             std::string s = "The following grids were empty: "
-                + boost::algorithm::join(emptyGrids, ", ");
+                + hboost::algorithm::join(emptyGrids, ", ");
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
         // add points to a group if requested
         if (1 == evalInt("dogroup", 0, time)) {
-            UT_String scatterStr;
-            evalString(scatterStr, "sgroup", 0, time);
-            GA_PointGroup* ptgroup = gdp->newPointGroup(scatterStr);
+            const std::string groupName = evalStdString("sgroup", time);
+            GA_PointGroup* ptgroup = gdp->newPointGroup(groupName.c_str());
 
             // add the scattered points to this group
 
             const GA_Offset lastOffset = gdp->getNumPointOffsets();
             ptgroup->addRange(GA_Range(gdp->getPointMap(), firstOffset, lastOffset));
 
-            const std::string groupName(scatterStr.toStdString());
             for (auto& pointGrid : pointGrids) {
                 openvdb::points::appendGroup(pointGrid->tree(), groupName);
                 openvdb::points::setGroup(pointGrid->tree(), groupName);

@@ -39,11 +39,25 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb/tools/MultiResGrid.h>
 #include <boost/algorithm/string/join.hpp>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
+#include <boost/algorithm/string/join.hpp>
+#endif
 #include <string>
 #include <vector>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 class SOP_OpenVDB_LOD: public hvdb::SOP_NodeVDB
@@ -56,9 +70,15 @@ public:
 
     int isRefInput(unsigned input) const override { return (input > 0); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
 protected:
     bool updateParmsFlags() override;
-    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
@@ -79,28 +99,24 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDB grids to be processed"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "lod", "LOD Mode")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "single", "Single Level",
             "range",  "Level Range",
-            "mipmaps","LOD Pyramid",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "lod", "LOD Mode")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDocumentation(
-                "How to build the LOD pyramid\n\n"
-                "Single Level:\n"
-                "    Build a single, filtered VDB.\n\n"
-                "Level Range:\n"
-                "    Build a series of VDBs of progressively lower resolution\n"
-                "    within a given range of scales.\n\n"
-                "LOD Pyramid:\n"
-                "    Build a standard pyramid of VDBs of decreasing resolution.\n"
-                "    Each level of the pyramid is half the resolution in each\n"
-                "    dimension of the previous level, starting with the input VDB.\n"));
-    }
+            "mipmaps","LOD Pyramid"
+        })
+        .setDocumentation(
+            "How to build the LOD pyramid\n\n"
+            "Single Level:\n"
+            "    Build a single, filtered VDB.\n\n"
+            "Level Range:\n"
+            "    Build a series of VDBs of progressively lower resolution\n"
+            "    within a given range of scales.\n\n"
+            "LOD Pyramid:\n"
+            "    Build a standard pyramid of VDBs of decreasing resolution.\n"
+            "    Each level of the pyramid is half the resolution in each\n"
+            "    dimension of the previous level, starting with the input VDB.\n"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "level", "Level")
         .setDefault(PRMoneDefaults)
@@ -139,6 +155,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
         .addInput("VDBs")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_LOD::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -282,19 +301,19 @@ isValidRange(float start, float end, float step)
 
 
 OP_ERROR
-SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_LOD)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
-        const fpreal time = context.getTime();
-
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         std::vector<std::string> skipped;
 
@@ -386,7 +405,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
 
         if (!skipped.empty()) {
             addWarning(SOP_MESSAGE, ("Unable to process grid(s): " +
-                boost::algorithm::join(skipped, ", ")).c_str());
+                hboost::algorithm::join(skipped, ", ")).c_str());
         }
 
     } catch (std::exception& e) {

@@ -38,6 +38,15 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
+#include <stdexcept>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -50,8 +59,12 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 };
 
 
@@ -75,6 +88,9 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("OpenVDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
         .addInput("VDBs to densify")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Densify::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -140,21 +156,19 @@ struct DensifyOp {
 
 
 OP_ERROR
-SOP_OpenVDB_Densify::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Densify)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        lock.markInputUnlocked(0);
+        duplicateSourceStealable(0, context);
+#endif
 
         const fpreal time = context.getTime();
 
-        // This does a deep copy of native Houdini primitives
-        // but only a shallow copy of OpenVDB grids.
-        duplicateSourceStealable(0, context);
-
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = this->matchGroup(*gdp, evalStdString("group", time));
 
         // Construct a functor to process grids of arbitrary type.
         const DensifyOp densifyOp;

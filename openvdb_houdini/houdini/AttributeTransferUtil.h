@@ -617,7 +617,6 @@ MeshAttrTransfer::operator()(IterRange &range) const
     openvdb::Int32Tree::LeafNodeType::ValueOnCIter iter;
 
     openvdb::Coord ijk;
-    GA_Size vtxn;
 
     const bool ptnAttrTransfer = mPointAttributes.size() > 0;
     const bool vtxAttrTransfer = mVertexAttributes.size() > 0;
@@ -647,13 +646,14 @@ MeshAttrTransfer::operator()(IterRange &range) const
             // Transfer vertex and point attributes
             const GA_Primitive * primRef = mMeshGdp.getPrimitiveList().get(prmOffset);
 
-            vtxn = primRef->getVertexCount();
+            const GA_Size vtxn = primRef->getVertexCount();
 
             // Get vertex and point offests
 #if UT_MAJOR_VERSION_INT >= 16
             for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
-                ptnOffsetList[vtx] = primRef->getPointOffset(vtx);
-                vtxOffsetList[vtx] = primRef->getVertexOffset(vtx);
+                const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
+                ptnOffsetList[vtx] = mMeshGdp.vertexPoint(vtxoff);
+                vtxOffsetList[vtx] = vtxoff;
 
                 UT_Vector3 p = mMeshGdp.getPos3(ptnOffsetList[vtx]);
                 ptnList[vtx][0] = double(p[0]);
@@ -1210,7 +1210,6 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
     openvdb::Vec3d pos, indexPos, uvw;
     openvdb::Coord ijk, coord;
     std::vector<GA_Index> primitives(8), similar_primitives(8);
-    int count;
 
     UT_Vector3 targetN, sourceN;
 
@@ -1229,15 +1228,15 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                     pos[2] = 0.0;
 
 #if UT_MAJOR_VERSION_INT >= 16
-                    count = static_cast<int>(primRef->getVertexCount());
+                    int count = static_cast<int>(primRef->getVertexCount());
                     for (int vtx = 0; vtx < count; ++vtx) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(primRef->getPointOffset(vtx));
+                        const UT_Vector3 p = primRef->getPos3(vtx);
                         pos[0] += p.x();
                         pos[1] += p.y();
                         pos[2] += p.z();
                     }
 #else
-                    count = 0;
+                    int count = 0;
                     for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
                         const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
                         pos[0] += p.x();
@@ -1297,7 +1296,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                 if (mVertAttributes.size() != 0) {
 #if UT_MAJOR_VERSION_INT >= 16
                     for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(primRef->getPointOffset(vtx));
+                        const UT_Vector3 p = primRef->getPos3(vtx);
 #else
                     for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
                         const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());

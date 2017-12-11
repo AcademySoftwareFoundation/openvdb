@@ -49,86 +49,32 @@
 #include <string>
 #include <vector>
 
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
+
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
+namespace {
 
-class SOP_OpenVDB_Filter: public hvdb::SOP_NodeVDB
-{
-public:
-    // Operations should be numbered sequentially starting from 0.
-    // When adding an item to the end of this list, be sure to update NUM_OPERATIONS.
-    enum Operation {
-        OP_MEAN = 0,
-        OP_GAUSS,
-        OP_MEDIAN,
+// Operations should be numbered sequentially starting from 0.
+// When adding an item to the end of this list, be sure to update NUM_OPERATIONS.
+enum Operation {
+    OP_MEAN = 0,
+    OP_GAUSS,
+    OP_MEDIAN,
 #ifndef SESI_OPENVDB
-        OP_OFFSET,
+    OP_OFFSET,
 #endif
-        NUM_OPERATIONS
-    };
-
-    static Operation intToOp(int);
-    static Operation stringToOp(const std::string&);
-    static std::string opToString(Operation);
-    static std::string opToMenuName(Operation);
-
-
-    SOP_OpenVDB_Filter(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Filter() override {}
-
-    static void registerSop(OP_OperatorTable*);
-    static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
-
-    int isRefInput(unsigned input) const override { return (input == 1); }
-
-protected:
-    struct FilterParms {
-        FilterParms(Operation _op)
-            : op(_op)
-            , iterations(1)
-            , radius(1)
-            , worldRadius(0.1f)
-            , minMask(0.0f)
-            , maxMask(0.0f)
-            , invertMask(false)
-            , useWorldRadius(false)
-            , mask(nullptr)
-#ifndef SESI_OPENVDB
-            , offset(0.0)
-            , verbose(false)
-#endif
-        {
-        }
-        Operation op;
-        int iterations;
-        int radius;
-        float worldRadius;
-        float minMask, maxMask;
-        bool  invertMask, useWorldRadius;
-        const openvdb::FloatGrid* mask;
-#ifndef SESI_OPENVDB
-        float offset;
-        bool verbose;
-#endif
-    };
-    using FilterParmVec = std::vector<FilterParms>;
-
-    OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
-
-    OP_ERROR cookMySop(OP_Context&) override;
-    bool updateParmsFlags() override;
-
-private:
-    struct FilterOp;
+    NUM_OPERATIONS
 };
 
-
-////////////////////////////////////////
-
-
-SOP_OpenVDB_Filter::Operation
-SOP_OpenVDB_Filter::intToOp(int i)
+inline Operation
+intToOp(int i)
 {
     switch (i) {
 #ifndef SESI_OPENVDB
@@ -139,14 +85,12 @@ SOP_OpenVDB_Filter::intToOp(int i)
         case OP_MEDIAN: return OP_MEDIAN;
         case NUM_OPERATIONS: break;
     }
-    std::ostringstream ostr;
-    ostr << "unknown operation (" << i << ")";
-    throw std::runtime_error(ostr.str().c_str());
+    throw std::runtime_error{"unknown operation (" + std::to_string(i) + ")"};
 }
 
 
-SOP_OpenVDB_Filter::Operation
-SOP_OpenVDB_Filter::stringToOp(const std::string& s)
+inline Operation
+stringToOp(const std::string& s)
 {
     if (s == "mean")   return OP_MEAN;
     if (s == "gauss")  return OP_GAUSS;
@@ -154,14 +98,12 @@ SOP_OpenVDB_Filter::stringToOp(const std::string& s)
 #ifndef SESI_OPENVDB
     if (s == "offset") return OP_OFFSET;
 #endif
-    std::ostringstream ostr;
-    ostr << "unknown operation \"" << s << "\"";
-    throw std::runtime_error(ostr.str().c_str());
+    throw std::runtime_error{"unknown operation \"" + s + "\""};
 }
 
 
-std::string
-SOP_OpenVDB_Filter::opToString(Operation op)
+inline std::string
+opToString(Operation op)
 {
     switch (op) {
 #ifndef SESI_OPENVDB
@@ -172,14 +114,12 @@ SOP_OpenVDB_Filter::opToString(Operation op)
         case OP_MEDIAN: return "median";
         case NUM_OPERATIONS: break;
     }
-    std::ostringstream ostr;
-    ostr << "unknown operation (" << int(op) << ")";
-    throw std::runtime_error(ostr.str().c_str());
+    throw std::runtime_error{"unknown operation (" + std::to_string(int(op)) + ")"};
 }
 
 
-std::string
-SOP_OpenVDB_Filter::opToMenuName(Operation op)
+inline std::string
+opToMenuName(Operation op)
 {
     switch (op) {
 #ifndef SESI_OPENVDB
@@ -190,10 +130,66 @@ SOP_OpenVDB_Filter::opToMenuName(Operation op)
         case OP_MEDIAN: return "Median Value";
         case NUM_OPERATIONS: break;
     }
-    std::ostringstream ostr;
-    ostr << "Unknown operation (" << int(op) << ")";
-    throw std::runtime_error(ostr.str().c_str());
+    throw std::runtime_error{"unknown operation (" + std::to_string(int(op)) + ")"};
 }
+
+
+struct FilterParms {
+    FilterParms(Operation _op): op(_op) {}
+
+    Operation op;
+    int iterations = 1;
+    int radius = 1;
+    float worldRadius = 0.1f;
+    float minMask = 0.0f;
+    float maxMask = 0.0f;
+    bool invertMask = false;
+    bool useWorldRadius = false;
+    const openvdb::FloatGrid* mask = nullptr;
+#ifndef SESI_OPENVDB
+    float offset = 0.0f;
+    bool verbose = false;
+#endif
+};
+
+using FilterParmVec = std::vector<FilterParms>;
+
+} // anonymous namespace
+
+
+////////////////////////////////////////
+
+
+class SOP_OpenVDB_Filter: public hvdb::SOP_NodeVDB
+{
+public:
+    SOP_OpenVDB_Filter(OP_Network*, const char* name, OP_Operator*);
+    ~SOP_OpenVDB_Filter() override = default;
+
+    static void registerSop(OP_OperatorTable*);
+    static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
+
+    int isRefInput(unsigned input) const override { return (input == 1); }
+
+protected:
+    void resolveObsoleteParms(PRM_ParmList*) override;
+    bool updateParmsFlags() override;
+
+#if VDB_COMPILABLE_SOP
+public:
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+        OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
+private:
+    struct FilterOp;
+};
 
 
 ////////////////////////////////////////
@@ -313,13 +309,13 @@ Offset:\n\
         .setTooltip("Invert the mask so that alpha value 0 maps to 1 and 1 to 0."));
 
     // Min mask range
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "minmask", "Min Mask Cutoff")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setTooltip("Threshold below which mask values are clamped to zero"));
 
     // Max mask range
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxmask", "Max Mask Cutoff")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setTooltip("Threshold above which mask values are clamped to one"));
@@ -333,12 +329,19 @@ Offset:\n\
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+        .setDefault(PRMzeroDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+        .setDefault(PRMoneDefaults));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
         .addOptionalInput("Optional VDB Alpha Mask")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Filter::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -373,6 +376,18 @@ and usage examples.\n");
 }
 
 
+void
+SOP_OpenVDB_Filter::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "minMask", "minmask");
+    resolveRenamedParm(*obsoleteParms, "maxMask", "maxmask");
+
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 // Disable UI Parms.
 bool
 SOP_OpenVDB_Filter::updateParmsFlags()
@@ -382,19 +397,15 @@ SOP_OpenVDB_Filter::updateParmsFlags()
     changed |= enableParm("mask", hasMask);
     bool useMask = bool(evalInt("mask", 0, 0)) && hasMask;
     changed |= enableParm("invert", useMask);
-    changed |= enableParm("minMask", useMask);
-    changed |= enableParm("maxMask", useMask);
+    changed |= enableParm("minmask", useMask);
+    changed |= enableParm("maxmask", useMask);
     changed |= enableParm("maskname", useMask);
 
     const bool worldUnits = bool(evalInt("worldunits", 0, 0));
 
-#ifndef SESI_OPENVDB
-    UT_String s;
-    evalString(s, "operation", 0, 0);
-
     Operation op = OP_MEAN;
     bool gotOp = false;
-    try { op = stringToOp(s.toStdString()); gotOp = true; }
+    try { op = stringToOp(evalStdString("operation", 0)); gotOp = true; }
     catch (std::runtime_error&) {}
 
     // Disable and hide unused parameters.
@@ -408,14 +419,12 @@ SOP_OpenVDB_Filter::updateParmsFlags()
         changed |= setVisibleState("radius", enable && !worldUnits);
         changed |= setVisibleState("worldradius", enable && worldUnits);
 
+#ifndef SESI_OPENVDB
         enable = (op == OP_OFFSET);
         changed |= enableParm("offset", enable);
         changed |= setVisibleState("offset", enable);
-    }
-#else
-    changed |= setVisibleState("radius", !worldUnits);
-    changed |= setVisibleState("worldradius", worldUnits);
 #endif
+    }
 
     return changed;
 }
@@ -505,14 +514,17 @@ struct SOP_OpenVDB_Filter::FilterOp
 
 
 OP_ERROR
-SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmVec& parmVec)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter)::evalFilterParms(
+    OP_Context& context, GU_Detail&, FilterParmVec& parmVec)
 {
+#if !VDB_COMPILABLE_SOP
     hutil::OP_EvalScope evalScope(*this, context);
+    clearErrors(context);
+#endif
+
     const fpreal now = context.getTime();
 
-    UT_String s;
-    evalString(s, "operation", 0, 0);
-    const Operation op = stringToOp(s.toStdString());
+    const Operation op = stringToOp(evalStdString("operation", 0));
 
     FilterParms parms(op);
     parms.radius = static_cast<int>(evalInt("radius", 0, now));
@@ -525,24 +537,22 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
 #endif
     openvdb::FloatGrid::ConstPtr maskGrid;
     if (this->nInputs() == 2 && evalInt("mask", 0, now)) {
+#if VDB_COMPILABLE_SOP
+        const GU_Detail* maskGeo = inputGeo(1);
+#else
         OP_Node* maskInputNode = getInput(1, /*mark_used*/true);
-        UT_String str;
-        evalString(str, "maskname", 0, now);
-        std::string maskName = str.toStdString();
         GU_DetailHandle maskHandle;
         maskHandle = static_cast<SOP_Node*>(maskInputNode)->getCookedGeoHandle(context);
 
         GU_DetailHandleAutoReadLock maskScope(maskHandle);
         const GU_Detail *maskGeo = maskScope.getGdp();
+#endif
+
+        const auto maskName = evalStdString("maskname", now);
 
         if (maskGeo) {
-#if (UT_MAJOR_VERSION_INT >= 15)
-            const GA_PrimitiveGroup * maskGroup =
+            const GA_PrimitiveGroup* maskGroup =
                 parsePrimitiveGroups(maskName.c_str(), GroupCreator(maskGeo));
-#else
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskName.c_str(), const_cast<GU_Detail*>(maskGeo));
-#endif
             if (!maskGroup && !maskName.empty()) {
                 addWarning(SOP_MESSAGE, "Mask not found.");
             } else {
@@ -561,9 +571,9 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
         }
     }
     parms.mask = maskGrid.get();
-    parms.minMask      = static_cast<float>(evalFloat("minMask", 0, now));
-    parms.maxMask      = static_cast<float>(evalFloat("maxMask", 0, now));
-    parms.invertMask   = evalInt("invert", 0, now);
+    parms.minMask = static_cast<float>(evalFloat("minmask", 0, now));
+    parms.maxMask = static_cast<float>(evalFloat("maxmask", 0, now));
+    parms.invertMask = evalInt("invert", 0, now);
 
     parmVec.push_back(parms);
 
@@ -574,48 +584,20 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
 ////////////////////////////////////////
 
 
+#if VDB_COMPILABLE_SOP
+
 OP_ERROR
-SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
+SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-        OP_AutoLockInputs lock;
-
         const fpreal now = context.getTime();
 
         FilterOp filterOp;
 
-        SOP_OpenVDB_Filter* startNode = this;
-        {
-            // Find adjacent, upstream nodes of the same type as this node.
-            std::vector<SOP_OpenVDB_Filter*> nodes = hutil::getNodeChain(context, this);
-
-            startNode = nodes[0];
-
-            // Collect filter parameters starting from the topmost node.
-            FilterParmVec& parmVec = filterOp.opSequence;
-            parmVec.reserve(nodes.size());
-            for (size_t n = 0, N = nodes.size(); n < N; ++n) {
-                if (nodes[n]->evalFilterParms(context, *gdp, parmVec) >= UT_ERROR_ABORT) {
-                    return error();
-                }
-            }
-        }
-#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
-        lock.setNode(startNode);
-        if (lock.lock(context) >= UT_ERROR_ABORT) return error();
-#else
-        if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
-#endif
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT) {
-            return error();
-        }
+        evalFilterParms(context, *gdp, filterOp.opSequence);
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, now);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", now));
 
         hvdb::Interrupter progress("Filtering VDB grids");
         filterOp.interrupt = &progress;
@@ -652,6 +634,93 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
     }
     return error();
 }
+
+#else // if !VDB_COMPILABLE_SOP
+
+OP_ERROR
+SOP_OpenVDB_Filter::cookVDBSop(OP_Context& context)
+{
+    try {
+        OP_AutoLockInputs lock;
+
+        const fpreal now = context.getTime();
+
+        FilterOp filterOp;
+
+        SOP_OpenVDB_Filter* startNode = this;
+        {
+            // Find adjacent, upstream nodes of the same type as this node.
+            std::vector<SOP_OpenVDB_Filter*> nodes = hutil::getNodeChain(context, this);
+
+            startNode = nodes[0];
+
+            // Collect filter parameters starting from the topmost node.
+            FilterParmVec& parmVec = filterOp.opSequence;
+            parmVec.reserve(nodes.size());
+            for (size_t n = 0, N = nodes.size(); n < N; ++n) {
+                if (nodes[n]->evalFilterParms(context, *gdp, parmVec) >= UT_ERROR_ABORT) {
+                    addInputError(0);
+                    return error();
+                }
+            }
+        }
+
+        lock.setNode(startNode);
+        if (lock.lock(context) >= UT_ERROR_ABORT) {
+            addInputError(0);
+            return error();
+        }
+
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+        lock.markInputUnlocked(0);
+#endif
+        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean=*/true)
+            >= UT_ERROR_ABORT)
+        {
+            return error();
+        }
+
+        // Get the group of grids to process.
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", now));
+
+        hvdb::Interrupter progress("Filtering VDB grids");
+        filterOp.interrupt = &progress;
+
+        // Process each VDB primitive in the selected group.
+        for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
+
+            if (progress.wasInterrupted()) {
+                throw std::runtime_error("processing was interrupted");
+            }
+
+            GU_PrimVDB* vdbPrim = *it;
+            UT_String name = it.getPrimitiveNameOrIndex();
+
+#ifndef SESI_OPENVDB
+            if (evalInt("verbose", 0, now)) {
+                std::cout << "\nFiltering \"" << name << "\"" << std::endl;
+            }
+#endif
+
+            int success = GEOvdbProcessTypedGridTopology(*vdbPrim, filterOp);
+
+            if (!success) {
+                std::stringstream ss;
+                ss << "VDB grid " << name << " of type "
+                    << vdbPrim->getConstGrid().valueType() << " was skipped";
+                addWarning(SOP_MESSAGE, ss.str().c_str());
+                continue;
+            }
+        }
+
+    } catch (std::exception& e) {
+        addError(SOP_MESSAGE, e.what());
+    }
+    return error();
+}
+
+#endif // VDB_COMPILABLE_SOP
 
 // Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

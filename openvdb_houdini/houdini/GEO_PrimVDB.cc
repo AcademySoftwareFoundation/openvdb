@@ -56,14 +56,8 @@
 
 #include <UT/UT_Debug.h>
 #include <UT/UT_Defines.h>
-
-#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
 #include <UT/UT_EnvControl.h>
 #include <UT/UT_FSATable.h>
-#else
-#include <UT/UT_FSA.h>
-#endif
-
 #include <UT/UT_IStream.h>
 #include <UT/UT_JSONParser.h>
 #include <UT/UT_JSONValue.h>
@@ -83,9 +77,7 @@
 #include <GA/GA_AttributeRefMapDestHandle.h>
 #include <GA/GA_Defragment.h>
 #include <GA/GA_ElementWrangler.h>
-#if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
 #include <GA/GA_IntrinsicMacros.h>
-#endif
 #include <GA/GA_MergeMap.h>
 #include <GA/GA_PrimitiveJSON.h>
 #include <GA/GA_RangeMemberQuery.h>
@@ -106,27 +98,8 @@
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/VectorTransformer.h>
 
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
-
-
-#if (UT_VERSION_INT < 0x0c0100B6) // earlier than 12.1.182
-static bool
-geo_JVDBError(UT_JSONParser &p, const GA_Primitive *prim, const char *m)
-{
-    p.addFatal("Error loading %s: %s", prim->getTypeName(), m);
-    return false;
-}
-#endif
-
-#if (UT_VERSION_INT < 0x0c010048) // earlier than 12.1.72
-GA_IntrinsicManager::Registrar
-GEO_PrimVDB::registerIntrinsics(GA_PrimitiveDefinition &defn)
-{
-    ///defn.setMergeConstructor(&gaPrimitiveMergeConstructor);
-    return GEO_Primitive::registerIntrinsics(defn);
-}
-#endif
+#include <iostream>
+#include <stdexcept>
 
 
 GEO_PrimVDB::UniqueId
@@ -147,10 +120,6 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
     , myTransformUniqueId(GEO_PrimVDB::nextUniqueId())
 {
     myVertex = allocateVertex();
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    myStashedState = false;
-    if (d) d->addVolumeRef();
-#endif
 }
 
 GEO_PrimVDB::GEO_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
@@ -169,10 +138,6 @@ GEO_PrimVDB::GEO_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
 	GA_Offset sidx = src_prim.myVertex; // Get source index
 	myVertex = map.mapDestFromSource(GA_ATTRIB_VERTEX, sidx);
     }
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    myStashedState = false;
-    static_cast<GEO_Detail &>(detail).addVolumeRef();
-#endif
 
     copyGridFrom(src_prim); // makes a shallow copy
 }
@@ -181,10 +146,6 @@ GEO_PrimVDB::~GEO_PrimVDB()
 {
     if (GAisValid(myVertex))
 	destroyVertex(myVertex);
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    if (!myStashedState && getParent())
-	getParent()->delVolumeRef();
-#endif
 }
 
 void
@@ -194,31 +155,12 @@ GEO_PrimVDB::clearForDeletion()
     GEO_Primitive::clearForDeletion();
 }
 
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
 void
 GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
 {
     // NB: Base class must be unstashed before we can call allocateVertex().
     GEO_Primitive::stashed(beingstashed, offset);
     myVertex = beingstashed ? GA_INVALID_OFFSET : allocateVertex();
-#else
-void
-GEO_PrimVDB::stashed(int onoff, GA_Offset offset)
-{
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    if (getParent())
-    {
-	if (onoff)
-	    getParent()->delVolumeRef();
-	else
-	    getParent()->addVolumeRef();
-    }
-    myStashedState = (onoff != 0);
-#endif
-    // NB: Base class must be unstashed before we can call allocateVertex().
-    GEO_Primitive::stashed(onoff, offset);
-    myVertex = onoff ? GA_INVALID_OFFSET : allocateVertex();
-#endif
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0);
 }
@@ -539,12 +481,12 @@ GEO_PrimVDB::conditionMatrix(UT_Matrix4D &mat4)
 // All AffineMap creation must to through this to avoid crashes when passing
 // singular matrices into OpenVDB
 template<typename T>
-static boost::shared_ptr<T>
+static UT_SharedPtr<T>
 geoCreateAffineMap(const UT_Matrix4D& mat4)
 {
     using namespace openvdb::math;
 
-    boost::shared_ptr<T> transform;
+    UT_SharedPtr<T> transform;
     UT_Matrix4D new_mat4(mat4);
     (void) GEO_PrimVDB::conditionMatrix(new_mat4);
     try
@@ -889,8 +831,8 @@ geo_calcArea(const GridType &grid, fpreal &area)
     }
 
     if (!calculated) {
-        typedef typename GridType::TreeType::LeafCIter LeafIter;
-        typedef typename GridType::TreeType::LeafNodeType::ValueOnCIter VoxelIter;
+        using LeafIter = typename GridType::TreeType::LeafCIter;
+        using VoxelIter = typename GridType::TreeType::LeafNodeType::ValueOnCIter;
         using openvdb::Coord;
         const Coord normals[] = {Coord(0,0,-1), Coord(0,0,1), Coord(-1,0,0),
                                  Coord(1,0,0), Coord(0,-1,0), Coord(0,1,0)};
@@ -1007,7 +949,7 @@ template <typename GridType>
 static inline typename GridType::ValueType
 geo_doubleToGridValue(double val)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     // This ugly construction avoids compiler warnings when,
     // for example, initializing an openvdb::Vec3i with a double.
     return ValueT(openvdb::zeroVal<ValueT>() + val);
@@ -1215,8 +1157,8 @@ public:
     void operator()(const GridT &grid)
     {
 	using namespace openvdb;
-	typedef typename GridT::ConstAccessor	AccessorT;
-	typedef typename GridT::ValueType	ValueT;
+	using AccessorT = typename GridT::ConstAccessor;
+	using ValueT = typename GridT::ValueType;
 
 	const math::Transform &	    xform = grid.transform();
 	const math::Vec3d	    dim = grid.voxelSize();
@@ -2385,7 +2327,7 @@ public:
 	    case geo_TBJ_ENTRIES:	    break;
 	}
 	UT_ASSERT(0);
-	return NULL;
+	return nullptr;
     }
 
     virtual bool
@@ -2461,27 +2403,8 @@ public:
     saveField(const GA_Primitive *pr, int i, UT_JSONValue &val,
 	      const GA_SaveMap &map) const
     {
-#if (UT_VERSION_INT >= 0x0c0100B6) // 12.1.182 or later
 	UT_AutoJSONWriter w(val);
 	return saveField(pr, i, *w, map);
-#else
-	GA_Offset		vtx;
-	switch (i)
-	{
-	    case geo_TBJ_VERTEX:
-	        vtx = vdb(pr)->getVertexOffset(0);
-	        val.setInt(map.getVertexIndex(vtx));
-	        return true;
-	    case geo_TBJ_VDB:
-	    case geo_TBJ_VDB_VISUALIZATION:
-	        return false;
-
-	    case geo_TBJ_ENTRIES:
-	        break;
-	}
-	UT_ASSERT(0);
-	return false;
-#endif
     }
     // Re-implement the H12.5 base class version, note that this was pure
     // virtual in H12.1.
@@ -2489,37 +2412,10 @@ public:
     loadField(GA_Primitive *pr, int i, UT_JSONParser &p,
 	      const UT_JSONValue &jval, const GA_LoadMap &map) const
     {
-#if (UT_VERSION_INT >= 0x0c0100B6) // 12.1.182 or later
 	UT_AutoJSONParser parser(jval);
 	bool ok = loadField(pr, i, *parser, map);
 	p.stealErrors(*parser);
 	return ok;
-#else
-	int64		voff;
-
-	switch (i)
-	{
-	    case geo_TBJ_VERTEX:
-		if (!jval.import(voff))
-		    return geo_JVDBError(p, pr, "Unable to import vertex");;
-		voff = map.getVertexOffset(voff);
-		// Assign the preallocated vertex, but
-		// don't bother updating the topology,
-		// which will be done at the end of the
-		// load anyway.
-		vdb(pr)->assignVertex(GA_Offset(voff), false);
-		return true;
-	    case geo_TBJ_VDB:
-		return vdb(pr)->loadVDB(p);
-	    case geo_TBJ_VDB_VISUALIZATION:
-		return false;
-
-	    case geo_TBJ_ENTRIES:
-		break;
-	}
-	UT_ASSERT(0);
-	return false;
-#endif
     }
 #endif
 
@@ -2554,9 +2450,9 @@ vdbJSON()
 
     if (!theJSON) {
         GA_PrimitiveJSON* json = new geo_PrimVDBJSON;
-        if (NULL != theJSON.compare_swap(NULL, json)) {
+        if (nullptr != theJSON.compare_swap(nullptr, json)) {
             delete json;
-            json = NULL;
+            json = nullptr;
         }
     }
     return theJSON;
@@ -2587,7 +2483,6 @@ geoSetVDBStreamCompression(openvdb::io::Stream& vos, bool backwards_compatible)
 bool
 GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 {
-#if (UT_VERSION_INT >= 0x0c0002bf) // 12.0.703 or later
     bool	ok = true;
 
     try
@@ -2600,12 +2495,8 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	openvdb::io::Stream			vos(os);
 	openvdb::MetaMap			meta;
 
-#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
-    geoSetVDBStreamCompression(vos,
-        UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
-#else
-    geoSetVDBStreamCompression(vos, /*backwards_compatible*/true);
-#endif
+	geoSetVDBStreamCompression(vos,
+	    UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
 
 	// Visual C++ requires a default meta object declared on the stack
 	vos.write(grids, meta);
@@ -2616,16 +2507,11 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	ok = false;
     }
     return ok;
-#else
-    #warning OpenVDB .bgeo I/O is not available prior to 12.0.703
-    return false;
-#endif
 }
 
 bool
 GEO_PrimVDB::loadVDB(UT_JSONParser &p)
 {
-#if (UT_VERSION_INT >= 0x0c0002bf) // 12.0.703 or later
     try
     {
 	UT_JSONParser::TiledStream	is(p);
@@ -2653,10 +2539,6 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p)
 	return false;
     }
     return true;
-#else
-    #warning OpenVDB .bgeo I/O is not available prior to 12.0.703
-    return false;
-#endif
 }
 
 namespace // anonymous
@@ -2672,7 +2554,7 @@ UT_FSATable	theJVolumeViz(
     geo_JVOL_VISMODE,		"mode",
     geo_JVOL_VISISO,		"iso",
     geo_JVOL_VISDENSITY,	"density",
-    -1,				NULL
+    -1,				nullptr
 );
 
 } // namespace anonymous
@@ -2680,10 +2562,6 @@ UT_FSATable	theJVolumeViz(
 bool
 GEO_PrimVDB::saveVisualization(UT_JSONWriter &w, const GA_SaveMap &) const
 {
-#if (UT_VERSION_INT < 0x0c010072) // earlier than 12.1.114
-    #warning OpenVDB visualization options do not persist prior to 12.0.114
-    return false;
-#else
     bool	ok = true;
     ok = ok && w.jsonBeginMap();
 
@@ -2697,16 +2575,11 @@ GEO_PrimVDB::saveVisualization(UT_JSONWriter &w, const GA_SaveMap &) const
     ok = ok && w.jsonReal(myVis.myDensity);
 
     return ok && w.jsonEndMap();
-#endif
 }
 
 bool
 GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
 {
-#if (UT_VERSION_INT < 0x0c010072) // earlier than 12.1.114
-    #warning OpenVDB visualization options do not persist prior to 12.0.114
-    return false;
-#else
     UT_JSONParser::traverser	it;
     GEO_VolumeVis		mode = myVis.myMode;
     fpreal			iso = myVis.myIso;
@@ -2753,7 +2626,6 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
     if (ok)
 	setVisualization(mode, iso, density);
     return ok;
-#endif
 }
 
 template <typename GridType>
@@ -2856,11 +2728,7 @@ GEO_PrimVDB::isDegenerate() const
 // Methods to handle vertex attributes for the attribute dictionary
 //
 void
-#if (UT_VERSION_INT >= 0x0d000000)
 GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc)
-#else
-GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
-#endif
 {
     if (psrc == this) return;
 
@@ -2875,49 +2743,11 @@ GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
 
     GA_Offset v = myVertex;
     GA_Index ptind = src_points.indexFromOffset(src->vertexPoint(0));
-#if (UT_VERSION_INT >= 0x0d000000)
     GA_Offset ptoff = getParent()->pointOffset(ptind);
     wireVertex(v, ptoff);
-#else
-    GEO_Point *ppt = ptredirect[ptind];
-    wireVertex(v, ppt ? ppt->getMapOffset() : GA_INVALID_OFFSET);
-#endif
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
     myVis = src->myVis;
 }
-
-#if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
-#if (UT_VERSION_INT >= 0x0c050132) // 12.5.306 or later
-void
-GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, GA_Index basept)
-#else
-void
-GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
-#endif
-{
-    if (psrc == this) return;
-
-    const GEO_PrimVDB	*src = (const GEO_PrimVDB *)psrc;
-    const GA_IndexMap	&points = getParent()->getPointMap();
-    const GA_IndexMap	&src_points = src->getParent()->getPointMap();
-    GA_Offset		 ppt;
-
-    copyGridFrom(*src); // makes a shallow copy
-
-    // TODO: Well and good to reuse the attribute handle for all our
-    //       points/vertices, but we should do so across primitives
-    //       as well.
-    GA_VertexWrangler		 vertex_wrangler(*getParent(),
-						 *src->getParent());
-
-    GA_Offset	v = fastVertexOffset(0);
-    ppt = points.offsetFromIndex(
-	    src_points.indexFromOffset(src->vertexPoint(0)) + basept);
-    wireVertex(v, ppt);
-    vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
-    myVis = src->myVis;
-}
-#endif
 
 static inline
 openvdb::math::Vec3d
@@ -2950,7 +2780,7 @@ GEO_PrimVDB::GridAccessor::updateGridTranslates(const GEO_PrimVDB &prim) const
     Vec3d delta = newpos - oldpos;
     const_cast<GEO_PrimVDB::GridAccessor *>(this)->makeGridUnique();
     myGrid->setTransform(
-	    boost::make_shared<Transform>(map->postTranslate(delta)));
+	UT_SharedPtr<Transform>(new Transform{map->postTranslate(delta)}));
 }
 
 // Copy the translation from xform and set into our vertex position
@@ -3139,16 +2969,9 @@ GEO_PrimVDB::getGridName() const
 }
 
 
-#if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
-
 namespace // anonymous
 {
-
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    typedef int	    geo_Size;
-#else
-    typedef GA_Size geo_Size;
-#endif
+    using geo_Size = GA_Size;
 
     // Intrinsic attributes
     enum geo_Intrinsic
@@ -3179,7 +3002,7 @@ namespace // anonymous
 	geo_INTRINSIC_META_SAVE_HALF_FLOAT, "vdb_is_saved_as_half_float",
 	geo_INTRINSIC_META_VALUE_TYPE,	    "vdb_value_type",
 	geo_INTRINSIC_META_VECTOR_TYPE,	    "vdb_vector_type",
-	-1,				    NULL
+	-1,				    nullptr
     );
 
     geo_Size
@@ -3271,11 +3094,7 @@ namespace // anonymous
     const char *
     intrinsicVisualMode(const GEO_PrimVDB *p)
     {
-#if (UT_VERSION_INT < 0x0c010072) // earlier than 12.1.114
-	return "";
-#else
 	return GEOgetVolumeVisToken(p->getVisualization());
-#endif
     }
 
     openvdb::Metadata::ConstPtr
@@ -3410,14 +3229,8 @@ GA_END_INTRINSIC_DEF(GEO_PrimVDB, GEO_Primitive)
 /*static*/ bool
 GEO_PrimVDB::isIntrinsicMetadata(const char *name)
 {
-#if (UT_VERSION_INT < 0x0c010072) // earlier than 12.1.114
-    return (-1 != theMetaNames.findSymbol(name));
-#else
     return theMetaNames.contains(name);
-#endif
 }
-
-#endif // (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
 
 #endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
 

@@ -44,8 +44,10 @@
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#if UT_MAJOR_VERSION_INT >= 16
+#include <SOP/SOP_NodeParmsOptions.h>
+#endif
 #include <UT/UT_IntArray.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
 #include <algorithm> // for std::for_each(), std::max(), std::remove(), std::sort()
 #include <cstdint> // for std::uintptr_t()
@@ -54,6 +56,7 @@
 #include <limits>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 
 namespace houdini_utils {
 
@@ -950,7 +953,43 @@ private:
     const std::string mHelpUrl, mDoc;
 };
 
-} // unnamed namespace
+
+#if UT_MAJOR_VERSION_INT >= 16
+
+class OpFactoryVerb: public SOP_NodeVerb
+{
+public:
+    OpFactoryVerb(const std::string& name, SOP_NodeVerb::CookMode cookMode,
+        const OpFactory::CacheAllocFunc& allocator, PRM_Template* parms)
+        : mName{name}
+        , mCookMode{cookMode}
+        , mAllocator{allocator}
+        , mParms{parms}
+    {}
+
+    SOP_NodeParms* allocParms() const override { return new SOP_NodeParmsOptions{mParms}; }
+    SOP_NodeCache* allocCache() const override { return mAllocator(); }
+
+    UT_StringHolder name() const override { return mName; }
+    CookMode cookMode(const SOP_NodeParms*) const override { return mCookMode; }
+
+    void cook(const CookParms& cookParms) const override
+    {
+        if (auto* cache = static_cast<SOP_NodeCacheOptions*>(cookParms.cache())) {
+            cache->doCook(this, cookParms);
+        }
+    }
+
+private:
+    std::string mName;
+    SOP_NodeVerb::CookMode mCookMode;
+    OpFactory::CacheAllocFunc mAllocator;
+    PRM_Template* mParms;
+}; // class OpFactoryVerb
+
+#endif // UT_MAJOR_VERSION_INT >= 16
+
+} // anonymous namespace
 
 
 ////////////////////////////////////////
@@ -1017,6 +1056,10 @@ struct OpFactory::Impl
 
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
+#if UT_MAJOR_VERSION_INT >= 16
+        if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
+#endif
+
         return op;
     }
 
@@ -1032,6 +1075,9 @@ struct OpFactory::Impl
     unsigned mFlags;
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
+#if UT_MAJOR_VERSION_INT >= 16
+    OpFactoryVerb* mVerb = nullptr;
+#endif
 };
 
 
@@ -1214,6 +1260,22 @@ OpFactory::setOperatorTable(const std::string& name)
     mImpl->mOperatorTableName = name;
     return *this;
 }
+
+
+#if UT_MAJOR_VERSION_INT >= 16
+OpFactory&
+OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator)
+{
+    if (flavor() != SOP) {
+        throw std::runtime_error{"expected operator of type SOP, got " + flavorToString(flavor())};
+    }
+    if (!allocator) throw std::invalid_argument{"must provide a cache allocator function"};
+
+    mImpl->mVerb = new OpFactoryVerb{name(), cookMode, allocator, mImpl->mParms};
+
+    return *this;
+}
+#endif
 
 
 ////////////////////////////////////////
@@ -1417,7 +1479,7 @@ sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     menuEntries[n_entries].setLabel(0);
 }
 
-} // unnamed namespace
+} // anonymous namespace
 
 
 #ifdef _MSC_VER
