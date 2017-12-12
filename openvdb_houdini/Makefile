@@ -395,13 +395,13 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops mantradsos houdinilib install_lib install
+.PHONY: all clean depend houdinisops mantradsos houdinilib install_lib install no_indirect_includes
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: depend houdinilib houdinisops mantradsos
+all: depend houdinilib houdinisops mantradsos no_indirect_includes
 
 # Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
@@ -535,6 +535,13 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	done
 
 depend: $(DEPEND)
+
+# Compile an implicit translation unit for each header to identify any indirect includes
+INDIRECT_INCLUDE_NAMES := $(addprefix indirect-,${LIBHOUDINI_INCLUDE_NAMES})
+${INDIRECT_INCLUDE_NAMES}: indirect-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(CXXFLAGS) $(HOUDINI_CXXFLAGS) \
+	    -isystem $(HOUDINI_INCL_DIR) -fPIC -o /dev/null -
+no_indirect_includes: ${INDIRECT_INCLUDE_NAMES}
 
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND)

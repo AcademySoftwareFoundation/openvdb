@@ -40,7 +40,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-
+#include <sstream> // for std::ostringstream
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
