@@ -32,6 +32,7 @@
 #   install             install plugins, scripts, etc. into MAYA_DESTDIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
+#   header_test         check for missing or indirectly included headers
 #
 # Options:
 #   abi=N               build for compatibility with version N of the
@@ -260,7 +261,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend install
+.PHONY: all clean depend header_test install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -302,6 +303,15 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	done
 
 depend: $(DEPEND)
+
+# Compile an implicit translation unit for each header to identify any indirect includes
+HEADER_TEST_FILES := $(addprefix header_test-,$(MAYA_INCLUDE_NAMES))
+$(HEADER_TEST_FILES): header_test-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(CXXFLAGS) \
+	    -isystem $(MAYA_INCL_DIR) -fPIC -o /dev/null -
+echo_header_test:
+	@echo "Checking for missing or indirectly included headers"
+header_test: echo_header_test $(HEADER_TEST_FILES)
 
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND) $(MAYA_OBJ_NAMES)

@@ -42,6 +42,7 @@
 #ifndef OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include <vector>
 #include <cassert>
 #include <iostream>

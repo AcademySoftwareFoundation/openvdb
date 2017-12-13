@@ -39,6 +39,7 @@
 
 #include <iosfwd> // for ostringstream
 #include <openvdb/version.h>
+#include <openvdb/Exceptions.h>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -72,7 +73,7 @@ public:
     {
     }
 
-    /// @brief Default copy constructor 
+    /// @brief Default copy constructor
     MinMax(const MinMax &other) = default;
 
     /// Add a single sample.
@@ -109,10 +110,10 @@ public:
     }
 
 protected:
-    
+
     ValueType mMin, mMax;
 };//end MinMax
-    
+
 /// @brief This class computes the minimum and maximum values of a population
 /// of floating-point values.
 class Extrema

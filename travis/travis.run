@@ -141,6 +141,8 @@ elif [ "$TASK" = "script" ]; then
         if [ "$BLOSC" = "yes" ]; then
             if [ "$RELEASE" = "yes" ]; then
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" -j4
+                # check for any indirect includes
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" -j4
             else
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" debug=yes -j4
             fi
@@ -169,6 +171,8 @@ elif [ "$TASK" = "script" ]; then
         cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
         # build OpenVDB Houdini SOPs
         make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
+        # check for any indirect includes
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi=3 -j4
     fi
 fi
 

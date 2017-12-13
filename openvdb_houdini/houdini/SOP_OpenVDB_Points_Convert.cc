@@ -797,6 +797,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         }
 
                         const std::string customName = evalStdString("maskname", time);
+
                         std::string vdbName;
                         switch (outputName) {
                             case NAME_KEEP:    vdbName = gridName; break;

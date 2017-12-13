@@ -50,6 +50,7 @@
 #   install_lib         install just the OpenVDB library and its headers
 #                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
+#   header_test         check for missing or indirectly included headers
 #   clean               delete generated files from the local directory
 #   test                run tests
 #
@@ -231,6 +232,11 @@ endif
 has_blosc := no
 ifneq (,$(and $(BLOSC_LIB_DIR),$(BLOSC_INCL_DIR),$(BLOSC_LIB)))
     has_blosc := yes
+endif
+
+has_cppunit := no
+ifneq (,$(and $(CPPUNIT_INCL_DIR),$(CPPUNIT_LIB_DIR),$(CPPUNIT_LIB)))
+    has_cppunit := yes
 endif
 
 has_glfw := no
@@ -721,7 +727,7 @@ ALL_PRODUCTS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend doc install lib pdfdoc pydoc pytest python test viewerlib
+.PHONY: all clean depend doc header_test install lib pdfdoc pydoc pytest python test viewerlib
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -984,6 +990,27 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES) openvdb_viewer
 	fi
 
 depend: $(DEPEND)
+
+# Compile an implicit translation unit for each header to identify any indirect includes
+HEADER_TEST_CXXFLAGS := $(CXXFLAGS)
+HEADER_TEST_FILES := $(addprefix header_test-,$(INCLUDE_NAMES) $(CMD_INCLUDE_NAMES))
+ifeq (yes,$(has_cppunit))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(UNITTEST_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += -isystem $(CPPUNIT_INCL_DIR)
+endif
+ifeq (yes,$(has_glfw))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(LIBVIEWER_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1
+endif
+ifeq (yes,$(has_python))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(PYTHON_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += $(PYCXXFLAGS)
+endif
+$(HEADER_TEST_FILES): header_test-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(HEADER_TEST_CXXFLAGS) -fPIC -o /dev/null -
+echo_header_test:
+	@echo "Checking for missing or indirectly included headers"
+header_test: echo_header_test $(HEADER_TEST_FILES)
 
 clean:
 	$(RM) $(OBJ_NAMES) $(ALL_PRODUCTS) $(DEPEND)

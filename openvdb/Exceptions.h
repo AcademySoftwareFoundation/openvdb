@@ -31,10 +31,11 @@
 #ifndef OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 #define OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
-#include <exception>
-#include <string>
-#include <iostream>
 #include <openvdb/version.h>
+#include <exception>
+#include <sstream>
+#include <string>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
