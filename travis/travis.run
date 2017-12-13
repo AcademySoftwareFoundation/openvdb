@@ -162,17 +162,17 @@ elif [ "$TASK" = "script" ]; then
         # note that this means the DSO can no longer be loaded in Houdini
         sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
         # build OpenVDB core library and OpenVDB houdini library
-        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi=3 -j4
+        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" -j4
         # manually install OpenVDB houdini headers and lib
         mkdir houdini_utils
         cp openvdb_houdini/houdini/*.h openvdb_houdini
         cp openvdb_houdini/houdini/*.h houdini_utils
         cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
         # build OpenVDB Houdini SOPs
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi=3 -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
         # check for any indirect includes
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi=3 -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" -j4
     fi
 fi
 
