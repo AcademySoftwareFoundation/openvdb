@@ -33,7 +33,6 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/shared_array.hpp>
 #include <zlib.h>
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
@@ -71,7 +70,7 @@ zipToStream(std::ostream& os, const char* data, size_t numBytes)
     // Get an upper bound on the size of the compressed data.
     uLongf numZippedBytes = compressBound(numBytes);
     // Compress the data.
-    boost::shared_array<Bytef> zippedData(new Bytef[numZippedBytes]);
+    std::unique_ptr<Bytef[]> zippedData(new Bytef[numZippedBytes]);
     int status = compress2(
         /*dest=*/zippedData.get(), &numZippedBytes,
         /*src=*/reinterpret_cast<const Bytef*>(data), numBytes,
@@ -123,7 +122,7 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
             is.seekg(numZippedBytes, std::ios_base::cur);
         } else {
             // Read the compressed data.
-            boost::shared_array<Bytef> zippedData(new Bytef[numZippedBytes]);
+            std::unique_ptr<Bytef[]> zippedData(new Bytef[numZippedBytes]);
             is.read(reinterpret_cast<char*>(zippedData.get()), numZippedBytes);
             // Uncompress the data.
             uLongf numUnzippedBytes = numBytes;
@@ -159,7 +158,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
     const size_t inBytes = valSize * numVals;
 
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
-    boost::shared_array<char> compressedData(new char[outBytes]);
+    std::unique_ptr<char[]> compressedData(new char[outBytes]);
 
     outBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
@@ -227,7 +226,7 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
             is.seekg(numCompressedBytes, std::ios_base::cur);
         } else {
             // Read the compressed data.
-            boost::shared_array<char> compressedData(new char[numCompressedBytes]);
+            std::unique_ptr<char[]> compressedData(new char[numCompressedBytes]);
             is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
             // Uncompress the data.
             const int numUncompressedBytes = blosc_decompress_ctx(

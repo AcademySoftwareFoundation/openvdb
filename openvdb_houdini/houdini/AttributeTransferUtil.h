@@ -46,6 +46,8 @@
 #include <SYS/SYS_Types.h>
 #include <UT/UT_Version.h>
 
+#include <boost/shared_ptr.hpp>
+
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::floor()
 #include <limits>

@@ -30,30 +30,30 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <tbb/task.h>
-#include <boost/type_traits/remove_const.hpp>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Prune.h>
+#include <type_traits>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 
-typedef float ValueType;
-typedef openvdb::tree::Tree<
+using ValueType = float;
+using Tree2Type = openvdb::tree::Tree<
     openvdb::tree::RootNode<
-    openvdb::tree::LeafNode<ValueType, 3> > > Tree2Type;
-typedef openvdb::tree::Tree<
-    openvdb::tree::RootNode<
-    openvdb::tree::InternalNode<
-    openvdb::tree::LeafNode<ValueType, 3>, 4> > > Tree3Type;
-typedef openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type Tree4Type;
-typedef openvdb::tree::Tree<
+    openvdb::tree::LeafNode<ValueType, 3> > >;
+using Tree3Type = openvdb::tree::Tree<
     openvdb::tree::RootNode<
     openvdb::tree::InternalNode<
+    openvdb::tree::LeafNode<ValueType, 3>, 4> > >;
+using Tree4Type = openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type;
+using Tree5Type = openvdb::tree::Tree<
+    openvdb::tree::RootNode<
     openvdb::tree::InternalNode<
     openvdb::tree::InternalNode<
-    openvdb::tree::LeafNode<ValueType, 3>, 4>, 5>, 5> > > Tree5Type;
-typedef Tree4Type TreeType;
+    openvdb::tree::InternalNode<
+    openvdb::tree::LeafNode<ValueType, 3>, 4>, 5>, 5> > >;
+using TreeType = Tree4Type;
 
 
 using namespace openvdb::tree;
@@ -61,8 +61,8 @@ using namespace openvdb::tree;
 class TestValueAccessor: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestValueAccessor);
 
@@ -224,7 +224,7 @@ template<typename AccessorT>
 void
 TestValueAccessor::accessorTest()
 {
-    typedef typename AccessorT::TreeType TreeType;
+    using TreeType = typename AccessorT::TreeType;
     const int leafDepth = int(TreeType::DEPTH) - 1;
     // subtract one because getValueDepth() returns 0 for values at the root
 
@@ -366,7 +366,7 @@ template<typename AccessorT>
 void
 TestValueAccessor::constAccessorTest()
 {
-    typedef typename boost::remove_const<typename AccessorT::TreeType>::type TreeType;
+    using TreeType = typename std::remove_const<typename AccessorT::TreeType>::type;
     const int leafDepth = int(TreeType::DEPTH) - 1;
         // subtract one because getValueDepth() returns 0 for values at the root
 
@@ -445,9 +445,9 @@ TestValueAccessor::testMultithreadedAccessor()
 {
 #define MAX_COORD 5000
 
-    typedef openvdb::tree::ValueAccessorRW<Tree4Type> AccessorT;
-    // Substituting the following typedef typically results in assertion failures:
-    //typedef openvdb::tree::ValueAccessor<Tree4Type> AccessorT;
+    using AccessorT = openvdb::tree::ValueAccessorRW<Tree4Type>;
+    // Substituting the following alias typically results in assertion failures:
+    //using AccessorT = openvdb::tree::ValueAccessor<Tree4Type>;
 
     // Task to perform multiple reads through a shared accessor
     struct ReadTask: public tbb::task {
@@ -458,7 +458,7 @@ TestValueAccessor::testMultithreadedAccessor()
             for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
                 ASSERT_DOUBLES_EXACTLY_EQUAL(double(i), acc.getValue(openvdb::Coord(i)));
             }
-            return NULL;
+            return nullptr;
         }
     };
     // Task to perform multiple writes through a shared accessor
@@ -473,7 +473,7 @@ TestValueAccessor::testMultithreadedAccessor()
                 acc.setValue(openvdb::Coord(i), float(i));
                 ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), acc.getValue(openvdb::Coord(i)));
             }
-            return NULL;
+            return nullptr;
         }
     };
     // Parent task to spawn multiple parallel read and write tasks
@@ -492,7 +492,7 @@ TestValueAccessor::testMultithreadedAccessor()
                 spawn(*r[i]); spawn(*w[i]);
             }
             wait_for_all();
-            return NULL;
+            return nullptr;
         }
     };
 
@@ -527,14 +527,14 @@ TestValueAccessor::testAccessorRegistration()
     acc.setValue(c0, value);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Reset the voxel to the background value and verify that no nodes
     // have been deleted and that the cache is still populated.
     tree->setValueOff(c0, background);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Prune the tree and verify that only the root node remains and that
     // the cache has been cleared.
@@ -542,26 +542,26 @@ TestValueAccessor::testAccessorRegistration()
     //tree->prune();
     CPPUNIT_ASSERT_EQUAL(Index(0), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->nonLeafCount()); // root node only
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == NULL);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 
     // Set the leaf voxel again and verify that the cache is repopulated.
     acc.setValue(c0, value);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Delete the tree and verify that the cache has been cleared.
     tree.reset();
-    CPPUNIT_ASSERT(acc.getTree() == NULL);
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::RootNodeType>() == NULL);
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == NULL);
+    CPPUNIT_ASSERT(acc.getTree() == nullptr);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::RootNodeType>() == nullptr);
+    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 }
 
 
 void
 TestValueAccessor::testGetNode()
 {
-    typedef Tree4Type::LeafNodeType LeafT;
+    using LeafT = Tree4Type::LeafNodeType;
 
     const ValueType background = 5.0f, value = -9.345f;
     const openvdb::Coord c0(5, 10, 20);
@@ -574,23 +574,23 @@ TestValueAccessor::testGetNode()
         acc.getValue(c0);
         // Verify that the cache contains a leaf node.
         LeafT* node = acc.getNode<LeafT>();
-        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT(node != nullptr);
 
         // Erase the leaf node from the cache and verify that it is gone.
         acc.eraseNode<LeafT>();
         node = acc.getNode<LeafT>();
-        CPPUNIT_ASSERT(node == NULL);
+        CPPUNIT_ASSERT(node == nullptr);
     }
     {
         // As above, but with a const tree.
         openvdb::tree::ValueAccessor<const Tree4Type> acc(tree);
         acc.getValue(c0);
         const LeafT* node = acc.getNode<const LeafT>();
-        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT(node != nullptr);
 
         acc.eraseNode<LeafT>();
         node = acc.getNode<const LeafT>();
-        CPPUNIT_ASSERT(node == NULL);
+        CPPUNIT_ASSERT(node == nullptr);
     }
 }
 

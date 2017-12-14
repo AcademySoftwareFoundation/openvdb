@@ -43,11 +43,12 @@
  */
 
 #include <UT/UT_Version.h>
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
+
+#ifndef SESI_OPENVDB
 
 #include <UT/UT_VDBUtils.h>
 
-#else // earlier than 12.5.343
+#else
 
 #ifndef __HDK_UT_VDBUtils__
 #define __HDK_UT_VDBUtils__
@@ -77,13 +78,6 @@ enum UT_VDBType
 #include <UT/UT_Matrix3.h>
 #include <UT/UT_Matrix2.h>
 #include <SYS/SYS_Math.h>
-
-#include <boost/typeof/typeof.hpp>
-
-
-#if (UT_VERSION_INT < 0x0c010072) // 12.1.114 or earlier
-#define UTverify_cast static_cast
-#endif
 
 
 /// Calls openvdb::initialize()
@@ -274,7 +268,7 @@ callTypedGrid(GridBaseType &grid, OpType& op)
 ///
 ///     template<typename GridT>
 ///     void operator()(GridT& grid) const {
-///         typedef typename GridT::ValueType ValueT;
+///         using ValueT = typename GridT::ValueType;
 ///         grid.fill(bbox, ValueT(1));
 ///     }
 /// };

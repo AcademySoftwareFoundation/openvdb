@@ -71,18 +71,19 @@
 # Note that if you plan to build the Houdini OpenVDB tools (distributed
 # separately), you must build the OpenVDB library and the Houdini tools
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
-# Fortunately, all three are included in the Houdini HDK, so the relevant
+# Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)
+# to set those two environment variables.)  Beginning with Houdini 16.5,
+# you must provide your own distribution of Boost.
 #
 # To build the OpenVDB Python module, you will need local distributions of
-# Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
-# includes Python 2.x as well as the Boost.Python headers.  Unfortunately,
-# it does not include the libboost_python library, nor does it include NumPy,
-# so both Boost.Python and NumPy have to be built separately.
-# Point the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
-# $(NUMPY_INCL_DIR) below to your local distributions of those libraries.
+# Python, Boost.Python, and optionally NumPy.  The Houdini HDK includes
+# Python 2.x, but not the libboost_python library or NumPy or, as of
+# Houdini 16.5, the Boost.Python headers, so both Boost.Python and NumPy
+# have to be built separately.  Point the variables $(BOOST_PYTHON_LIB_DIR),
+# $(BOOST_PYTHON_LIB) and $(NUMPY_INCL_DIR) below to your local distributions
+# of those libraries.
 #
 
 # The directory into which to install libraries, executables and header files

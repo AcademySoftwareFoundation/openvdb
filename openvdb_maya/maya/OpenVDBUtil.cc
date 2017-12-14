@@ -37,10 +37,12 @@
 
 #include <maya/MGlobal.h>
 
+#include <boost/algorithm/string.hpp>
+
 #include <iomanip> // std::setw, std::setfill, std::left
 #include <sstream> // std::stringstream
 #include <string> // std::string, std::getline
-#include <vector>
+#include <stdexcept>
 
 namespace openvdb_maya {
 
@@ -56,7 +58,7 @@ getInputVDB(const MObject& vdb, MDataBlock& data)
 
     if (status != MS::kSuccess) {
         MGlobal::displayError("Invalid VDB input");
-        return NULL;
+        return nullptr;
     }
 
     MFnPluginData inputPluginData(inputVdbHandle.data());
@@ -64,7 +66,7 @@ getInputVDB(const MObject& vdb, MDataBlock& data)
 
     if (!inputPxData) {
         MGlobal::displayError("Invalid VDB input");
-        return NULL;
+        return nullptr;
     }
 
     return dynamic_cast<const OpenVDBData*>(inputPxData);
@@ -107,9 +109,9 @@ bool containsGrid(const std::vector<std::string>& selectionList,
 
         try {
 
-            return boost::lexical_cast<size_t>(word) == gridIndex;
+            return static_cast<size_t>(std::stoul(word)) == gridIndex;
 
-        } catch (const boost::bad_lexical_cast&) {
+        } catch (const std::exception&) {
 
             bool match = true;
             for (size_t i = 0, I = std::min(word.length(), gridName.length()); i < I; ++i) {

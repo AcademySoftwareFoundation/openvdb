@@ -54,9 +54,7 @@
 #include "GT_GEOPrimCollectVDB.h"
 #include <GU/GU_ConvertParms.h>
 #include <GU/GU_PrimPoly.h>
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <GU/GU_PrimPolySoup.h>
-#endif
 #include <GU/GU_PrimVolume.h>
 #include <GU/GU_RayIntersect.h>
 
@@ -77,36 +75,23 @@
 #include <UT/UT_Lock.h>
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_ScopedPtr.h>
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <UT/UT_ScopeExit.h>
-#endif
-
-#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
-typedef UT_Vector2T<int32> UT_Vector2i;
-typedef UT_Vector3T<int32> UT_Vector3i;
-#else
 #include <UT/UT_Singleton.h>
-#endif
-
 #include <UT/UT_StopWatch.h>
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
-#endif
 #include <SYS/SYS_Types.h>
 
 #include <openvdb/tools/VolumeToMesh.h>
-
-#include <boost/function.hpp>
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-#include <boost/scope_exit.hpp>
-#endif
-
 #include <openvdb/tools/SignedFloodFill.h>
-#include <boost/type_traits/is_arithmetic.hpp>
-#include <boost/utility/enable_if.hpp>
 
 #include <algorithm>
+#include <functional>
+#include <limits>
+#include <map>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 #include <stddef.h>
@@ -121,139 +106,6 @@ typedef UT_Vector3T<int32> UT_Vector3i;
 	fflush(stdout); \
 	timer.start(); \
     }
-
-
-#if (UT_VERSION_INT < 0x0c0500F5) // Prior to 12.5.245
-
-// These methods come from the H12.5 version of GU_ConvertParms.h for compiling
-// in H12.1.
-namespace GU_Convert_H12_5 {
-
-class GU_ConvertMarker
-{
-public:
-    GU_ConvertMarker(const GA_Detail &geo)
-	: myGeo(geo)
-	, myPrimBegin(primOff())
-	, myPtBegin(ptOff())
-    {
-    }
-
-    GA_Range getPrimitives() const
-    {
-	return GA_Range(myGeo.getPrimitiveMap(), myPrimBegin, primOff());
-    }
-    GA_Range getPoints() const
-    {
-	return GA_Range(myGeo.getPointMap(), myPtBegin, ptOff() + 1);
-    }
-
-    GA_Offset	primitiveBegin() const	{ return myPrimBegin; }
-    GA_Offset	pointBegin() const	{ return myPtBegin; }
-
-    GA_Size numPrimitives() const	{ return primOff() - myPrimBegin; }
-    GA_Size numPoints() const		{ return ptOff() - myPtBegin; }
-
-private:
-    GA_Offset	primOff() const
-		{ return myGeo.getPrimitiveMap().lastOffset() + 1; }
-    GA_Offset	ptOff() const	{ return myGeo.getPointMap().lastOffset() + 1; }
-
-private:
-    const GA_Detail &	myGeo;
-    GA_Offset		myPrimBegin;
-    GA_Offset		myPtBegin;
-};
-
-// Implementation which uses un-cached wranglers for H12.1, in H12.5 these
-// wranglers are cached across all primitives with GU_ConvertParms itself.
-static void
-GUconvertCopySingleVertexPrimAttribsAndGroups(
-#ifdef SESI_OPENVDB
-	GU_ConvertParms &parms,
-#else
-	GU_ConvertParms &/*parms*/,
-#endif
-	const GA_Detail &src,
-	GA_Offset src_primoff,
-	GA_Detail &dst,
-	const GA_Range &dst_prims,
-	const GA_Range &dst_points)
-{
-    UT_ScopedPtr<GA_ElementWranglerCache> cache;
-#ifdef SESI_OPENVDB
-    if (parms.preserveGroups)
-	cache.reset(new GA_ElementWranglerCache(dst, src,
-				    GA_AttributeFilter::selectGroup()));
-    else
-#endif
-	cache.reset(new GA_ElementWranglerCache(dst, src,
-				    GA_PointWrangler::EXCLUDE_P));
-
-    const GA_Primitive &	src_prim = *(src.getPrimitiveList().get(
-								src_primoff));
-    GA_Offset			src_vtxoff = src_prim.getVertexOffset(0);
-    GA_Offset			src_ptoff = src_prim.getPointOffset(0);
-    GA_ElementWranglerCache &	wranglers = *cache;
-    GA_PrimitiveWrangler &	prim_wrangler = wranglers.getPrimitive();
-    GA_VertexWrangler &		vtx_wrangler = wranglers.getVertex();
-    GA_PointWrangler &		pt_wrangler = wranglers.getPoint();
-    GA_PrimitiveWrangler *	prim_group_wrangler = NULL;
-    GA_PointWrangler *		pt_group_wrangler = NULL;
-
-#ifndef SESI_OPENVDB
-    bool have_vtx_attribs = true;
-    bool have_pt_attribs = true;
-#else
-    // This is only optimization available in H12.5
-    bool have_vtx_attribs = (vtx_wrangler.getNumAttributes() > 0);
-    bool have_pt_attribs = (pt_wrangler.getNumAttributes() > 0);
-
-    if (parms.preserveGroups)
-    {
-	prim_group_wrangler = &parms.getGroupWranglers(dst,&src).getPrimitive();
-	if (prim_group_wrangler->getNumAttributes() <= 0)
-	    prim_group_wrangler = NULL;
-	pt_group_wrangler = &parms.getGroupWranglers(dst,&src).getPoint();
-	if (pt_group_wrangler->getNumAttributes() <= 0)
-	    pt_group_wrangler = NULL;
-    }
-#endif
-
-    UT_ASSERT(src_prim.getVertexCount() == 1);
-    for (GA_Iterator i(dst_prims); !i.atEnd(); ++i)
-    {
-	if (prim_group_wrangler)
-	    prim_group_wrangler->copyAttributeValues(*i, src_primoff);
-	if (have_pt_attribs)
-	    prim_wrangler.copyAttributeValues(*i, src_primoff);
-	if (have_vtx_attribs)
-	{
-	    GA_Primitive &dst_prim = *(dst.getPrimitiveList().get(*i));
-	    GA_Size nvtx = dst_prim.getVertexCount();
-	    for (GA_Size j = 0; j < nvtx; ++j)
-	    {
-		vtx_wrangler.copyAttributeValues(
-			dst_prim.getVertexOffset(j),
-			src_vtxoff);
-	    }
-	}
-    }
-
-    for (GA_Iterator i(dst_points); !i.atEnd(); ++i)
-    {
-	if (pt_group_wrangler)
-	    pt_group_wrangler->copyAttributeValues(*i, src_ptoff);
-	if (have_pt_attribs)
-	    pt_wrangler.copyAttributeValues(*i, src_ptoff);
-    }
-}
-
-} // namespace GU_Convert_H12_5
-
-using GU_Convert_H12_5::GU_ConvertMarker;
-using GU_Convert_H12_5::GUconvertCopySingleVertexPrimAttribsAndGroups;
-#endif // Prior to 12.5.245
 
 
 GA_PrimitiveDefinition *GU_PrimVDB::theDefinition = 0;
@@ -297,11 +149,11 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
     openvdb::GridBase::Ptr grid =
 	*static_cast<openvdb::GridBase::Ptr*>(gridPtr);
     if (!grid)
-	return NULL;
+	return nullptr;
 
     GU_PrimVDB* vdb = GU_PrimVDB::build(&gdp);
-    if (vdb != NULL) {
-        if (src != NULL) {
+    if (vdb != nullptr) {
+        if (src != nullptr) {
             // Copy the source primitive's attributes to this primitive,
             // then transfer those attributes to this grid's metadata.
             vdb->copyAttributesAndGroups(*src, /*copyGroups=*/true);
@@ -313,7 +165,7 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
         }
 
 	// Ensure that certain metadata exists (grid name, grid class, etc.).
-	if (name != NULL) grid->setName(name);
+	if (name != nullptr) grid->setName(name);
 	grid->removeMeta("value_type");
 	grid->insertMeta("value_type", openvdb::StringMetadata(grid->valueType()));
 	// For each of the following, force any existing metadata's value
@@ -330,7 +182,7 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
 
 	// If we had no source, have to set options to reasonable
 	// defaults.
-	if (src == NULL)
+	if (src == nullptr)
 	{
 	    if (grid->getGridClass() == openvdb::GRID_LEVEL_SET)
 	    {
@@ -562,7 +414,7 @@ GU_PrimVDB::buildFromPrimVolume(
 	gu_VolumeMax max_op(vox, progress);
 	background = max_op.findMax();
 	if (progress.wasInterrupted())
-	    return NULL;
+	    return nullptr;
     }
     else
     {
@@ -575,7 +427,7 @@ GU_PrimVDB::buildFromPrimVolume(
     gu_ConvertToVDB converter(vox, background, progress);
     FloatGrid::Ptr grid = converter.run();
     if (progress.wasInterrupted())
-	return NULL;
+	return nullptr;
 
     if (vol.isSDF())
 	grid->setGridClass(GridClass(GRID_LEVEL_SET));
@@ -591,9 +443,9 @@ GU_PrimVDB::buildFromPrimVolume(
         openvdb::tools::signedFloodFill(grid->tree());
     }
 
-    GU_PrimVDB *prim_vdb = buildFromGrid(geo, grid, NULL, name);
+    GU_PrimVDB *prim_vdb = buildFromGrid(geo, grid, nullptr, name);
     if (!prim_vdb)
-	return NULL;
+	return nullptr;
     int rx, ry, rz;
     vol.getRes(rx, ry, rz);
     prim_vdb->setSpaceTransform(vol.getSpaceTransform(), UT_Vector3R(rx,ry,rz));
@@ -704,9 +556,7 @@ GU_PrimVDB::registerMyself(GA_PrimitiveFactory *factory)
     }
 
     theDefinition->setLabel("Sparse Volumes (VDBs)");
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     theDefinition->setHasLocalTransform(true);
-#endif
     theDefinition->setMergeConstructor(&gaPrimitiveMergeConstructor);
     registerIntrinsics(*theDefinition);
 
@@ -723,29 +573,16 @@ GU_PrimVDB::convertToNewPrim(
 	bool split_disjoint_volumes,
 	bool &success) const
 {
-    GEO_Primitive *	prim = NULL;
+    GEO_Primitive *	prim = nullptr;
 
-#if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
-    const GA_PrimCompat::TypeMask parmType = parms.toType;
-#else
     const GA_PrimCompat::TypeMask parmType = parms.toType();
-#endif
 
     success = false;
-    if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLY)
-    {
-	prim = convertToPoly(dst_geo, parms, adaptivity,
-			     /*polysoup*/false, success);
-    }
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
-    else if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLYSOUP)
-    {
-	prim = convertToPoly(dst_geo, parms, adaptivity,
-			     /*polysoup*/true, success);
-    }
-#endif
-    else if (parmType == GEO_PrimTypeCompat::GEOPRIMVOLUME)
-    {
+    if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLY) {
+	prim = convertToPoly(dst_geo, parms, adaptivity, /*polysoup*/false, success);
+    } else if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLYSOUP) {
+	prim = convertToPoly(dst_geo, parms, adaptivity, /*polysoup*/true, success);
+    } else if (parmType == GEO_PrimTypeCompat::GEOPRIMVOLUME) {
 	prim = convertToPrimVolume(dst_geo, parms, split_disjoint_volumes);
 	if (prim)
 	    success = true;
@@ -766,61 +603,13 @@ static void
 guCopyMesh(
 	GEO_Detail& detail,
 	openvdb::tools::VolumeToMesh& mesher,
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-	bool /*buildpolysoup*/,
-#else
 	bool buildpolysoup,
-#endif
 	bool verbose)
 {
     TIMING_DEF;
 
     const openvdb::tools::PointList& points = mesher.pointList();
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
-
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    const GA_Offset lastIdx(detail.getPointMap().lastOffset()+1);
-
-    for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
-        GA_Offset ptoff = detail.appendPointOffset();
-        detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
-    }
-
-    TIMING_LOG("Copy Points");
-
-    for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
-
-        const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
-
-        // Copy quads
-        for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
-
-            const openvdb::Vec4I& quad = polygons.quad(i);
-            GEO_PrimPoly& prim = *GU_PrimPoly::build(
-                static_cast<GU_Detail*>(&detail), 4, GU_POLY_CLOSED, 0);
-
-            for (int v = 0; v < 4; ++v) {
-                prim(v).setPointOffset(lastIdx + quad[v]);
-            }
-        }
-
-
-        // Copy triangles (adaptive mesh)
-        for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
-
-            const openvdb::Vec3I& triangle = polygons.triangle(i);
-            GEO_PrimPoly& prim = *GU_PrimPoly::build(
-                static_cast<GU_Detail*>(&detail), 3, GU_POLY_CLOSED, 0);
-
-            for (int v = 0; v < 3; ++v) {
-                prim(v).setPointOffset(lastIdx + triangle[v]);
-            }
-        }
-    }
-
-    TIMING_LOG("Build Polys");
-
-#else // 12.5.0 or later
 
     // NOTE: Adaptive meshes consist of tringles and quads.
 
@@ -888,8 +677,6 @@ guCopyMesh(
         GU_PrimPoly::buildBlock(&detail, startpt, npoints, sizelist, verts.array());
 
     TIMING_LOG("Build Polys");
-
-#endif
 }
 
 namespace {
@@ -944,11 +731,7 @@ GU_PrimVDB::convertToPoly(
     using namespace openvdb;
 
     UT_AutoInterrupt    progress("Convert VDB to Polygons");
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
     GA_Detail::OffsetMarker marker(dst_geo);
-#else
-    GU_ConvertMarker	marker(dst_geo);
-#endif
     bool		verbose = false;
 
     success = false;
@@ -958,27 +741,22 @@ GU_PrimVDB::convertToPoly(
 	tools::VolumeToMesh mesher(parms.myOffset, adaptivity);
 	UTvdbProcessTypedGridScalar(getStorageType(), getGrid(), mesher);
 	if (progress.wasInterrupted())
-	    return NULL;
+	    return nullptr;
 	guCopyMesh(dst_geo, mesher, polysoup, verbose);
 	if (progress.wasInterrupted())
-	    return NULL;
+	    return nullptr;
     }
     catch (std::exception& /*e*/)
     {
-        return NULL;
+        return nullptr;
     }
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
-        GA_Range pointrange(marker.pointRange());
-        GA_Range primitiverange(marker.primitiveRange());
-#else
-        GA_Range pointrange(marker.getPoints());
-        GA_Range primitiverange(marker.getPrimitives());
-#endif
+    GA_Range pointrange(marker.pointRange());
+    GA_Range primitiverange(marker.primitiveRange());
     GUconvertCopySingleVertexPrimAttribsAndGroups(
 	    parms, *getParent(), getMapOffset(), dst_geo,
 	    primitiverange, pointrange);
     if (progress.wasInterrupted())
-	return NULL;
+	return nullptr;
 
     // If there was already a point normal attribute, we should compute normals
     // to avoid getting zero default values for the new polygons.
@@ -988,14 +766,14 @@ GU_PrimVDB::convertToPoly(
         UTparallelFor(GA_SplittableRange(pointrange),
                       gu_VDBNormalsParallel(dst_geo.getP(), normal_ref.getAttribute(), *this));
 	if (progress.wasInterrupted())
-	    return NULL;
+	    return nullptr;
     }
 
     // At this point, we have succeeded, marker.numPrimitives() might be 0 if
     // we had an empty VDB.
     success = true;
     if (primitiverange.isEmpty())
-	return NULL;
+	return nullptr;
 
     return dst_geo.getGEOPrimitive(marker.primitiveBegin());
 }
@@ -1009,23 +787,13 @@ GU_PrimVDB::convertPrimVolumeToPolySoup(
     UT_AutoInterrupt progress("Convert to Polygons");
 
     GU_PrimVDB &vdb = *buildFromPrimVolume(
-			    dst_geo, src_vol, NULL,
+			    dst_geo, src_vol, nullptr,
 			    /*flood*/false, /*prune*/true, /*tol*/0);
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    // NOTE: This syntax is for Boost 1.46 used by H12.1. It is different in
-    // Boost 1.51 used by H12.5.
-    BOOST_SCOPE_EXIT( (&vdb) (&dst_geo) )
-#else
     UT_SCOPE_EXIT(&vdb, &dst_geo)
-#endif
     {
 	dst_geo.destroyPrimitive(vdb, /*and_points*/true);
     }
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    BOOST_SCOPE_EXIT_END
-#else
     UT_SCOPE_EXIT_END
-#endif
 
     if (progress.wasInterrupted())
 	return;
@@ -1067,10 +835,10 @@ namespace // anonymous
 {
 
 #define SCALAR_RET(T) \
-	typename boost::enable_if< boost::is_arithmetic< T >, T >::type
+	typename std::enable_if<std::is_arithmetic<T>::value, T>::type
 
 #define NON_SCALAR_RET(T) \
-	typename boost::disable_if< boost::is_arithmetic< T >, T >::type
+	typename std::enable_if<!std::is_arithmetic<T>::value, T>::type
 
 /// Houdini Volume wrapper to abstract multiple volumes with a consistent API.
 template <int TUPLE_SIZE>
@@ -1132,18 +900,8 @@ public:
 
     void setSpaceTransform(const GEO_PrimVolumeXform& s)
     {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or newer
 	for (int i = 0; i < TUPLE_SIZE; i++)
 	    mVol[i]->setSpaceTransform(s);
-#else
-	for (int i = 0; i < TUPLE_SIZE; i++) {
-	    GEO_Detail *gdp = mVol[i]->getParent();
-	    gdp->setPos3(mVol[i]->getPointOffset(0), s.myCenter);
-	    mVol[i]->setTransform(s.myXform);
-	    mVol[i]->setTaperX(s.myTaperX);
-	    mVol[i]->setTaperY(s.myTaperY);
-	}
-#endif
     }
 
     int
@@ -1168,7 +926,7 @@ public:
 
 private: // methods
 
-    typedef UT_VoxelTile<fpreal32> VoxelTileF;
+    using VoxelTileF = UT_VoxelTile<fpreal32>;
 
     template <class ValueT>
     static void
@@ -1267,7 +1025,7 @@ private: // methods
     {
 	using openvdb::math::isApproxEqual;
 
-	typedef typename ConstAccessorT::LeafNodeT LeafNodeType;
+	using LeafNodeType = typename ConstAccessorT::LeafNodeT;
 	const openvdb::Index DIM = LeafNodeType::DIM;
 
 	// The smallest constant tile size in vdb is DIM and the
@@ -1277,7 +1035,7 @@ private: // methods
 	    for (ijk[1] = beg[1]; ijk[1] < end[1]; ijk[1] += DIM) {
 		for (ijk[2] = beg[2]; ijk[2] < end[2]; ijk[2] += DIM) {
 
-		    if (acc.probeConstLeaf(ijk) != NULL)
+		    if (acc.probeConstLeaf(ijk) != nullptr)
 			return false;
 
 		    ValueType sampleValue = acc.getValue(ijk);
@@ -1318,7 +1076,7 @@ private: // methods
     {
 	using openvdb::math::isApproxEqual;
 
-	typedef typename ConstAccessorT::LeafNodeT LeafNodeType;
+	using LeafNodeType = typename ConstAccessorT::LeafNodeT;
 	const openvdb::Index DIM = LeafNodeType::DIM;
 	const openvdb::Index LOG2DIM = LeafNodeType::LOG2DIM;
 
@@ -1467,8 +1225,8 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToAlignedTile(
     using openvdb::Coord;
     using openvdb::CoordBBox;
 
-    typedef typename ConstAccessorT::ValueType ValueType;
-    typedef typename ConstAccessorT::LeafNodeT LeafNodeType;
+    using ValueType = typename ConstAccessorT::ValueType;
+    using LeafNodeType = typename ConstAccessorT::LeafNodeT;
     const openvdb::Index LEAF_DIM = LeafNodeType::DIM;
 
     VoxelTileF* tiles[TUPLE_SIZE];
@@ -1488,11 +1246,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToAlignedTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
-#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
 	    tile->makeRawUninitialized();
-#else
-	    tile->uncompress();
-#endif
 
 	    Coord ijk;
 	    for (ijk[0] = beg[0]; ijk[0] < end[0]; ijk[0] += LEAF_DIM) {
@@ -1503,7 +1257,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToAlignedTile(
 			Coord tile_end = tile_beg.offsetBy(LEAF_DIM);
 
 			const LeafNodeType* leaf = acc.probeConstLeaf(ijk);
-			if (leaf != NULL) {
+			if (leaf != nullptr) {
 			    copyAlignedLeafNode_(
 				    tile, tuple_i, tile_beg, *leaf);
 			} else {
@@ -1528,8 +1282,8 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
     using openvdb::Coord;
     using openvdb::CoordBBox;
 
-    typedef typename ConstAccessorT::ValueType ValueType;
-    typedef typename ConstAccessorT::LeafNodeT LeafNodeType;
+    using ValueType = typename ConstAccessorT::ValueType;
+    using LeafNodeType = typename ConstAccessorT::LeafNodeT;
     const openvdb::Index DIM = LeafNodeType::DIM;
 
     VoxelTileF* tiles[TUPLE_SIZE];
@@ -1552,11 +1306,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
-#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
 	    tile->makeRawUninitialized();
-#else
-	    tile->uncompress();
-#endif
 
 	    Coord ijk;
 	    for (ijk[0] = a_beg[0]; ijk[0] < end[0]; ijk[0] += DIM) {
@@ -1578,7 +1328,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
 
 			// Copy the region
 			const LeafNodeType* leaf = acc.probeConstLeaf(leaf_beg);
-			if (leaf != NULL) {
+			if (leaf != nullptr) {
 			    copyLeafNode_(
 				    tile, tuple_i, tile_beg, tile_end,
 				    leaf_beg, *leaf);
@@ -1726,7 +1476,7 @@ public:
 	if (mSplitDisjoint) {
 	    vdbToDisjointVolumes(grid);
 	} else {
-	    typedef typename GridT::TreeType::LeafNodeType LeafNodeType;
+	    using LeafNodeType = typename GridT::TreeType::LeafNodeType;
 	    const openvdb::Index LEAF_DIM = LeafNodeType::DIM;
 
 	    VolumeT volume(mDstGeo);
@@ -1773,7 +1523,7 @@ gu_ConvertFromVDB<VolumeT>::vdbToVolume(
 	VolumeT& vol,
 	bool aligned)
 {
-    typedef typename GridType::TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename GridType::TreeType::LeafNodeType;
 
     // Creating a Houdini volume with a zero bbox seems to break the transform.
     // (probably related to the bbox derived 'local space')
@@ -1809,8 +1559,8 @@ template<typename GridType>
 void
 gu_ConvertFromVDB<VolumeT>::vdbToDisjointVolumes(const GridType& grid)
 {
-    typedef typename GridType::TreeType	TreeType;
-    typedef typename TreeType::RootNodeType::ChildNodeType NodeType;
+    using TreeType = typename GridType::TreeType;
+    using NodeType = typename TreeType::RootNodeType::ChildNodeType;
 
     std::vector<const NodeType*> nodes;
 
@@ -1818,7 +1568,7 @@ gu_ConvertFromVDB<VolumeT>::vdbToDisjointVolumes(const GridType& grid)
     iter.setMaxDepth(1);
     iter.setMinDepth(1);
     for (; iter; ++iter) {
-        const NodeType* node = NULL;
+        const NodeType* node = nullptr;
         iter.template getNode<const NodeType>(node);
         if (node) nodes.push_back(node);
     }
@@ -1855,7 +1605,7 @@ gu_ConvertFromVDB<VolumeT>::vdbToDisjointVolumes(const GridType& grid)
 
                 if (regionA.hasOverlap(regionB)) {
 
-                    nodes[i] = NULL;
+                    nodes[i] = nullptr;
                     expanded = true;
 
                     bbox.expand(nodeBBox[i]);
@@ -1882,11 +1632,7 @@ GU_PrimVDB::convertToPrimVolume(
     using namespace openvdb;
 
     UT_AutoInterrupt    progress("Convert VDB to Volume");
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
     GA_Detail::OffsetMarker marker(dst_geo);
-#else
-    GU_ConvertMarker	marker(dst_geo);
-#endif
     UT_IntArray		dst_components;
 
     bool processed = false;
@@ -1903,15 +1649,10 @@ GU_PrimVDB::convertToPrimVolume(
     }
 
     // Copy attributes from source to dest primitives
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
     GA_Range pointrange(marker.pointRange());
     GA_Range primitiverange(marker.primitiveRange());
-#else
-    GA_Range pointrange(marker.getPoints());
-    GA_Range primitiverange(marker.getPrimitives());
-#endif
     if (!processed || primitiverange.isEmpty() || progress.wasInterrupted())
-	return NULL;
+	return nullptr;
 
     GUconvertCopySingleVertexPrimAttribsAndGroups(
 	    parms, *getParent(), getMapOffset(),
@@ -2000,25 +1741,16 @@ GU_PrimVDB::convertVolumesToVDBs(
 
 	GEO_PrimVolume *vol = UTverify_cast<GEO_PrimVolume*>(prim);
 	GA_Offset voloff = vol->getMapOffset();
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
         GA_Detail::OffsetMarker marker(dst_geo);
-#else
-	GU_ConvertMarker marker(dst_geo);
-#endif
 
 	GU_PrimVDB *new_prim;
 	new_prim = GU_PrimVDB::buildFromPrimVolume(
-			dst_geo, *vol, NULL, flood_sdf, prune, tolerance);
+			dst_geo, *vol, nullptr, flood_sdf, prune, tolerance);
 	if (!new_prim || progress.wasInterrupted())
 	    break;
 
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or newer
         GA_Range pointrange(marker.pointRange());
         GA_Range primitiverange(marker.primitiveRange());
-#else
-        GA_Range pointrange(marker.getPoints());
-        GA_Range primitiverange(marker.getPrimitives());
-#endif
 	GUconvertCopySingleVertexPrimAttribsAndGroups(
 		parms, src_geo, voloff, dst_geo,
 		primitiverange, pointrange);
@@ -2047,7 +1779,7 @@ GU_PrimVDB::convertVDBs(
 	    break;
 
 	GU_PrimVDB *vdb = dynamic_cast<GU_PrimVDB*>(prim);
-	if (vdb == NULL)
+	if (vdb == nullptr)
 	    continue;
 
 	bool success = false;
@@ -2075,77 +1807,16 @@ GU_PrimVDB::normal(NormalComp& /*output*/) const
     // No need here.
 }
 
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-void *
-GU_PrimVDB::castTo() const
-{
-    return (GU_Primitive *)this;
-}
-
-const GEO_Primitive *
-GU_PrimVDB::castToGeo(void) const
-{
-    return this;
-}
-#endif
-
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-GU_RayIntersect *
-GU_PrimVDB::createRayCache(int &callermustdelete)
-{
-    GU_Detail		*gdp	= (GU_Detail *)getParent();
-    GU_RayIntersect	*intersect;
-
-    callermustdelete = 0;
-    if (gdp->cacheable())
-	buildRayCache();
-
-    intersect = getRayCache();
-    if (!intersect)
-    {
-	intersect = new GU_RayIntersect(gdp, this);
-	callermustdelete = 1;
-    }
-
-    return intersect;
-}
-#endif
-
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-int
-GU_PrimVDB::intersectRay(const UT_Vector3 &org, const UT_Vector3 &dir,
-		float tmax, float , float *distance,
-		UT_Vector3 *pos, UT_Vector3 *nml,
-		int, float *, float *, int) const
-{
-    int			result;
-    float		dist;
-    UT_BoundingBox	bbox;
-
-    // TODO: Build ray cache and intsrect properly.
-    getBBox(&bbox);
-    result =  bbox.intersectRay(org, dir, tmax, &dist, nml);
-    if (result)
-    {
-	if (distance) *distance = dist;
-	if (pos) *pos = org + dist * dir;
-    }
-    return result;
-}
-#endif
-
 
 ////////////////////////////////////////
 
 
 namespace {
 
-template <typename T> struct IsScalarMeta
-{ BOOST_STATIC_CONSTANT(bool, value = true); };
+template <typename T> struct IsScalarMeta: public std::true_type {};
 
 #define DECLARE_VECTOR(METADATA_T) \
-    template <> struct IsScalarMeta<METADATA_T> \
-    { BOOST_STATIC_CONSTANT(bool, value = false); }; \
+    template <> struct IsScalarMeta<METADATA_T>: public std::false_type {};
     /**/
 DECLARE_VECTOR(openvdb::Vec2IMetadata)
 DECLARE_VECTOR(openvdb::Vec2SMetadata)
@@ -2164,7 +1835,7 @@ struct MetaTuple
 };
 
 template<typename T, typename MetadataT, int I>
-struct MetaTuple<T, MetadataT, I, typename boost::enable_if< IsScalarMeta<MetadataT> >::type>
+struct MetaTuple<T, MetadataT, I, typename std::enable_if<IsScalarMeta<MetadataT>::value>::type>
 {
     static T get(const MetadataT& meta) {
         UT_ASSERT(I == 0);
@@ -2186,8 +1857,8 @@ template <typename MetadataT> struct MetaAttr;
 #define META_ATTR(METADATA_T, STORAGE, TUPLE_T, TUPLE_SIZE) \
     template <> \
     struct MetaAttr<METADATA_T> { \
-   typedef TUPLE_T TupleT; \
-   typedef GA_HandleT<TupleT>::RWType RWHandleT; \
+   using TupleT = TUPLE_T; \
+   using RWHandleT = GA_HandleT<TupleT>::RWType; \
    static const int theTupleSize = TUPLE_SIZE; \
    static const GA_Storage theStorage = STORAGE; \
     }; \
@@ -2209,17 +1880,17 @@ META_ATTR(openvdb::Vec3DMetadata,  GA_STORE_REAL64, fpreal64,    3)
 #undef META_ATTR
 
 // Functor for setAttr()
-typedef boost::function<
-    void (GEO_Detail&, GA_AttributeOwner, GA_Offset, const char*, const openvdb::Metadata&)> AttrSettor;
+using AttrSettor = std::function<
+    void (GEO_Detail&, GA_AttributeOwner, GA_Offset, const char*, const openvdb::Metadata&)>;
 
 template <typename MetadataT>
 static void
 setAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     const char* name, const openvdb::Metadata& meta_base)
 {
-    typedef MetaAttr<MetadataT>             MetaAttrT;
-    typedef typename MetaAttrT::RWHandleT   RWHandleT;
-    typedef typename MetaAttrT::TupleT      TupleT;
+    using MetaAttrT = MetaAttr<MetadataT>;
+    using RWHandleT = typename MetaAttrT::RWHandleT;
+    using TupleT = typename MetaAttrT::TupleT;
 
     /// @todo If there is an existing attribute with the given name but
     /// a different type, this will replace the old attribute with a new one.
@@ -2277,34 +1948,7 @@ public:
 };
 
 
-#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
-
-static UT_Lock sLock;
-
-template <typename T>
-struct PrimVDBSingletonWithLock {
-
-    PrimVDBSingletonWithLock() : mData(NULL) {}
-    ~PrimVDBSingletonWithLock() { if (mData) delete mData; }
-
-    T *operator->() {
-        if (mData != NULL) return mData;
-        UT_Lock::Scope lock(sLock);
-        if (mData == NULL) mData = new T();
-        return mData;
-    }
-
-private:
-    T* mData;
-};
-
-static PrimVDBSingletonWithLock<MetaToAttrMap> sMetaToAttrMap;
-
-#else
-
 static UT_SingletonWithLock<MetaToAttrMap> sMetaToAttrMap;
-
-#endif
 
 } // unnamed namespace
 

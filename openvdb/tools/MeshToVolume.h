@@ -62,8 +62,9 @@
 #include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
 
-#include <boost/integer_traits.hpp> // for const_max
-#include <boost/shared_array.hpp>
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/int.hpp>
+#include <boost/mpl/size.hpp>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()
@@ -759,7 +760,7 @@ public:
             ijk += step;
         }
 
-        return boost::integer_traits<size_t>::const_max;
+        return std::numeric_limits<size_t>::max();
     }
 
 
@@ -776,7 +777,7 @@ private:
 template<typename TreeType>
 struct LeafNodeConnectivityTable
 {
-    enum { INVALID_OFFSET = boost::integer_traits<size_t>::const_max };
+    enum { INVALID_OFFSET = std::numeric_limits<size_t>::max() };
 
     using LeafNodeType = typename TreeType::LeafNodeType;
 
@@ -1370,8 +1371,8 @@ struct ComputeIntersectingVoxelSign
     using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
     using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
 
-    using PointArray = boost::shared_array<Vec3d>;
-    using MaskArray = boost::shared_array<bool>;
+    using PointArray = std::unique_ptr<Vec3d[]>;
+    using MaskArray = std::unique_ptr<bool[]>;
     using LocalData = std::pair<PointArray, MaskArray>;
     using LocalDataTable = tbb::enumerable_thread_specific<LocalData>;
 

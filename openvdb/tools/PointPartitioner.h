@@ -50,12 +50,12 @@
 
 #include <boost/integer.hpp> // boost::int_t<N>::least
 #include <boost/scoped_array.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
 
+#include <algorithm>
 #include <cmath> // for std::isfinite()
 #include <deque>
 #include <map>

@@ -35,9 +35,7 @@
 #ifndef OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
-#include <boost/lexical_cast.hpp>
 #include <boost/python.hpp>
-#include <boost/type_traits/remove_const.hpp>
 #ifndef DWA_BOOST_VERSION
 #include <boost/version.hpp>
 #define DWA_BOOST_VERSION (10 * BOOST_VERSION)
@@ -75,6 +73,7 @@
 #include <algorithm> // for std::max()
 #include <cstring> // for memcpy()
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1657,7 +1656,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueOnCIter>
     static std::string descr()
     {
         return std::string("Read-only iterator over the active values (tile and voxel)\nof a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<const GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1672,7 +1671,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueOffCIter>
     static std::string descr()
     {
         return std::string("Read-only iterator over the inactive values (tile and voxel)\nof a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<const GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1687,7 +1686,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueAllCIter>
     static std::string descr()
     {
         return std::string("Read-only iterator over all tile and voxel values of a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<const GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1702,7 +1701,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueOnIter>
     static std::string descr()
     {
         return std::string("Read/write iterator over the active values (tile and voxel)\nof a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1717,7 +1716,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueOffIter>
     static std::string descr()
     {
         return std::string("Read/write iterator over the inactive values (tile and voxel)\nof a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1732,7 +1731,7 @@ template<typename GridT> struct IterTraits<GridT, typename GridT::ValueAllIter>
     static std::string descr()
     {
         return std::string("Read/write iterator over all tile and voxel values of a ")
-            + pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name();
+            + pyutil::GridTraits<typename std::remove_const<GridT>::type>::name();
     }
     static IterWrap<GridT, IterT> begin(typename GridT::Ptr g)
     {
@@ -1949,7 +1948,7 @@ public:
     static void wrap()
     {
         const std::string
-            gridClassName = pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name(),
+            gridClassName = pyutil::GridTraits<typename std::remove_const<GridT>::type>::name(),
             iterClassName = /*gridClassName +*/ Traits::name(),
             valueClassName = /*gridClassName +*/ "Value";
 
@@ -2406,7 +2405,7 @@ exportGrid()
                      py::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH),
                 ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
                  "    transform=None, halfWidth="
-                 + boost::lexical_cast<std::string>(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
+                 + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
                  + pyGridTypeName + "\n\n"
                 "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
                 "The mesh must form a closed surface, but the surface need not be\n"

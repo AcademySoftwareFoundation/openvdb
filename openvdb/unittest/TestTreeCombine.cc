@@ -35,26 +35,31 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <algorithm> // for std::max() and std::min()
+#include <cmath> // for std::isnan() and std::isinf()
 #include <limits> // for std::numeric_limits
-#include <boost/math/special_functions/fpclassify.hpp> // for boost::math::isnan() and isinf()
+#include <sstream>
+#include <string>
+#include <type_traits>
 
 #define TEST_CSG_VERBOSE 0
 
 #if TEST_CSG_VERBOSE
 #include <openvdb/util/CpuTimer.h>
+#include <iostream>
 #endif
 
 namespace {
-typedef openvdb::tree::Tree4<float, 4, 3, 3>::Type Float433Tree;
-typedef openvdb::Grid<Float433Tree> Float433Grid;
+using Float433Tree = openvdb::tree::Tree4<float, 4, 3, 3>::Type;
+using Float433Grid = openvdb::Grid<Float433Tree>;
 }
 
 
 class TestTreeCombine: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); Float433Grid::registerGrid(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+     void setUp() override { openvdb::initialize(); Float433Grid::registerGrid(); }
+     void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestTreeCombine);
     CPPUNIT_TEST(testCombine);
@@ -132,7 +137,7 @@ void combine(TreeT& a, TreeT& b)
 template<typename TreeT>
 void extendedCombine(TreeT& a, TreeT& b)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
     struct ArgsOp {
         static void order(openvdb::CombineArgs<ValueT>& args) {
             // The result is order-dependent on A and B.
@@ -282,11 +287,11 @@ TestTreeCombine::testCompDivByZero()
 
         openvdb::tools::compDiv(a, b);
 
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c0))); //  1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c1))); //  1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c2))); // -1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c3))); // -1 / 0
-        CPPUNIT_ASSERT(boost::math::isnan(a.getValue(c4))); //  0 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c0))); //  1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c1))); //  1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c2))); // -1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c3))); // -1 / 0
+        CPPUNIT_ASSERT(std::isnan(a.getValue(c4))); //  0 / 0
     }
 }
 
@@ -303,7 +308,7 @@ template<typename TreeT, typename TreeComp, typename ValueComp>
 void
 TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
@@ -596,7 +601,7 @@ template<typename TreeT>
 void
 TestTreeCombine::testCompRepl()
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
@@ -725,9 +730,9 @@ TestTreeCombine::testCompRepl()
 void
 TestTreeCombine::testCsg()
 {
-    typedef openvdb::FloatTree TreeT;
-    typedef TreeT::Ptr TreePtr;
-    typedef openvdb::Grid<TreeT> GridT;
+    using TreeT = openvdb::FloatTree;
+    using TreePtr = TreeT::Ptr;
+    using GridT = openvdb::Grid<TreeT>;
 
     struct Local {
         static TreePtr readFile(const std::string& fname) {
@@ -773,13 +778,13 @@ TestTreeCombine::testCsg()
 
     const std::string testDir("/work/rd/fx_tools/vdb_unittest/TestGridCombine::testCsg/");
     smallTree1 = Local::readFile(testDir + "small1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(smallTree1.get() != NULL);
+    CPPUNIT_ASSERT(smallTree1.get() != nullptr);
     smallTree2 = Local::readFile(testDir + "small2.vdb2 Cylinder");
-    CPPUNIT_ASSERT(smallTree2.get() != NULL);
+    CPPUNIT_ASSERT(smallTree2.get() != nullptr);
     largeTree1 = Local::readFile(testDir + "large1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree1.get() != NULL);
+    CPPUNIT_ASSERT(largeTree1.get() != nullptr);
     largeTree2 = Local::readFile(testDir + "large2.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree2.get() != NULL);
+    CPPUNIT_ASSERT(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
     std::cerr << "file read: " << timer.delta() << " sec\n";
@@ -822,7 +827,7 @@ typename TreeT::Ptr
 TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     const TreeT& refTree, const VisitorT& visitor)
 {
-    typedef typename TreeT::Ptr TreePtr;
+    using TreePtr = typename TreeT::Ptr;
 
 #if TEST_CSG_VERBOSE
     openvdb::util::CpuTimer timer;
@@ -897,9 +902,9 @@ TestTreeCombine::testCsgCopy()
     openvdb::FloatGrid::Ptr intersectionGrid = openvdb::tools::csgIntersectionCopy(*gridA, *gridB);
     openvdb::FloatGrid::Ptr differenceGrid = openvdb::tools::csgDifferenceCopy(*gridA, *gridB);
 
-    CPPUNIT_ASSERT(unionGrid.get() != NULL);
-    CPPUNIT_ASSERT(intersectionGrid.get() != NULL);
-    CPPUNIT_ASSERT(differenceGrid.get() != NULL);
+    CPPUNIT_ASSERT(unionGrid.get() != nullptr);
+    CPPUNIT_ASSERT(intersectionGrid.get() != nullptr);
+    CPPUNIT_ASSERT(differenceGrid.get() != nullptr);
 
     CPPUNIT_ASSERT(!unionGrid->empty());
     CPPUNIT_ASSERT(!intersectionGrid->empty());
@@ -994,22 +999,18 @@ TestTreeCombine::testCompActiveLeafVoxels()
     }
     {
         using BufferT = openvdb::FloatTree::LeafNodeType::Buffer;
-        //std::cout << "FloatTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::Vec3fTree::LeafNodeType::Buffer;
-        //std::cout << "Vec3fTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::BoolTree::LeafNodeType::Buffer;
-        //std::cout << "BoolTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::MaskTree::LeafNodeType::Buffer;
-        //std::cout << "MaskTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {//replace bool tree

@@ -414,10 +414,6 @@ struct RebuildOp
     }
 }; // struct RebuildOp
 
-} // anonymous namespace
-
-
-namespace {
 
 // Functor for use with UTvdbProcessTypedGridVec3() to apply a transform
 // to the voxel values of vector-valued grids

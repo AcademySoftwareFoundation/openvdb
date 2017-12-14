@@ -2339,7 +2339,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
             for (ijk[1] = origin[1]; ijk[1] < end[1]; ijk[1] += dim) {
                 for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
-                    if (!mask.isValueOn(ijk) & isNonManifold(inputAcc, ijk, mIsovalue, dim)) {
+                    if (!mask.isValueOn(ijk) && isNonManifold(inputAcc, ijk, mIsovalue, dim)) {
                         mask.setActiveState(ijk, true);
                     }
                 }

@@ -32,20 +32,20 @@
 ///
 /// @author Peter Cucka
 
-#include <map>
-#include <sstream>
-#include <boost/type_traits/is_const.hpp>
-#include <boost/shared_ptr.hpp>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tree/Tree.h>
+#include <map>
+#include <set>
+#include <sstream>
+#include <type_traits>
 
 
 class TestTreeVisitor: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestTreeVisitor);
     CPPUNIT_TEST(testVisitTreeBool);
@@ -79,7 +79,7 @@ template<typename TreeT>
 TreeT
 TestTreeVisitor::createTestTree() const
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
     const ValueT zero = openvdb::zeroVal<ValueT>(), one = zero + 1;
 
     // Create a sparse test tree comprising the eight corners of
@@ -113,7 +113,7 @@ namespace {
 class Visitor
 {
 public:
-    typedef std::map<openvdb::Index, std::set<const void*> > NodeMap;
+    using NodeMap = std::map<openvdb::Index, std::set<const void*> >;
 
     Visitor(): mSkipLeafNodes(false) { reset(); }
 
@@ -129,13 +129,13 @@ public:
     template<typename IterT>
     bool operator()(IterT& iter)
     {
-        incrementIterUseCount(boost::is_const<typename IterT::NodeType>::value);
-        CPPUNIT_ASSERT(iter.getParentNode() != NULL);
+        incrementIterUseCount(std::is_const<typename IterT::NodeType>::value);
+        CPPUNIT_ASSERT(iter.getParentNode() != nullptr);
 
         if (mSkipLeafNodes && iter.parent().getLevel() == 1) return true;
 
-        typedef typename IterT::NonConstValueType ValueT;
-        typedef typename IterT::ChildNodeType ChildT;
+        using ValueT = typename IterT::NonConstValueType;
+        using ChildT = typename IterT::ChildNodeType;
         ValueT value;
         if (const ChildT* child = iter.probeChild(value)) {
             insertChild<ChildT>(child);
@@ -170,7 +170,7 @@ private:
     template<typename ChildT>
     void insertChild(const ChildT* child)
     {
-        if (child != NULL) {
+        if (child != nullptr) {
             const openvdb::Index level = child->getLevel();
             if (!mSkipLeafNodes || level > 0) {
                 mNodes[level].insert(child);
@@ -241,7 +241,7 @@ namespace {
 class Visitor2
 {
 public:
-    typedef std::map<openvdb::Index, std::set<const void*> > NodeMap;
+    using NodeMap = std::map<openvdb::Index, std::set<const void*> >;
 
     Visitor2() { reset(); }
 
@@ -263,8 +263,8 @@ public:
     template<typename AIterT, typename BIterT>
     int operator()(AIterT& aIter, BIterT& bIter)
     {
-        CPPUNIT_ASSERT(aIter.getParentNode() != NULL);
-        CPPUNIT_ASSERT(bIter.getParentNode() != NULL);
+        CPPUNIT_ASSERT(aIter.getParentNode() != nullptr);
+        CPPUNIT_ASSERT(bIter.getParentNode() != nullptr);
 
         typename AIterT::NodeType& aNode = aIter.parent();
         typename BIterT::NodeType& bNode = bIter.parent();
@@ -307,9 +307,9 @@ private:
 void
 TestTreeVisitor::testVisit2Trees()
 {
-    typedef openvdb::FloatTree TreeT;
-    typedef openvdb::VectorTree Tree2T;
-    typedef TreeT::ValueType ValueT;
+    using TreeT = openvdb::FloatTree;
+    using Tree2T = openvdb::VectorTree;
+    using ValueT = TreeT::ValueType;
 
     // Create a test tree.
     TreeT tree = createTestTree<TreeT>();

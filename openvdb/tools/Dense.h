@@ -42,9 +42,12 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Formats.h>
 #include "Prune.h"
-#include <boost/scoped_array.hpp>
 #include <tbb/parallel_for.h>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <utility> // for std::pair
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -394,7 +397,7 @@ private:
         mData = mArray.get();
     }
 
-    boost::scoped_array<ValueT> mArray;
+    std::unique_ptr<ValueT[]> mArray;
     ValueT* mData;//raw c-style pointer to values
 };// end of Dense
 

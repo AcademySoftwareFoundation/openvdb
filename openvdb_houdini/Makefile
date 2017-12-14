@@ -61,10 +61,11 @@
 #
 # Note that the OpenVDB library and these Houdini tools must be built
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
-# Fortunately, all three are included in the Houdini HDK, so the relevant
+# Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)
+# to set those two environment variables.)  Beginning with Houdini 16.5,
+# you must provide your own distribution of Boost.
 #
 
 ifeq (,$(HFS))
