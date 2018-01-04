@@ -100,14 +100,18 @@ using math::Vec4d;
 
 // Three-dimensional matrix types
 using Mat3R = math::Mat3<Real>;
+using math::Mat3s;
+using math::Mat3d;
 
 // Four-dimensional matrix types
 using Mat4R = math::Mat4<Real>;
-using Mat4d = math::Mat4<double>;
-using Mat4s = math::Mat4<float>;
+using math::Mat4s;
+using math::Mat4d;
 
 // Quaternions
 using QuatR = math::Quat<Real>;
+using math::Quats;
+using math::Quatd;
 
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};

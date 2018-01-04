@@ -842,7 +842,17 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     return false;
 }
 
+
+using Mat3s = Mat3<float>;
+using Mat3d = Mat3<double>;
+using Mat3f = Mat3d;
+
 } // namespace math
+
+
+template<> inline math::Mat3s zeroVal<math::Mat3s>() { return math::Mat3s::identity(); }
+template<> inline math::Mat3d zeroVal<math::Mat3d>() { return math::Mat3d::identity(); }
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
