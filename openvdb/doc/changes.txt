@@ -13,6 +13,18 @@ New features:
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 
 @par
+Improvements:
+- @vdblink::zeroVal zeroVal@endlink now returns a zero matrix instead of
+  an identity matrix for @vdblink::math::Mat4s Mat4s@endlink
+  and @vdblink::math::Mat4d Mat4d@endlink, and it is now also defined
+  (and returns a zero matrix) for @vdblink::math::Mat3s Mat3s@endlink
+  and @vdblink::math::Mat3d Mat3d@endlink.
+- Added support for @vdblink::math::Mat3s Mat3s@endlink and
+  @vdblink::math::Mat3d Mat3d@endlink point data
+  @vdblink::points::TypedAttributeArray typed attributes@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+@par
 Houdini:
 - Added options to the Clip&nbsp;SOP to expand or shrink the clipping region
   and, when clipping to a camera frustum, to set the near and far

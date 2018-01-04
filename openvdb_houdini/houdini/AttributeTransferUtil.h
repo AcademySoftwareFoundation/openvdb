@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,11 +46,10 @@
 #include <SYS/SYS_Types.h>
 #include <UT/UT_Version.h>
 
-#include <boost/shared_ptr.hpp>
-
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::floor()
 #include <limits>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -411,7 +410,7 @@ evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
 class AttributeDetailBase
 {
 public:
-    using Ptr = boost::shared_ptr<AttributeDetailBase>;
+    using Ptr = std::shared_ptr<AttributeDetailBase>;
 
     virtual ~AttributeDetailBase() = default;
 
@@ -453,14 +452,14 @@ public:
         const bool isVector = false);
 
     void set(const openvdb::Coord& ijk, const GA_Offset (&offsets)[3],
-        const openvdb::Vec3d& weights);
+        const openvdb::Vec3d& weights) override;
 
-    void set(const openvdb::Coord& ijk, GA_Offset offset);
+    void set(const openvdb::Coord& ijk, GA_Offset offset) override;
 
-    openvdb::GridBase::Ptr& grid() { return mGrid; }
-    std::string& name() { return mName; }
+    openvdb::GridBase::Ptr& grid() override { return mGrid; }
+    std::string& name() override { return mName; }
 
-    AttributeDetailBase::Ptr copy();
+    AttributeDetailBase::Ptr copy() override;
 
 protected:
     AttributeDetail();
@@ -758,17 +757,14 @@ class PointAttrTransfer
 public:
     using IterRange = openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter>;
 
-    inline
-    PointAttrTransfer(
+    inline PointAttrTransfer(
         AttributeDetailList &pointAttributes,
         const openvdb::Int32Grid& closestPtnIdxGrid,
         const GU_Detail& ptGeop);
 
-    inline
-    PointAttrTransfer(const PointAttrTransfer &other);
+    inline PointAttrTransfer(const PointAttrTransfer &other);
 
-    inline
-    ~PointAttrTransfer() {}
+    inline ~PointAttrTransfer() {}
 
     /// Main calls
     inline void runParallel();
@@ -854,7 +850,7 @@ PointAttrTransfer::operator()(IterRange &range) const
 
 struct AttributeCopyBase
 {
-    using Ptr = boost::shared_ptr<AttributeCopyBase>;
+    using Ptr = std::shared_ptr<AttributeCopyBase>;
 
     virtual ~AttributeCopyBase() {}
     virtual void copy(GA_Offset /*source*/, GA_Offset /*target*/) = 0;
@@ -877,7 +873,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         ValueType data;
         for (int i = 0; i < mTupleSize; ++i) {
@@ -887,13 +883,12 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         doCopy<ValueType>(v0, v1, v2, target, uvw);
     }
 
 private:
-
     template<typename T>
     typename std::enable_if<std::is_integral<T>::value>::type
     doCopy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target, const openvdb::Vec3d& uvw)
@@ -947,7 +942,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         for (int i = 0; i < mTupleSize; ++i) {
             mAIF.setString(&mTargetAttr, target, mAIF.getString(&mSourceAttr, source, i), i);
@@ -955,7 +950,7 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         GA_Offset source = v0;
         double min = uvw[0];
@@ -1622,6 +1617,6 @@ transferPrimitiveAttributes(
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -8,6 +8,13 @@ Version 5.1.0 - In development
       for dependencies on missing or indirectly included headers.
       [Contributed by Dan Bailey]
 
+    Improvements:
+    - zeroVal() now returns a zero matrix instead of an identity matrix
+      for Mat4s and Mat4d, and it is now also defined (and returns
+      a zero matrix) for Mat3s and Mat3d.
+    - Added support for Mat3s and Mat3d point data typed attributes.
+      [Contributed by Dan Bailey]
+
     Houdini:
     - Added options to the Clip SOP to expand or shrink the clipping region
       and, when clipping to a camera frustum, to set the near and far

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,7 +42,6 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
 
-#include <boost/integer_traits.hpp>
 #include <boost/scoped_array.hpp>
 
 #include <tbb/blocked_range.h>
@@ -3790,11 +3789,11 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
     , mIntersectionNodes(&intersectionLeafNodes.front())
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(signFlagsTree)
-    , mPointIndexTree(boost::integer_traits<Index32>::const_max)
+    , mPointIndexTree(std::numeric_limits<Index32>::max())
     , mPointIndexAccessor(pointIndexTree)
     , mIsovalue(iso)
 {
-    pointIndexTree.root().setBackground(boost::integer_traits<Index32>::const_max, false);
+    pointIndexTree.root().setBackground(std::numeric_limits<Index32>::max(), false);
 }
 
 
@@ -3804,7 +3803,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& 
     , mIntersectionNodes(rhs.mIntersectionNodes)
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(mSignFlagsTree)
-    , mPointIndexTree(boost::integer_traits<Index32>::const_max)
+    , mPointIndexTree(std::numeric_limits<Index32>::max())
     , mPointIndexAccessor(mPointIndexTree)
     , mIsovalue(rhs.mIsovalue)
 {
@@ -4927,7 +4926,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
     }
 
     Int16TreeType signFlagsTree(0);
-    Index32TreeType pointIndexTree(boost::integer_traits<Index32>::const_max);
+    Index32TreeType pointIndexTree(std::numeric_limits<Index32>::max());
 
 
     // collect auxiliary data
@@ -4971,7 +4970,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
             typename Int16TreeType::Ptr refSignFlagsTreePt(new Int16TreeType(0));
             typename Index32TreeType::Ptr refPointIndexTreePt(
-                new Index32TreeType(boost::integer_traits<Index32>::const_max));
+                new Index32TreeType(std::numeric_limits<Index32>::max()));
 
             BoolTreeType refIntersectionTree(false);
 
@@ -5291,6 +5290,6 @@ volumeToMesh(
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
