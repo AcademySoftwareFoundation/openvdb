@@ -101,6 +101,9 @@ public:
     uint32_t pass() const;
     void setPass(uint32_t);
 
+    uint64_t leaf() const;
+    void setLeaf(uint64_t);
+
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid
     /// currently being read or written.

@@ -210,6 +210,7 @@ struct StreamMetadata::Impl
     bool mSeekable = false;
     bool mCountingPasses = false;
     uint32_t mPass = 0;
+    uint64_t mLeaf = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
 }; // struct StreamMetadata
@@ -273,6 +274,7 @@ bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGr
 bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
+uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 
@@ -289,6 +291,7 @@ void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
+void StreamMetadata::setLeaf(uint64_t i)                { mImpl->mLeaf = i; }
 
 std::string
 StreamMetadata::str() const
@@ -1085,6 +1088,9 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
     const GridClass gridClass = grid->getGridClass();
     io::setGridClass(is, gridClass);
+
+    // reset leaf value to zero
+    streamMetadata->setLeaf(0);
 
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
         grid->readTransform(is);
