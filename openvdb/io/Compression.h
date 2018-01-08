@@ -101,6 +101,94 @@ enum {
 };
 
 
+template <typename ValueT, typename MaskT>
+struct MaskCompress
+{
+    // Comparison function for values
+    static inline bool eq(const ValueT& a, const ValueT& b) {
+        return math::isExactlyEqual(a, b);
+    }
+
+    MaskCompress(
+        const MaskT& valueMask, const MaskT& childMask,
+        const ValueT* srcBuf, const ValueT& background)
+    {
+        /// @todo Consider all values, not just inactive values?
+        inactiveVal[0] = inactiveVal[1] = background;
+        int numUniqueInactiveVals = 0;
+        for (typename MaskT::OffIterator it = valueMask.beginOff();
+            numUniqueInactiveVals < 3 && it; ++it)
+        {
+            const Index32 idx = it.pos();
+
+            // Skip inactive values that are actually child node pointers.
+            if (childMask.isOn(idx)) continue;
+
+            const ValueT& val = srcBuf[idx];
+            const bool unique = !(
+                (numUniqueInactiveVals > 0 && MaskCompress::eq(val, inactiveVal[0])) ||
+                (numUniqueInactiveVals > 1 && MaskCompress::eq(val, inactiveVal[1]))
+            );
+            if (unique) {
+                if (numUniqueInactiveVals < 2) inactiveVal[numUniqueInactiveVals] = val;
+                ++numUniqueInactiveVals;
+            }
+        }
+
+        metadata = NO_MASK_OR_INACTIVE_VALS;
+
+        if (numUniqueInactiveVals == 1) {
+            if (!MaskCompress::eq(inactiveVal[0], background)) {
+                if (MaskCompress::eq(inactiveVal[0], math::negative(background))) {
+                    metadata = NO_MASK_AND_MINUS_BG;
+                } else {
+                    metadata = NO_MASK_AND_ONE_INACTIVE_VAL;
+                }
+            }
+        } else if (numUniqueInactiveVals == 2) {
+            metadata = NO_MASK_OR_INACTIVE_VALS;
+            if (!MaskCompress::eq(inactiveVal[0], background) && !MaskCompress::eq(inactiveVal[1], background)) {
+                // If neither inactive value is equal to the background, both values
+                // need to be saved, along with a mask that selects between them.
+                metadata = MASK_AND_TWO_INACTIVE_VALS;
+
+            } else if (MaskCompress::eq(inactiveVal[1], background)) {
+                if (MaskCompress::eq(inactiveVal[0], math::negative(background))) {
+                    // If the second inactive value is equal to the background and
+                    // the first is equal to -background, neither value needs to be saved,
+                    // but save a mask that selects between -background and +background.
+                    metadata = MASK_AND_NO_INACTIVE_VALS;
+                } else {
+                    // If the second inactive value is equal to the background, only
+                    // the first value needs to be saved, along with a mask that selects
+                    // between it and the background.
+                    metadata = MASK_AND_ONE_INACTIVE_VAL;
+                }
+            } else if (MaskCompress::eq(inactiveVal[0], background)) {
+                if (MaskCompress::eq(inactiveVal[1], math::negative(background))) {
+                    // If the first inactive value is equal to the background and
+                    // the second is equal to -background, neither value needs to be saved,
+                    // but save a mask that selects between -background and +background.
+                    metadata = MASK_AND_NO_INACTIVE_VALS;
+                    std::swap(inactiveVal[0], inactiveVal[1]);
+                } else {
+                    // If the first inactive value is equal to the background, swap it
+                    // with the second value and save only that value, along with a mask
+                    // that selects between it and the background.
+                    std::swap(inactiveVal[0], inactiveVal[1]);
+                    metadata = MASK_AND_ONE_INACTIVE_VAL;
+                }
+            }
+        } else if (numUniqueInactiveVals > 2) {
+            metadata = NO_MASK_AND_ALL_VALS;
+        }
+    }
+
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
+    ValueT inactiveVal[2];
+};
+
+
 ////////////////////////////////////////
 
 
@@ -462,13 +550,6 @@ inline void
 writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     const MaskT& valueMask, const MaskT& childMask, bool toHalf)
 {
-    struct Local {
-        // Comparison function for values
-        static inline bool eq(const ValueT& a, const ValueT& b) {
-            return math::isExactlyEqual(a, b);
-        }
-    };
-
     // Get the stream's compression settings.
     const uint32_t compress = getDataCompression(os);
     const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
@@ -494,75 +575,8 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
             background = *static_cast<const ValueT*>(bgPtr);
         }
 
-        /// @todo Consider all values, not just inactive values?
-        ValueT inactiveVal[2] = { background, background };
-        int numUniqueInactiveVals = 0;
-        for (typename MaskT::OffIterator it = valueMask.beginOff();
-            numUniqueInactiveVals < 3 && it; ++it)
-        {
-            const Index32 idx = it.pos();
-
-            // Skip inactive values that are actually child node pointers.
-            if (childMask.isOn(idx)) continue;
-
-            const ValueT& val = srcBuf[idx];
-            const bool unique = !(
-                (numUniqueInactiveVals > 0 && Local::eq(val, inactiveVal[0])) ||
-                (numUniqueInactiveVals > 1 && Local::eq(val, inactiveVal[1]))
-            );
-            if (unique) {
-                if (numUniqueInactiveVals < 2) inactiveVal[numUniqueInactiveVals] = val;
-                ++numUniqueInactiveVals;
-            }
-        }
-
-        metadata = NO_MASK_OR_INACTIVE_VALS;
-
-        if (numUniqueInactiveVals == 1) {
-            if (!Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[0], math::negative(background))) {
-                    metadata = NO_MASK_AND_MINUS_BG;
-                } else {
-                    metadata = NO_MASK_AND_ONE_INACTIVE_VAL;
-                }
-            }
-        } else if (numUniqueInactiveVals == 2) {
-            metadata = NO_MASK_OR_INACTIVE_VALS;
-            if (!Local::eq(inactiveVal[0], background) && !Local::eq(inactiveVal[1], background)) {
-                // If neither inactive value is equal to the background, both values
-                // need to be saved, along with a mask that selects between them.
-                metadata = MASK_AND_TWO_INACTIVE_VALS;
-
-            } else if (Local::eq(inactiveVal[1], background)) {
-                if (Local::eq(inactiveVal[0], math::negative(background))) {
-                    // If the second inactive value is equal to the background and
-                    // the first is equal to -background, neither value needs to be saved,
-                    // but save a mask that selects between -background and +background.
-                    metadata = MASK_AND_NO_INACTIVE_VALS;
-                } else {
-                    // If the second inactive value is equal to the background, only
-                    // the first value needs to be saved, along with a mask that selects
-                    // between it and the background.
-                    metadata = MASK_AND_ONE_INACTIVE_VAL;
-                }
-            } else if (Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[1], math::negative(background))) {
-                    // If the first inactive value is equal to the background and
-                    // the second is equal to -background, neither value needs to be saved,
-                    // but save a mask that selects between -background and +background.
-                    metadata = MASK_AND_NO_INACTIVE_VALS;
-                    std::swap(inactiveVal[0], inactiveVal[1]);
-                } else {
-                    // If the first inactive value is equal to the background, swap it
-                    // with the second value and save only that value, along with a mask
-                    // that selects between it and the background.
-                    std::swap(inactiveVal[0], inactiveVal[1]);
-                    metadata = MASK_AND_ONE_INACTIVE_VAL;
-                }
-            }
-        } else if (numUniqueInactiveVals > 2) {
-            metadata = NO_MASK_AND_ALL_VALS;
-        }
+        MaskCompress<ValueT, MaskT> maskCompressData(valueMask, childMask, srcBuf, background);
+        metadata = maskCompressData.metadata;
 
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);
 
@@ -572,18 +586,18 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
         {
             if (!toHalf) {
                 // Write one of at most two distinct inactive values.
-                os.write(reinterpret_cast<const char*>(&inactiveVal[0]), sizeof(ValueT));
+                os.write(reinterpret_cast<const char*>(&maskCompressData.inactiveVal[0]), sizeof(ValueT));
                 if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
                     // Write the second of two distinct inactive values.
-                    os.write(reinterpret_cast<const char*>(&inactiveVal[1]), sizeof(ValueT));
+                    os.write(reinterpret_cast<const char*>(&maskCompressData.inactiveVal[1]), sizeof(ValueT));
                 }
             } else {
                 // Write one of at most two distinct inactive values.
-                ValueT truncatedVal = static_cast<ValueT>(truncateRealToHalf(inactiveVal[0]));
+                ValueT truncatedVal = static_cast<ValueT>(truncateRealToHalf(maskCompressData.inactiveVal[0]));
                 os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
                 if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
                     // Write the second of two distinct inactive values.
-                    truncatedVal = truncateRealToHalf(inactiveVal[1]);
+                    truncatedVal = truncateRealToHalf(maskCompressData.inactiveVal[1]);
                     os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
                 }
             }
@@ -618,7 +632,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                         tempBuf[tempCount] = srcBuf[srcIdx];
                         ++tempCount;
                     } else { // inactive value
-                        if (Local::eq(srcBuf[srcIdx], inactiveVal[1])) {
+                        if (MaskCompress<ValueT, MaskT>::eq(srcBuf[srcIdx], maskCompressData.inactiveVal[1])) {
                             selectionMask.setOn(srcIdx); // inactive value 1
                         } // else inactive value 0
                     }
