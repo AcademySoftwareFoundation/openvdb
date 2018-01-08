@@ -82,6 +82,7 @@ TestStream::setUp()
     openvdb::Int32Metadata::registerType();
     openvdb::Int64Metadata::registerType();
     openvdb::Vec3IMetadata::registerType();
+    openvdb::io::DelayedLoadMetadata::registerType();
 
     // Register maps
     openvdb::math::MapRegistry::clear();

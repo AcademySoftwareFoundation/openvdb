@@ -99,6 +99,7 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     CPPUNIT_TEST(testBlosc);
 #endif
+    CPPUNIT_TEST(testDelayedLoadMetadata);
     CPPUNIT_TEST_SUITE_END();
 
     void testHeader();
@@ -129,6 +130,7 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     void testBlosc();
 #endif
+    void testDelayedLoadMetadata();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
@@ -263,6 +265,11 @@ TestFile::testWriteGrid()
     gd2_grid->readMeta(istr);
     gd2_grid->readTransform(istr);
     gd2_grid->readTopology(istr);
+
+    // Remove delay load metadata if it exists.
+    if ((*gd2_grid)["file_delayed_load"]) {
+        gd2_grid->removeMeta("file_delayed_load");
+    }
 
     // Ensure that we have the same metadata.
     CPPUNIT_ASSERT_EQUAL(grid->metaCount(), gd2_grid->metaCount());
@@ -1522,6 +1529,10 @@ TestFile::testReadGridMetadata()
                 if ((*statsMetadata)[it->first]) {
                     otherMetadata->removeMeta(it->first);
                 }
+                // Remove delay load metadata if it exists.
+                if ((*otherMetadata)["file_delayed_load"]) {
+                    otherMetadata->removeMeta("file_delayed_load");
+                }
             }
             CPPUNIT_ASSERT_EQUAL(srcGrid->str(), otherMetadata->str());
 
@@ -2595,6 +2606,109 @@ TestFile::testBlosc()
     }
 }
 #endif
+
+
+void
+TestFile::testDelayedLoadMetadata()
+{
+    openvdb::initialize();
+
+    using namespace openvdb;
+
+    io::File file("something.vdb2");
+
+    // Create a level set grid.
+    auto lsGrid = createLevelSet<FloatGrid>();
+    lsGrid->setName("sphere");
+    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
+        *lsGrid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+
+    // Write the VDB to a string stream.
+    std::ostringstream ostr(std::ios_base::binary);
+
+    // Create the grid descriptor out of this grid.
+    io::GridDescriptor gd(Name("sphere"), lsGrid->type());
+
+    // Write out the grid.
+    file.writeGrid(gd, lsGrid, ostr, /*seekable=*/true);
+
+    // Duplicate VDB string stream.
+    std::ostringstream ostr2(std::ios_base::binary);
+
+    { // Read back in, clip and write out again to verify metadata is rebuilt.
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+
+        const BBoxd clipBbox(Vec3d(-10.0,-10.0,-10.0), Vec3d(10.0,10.0,10.0));
+        io::Archive::readGrid(grid, gd2, istr, clipBbox);
+
+        // Verify clipping is working as expected.
+        CPPUNIT_ASSERT(grid->baseTreePtr()->leafCount() < lsGrid->tree().leafCount());
+
+        file.writeGrid(gd, grid, ostr2, /*seekable=*/true);
+    }
+
+    // Since the input is only a fragment of a VDB file (in particular,
+    // it doesn't have a header), set the file format version number explicitly.
+    // On read, the delayed load metadata for OpenVDB library versions less than 6.1
+    // should be removed to ensure correctness as it possible for the metadata to
+    // have been treated as unknown and blindly copied over when read and re-written
+    // using this library version resulting in out-of-sync metadata.
+
+    { // read using current library version
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 5.0
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(5,0), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 4.9
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(4,9), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 6.0
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(6,1), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    remove("something.vdb2");
+}
 
 // Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
