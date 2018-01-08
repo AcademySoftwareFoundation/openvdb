@@ -345,6 +345,7 @@ INCLUDE_NAMES := \
     Grid.h \
     io/Archive.h \
     io/Compression.h \
+    io/DelayedLoadMetadata.h \
     io/File.h \
     io/GridDescriptor.h \
     io/io.h \
@@ -472,6 +473,7 @@ SRC_NAMES := \
     Grid.cc \
     io/Archive.cc \
     io/Compression.cc \
+    io/DelayedLoadMetadata.cc \
     io/File.cc \
     io/GridDescriptor.cc \
     io/Queue.cc \
@@ -510,6 +512,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestCoord.cc \
     unittest/TestCpt.cc \
     unittest/TestCurl.cc \
+    unittest/TestDelayedLoadMetadata.cc \
     unittest/TestDense.cc \
     unittest/TestDenseSparseTools.cc \
     unittest/TestDiagnostics.cc \
