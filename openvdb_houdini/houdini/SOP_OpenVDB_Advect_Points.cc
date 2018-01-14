@@ -36,8 +36,10 @@
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
+#include <openvdb_houdini/PointUtils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/PointAdvect.h>
+#include <openvdb/points/PointAdvect.h>
 
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>
@@ -208,6 +210,8 @@ struct AdvectionParms
         : mOutputGeo(outputGeo)
         , mPointGeo(nullptr)
         , mPointGroup(nullptr)
+        , mIncludeGroups()
+        , mExcludeGroups()
         , mVelPrim(nullptr)
         , mCptPrim(nullptr)
         , mPropagationType(PROPAGATION_TYPE_ADVECTION)
@@ -223,6 +227,8 @@ struct AdvectionParms
     GU_Detail* mOutputGeo;
     const GU_Detail* mPointGeo;
     const GA_PointGroup* mPointGroup;
+    std::vector<std::string> mIncludeGroups;
+    std::vector<std::string> mExcludeGroups;
     const GU_PrimVDB *mVelPrim;
     const GU_PrimVDB *mCptPrim;
     PropagationType mPropagationType;
@@ -595,6 +601,40 @@ private:
     hvdb::Interrupter& mBoss;
 };
 
+
+template <typename PointDataGridT>
+class VDBPointsAdvection
+{
+public:
+    VDBPointsAdvection(PointDataGridT& outputGrid, AdvectionParms& parms, hvdb::Interrupter& boss)
+        : mOutputGrid(outputGrid)
+        , mParms(parms)
+        , mBoss(boss)
+    {
+    }
+
+    template<typename GridType>
+    void operator()(const GridType& velocityGrid)
+    {
+        if (mBoss.wasInterrupted()) return;
+
+        // note that streamlines are not implemented for VDB Points
+        if (mParms.mStreamlines)    return;
+
+        auto leaf = mOutputGrid.constTree().cbeginLeaf();
+        if (!leaf)  return;
+
+        openvdb::points::MultiGroupFilter filter(mParms.mIncludeGroups, mParms.mExcludeGroups, leaf->attributeSet());
+        openvdb::points::advectPoints(mOutputGrid, velocityGrid,
+            mParms.mIntegrationType+1, mParms.mTimeStep, mParms.mSteps, filter);
+    }
+
+private:
+    PointDataGridT&    mOutputGrid;
+    AdvectionParms&    mParms;
+    hvdb::Interrupter& mBoss;
+};
+
 } // namespace
 
 
@@ -644,6 +684,10 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Point Group")
         .setChoiceList(&SOP_Node::pointGroupMenu)
         .setTooltip("A subset of points in the first input to move using the velocity field"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroups", "VDB Points Groups")
+        .setHelpText("Specify VDB points groups to advect.")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1));
 
     // Velocity grid
     parms.add(hutil::ParmFactory(PRM_STRING, "velgroup", "Velocity VDB")
@@ -925,6 +969,39 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
 
         hvdb::Interrupter boss("Processing points");
 
+        hvdb::VdbPrimIterator vdbIt(gdp);
+
+        for (; vdbIt; ++vdbIt) {
+            GU_PrimVDB* vdbPrim = *vdbIt;
+
+            // only process if grid is a PointDataGrid with leaves
+            if(!openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
+            auto&& pointDataGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGrid());
+            auto leafIter = pointDataGrid.tree().cbeginLeaf();
+            if (!leafIter) continue;
+
+            // deep copy the VDB tree if it is not already unique
+            vdbPrim->makeGridUnique();
+
+            auto&& outputGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getGrid());
+
+            switch (parms.mPropagationType) {
+
+                case PROPAGATION_TYPE_ADVECTION:
+                case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
+                {
+                    VDBPointsAdvection<openvdb::points::PointDataGrid> advection(outputGrid, parms, boss);
+                    GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+                    break;
+                }
+                case PROPAGATION_TYPE_PROJECTION:
+                {
+                    // not implemented
+                }
+                case PROPAGATION_TYPE_UNKNOWN: break;
+            }
+        }
+
         switch (parms.mPropagationType) {
 
             case PROPAGATION_TYPE_ADVECTION:
@@ -974,6 +1051,12 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
     evalString(ptGroupStr, "group", 0, now);
 
     parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
+
+    const std::string groups = evalStdString("vdbpointsgroups", now);
+
+    // Get and parse the vdb points groups
+    openvdb::points::AttributeSet::Descriptor::parseNames(
+        parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
 
     if (!parms.mPointGroup && ptGroupStr.length() > 0) {
         addWarning(SOP_MESSAGE, "Point group not found");

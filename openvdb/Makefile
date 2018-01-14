@@ -357,6 +357,7 @@ INCLUDE_NAMES := \
     points/AttributeSet.h \
     points/IndexFilter.h \
     points/IndexIterator.h \
+    points/PointAdvect.h \
     points/PointAttribute.h \
     points/PointConversion.h \
     points/PointCount.h \
@@ -525,6 +526,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeMask.cc \
     unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointAdvect.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
