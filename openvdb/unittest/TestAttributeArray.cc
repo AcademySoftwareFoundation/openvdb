@@ -812,6 +812,9 @@ TestAttributeArray::testAccessorEval()
 
         AttributeHandle<float, NullCodec> handle(array);
 
+        const AttributeArray& constArray(array);
+        CPPUNIT_ASSERT_EQUAL(&constArray, &handle.array());
+
         handle.mGetter = TestAccessor::getterError;
 
         const float result1 = handle.get(4);
@@ -831,6 +834,8 @@ TestAttributeArray::testAccessorEval()
         // unknown codec is used here so getter and setter are called
 
         AttributeWriteHandle<float, UnknownCodec> writeHandle(array);
+
+        CPPUNIT_ASSERT_EQUAL(&array, &writeHandle.array());
 
         writeHandle.mSetter = TestAccessor::setterError;
 
