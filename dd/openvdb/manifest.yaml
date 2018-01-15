@@ -14,7 +14,7 @@ Schema: '1.0'
 # versioning.
 Name: openvdb
 
-Version: 4.0.1_dd01
+Version: 4.0.1_dd02
 
 # The type of installation that will be performed for this software.
 # This information MUST be provided.
@@ -54,6 +54,6 @@ Requires:
   - boost-1.61.0
   - tbb-4.4.6
   - openexr-2.2.0
-  - glfw-2.7.6
+  - glfw-3.1
   - blosc-1.5.0
   - zlib-1.2.8
