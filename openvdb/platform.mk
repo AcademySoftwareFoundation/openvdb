@@ -89,8 +89,13 @@ ifdef WINDOWS_NT
     endif
     
     ifdef AMD64
-    	TOOL_BINPATH	    := $(TOOL_BINPATH)/amd64
-    	TOOL_CYGWIN_BINPATH := $(TOOL_CYGWIN_BINPATH)/amd64
+	ifneq (,$(wildcard $(TOOL_BINPATH)/amd64/cl.exe))
+	    AMD64_SUFFIX    := amd64
+	else
+	    AMD64_SUFFIX    := Hostx64/x64
+	endif
+    	TOOL_BINPATH	    := $(TOOL_BINPATH)/$(AMD64_SUFFIX)
+    	TOOL_CYGWIN_BINPATH := $(TOOL_CYGWIN_BINPATH)/$(AMD64_SUFFIX)
     endif
 
     # These are specific path environment variables
