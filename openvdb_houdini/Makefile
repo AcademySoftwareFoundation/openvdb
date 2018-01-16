@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2018 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,6 +42,7 @@
 #                       and the SOPs into HOUDINI_DESTDIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
+#   header_test         check for missing or indirectly included headers
 #
 # Options:
 #   abi=N               build for compatibility with version N of the
@@ -86,10 +87,11 @@ endif
 #
 # Note that the OpenVDB library and these Houdini tools must be built
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
-# Fortunately, all three are included in the Houdini HDK, so the relevant
+# Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)
+# to set those two environment variables.)  Beginning with Houdini 16.5,
+# you must provide your own distribution of Boost.
 #
 
 ifeq (,$(HFS))
@@ -516,7 +518,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops mantradsos houdinilib install_lib install
+.PHONY: all clean depend header_test houdinisops mantradsos houdinilib install_lib install
 
 .cc.o:
 	$(call CompileCXX)
@@ -687,6 +689,15 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 
 depend: $(DEPEND)
 
+# Compile an implicit translation unit for each header to identify any indirect includes
+HEADER_TEST_FILES := $(addprefix header_test-,$(LIBHOUDINI_INCLUDE_NAMES))
+$(HEADER_TEST_FILES): header_test-%: openvdb_houdini houdini_utils
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(CXXFLAGS) $(HOUDINI_CXXFLAGS) \
+	    -isystem $(HOUDINI_INCL_DIR) -fPIC -o /dev/null -
+echo_header_test:
+	@echo "Checking for missing or indirectly included headers"
+header_test: echo_header_test $(HEADER_TEST_FILES)
+
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND)
 	$(RM) $(LIBHOUDINI_STATIC)
@@ -703,6 +714,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2018 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

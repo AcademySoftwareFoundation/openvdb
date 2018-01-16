@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,16 +37,11 @@
 #ifndef OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-#include <algorithm> // for std::nth_element
-
-#include <boost/utility/enable_if.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-
 #include <openvdb/math/Math.h> // for isNegative and negative
-#include <openvdb/Types.h> // for Index typedef
 #include <openvdb/Types.h>
 #include <openvdb/tree/NodeManager.h>
+#include <algorithm> // for std::nth_element()
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -167,10 +162,10 @@ template<typename TreeT, Index TerminationLevel = 0>
 class InactivePruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
     InactivePruneOp(TreeT& tree) : mValue(tree.background())
     {
@@ -184,6 +179,7 @@ public:
 
     // Nothing to do at the leaf node level
     void operator()(LeafT&) const {}
+
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -194,6 +190,7 @@ public:
             }
         }
     }
+
     // Prune the child nodes of the root node
     void operator()(RootT& root) const
     {
@@ -202,8 +199,8 @@ public:
         }
         root.eraseBackgroundTiles();
     }
-private:
 
+private:
     const ValueT mValue;
 };// InactivePruneOp
 
@@ -212,10 +209,10 @@ template<typename TreeT, Index TerminationLevel = 0>
 class TolerancePruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
     TolerancePruneOp(TreeT& tree, const ValueT& tol) : mTolerance(tol)
     {
@@ -250,7 +247,6 @@ public:
     inline void operator()(LeafT&) const {}
 
 private:
-
     // Private method specialized for leaf nodes
     inline ValueT median(LeafT& leaf) const {return leaf.medianAll(leaf.buffer().data());}
 
@@ -265,11 +261,11 @@ private:
         std::nth_element(data, data + midpoint, data + NodeT::NUM_VALUES, op);
         return data[midpoint].getValue();
     }
-    
+
     // Specialization to nodes templated on booleans values
     template<typename NodeT>
     inline
-    typename boost::enable_if<boost::is_same<bool, typename NodeT::ValueType>, bool>::type
+    typename std::enable_if<std::is_same<bool, typename NodeT::ValueType>::value, bool>::type
     isConstant(NodeT& node, bool& value, bool& state) const
     {
         return node.isConstant(value, state, mTolerance);
@@ -278,7 +274,7 @@ private:
     // Nodes templated on non-boolean values
     template<typename NodeT>
     inline
-    typename boost::disable_if<boost::is_same<bool, typename NodeT::ValueType>, bool>::type
+    typename std::enable_if<!std::is_same<bool, typename NodeT::ValueType>::value, bool>::type
     isConstant(NodeT& node, ValueT& value, bool& state) const
     {
         ValueT tmp;
@@ -286,7 +282,7 @@ private:
         if (test) value = this->median(node);
         return test;
     }
-   
+
     const ValueT mTolerance;
 };// TolerancePruneOp
 
@@ -295,10 +291,10 @@ template<typename TreeT, Index TerminationLevel = 0>
 class LevelSetPruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
     LevelSetPruneOp(TreeT& tree)
         : mOutside(tree.background())
@@ -310,6 +306,7 @@ public:
         }
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
+
     LevelSetPruneOp(TreeT& tree, const ValueT& outside, const ValueT& inside)
         : mOutside(outside)
         , mInside(inside)
@@ -324,8 +321,10 @@ public:
         }
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
+
     // Nothing to do at the leaf node level
     void operator()(LeafT&) const {}
+
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -336,6 +335,7 @@ public:
             }
         }
     }
+
     // Prune the child nodes of the root node
     void operator()(RootT& root) const
     {
@@ -426,6 +426,6 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 #endif // OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

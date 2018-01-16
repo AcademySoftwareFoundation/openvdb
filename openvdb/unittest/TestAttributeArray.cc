@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -322,7 +322,7 @@ TestAttributeArray::testAttributeArray()
     {
         AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(attr->size(), Index(50));
+        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
     }
 
     {
@@ -439,10 +439,10 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArrayI attr(count);
 
-        CPPUNIT_ASSERT_EQUAL(attr.size(), Index(count));
+        CPPUNIT_ASSERT_EQUAL(Index(count), attr.size());
 
-        CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
-        CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);
+        CPPUNIT_ASSERT_EQUAL(0, attr.get(0));
+        CPPUNIT_ASSERT_EQUAL(0, attr.get(10));
 
         CPPUNIT_ASSERT(attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
@@ -461,17 +461,17 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT(!attr.compact());
         CPPUNIT_ASSERT(!attr.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(attr.get(0), 10);
-        CPPUNIT_ASSERT_EQUAL(attr.get(1), 5);
-        CPPUNIT_ASSERT_EQUAL(attr.get(2), 0);
+        CPPUNIT_ASSERT_EQUAL(10, attr.get(0));
+        CPPUNIT_ASSERT_EQUAL(5, attr.get(1));
+        CPPUNIT_ASSERT_EQUAL(0, attr.get(2));
 
         attr.collapse(5);
         CPPUNIT_ASSERT(attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
 
-        CPPUNIT_ASSERT_EQUAL(attr.get(0), 5);
-        CPPUNIT_ASSERT_EQUAL(attr.get(20), 5);
-        CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(20), 5);
+        CPPUNIT_ASSERT_EQUAL(5, attr.get(0));
+        CPPUNIT_ASSERT_EQUAL(5, attr.get(20));
+        CPPUNIT_ASSERT_EQUAL(5, attr.getUnsafe(20));
 
         attr.expand(/*fill=*/false);
         CPPUNIT_ASSERT(!attr.isUniform());
@@ -487,7 +487,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
+            CPPUNIT_ASSERT_EQUAL(5, attr.get(i));
         }
 
         CPPUNIT_ASSERT(attr.compact());
@@ -501,22 +501,22 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attr.get(i), 10);
+            CPPUNIT_ASSERT_EQUAL(10, attr.get(i));
         }
 
         attr.collapse(7);
         CPPUNIT_ASSERT(attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
 
-        CPPUNIT_ASSERT_EQUAL(attr.get(0), 7);
-        CPPUNIT_ASSERT_EQUAL(attr.get(20), 7);
+        CPPUNIT_ASSERT_EQUAL(7, attr.get(0));
+        CPPUNIT_ASSERT_EQUAL(7, attr.get(20));
 
         attr.fill(5);
         CPPUNIT_ASSERT(attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
+            CPPUNIT_ASSERT_EQUAL(5, attr.get(i));
         }
 
         CPPUNIT_ASSERT(!attr.isTransient());
@@ -744,7 +744,7 @@ TestAttributeArray::testAttributeArray()
         std::ostringstream ostrC(std::ios_base::binary);
         attrC.write(ostrC);
 
-        CPPUNIT_ASSERT_EQUAL(ostrC.str().size(), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(size_t(0), ostrC.str().size());
 
         std::ostringstream ostrD(std::ios_base::binary);
         attrC.write(ostrD, /*transient=*/true);
@@ -817,8 +817,8 @@ TestAttributeArray::testAccessorEval()
         const float result1 = handle.get(4);
         const float result2 = handle.get(6);
 
-        CPPUNIT_ASSERT_EQUAL(result1, 15.0f);
-        CPPUNIT_ASSERT_EQUAL(result2, 5.0f);
+        CPPUNIT_ASSERT_EQUAL(15.0f, result1);
+        CPPUNIT_ASSERT_EQUAL(5.0f, result2);
     }
 
     { // test get and set (UnknownCodec)
@@ -882,10 +882,10 @@ TestAttributeArray::testAttributeHandle()
         AttributeHandleRWI handle(*array);
         CPPUNIT_ASSERT(!handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(handle.size(), array->size());
+        CPPUNIT_ASSERT_EQUAL(array->size(), handle.size());
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), 0);
-        CPPUNIT_ASSERT_EQUAL(handle.get(10), 0);
+        CPPUNIT_ASSERT_EQUAL(0, handle.get(0));
+        CPPUNIT_ASSERT_EQUAL(0, handle.get(10));
 
         handle.set(0, 10);
         CPPUNIT_ASSERT(!handle.isUniform());
@@ -893,14 +893,14 @@ TestAttributeArray::testAttributeHandle()
         handle.collapse(5);
         CPPUNIT_ASSERT(handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), 5);
-        CPPUNIT_ASSERT_EQUAL(handle.get(20), 5);
+        CPPUNIT_ASSERT_EQUAL(5, handle.get(0));
+        CPPUNIT_ASSERT_EQUAL(5, handle.get(20));
 
         handle.expand();
         CPPUNIT_ASSERT(!handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(handle.get(i), 5);
+            CPPUNIT_ASSERT_EQUAL(5, handle.get(i));
         }
 
         CPPUNIT_ASSERT(handle.compact());
@@ -912,20 +912,20 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT(!handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(handle.get(i), 10);
+            CPPUNIT_ASSERT_EQUAL(10, handle.get(i));
         }
 
         handle.collapse(7);
         CPPUNIT_ASSERT(handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), 7);
-        CPPUNIT_ASSERT_EQUAL(handle.get(20), 7);
+        CPPUNIT_ASSERT_EQUAL(7, handle.get(0));
+        CPPUNIT_ASSERT_EQUAL(7, handle.get(20));
 
         handle.fill(5);
         CPPUNIT_ASSERT(handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(handle.get(i), 5);
+            CPPUNIT_ASSERT_EQUAL(5, handle.get(i));
         }
 
         CPPUNIT_ASSERT(handle.isUniform());
@@ -938,7 +938,7 @@ TestAttributeArray::testAttributeHandle()
 
         handle.set(5, Vec3f(10));
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(5), Vec3f(10));
+        CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
     {
@@ -950,7 +950,7 @@ TestAttributeArray::testAttributeHandle()
 
         handle.set(6, float(11));
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(6), float(11));
+        CPPUNIT_ASSERT_EQUAL(float(11), handle.get(6));
 
         CPPUNIT_ASSERT(!array->isCompressed());
 
@@ -964,7 +964,7 @@ TestAttributeArray::testAttributeHandle()
 
             CPPUNIT_ASSERT(array->isCompressed());
 
-            CPPUNIT_ASSERT_EQUAL(handleRO.get(6), float(11));
+            CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
 
             CPPUNIT_ASSERT(array->isCompressed());
         }
@@ -978,7 +978,7 @@ TestAttributeArray::testAttributeHandle()
 
             CPPUNIT_ASSERT(!array->isCompressed());
 
-            CPPUNIT_ASSERT_EQUAL(handleRO.get(6), float(11));
+            CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
 
             CPPUNIT_ASSERT(!array->isCompressed());
         }
@@ -994,7 +994,7 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT(array);
 
-        CPPUNIT_ASSERT_EQUAL(array->get(5), Vec3f(10));
+        CPPUNIT_ASSERT_EQUAL(Vec3f(10), array->get(5));
     }
 
     {
@@ -1002,7 +1002,7 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT(array);
 
-        CPPUNIT_ASSERT_EQUAL(array->get(6), float(11));
+        CPPUNIT_ASSERT_EQUAL(float(11), array->get(6));
     }
 }
 
@@ -1016,9 +1016,9 @@ TestAttributeArray::testStrided()
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
         CPPUNIT_ASSERT(array->hasConstantStride());
-        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(1));
-        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
-        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(Index(1), array->stride());
+        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
+        CPPUNIT_ASSERT_EQUAL(Index(2), array->dataSize());
     }
 
     { // strided array
@@ -1026,13 +1026,13 @@ TestAttributeArray::testStrided()
 
         CPPUNIT_ASSERT(array->hasConstantStride());
 
-        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
-        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(6));
+        CPPUNIT_ASSERT_EQUAL(Index(3), array->stride());
+        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
+        CPPUNIT_ASSERT_EQUAL(Index(6), array->dataSize());
         CPPUNIT_ASSERT(array->isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(5), 0);
+        CPPUNIT_ASSERT_EQUAL(0, array->get(0));
+        CPPUNIT_ASSERT_EQUAL(0, array->get(5));
         CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
 
         CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
@@ -1040,63 +1040,64 @@ TestAttributeArray::testStrided()
 
         array->collapse(10);
 
-        CPPUNIT_ASSERT_EQUAL(array->get(0), int(10));
-        CPPUNIT_ASSERT_EQUAL(array->get(5), int(10));
+        CPPUNIT_ASSERT_EQUAL(int(10), array->get(0));
+        CPPUNIT_ASSERT_EQUAL(int(10), array->get(5));
 
         array->expand();
 
-        CPPUNIT_ASSERT_EQUAL(array->get(0), int(10));
-        CPPUNIT_ASSERT_EQUAL(array->get(5), int(10));
+        CPPUNIT_ASSERT_EQUAL(int(10), array->get(0));
+        CPPUNIT_ASSERT_EQUAL(int(10), array->get(5));
 
         array->collapse(0);
 
-        CPPUNIT_ASSERT_EQUAL(array->get(0), int(0));
-        CPPUNIT_ASSERT_EQUAL(array->get(5), int(0));
+        CPPUNIT_ASSERT_EQUAL(int(0), array->get(0));
+        CPPUNIT_ASSERT_EQUAL(int(0), array->get(5));
 
         StridedWriteHandle writeHandle(*array);
 
         writeHandle.set(0, 2, 5);
         writeHandle.set(1, 1, 10);
 
-        CPPUNIT_ASSERT_EQUAL(writeHandle.stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(writeHandle.size(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(Index(3), writeHandle.stride());
+        CPPUNIT_ASSERT_EQUAL(Index(2), writeHandle.size());
 
         // non-interleaved: 0 0 5 0 10 0
 
-        CPPUNIT_ASSERT_EQUAL(array->get(2), 5);
-        CPPUNIT_ASSERT_EQUAL(array->get(4), 10);
+        CPPUNIT_ASSERT_EQUAL(5, array->get(2));
+        CPPUNIT_ASSERT_EQUAL(10, array->get(4));
 
-        CPPUNIT_ASSERT_EQUAL(writeHandle.get(0, 2), 5);
-        CPPUNIT_ASSERT_EQUAL(writeHandle.get(1, 1), 10);
+        CPPUNIT_ASSERT_EQUAL(5, writeHandle.get(0, 2));
+        CPPUNIT_ASSERT_EQUAL(10, writeHandle.get(1, 1));
 
         StridedHandle handle(*array);
         CPPUNIT_ASSERT(handle.hasConstantStride());
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
-        CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
+        CPPUNIT_ASSERT_EQUAL(5, handle.get(0, 2));
+        CPPUNIT_ASSERT_EQUAL(10, handle.get(1, 1));
 
-        CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(handle.size(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(Index(3), handle.stride());
+        CPPUNIT_ASSERT_EQUAL(Index(2), handle.size());
 
         size_t arrayMem = 64;
 
-        CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
+        CPPUNIT_ASSERT_EQUAL(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 
     { // dynamic stride
-        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/7, /*constantStride=*/false);
+        AttributeArrayI::Ptr array = AttributeArrayI::create(
+            /*n=*/2, /*stride=*/7, /*constantStride=*/false);
 
         CPPUNIT_ASSERT(!array->hasConstantStride());
 
         // zero indicates dynamic striding
-        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(0));
-        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(Index(0), array->stride());
+        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
         // the actual array size
-        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(7));
+        CPPUNIT_ASSERT_EQUAL(Index(7), array->dataSize());
         CPPUNIT_ASSERT(array->isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(6), 0);
+        CPPUNIT_ASSERT_EQUAL(0, array->get(0));
+        CPPUNIT_ASSERT_EQUAL(0, array->get(6));
         CPPUNIT_ASSERT_THROW(array->get(7), IndexError); // out-of-range
 
         CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
@@ -1105,8 +1106,8 @@ TestAttributeArray::testStrided()
         // handle is bound as if a linear array with stride 1
         StridedHandle handle(*array);
         CPPUNIT_ASSERT(!handle.hasConstantStride());
-        CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(1));
-        CPPUNIT_ASSERT_EQUAL(handle.size(), array->dataSize());
+        CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
+        CPPUNIT_ASSERT_EQUAL(array->dataSize(), handle.size());
     }
 }
 
@@ -1494,7 +1495,7 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrB.isUniform());
 
-            CPPUNIT_ASSERT_EQUAL(attrB.get(0), 0);
+            CPPUNIT_ASSERT_EQUAL(0, attrB.get(0));
         }
 
         // read in and write out using delayed load to check writing out-of-core attributes
@@ -1613,7 +1614,7 @@ TestAttributeArray::testDelayedLoad()
 
         AttributeArrayI attrStrided(count, /*stride=*/3);
 
-        CPPUNIT_ASSERT_EQUAL(attrStrided.stride(), Index(3));
+        CPPUNIT_ASSERT_EQUAL(Index(3), attrStrided.stride());
 
         // Clean up temp files.
         std::remove(mappedFile->filename().c_str());
@@ -1660,7 +1661,7 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT_EQUAL(attrB.stride(), Index(3));
+            CPPUNIT_ASSERT_EQUAL(Index(3), attrB.stride());
         }
 
         // Clean up temp files.
@@ -1927,15 +1928,15 @@ TestAttributeArray::testQuaternions()
     { // get some quaternion values
         AttributeHandle<QuatR> orientHandle(orient);
 
-        CPPUNIT_ASSERT_EQUAL(orientHandle.get(3), QuatR::zero());
-        CPPUNIT_ASSERT_EQUAL(orientHandle.get(4), QuatR(1, 2, 3, 4));
-        CPPUNIT_ASSERT_EQUAL(orientHandle.get(7), QuatR::identity());
+        CPPUNIT_ASSERT_EQUAL(QuatR::zero(), orientHandle.get(3));
+        CPPUNIT_ASSERT_EQUAL(QuatR(1, 2, 3, 4), orientHandle.get(4));
+        CPPUNIT_ASSERT_EQUAL(QuatR::identity(), orientHandle.get(7));
     }
 
     { // create a quaternion array with a zero uniform value
         AttributeQD zero(/*size=*/10, /*stride=*/1, /*constantStride=*/true, QuatR::zero());
 
-        CPPUNIT_ASSERT_EQUAL(zero.get(5), QuatR::zero());
+        CPPUNIT_ASSERT_EQUAL(QuatR::zero(), zero.get(5));
     }
 }
 
@@ -1963,15 +1964,15 @@ TestAttributeArray::testMatrices()
     { // get some matrix values
         AttributeHandle<Mat4d> matrixHandle(matrix);
 
-        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(3), Mat4d::identity());
-        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(4), testMatrix);
-        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(7), Mat4d::zero());
+        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), matrixHandle.get(3));
+        CPPUNIT_ASSERT_EQUAL(testMatrix, matrixHandle.get(4));
+        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), matrixHandle.get(7));
     }
 
     { // create a matrix array with a zero uniform value
         AttributeM zero(/*size=*/10, /*stride=*/1, /*constantStride=*/true, Mat4d::zero());
 
-        CPPUNIT_ASSERT_EQUAL(zero.get(5), Mat4d::zero());
+        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), zero.get(5));
     }
 }
 
@@ -2151,6 +2152,6 @@ TestAttributeArray::testProfile()
     }
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

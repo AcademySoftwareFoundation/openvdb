@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,8 +31,10 @@
 #ifndef OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include <string>
 #include <tbb/tick_count.h>
+#include <iostream>// for std::cerr
 #include <sstream>// for ostringstream
 #include <iomanip>//for setprecision
 
@@ -45,13 +47,13 @@ namespace util {
 ///
 /// @code
 ///    CpuTimer timer;
-///    // code here will not be timed!    
+///    // code here will not be timed!
 ///    timer.start("algorithm");
 ///    // code to be timed goes here
 ///    timer.stop();
 /// @endcode
-///    
-/// or to time multiple blocks of code    
+///
+/// or to time multiple blocks of code
 ///
 /// @code
 ///    CpuTimer timer("algorithm 1");
@@ -123,6 +125,6 @@ private:
 
 #endif // OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

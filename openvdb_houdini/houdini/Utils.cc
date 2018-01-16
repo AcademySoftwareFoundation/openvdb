@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -109,11 +109,7 @@ VdbPrimCIterator::getPrimitive() const
 {
     if (mIter) {
         if (GA_Primitive* prim = mIter->getPrimitive()) {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
             const GA_PrimitiveTypeId primVdbTypeId = GA_PRIMVDB;
-#else
-            const GA_PrimitiveTypeId primVdbTypeId = GU_PrimVDB::theTypeId();
-#endif
             if (prim->getTypeId() == primVdbTypeId) {
                 GU_PrimVDB* vdb = UTverify_cast<GU_PrimVDB*>(prim);
                 if (mFilter && !mFilter(*vdb)) return nullptr;
@@ -426,6 +422,6 @@ isLogForwarding(OP_OpTypeId opId)
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

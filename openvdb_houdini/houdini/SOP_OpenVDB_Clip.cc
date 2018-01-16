@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,9 +40,20 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/Clip.h> // for tools::clip()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
+#include <openvdb/tools/Mask.h> // for tools::interiorMask()
+#include <openvdb/tools/Morphology.h> // for tools::dilateActiveValues(), tools::erodeVoxels()
 #include <openvdb/points/PointDataGrid.h>
 #include <OBJ/OBJ_Camera.h>
+#include <cmath> // for std::abs(), std::round()
 #include <exception>
+#include <string>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -58,16 +69,26 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    public:
+        openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+    private:
+        void getFrustum(OP_Context&);
+
+        openvdb::math::Transform::Ptr mFrustum;
+#if VDB_COMPILABLE_SOP
+    }; // class Cache
+#endif
+
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
     OP_ERROR cookMyGuide1(OP_Context&) override;
-    OP_ERROR cookMySop(OP_Context&) override;
-
-private:
-    void getFrustum(OP_Context&);
-
-    openvdb::math::Transform::Ptr mFrustum;
 };
 
 
@@ -81,25 +102,31 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("Specify a subset of VDBs from the first input to be clipped.")
         .setDocumentation(
             "A subset of VDBs from the first input to be clipped"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "inside", "Keep Inside")
+        .setDefault(PRMoneDefaults)
+        .setTooltip(
+            "If enabled, keep voxels that lie inside the clipping region.\n"
+            "If disabled, keep voxels that lie outside the clipping region.")
+        .setDocumentation(
+            "If enabled, keep voxels that lie inside the clipping region,"
+            " otherwise keep voxels that lie outside the clipping region."));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "camera",   "Camera",
             "geometry", "Geometry",
-            "mask",     "Mask VDB",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("geometry")
-            .setTooltip("Specify how the clipping region should be defined.")
-            .setDocumentation("\
+            "mask",     "Mask VDB"
+        })
+        .setDefault("geometry")
+        .setTooltip("Specify how the clipping region should be defined.")
+        .setDocumentation("\
 How to define the clipping region\n\
 \n\
 Camera:\n\
@@ -108,7 +135,6 @@ Geometry:\n\
     Use the bounding box of geometry from the second input as the clipping region.\n\
 Mask VDB:\n\
     Use the active voxels of a VDB volume from the second input as a clipping mask.\n"));
-    }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -125,14 +151,45 @@ Mask VDB:\n\
             "The path to the camera whose frustum is to be used as a clipping region"
             " (e.g., `/obj/cam1`)"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "inside", "Keep Inside")
-        .setDefault(PRMoneDefaults)
-        .setTooltip(
-            "If enabled, keep voxels that lie inside the clipping region.\n"
-            "If disabled, keep voxels that lie outside the clipping region.")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "setnear", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("If enabled, override the camera's near clipping plane."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_E, "near", "Near Clipping")
+        .setDefault(0.001)
+        .setTooltip("The position of the near clipping plane")
         .setDocumentation(
-            "If enabled, keep voxels that lie inside the clipping region,"
-            " otherwise keep voxels that lie outside the clipping region."));
+            "The position of the near clipping plane\n\n"
+            "If enabled, this setting overrides the camera's clipping plane."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "setfar", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("If enabled, override the camera's far clipping plane."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_E, "far", "Far Clipping")
+        .setDefault(10000)
+        .setTooltip("The position of the far clipping plane")
+        .setDocumentation(
+            "The position of the far clipping plane\n\n"
+            "If enabled, this setting overrides the camera's clipping plane."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "setpadding", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("If enabled, expand or shrink the clipping region."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_E, "padding", "Padding")
+        .setVectorSize(3)
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Padding in world units to be added to the clipping region")
+        .setDocumentation(
+            "Padding in world units to be added to the clipping region\n\n"
+            "Negative values shrink the clipping region.\n\n"
+            "Nonuniform padding is not supported when clipping to a VDB volume.\n"
+            "The mask volume will be dilated or eroded uniformly"
+            " by the _x_-axis padding value."));
 
 
     // Obsolete parameters
@@ -144,6 +201,9 @@ Mask VDB:\n\
         .addInput("VDBs")
         .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Clip::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -199,10 +259,24 @@ SOP_OpenVDB_Clip::updateParmsFlags()
     bool changed = false;
 
     UT_String clipper;
-    evalString(clipper, "clipper", 0, 0);
+    evalString(clipper, "clipper", 0, 0.0);
 
-    changed |= enableParm("camera", clipper == "camera");
+    const bool clipToCamera = (clipper == "camera");
+
     changed |= enableParm("mask", clipper == "mask");
+    changed |= enableParm("camera", clipToCamera);
+    changed |= enableParm("setnear", clipToCamera);
+    changed |= enableParm("near", clipToCamera && evalInt("setnear", 0, 0.0));
+    changed |= enableParm("setfar", clipToCamera);
+    changed |= enableParm("far", clipToCamera && evalInt("setfar", 0, 0.0));
+    changed |= enableParm("padding", 0 != evalInt("setpadding", 0, 0.0));
+
+    changed |= setVisibleState("mask", clipper == "mask");
+    changed |= setVisibleState("camera", clipToCamera);
+    changed |= setVisibleState("setnear", clipToCamera);
+    changed |= setVisibleState("near", clipToCamera);
+    changed |= setVisibleState("setfar", clipToCamera);
+    changed |= setVisibleState("far", clipToCamera);
 
     return changed;
 }
@@ -230,6 +304,68 @@ SOP_OpenVDB_Clip::SOP_OpenVDB_Clip(OP_Network* net,
 
 
 namespace {
+
+// Functor to convert a mask grid of arbitrary type to a BoolGrid
+// and to dilate or erode it
+struct DilatedMaskOp
+{
+    DilatedMaskOp(int dilation_): dilation{dilation_} {}
+
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        if (dilation == 0) return;
+
+        maskGrid = openvdb::BoolGrid::create();
+        maskGrid->setTransform(grid.transform().copy());
+        maskGrid->topologyUnion(grid);
+
+        if (dilation < 0) {
+            // Densify the mask, since tools::erodeVoxels() ignores active tiles.
+            /// @todo Remove this once tools::erodeActiveValues() is implemented.
+            maskGrid->tree().voxelizeActiveTiles();
+        }
+
+        UT_AutoInterrupt progress{
+            ((dilation > 0 ? "Dilating" : "Eroding") + std::string{" VDB mask"}).c_str()};
+
+        int numIterations = std::abs(dilation);
+
+        const int kNumIterationsPerPass = 4;
+        const int numPasses = numIterations / kNumIterationsPerPass;
+
+        auto morphologyOp = [&](int iterations) {
+            if (dilation > 0) {
+                openvdb::tools::dilateActiveValues(maskGrid->tree(), iterations);
+            } else {
+                /// @todo Replace with tools::erodeActiveValues() once it is implemented.
+                openvdb::tools::erodeVoxels(maskGrid->tree(), iterations);
+            }
+        };
+
+        // Since large dilations and erosions can be expensive, apply them
+        // in multiple passes and check for interrupts.
+        for (int pass = 0; pass < numPasses; ++pass, numIterations -= kNumIterationsPerPass) {
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+            const bool interrupt = progress.wasInterrupted(
+                /*pct=*/int((100.0 * pass * kNumIterationsPerPass) / std::abs(dilation)));
+#else
+            const bool interrupt = progress.wasInterrupted();
+#endif
+            if (interrupt) {
+                maskGrid.reset();
+                throw std::runtime_error{"interrupted"};
+            }
+            morphologyOp(kNumIterationsPerPass);
+        }
+        if (numIterations > 0) {
+            morphologyOp(numIterations);
+        }
+    }
+
+    int dilation = 0; // positive = dilation, negative = erosion
+    openvdb::BoolGrid::Ptr maskGrid;
+};
 
 
 struct LevelSetMaskOp
@@ -335,7 +471,7 @@ struct MaskClipOp
 
 /// Get the selected camera's frustum transform.
 void
-SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::getFrustum(OP_Context& context)
 {
     mFrustum.reset();
 
@@ -348,13 +484,22 @@ SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
     }
 
     OBJ_Camera* camera = nullptr;
+#if VDB_COMPILABLE_SOP
+    if (auto* obj = cookparms()->getCwd()->findOBJNode(cameraPath)) {
+        camera = obj->castToOBJCamera();
+    }
+    OP_Node* self = cookparms()->getCwd();
+#else
     if (auto* obj = findOBJNode(cameraPath)) {
         camera = obj->castToOBJCamera();
     }
+    OP_Node* self = this;
+#endif
+
     if (!camera) {
         throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
     }
-    this->addExtraInput(camera, OP_INTEREST_DATA);
+    self->addExtraInput(camera, OP_INTEREST_DATA);
 
     OBJ_CameraParms cameraParms;
     camera->getCameraParms(cameraParms, time);
@@ -363,15 +508,31 @@ SOP_OpenVDB_Clip::getFrustum(OP_Context& context)
         /// @todo support ortho and other cameras?
     }
 
-    const float
-        nearPlane = static_cast<float>(camera->getNEAR(time)),
-        farPlane = static_cast<float>(camera->getFAR(time));
-    mFrustum = hvdb::frustumTransformFromCamera(*this, context, *camera,
+    const bool pad = (0 != evalInt("setpadding", 0, time));
+    const auto padding = pad ? evalVec3f("padding", time) : openvdb::Vec3f{0};
+
+    const float nearPlane = (evalInt("setnear", 0, time)
+        ? static_cast<float>(evalFloat("near", 0, time))
+        : static_cast<float>(camera->getNEAR(time))) - padding[2];
+    const float farPlane = (evalInt("setfar", 0, time)
+        ? static_cast<float>(evalFloat("far", 0, time))
+        : static_cast<float>(camera->getFAR(time))) + padding[2];
+
+    mFrustum = hvdb::frustumTransformFromCamera(*self, context, *camera,
         /*offset=*/0.f, nearPlane, farPlane, /*voxelDepth=*/1.f, /*voxelCountX=*/100);
 
     if (!mFrustum || !mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()) {
         throw std::runtime_error{
             "failed to compute frustum bounds for camera " + cameraPath.toStdString()};
+    }
+
+    if (pad) {
+        const auto extents =
+            mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()->getBBox().extents();
+        mFrustum->preScale(openvdb::Vec3d{
+            (extents[0] + 2 * padding[0]) / extents[0],
+            (extents[1] + 2 * padding[1]) / extents[1],
+            1.0});
     }
 }
 
@@ -383,9 +544,20 @@ OP_ERROR
 SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
-    if (mFrustum) {
+
+    openvdb::math::Transform::ConstPtr frustum;
+#if !VDB_COMPILABLE_SOP
+    frustum = mFrustum;
+#else
+    // Attempt to extract the frustum from our cache.
+    if (auto* cache = dynamic_cast<SOP_OpenVDB_Clip::Cache*>(myNodeVerbCache)) {
+        frustum = cache->frustum();
+    }
+#endif
+
+    if (frustum) {
         const UT_Vector3 color{0.9f, 0.0f, 0.0f};
-        hvdb::drawFrustum(*myGuide1, *mFrustum, &color,
+        hvdb::drawFrustum(*myGuide1, *frustum, &color,
             /*tickColor=*/nullptr, /*shaded=*/false, /*ticks=*/false);
     }
     return error();
@@ -393,16 +565,19 @@ SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
 
 
 OP_ERROR
-SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock{*this, context};
-        const fpreal time = context.getTime();
-
-        UT_AutoInterrupt progress{"Clipping VDBs"};
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
+#endif
+
+        const fpreal time = context.getTime();
+
+        UT_AutoInterrupt progress{"Clipping VDBs"};
 
         const GU_Detail* maskGeo = inputGeo(1);
 
@@ -412,7 +587,10 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
         const bool
             useCamera = (clipper == "camera"),
             useMask = (clipper == "mask"),
-            inside = evalInt("inside", 0, time);
+            inside = evalInt("inside", 0, time),
+            pad = evalInt("setpadding", 0, time);
+
+        const auto padding = pad ? evalVec3f("padding", time) : openvdb::Vec3f{0};
 
         mFrustum.reset();
 
@@ -423,15 +601,8 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             getFrustum(context);
         } else if (maskGeo) {
             if (useMask) {
-                UT_String maskStr;
-                evalString(maskStr, "mask", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
                 const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
-                    maskStr.buffer(), GroupCreator{maskGeo});
-#else
-                const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
-                    maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-#endif
+                    evalStdString("mask", time).c_str(), GroupCreator{maskGeo});
                 hvdb::VdbPrimCIterator maskIt{maskGeo, maskGroup};
                 if (maskIt) {
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
@@ -447,6 +618,26 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
                     addError(SOP_MESSAGE, "mask VDB not found");
                     return error();
                 }
+                if (pad) {
+                    // If padding is enabled and nonzero, dilate or erode the mask grid.
+                    const auto paddingInVoxels = padding / maskGrid->voxelSize();
+                    if (!openvdb::math::isApproxEqual(paddingInVoxels[0], paddingInVoxels[1])
+                        || !openvdb::math::isApproxEqual(paddingInVoxels[1], paddingInVoxels[2]))
+                    {
+                        addWarning(SOP_MESSAGE,
+                            "nonuniform padding is not supported for mask clipping");
+                    }
+                    if (const int dilation = int(std::round(paddingInVoxels[0]))) {
+                        const auto maskType = UTvdbGetGridType(*maskGrid);
+                        DilatedMaskOp op{dilation};
+                        if (!UTvdbProcessTypedGridTopology(maskType, *maskGrid, op)) {
+#if UT_VERSION_INT >= 0x10000258 // 16.0.600 or later
+                            UTvdbProcessTypedGridPoint(maskType, *maskGrid, op);
+#endif
+                        }
+                        if (op.maskGrid) maskGrid = op.maskGrid;
+                    }
+                }
             } else {
                 UT_BoundingBox box;
                 maskGeo->computeQuickBounds(box);
@@ -457,6 +648,10 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
                 clipBox.max()[0] = box.xmax();
                 clipBox.max()[1] = box.ymax();
                 clipBox.max()[2] = box.zmax();
+                if (pad) {
+                    clipBox.min() -= padding;
+                    clipBox.max() += padding;
+                }
             }
         } else {
             addError(SOP_MESSAGE, "Not enough sources specified.");
@@ -464,9 +659,7 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
         }
 
         // Get the group of grids to process.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         int numLevelSets = 0;
         for (hvdb::VdbPrimIterator it{gdp, group}; it; ++it) {
@@ -536,6 +729,6 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

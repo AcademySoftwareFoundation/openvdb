@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,15 +41,15 @@
 #ifndef OPENVDB_TOOLS_LEVELSETPLATONIC_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETPLATONIC_HAS_BEEN_INCLUDED
 
-#include <vector>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
-#include <boost/utility.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
+#include <type_traits>
+#include <vector>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -338,7 +338,8 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
     float voxelSize, float halfWidth, InterruptT *interrupt)
 {
     // GridType::ValueType is required to be a floating-point scalar.
-    BOOST_STATIC_ASSERT(boost::is_floating_point<typename GridType::ValueType>::value);
+    static_assert(std::is_floating_point<typename GridType::ValueType>::value,
+        "level set grids must have scalar, floating-point value types");
 
     const math::Transform::Ptr xform = math::Transform::createLinearTransform( voxelSize );
 
@@ -503,6 +504,6 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 
 #endif // OPENVDB_TOOLS_LEVELSETPLATONIC_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

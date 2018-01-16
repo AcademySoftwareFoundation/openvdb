@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,6 +49,7 @@
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::floor()
 #include <limits>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <string>
@@ -342,6 +343,36 @@ evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
     return quat;
 }
 
+template <> inline openvdb::math::Mat3<float>
+evalAttrDefault<openvdb::math::Mat3<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<float> mat;
+    fpreal64 value;
+    float* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = float(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat3<double>
+evalAttrDefault<openvdb::math::Mat3<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<double> mat;
+    fpreal64 value;
+    double* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = double(value);
+    }
+
+    return mat;
+}
+
 template <> inline openvdb::math::Mat4<float>
 evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
 {
@@ -379,7 +410,7 @@ evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
 class AttributeDetailBase
 {
 public:
-    using Ptr = boost::shared_ptr<AttributeDetailBase>;
+    using Ptr = std::shared_ptr<AttributeDetailBase>;
 
     virtual ~AttributeDetailBase() = default;
 
@@ -421,14 +452,14 @@ public:
         const bool isVector = false);
 
     void set(const openvdb::Coord& ijk, const GA_Offset (&offsets)[3],
-        const openvdb::Vec3d& weights);
+        const openvdb::Vec3d& weights) override;
 
-    void set(const openvdb::Coord& ijk, GA_Offset offset);
+    void set(const openvdb::Coord& ijk, GA_Offset offset) override;
 
-    openvdb::GridBase::Ptr& grid() { return mGrid; }
-    std::string& name() { return mName; }
+    openvdb::GridBase::Ptr& grid() override { return mGrid; }
+    std::string& name() override { return mName; }
 
-    AttributeDetailBase::Ptr copy();
+    AttributeDetailBase::Ptr copy() override;
 
 protected:
     AttributeDetail();
@@ -617,7 +648,6 @@ MeshAttrTransfer::operator()(IterRange &range) const
     openvdb::Int32Tree::LeafNodeType::ValueOnCIter iter;
 
     openvdb::Coord ijk;
-    GA_Size vtxn;
 
     const bool ptnAttrTransfer = mPointAttributes.size() > 0;
     const bool vtxAttrTransfer = mVertexAttributes.size() > 0;
@@ -647,13 +677,14 @@ MeshAttrTransfer::operator()(IterRange &range) const
             // Transfer vertex and point attributes
             const GA_Primitive * primRef = mMeshGdp.getPrimitiveList().get(prmOffset);
 
-            vtxn = primRef->getVertexCount();
+            const GA_Size vtxn = primRef->getVertexCount();
 
             // Get vertex and point offests
 #if UT_MAJOR_VERSION_INT >= 16
             for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
-                ptnOffsetList[vtx] = primRef->getPointOffset(vtx);
-                vtxOffsetList[vtx] = primRef->getVertexOffset(vtx);
+                const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
+                ptnOffsetList[vtx] = mMeshGdp.vertexPoint(vtxoff);
+                vtxOffsetList[vtx] = vtxoff;
 
                 UT_Vector3 p = mMeshGdp.getPos3(ptnOffsetList[vtx]);
                 ptnList[vtx][0] = double(p[0]);
@@ -726,17 +757,14 @@ class PointAttrTransfer
 public:
     using IterRange = openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter>;
 
-    inline
-    PointAttrTransfer(
+    inline PointAttrTransfer(
         AttributeDetailList &pointAttributes,
         const openvdb::Int32Grid& closestPtnIdxGrid,
         const GU_Detail& ptGeop);
 
-    inline
-    PointAttrTransfer(const PointAttrTransfer &other);
+    inline PointAttrTransfer(const PointAttrTransfer &other);
 
-    inline
-    ~PointAttrTransfer() {}
+    inline ~PointAttrTransfer() {}
 
     /// Main calls
     inline void runParallel();
@@ -822,7 +850,7 @@ PointAttrTransfer::operator()(IterRange &range) const
 
 struct AttributeCopyBase
 {
-    using Ptr = boost::shared_ptr<AttributeCopyBase>;
+    using Ptr = std::shared_ptr<AttributeCopyBase>;
 
     virtual ~AttributeCopyBase() {}
     virtual void copy(GA_Offset /*source*/, GA_Offset /*target*/) = 0;
@@ -845,7 +873,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         ValueType data;
         for (int i = 0; i < mTupleSize; ++i) {
@@ -855,13 +883,12 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         doCopy<ValueType>(v0, v1, v2, target, uvw);
     }
 
 private:
-
     template<typename T>
     typename std::enable_if<std::is_integral<T>::value>::type
     doCopy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target, const openvdb::Vec3d& uvw)
@@ -915,7 +942,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         for (int i = 0; i < mTupleSize; ++i) {
             mAIF.setString(&mTargetAttr, target, mAIF.getString(&mSourceAttr, source, i), i);
@@ -923,7 +950,7 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         GA_Offset source = v0;
         double min = uvw[0];
@@ -1210,7 +1237,6 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
     openvdb::Vec3d pos, indexPos, uvw;
     openvdb::Coord ijk, coord;
     std::vector<GA_Index> primitives(8), similar_primitives(8);
-    int count;
 
     UT_Vector3 targetN, sourceN;
 
@@ -1229,15 +1255,15 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                     pos[2] = 0.0;
 
 #if UT_MAJOR_VERSION_INT >= 16
-                    count = static_cast<int>(primRef->getVertexCount());
+                    int count = static_cast<int>(primRef->getVertexCount());
                     for (int vtx = 0; vtx < count; ++vtx) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(primRef->getPointOffset(vtx));
+                        const UT_Vector3 p = primRef->getPos3(vtx);
                         pos[0] += p.x();
                         pos[1] += p.y();
                         pos[2] += p.z();
                     }
 #else
-                    count = 0;
+                    int count = 0;
                     for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
                         const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
                         pos[0] += p.x();
@@ -1297,7 +1323,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                 if (mVertAttributes.size() != 0) {
 #if UT_MAJOR_VERSION_INT >= 16
                     for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(primRef->getPointOffset(vtx));
+                        const UT_Vector3 p = primRef->getPos3(vtx);
 #else
                     for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
                         const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
@@ -1591,6 +1617,6 @@ transferPrimitiveAttributes(
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

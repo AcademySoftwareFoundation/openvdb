@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,6 +42,7 @@
 #include "IndexIterator.h"
 #include "IndexFilter.h"
 
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 
 namespace openvdb {
@@ -102,11 +103,7 @@ struct DeleteByFilterOp
 
     void operator()(const LeafRangeT& range) const
     {
-        for (auto leaf = range.begin(); leaf != range.end(); ++leaf)
-        {
-            // early-exit if the leaf has no points
-            const size_t size = iterCount(leaf->beginIndexAll());
-            if (size == 0)    continue;
+        for (auto leaf = range.begin(); leaf != range.end(); ++leaf) {
 
             const size_t newSize =
                 iterCount(leaf->template beginIndexAll<FilterT>(mFilter));
@@ -116,6 +113,11 @@ struct DeleteByFilterOp
                 leaf->clearAttributes();
                 continue;
             }
+
+            // early exit if no points are being deleted
+
+            const size_t currentSize = leaf->getLastValue();
+            if (newSize == currentSize) continue;
 
             const AttributeSet& existingAttributeSet = leaf->attributeSet();
             AttributeSet* newAttributeSet = new AttributeSet(
@@ -201,6 +203,10 @@ inline void deleteFromGroups(PointDataTreeT& pointTree, const std::vector<std::s
     point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(*filter);
     tbb::parallel_for(leafManager.leafRange(), deleteOp);
 
+    // remove empty leaf nodes
+
+    tools::pruneInactive(pointTree);
+
     // drop the now-empty groups (unless invert = true)
 
     if (!invert) {
@@ -223,6 +229,6 @@ inline void deleteFromGroup(PointDataTreeT& pointTree, const std::string& group,
 
 #endif // OPENVDB_POINTS_POINT_DELETE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

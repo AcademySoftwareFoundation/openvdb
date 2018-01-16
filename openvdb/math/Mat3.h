@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -695,10 +695,6 @@ Mat3<T> outerProduct(const Vec3<T>& v1, const Vec3<T>& v2)
                    v1[2]*v2[0], v1[2]*v2[1], v1[2]*v2[2]);
 }// outerProduct
 
-using Mat3s = Mat3<float>;
-using Mat3d = Mat3<double>;
-using Mat3f = Mat3d;
-
 
 /// Interpolate the rotation between m1 and m2 using Mat::powSolve.
 /// Unlike slerp, translation is not treated independently.
@@ -842,12 +838,22 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     return false;
 }
 
+
+using Mat3s = Mat3<float>;
+using Mat3d = Mat3<double>;
+using Mat3f = Mat3d;
+
 } // namespace math
+
+
+template<> inline math::Mat3s zeroVal<math::Mat3s>() { return math::Mat3s::zero(); }
+template<> inline math::Mat3d zeroVal<math::Mat3d>() { return math::Mat3d::zero(); }
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

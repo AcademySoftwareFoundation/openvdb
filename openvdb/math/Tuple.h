@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,6 +37,7 @@
 #include "Math.h"
 #include <cmath>
 #include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -53,8 +54,8 @@ struct Conversion {};
 template<int SIZE, typename T>
 class Tuple {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
 
     static const int size = SIZE;
 
@@ -161,7 +162,7 @@ public:
     }
 
     /// True if a Nan is present in this tuple
-    bool isNan() const { 
+    bool isNan() const {
         for (int i = 0; i < SIZE; ++i) {
             if (std::isnan(mm[i])) return true;
         }
@@ -179,7 +180,7 @@ public:
     /// True if no Nan or Inf values are present
     bool isFinite() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (!std::isfinite((double)mm[i])) return false;
+            if (!math::isFinite(mm[i])) return false;
         }
         return true;
     }
@@ -270,6 +271,6 @@ std::ostream& operator<<(std::ostream& ostr, const Tuple<SIZE, T>& classname)
 
 #endif // OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

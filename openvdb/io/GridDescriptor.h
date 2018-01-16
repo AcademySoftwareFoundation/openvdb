@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,7 +33,7 @@
 
 #include <openvdb/Grid.h>
 #include <iostream>
-#include <boost/cstdint.hpp>
+#include <string>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -62,14 +62,14 @@ public:
 
     bool saveFloatAsHalf() const { return mSaveFloatAsHalf; }
 
-    void setGridPos(boost::int64_t pos) { mGridPos = pos; }
-    boost::int64_t getGridPos() const { return mGridPos; }
+    void setGridPos(int64_t pos) { mGridPos = pos; }
+    int64_t getGridPos() const { return mGridPos; }
 
-    void setBlockPos(boost::int64_t pos) { mBlockPos = pos; }
-    boost::int64_t getBlockPos() const { return mBlockPos; }
+    void setBlockPos(int64_t pos) { mBlockPos = pos; }
+    int64_t getBlockPos() const { return mBlockPos; }
 
-    void setEndPos(boost::int64_t pos) { mEndPos = pos; }
-    boost::int64_t getEndPos() const { return mEndPos; }
+    void setEndPos(int64_t pos) { mEndPos = pos; }
+    int64_t getEndPos() const { return mEndPos; }
 
     // These methods seek to the right position in the given stream.
     void seekToGrid(std::istream&) const;
@@ -118,11 +118,11 @@ private:
     /// Are floats quantized to 16 bits on disk?
     bool mSaveFloatAsHalf;
     /// Location in the stream where the grid data is stored
-    boost::int64_t mGridPos;
+    int64_t mGridPos;
     /// Location in the stream where the grid blocks are stored
-    boost::int64_t mBlockPos;
+    int64_t mBlockPos;
     /// Location in the stream where the next grid descriptor begins
-    boost::int64_t mEndPos;
+    int64_t mEndPos;
 };
 
 } // namespace io
@@ -131,6 +131,6 @@ private:
 
 #endif // OPENVDB_IO_GRIDDESCRIPTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

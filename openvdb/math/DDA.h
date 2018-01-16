@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,8 +40,10 @@
 #include "Coord.h"
 #include "Math.h"
 #include "Vec3.h"
+#include <openvdb/Types.h>
 #include <iostream>// for std::ostream
 #include <limits>// for std::numeric_limits<Type>::max()
+#include <boost/mpl/at.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -231,7 +233,7 @@ public:
     /// ListType is a list of RayType::TimeSpan and is required to
     /// have the two methods: clear() and push_back(). Thus, it could
     /// be std::vector<typename RayType::TimeSpan> or
-    /// std::deque<typename RayType::TimeSpan>.  
+    /// std::deque<typename RayType::TimeSpan>.
     template <typename AccessorT, typename ListT>
     void hits(RayT& ray, AccessorT &acc, ListT& times)
     {
@@ -264,7 +266,7 @@ private:
         if (t.t0>=0) t.t1 = mDDA.maxTime();
         return false;
     }
-    
+
     /// ListType is a list of RayType::TimeSpan and is required to
     /// have the two methods: clear() and push_back(). Thus, it could
     /// be std::vector<typename RayType::TimeSpan> or
@@ -368,6 +370,6 @@ private:
 
 #endif // OPENVDB_MATH_DDA_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
