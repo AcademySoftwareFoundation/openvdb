@@ -578,7 +578,7 @@ TestPointGroup::testFilter()
         std::vector<Vec3f> positions;
 
         for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-            GroupFilter filterx("first_bbox");
+            GroupFilter filterx("first_bbox", iter->attributeSet());
             auto filterIndexIter = iter->beginIndexOn(filterx);
 
             auto handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));

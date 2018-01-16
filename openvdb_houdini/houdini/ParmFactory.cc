@@ -47,9 +47,81 @@
 #include <UT/UT_IntArray.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
-#include <cstring> // for ::strdup()
+#include <algorithm> // for std::for_each(), std::max(), std::remove(), std::sort()
+#include <cstdint> // for std::uintptr_t()
+#include <cstdlib> // for std::atoi()
+#include <cstring> // for std::strcmp(), ::strdup()
+#include <limits>
+#include <ostream>
+#include <sstream>
 
 namespace houdini_utils {
+
+namespace {
+
+// PRM_SpareData token names
+
+// SOP input index specifier
+/// @todo Is there an existing constant for this token?
+char const * const kSopInputToken = "sop_input";
+// Parameter documentation wiki markup
+char const * const kParmDocToken = "houdini_utils::doc";
+// String-encoded GA_AttributeOwner
+char const * const kAttrOwnerToken = "houdini_utils::attr_owner";
+// Pointer to an AttrFilterFunc
+char const * const kAttrFilterToken = "houdini_utils::attr_filter";
+
+
+// Add an integer value (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSpareInteger(PRM_SpareData* spare, const char* token, int value)
+{
+    if (spare && token) {
+        spare->addTokenValue(token, std::to_string(value).c_str());
+    }
+}
+
+// Retrieve the integer value with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default integer value.
+inline int
+getSpareInteger(const PRM_SpareData* spare, const char* token, int deflt = 0)
+{
+    if (!spare || !token) return deflt;
+    char const * const str = spare->getValue(token);
+    return str ? std::atoi(str) : deflt;
+}
+
+
+// Add a pointer (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSparePointer(PRM_SpareData* spare, const char* token, const void* ptr)
+{
+    if (spare && token) {
+        spare->addTokenValue(token,
+            std::to_string(reinterpret_cast<std::uintptr_t>(ptr)).c_str());
+    }
+}
+
+// Retrieve the pointer with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default pointer.
+inline const void*
+getSparePointer(const PRM_SpareData* spare, const char* token, const void* deflt = nullptr)
+{
+    if (!spare || !token) return deflt;
+    if (sizeof(std::uintptr_t) > sizeof(unsigned long long)) {
+        throw std::range_error{"houdini_utils::ParmFactory: can't decode pointer from string"};
+    }
+    if (const char* str = spare->getValue(token)) {
+        auto intPtr = static_cast<std::uintptr_t>(std::stoull(str));
+        return reinterpret_cast<void*>(intPtr);
+    }
+    return deflt;
+}
+
+} // anonymous namespace
+
 
 ParmList&
 ParmList::add(const PRM_Template& p)
@@ -71,7 +143,7 @@ ParmList::add(const ParmFactory& f)
 ParmList::SwitcherInfo*
 ParmList::getCurrentSwitcher()
 {
-    SwitcherInfo* info = NULL;
+    SwitcherInfo* info = nullptr;
     if (!mSwitchers.empty()) {
         info = &mSwitchers.back();
     }
@@ -82,7 +154,7 @@ ParmList::getCurrentSwitcher()
 ParmList&
 ParmList::beginSwitcher(const std::string& token, const std::string& label)
 {
-    if (NULL != getCurrentSwitcher()) {
+    if (nullptr != getCurrentSwitcher()) {
         incFolderParmCount();
     }
     SwitcherInfo info;
@@ -98,7 +170,7 @@ ParmList::beginSwitcher(const std::string& token, const std::string& label)
 ParmList&
 ParmList::beginExclusiveSwitcher(const std::string& token, const std::string& label)
 {
-    if (NULL != getCurrentSwitcher()) {
+    if (nullptr != getCurrentSwitcher()) {
         incFolderParmCount();
     }
     SwitcherInfo info;
@@ -187,32 +259,35 @@ struct ParmFactory::Impl
 {
     Impl(const std::string& token, const std::string& label):
         callbackFunc(0),
-        choicelist(NULL),
-        conditional(NULL),
+        choicelist(nullptr),
+        conditional(nullptr),
         defaults(PRMzeroDefaults),
-        helpText(NULL),
         multiType(PRM_MULTITYPE_NONE),
         name(new PRM_Name(token.c_str(), label.c_str())),
         parmGroup(0),
-        range(NULL),
-        spareData(NULL),
-        multiparms(NULL),
+        range(nullptr),
+        spareData(nullptr),
+        multiparms(nullptr),
         typeExtended(PRM_TYPE_NONE),
         vectorSize(1)
     {
         const_cast<PRM_Name*>(name)->harden();
     }
 
+    static PRM_SpareData* getSopInputSpareData(size_t inp); ///< @todo return a const pointer?
+    static void getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+        const PRM_SpareData*, const PRM_Parm*);
+
     PRM_Callback               callbackFunc;
     const PRM_ChoiceList*      choicelist;
     const PRM_ConditionalBase* conditional;
     const PRM_Default*         defaults;
-    const char*                helpText;
+    std::string                tooltip;
     PRM_MultiType              multiType;
     const PRM_Name*            name;
     int                        parmGroup;
     const PRM_Range*           range;
-    const PRM_SpareData*       spareData;
+    PRM_SpareData*             spareData;
     const PRM_Template*        multiparms;
     PRM_Type                   type;
     PRM_TypeExtended           typeExtended;
@@ -225,6 +300,109 @@ struct ParmFactory::Impl
 PRM_SpareData* const ParmFactory::Impl::sSOPInputSpareData[4] = {
         &SOP_Node::theFirstInput, &SOP_Node::theSecondInput,
         &SOP_Node::theThirdInput, &SOP_Node::theFourthInput};
+
+
+// Return one of the predefined PRM_SpareData maps that specify a SOP input number,
+// or construct new PRM_SpareData if none exists for the given input number.
+PRM_SpareData*
+ParmFactory::Impl::getSopInputSpareData(size_t inp)
+{
+    if (inp < 4) return Impl::sSOPInputSpareData[inp];
+
+    auto spare = new PRM_SpareData{SOP_Node::theFirstInput};
+    spare->addTokenValue(kSopInputToken, std::to_string(inp).c_str());
+    return spare;
+}
+
+
+// PRM_ChoiceGenFunc invoked by ParmFactory::setAttrChoiceList()
+void
+ParmFactory::Impl::getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+    const PRM_SpareData* spare, const PRM_Parm* parm)
+{
+    if (!op || !choices || !parm) return;
+    // This function can only be used in SOPs, because it calls SOP_Node::fillAttribNameMenu().
+    if (static_cast<OP_Node*>(op)->getOpTypeID() != SOP_OPTYPE_ID) return;
+
+    auto* sop = static_cast<SOP_Node*>(op);
+
+    // Extract the SOP input number, the attribute class, and an optional
+    // pointer to a filter functor from the spare data.
+    const int inp = getSpareInteger(spare, kSopInputToken);
+    const int attrOwner = getSpareInteger(spare, kAttrOwnerToken, GA_ATTRIB_INVALID);
+    const auto* attrFilter =
+        static_cast<const AttrFilterFunc*>(getSparePointer(spare, kAttrFilterToken));
+
+    // Marshal pointers to the filter functor and the parameter and SOP for which this function
+    // is being called into blind data that can be passed to SOP_Node::fillAttribNameMenu().
+    struct AttrFilterData {
+        const AttrFilterFunc* func;
+        const PRM_Parm* parm;
+        const SOP_Node* sop;
+    };
+    AttrFilterData cbData{attrFilter, parm, sop};
+
+    // Define a filter callback function to be passed to SOP_Node::fillAttribNameMenu().
+    // Because the latter uses a C-style callback mechanism, this callback must be
+    // equivalent to a static function pointer (as a non-capturing lambda is).
+    auto cb = [](const GA_Attribute* aAttr, void* aData) -> bool {
+        if (!aAttr) return false;
+        // Cast the blind data pointer supplied by SOP_Node::fillAttribNameMenu().
+        const auto* data = static_cast<AttrFilterData*>(aData);
+        if (!data || !data->func) return true; // no filter; accept all attributes
+        // Invoke the filter functor and return the result.
+        return (*(data->func))(*aAttr, *(data->parm), *(data->sop));
+    };
+
+    // Invoke SOP_Node::fillAttribNameMenu() for the appropriate attribute class.
+    switch (attrOwner) {
+        case GA_ATTRIB_VERTEX:
+        case GA_ATTRIB_POINT:
+        case GA_ATTRIB_PRIMITIVE:
+        case GA_ATTRIB_DETAIL:
+            if (cbData.func) {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp, cb, &cbData);
+            } else {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp);
+            }
+            break;
+        default: // all attributes
+        {
+            // To collect all classes of attributes, call SOP_Node::fillAttribNameMenu()
+            // once for each class.  Each call appends zero or more PRM_Names to the list
+            // as well as an end-of-list terminator.
+            auto* head = choices;
+            int count = 0, maxCount = maxChoices;
+            for (auto owner:
+                { GA_ATTRIB_VERTEX, GA_ATTRIB_POINT, GA_ATTRIB_PRIMITIVE, GA_ATTRIB_DETAIL })
+            {
+                int numAdded = (cbData.func ?
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp, cb, &cbData) :
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp));
+                if (numAdded > 0) {
+                    // SOP_Node::fillAttribNameMenu() returns the number of entries added
+                    // to the list, not including the terminator.
+                    // Advance the list head pointer so that the next entry to be added
+                    // (if any) overwrites the terminator.
+                    count += numAdded;
+                    head += numAdded;
+                    maxCount -= numAdded;
+                }
+            }
+            if (count) {
+                // Sort the list by name to reproduce the behavior of SOP_Node::allAttribMenu.
+                std::sort(choices, choices + count,
+                    [](const PRM_Name& n1, const PRM_Name& n2) {
+                        return (0 > std::strcmp(n1.getToken(), n2.getToken()));
+                    }
+                );
+            }
+            break;
+        }
+    }
+}
 
 
 ////////////////////////////////////////
@@ -254,16 +432,16 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
 #if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
     if (c == &PrimGroupMenuInput1) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            NULL, 0, &SOP_Node::theFirstInput));
+            nullptr, 0, &SOP_Node::theFirstInput));
     } else if (c == &PrimGroupMenuInput2) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            NULL, 1, &SOP_Node::theSecondInput));
+            nullptr, 1, &SOP_Node::theSecondInput));
     } else if (c == &PrimGroupMenuInput3) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            NULL, 2, &SOP_Node::theThirdInput));
+            nullptr, 2, &SOP_Node::theThirdInput));
     } else if (c == &PrimGroupMenuInput4) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            NULL, 3, &SOP_Node::theFourthInput));
+            nullptr, 3, &SOP_Node::theFourthInput));
     }
 #else
     if (c == &PrimGroupMenuInput1) {
@@ -287,7 +465,7 @@ ParmFactory&
 ParmFactory::doSetChoiceList(PRM_ChoiceListType typ, const char* const* items, bool paired)
 {
     size_t numItems = 0;
-    for ( ; items[numItems] != NULL; ++numItems) {}
+    for ( ; items[numItems] != nullptr; ++numItems) {}
     if (paired) numItems >>= 1;
     PRM_Name* copyOfItems = new PRM_Name[numItems + 1]; // extra item is list terminator
     if (paired) {
@@ -361,20 +539,39 @@ ParmFactory::setChoiceListItems(PRM_ChoiceListType typ, const std::vector<std::s
     return doSetChoiceList(typ, items, /*paired=*/true);
 }
 
+
 ParmFactory&
-ParmFactory::setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ)
+ParmFactory::setGroupChoiceList(size_t inputIndex, PRM_ChoiceListType typ)
 {
-    if (0 <= inputIndex && inputIndex < 4) {
-        mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+    mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+
 #if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
-        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            NULL, inputIndex, Impl::sSOPInputSpareData[inputIndex]));
+    setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE, nullptr,
+        static_cast<int>(inputIndex), mImpl->getSopInputSpareData(inputIndex)));
 #else
-        setSpareData(Impl::sSOPInputSpareData[inputIndex]);
+    setSpareData(mImpl->getSopInputSpareData(inputIndex));
 #endif
-    }
+
     return *this;
 }
+
+
+ParmFactory&
+ParmFactory::setAttrChoiceList(size_t inputIndex, GA_AttributeOwner attrOwner,
+    PRM_ChoiceListType typ, AttrFilterFunc attrFilter)
+{
+    setChoiceList(new PRM_ChoiceList{typ, Impl::getAttrChoices});
+
+    mImpl->spareData = new PRM_SpareData;
+    setSpareInteger(mImpl->spareData, kSopInputToken, int(inputIndex));
+    setSpareInteger(mImpl->spareData, kAttrOwnerToken, static_cast<int>(attrOwner));
+    if (attrFilter) {
+        setSparePointer(mImpl->spareData, kAttrFilterToken, new AttrFilterFunc{attrFilter});
+    }
+
+    return *this;
+}
+
 
 ParmFactory&
 ParmFactory::setConditional(const PRM_ConditionalBase* c) { mImpl->conditional = c; return *this; }
@@ -418,13 +615,24 @@ ParmFactory::setDefault(const std::vector<PRM_Default>& defaults)
 }
 
 ParmFactory&
-ParmFactory::setDefault(const PRM_Default* d)       { mImpl->defaults = d; return *this; }
+ParmFactory::setDefault(const PRM_Default* d) { mImpl->defaults = d; return *this; }
 
 ParmFactory&
-ParmFactory::setHelpText(const char* t)             { mImpl->helpText = t; return *this; }
+ParmFactory::setTooltip(const char* t) { mImpl->tooltip = (t ? t : ""); return *this; }
 
 ParmFactory&
-ParmFactory::setParmGroup(int n)                    { mImpl->parmGroup = n; return *this; }
+ParmFactory::setHelpText(const char* t) { return setTooltip(t); }
+
+ParmFactory&
+ParmFactory::setDocumentation(const char* doc)
+{
+    if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
+    mImpl->spareData->addTokenValue(kParmDocToken, ::strdup(doc ? doc : ""));
+    return *this;
+}
+
+ParmFactory&
+ParmFactory::setParmGroup(int n) { mImpl->parmGroup = n; return *this; }
 
 ParmFactory&
 ParmFactory::setRange(PRM_RangeFlag minFlag, fpreal minVal, PRM_RangeFlag maxFlag, fpreal maxVal)
@@ -446,42 +654,49 @@ ParmFactory::setRange(const std::vector<PRM_Range>& ranges)
 }
 
 ParmFactory&
-ParmFactory::setRange(const PRM_Range* r)            { mImpl->range = r; return *this; }
+ParmFactory::setRange(const PRM_Range* r) { mImpl->range = r; return *this; }
 
 ParmFactory&
 ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
 {
-    typedef std::map<std::string, std::string> StringMap;
+    using StringMap = std::map<std::string, std::string>;
     if (!items.empty()) {
-        PRM_SpareData* data = new PRM_SpareData();
+        if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
         for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
-            data->addTokenValue(i->first.c_str(), i->second.c_str());
+            mImpl->spareData->addTokenValue(i->first.c_str(), i->second.c_str());
         }
-        mImpl->spareData = data;
     }
     return *this;
 }
 
 ParmFactory&
-ParmFactory::setSpareData(const PRM_SpareData* d)   { mImpl->spareData = d; return *this; }
+ParmFactory::setSpareData(const PRM_SpareData* d)
+{
+    if (!d) {
+        if (mImpl->spareData) mImpl->spareData->clear();
+    } else {
+        mImpl->spareData = new PRM_SpareData{*d};
+    }
+    return *this;
+}
 
 ParmFactory&
-ParmFactory::setMultiparms(const ParmList& p)       { mImpl->multiparms = p.get(); return *this; }
+ParmFactory::setMultiparms(const ParmList& p) { mImpl->multiparms = p.get(); return *this; }
 
 ParmFactory&
-ParmFactory::setTypeExtended(PRM_TypeExtended t)    { mImpl->typeExtended = t; return *this; }
+ParmFactory::setTypeExtended(PRM_TypeExtended t) { mImpl->typeExtended = t; return *this; }
 
 ParmFactory&
-ParmFactory::setVectorSize(int n)                   { mImpl->vectorSize = n; return *this; }
+ParmFactory::setVectorSize(int n) { mImpl->vectorSize = n; return *this; }
 
 PRM_Template
 ParmFactory::get() const
 {
 #ifdef SESI_OPENVDB
     // Help is maintained separately within Houdini
-    const char *helpText = NULL;
+    const char *tooltip = nullptr;
 #else
-    const char *helpText = mImpl->helpText;
+    const char *tooltip = mImpl->tooltip.c_str();
 #endif
     if (mImpl->multiType != PRM_MULTITYPE_NONE) {
         return PRM_Template(
@@ -491,8 +706,8 @@ ParmFactory::get() const
             const_cast<PRM_Name*>(mImpl->name),
             const_cast<PRM_Default*>(mImpl->defaults),
             const_cast<PRM_Range*>(mImpl->range),
-            const_cast<PRM_SpareData*>(mImpl->spareData),
-            helpText,
+            mImpl->spareData,
+            tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     } else {
         return PRM_Template(
@@ -504,9 +719,9 @@ ParmFactory::get() const
             const_cast<PRM_ChoiceList*>(mImpl->choicelist),
             const_cast<PRM_Range*>(mImpl->range),
             mImpl->callbackFunc,
-            const_cast<PRM_SpareData*>(mImpl->spareData),
+            mImpl->spareData,
             mImpl->parmGroup,
-            helpText,
+            tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     }
 }
@@ -517,12 +732,159 @@ ParmFactory::get() const
 
 namespace {
 
+/// @brief Output wiki markup documentation to the given stream for
+/// a (possibly nested) list of parameters.
+/// @return the address of the parameter list entry one past the last parameter
+/// that was documented
+inline const PRM_Template*
+documentParms(std::ostream& os, PRM_Template const * const parmList, int level = 0,
+    int numParms = std::numeric_limits<int>::max())
+{
+    if (level > 10) return parmList; // probably something wrong if there are 10 levels of nesting
+
+    auto indent = [&level]() { return std::string(4 * std::max(0, level), ' '); };
+
+    bool hasHeading = false;
+    const PRM_Template* parm = parmList;
+    for (int parmIdx = 0;
+        parm && (parmIdx < numParms) && (parm->getType() != PRM_LIST_TERMINATOR);
+        ++parmIdx, ++parm)
+    {
+        const auto parmType = parm->getType();
+        if (parmType == PRM_LABEL) continue;
+
+        const auto parmLabel = [parm]() {
+            UT_String lbl = parm->getLabel();
+            // Houdini's wiki markup parser aggressively expands square-bracketed text into
+            // hyperlinks.  The following is one way to suppress that behavior, given that
+            // there doesn't appear to be any native escaping mechanism.  Since we might want
+            // to use brackets--but probably not hyperlinks--in parameter labels, and since
+            // hacks like this don't render correctly in the parameter pane, we unconditionally
+            // "escape" brackets in parameter labels, but only in the documentation markup.
+            lbl.substitute("[", "&#91;", /*all=*/true); // 91 is the ISO-8859 code for "["
+            lbl.substitute("]", "&#93;", /*all=*/true); // 93 is the ISO-8859 code for "]"
+            return lbl;
+        }();
+        const bool hasLabel = parmLabel.isstring();
+
+        if ((parmType == PRM_SEPARATOR) || ((parmType == PRM_HEADING) && !hasLabel)) {
+            // A separator or empty heading removes one level of nesting.
+            // (There are no begin/end grouping indicators, so this is just a best guess.)
+            level = std::max(0, level - 1);
+            hasHeading = false;
+            continue;
+        }
+
+        UT_String parmDoc;
+        const PRM_SpareData* const spare = parm->getSparePtr();
+        if (spare && spare->getValue(kParmDocToken)) {
+            // If the parameter was documented with setDocumentation(), use that text.
+            // (This relies on kParmDocToken not being paired with nullptr.
+            // ParmFactory::setDocumentation(), at least, ensures that it isn't.)
+            parmDoc = spare->getValue(kParmDocToken);
+            // If the text is empty, suppress this parameter.
+            if (!parmDoc.isstring()) continue;
+        } else {
+            // Otherwise, if the parameter has a tool tip, use that.
+            parmDoc = parm->getHelpText();
+
+            // If the parameter has no tool tip but has a choice list, list the choices
+            // (except if the parameter is a toggle--toggles seem to be implemented as
+            // on/off choice lists).
+            if (!parmDoc.isstring() && (parmType.getOrdinalType() != PRM_Type::PRM_ORD_TOGGLE)) {
+                if (const PRM_ChoiceList* choices = parm->getChoiceListPtr()) {
+                    for (const PRM_Name* choiceName =
+                        const_cast<PRM_ChoiceList*>(choices)->choiceNamesPtr();
+                        choiceName && choiceName->getToken(); ++choiceName)
+                    {
+                        if (const char* n = choiceName->getLabel()) {
+                            parmDoc += (std::string{"* "} + n + "\n").c_str();
+                        }
+                    }
+                }
+            }
+            // Otherwise, show the parameter without documentation.
+            /// @todo Just suppress undocumented parameters?
+            if ((parmType != PRM_HEADING) && !parm->isMultiType() && !parmDoc.isstring()) {
+                parmDoc = "&nbsp;";
+            }
+        }
+        const bool hasDoc = parmDoc.isstring();
+
+        if (parmType == PRM_HEADING) {
+            // Decrement the nesting level for a heading label if there was
+            // a previous heading.  (This assumes that headings aren't nested.)
+            if (hasHeading) --level;
+            hasHeading = true;
+            os << indent() << parmLabel.c_str() << ":\n";
+            ++level; // increment the nesting level below a heading
+            if (hasDoc) {
+                parmDoc.substitute("\n", ("\n" + indent()).c_str(), /*all=*/true);
+                os << indent() << parmDoc.c_str() << "\n\n";
+            }
+
+        } else if ((parmType == PRM_SWITCHER) || (parmType == PRM_SWITCHER_EXCLUSIVE)
+            || (parmType == PRM_SWITCHER_REFRESH))
+        {
+            // The vector size of a switcher is the number of folders.
+            const int numFolders = parm->getVectorSize();
+            const PRM_Template* firstFolderParm = parm + 1;
+            const PRM_Default* deflt = parm->getFactoryDefaults();
+            for (int folder = 0; deflt && (folder < numFolders); ++folder, ++deflt) {
+                // The default values of a switcher are per-folder (member count, title) pairs.
+                const int numMembers = deflt->getOrdinal();
+                char const * const title = deflt->getString();
+                if (title) {
+                    // If the folder has a title, show the title and increment
+                    // the nesting level for the folder's members.
+                    os << indent() << title << ":\n";
+                    ++level;
+                }
+                firstFolderParm = documentParms(os, firstFolderParm, level, numMembers);
+                if (title) { --level; }
+            }
+            parm = PRM_Template::getEndOfSwitcher(parm);
+            --parm; // decrement to compensate for loop increment
+
+        } else if (parm->isMultiType()) {
+            if (hasLabel) { os << indent() << parmLabel.c_str() << ":\n"; }
+            ++level; // increment the nesting level for the members of a multiparm
+            if (hasDoc) {
+                // Add the multiparm's documentation.
+                parmDoc.substitute("\n", ("\n" + indent()).c_str(), /*all=*/true);
+                os << indent() << parmDoc.c_str() << "\n\n";
+            }
+            // Add documentation for the members of the multiparm
+            // (but not for members of native types such as ramps,
+            // since those members have only generic descriptions).
+            if ((parm->getMultiType() != PRM_MULTITYPE_RAMP_FLT)
+                && (parm->getMultiType() != PRM_MULTITYPE_RAMP_RGB))
+            {
+                if (PRM_Template const * const subparms = parm->getMultiParmTemplate()) {
+                    documentParms(os, subparms, level);
+                }
+            }
+            --level;
+
+        } else if (hasLabel && hasDoc) {
+            // Add this parameter only if it has both a label and documentation.
+            os << indent() << parmLabel.c_str() << ":\n";
+            ++level;
+            parmDoc.substitute("\n", ("\n" + indent()).c_str(), /*all=*/true);
+            os << indent() << parmDoc.c_str() << "\n\n";
+            --level;
+        }
+    }
+    return parm;
+}
+
+
 /// @brief Operator class that adds the help link. Used by the OpFactory.
 class OP_OperatorDW: public OP_Operator
 {
 public:
     OP_OperatorDW(
-        OpFactory::OpFlavor,
+        OpFactory::OpFlavor flavor,
         const char* name,
         const char* english,
         OP_Constructor construct,
@@ -535,21 +897,57 @@ public:
         CH_LocalVariable* variables,
         unsigned flags,
         const char** inputlabels,
-        const std::string& helpUrl):
-        OP_Operator(name, english, construct, multiparms,
+        const std::string& helpUrl,
+        const std::string& doc)
+        : OP_Operator(name, english, construct, multiparms,
 #if (UT_MAJOR_VERSION_INT >= 16)
             operatorTableName,
 #endif
-            minSources, maxSources, variables, flags, inputlabels),
-        mHelpUrl(helpUrl)
+            minSources, maxSources, variables, flags, inputlabels)
+        , mHelpUrl(helpUrl)
     {
+#ifndef SESI_OPENVDB
+        // Generate help page markup for this operator if the help URL is empty
+        // and the documentation string is nonempty.
+        if (mHelpUrl.empty() && !doc.empty()) {
+            UT_String flavorStr{OpFactory::flavorToString(flavor)};
+            flavorStr.toLower();
+
+            std::ostringstream os;
+            os << "= " << english << " =\n\n"
+                << "#type: node\n"
+                << "#context: " << flavorStr << "\n"
+                << "#internal: " << name << "\n\n"
+                << doc << "\n\n";
+            {
+                std::ostringstream osParm;
+                documentParms(osParm, multiparms);
+                const std::string parmDoc = osParm.str();
+                if (!parmDoc.empty()) {
+                    os << "@parameters\n\n" << parmDoc;
+                }
+            }
+
+            const_cast<std::string*>(&mDoc)->assign(os.str());
+        }
+#endif
     }
 
-    virtual ~OP_OperatorDW() {}
-    virtual bool getOpHelpURL(UT_String& url) { url = mHelpUrl; return !mHelpUrl.empty(); }
+    ~OP_OperatorDW() override {}
+
+    bool getOpHelpURL(UT_String& url) override { url = mHelpUrl; return !mHelpUrl.empty(); }
+
+    bool getHDKHelp(UT_String& txt) const override
+    {
+        if (!mHelpUrl.empty()) return false; // URL takes precedence over help text
+
+        txt = mDoc;
+        txt.hardenIfNeeded();
+        return !mDoc.empty();
+    }
 
 private:
-    std::string mHelpUrl;
+    const std::string mHelpUrl, mDoc;
 };
 
 } // unnamed namespace
@@ -567,9 +965,9 @@ struct OpFactory::Impl
         mConstruct(constructor),
         mTable(&table),
         mParms(parms),
-        mObsoleteParms(NULL),
+        mObsoleteParms(nullptr),
         mMaxSources(0),
-        mVariables(NULL),
+        mVariables(nullptr),
         mFlags(0)
     {
     }
@@ -605,7 +1003,7 @@ struct OpFactory::Impl
         // as the number of labeled inputs.
         mMaxSources = std::max<unsigned>(unsigned(mInputLabels.size()), mMaxSources);
 
-        mInputLabels.push_back(NULL);
+        mInputLabels.push_back(nullptr);
 
         OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
             mConstruct, mParms,
@@ -613,18 +1011,18 @@ struct OpFactory::Impl
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
 #endif
             minSources, mMaxSources, mVariables, mFlags,
-            const_cast<const char**>(&mInputLabels[0]), mHelpUrl);
+            const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc);
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
-        if (mObsoleteParms != NULL) op->setObsoleteTemplates(mObsoleteParms);
+        if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
         return op;
     }
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mIconName, mHelpUrl, mOperatorTableName;
+    std::string mEnglish, mName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -723,6 +1121,13 @@ OpFactory::helpURL() const
 }
 
 
+const std::string&
+OpFactory::documentation() const
+{
+    return mImpl->mDoc;
+}
+
+
 const OP_OperatorTable&
 OpFactory::table() const
 {
@@ -751,6 +1156,14 @@ OpFactory::addAliasVerbatim(const std::string& name)
 
 
 OpFactory&
+OpFactory::setDocumentation(const std::string& doc)
+{
+    mImpl->mDoc = doc;
+    return *this;
+}
+
+
+OpFactory&
 OpFactory::addInput(const std::string& name)
 {
     mImpl->mInputLabels.push_back(::strdup(name.c_str()));
@@ -773,7 +1186,7 @@ OpFactory::setMaxInputs(unsigned n) { mImpl->mMaxSources = n; return *this; }
 OpFactory&
 OpFactory::setObsoleteParms(const ParmList& parms)
 {
-    if (mImpl->mObsoleteParms != NULL) delete mImpl->mObsoleteParms;
+    if (mImpl->mObsoleteParms != nullptr) delete mImpl->mObsoleteParms;
     mImpl->mObsoleteParms = parms.get();
     return *this;
 }
@@ -836,14 +1249,7 @@ DWAOpPolicy::getName(const OpFactory&, const std::string& english)
 std::string
 DWAOpPolicy::getHelpURL(const OpFactory& factory)
 {
-#if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
-    std::string url("http://mydw.anim.dreamworks.com/display/FX/Houdini+");
-    url += factory.flavorString(); // append "SOP", "POP", etc.
-    url += "_" + factory.name();
-    return url;
-#else
-    return "";
-#endif
+    return OpPolicy::getHelpURL(factory);
 }
 
 
@@ -867,22 +1273,12 @@ namespace {
 // (this functionality was added to SOP_Node::primGroupMenu some time ago,
 // possibly as early as Houdini 12.5)
 
-inline int
-lookupGroupInput(const PRM_SpareData *spare)
-{
-    const char  *istring;
-    if (!spare) return 0;
-    istring = spare->getValue("sop_input");
-    return istring ? atoi(istring) : 0;
-}
-
-
 void
 sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     const PRM_SpareData *spare, const PRM_Parm *parm)
 {
     SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
-    int inputIndex = lookupGroupInput(spare);
+    int inputIndex = getSopInputIndex(spare);
 
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
 

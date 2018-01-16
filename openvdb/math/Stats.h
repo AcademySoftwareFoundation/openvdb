@@ -55,12 +55,25 @@ namespace math {
 template <typename ValueType, typename Less = std::less<ValueType> >
 class MinMax
 {
+    using Limits = std::numeric_limits<ValueType>;
 public:
+
+    /// @brief Empty constructor
+    ///
+    /// @warning Only use this constructor with POD types
+    MinMax() : mMin(Limits::max()), mMax(Limits::lowest())
+    {
+        static_assert(std::numeric_limits<ValueType>::is_specialized,
+                      "openvdb::math::MinMax default constructor requires a std::numeric_limits specialization");
+    }
 
     /// @brief Constructor
     MinMax(const ValueType &min, const ValueType &max) : mMin(min), mMax(max)
     {
     }
+
+    /// @brief Default copy constructor 
+    MinMax(const MinMax &other) = default;
 
     /// Add a single sample.
     inline void add(const ValueType &val, const Less &less = Less())
@@ -386,7 +399,7 @@ private:
     uint64_t mSize;
     double mMin, mMax, mDelta;
     std::vector<uint64_t> mBins;
-};
+};// end Histogram
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

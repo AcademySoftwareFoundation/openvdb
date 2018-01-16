@@ -31,6 +31,7 @@
 #include "Metadata.h"
 
 #include <tbb/mutex.h>
+#include <algorithm> // for std::min()
 #include <map>
 #include <sstream>
 #include <vector>
@@ -40,12 +41,12 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
+using Mutex = tbb::mutex;
+using Lock = Mutex::scoped_lock;
 
-typedef Metadata::Ptr (*createMetadata)();
-typedef std::map<Name, createMetadata> MetadataFactoryMap;
-typedef MetadataFactoryMap::const_iterator MetadataFactoryMapCIter;
+using createMetadata = Metadata::Ptr (*)();
+using MetadataFactoryMap = std::map<Name, createMetadata>;
+using MetadataFactoryMapCIter = MetadataFactoryMap::const_iterator;
 
 struct LockedMetadataTypeRegistry {
     LockedMetadataTypeRegistry() {}
@@ -63,9 +64,9 @@ getMetadataTypeRegistry()
 {
     Lock lock(theInitMetadataTypeRegistryMutex);
 
-    static LockedMetadataTypeRegistry *registry = NULL;
+    static LockedMetadataTypeRegistry *registry = nullptr;
 
-    if(registry == NULL) {
+    if (registry == nullptr) {
 #if defined(__ICC)
 __pragma(warning(disable:1711)) // disable ICC "assignment to static variable" warnings
 #endif
@@ -160,6 +161,50 @@ Metadata::operator==(const Metadata& other) const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+
+Metadata::Ptr
+UnknownMetadata::copy() const
+{
+    Metadata::Ptr metadata{new UnknownMetadata{mTypeName}};
+    static_cast<UnknownMetadata*>(metadata.get())->setValue(mBytes);
+    return metadata;
+}
+
+
+void
+UnknownMetadata::copy(const Metadata& other)
+{
+    std::ostringstream ostr(std::ios_base::binary);
+    other.write(ostr);
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    const auto numBytes = readSize(istr);
+    readValue(istr, numBytes);
+}
+
+
+void
+UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
+{
+    mBytes.clear();
+    if (numBytes > 0) {
+        ByteVec buffer(numBytes);
+        is.read(reinterpret_cast<char*>(&buffer[0]), numBytes);
+        mBytes.swap(buffer);
+    }
+}
+
+
+void
+UnknownMetadata::writeValue(std::ostream& os) const
+{
+    if (!mBytes.empty()) {
+        os.write(reinterpret_cast<const char*>(&mBytes[0]), mBytes.size());
+    }
+}
+
+#else // if OPENVDB_ABI_VERSION_NUMBER < 5
+
 void
 UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
 {
@@ -180,6 +225,8 @@ UnknownMetadata::writeValue(std::ostream&) const
 {
     OPENVDB_THROW(TypeError, "Metadata has unknown type");
 }
+
+#endif
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

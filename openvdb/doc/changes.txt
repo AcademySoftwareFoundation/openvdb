@@ -2,6 +2,232 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v5_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 5.0.0</B> - <I>November 6, 2017</I>
+
+@par
+<BLOCKQUOTE>
+Some changes in this release (see @ref v5_0_0_ABI_changes "ABI changes" below)
+alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
+the OpenVDB library, such as the ones built into Houdini up to and including
+Houdini&nbsp;16.
+To preserve ABI compatibility, when compiling OpenVDB or any dependent code
+define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
+for example, <I>N</I> is 3 for Houdini&nbsp;15, 15.5 and&nbsp;16 and 4
+for the upcoming release.
+</BLOCKQUOTE>
+
+@par
+New features:
+- Added a @vdblink::getLibraryAbiVersionString()
+  getLibraryAbiVersionString@endlink function, which returns a
+  string such as <TT>"5.0.0abi3"</TT>.
+- Added a @vdblink::WeakPtr weak pointer@endlink type alias for ABI
+  compatibility.
+- Metadata fields of unregistered types are no longer discarded after
+  being read from a <TT>.vdb</TT> file, and although their values are not
+  printable, they can be written back to disk.
+- Added a @c DESTDIR_LIB_DIR Makefile variable for Linux multiarch support.
+  <I>[Contributed&nbsp;by&nbsp;Mathieu&nbsp;Malaterre]</I>
+- Added tools to create @link tools/PotentialFlow.h potential flow@endlink
+  fields, as described in the 2017&nbsp;SIGGRAPH OpenVDB course.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @link points/PointMask.h tools@endlink to create mask grids from
+  point data grids and to compute
+  @vdblink::points::pointCountGrid() point counts@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added @link points/PointScatter.h tools@endlink to scatter
+  @ref secPtOverview "OpenVDB points" randomly throughout a volume.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+
+@par
+Improvements:
+- Significantly improved the performance of point data grid
+  @vdblink::points::MultiGroupFilter group filters@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Bug fixes:
+- Fixed bugs in the
+  @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink tool&rsquo;s
+  distance calculations that caused searches to produce incorrect results.
+- Fixed a locking issue that affected multithreaded access to
+  @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink&zwj;s
+  when delayed loading was in effect.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+
+@anchor v5_0_0_ABI_changes
+@par
+ABI changes:
+- Made @vdblink::tree::InternalNode InternalNode@endlink&rsquo;s destructor
+  non-virtual.
+- The @ref v4_0_2_delayed_load_fix "fix" for a delayed-loading race condition
+  in the @vdblink::tree::LeafBuffer LeafBuffer@endlink class that was only
+  partially rolled out in the previous release is now enabled on all platforms.
+- Replaced a bit flag with an atomic integer in
+  @vdblink::points::AttributeArray points::AttributeArray@endlink
+  to address a threading issue during delayed loading.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Deprecated the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
+  macros in favor of a new @c OPENVDB_ABI_VERSION_NUMBER macro.
+  The new macro defaults to the library major version number but can be
+  set at compile time to an earlier version number to disable ABI changes
+  since that version.
+  (Older ABIs will not be supported indefinitely, however.)
+  For example, compile OpenVDB and any dependent code with
+  <TT>-DOPENVDB_ABI_VERSION_NUMBER=4</TT> to use the 4.x&nbsp;ABI.
+
+@par
+API changes:
+- Replaced @b tools::ClosestSurfacePoint::initialize with
+  @vdblink::tools::ClosestSurfacePoint::create()
+  tools::ClosestSurfacePoint::create@endlink,
+  which returns a newly-allocated and properly initialized object.
+- Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
+  including @b io::File::readGridPartial, @b points::initialize,
+  @b points::uninitialize and @b util::PagedArray::pop_back.
+- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
+  in favor of @vdblink::ValueError ValueError@endlink.
+- Changed the naming scheme for the
+  @link OPENVDB_VERSION_NAME library namespace@endlink
+  from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
+  to <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>abi</B><I>N</I>,
+  where @e X, @e Y, @e Z and @e N are the major, minor, patch and ABI
+  version numbers, respectively.
+  The <B>abi</B><I>N</I> suffix is added only when the library is built
+  using an older ABI version.
+
+@par
+Python:
+- Reimplemented NumPy support for Boost&nbsp;1.65 compatibility.
+
+@par
+Houdini:
+- Fixed bugs that caused the Ray&nbsp;SOP&rsquo;s closest surface point
+  searches to produce incorrect results.
+- Changed the @b VdbPrimCIterator::FilterFunc type from @b boost::function
+  to @b std::function.
+- Changed the @b houdini_utils::OpPolicyPtr type from @b boost:shared_ptr
+  to @b std::shared_ptr.
+- Debug-level log messages generated by OpenVDB are no longer forwarded
+  to Houdini&rsquo;s error manager.
+- Fixed a bug in the Read&nbsp;SOP that made it impossible to select among
+  grids of the same name in a file.
+- Added @b houdini_utils::ParmFactory::setAttrChoiceList, a convenience
+  method for the creation of menus of attributes.
+- Added a Potential&nbsp;Flow&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added point data grid support to the Scatter&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Added mask and point count output options to the
+  Points&nbsp;Convert&nbsp;SOP.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+
+@htmlonly <a name="v4_0_2_changes"></a>@endhtmlonly
+@par
+<B>Version 4.0.2</B> - <I>July 28, 2017</I>
+@par
+New features:
+- Added @vdblink::tools::compActiveLeafVoxels compActiveLeafVoxels@endlink,
+  which composites active voxel values from a source tree into a destination
+  tree.
+  It is threaded and faster than existing tools that merge trees, however
+  it operates only on leaf nodes.
+- Added a <TT>vdb_test&nbsp;-f</TT> option that reads a list of tests
+  to be run from a text file.
+- Added functions for @link points/PointDelete.h deleting points@endlink
+  from point data grids based on group membership.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Enabled display of point data grids in <TT>vdb_view</TT>.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Added a view mode indicator to <TT>vdb_view</TT>.
+- Added @vdblink::math::Mat::isFinite() isFinite@endlink,
+  @vdblink::math::Mat::isNan() isNan@endlink, and
+  @vdblink::math::Mat::isZero() isZero@endlink methods to
+  @vdblink::math::Mat math::Mat@endlink and added
+  @vdblink::math::Tuple::isZero() isZero@endlink to
+  @vdblink::math::Tuple math::Tuple@endlink.
+- Added @vdblink::tools::interiorMask() tools::interiorMask@endlink,
+  which constructs a boolean mask grid from the active voxels of an
+  input grid or, if the input grid is a level set, from the interior
+  voxels of the level set.
+- Added @vdblink::math::CoordBBox::begin() begin@endlink
+  and @vdblink::math::CoordBBox::end() end@endlink iterator methods
+  (and related methods) to @vdblink::math::CoordBBox CoordBBox@endlink,
+  so that it can be used in range-based <TT>for</TT>&nbsp;loops.
+- The @link tools/Clip.h clip@endlink tool now accepts either a box,
+  a mask grid or a camera frustum as the clipping region.
+  The latter is new in this version.
+
+@par
+Improvements:
+- Moved the @vdblink::math::Tuple::isFinite() isFinite@endlink,
+  @vdblink::math::Tuple::isInfinite() isInfinite@endlink,
+  and @vdblink::math::Tuple::isNan() isNan@endlink methods from
+  @vdblink::math::Vec3 math::Vec3@endlink et&nbsp;al.
+  to @vdblink::math::Tuple math::Tuple@endlink.
+
+@par
+Bug fixes:
+- @anchor v4_0_2_delayed_load_fix
+  Fixed a delayed-loading race condition that could result in crashes.
+  <I>[Reported&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+  <BLOCKQUOTE>
+  @b Note: To preserve ABI compatibility, this fix is currently enabled
+  only on platforms for which the alignment of a
+  <TT>tbb::atomic&lt;uint32_t&gt;</TT> is the same as for a @c uint32_t.
+  On other platforms, warnings will be logged during OpenVDB initialization,
+  and it is recommended to disable delayed loading in that case (for example,
+  by defining the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD).
+  </BLOCKQUOTE>
+- Fixed a delayed-loading memory leak in the
+  @vdblink::points::PointDataLeafNode PointDataLeafNode@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Changed the random number seeding mechanism for <TT>.vdb</TT> file UUIDs
+  to avoid duplicate&nbsp;IDs.
+  <I>[Reported&nbsp;by&nbsp;Jason&nbsp;Lefley]</I>
+- Fixed an off-by-one bug in the
+  @vdblink::tools::GridResampler resampler@endlink that produced grid patterns
+  of missing interior voxels for scale factors greater than one.
+
+@par
+Houdini:
+- As of Houdini&nbsp;16.0.549, @c houdini_utils::OpFactory can generate
+  help cards for operators automatically.
+  New @c OpFactory::setDocumentation and @c ParmFactory::setDocumentation
+  methods allow one to add custom help text in
+  <A HREF="http://www.sidefx.com/docs/houdini/help/format">wiki markup</A>
+  format.
+- Added help cards for all SOPs.  Houdini&nbsp;16.0.578 or later is required.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey&nbsp;and&nbsp;SideFX]</I>
+- The Extended Operator Info window in Houdini&nbsp;16 now renders correctly
+  for OpenVDB SOPs, instead of displaying a Python stack trace.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added a Points Delete SOP for deleting points from point data grids
+  based on group membership.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added a Mantra VRAY procedural and a delayed load SHOP for rendering
+  point data grids.
+  Houdini&nbsp;16 is required.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Replaced the Combine SOP&rsquo;s &ldquo;A/B&nbsp;Pairs&rdquo;
+  and &ldquo;Flatten&rdquo; toggles with a menu of collation options
+  that include flattening only <I>A</I>&nbsp;grids and flattening groups
+  of <I>A</I>&nbsp;grids independently.
+- Added a slider to the Remove Divergence SOP to set the error tolerance
+  for the pressure solver.
+- Added value type conversion options (for VDB output) to the Convert&nbsp;SOP.
+- Added a Densify SOP that replaces active tiles with leaf voxels.
+- Fixed a bug in the Rasterize Points&nbsp;SOP that capped density values
+  to one instead of to the particles&rsquo; densities.
+- The Convert and To&nbsp;Polygons SOPs now accept grids of any type
+  as surface masks, not just level set or SDF grids.
+- Added an option to the Clip&nbsp;SOP to clip to a camera frustum.
+
+
 @htmlonly <a name="v4_0_1_changes"></a>@endhtmlonly
 @par
 <B>Version 4.0.1</B> - <I>March 8, 2017</I>
@@ -199,7 +425,7 @@ Bug fixes:
   returns an empty list of spheres instead of crashing when the user selects
   an isosurface that lies outside the bounding volume&rsquo;s narrow band.
 - Fixed a null pointer dereference when copying grids that were loaded
-  with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
+  with @c io::File::readGridPartial.
   <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 @anchor v4_0_0_ABI_changes
@@ -232,10 +458,8 @@ API changes:
 - Made @c LeafNode::Buffer a top-level class and renamed it to
   @vdblink::tree::LeafBuffer LeafBuffer@endlink.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
-- Deprecated @vdblink::io::File::readGridPartial()
-  io::File::readGridPartial@endlink in favor of delayed loading.
-- @vdblink::tools::ClosestSurfacePoint::initialize()
-  tools::ClosestSurfacePoint::initialize@endlink now returns a boolean
+- Deprecated @c io::File::readGridPartial in favor of delayed loading.
+- @c tools::ClosestSurfacePoint::initialize now returns a boolean
   indicating whether initialization was successful.
 - Dropped the @c CopyPolicy enum and added
   @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
@@ -453,8 +677,7 @@ Bug fixes:
 
 @par
 API changes:
-- Deprecated @vdblink::math::Mat3::setBasis Mat3::setBasis@endlink and
-  @vdblink::math::Mat4::setBasis Mat4::setBasis@endlink.
+- Deprecated @c math::Mat3::setBasis and @c math::Mat4::setBasis.
 - Renamed @c GudonovsNormSqrd to
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
@@ -774,9 +997,9 @@ Houdini:
   an index-space bounding box.
 - Added @vdblink::tools::clip() tools::clip@endlink, which clips a grid
   either against a bounding box or against the active voxels of a mask grid.
-- @vdblink::io::File::readGridPartial() File::readGridPartial@endlink
-  allocates the nodes of a grid&rsquo;s tree as before, but it now allocates
-  leaf nodes without data buffers.  (This feature is mainly for internal use.
+- @c io::File::readGridPartial allocates the nodes of a grid&rsquo;s tree
+  as before, but it now allocates leaf nodes without data buffers.
+  (This feature is mainly for internal use.
   Partially-read grids should be used with care if at all, and they should
   be treated as read-only.)
 - Grid names retrieved using a

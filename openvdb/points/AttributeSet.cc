@@ -220,72 +220,28 @@ AttributeSet::get(size_t pos)
 size_t
 AttributeSet::groupOffset(const Name& group) const
 {
-    const Descriptor::NameToPosMap& map = this->descriptor().groupMap();
-    const Descriptor::ConstIterator it = map.find(group);
-    if (it == map.end()) {
-        return INVALID_POS;
-    }
-    return it->second;
+    return mDescr->groupOffset(group);
 }
 
 
 size_t
 AttributeSet::groupOffset(const Util::GroupIndex& index) const
 {
-    if (index.first >= mAttrs.size()) {
-        OPENVDB_THROW(LookupError, "Out of range group index.")
-    }
-
-    if (!isGroup(*mAttrs[index.first])) {
-        OPENVDB_THROW(LookupError, "Group index invalid.")
-    }
-
-    // find the relative index in the group attribute arrays
-
-    size_t relativeIndex = 0;
-    for (size_t i = 0; i < mAttrs.size(); i++) {
-        if (i < index.first && isGroup(*mAttrs[i]))    relativeIndex++;
-    }
-
-    const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
-
-    return (relativeIndex * GROUP_BITS) + index.second;
+    return mDescr->groupOffset(index);
 }
 
 
 AttributeSet::Descriptor::GroupIndex
 AttributeSet::groupIndex(const Name& group) const
 {
-    const size_t offset = this->groupOffset(group);
-    if (offset == INVALID_POS) {
-        OPENVDB_THROW(LookupError, "Group not found - " << group << ".")
-    }
-    return this->groupIndex(offset);
+    return mDescr->groupIndex(group);
 }
 
 
 AttributeSet::Descriptor::GroupIndex
 AttributeSet::groupIndex(const size_t offset) const
 {
-    // extract all attribute array group indices
-
-    const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
-
-    std::vector<unsigned> groups;
-    for (size_t i = 0; i < mAttrs.size(); i++) {
-        if (isGroup(*mAttrs[i])) {
-            groups.push_back(static_cast<unsigned>(i));
-        }
-    }
-
-    if (offset >= groups.size() * GROUP_BITS) {
-        OPENVDB_THROW(LookupError, "Out of range group offset - " << offset << ".")
-    }
-
-    // adjust relative offset to find offset into the array vector
-
-    return Util::GroupIndex(groups[offset / GROUP_BITS],
-			    static_cast<uint8_t>(offset % GROUP_BITS));
+    return mDescr->groupIndex(offset);
 }
 
 
@@ -685,6 +641,27 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
     return pos;
 }
 
+size_t
+AttributeSet::Descriptor::renameGroup(const std::string& fromName, const std::string& toName)
+{
+    if (!validName(toName))  throw RuntimeError("Group name contains invalid characters - " + toName);
+
+    size_t pos = INVALID_POS;
+
+    // check if the new name is already used.
+    auto it = mGroupMap.find(toName);
+    if (it != mGroupMap.end()) return pos;
+
+    it = mGroupMap.find(fromName);
+    if (it != mGroupMap.end()) {
+        pos = it->second;
+        mGroupMap.erase(it);
+        mGroupMap[toName] = pos;
+    }
+
+    return pos;
+}
+
 
 const Name&
 AttributeSet::Descriptor::valueType(size_t pos) const
@@ -861,11 +838,70 @@ AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
     NameAndTypeVec vec;
     this->appendTo(vec);
 
-    // drop the indices in pos from vec
+    Descriptor::Ptr descriptor;
 
-    eraseIndices(vec, pos);
+    // If groups exist, check to see if those arrays are being dropped
 
-    Descriptor::Ptr descriptor = Descriptor::create(vec, mGroupMap, mMetadata);
+    if (!mGroupMap.empty()) {
+
+        // extract all attribute array group indices and specific groups
+        // to drop
+
+        std::vector<size_t> groups, groupsToDrop;
+        for (size_t i = 0; i < vec.size(); i++) {
+            if (vec[i].type == GroupAttributeArray::attributeType()) {
+                groups.push_back(i);
+                if (std::find(pos.begin(), pos.end(), i) != pos.end()) {
+                    groupsToDrop.push_back(i);
+                }
+            }
+        }
+
+        // drop the indices in indices from vec
+
+        eraseIndices(vec, pos);
+
+        if (!groupsToDrop.empty()) {
+
+            // configure group mapping if group arrays have been dropped
+
+            NameToPosMap droppedGroupMap = mGroupMap;
+
+            const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
+            for (auto iter = droppedGroupMap.begin(); iter != droppedGroupMap.end();) {
+                const size_t groupArrayPos = iter->second / GROUP_BITS;
+                const size_t arrayPos = groups[groupArrayPos];
+                if (std::find(pos.begin(), pos.end(), arrayPos) != pos.end()) {
+                    iter = droppedGroupMap.erase(iter);
+                }
+                else {
+                    size_t offset(0);
+                    for (const size_t& idx : groupsToDrop) {
+                        if (idx >= arrayPos) break;
+                        ++offset;
+                    }
+                    iter->second -= (offset * GROUP_BITS);
+                    ++iter;
+                }
+            }
+
+            descriptor = Descriptor::create(vec, droppedGroupMap, mMetadata);
+
+            // remove any unused default values
+
+            descriptor->pruneUnusedDefaultValues();
+
+            return descriptor;
+        }
+    }
+    else {
+
+        // drop the indices in pos from vec
+
+        eraseIndices(vec, pos);
+    }
+
+    descriptor = Descriptor::create(vec, mGroupMap, mMetadata);
 
     // remove any unused default values
 
@@ -923,13 +959,105 @@ AttributeSet::Descriptor::clearGroups()
 const Name
 AttributeSet::Descriptor::uniqueName(const Name& name) const
 {
+    auto it = mNameMap.find(name);
+    if (it == mNameMap.end()) return name;
+
     std::ostringstream ss;
-    for (size_t i = 0; i < this->size() + 1; i++) {
+    size_t i(0);
+    while (it != mNameMap.end()) {
         ss.str("");
-        ss << name << i;
-        if (this->find(ss.str()) == INVALID_POS)    break;
+        ss << name << i++;
+        it = mNameMap.find(ss.str());
     }
     return ss.str();
+}
+
+const Name
+AttributeSet::Descriptor::uniqueGroupName(const Name& name) const
+{
+    auto it = mGroupMap.find(name);
+    if (it == mGroupMap.end()) return name;
+
+    std::ostringstream ss;
+    size_t i(0);
+    while (it != mGroupMap.end()) {
+        ss.str("");
+        ss << name << i++;
+        it = mGroupMap.find(ss.str());
+    }
+    return ss.str();
+}
+
+size_t
+AttributeSet::Descriptor::groupOffset(const Name& group) const
+{
+    const auto it = mGroupMap.find(group);
+    if (it == mGroupMap.end()) {
+        return INVALID_POS;
+    }
+    return it->second;
+}
+
+size_t
+AttributeSet::Descriptor::groupOffset(const Util::GroupIndex& index) const
+{
+    if (index.first >= mNameMap.size()) {
+        OPENVDB_THROW(LookupError, "Out of range group index.")
+    }
+
+    if (mTypes[index.first] != GroupAttributeArray::attributeType()) {
+        OPENVDB_THROW(LookupError, "Group index invalid.")
+    }
+
+    // find the relative index in the group attribute arrays
+
+    size_t relativeIndex = 0;
+    for (const auto& namePos : mNameMap) {
+        if (namePos.second < index.first &&
+            mTypes[namePos.second] == GroupAttributeArray::attributeType()) {
+            relativeIndex++;
+        }
+    }
+
+    const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
+
+    return (relativeIndex * GROUP_BITS) + index.second;
+}
+
+AttributeSet::Descriptor::GroupIndex
+AttributeSet::Descriptor::groupIndex(const Name& group) const
+{
+    const size_t offset = this->groupOffset(group);
+    if (offset == INVALID_POS) {
+        OPENVDB_THROW(LookupError, "Group not found - " << group << ".")
+    }
+    return this->groupIndex(offset);
+}
+
+
+AttributeSet::Descriptor::GroupIndex
+AttributeSet::Descriptor::groupIndex(const size_t offset) const
+{
+    // extract all attribute array group indices
+
+    const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
+
+    std::vector<size_t> groups;
+    for (const auto& namePos : mNameMap) {
+        if (mTypes[namePos.second] == GroupAttributeArray::attributeType()) {
+            groups.push_back(namePos.second);
+        }
+    }
+
+    if (offset >= groups.size() * GROUP_BITS) {
+        OPENVDB_THROW(LookupError, "Out of range group offset - " << offset << ".")
+    }
+
+    // adjust relative offset to find offset into the array vector
+
+    std::sort(groups.begin(), groups.end());
+    return Util::GroupIndex(groups[offset / GROUP_BITS],
+                static_cast<uint8_t>(offset % GROUP_BITS));
 }
 
 bool
@@ -943,9 +1071,10 @@ AttributeSet::Descriptor::validName(const Name& name)
 void
 AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
                                         std::vector<std::string>& excludeNames,
+                                        bool& includeAll,
                                         const std::string& nameStr)
 {
-    bool includeAll = false;
+    includeAll = false;
 
     std::stringstream tokenStream(nameStr);
 
@@ -970,6 +1099,15 @@ AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
             includeNames.push_back(token);
         }
     }
+}
+
+void
+AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
+                                        std::vector<std::string>& excludeNames,
+                                        const std::string& nameStr)
+{
+    bool includeAll = false;
+    Descriptor::parseNames(includeNames, excludeNames, includeAll, nameStr);
 }
 
 void

@@ -39,6 +39,7 @@
 #ifndef OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
@@ -48,9 +49,17 @@
 #include "AttributeGroup.h"
 #include "AttributeSet.h"
 #include "StreamCompression.h"
+#include <cstring> // std::memcpy
+#include <iostream>
+#include <limits>
+#include <memory>
 #include <type_traits> // std::is_same
 #include <utility> // std::pair, std::make_pair
+#include <vector>
 
+#include <boost/mpl/vector.hpp>//for boost::mpl::vector
+#include <boost/mpl/push_back.hpp>
+#include <boost/mpl/back.hpp>
 
 class TestPointDataLeaf;
 
@@ -325,7 +334,7 @@ public:
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
@@ -1110,7 +1119,10 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
 {
-    GroupFilter filter(groupName);
+    if (!this->attributeSet().descriptor().hasGroup(groupName)) {
+        return Index64(0);
+    }
+    GroupFilter filter(groupName, this->attributeSet());
     return iterCount(this->beginIndexAll(filter));
 }
 
@@ -1271,9 +1283,29 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             uint8_t header;
             is.read(reinterpret_cast<char*>(&header), sizeof(uint8_t));
             mAttributeSet->readDescriptor(is);
-            if (header == uint8_t(1)) {
+            if (header & uint8_t(1)) {
                 AttributeSet::DescriptorPtr descriptor = mAttributeSet->descriptorPtr();
                 Local::insertDescriptor(meta->auxData(), descriptor);
+            }
+            // a forwards-compatibility mechanism for future use,
+            // if a 0x2 bit is set, read and skip over a specific number of bytes
+            if (header & uint8_t(2)) {
+                uint64_t bytesToSkip;
+                is.read(reinterpret_cast<char*>(&bytesToSkip), sizeof(uint64_t));
+                if (bytesToSkip > uint64_t(0)) {
+                    auto metadata = io::getStreamMetadataPtr(is);
+                    if (metadata && metadata->seekable()) {
+                        is.seekg(bytesToSkip, std::ios_base::cur);
+                    }
+                    else {
+                        std::vector<uint8_t> tempData(bytesToSkip);
+                        is.read(reinterpret_cast<char*>(&tempData[0]), bytesToSkip);
+                    }
+                }
+            }
+            // this reader is only able to read headers with 0x1 and 0x2 bits set
+            if (header > uint8_t(3)) {
+                OPENVDB_THROW(IoError, "Unrecognised header flags in PointDataLeafNode");
             }
         }
         mAttributeSet->readMetadata(is);
@@ -1545,7 +1577,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
 #endif
 
@@ -1651,13 +1683,52 @@ void initialize();
 /// no need to call it directly.
 void uninitialize();
 
-}
+
+/// @brief Recursive node chain which generates a boost::mpl::vector listing
+/// value converted types of nodes to PointDataGrid nodes of the same configuration,
+/// rooted at RootNodeType in reverse order, from LeafNode to RootNode.
+/// See also TreeConverter<>.
+template<typename HeadT, int HeadLevel>
+struct PointDataNodeChain
+{
+    using SubtreeT = typename PointDataNodeChain<typename HeadT::ChildNodeType, HeadLevel-1>::Type;
+    using RootNodeT = tree::RootNode<typename boost::mpl::back<SubtreeT>::type>;
+    using Type = typename boost::mpl::push_back<SubtreeT, RootNodeT>::type;
+};
+
+// Specialization for internal nodes which require their embedded child type to
+// be switched
+template <typename ChildT, Index Log2Dim, int HeadLevel>
+struct PointDataNodeChain<tree::InternalNode<ChildT, Log2Dim>, HeadLevel>
+{
+    using SubtreeT = typename PointDataNodeChain<ChildT, HeadLevel-1>::Type;
+    using InternalNodeT = tree::InternalNode<typename boost::mpl::back<SubtreeT>::type, Log2Dim>;
+    using Type = typename boost::mpl::push_back<SubtreeT, InternalNodeT>::type;
+};
+
+// Specialization for the last internal node of a node chain, expected
+// to be templated on a leaf node
+template <typename ChildT, Index Log2Dim>
+struct PointDataNodeChain<tree::InternalNode<ChildT, Log2Dim>, /*HeadLevel=*/1>
+{
+    using LeafNodeT = PointDataLeafNode<PointDataIndex32, ChildT::LOG2DIM>;
+    using InternalNodeT = tree::InternalNode<LeafNodeT, Log2Dim>;
+    using Type = typename boost::mpl::vector<LeafNodeT, InternalNodeT>::type;
+};
+
+} // namespace internal
 
 
-/// @deprecated See internal::initialize()
-OPENVDB_DEPRECATED void initialize();
-/// @deprecated See internal::uninitialize()
-OPENVDB_DEPRECATED void uninitialize();
+/// @brief Similiar to ValueConverter, but allows for tree configuration conversion
+/// to a PointDataTree. ValueConverter<PointDataIndex32> cannot be used as a
+/// PointDataLeafNode is not a specialization of LeafNode
+template <typename TreeType>
+struct TreeConverter {
+    using RootNodeT = typename TreeType::RootNodeType;
+    using NodeChainT = typename internal::PointDataNodeChain<RootNodeT, RootNodeT::LEVEL>::Type;
+    using Type = tree::Tree<typename boost::mpl::back<NodeChainT>::type>;
+};
+
 
 } // namespace points
 

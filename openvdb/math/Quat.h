@@ -31,14 +31,15 @@
 #ifndef OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <cmath>
-
 #include "Mat.h"
 #include "Mat3.h"
 #include "Math.h"
 #include "Vec3.h"
 #include <openvdb/Exceptions.h>
+#include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -555,8 +556,8 @@ public:
     static Quat identity() { return Quat<T>(0,0,0,1); }
 
      /// @return string representation of Classname
-    std::string
-    str() const {
+    std::string str() const
+    {
         std::ostringstream buffer;
 
         buffer << "[";
@@ -588,7 +589,7 @@ protected:
     T mm[4];
 };
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 3]\f$
+/// Multiply each element of the given quaternion by @a scalar and return the result.
 template <typename S, typename T>
 Quat<T> operator*(S scalar, const Quat<T> &q) { return q*scalar; }
 
@@ -599,7 +600,7 @@ Quat<T> operator*(S scalar, const Quat<T> &q) { return q*scalar; }
 template <typename T, typename T0>
 Mat3<T> slerp(const Mat3<T0> &m1, const Mat3<T0> &m2, T t)
 {
-    typedef Mat3<T> MatType;
+    using MatType = Mat3<T>;
 
     Quat<T> q1(m1);
     Quat<T> q2(m2);
@@ -638,8 +639,8 @@ Mat3<T> bezLerp(const Mat3<T0> &m1, const Mat3<T0> &m2,
     return slerp(m10, m11, t);
 }
 
-typedef Quat<float> Quats;
-typedef Quat<double> Quatd;
+using Quats = Quat<float>;
+using Quatd = Quat<double>;
 
 } // namespace math
 

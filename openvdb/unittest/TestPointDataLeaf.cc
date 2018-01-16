@@ -34,8 +34,16 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
 
+#include <cmath>
+#include <ios>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <vector>
+
 using namespace openvdb;
 using namespace openvdb::points;
+
 
 class TestPointDataLeaf: public CppUnit::TestCase
 {
@@ -1189,6 +1197,7 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(leaf == *leafFromDisk);
         }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         { // read grids from file and pre-fetch
             PointDataGrid::Ptr gridFromDisk;
 
@@ -1223,6 +1232,7 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
             CPPUNIT_ASSERT(!attribute.isOutOfCore());
         }
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
         remove("leaf.vdb");
     }

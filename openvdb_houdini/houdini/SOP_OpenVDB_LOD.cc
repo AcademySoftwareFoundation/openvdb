@@ -37,10 +37,10 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
-
 #include <openvdb/tools/MultiResGrid.h>
-
 #include <boost/algorithm/string/join.hpp>
+#include <string>
+#include <vector>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -50,15 +50,15 @@ class SOP_OpenVDB_LOD: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_LOD(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_LOD() {}
+    ~SOP_OpenVDB_LOD() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input > 0); }
+    int isRefInput(unsigned input) const override { return (input > 0); }
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual OP_ERROR cookMySop(OP_Context&);
+    bool updateParmsFlags() override;
+    OP_ERROR cookMySop(OP_Context&) override;
 };
 
 
@@ -68,61 +68,97 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDB grids to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "single", "Single Level",
             "range",  "Level Range",
             "mipmaps","LOD Pyramid",
-            NULL
+            nullptr
         };
-
         parms.add(hutil::ParmFactory(PRM_ORD, "lod", "LOD Mode")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDocumentation(
+                "How to build the LOD pyramid\n\n"
+                "Single Level:\n"
+                "    Build a single, filtered VDB.\n\n"
+                "Level Range:\n"
+                "    Build a series of VDBs of progressively lower resolution\n"
+                "    within a given range of scales.\n\n"
+                "LOD Pyramid:\n"
+                "    Build a standard pyramid of VDBs of decreasing resolution.\n"
+                "    Each level of the pyramid is half the resolution in each\n"
+                "    dimension of the previous level, starting with the input VDB.\n"));
     }
-
-
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "level", "Level")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
-        .setHelpText("Specify which level to produce.\n"
-            "Level 0 is the highest-resolution level."));
+        .setTooltip("Specify which single level to produce.\n"
+            "Level 0, the highest-resolution level, is the input VDB."));
 
     {
-        std::vector<fpreal> defaultRange;
-        defaultRange.push_back(fpreal(0.0)); // start
-        defaultRange.push_back(fpreal(2.0)); // end
-        defaultRange.push_back(fpreal(1.0)); // step
+        const std::vector<fpreal> defaultRange{
+            fpreal(0.0), // start
+            fpreal(2.0), // end
+            fpreal(1.0)  // step
+        };
 
         parms.add(hutil::ParmFactory(PRM_FLT_J, "range", "Range")
             .setDefault(defaultRange)
             .setVectorSize(3)
             .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
-            .setHelpText("Specify the inclusive range [start, end, step]"));
+            .setTooltip(
+                "In Level Range mode, specify the (inclusive) starting and ending levels"
+                " and the level step. Level 0, the highest-resolution level, is the input VDB;"
+                " fractional levels are allowed."));
     }
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "count", "Count")
         .setDefault(PRMtwoDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 2, PRM_RANGE_UI, 10)
-        .setHelpText("Number of levels\n"
-            "Each level is half the resolution of the previous level."));
+        .setTooltip(
+            "In LOD Pyramid mode, specify the number of pyramid levels to generate."
+            " Each level is half the resolution of the previous level."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "reuse", "Preserve Grid Names")
-        .setHelpText("Reuse the name of the input VDB grid.\n"
-            "Only available when a single Level is generated.")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip(
+            "In Single Level mode, give the output VDB the same name as the input VDB."));
 
     hvdb::OpenVDBOpFactory("OpenVDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
-        .addInput("VDBs");
+        .addInput("VDBs")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Build an LOD pyramid from a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node creates filtered versions of a VDB volume at multiple resolutions,\n\
+providing mipmap-like levels of detail.\n\
+The low-resolution versions can be used both as thumbnails for fast processing\n\
+and for constant-time, filtered lookups over large areas of a volume.\n\
+\n\
+@related\n\
+- [OpenVDB Resample|Node:sop/DW_OpenVDBResample]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -131,7 +167,7 @@ SOP_OpenVDB_LOD::updateParmsFlags()
 {
     bool changed = false;
 
-    int lodMode = evalInt("lod", 0, 0);
+    const auto lodMode = evalInt("lod", 0, 0);
 
     changed |= enableParm("level", lodMode == 0);
     changed |= enableParm("reuse", lodMode == 0);
@@ -176,7 +212,7 @@ struct MultiResGridFractionalOp
             outputGrid = typename GridType::Ptr( new GridType(grid) );
         } else {
             const size_t levels = openvdb::math::Ceil(level) + 1;
-            typedef typename GridType::TreeType TreeT;
+            using TreeT = typename GridType::TreeType;
             openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
             outputGrid = mrg.template createGrid<Order>( level );
         }
@@ -197,7 +233,7 @@ struct MultiResGridRangeOp
     {
         if ( end > 0.0f ) {
             const size_t levels = openvdb::math::Ceil(end) + 1;
-            typedef typename GridType::TreeType TreeT;
+            using TreeT = typename GridType::TreeType;
             openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
 
             // inclusive range
@@ -220,7 +256,7 @@ struct MultiResGridIntegerOp
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        typedef typename GridType::TreeType TreeT;
+        using TreeT = typename GridType::TreeType;
         openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
         outputGrids = mrg.grids();
     }
@@ -264,7 +300,7 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
 
         hvdb::Interrupter boss("LOD");
 
-        const int lodMode = evalInt("lod", 0, 0);
+        const auto lodMode = evalInt("lod", 0, 0);
         if (lodMode == 0) {
 
             const bool reuseName = evalInt("reuse", 0, 0) > 0;

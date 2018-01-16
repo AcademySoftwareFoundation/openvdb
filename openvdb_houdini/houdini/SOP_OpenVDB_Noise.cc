@@ -43,6 +43,8 @@
 #include <openvdb/tools/Interpolation.h> // for box sampler
 #include <UT/UT_PNoise.h>
 #include <UT/UT_Interrupt.h>
+#include <sstream>
+#include <stdexcept>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -123,15 +125,15 @@ class SOP_OpenVDB_Noise: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Noise(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Noise() {}
+    ~SOP_OpenVDB_Noise() override {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
 private:
     // Process the given grid and return the output grid.
@@ -151,102 +153,154 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Define a string-valued group name pattern parameter and add it to the list.
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     // amplitude
     parms.add(hutil::ParmFactory(PRM_FLT_J, "amp", "Amplitude")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0)
+        .setTooltip("The amplitude of the noise"));
 
     // frequency
     parms.add(hutil::ParmFactory(PRM_FLT_J, "freq", "Frequency")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 1.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 1.0)
+        .setTooltip("The frequency of the noise"));
 
     // Octaves
     parms.add(hutil::ParmFactory(PRM_INT_J, "oct", "Octaves")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10)
+        .setTooltip("The number of octaves for the noise"));
 
     // Lacunarity
     parms.add(hutil::ParmFactory(PRM_FLT_J, "lac", "Lacunarity")
         .setDefault(PRMtwoDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0)
+        .setTooltip("The lacunarity of the noise"));
 
     // Gain
     parms.add(hutil::ParmFactory(PRM_FLT_J, "gain", "Gain")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 1.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 1.0)
+        .setTooltip("The gain of the noise"));
 
     // Roughness
     parms.add(hutil::ParmFactory(PRM_FLT_J, "rough", "Roughness")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 10.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 10.0)
+        .setTooltip("The roughness of the noise"));
 
     // SurfaceOffset
     parms.add(hutil::ParmFactory(PRM_FLT_J, "soff", "Surface Offset")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("An offset from the isosurface of the level set at which to apply the noise"));
 
     // Noise Offset
-    parms.add(hutil::ParmFactory(PRM_XYZ_J,"noff", "Noise Offset")
+    parms.add(hutil::ParmFactory(PRM_XYZ_J, "noff", "Noise Offset")
         .setVectorSize(3)
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("An offset for the noise in world units"));
 
     {   // Noise Mode
-        const char* items[] = {
+        char const * const items[] = {
             "straight", "Straight",
             "abs",      "Absolute",
             "invabs",   "Inverse Absolute",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Noise Mode")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The noise mode: either Straight, Absolute, or Inverse Absolute"));
     }
 
     // Mask {
-    parms.add(hutil::ParmFactory(PRM_HEADING, "maskHeading", "Maks"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "maskHeading", "Mask"));
 
     // Group
-    parms.add(
-        hutil::ParmFactory(PRM_STRING, "maskGroup",  "Mask Group")
-        .setChoiceList(&hutil::PrimGroupMenuInput2));
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskGroup", "Mask Group")
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setDocumentation(
+            "A scalar VDB from the second input to be used as a mask"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     {   // Use mask
-        const char* items[] = {
+        char const * const items[] = {
             "maskless",       "No noise if mask < threshold",
             "maskgreater",    "No noise if mask > threshold",
             "maskgreaternml", "No noise if mask > threshold & normals align",
             "maskisfreqmult", "Use mask as frequency multiplier",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "mask", "Mask")
             .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("How to interpret the mask")
+            .setDocumentation("\
+How to interpret the mask\n\
+\n\
+No noise if mask < threshold:\n\
+    Don't add noise to a voxel if the mask value at that voxel\n\
+    is less than the __Mask Threshold__.\n\
+No noise if mask > threshold:\n\
+    Don't add noise to a voxel if the mask value at that voxel\n\
+    is greater than the __Mask Threshold__.\n\
+No noise if mask > threshold & normals align:\n\
+    Don't add noise to a voxel if the mask value at that voxel\n\
+    is greater than the __Mask Threshold__ and the surface normal\n\
+    of the level set at that voxel aligns with the gradient of the mask.\n\
+Use mask as frequency multiplier:\n\
+    Add noise to every voxel, but multiply the noise frequency by the mask.\n"));
     }
 
     // mask threshold
     parms.add(hutil::ParmFactory(PRM_FLT_J, "thres", "Mask Threshold")
-        .setDefault(PRMzeroDefaults));
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("The threshold value for mask comparisons"));
 
     // Fall off
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "fall", "Fall-Off")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "fall", "Falloff")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_FREE, 10.0)
+        .setTooltip("A falloff value for the threshold"));
     // }
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Noise", SOP_OpenVDB_Noise::factory, parms, *table)
         .addAlias("OpenVDB LevelSet Noise")
         .addInput("VDB grids to noise")
-        .addOptionalInput("Optional VDB grid to use as mask");
+        .addOptionalInput("Optional VDB grid to use as mask")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Add noise to VDB level sets.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+Using a fractal Boltzmann generator, this node adds surface noise\n\
+to VDB level set volumes.\n\
+An optional mask grid can be provided to control the amount of noise per voxel.\n\
+\n\
+@related\n\
+- [Node:sop/cloudnoise]\n\
+- [Node:sop/volumevop]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -260,9 +314,7 @@ SOP_OpenVDB_Noise::factory(OP_Network* net, const char* name, OP_Operator *op)
 }
 
 
-SOP_OpenVDB_Noise::SOP_OpenVDB_Noise(OP_Network* net,
-                                                     const char* name,
-                                                     OP_Operator* op):
+SOP_OpenVDB_Noise::SOP_OpenVDB_Noise(OP_Network* net, const char* name, OP_Operator* op):
     SOP_NodeVDB(net, name, op),
     mSecondInputConnected(false)
 {
@@ -284,12 +336,6 @@ SOP_OpenVDB_Noise::updateParmsFlags()
     changed |= enableParm("thres", mSecondInputConnected);
     changed |= enableParm("fall", mSecondInputConnected);
 
-    changed |= setVisibleState("maskHeading", mSecondInputConnected);
-    changed |= setVisibleState("maskGroup", mSecondInputConnected);
-    changed |= setVisibleState("mask", mSecondInputConnected);
-    changed |= setVisibleState("thres", mSecondInputConnected);
-    changed |= setVisibleState("fall", mSecondInputConnected);
-
     return changed;
 }
 
@@ -306,12 +352,12 @@ SOP_OpenVDB_Noise::applyNoise(
     const hvdb::Grid* mask) const
 {
     // Use second order finite difference.
-    typedef cvdb::math::Gradient<cvdb::math::GenericMap, cvdb::math::CD_2ND>  Gradient;
-    typedef cvdb::math::CPT<cvdb::math::GenericMap, cvdb::math::CD_2ND>       CPT;
-    typedef cvdb::math::SecondOrderDenseStencil<GridType>                     StencilType;
+    using Gradient = cvdb::math::Gradient<cvdb::math::GenericMap, cvdb::math::CD_2ND>;
+    using CPT = cvdb::math::CPT<cvdb::math::GenericMap, cvdb::math::CD_2ND>;
+    using StencilType = cvdb::math::SecondOrderDenseStencil<GridType>;
 
-    typedef typename GridType::TreeType                     TreeType;
-    typedef cvdb::math::Vec3<typename TreeType::ValueType>  Vec3Type;
+    using TreeType = typename GridType::TreeType;
+    using Vec3Type = cvdb::math::Vec3<typename TreeType::ValueType>;
 
     // Down cast the generic pointer to the output grid.
     GridType& outGrid = UTvdbGridCast<GridType>(grid);
@@ -469,26 +515,28 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         duplicateSourceStealable(0, context);
 
         // Evaluate the FractalBoltzman noise parameters from UI
-        FractalBoltzmanGenerator fbGenerator(static_cast<float>(evalFloat("freq", 0, time)),
-                                             static_cast<float>(evalFloat("amp", 0, time)),
-                                             evalInt("oct", 0, time),
-                                             static_cast<float>(evalFloat("gain", 0, time)),
-                                             static_cast<float>(evalFloat("lac", 0, time)),
-                                             static_cast<float>(evalFloat("rough", 0, time)),
-                                             evalInt("mode", 0, time));
+        FractalBoltzmanGenerator fbGenerator(
+            static_cast<float>(evalFloat("freq", 0, time)),
+            static_cast<float>(evalFloat("amp", 0, time)),
+            static_cast<int>(evalInt("oct", 0, time)),
+            static_cast<float>(evalFloat("gain", 0, time)),
+            static_cast<float>(evalFloat("lac", 0, time)),
+            static_cast<float>(evalFloat("rough", 0, time)),
+            static_cast<int>(evalInt("mode", 0, time)));
 
         NoiseSettings settings;
 
         // evaluate parameter for blending noise
         settings.mOffset = static_cast<float>(evalFloat("soff", 0, time));
-        settings.mNOffset = cvdb::Vec3R(evalFloat("noff", 0, time),
-                                        evalFloat("noff", 1, time),
-                                        evalFloat("noff", 2, time));
+        settings.mNOffset = cvdb::Vec3R(
+            evalFloat("noff", 0, time),
+            evalFloat("noff", 1, time),
+            evalFloat("noff", 2, time));
 
         // Mask
-        const openvdb::GridBase* maskGrid = NULL;
+        const openvdb::GridBase* maskGrid = nullptr;
         const GU_Detail* refGdp = inputGeo(1);
-        mSecondInputConnected = refGdp != NULL;
+        mSecondInputConnected = refGdp != nullptr;
         UT_String groupStr;
 
         if (mSecondInputConnected) {
@@ -500,7 +548,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
             hvdb::VdbPrimCIterator gridIter(refGdp, maskGroup);
 
             if (gridIter) {
-                settings.mMaskMode = evalInt("mask", 0, time);
+                settings.mMaskMode = static_cast<int>(evalInt("mask", 0, time));
                 settings.mThreshold = static_cast<float>(evalFloat("thres", 0, time));
                 settings.mFallOff = static_cast<float>(evalFloat("fall", 0, time));
 

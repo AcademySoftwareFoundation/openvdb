@@ -93,21 +93,22 @@ MetaMap::readMeta(std::istream &is)
         // Read in the metadata typename.
         Name typeName = readString(is);
 
-        // Create a metadata type from the typename. Make sure that the type is
-        // registered.
-        if (!Metadata::isRegisteredType(typeName)) {
+        // Read in the metadata value and add it to the map.
+        if (Metadata::isRegisteredType(typeName)) {
+            Metadata::Ptr metadata = Metadata::createMetadata(typeName);
+            metadata->read(is);
+            insertMeta(name, *metadata);
+        } else {
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+            UnknownMetadata metadata(typeName);
+            metadata.read(is); // read raw bytes into an array
+            insertMeta(name, metadata);
+#else
             OPENVDB_LOG_WARN("cannot read metadata \"" << name
                 << "\" of unregistered type \"" << typeName << "\"");
             UnknownMetadata metadata;
             metadata.read(is);
-        } else {
-            Metadata::Ptr metadata = Metadata::createMetadata(typeName);
-
-            // Read the value from the stream.
-            metadata->read(is);
-
-            // Add the name and metadata to the map.
-            insertMeta(name, *metadata);
+#endif
         }
     }
 }
@@ -139,18 +140,18 @@ MetaMap::writeMeta(std::ostream &os) const
 void
 MetaMap::insertMeta(const Name &name, const Metadata &m)
 {
-    if(name.size() == 0)
+    if (name.size() == 0)
         OPENVDB_THROW(ValueError, "Metadata name cannot be an empty string");
 
     // See if the value already exists, if so then replace the existing one.
     MetaIterator iter = mMeta.find(name);
 
-    if(iter == mMeta.end()) {
+    if (iter == mMeta.end()) {
         // Create a copy of the metadata and store it in the map
         Metadata::Ptr tmp = m.copy();
         mMeta[name] = tmp;
     } else {
-        if(iter->second->typeName() != m.typeName()) {
+        if (iter->second->typeName() != m.typeName()) {
             std::ostringstream ostr;
             ostr << "Cannot assign value of type "
                  << m.typeName() << " to metadata attribute " << name

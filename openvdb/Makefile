@@ -54,8 +54,9 @@
 #   test                run tests
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -102,6 +103,9 @@ OPENVDB_SUFFIX ?=
 
 # The directory into which to install libraries, executables and header files
 DESTDIR := $(INSTALL_BASE)
+
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR ?= $(PACKAGES_DIR)/boost/$(BOOST_VERSION)/include
@@ -284,8 +288,10 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
@@ -370,7 +376,10 @@ INCLUDE_NAMES := \
     points/PointConversion.h \
     points/PointCount.h \
     points/PointDataGrid.h \
+    points/PointDelete.h \
     points/PointGroup.h \
+    points/PointMask.h \
+    points/PointScatter.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
     tools/Clip.h \
@@ -392,6 +401,7 @@ INCLUDE_NAMES := \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
+    tools/Mask.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
     tools/Morphology26N.h \
@@ -405,6 +415,7 @@ INCLUDE_NAMES := \
     tools/PointScatter.h \
     tools/PointsToMask.h \
     tools/PoissonSolver.h \
+    tools/PotentialFlow.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -534,11 +545,15 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
+    unittest/TestPointMask.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointScatter.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
+    unittest/TestPotentialFlow.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
@@ -675,7 +690,7 @@ else
 LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
 LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
-LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBOPENVDB_SONAME)
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBOPENVDB_SONAME)
 endif
 
 # TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
@@ -690,7 +705,7 @@ else
 LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
 LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
 LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
-LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBVIEWER_SONAME)
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb$(if $(OPENVDB_SUFFIX),_$(OPENVDB_SUFFIX))
@@ -706,7 +721,7 @@ ifeq (no,$(strip $(shared)))
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
     LIBVIEWER := $(LIBVIEWER_SHARED)
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR_LIB_DIR)
 endif # shared
 
 DEPEND := dependencies
@@ -908,16 +923,16 @@ install_lib: lib
 	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBOPENVDB) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR_LIB_DIR)
+	@echo "Created $(DESTDIR_LIB_DIR)"
+	cp -f $(LIBOPENVDB) $(DESTDIR_LIB_DIR)
+	pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED) ]; then \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SHARED_NAME); \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SONAME); \
 	    fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR_LIB_DIR)"
 
 install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	if [ -f $(LIBVIEWER) ]; \
@@ -926,12 +941,12 @@ install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
 	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
 	    @echo "Copied vdb_view header files to $(DESTDIR)/include" \
-	    cp -f $(LIBVIEWER) $(DESTDIR)/lib; \
-	    pushd $(DESTDIR)/lib > /dev/null; \
+	    cp -f $(LIBVIEWER) $(DESTDIR_LIB_DIR); \
+	    pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	        if [ -f $(LIBVIEWER_SHARED) ]; then \
 	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_SHARED_NAME); fi; \
 	        popd > /dev/null; \
-	    @echo "Copied libopenvdb_viewer to $(DESTDIR)/lib/"; \
+	    @echo "Copied libopenvdb_viewer to $(DESTDIR_LIB_DIR)"; \
 	fi
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \

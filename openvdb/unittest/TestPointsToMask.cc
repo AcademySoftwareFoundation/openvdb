@@ -133,9 +133,9 @@ TestPointsToMask::testPointsToMask()
     const openvdb::math::Transform::Ptr xform =
         openvdb::math::Transform::createLinearTransform(voxelSize);
 
-    // generate 150,000,000 points
+    // generate lots of points
     std::vector<openvdb::Vec3R> points;
-    unittest_util::genPoints(150000000, points);
+    unittest_util::genPoints(15000000, points);
     PointList pointList(points);
 
     //openvdb::util::CpuTimer timer;

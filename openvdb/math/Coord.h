@@ -31,7 +31,10 @@
 #ifndef OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
+#include <algorithm> // for std::min(), std::max()
 #include <array> // for std::array
+#include <iostream>
+#include <limits>
 #include <openvdb/Platform.h>
 #include "Math.h"
 #include "Vec3.h"
@@ -48,13 +51,13 @@ namespace math {
 class Coord
 {
 public:
-    typedef int32_t Int32;
-    typedef uint32_t Index32;
-    typedef Vec3<Int32> Vec3i;
-    typedef Vec3<Index32> Vec3I;
+    using Int32 = int32_t;
+    using Index32 = uint32_t;
+    using Vec3i = Vec3<Int32>;
+    using Vec3I = Vec3<Index32>;
 
-    typedef Int32 ValueType;
-    typedef std::numeric_limits<ValueType> Limits;
+    using ValueType = Int32;
+    using Limits = std::numeric_limits<ValueType>;
 
     Coord(): mVec{{0, 0, 0}} {}
     explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
@@ -250,11 +253,6 @@ private:
     std::array<Int32, 3> mVec;
 }; // class Coord
 
-inline Coord
-Abs(const Coord& xyz)
-{
-    return Coord(Abs(xyz[0]), Abs(xyz[1]), Abs(xyz[2]));
-}
 
 ////////////////////////////////////////
 
@@ -266,56 +264,56 @@ Abs(const Coord& xyz)
 class CoordBBox
 {
 public:
-    typedef uint64_t         Index64;
-    typedef Coord::ValueType ValueType;
+    using Index64 = uint64_t;
+    using ValueType = Coord::ValueType;
 
-    /// @brief Iterator over Coord domain covered by a CoordBBox
-    ///
-    /// @note If ZYX is true Z is the fastest moving coordinate, else
-    /// it is the X coordinate, i.e. XYZ traversal
-    template<bool ZYX>
-    class Iterator {
+    /// @brief Iterator over the Coord domain covered by a CoordBBox
+    /// @note If ZYXOrder is @c true, @e z is the fastest-moving coordinate,
+    /// otherwise the traversal is in XYZ order (i.e., @e x is fastest-moving).
+    template<bool ZYXOrder>
+    class Iterator
+    {
     public:
         /// @brief C-tor from a bounding box
-        Iterator(const CoordBBox &b) : mPos(b.min()), mMin(b.min()), mMax(b.max()) {}
-        /// @brief Increments iterator to point to the next coordinate
-        /// @note Stops a the last + 1 coordinate of the bounding box
-        /// as defined by the template parameter.
-        Iterator& operator++() {
-            ZYX ? this->next<2,1,0>() : this->next<0,1,2>();//resolved and inlined
-            return *this;
-        }
-        /// @brief Return true if the iterator still points to a valid coordinate
-        operator bool() const {
-            return ZYX ? mPos[0] <= mMax[0] : mPos[2] <= mMax[2];
-        }
-        /// @brief Return a const reference to the coordinate currently pointed to
+        Iterator(const CoordBBox& b): mPos(b.min()), mMin(b.min()), mMax(b.max()) {}
+        /// @brief Increment the iterator to point to the next coordinate.
+        /// @details Iteration stops one past the maximum coordinate
+        /// along the axis determined by the template parameter.
+        Iterator& operator++() { ZYXOrder ? next<2,1,0>() : next<0,1,2>(); return *this; }
+        /// @brief Return @c true if the iterator still points to a valid coordinate.
+        operator bool() const { return ZYXOrder ? (mPos[0] <= mMax[0]) : (mPos[2] <= mMax[2]); }
+        /// @brief Return a const reference to the coordinate currently pointed to.
         const Coord& operator*() const { return mPos; }
+        /// Return @c true if this iterator and the given iterator point to the same coordinate.
+        bool operator==(const Iterator& other) const
+        {
+            return ((mPos == other.mPos) && (mMin == other.mMin) && (mMax == other.mMax));
+        }
+        /// Return @c true if this iterator and the given iterator point to different coordinates.
+        bool operator!=(const Iterator& other) const { return !(*this == other); }
     private:
         template<size_t a, size_t b, size_t c>
-        inline void next() {
-            if ( mPos[a] < mMax[a] )  {// this is the most common case
-                ++mPos[a];
-            } else if ( mPos[b] < mMax[b] )  {
-                mPos[a] = mMin[a];
-                ++mPos[b];
-            } else if ( mPos[c] <= mMax[c] ) {
-                mPos[a] = mMin[a];
-                mPos[b] = mMin[b];
-                ++mPos[c];
-            }
+        void next()
+        {
+            if (mPos[a] < mMax[a]) { ++mPos[a]; } // this is the most common case
+            else if (mPos[b] < mMax[b]) { mPos[a] = mMin[a]; ++mPos[b]; }
+            else if (mPos[c] <= mMax[c]) { mPos[a] = mMin[a]; mPos[b] = mMin[b]; ++mPos[c]; }
         }
         Coord mPos, mMin, mMax;
+        friend class CoordBBox; // for CoordBBox::end()
     };// CoordBBox::Iterator
+
+    using ZYXIterator = Iterator</*ZYX=*/true>;
+    using XYZIterator = Iterator</*ZYX=*/false>;
 
     /// @brief The default constructor produces an empty bounding box.
     CoordBBox(): mMin(Coord::max()), mMax(Coord::min()) {}
     /// @brief Construct a bounding box with the given @a min and @a max bounds.
     CoordBBox(const Coord& min, const Coord& max): mMin(min), mMax(max) {}
     /// @brief Construct from individual components of the min and max bounds.
-    CoordBBox(ValueType x_min, ValueType y_min, ValueType z_min,
-              ValueType x_max, ValueType y_max, ValueType z_max)
-        : mMin(x_min, y_min, z_min), mMax(x_max, y_max, z_max)
+    CoordBBox(ValueType xMin, ValueType yMin, ValueType zMin,
+              ValueType xMax, ValueType yMax, ValueType zMax)
+        : mMin(xMin, yMin, zMin), mMax(xMax, yMax, zMax)
     {
     }
     /// @brief Splitting constructor for use in TBB ranges
@@ -346,20 +344,36 @@ public:
     void reset(const Coord& min, const Coord& max) { mMin = min; mMax = max; }
     void resetToCube(const Coord& min, ValueType dim) { mMin = min; mMax = min.offsetBy(dim - 1); }
 
+    /// @brief Return the minimum coordinate.
     /// @note The start coordinate is inclusive.
     Coord getStart() const { return mMin; }
-    /// @note The end coordinate is exclusive.
+    /// @brief Return the maximum coordinate plus one.
+    /// @note This end coordinate is exclusive.
     Coord getEnd() const { return mMax.offsetBy(1); }
+
+    /// @brief Return a ZYX-order iterator that points to the minimum coordinate.
+    ZYXIterator begin() const { return ZYXIterator{*this}; }
+    /// @brief Return a ZYX-order iterator that points to the minimum coordinate.
+    ZYXIterator beginZYX() const { return ZYXIterator{*this}; }
+    /// @brief Return an XYZ-order iterator that points to the minimum coordinate.
+    XYZIterator beginXYZ() const { return XYZIterator{*this}; }
+
+    /// @brief Return a ZYX-order iterator that points past the maximum coordinate.
+    ZYXIterator end() const { ZYXIterator it{*this}; it.mPos[0] = mMax[0] + 1; return it; }
+    /// @brief Return a ZYX-order iterator that points past the maximum coordinate.
+    ZYXIterator endZYX() const { return end(); }
+    /// @brief Return an XYZ-order iterator that points past the maximum coordinate.
+    XYZIterator endXYZ() const { XYZIterator it{*this}; it.mPos[2] = mMax[2] + 1; return it; }
 
     bool operator==(const CoordBBox& rhs) const { return mMin == rhs.mMin && mMax == rhs.mMax; }
     bool operator!=(const CoordBBox& rhs) const { return !(*this == rhs); }
 
+    /// @brief Return @c true if this bounding box is empty (i.e., encloses no coordinates).
     bool empty() const { return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]); }
-    //@{
-    /// Return @c true if this bounding box is nonempty
+    /// Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
     operator bool() const { return !this->empty(); }
+    /// Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
     bool hasVolume() const { return !this->empty(); }
-    //@}
 
     /// Return the floating-point position of the center of this bounding box.
     Vec3d getCenter() const { return 0.5 * Vec3d((mMin + mMax).asPointer()); }
@@ -443,7 +457,8 @@ public:
         mMin.minComponent(min);
         mMax.maxComponent(min.offsetBy(dim-1));
     }
-    /// Translate this bounding box by @f$(t_x, t_y, t_z)@f$.
+    /// Translate this bounding box by
+    /// (<i>t<sub>x</sub></i>, <i>t<sub>y</sub></i>, <i>t<sub>z</sub></i>).
     void translate(const Coord& t) { mMin += t; mMax += t; }
 
     /// @brief Populates an array with the eight corner points of this bounding box.
@@ -491,6 +506,13 @@ private:
 inline std::ostream& operator<<(std::ostream& os, const Coord& xyz)
 {
     os << xyz.asVec3i(); return os;
+}
+
+
+inline Coord
+Abs(const Coord& xyz)
+{
+    return Coord(Abs(xyz[0]), Abs(xyz[1]), Abs(xyz[2]));
 }
 
 

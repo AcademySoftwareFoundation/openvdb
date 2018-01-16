@@ -156,7 +156,7 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
 {
     using IndexGroupIter = IndexIter<ValueVoxelCIter, MultiGroupFilter>;
     ValueVoxelCIter indexIter(0, size);
-    MultiGroupFilter filter(include, exclude);
+    MultiGroupFilter filter(include, exclude, leaf.attributeSet());
     filter.reset(leaf);
     IndexGroupIter iter(indexIter, filter);
     for (unsigned i = 0; i < indices.size(); ++i, ++iter) {
@@ -191,7 +191,7 @@ TestIndexFilter::testMultiGroupFilter()
     { // construction, copy construction
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
-        MultiGroupFilter filter(includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
         CPPUNIT_ASSERT(!filter.initialized());
         MultiGroupFilter filter2 = filter;
         CPPUNIT_ASSERT(!filter2.initialized());

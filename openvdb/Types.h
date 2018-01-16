@@ -45,6 +45,9 @@
 #include <openvdb/math/Coord.h>
 #include <memory>
 #include <type_traits>
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
+#include <boost/shared_ptr.hpp>
+#endif
 
 
 namespace openvdb {
@@ -110,10 +113,11 @@ using QuatR = math::Quat<Real>;
 class ValueMask {};
 
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
 
 // Use Boost shared pointers in OpenVDB 3 ABI compatibility mode.
 template<typename T> using SharedPtr = boost::shared_ptr<T>;
+template<typename T> using WeakPtr = boost::weak_ptr<T>;
 
 template<typename T, typename U> inline SharedPtr<T>
 ConstPtrCast(const SharedPtr<U>& ptr) { return boost::const_pointer_cast<T, U>(ptr); }
@@ -124,10 +128,11 @@ DynamicPtrCast(const SharedPtr<U>& ptr) { return boost::dynamic_pointer_cast<T, 
 template<typename T, typename U> inline SharedPtr<T>
 StaticPtrCast(const SharedPtr<U>& ptr) { return boost::static_pointer_cast<T, U>(ptr); }
 
-#else // if !defined(OPENVDB_3_ABI_COMPATIBLE)
+#else // if OPENVDB_ABI_VERSION_NUMBER > 3
 
 // Use STL shared pointers from OpenVDB 4 on.
 template<typename T> using SharedPtr = std::shared_ptr<T>;
+template<typename T> using WeakPtr = std::weak_ptr<T>;
 
 /// @brief Return a new shared pointer that points to the same object
 /// as the given pointer but with possibly different <TT>const</TT>-ness.
@@ -160,7 +165,7 @@ DynamicPtrCast(const SharedPtr<U>& ptr) { return std::dynamic_pointer_cast<T, U>
 template<typename T, typename U> inline SharedPtr<T>
 StaticPtrCast(const SharedPtr<U>& ptr) { return std::static_pointer_cast<T, U>(ptr); }
 
-#endif // OPENVDB_3_ABI_COMPATIBLE
+#endif
 
 
 ////////////////////////////////////////
@@ -375,8 +380,8 @@ public:
     using BValueT = BValueType;
 
     CombineArgs()
-        : mAValPtr(NULL)
-        , mBValPtr(NULL)
+        : mAValPtr(nullptr)
+        , mBValPtr(nullptr)
         , mResultValPtr(&mResultVal)
         , mAIsActive(false)
         , mBIsActive(false)
@@ -477,7 +482,7 @@ struct SwappedCombineOp
 ////////////////////////////////////////
 
 
-#ifdef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 3
 /// In copy constructors, members stored as shared pointers can be handled
 /// in several ways:
 /// <dl>

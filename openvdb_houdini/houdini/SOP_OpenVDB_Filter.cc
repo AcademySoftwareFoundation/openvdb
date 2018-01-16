@@ -43,6 +43,10 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace hvdb = openvdb_houdini;
@@ -71,12 +75,12 @@ public:
 
 
     SOP_OpenVDB_Filter(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Filter() {}
+    ~SOP_OpenVDB_Filter() override {}
 
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
     struct FilterParms {
@@ -89,7 +93,7 @@ protected:
             , maxMask(0.0f)
             , invertMask(false)
             , useWorldRadius(false)
-            , mask(NULL)
+            , mask(nullptr)
 #ifndef SESI_OPENVDB
             , offset(0.0)
             , verbose(false)
@@ -108,12 +112,12 @@ protected:
         bool verbose;
 #endif
     };
-    typedef std::vector<FilterParms> FilterParmVec;
+    using FilterParmVec = std::vector<FilterParms>;
 
     OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
 
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 
 private:
     struct FilterOp;
@@ -219,23 +223,27 @@ newSopOperator(OP_OperatorTable* table)
 void
 SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     // Input group
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input VDB grids to be processed.")
-              .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setDocumentation(
+            "A subset of the input VDBs to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
-              .setDefault(PRMoneDefaults)
-              .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-              .setHelpText("Enable / disable the mask."));
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("Enable / disable the mask."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
-              .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-              .setChoiceList(&hutil::PrimGroupMenuInput2));
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setTooltip("Optional scalar VDB used for alpha masking\n\n"
+            "Values are assumed to be between 0 and 1."));
 
     // Menu of operations
     {
@@ -246,56 +254,80 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
             items.push_back(opToMenuName(op)); // label
         }
         parms.add(hutil::ParmFactory(PRM_STRING, "operation", "Operation")
-            .setHelpText("Select the operation to be applied to input grids.")
             .setDefault(opToString(OP_MEAN))
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The operation to be applied to input volumes")
+            .setDocumentation("\
+The operation to be applied to input volumes\n\n\
+Gaussian:\n\
+    Set the value of each active voxel to a Gaussian-weighted sum\n\
+    over the voxel's neighborhood.\n\n\
+    This is equivalent to a Gaussian blur.\n\
+Mean Value:\n\
+    Set the value of each active voxel to the average value over\n\
+    the voxel's neighborhood.\n\n\
+    One iteration is equivalent to a box blur.  For a cone blur,\n\
+    multiply the radius by 0.454545 and use two iterations.\n\
+Median Value:\n\
+    Set the value of each active voxel to the median value over\n\
+    the voxel's neighborhood.\n\n\
+    This is useful for suppressing outlier values.\n\
+Offset:\n\
+    Add a given offset to each active voxel's value.\n\
+"));
     }
 
     // Filter radius
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Radius Units"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Radius Units")
+        .setTooltip(
+            "If enabled, specify the filter neighborhood size in world units,\n"
+            "otherwise specify the size in voxels."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "radius", "Filter Voxel Radius")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5));
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5)
+        .setDocumentation(nullptr));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "worldradius", "Filter Radius")
         .setDefault(0.1)
-        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
+        .setTooltip("Half the width of a side of the cubic filter neighborhood"));
 
     // Number of iterations
     parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
         .setDefault(PRMfourDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("The number of times to apply the operation"));
 
 #ifndef SESI_OPENVDB
     // Offset
     parms.add(hutil::ParmFactory(PRM_FLT_J, "offset", "Offset")
-        .setHelpText("Specify a value to be added to all active voxels.")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_UI, -10.0, PRM_RANGE_UI, 10.0));
+        .setRange(PRM_RANGE_UI, -10.0, PRM_RANGE_UI, 10.0)
+        .setTooltip("When the operation is Offset, add this value to all active voxels."));
 #endif
 
      //Invert mask.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
-              .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+        .setTooltip("Invert the mask so that alpha value 0 maps to 1 and 1 to 0."));
 
     // Min mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-              .setHelpText("Value below which the mask values map to zero")
-              .setDefault(PRMzeroDefaults)
-              .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+        .setTooltip("Threshold below which mask values are clamped to zero"));
 
     // Max mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-              .setHelpText("Value above which the mask values map to one")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+        .setTooltip("Threshold above which mask values are clamped to one"));
 
 #ifndef SESI_OPENVDB
     // Verbosity toggle.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
-              .setHelpText("Prints the sequence of operations to the terminal."));
+        .setTooltip("Print the sequence of operations to the terminal."));
 #endif
 
     // Obsolete parameters
@@ -306,7 +338,38 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
-        .addOptionalInput("Optional VDB Alpha Mask");
+        .addOptionalInput("Optional VDB Alpha Mask")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Filters/smooths the values in a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node assigns to each active voxel in a VDB volume a value,\n\
+such as the mean or median, that is representative of the voxel's neighborhood,\n\
+where the neighborhood is a cube centered on the voxel.\n\
+This has the effect of reducing high-frequency content and suppressing noise.\n\
+\n\
+If the optional scalar mask volume is provided, the output value of\n\
+each voxel is a linear blend between its input value and the neighborhood value.\n\
+A mask value of zero leaves the input value unchanged.\n\
+\n\
+NOTE:\n\
+    To filter a level set, use the\n\
+    [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet] node.\n\
+\n\
+@related\n\
+- [OpenVDB Noise|Node:sop/DW_OpenVDBNoise]\n\
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
+- [Node:sop/vdbsmooth]\n\
+- [Node:sop/vdbsmoothsdf]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -370,8 +433,8 @@ struct SOP_OpenVDB_Filter::FilterOp
     template<typename GridT>
     void operator()(GridT& grid)
     {
-        typedef typename GridT::ValueType ValueT;
-        typedef openvdb::FloatGrid MaskT;
+        using ValueT = typename GridT::ValueType;
+        using MaskT = openvdb::FloatGrid;
 
         openvdb::tools::Filter<GridT, MaskT, hvdb::Interrupter> filter(grid, interrupt);
 
@@ -452,10 +515,10 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
     const Operation op = stringToOp(s.toStdString());
 
     FilterParms parms(op);
-    parms.radius = evalInt("radius", 0, now);
+    parms.radius = static_cast<int>(evalInt("radius", 0, now));
     parms.worldRadius = float(evalFloat("worldradius", 0, now));
     parms.useWorldRadius = bool(evalInt("worldunits", 0, now));
-    parms.iterations = evalInt("iterations", 0, now);
+    parms.iterations = static_cast<int>(evalInt("iterations", 0, now));
 #ifndef SESI_OPENVDB
     parms.offset = static_cast<float>(evalFloat("offset", 0, now));
     parms.verbose = bool(evalInt("verbose", 0, now));

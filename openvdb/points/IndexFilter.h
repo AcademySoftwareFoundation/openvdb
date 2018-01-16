@@ -46,6 +46,7 @@
 #include "IndexIterator.h"
 #include "AttributeArray.h"
 #include "AttributeGroup.h"
+#include "AttributeSet.h"
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -104,10 +105,31 @@ class MultiGroupFilter
 {
 public:
     using NameVector    = std::vector<Name>;
-    using HandleVector  = boost::ptr_vector<GroupHandle>;
+    using IndexVector   = std::vector<AttributeSet::Descriptor::GroupIndex>;
+    using HandleVector  = std::vector<GroupHandle>;
 
+private:
+    static IndexVector namesToIndices(const AttributeSet& attributeSet, const NameVector& names) {
+        IndexVector indices;
+        for (const auto& name : names) {
+            try {
+                indices.emplace_back(attributeSet.groupIndex(name));
+            } catch (LookupError) {
+                // silently drop group names that don't exist
+            }
+        }
+        return indices;
+    }
+
+public:
     MultiGroupFilter(   const NameVector& include,
-                        const NameVector& exclude)
+                        const NameVector& exclude,
+                        const AttributeSet& attributeSet)
+        : mInclude(MultiGroupFilter::namesToIndices(attributeSet, include))
+        , mExclude(MultiGroupFilter::namesToIndices(attributeSet, exclude)) { }
+
+    MultiGroupFilter(   const IndexVector& include,
+                        const IndexVector& exclude)
         : mInclude(include)
         , mExclude(exclude) { }
 
@@ -124,15 +146,11 @@ public:
     void reset(const LeafT& leaf) {
         mIncludeHandles.clear();
         mExcludeHandles.clear();
-        for (const Name& name : mInclude) {
-            if (leaf.attributeSet().descriptor().hasGroup(name)) {
-                mIncludeHandles.push_back(new GroupHandle(leaf.groupHandle(name)));
-            }
+        for (const AttributeSet::Descriptor::GroupIndex& index : mInclude) {
+            mIncludeHandles.emplace_back(leaf.groupHandle(index));
         }
-        for (const Name& name : mExclude) {
-            if (leaf.attributeSet().descriptor().hasGroup(name)) {
-                mExcludeHandles.push_back(new GroupHandle(leaf.groupHandle(name)));
-            }
+        for (const AttributeSet::Descriptor::GroupIndex& index : mExclude) {
+            mExcludeHandles.emplace_back(leaf.groupHandle(index));
         }
         mInitialized = true;
     }
@@ -143,21 +161,21 @@ public:
         // accept no include filters as valid
         bool includeValid = mIncludeHandles.empty();
         for (const GroupHandle& handle : mIncludeHandles) {
-            if (handle.get(*iter)) {
+            if (handle.getUnsafe(*iter)) {
                 includeValid = true;
                 break;
             }
         }
         if (!includeValid)          return false;
         for (const GroupHandle& handle : mExcludeHandles) {
-            if (handle.get(*iter))  return false;
+            if (handle.getUnsafe(*iter))  return false;
         }
         return true;
     }
 
 private:
-    const NameVector mInclude;
-    const NameVector mExclude;
+    IndexVector mInclude;
+    IndexVector mExclude;
     HandleVector mIncludeHandles;
     HandleVector mExcludeHandles;
     bool mInitialized = false;

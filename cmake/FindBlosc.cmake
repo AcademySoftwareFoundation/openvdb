@@ -51,14 +51,20 @@ IF ( BLOSC_FOUND )
 
   SET ( BLOSC_LIBRARYDIR ${BLOSC_LOCATION}/lib
     CACHE STRING "Blosc library directories")
+
+  SET ( _blosc_library_name "blosc" )
   
   # Static library setup
   IF (Blosc_USE_STATIC_LIBS)
     SET(CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+	IF (WIN32)
+	  SET ( _blosc_library_name "libblosc" )
+	ELSE ()
+	  SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+	ENDIF ()
   ENDIF()
 
-  FIND_LIBRARY ( BLOSC_blosc_LIBRARY blosc
+  FIND_LIBRARY ( BLOSC_blosc_LIBRARY ${_blosc_library_name}
     PATHS ${BLOSC_LIBRARYDIR}
     NO_DEFAULT_PATH
     NO_SYSTEM_ENVIRONMENT_PATH

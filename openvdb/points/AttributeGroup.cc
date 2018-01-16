@@ -49,6 +49,17 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
         , mBitMask(static_cast<GroupType>(1 << offset))
 {
     assert(isGroup(mArray));
+
+    // load data if delay-loaded
+
+    mArray.loadData();
+
+    // if array is compressed and preserve compression is true, copy and decompress
+    // into a local copy that is destroyed with handle to maintain thread-safety
+
+    if (mArray.isCompressed()) {
+        const_cast<GroupAttributeArray&>(mArray).decompress();
+    }
 }
 
 
@@ -58,12 +69,29 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     , mBitMask(bitMask)
 {
     assert(isGroup(mArray));
+
+    // load data if delay-loaded
+
+    mArray.loadData();
+
+    // if array is compressed and preserve compression is true, copy and decompress
+    // into a local copy that is destroyed with handle to maintain thread-safety
+
+    if (mArray.isCompressed()) {
+        const_cast<GroupAttributeArray&>(mArray).decompress();
+    }
 }
 
 
 bool GroupHandle::get(Index n) const
 {
     return (mArray.get(n) & mBitMask) == mBitMask;
+}
+
+
+bool GroupHandle::getUnsafe(Index n) const
+{
+    return (mArray.getUnsafe(n) & mBitMask) == mBitMask;
 }
 
 

@@ -35,6 +35,7 @@
 #include "Math.h"
 #include "Tuple.h"
 #include "Vec3.h"
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 
@@ -50,8 +51,8 @@ template<typename T>
 class Vec4: public Tuple<4, T>
 {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
     Vec4() {}
@@ -316,7 +317,7 @@ public:
         return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec4<T>(1, 0, 0, 0);
     }
 
-    /// Returns v, where \f$v_i *= scalar\f$ for \f$i \in [0, 3]\f$
+    /// Multiply each element of this vector by @a scalar.
     template <typename S>
     const Vec4<T> &operator*=(S scalar)
     {
@@ -327,7 +328,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i *= v1_i\f$ for \f$i \in [0, 3]\f$
+    /// Multiply each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec4<T> &operator*=(const Vec4<S> &v1)
     {
@@ -339,7 +340,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i /= scalar\f$ for \f$i \in [0, 3]\f$
+    /// Divide each element of this vector by @a scalar.
     template <typename S>
     const Vec4<T> &operator/=(S scalar)
     {
@@ -350,7 +351,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i /= v1_i\f$ for \f$i \in [0, 3]\f$
+    /// Divide each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec4<T> &operator/=(const Vec4<S> &v1)
     {
@@ -361,7 +362,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 3]\f$
+    /// Add @a scalar to each element of this vector.
     template <typename S>
     const Vec4<T> &operator+=(S scalar)
     {
@@ -372,7 +373,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i += v1_i\f$ for \f$i \in [0, 3]\f$
+    /// Add each element of the given vector to the corresponding element of this vector.
     template <typename S>
     const Vec4<T> &operator+=(const Vec4<S> &v1)
     {
@@ -383,7 +384,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 3]\f$
+    /// Subtract @a scalar from each element of this vector.
     template <typename S>
     const Vec4<T> &operator-=(S scalar)
     {
@@ -394,7 +395,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i -= v1_i\f$ for \f$i \in [0, 3]\f$
+    /// Subtract each element of the given vector from the corresponding element of this vector.
     template <typename S>
     const Vec4<T> &operator-=(const Vec4<S> &v1)
     {
@@ -409,27 +410,6 @@ public:
     static unsigned numRows() { return 1; }
     static unsigned numColumns()  { return 4; }
     static unsigned numElements()  { return 4; }
-
-    /// True if a Nan is present in vector
-    bool isNan() const
-    {
-        return isnan(this->mm[0]) || isnan(this->mm[1])
-            || isnan(this->mm[2]) || isnan(this->mm[3]);
-    }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const
-    {
-        return isinf(this->mm[0]) || isinf(this->mm[1])
-            || isinf(this->mm[2]) || isinf(this->mm[3]);
-    }
-
-    /// True if all no Nan or Inf values present
-    bool isFinite() const
-    {
-        return finite(this->mm[0]) && finite(this->mm[1])
-            && finite(this->mm[2]) && finite(this->mm[3]);
-    }
 
     /// Predefined constants, e.g.   Vec4f v = Vec4f::xNegAxis();
     static Vec4<T> zero() { return Vec4<T>(0, 0, 0, 0); }
@@ -452,12 +432,12 @@ inline bool operator==(const Vec4<T0> &v0, const Vec4<T1> &v1)
 template <typename T0, typename T1>
 inline bool operator!=(const Vec4<T0> &v0, const Vec4<T1> &v1) { return !(v0==v1); }
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 3]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator*(S scalar, const Vec4<T> &v)
 { return v*scalar; }
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 3]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator*(const Vec4<T> &v, S scalar)
 {
@@ -466,10 +446,9 @@ inline Vec4<typename promote<S, T>::type> operator*(const Vec4<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i * v1_i\f$ for \f$i \in [0, 3]\f$
+/// Multiply corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
-inline Vec4<typename promote<T0, T1>::type> operator*(const Vec4<T0> &v0,
-                                               const Vec4<T1> &v1)
+inline Vec4<typename promote<T0, T1>::type> operator*(const Vec4<T0> &v0, const Vec4<T1> &v1)
 {
     Vec4<typename promote<T0, T1>::type> result(v0[0]*v1[0],
                                                 v0[1]*v1[1],
@@ -478,7 +457,7 @@ inline Vec4<typename promote<T0, T1>::type> operator*(const Vec4<T0> &v0,
     return result;
 }
 
-/// Returns V, where \f$V_i = scalar / v_i\f$ for \f$i \in [0, 3]\f$
+/// Divide @a scalar by each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator/(S scalar, const Vec4<T> &v)
 {
@@ -488,7 +467,7 @@ inline Vec4<typename promote<S, T>::type> operator/(S scalar, const Vec4<T> &v)
                                               scalar/v[3]);
 }
 
-/// Returns V, where \f$V_i = v_i / scalar\f$ for \f$i \in [0, 3]\f$
+/// Divide each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator/(const Vec4<T> &v, S scalar)
 {
@@ -497,17 +476,16 @@ inline Vec4<typename promote<S, T>::type> operator/(const Vec4<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i / v1_i\f$ for \f$i \in [0, 3]\f$
+/// Divide corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
-inline Vec4<typename promote<T0, T1>::type> operator/(const Vec4<T0> &v0,
-                                               const Vec4<T1> &v1)
+inline Vec4<typename promote<T0, T1>::type> operator/(const Vec4<T0> &v0, const Vec4<T1> &v1)
 {
     Vec4<typename promote<T0, T1>::type>
         result(v0[0]/v1[0], v0[1]/v1[1], v0[2]/v1[2], v0[3]/v1[3]);
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i + v1_i\f$ for \f$i \in [0, 3]\f$
+/// Add corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec4<typename promote<T0, T1>::type> operator+(const Vec4<T0> &v0, const Vec4<T1> &v1)
 {
@@ -516,7 +494,7 @@ inline Vec4<typename promote<T0, T1>::type> operator+(const Vec4<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i + scalar\f$ for \f$i \in [0, 3]\f$
+/// Add @a scalar to each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator+(const Vec4<T> &v, S scalar)
 {
@@ -525,7 +503,7 @@ inline Vec4<typename promote<S, T>::type> operator+(const Vec4<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i - v1_i\f$ for \f$i \in [0, 3]\f$
+/// Subtract corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec4<typename promote<T0, T1>::type> operator-(const Vec4<T0> &v0, const Vec4<T1> &v1)
 {
@@ -534,7 +512,7 @@ inline Vec4<typename promote<T0, T1>::type> operator-(const Vec4<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i - scalar\f$ for \f$i \in [0, 3]\f$
+/// Subtract @a scalar from each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec4<typename promote<S, T>::type> operator-(const Vec4<T> &v, S scalar)
 {
@@ -557,21 +535,6 @@ isApproxEqual(const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& eps)
            isApproxEqual(a[1], b[1], eps[1]) &&
            isApproxEqual(a[2], b[2], eps[2]) &&
            isApproxEqual(a[3], b[3], eps[3]);
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec4<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]) && isFinite(v[3]);
-}
-
-/// Return @c true if all components are exactly equal to zero.
-template<typename T>
-inline bool
-isZero(const Vec4<T>& v)
-{
-    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]) && isZero(v[3]);
 }
 
 template<typename T>
@@ -618,10 +581,10 @@ inline Vec4<T> Exp(Vec4<T> v) { return v.exp(); }
 template <typename T>
 inline Vec4<T> Log(Vec4<T> v) { return v.log(); }
 
-typedef Vec4<int32_t>   Vec4i;
-typedef Vec4<uint32_t>  Vec4ui;
-typedef Vec4<float>     Vec4s;
-typedef Vec4<double>    Vec4d;
+using Vec4i = Vec4<int32_t>;
+using Vec4ui = Vec4<uint32_t>;
+using Vec4s = Vec4<float>;
+using Vec4d = Vec4<double>;
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

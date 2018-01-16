@@ -48,13 +48,13 @@ class SOP_OpenVDB_Prune: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Prune(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Prune() {}
+    ~SOP_OpenVDB_Prune() override {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    OP_ERROR cookMySop(OP_Context&) override;
+    bool updateParmsFlags() override;
 };
 
 
@@ -65,25 +65,28 @@ protected:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenuInput1));
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
+        .setTooltip("Specify a subset of the input VDBs to be pruned.")
+        .setDocumentation(
+            "A subset of the input VDBs to be pruned"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "value",    "Value",
             "inactive", "Inactive",
             "levelset", "Level Set",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Mode")
             .setDefault("value")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
+            .setTooltip(
                 "Value:\n"
                 "    Collapse regions in which all voxels have the same\n"
                 "    value and active state into tiles with those values\n"
@@ -101,12 +104,35 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Tolerance")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
-        .setHelpText(
+        .setTooltip(
             "Voxel values are considered equal if they differ\n"
             "by less than the specified threshold."));
 
     hvdb::OpenVDBOpFactory("OpenVDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
-        .addInput("Grids to process");
+        .addInput("Grids to process")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Reduce the memory footprint of VDB volumes.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node prunes branches of VDB\n\
+[trees|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
+where all voxels have the same or similar values.\n\
+This can help to reduce the memory footprint of a VDB, without changing its topology.\n\
+With a suitably high tolerance, pruning can function as a simple\n\
+form of lossy compression.\n\
+\n\
+@related\n\
+- [OpenVDB Densify|Node:sop/DW_OpenVDBDensify]\n\
+- [Node:sop/vdbactivate]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -156,7 +182,7 @@ struct PruneOp {
     template<typename GridT>
     void operator()(GridT& grid) const
     {
-        typedef typename GridT::ValueType ValueT;
+        using ValueT = typename GridT::ValueType;
 
         if (mode == "value") {
             openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));

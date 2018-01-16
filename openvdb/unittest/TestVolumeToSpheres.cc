@@ -30,11 +30,10 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb/openvdb.h> // for FloatGrid
+#include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h> // for createLevelSetSphere
 #include <openvdb/tools/LevelSetUtil.h> // for sdfToFogVolume
 #include <openvdb/tools/VolumeToSpheres.h> // for fillWithSpheres
-#include <openvdb/Exceptions.h>
 
 #include <vector>
 
@@ -45,10 +44,12 @@ public:
     CPPUNIT_TEST_SUITE(TestVolumeToSpheres);
     CPPUNIT_TEST(testFromLevelSet);
     CPPUNIT_TEST(testFromFog);
+    CPPUNIT_TEST(testClosestSurfacePoint);
     CPPUNIT_TEST_SUITE_END();
 
     void testFromLevelSet();
     void testFromFog();
+    void testClosestSurfacePoint();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToSpheres);
@@ -158,6 +159,67 @@ TestVolumeToSpheres::testFromFog()
         openvdb::tools::fillWithSpheres(*grid, spheres, maxSphereCount, overlapping,
             minRadius, maxRadius, 10.0f, instanceCount);
         CPPUNIT_ASSERT(!spheres.empty());
+    }
+}
+
+
+void
+TestVolumeToSpheres::testClosestSurfacePoint()
+{
+    using namespace openvdb;
+
+    const float voxelSize = 1.0f;
+    const Vec3f center{0.0f}; // ensure multiple internal nodes
+
+    for (const float radius: { 8.0f, 50.0f }) {
+        // Construct a spherical level set.
+        const auto sphere = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize);
+        CPPUNIT_ASSERT(sphere);
+
+        // Construct the corners of a cube that exactly encloses the sphere.
+        const std::vector<Vec3R> corners{
+            { -radius, -radius, -radius },
+            { -radius, -radius,  radius },
+            { -radius,  radius, -radius },
+            { -radius,  radius,  radius },
+            {  radius, -radius, -radius },
+            {  radius, -radius,  radius },
+            {  radius,  radius, -radius },
+            {  radius,  radius,  radius },
+        };
+        // Compute the distance from a corner of the cube to the surface of the sphere.
+        const auto distToSurface = Vec3d{radius}.length() - radius;
+
+        auto csp = tools::ClosestSurfacePoint<FloatGrid>::create(*sphere);
+        CPPUNIT_ASSERT(csp);
+
+        // Move each corner point to the closest surface point.
+        auto points = corners;
+        std::vector<float> distances;
+        bool ok = csp->searchAndReplace(points, distances);
+        CPPUNIT_ASSERT(ok);
+        CPPUNIT_ASSERT_EQUAL(8, int(points.size()));
+        CPPUNIT_ASSERT_EQUAL(8, int(distances.size()));
+
+        for (auto d: distances) {
+            CPPUNIT_ASSERT((std::abs(d - distToSurface) / distToSurface) < 0.01); // rel err < 1%
+        }
+        for (int i = 0; i < 8; ++i) {
+            const auto intersection = corners[i] + distToSurface * (center - corners[i]).unit();
+            CPPUNIT_ASSERT(points[i].eq(intersection, /*tolerance=*/0.1));
+        }
+
+        // Place a point inside the sphere.
+        points.clear();
+        distances.clear();
+        points.emplace_back(1, 0, 0);
+        ok = csp->searchAndReplace(points, distances);
+        CPPUNIT_ASSERT(ok);
+        CPPUNIT_ASSERT_EQUAL(1, int(points.size()));
+        CPPUNIT_ASSERT_EQUAL(1, int(distances.size()));
+        CPPUNIT_ASSERT((std::abs(radius - 1 - distances[0]) / (radius - 1)) < 0.01);
+        CPPUNIT_ASSERT(points[0].eq(Vec3R{radius, 0, 0}, /*tolerance=*/0.5));
+            ///< @todo off by half a voxel in y and z
     }
 }
 

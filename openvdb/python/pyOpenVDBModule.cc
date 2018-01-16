@@ -30,15 +30,22 @@
 
 #include <cstring> // for strncmp(), strrchr(), etc.
 #include <limits>
+#include <string>
+#include <utility> // for std::make_pair()
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
-#ifdef PY_OPENVDB_USE_NUMPY
-#define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
-#ifdef NPY_1_7_API_VERSION
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#ifndef DWA_BOOST_VERSION
+#include <boost/version.hpp>
+#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
 #endif
-#include <arrayobject.h> // for import_array()
+#if defined PY_OPENVDB_USE_NUMPY && DWA_BOOST_VERSION < 1065000
+  #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
+  #include <numpyconfig.h>
+  #ifdef NPY_1_7_API_VERSION
+    #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+  #endif
+  #include <arrayobject.h> // for import_array()
 #endif
 #include "openvdb/openvdb.h"
 #include "pyopenvdb.h"
@@ -75,13 +82,13 @@ struct CoordConverter
         return obj.ptr();
     }
 
-    /// @return NULL if the given Python object is not convertible to a Coord.
+    /// @return nullptr if the given Python object is not convertible to a Coord.
     static void* convertible(PyObject* obj)
     {
-        if (!PySequence_Check(obj)) return NULL; // not a Python sequence
+        if (!PySequence_Check(obj)) return nullptr; // not a Python sequence
 
         Py_ssize_t len = PySequence_Length(obj);
-        if (len != 3 && len != 1) return NULL; // not the right length
+        if (len != 3 && len != 1) return nullptr; // not the right length
 
         return obj;
     }
@@ -91,8 +98,7 @@ struct CoordConverter
         py::converter::rvalue_from_python_stage1_data* data)
     {
         // Construct a Coord in the provided memory location.
-        typedef py::converter::rvalue_from_python_storage<openvdb::Coord>
-            StorageT;
+        using StorageT = py::converter::rvalue_from_python_storage<openvdb::Coord>;
         void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
         new (storage) openvdb::Coord; // placement new
         data->convertible = storage;
@@ -162,17 +168,17 @@ struct VecConverter
 
     static void* convertible(PyObject* obj)
     {
-        if (!PySequence_Check(obj)) return NULL; // not a Python sequence
+        if (!PySequence_Check(obj)) return nullptr; // not a Python sequence
 
         Py_ssize_t len = PySequence_Length(obj);
-        if (len != VecT::size) return NULL;
+        if (len != VecT::size) return nullptr;
 
         // Check that all elements of the Python sequence are convertible
         // to the Vec's value type.
         py::object seq = pyutil::pyBorrow(obj);
         for (int i = 0; i < VecT::size; ++i) {
             if (!py::extract<typename VecT::value_type>(seq[i]).check()) {
-                return NULL;
+                return nullptr;
             }
         }
         return obj;
@@ -182,7 +188,7 @@ struct VecConverter
         py::converter::rvalue_from_python_stage1_data* data)
     {
         // Construct a Vec in the provided memory location.
-        typedef py::converter::rvalue_from_python_storage<VecT> StorageT;
+        using StorageT = py::converter::rvalue_from_python_storage<VecT>;
         void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
         new (storage) VecT; // placement new
         data->convertible = storage;
@@ -262,14 +268,14 @@ struct MetaMapConverter
 
     static void* convertible(PyObject* obj)
     {
-        return (PyMapping_Check(obj) ? obj : NULL);
+        return (PyMapping_Check(obj) ? obj : nullptr);
     }
 
     static void construct(PyObject* obj,
         py::converter::rvalue_from_python_stage1_data* data)
     {
         // Construct a MetaMap in the provided memory location.
-        typedef py::converter::rvalue_from_python_storage<MetaMap> StorageT;
+        using StorageT = py::converter::rvalue_from_python_storage<MetaMap>;
         void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
         new (storage) MetaMap; // placement new
         data->convertible = storage;
@@ -514,6 +520,11 @@ writeToFile(const std::string& filename, py::object gridOrSeqObj, py::object dic
 ////////////////////////////////////////
 
 
+std::string getLoggingLevel();
+void setLoggingLevel(py::object);
+void setProgramName(py::object, bool);
+
+
 std::string
 getLoggingLevel()
 {
@@ -589,7 +600,7 @@ struct GridClassDescr
             { "STAGGERED",  strdup(GridBase::gridClassToString(GRID_STAGGERED).c_str()) }
         };
         if (i >= 0 && i < sCount) return pyutil::CStringPair(&sStrings[i][0], &sStrings[i][1]);
-        return pyutil::CStringPair(static_cast<char**>(NULL), static_cast<char**>(NULL));
+        return pyutil::CStringPair(static_cast<char**>(nullptr), static_cast<char**>(nullptr));
     }
 };
 
@@ -632,7 +643,7 @@ struct VecTypeDescr
                 strdup(GridBase::vecTypeToString(openvdb::VEC_CONTRAVARIANT_ABSOLUTE).c_str()) }
         };
         if (i >= 0 && i < sCount) return std::make_pair(&sStrings[i][0], &sStrings[i][1]);
-        return pyutil::CStringPair(static_cast<char**>(NULL), static_cast<char**>(NULL));
+        return pyutil::CStringPair(static_cast<char**>(nullptr), static_cast<char**>(nullptr));
     }
 };
 
@@ -659,10 +670,14 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
 #ifdef PY_OPENVDB_USE_NUMPY
     // Initialize NumPy.
+#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
+    boost::python::numpy::initialize();
+#else
 #if PY_MAJOR_VERSION >= 3
     if (_import_array()) {}
 #else
     import_array();
+#endif
 #endif
 #endif
 

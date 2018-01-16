@@ -41,8 +41,8 @@
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeSet);
     CPPUNIT_TEST(testAttributeSetDescriptor);
@@ -295,7 +295,7 @@ TestAttributeSet::testAttributeSetDescriptor()
         Descriptor::Inserter names2;
         Descriptor::Ptr emptyDescr = Descriptor::create(AttributeVec3f::attributeType());
         const openvdb::Name uniqueNameEmpty = emptyDescr->uniqueName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test0"));
+        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test"));
 
         names2.add("test", AttributeS::attributeType());
         names2.add("test1", AttributeI::attributeType());
@@ -378,7 +378,9 @@ TestAttributeSet::testAttributeSetDescriptor()
     { // Test single token parse
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
-        Descriptor::parseNames(includeNames, excludeNames, "group1");
+        bool includeAll = false;
+        Descriptor::parseNames(includeNames, excludeNames, includeAll, "group1");
+        CPPUNIT_ASSERT(!includeAll);
         CPPUNIT_ASSERT(testStringVector(includeNames, "group1"));
         CPPUNIT_ASSERT(testStringVector(excludeNames));
     }
@@ -441,7 +443,9 @@ TestAttributeSet::testAttributeSetDescriptor()
     { // Test parse (*) character
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
-        Descriptor::parseNames(includeNames, excludeNames, "*");
+        bool includeAll = false;
+        Descriptor::parseNames(includeNames, excludeNames, includeAll, "*");
+        CPPUNIT_ASSERT(includeAll);
         CPPUNIT_ASSERT(testStringVector(includeNames));
         CPPUNIT_ASSERT(testStringVector(excludeNames));
     }
@@ -811,6 +815,48 @@ TestAttributeSet::testAttributeSet()
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
+
+        { // test duplicateDrop configures group mapping
+            AttributeSet attrSetC;
+
+            const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
+
+            attrSetC.appendAttribute("test1", AttributeI::attributeType());
+            attrSetC.appendAttribute("__group1", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("test2", AttributeI::attributeType());
+            attrSetC.appendAttribute("__group2", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("__group3", GroupAttributeArray::attributeType());
+            attrSetC.appendAttribute("__group4", GroupAttributeArray::attributeType());
+
+            // 5 attributes exist - append a group as the sixth and then drop
+
+            Descriptor::Ptr descriptor = attrSetC.descriptorPtr();
+            size_t count = descriptor->count(GroupAttributeArray::attributeType());
+            CPPUNIT_ASSERT_EQUAL(count, size_t(4));
+
+            descriptor->setGroup("test_group1", /*offset*/0); // __group1
+            descriptor->setGroup("test_group2", /*offset=8*/GROUP_BITS); // __group2
+            descriptor->setGroup("test_group3", /*offset=16*/GROUP_BITS*2); // __group3
+            descriptor->setGroup("test_group4", /*offset=28*/GROUP_BITS*3 + GROUP_BITS/2); // __group4
+
+            descriptor = descriptor->duplicateDrop({ 1, 2, 3 });
+            count = descriptor->count(GroupAttributeArray::attributeType());
+            CPPUNIT_ASSERT_EQUAL(count, size_t(2));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor->size());
+            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group1"));
+            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group2"));
+            CPPUNIT_ASSERT(descriptor->hasGroup("test_group3"));
+            CPPUNIT_ASSERT(descriptor->hasGroup("test_group4"));
+
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group1"), size_t(AttributeSet::INVALID_POS));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group2"), size_t(AttributeSet::INVALID_POS));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group3"), size_t(1));
+            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group4"), size_t(2));
+
+            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group3"), size_t(0));
+            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group4"), size_t(GROUP_BITS + GROUP_BITS/2));
+        }
     }
 
     // replace existing arrays
@@ -990,6 +1036,39 @@ TestAttributeSet::testAttributeSetGroups()
 
         CPPUNIT_ASSERT_NO_THROW(attrSet.groupIndex(23));
         CPPUNIT_ASSERT_THROW(attrSet.groupIndex(24), LookupError);
+    }
+
+    { // group unique name
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        const openvdb::Name uniqueNameEmpty = descr->uniqueGroupName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test"));
+
+        descr->setGroup("test", 1);
+        descr->setGroup("test1", 2);
+
+        const openvdb::Name uniqueName1 = descr->uniqueGroupName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueName1, openvdb::Name("test0"));
+        descr->setGroup(uniqueName1, 3);
+
+        const openvdb::Name uniqueName2 = descr->uniqueGroupName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
+    }
+
+    { // group rename
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        descr->setGroup("test", 1);
+        descr->setGroup("test1", 2);
+
+        size_t pos = descr->renameGroup("test", "test1");
+        CPPUNIT_ASSERT(pos == AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descr->hasGroup("test"));
+        CPPUNIT_ASSERT(descr->hasGroup("test1"));
+
+        pos = descr->renameGroup("test", "test2");
+        CPPUNIT_ASSERT_EQUAL(pos, size_t(1));
+        CPPUNIT_ASSERT(!descr->hasGroup("test"));
+        CPPUNIT_ASSERT(descr->hasGroup("test1"));
+        CPPUNIT_ASSERT(descr->hasGroup("test2"));
     }
 }
 

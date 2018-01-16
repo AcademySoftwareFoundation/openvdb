@@ -53,10 +53,10 @@ OPENVDB_API void
 calculateBounds(const Transform& t, const Vec3d& minWS, const Vec3d& maxWS,
     Vec3d& minIS, Vec3d& maxIS);
 
-/// @brief Calculate an axis-aligned bounding box in index space from a
+/// @todo Calculate an axis-aligned bounding box in index space from a
 /// bounding sphere in world space.
-/// @todo void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
-///     Vec3d& minIS, Vec3d& maxIS);
+//void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
+//    Vec3d& minIS, Vec3d& maxIS);
 
 
 ////////////////////////////////////////

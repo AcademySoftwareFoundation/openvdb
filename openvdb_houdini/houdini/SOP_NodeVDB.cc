@@ -247,7 +247,7 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
     // Add the OpenVDB library version number to this node's
     // extended operator information.
     if (UT_InfoTree* child = tree.addChildMap("OpenVDB")) {
-        child->addProperties("OpenVDB Version", openvdb::getLibraryVersionString());
+        child->addProperties("OpenVDB Version", openvdb::getLibraryAbiVersionString());
     }
 }
 #endif

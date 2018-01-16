@@ -191,6 +191,9 @@ public:
     GridResampler(): mThreaded(true), mTransformTiles(true) {}
     virtual ~GridResampler() {}
 
+    GridResampler(const GridResampler&) = default;
+    GridResampler& operator=(const GridResampler&) = default;
+
     /// Enable or disable threading.  (Threading is enabled by default.)
     void setThreaded(bool b) { mThreaded = b; }
     /// Return @c true if threading is enabled.
@@ -264,6 +267,9 @@ public:
         const std::string& xformOrder = "tsr",
         const std::string& rotationOrder = "zyx");
     ~GridTransformer() override = default;
+
+    GridTransformer(const GridTransformer&) = default;
+    GridTransformer& operator=(const GridTransformer&) = default;
 
     const Mat4R& getTransform() const { return mTransform; }
 
@@ -941,7 +947,7 @@ GridResampler::transformBBox(
     // and compute the enclosing bounding box in the output tree.
     Vec3R
         inRMin(bbox.min().x(), bbox.min().y(), bbox.min().z()),
-        inRMax(bbox.max().x(), bbox.max().y(), bbox.max().z()),
+        inRMax(bbox.max().x()+1, bbox.max().y()+1, bbox.max().z()+1),
         outRMin = math::minComponent(xform.transform(inRMin), xform.transform(inRMax)),
         outRMax = math::maxComponent(xform.transform(inRMin), xform.transform(inRMax));
     for (int i = 0; i < 8; ++i) {

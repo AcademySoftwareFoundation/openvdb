@@ -38,6 +38,7 @@
 #define OPENVDB_POINTS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 
 #include "AttributeArray.h"
+#include "AttributeSet.h"
 #include <memory>
 
 namespace openvdb {
@@ -115,6 +116,7 @@ public:
     bool isUniform() const { return mArray.isUniform(); }
 
     bool get(Index n) const;
+    bool getUnsafe(Index n) const;
 
 protected:
     const GroupAttributeArray& mArray;
@@ -157,24 +159,27 @@ public:
 class GroupFilter
 {
 public:
-    explicit GroupFilter(const Name& attribute)
-        : mAttribute(attribute) { }
+    GroupFilter(const Name& name, const AttributeSet& attributeSet)
+        : mIndex(attributeSet.groupIndex(name)) { }
+
+    explicit GroupFilter(const AttributeSet::Descriptor::GroupIndex& index)
+        : mIndex(index) { }
 
     inline bool initialized() const { return bool(mHandle); }
 
     template <typename LeafT>
     void reset(const LeafT& leaf) {
-        mHandle.reset(new GroupHandle(leaf.groupHandle(mAttribute)));
+        mHandle.reset(new GroupHandle(leaf.groupHandle(mIndex)));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
         assert(mHandle);
-        return mHandle->get(*iter);
+        return mHandle->getUnsafe(*iter);
     }
 
 private:
-    const Name mAttribute;
+    const AttributeSet::Descriptor::GroupIndex mIndex;
     GroupHandle::Ptr mHandle;
 }; // class GroupFilter
 

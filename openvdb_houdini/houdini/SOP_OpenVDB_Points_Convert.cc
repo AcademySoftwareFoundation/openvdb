@@ -35,16 +35,13 @@
 /// @brief Converts points to OpenVDB points.
 
 #include <openvdb/openvdb.h>
-#include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointAttribute.h>
-#include <openvdb/points/PointConversion.h>
-#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointMask.h>
 
 #include <openvdb_houdini/Utils.h>
-#include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/PointUtils.h>
-#include <openvdb_houdini/AttributeTransferUtil.h>
+#include <openvdb_houdini/SOP_NodeVDB.h>
 
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
@@ -60,658 +57,22 @@
     #include <GU/GU_DetailHandle.h>
 #endif
 
-#include <CH/CH_Manager.h>
-#include <GA/GA_Types.h> // for GA_ATTRIB_POINT
-#include <SYS/SYS_Types.h> // for int32, float32, etc
+#include <CH/CH_Manager.h> // for CHgetEvalTime
+
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
 
 using namespace openvdb;
 using namespace openvdb::points;
 using namespace openvdb::math;
 
-namespace openvdb_houdini {
-    template <> inline openvdb::math::Quat<float>
-    evalAttrDefault<openvdb::math::Quat<float>>(const GA_Defaults& defaults, int)
-    {
-        openvdb::math::Quat<float> quat;
-        fpreal32 value;
-
-        for (int i = 0; i < 4; i++) {
-            defaults.get(i, value);
-            quat[i] = float(value);
-        }
-
-        return quat;
-    }
-
-    template <> inline openvdb::math::Quat<double>
-    evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
-    {
-        openvdb::math::Quat<double> quat;
-        fpreal64 value;
-
-        for (int i = 0; i < 4; i++) {
-            defaults.get(i, value);
-            quat[i] = double(value);
-        }
-
-        return quat;
-    }
-
-    template <> inline openvdb::math::Mat4<float>
-    evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
-    {
-        openvdb::math::Mat4<float> mat;
-        fpreal64 value;
-        float* data = mat.asPointer();
-
-        for (int i = 0; i < 16; i++) {
-            defaults.get(i, value);
-            data[i] = float(value);
-        }
-
-        return mat;
-    }
-
-    template <> inline openvdb::math::Mat4<double>
-    evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
-    {
-        openvdb::math::Mat4<double> mat;
-        fpreal64 value;
-        double* data = mat.asPointer();
-
-        for (int i = 0; i < 16; i++) {
-            defaults.get(i, value);
-            data[i] = double(value);
-        }
-
-        return mat;
-    }
-}
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-
-enum COMPRESSION_TYPE
-{
-    NONE = 0,
-    TRUNCATE,
-    UNIT_VECTOR,
-    UNIT_FIXED_POINT_8,
-    UNIT_FIXED_POINT_16,
-};
-
-/// @brief Returns supported Storage types for conversion from GA_Attribute
-///
-inline GA_Storage
-attributeStorageType(const GA_Attribute* const attribute)
-{
-    if (!attribute) return GA_STORE_INVALID;
-
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-    if (!tupleAIF)
-    {
-        if (attribute->getAIFStringTuple())
-        {
-            return GA_STORE_STRING;
-        }
-    }
-    else
-    {
-        return tupleAIF->getStorage(attribute);
-    }
-
-    return GA_STORE_INVALID;
-}
-
-inline int16_t
-attributeTupleSize(const GA_Attribute* const attribute)
-{
-    if (!attribute) return int16_t(0);
-
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-    if (!tupleAIF)
-    {
-        const GA_AIFStringTuple* tupleAIFString = attribute->getAIFStringTuple();
-        if (tupleAIFString)
-        {
-            return static_cast<int16_t>(tupleAIFString->getTupleSize(attribute));
-        }
-    }
-    else
-    {
-        return static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
-    }
-
-    return int16_t(0);
-}
-
-template <typename ValueType, typename CodecType = NullCodec>
-inline void
-convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& indexTree,
-    const openvdb::Name& name, const GA_Attribute* const attribute,
-    const GA_Defaults& defaults, const Index stride = 1)
-{
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value,
-        "ValueType must not be derived from AttributeArray");
-    static_assert(!std::is_same<ValueType, openvdb::Name>::value,
-        "ValueType must not be openvdb::Name/std::string");
-
-    using HoudiniAttribute = hvdb::HoudiniReadAttribute<ValueType>;
-
-    ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
-
-    // empty metadata if default is zero
-    Metadata::Ptr defaultValue;
-    if (!math::isZero<ValueType>(value)) {
-        defaultValue = TypedMetadata<ValueType>(value).copy();
-    }
-
-    appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(),
-        stride, /*constantstride=*/true, defaultValue);
-
-    HoudiniAttribute houdiniAttribute(*attribute);
-    populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniAttribute>(
-        tree, indexTree, name, houdiniAttribute, stride);
-}
-
-inline void
-convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& indexTree,
-    const openvdb::Name& name, const GA_Attribute* const attribute, const int compression = 0)
-{
-    using HoudiniStringAttribute = hvdb::HoudiniReadAttribute<openvdb::Name>;
-
-    if (!attribute) {
-        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    const GA_Storage storage(attributeStorageType(attribute));
-
-    if (storage == GA_STORE_INVALID) {
-        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    const int16_t width(attributeTupleSize(attribute));
-    assert(width > 0);
-
-    // explicitly handle string attributes
-
-    if (storage == GA_STORE_STRING) {
-        appendAttribute<Name>(tree, name);
-        HoudiniStringAttribute houdiniAttribute(*attribute);
-        populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniStringAttribute>(
-            tree, indexTree, name, houdiniAttribute);
-        return;
-    }
-
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-    if (!tupleAIF) {
-        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    GA_Defaults defaults = tupleAIF->getDefaults(attribute);
-    const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
-
-    const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
-                                         typeInfo == GA_TYPE_NORMAL ||
-                                         typeInfo == GA_TYPE_COLOR);
-    const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
-    const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
-
-    if (isVector)
-    {
-        if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<Vec3<int>>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL16)
-        {
-            // implicitly convert 16-bit float into truncated 32-bit float
-
-            convertAttributeFromHoudini<Vec3<float>, TruncateCodec>(
-                tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            if (compression == NONE) {
-                convertAttributeFromHoudini<Vec3<float>>(
-                    tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == TRUNCATE) {
-                convertAttributeFromHoudini<Vec3<float>, TruncateCodec>(
-                    tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == UNIT_VECTOR) {
-                convertAttributeFromHoudini<Vec3<float>, UnitVecCodec>(
-                    tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == UNIT_FIXED_POINT_8) {
-                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<true, UnitRange>>(
-                    tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == UNIT_FIXED_POINT_16) {
-                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<false, UnitRange>>(
-                    tree, indexTree, name, attribute, defaults);
-            }
-        }
-        else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<Vec3<double>>(tree, indexTree, name, attribute, defaults);
-        }
-        else {
-            std::stringstream ss; ss << "Unknown vector attribute type - " << name;
-            throw std::runtime_error(ss.str());
-        }
-    }
-    else if (isQuaternion)
-    {
-        if (storage == GA_STORE_REAL16)
-        {
-            // implicitly convert 16-bit float into 32-bit float
-
-            convertAttributeFromHoudini<Quat<float>>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            convertAttributeFromHoudini<Quat<float>>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<Quat<double>>(tree, indexTree, name, attribute, defaults);
-        }
-        else {
-            std::stringstream ss; ss << "Unknown quaternion attribute type - " << name;
-            throw std::runtime_error(ss.str());
-        }
-    }
-    else if (isMatrix)
-    {
-        if (storage == GA_STORE_REAL16)
-        {
-            // implicitly convert 16-bit float into 32-bit float
-
-            convertAttributeFromHoudini<Mat4<float>>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            convertAttributeFromHoudini<Mat4<float>>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<Mat4<double>>(tree, indexTree, name, attribute, defaults);
-        }
-        else {
-            std::stringstream ss; ss << "Unknown matrix attribute type - " << name;
-            throw std::runtime_error(ss.str());
-        }
-    }
-    else {
-        if (storage == GA_STORE_BOOL) {
-            convertAttributeFromHoudini<bool>(tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_INT16) {
-            convertAttributeFromHoudini<int16_t>(tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<int32_t>(tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_INT64) {
-            convertAttributeFromHoudini<int64_t>(tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL16) {
-            convertAttributeFromHoudini<float, TruncateCodec>(
-                tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL32 && compression == NONE) {
-            convertAttributeFromHoudini<float>(tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL32 && compression == TRUNCATE) {
-            convertAttributeFromHoudini<float, TruncateCodec>(
-                tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_8) {
-            convertAttributeFromHoudini<float, FixedPointCodec<true, UnitRange>>(
-                tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_16) {
-            convertAttributeFromHoudini<float, FixedPointCodec<false, UnitRange>>(
-                tree, indexTree, name, attribute, defaults, width);
-        } else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<double>(tree, indexTree, name, attribute, defaults, width);
-        } else {
-            std::stringstream ss; ss << "Unknown attribute type - " << name;
-            throw std::runtime_error(ss.str());
-        }
-    }
-}
-
-
-////////////////////////////////////////
-
-
-using AttributeInfoMap = std::map<Name, std::pair<int, bool>>;
-
-
-///////////////////////////////////////
-
-
-inline
-PointDataGrid::Ptr
-createPointDataGrid(const GU_Detail& ptGeo, const int compression,
-                    const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
-{
-    using HoudiniPositionAttribute = hvdb::HoudiniReadAttribute<openvdb::Vec3d>;
-
-    // store point group information
-
-    const GA_ElementGroupTable& elementGroups = ptGeo.getElementGroupTable(GA_ATTRIB_POINT);
-
-    // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
-
-    const GA_Attribute& positionAttribute = *ptGeo.getP();
-
-    hvdb::OffsetListPtr offsets;
-    hvdb::OffsetPairListPtr offsetPairs;
-
-    size_t vertexCount = 0;
-
-    for (GA_Iterator primitiveIt(ptGeo.getPrimitiveRange()); !primitiveIt.atEnd(); ++primitiveIt) {
-        const GA_Primitive* primitive = ptGeo.getPrimitiveList().get(*primitiveIt);
-
-        if (primitive->getTypeId() != GA_PRIMNURBCURVE) continue;
-
-        vertexCount = primitive->getVertexCount();
-
-        if (vertexCount == 0)  continue;
-
-        if (!offsets)   offsets.reset(new hvdb::OffsetList);
-
-        GA_Offset firstOffset = primitive->getPointOffset(0);
-        offsets->push_back(firstOffset);
-
-        if (vertexCount > 1) {
-            if (!offsetPairs)   offsetPairs.reset(new hvdb::OffsetPairList);
-
-            for (size_t i = 1; i < vertexCount; i++) {
-                GA_Offset offset = primitive->getPointOffset(i);
-                offsetPairs->push_back(hvdb::OffsetPair(firstOffset, offset));
-            }
-        }
-    }
-
-    HoudiniPositionAttribute points(positionAttribute, offsets);
-
-    // Create PointIndexGrid used for consistent index ordering in all attribute conversion
-
-    tools::PointIndexGrid::Ptr pointIndexGrid =
-        tools::createPointIndexGrid<tools::PointIndexGrid>(points, transform);
-
-    // Create PointDataGrid using position attribute
-
-    PointDataGrid::Ptr pointDataGrid;
-
-    if (compression == 1 /*FIXED_POSITION_16*/) {
-        pointDataGrid = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
-            *pointIndexGrid, points, transform);
-    }
-    else if (compression == 2 /*FIXED_POSITION_8*/) {
-        pointDataGrid = createPointDataGrid<FixedPointCodec<true>, PointDataGrid>(
-            *pointIndexGrid, points, transform);
-    }
-    else /*NONE*/ {
-        pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(
-            *pointIndexGrid, points, transform);
-    }
-
-    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
-    PointDataTree& tree = pointDataGrid->tree();
-    PointDataTree::LeafIter leafIter = tree.beginLeaf();
-
-    if (!leafIter)  return pointDataGrid;
-
-    // Append (empty) groups to tree
-
-    std::vector<Name> groupNames;
-    groupNames.reserve(elementGroups.entries());
-
-    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
-        it != itEnd; ++it)
-    {
-        groupNames.push_back((*it)->getName().toStdString());
-    }
-
-    appendGroups(tree, groupNames);
-
-    // Set group membership in tree
-
-    const int64_t numPoints = ptGeo.getNumPoints();
-    std::vector<short> inGroup(numPoints, short(0));
-
-    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
-        it != itEnd; ++it)
-    {
-        // insert group offsets
-
-        GA_Offset start, end;
-        GA_Range range(**it);
-        for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
-            end = std::min(end, numPoints);
-            for (GA_Offset off = start; off < end; ++off) {
-                assert(off < numPoints);
-                inGroup[off] = short(1);
-            }
-        }
-
-        const Name groupName = (*it)->getName().toStdString();
-        setGroup(tree, indexTree, inGroup, groupName);
-
-        std::fill(inGroup.begin(), inGroup.end(), short(0));
-    }
-
-    // Add other attributes to PointDataGrid
-
-    for (const auto& attrInfo : attributes)
-    {
-        const openvdb::Name& name = attrInfo.first;
-
-        // skip position as this has already been added
-
-        if (name == "P")  continue;
-
-        GA_ROAttributeRef attrRef = ptGeo.findPointAttribute(name.c_str());
-
-        if (!attrRef.isValid())     continue;
-
-        GA_Attribute const * gaAttribute = attrRef.getAttribute();
-
-        if (!gaAttribute)             continue;
-
-        const GA_AIFSharedStringTuple* sharedStringTupleAIF =
-            gaAttribute->getAIFSharedStringTuple();
-        const bool isString = bool(sharedStringTupleAIF);
-
-        // Extract all the string values from the string table and insert them
-        // into the Descriptor Metadata
-        if (isString)
-        {
-            // Iterate over the strings in the table and insert them into the Metadata
-            MetaMap& metadata = makeDescriptorUnique(tree)->getMetadata();
-            StringMetaInserter inserter(metadata);
-            for (auto it = sharedStringTupleAIF->begin(gaAttribute),
-                itEnd = sharedStringTupleAIF->end(); !(it == itEnd); ++it)
-            {
-                Name str(it.getString());
-                if (!str.empty())   inserter.insert(str);
-            }
-        }
-
-        convertAttributeFromHoudini(tree, indexTree, name, gaAttribute,
-            /*compression=*/attrInfo.second.first);
-    }
-
-    // Attempt to compact attributes
-
-    compactAttributes(tree);
-
-    // Apply blosc compression to attributes
-
-    for (const auto& attrInfo : attributes)
-    {
-        if (!attrInfo.second.second)  continue;
-
-        bloscCompressAttribute(tree, attrInfo.first);
-    }
-
-    return pointDataGrid;
-}
-
-///////////////////////////////////////
-
-
-template<typename ValueType>
-Metadata::Ptr
-createTypedMetadataFromAttribute(const GA_Attribute* const attribute, const uint32_t component = 0)
-{
-    using HoudiniAttribute = hvdb::HoudiniReadAttribute<ValueType>;
-
-    ValueType value;
-    HoudiniAttribute::get(*attribute, value, /*offset*/0, component);
-    return openvdb::TypedMetadata<ValueType>(value).copy();
-}
-
-template <typename ValueType>
-void
-populateHoudiniDetailAttribute(GA_RWAttributeRef& attrib, const openvdb::MetaMap& metaMap,
-                               const Name& key, const int index)
-{
-    using WriteHandleType = typename hvdb::GAHandleTraits<ValueType>::RW;
-    using TypedMetadataT = TypedMetadata<ValueType>;
-
-    typename TypedMetadataT::ConstPtr typedMetadata = metaMap.getMetadata<TypedMetadataT>(key);
-    if (!typedMetadata) return;
-
-    const ValueType& value = typedMetadata->value();
-    WriteHandleType handle(attrib.getAttribute());
-    hvdb::writeAttributeValue<WriteHandleType, ValueType>(handle, GA_Offset(0), index, value);
-}
-
-inline void
-convertGlobalMetadataToHoudini(GU_Detail& detail, const openvdb::MetaMap& metaMap,
-                               std::vector<std::string>& warnings)
-{
-    struct Local {
-        static bool isGlobalMetadata(const Name& name) {
-            return name.compare(0, 7, "global:") == 0;
-        }
-
-        static Name toDetailName(const Name& name) {
-            Name detailName(name);
-            detailName.erase(0, 7);
-            const size_t open = detailName.find('[');
-            if (open != std::string::npos) {
-                detailName = detailName.substr(0, open);
-            }
-            return detailName;
-        }
-
-        static int toDetailIndex(const Name& name) {
-            const size_t open = name.find('[');
-            const size_t close = name.find(']');
-            int index = 0;
-            if (open != std::string::npos && close != std::string::npos &&
-                close == name.length()-1 && open > 0 && open+1 < close) {
-                try { // parse array index
-                    index = std::stoi(name.substr(open+1, close-open-1));
-                }
-                catch (const std::exception&) {}
-            }
-            return index;
-        }
-    };
-
-    using DetailInfo = std::pair<Name, int>;
-    using DetailMap = std::map<Name, DetailInfo>;
-
-    DetailMap detailCreate;
-    DetailMap detailPopulate;
-
-    for(MetaMap::ConstMetaIterator iter = metaMap.beginMeta(); iter != metaMap.endMeta(); ++iter)
-    {
-        const Metadata::Ptr metadata = iter->second;
-        if (!metadata) continue;
-
-        const Name& key = iter->first;
-
-        if (!Local::isGlobalMetadata(key)) continue;
-
-        Name name = Local::toDetailName(key);
-        int index = Local::toDetailIndex(key);
-
-        // add to creation map
-
-        if (detailCreate.find(name) == detailCreate.end()) {
-            detailCreate[name] = DetailInfo(metadata->typeName(), index);
-        }
-        else {
-            if (index > detailCreate[name].second)   detailCreate[name].second = index;
-        }
-
-        // add to populate map
-
-        detailPopulate[key] = DetailInfo(name, index);
-    }
-
-    // add all detail attributes
-
-    for (const auto& item : detailCreate) {
-        const Name& name = item.first;
-        const DetailInfo& info = item.second;
-        const Name& type = info.first;
-        const int size = info.second;
-        GA_RWAttributeRef attribute = detail.findGlobalAttribute(name);
-
-        if (attribute.isInvalid())
-        {
-            const GA_Storage storage = hvdb::gaStorageFromAttrString(type);
-
-            if (storage == GA_STORE_INVALID) {
-                throw std::runtime_error("Invalid attribute storage type \"" + name + "\".");
-            }
-
-            if (type == "vec3s" || type == "vec3d") {
-                attribute = detail.addTuple(storage, GA_ATTRIB_GLOBAL, name.c_str(), 3);
-                attribute.setTypeInfo(GA_TYPE_VECTOR);
-            }
-            else {
-                attribute = detail.addTuple(storage, GA_ATTRIB_GLOBAL, name.c_str(), size+1);
-            }
-
-            if (!attribute.isValid()) {
-                throw std::runtime_error("Error creating attribute with name \"" + name + "\".");
-            }
-        }
-    }
-
-    // populate the values
-
-    for (const auto& item : detailPopulate) {
-        const Name& key = item.first;
-        const DetailInfo& info = item.second;
-        const Name& name = info.first;
-        const int index = info.second;
-        const Name& type = metaMap[key]->typeName();
-
-        GA_RWAttributeRef attrib = detail.findGlobalAttribute(name);
-        assert(!attrib.isInvalid());
-
-        if (type == openvdb::typeNameAsString<bool>())                 populateHoudiniDetailAttribute<bool>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<int16_t>())         populateHoudiniDetailAttribute<int16_t>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<int32_t>())         populateHoudiniDetailAttribute<int32_t>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<int64_t>())         populateHoudiniDetailAttribute<int64_t>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<float>())           populateHoudiniDetailAttribute<float>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<double>())          populateHoudiniDetailAttribute<double>(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<Vec3<int32_t> >())  populateHoudiniDetailAttribute<Vec3<int32_t> >(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<Vec3<float> >())    populateHoudiniDetailAttribute<Vec3<float> >(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<Vec3<double> >())   populateHoudiniDetailAttribute<Vec3<double> >(attrib, metaMap, key, index);
-        else if (type == openvdb::typeNameAsString<Name>())            populateHoudiniDetailAttribute<Name>(attrib, metaMap, key, index);
-        else {
-            std::stringstream ss;
-            ss << "Metadata value \"" << key
-                << "\" unsupported type for detail attribute conversion.";
-            warnings.push_back(ss.str());
-        }
-    }
-}
 
 
 ////////////////////////////////////////
@@ -720,7 +81,20 @@ convertGlobalMetadataToHoudini(GU_Detail& detail, const openvdb::MetaMap& metaMa
 class SOP_OpenVDB_Points_Convert: public hvdb::SOP_NodeVDB
 {
 public:
-    enum { TRANSFORM_TARGET_POINTS = 0, TRANSFORM_VOXEL_SIZE, TRANSFORM_REF_GRID };
+    enum TRANSFORM_MODE
+    {
+        TRANSFORM_TARGET_POINTS = 0,
+        TRANSFORM_VOXEL_SIZE,
+        TRANSFORM_REF_GRID
+    };
+
+    enum CONVERSION_MODE
+    {
+        MODE_CONVERT_TO_VDB = 0,
+        MODE_CONVERT_FROM_VDB,
+        MODE_GENERATE_MASK,
+        MODE_COUNT_POINTS,
+    };
 
     SOP_OpenVDB_Points_Convert(OP_Network*, const char* name, OP_Operator*);
     ~SOP_OpenVDB_Points_Convert() override = default;
@@ -741,6 +115,7 @@ private:
 
 
 ////////////////////////////////////////
+
 
 namespace {
 
@@ -815,6 +190,7 @@ const PRM_ChoiceList PrimAttrMenu(
 
 } // unnamed namespace
 
+
 ////////////////////////////////////////
 
 
@@ -830,28 +206,52 @@ newSopOperator(OP_OperatorTable* table)
 
     {
         const char* items[] = {
-            "vdb", "Houdini Points to VDB Points",
-            "hdk", "VDB Points to Houdini Points",
+            "vdb", "Pack Points into VDB Points",
+            "hdk", "Extract Points from VDB Points",
+            "mask", "Generate Mask from VDB Points",
+            "count", "Points/Voxel Count from VDB Points",
             nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Conversion")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("The conversion method for the expected input types.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The conversion method for the expected input types.")
+            .setDocumentation(
+                "Whether to pack points into a VDB Points primitive"
+                " or to extract points from such a primitive or to generate"
+                " a mask from the primitive or to count the number of"
+                " points-per-voxel in the primitive"));
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset of the input point data grids to convert.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenu)
+        .setTooltip("Specify a subset of the input point data grids to convert.")
+        .setDocumentation(
+            "A subset of the input VDB Points primitives to be processed"
+            " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
-        .setHelpText("Specify VDB Points Groups to use as an input."));
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1)
+        .setTooltip("Specify VDB Points Groups to use as an input.")
+        .setDocumentation(
+            "The point group inside the VDB Points primitive to extract\n\n"
+            "This may be a normal point group that was collapsed into the"
+            " VDB Points primitive when it was created, or a new group created"
+            " with the [OpenVDB Points Group node|Node:sop/DW_OpenVDBPointsGroup]."));
 
     //  point grid name
     parms.add(hutil::ParmFactory(PRM_STRING, "name", "VDB Name")
         .setDefault("points")
-        .setHelpText("Output grid name."));
+        .setTooltip("The name of the VDB Points primitive to be created"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "countname", "VDB Name")
+        .setDefault("count")
+        .setTooltip("The name of the VDB count primitive to be created"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "VDB Name")
+        .setDefault("mask")
+        .setTooltip("The name of the VDB mask primitive to be created"));
 
     {   // Transform
         const char* items[] = {
@@ -864,7 +264,7 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_ORD, "transform", "Define Transform")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setHelpText(
+            .setTooltip(
                 "Specify how to construct the PointDataGrid transform. If\n"
                 "an optional transform input is provided for the first two\n"
                 "options, the rotate and translate components are preserved.\n"
@@ -874,32 +274,55 @@ newSopOperator(OP_OperatorTable* table)
                 "Using Voxel Size Only:\n"
                 "    Explicitly sets a voxel size.\n"
                 "To Match Reference VDB:\n"
-                "    Uses the complete transform provided from the second input."));
+                "    Uses the complete transform provided from the second input.")
+            .setDocumentation("\
+How to construct the VDB Points primitive's transform\n\n\
+An important consideration is how big to make the grid cells\n\
+that contain the points.  Too large and there are too many points\n\
+per cell and little optimization occurs.  Too small and the cost\n\
+of the cells outweighs the points.\n\
+\n\
+Using Target Points Per Voxel:\n\
+    Automatically calculate a voxel size so that the given number\n\
+    of points ends up in each voxel.  This will assume uniform\n\
+    distribution of points.\n\
+    \n\
+    If an optional transform input is provided, use its rotation\n\
+    and translation.\n\
+Using Voxel Size Only:\n\
+    Provide an explicit voxel size, and if an optional transform input\n\
+    is provided, use its rotation and translation.\n\
+To Match Reference VDB:\n\
+    Use the complete transform provided from the second input.\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
-        .setHelpText("The desired voxel size of the new VDB Points grid.")
-        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5));
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5)
+        .setTooltip("The desired voxel size of the new VDB Points grid"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "pointspervoxel", "Points Per Voxel")
         .setDefault(8)
-        .setHelpText("The number of points per voxel to use as the target for "
-                     "automatic voxel size computation.")
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16));
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 16)
+        .setTooltip(
+            "The number of points per voxel to use as the target for "
+            "automatic voxel size computation"));
 
     // Group name (Transform reference)
     parms.add(hutil::ParmFactory(PRM_STRING, "refvdb", "Reference VDB")
         .setChoiceList(&hutil::PrimGroupMenu)
         .setSpareData(&SOP_Node::theSecondInput)
-        .setHelpText("References the first/selected grid's transform."));
+        .setTooltip("References the first/selected grid's transform.")
+        .setDocumentation(
+            "Which VDB in the second input to use as the reference for the transform\n\n"
+            "If this is not set, use the first VDB found."));
 
     //////////
 
     // Point attribute transfer
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             "int16", "16-bit Fixed Point",
             "int8", "8-bit Fixed Point",
@@ -908,8 +331,12 @@ newSopOperator(OP_OperatorTable* table)
 
         parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
             .setDefault(PRMoneDefaults)
-            .setHelpText("The position attribute compression setting.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("The position attribute compression setting.")
+            .setDocumentation(
+                "The position can be stored relative to the center of the voxel.\n"
+                "This means it does not require the full 32-bit float representation,\n"
+                "but can be quantized to a smaller fixed-point value."));
     }
 
     parms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute Transfer"));
@@ -917,7 +344,7 @@ newSopOperator(OP_OperatorTable* table)
      // Mode. Either convert all or convert specifc attributes
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "all", "All Attributes",
             "spec", "Specific Attributes",
             nullptr
@@ -925,7 +352,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Mode")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Whether to transfer only specific attributes or all attributes found.")
+        .setTooltip("Whether to transfer only specific attributes or all attributes found")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
@@ -935,12 +362,12 @@ newSopOperator(OP_OperatorTable* table)
     attrParms.add(hutil::ParmFactory(PRM_STRING, "attribute#", "Attribute")
         .setChoiceList(&PrimAttrMenu)
         .setSpareData(&SOP_Node::theFirstInput)
-        .setHelpText("Select a point attribute to transfer. "
-            "Supports integer and floating point attributes of "
+        .setTooltip("Select a point attribute to transfer.\n\n"
+            "Supports integer and floating-point attributes of "
             "arbitrary precisions and tuple sizes."));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             "truncate", "16-bit Truncate",
             UnitVecCodec::name(), "Unit Vector",
@@ -951,24 +378,45 @@ newSopOperator(OP_OperatorTable* table)
 
         attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompression#", "Value Compression")
             .setDefault(PRMzeroDefaults)
-            .setHelpText("Value Compression to use for specific attributes.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setTooltip("Value compression to use for specific attributes.")
+            .setDocumentation("\
+How to compress attribute values\n\
+\n\
+None:\n\
+    Values are stored with their full precision.\n\
+\n\
+16-bit Truncate:\n\
+    Values are stored at half precision, truncating lower-order bits.\n\
+\n\
+Unit Vector:\n\
+    Values are treated as unit vectors, so that if two components\n\
+    are known, the third is implied and need not be stored.\n\
+\n\
+8-bit Unit:\n\
+    Values are treated as lying in the 0..1 range and are quantized to 8 bits.\n\
+\n\
+16-bit Unit:\n\
+    Values are treated as lying in the 0..1 range and are quantized to 16 bits.\n"));
     }
 
     attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Enable Blosc Compression."));
+        .setTooltip(
+            "Enable Blosc compression\n\n"
+            "Blosc is a lossless compression codec that is effective with"
+            " floating-point data and is very fast to compress and decompress."));
 
     // Add multi parm
     parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Point Attributes")
-        .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
+        .setTooltip("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
 
     parms.add(hutil::ParmFactory(PRM_LABEL, "attributespacer", ""));
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             UnitVecCodec::name(), "Unit Vector",
             "truncate", "16-bit Truncate",
@@ -977,12 +425,12 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("All normal attributes will use this compression codec.")
+        .setTooltip("All normal attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     {
-        const char* items[] = {
+        char const * const items[] = {
             "none", "None",
             FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
             FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
@@ -992,7 +440,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("All color attributes will use this compression codec.")
+        .setTooltip("All color attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
@@ -1002,7 +450,33 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Points Convert",
         SOP_OpenVDB_Points_Convert::factory, parms, *table)
         .addInput("Points to Convert")
-        .addOptionalInput("Optional Reference VDB (for transform)");
+        .addOptionalInput("Optional Reference VDB (for transform)")
+        .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Convert a point cloud into a VDB Points primitive, or vice versa.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node converts an unstructured cloud of points to and from a single\n\
+[VDB Points|http://www.openvdb.org/documentation/doxygen/points.html] primitive.\n\
+The resulting primitive will reorder the points to place spatially\n\
+close points close together.\n\
+It is then able to efficiently unpack regions of interest within that primitive.\n\
+The [OpenVDB Points Group node|Node:sop/DW_OpenVDBPointsGroup] can be used\n\
+to create regions of interest.\n\
+\n\
+Because nearby points often have similar data, there is the possibility\n\
+of aggressively compressing attribute data to minimize data size.\n\
+\n\
+@related\n\
+- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
 }
 
 
@@ -1035,8 +509,10 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     bool changed = false;
 
     const bool toVdbPoints = evalInt("conversion", 0, 0) == 0;
+    const bool toMask = evalInt("conversion", 0, 0) == 2;
+    const bool toCount = evalInt("conversion", 0, 0) == 3;
     const bool convertAll = evalInt("mode", 0, 0) == 0;
-    const int transform = evalInt("transform", 0, 0);
+    const auto transform = evalInt("transform", 0, 0);
 
     changed |= enableParm("group", !toVdbPoints);
     changed |= setVisibleState("group", !toVdbPoints);
@@ -1046,6 +522,12 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
 
     changed |= enableParm("name", toVdbPoints);
     changed |= setVisibleState("name", toVdbPoints);
+
+    changed |= enableParm("countname", toCount);
+    changed |= setVisibleState("countname", toCount);
+
+    changed |= enableParm("maskname", toMask);
+    changed |= setVisibleState("maskname", toMask);
 
     const int refexists = (this->nInputs() == 2);
 
@@ -1091,36 +573,42 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
 
         const fpreal time = context.getTime();
-        // Check for particles in the primary (left) input port
-        const GU_Detail* ptGeo = inputGeo(0, context);
 
-        if (evalInt("conversion", 0, time) != 0) {
+        const int conversion = static_cast<int>(evalInt("conversion", 0, time));
 
-            UT_String groupStr;
-            evalString(groupStr, "group", 0, time);
-            const GA_PrimitiveGroup *group =
-                matchGroup(const_cast<GU_Detail&>(*ptGeo), groupStr.toStdString());
+        UT_String groupStr;
+        evalString(groupStr, "group", 0, time);
+        const GA_PrimitiveGroup *group =
+            matchGroup(const_cast<GU_Detail&>(*gdp), groupStr.toStdString());
 
-            // Extract VDB Point groups to filter
+        // Extract VDB Point groups to filter
 
-            UT_String pointsGroupStr;
-            evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
-            const std::string pointsGroup = pointsGroupStr.toStdString();
+        UT_String pointsGroupStr;
+        evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
+        const std::string pointsGroup = pointsGroupStr.toStdString();
 
-            std::vector<std::string> includeGroups;
-            std::vector<std::string> excludeGroups;
-            openvdb::points::AttributeSet::Descriptor::parseNames(
-                includeGroups, excludeGroups, pointsGroup);
+        std::vector<std::string> includeGroups;
+        std::vector<std::string> excludeGroups;
+        openvdb::points::AttributeSet::Descriptor::parseNames(
+            includeGroups, excludeGroups, pointsGroup);
+
+        if (conversion == MODE_CONVERT_FROM_VDB) {
+
+            // Duplicate primary (left) input geometry and convert the VDB points inside
+
+            if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
 
             // passing an empty vector of attribute names implies that
             // all attributes should be converted
             const std::vector<std::string> emptyNameVector;
 
-            // Mesh each VDB primitive independently
-            for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
+            UT_Array<GEO_Primitive*> primsToDelete;
+            primsToDelete.clear();
+
+            // Convert each VDB primitive independently
+            for (hvdb::VdbPrimIterator vdbIt(gdp, group); vdbIt; ++vdbIt) {
 
                 GU_Detail geo;
 
@@ -1147,7 +635,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                 const MetaMap& metaMap = grid;
                 std::vector<std::string> warnings;
-                convertGlobalMetadataToHoudini(geo, metaMap, warnings);
+                hvdb::convertMetadataToHoudini(geo, metaMap, warnings);
                 if (warnings.size() > 0) {
                     for (const auto& warning: warnings) {
                         addWarning(SOP_MESSAGE, warning.c_str());
@@ -1155,10 +643,19 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 }
 
                 gdp->merge(geo);
+                primsToDelete.append(*vdbIt);
             }
 
+            gdp->deletePrimitives(primsToDelete, true);
             return error();
         }
+
+        // if we're here, we're converting Houdini points to OpenVDB. Clear gdp entirely
+        // before proceeding, then check for particles in the primary (left) input port
+
+        gdp->clearAndDestroy();
+
+        const GU_Detail* ptGeo = inputGeo(0, context);
 
         // Set member data
 
@@ -1185,7 +682,54 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             transform = refPrim->getGrid().transform().copy();
         }
 
-        const int transformMode = evalInt("transform", 0, time);
+        if (conversion == MODE_GENERATE_MASK || conversion == MODE_COUNT_POINTS) {
+
+            // Process each VDB primitive independently
+            for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
+
+                GU_Detail geo;
+
+                const GridBase& baseGrid = vdbIt->getGrid();
+                if (!baseGrid.isType<PointDataGrid>()) continue;
+
+                const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
+
+                if (conversion == MODE_GENERATE_MASK) {
+                    openvdb::BoolGrid::Ptr maskGrid;
+                    if (transform) {
+                        maskGrid = openvdb::points::convertPointsToMask(
+                            grid, *transform, includeGroups, excludeGroups);
+                    }
+                    else {
+                        maskGrid = openvdb::points::convertPointsToMask(
+                            grid, includeGroups, excludeGroups);
+                    }
+
+                    UT_String nameStr = "";
+                    evalString(nameStr, "maskname", 0, time);
+                    hvdb::createVdbPrimitive(*gdp, maskGrid, nameStr.toStdString().c_str());
+                }
+                else {
+                    openvdb::Int32Grid::Ptr countGrid;
+                    if (transform) {
+                        countGrid = openvdb::points::pointCountGrid(
+                            grid, *transform, includeGroups, excludeGroups);
+                    }
+                    else {
+                        countGrid = openvdb::points::pointCountGrid(
+                            grid, includeGroups, excludeGroups);
+                    }
+
+                    UT_String nameStr = "";
+                    evalString(nameStr, "countname", 0, time);
+                    hvdb::createVdbPrimitive(*gdp, countGrid, nameStr.toStdString().c_str());
+                }
+            }
+
+            return error();
+        }
+
+        const auto transformMode = evalInt("transform", 0, time);
 
         math::Mat4d matrix(math::Mat4d::identity());
 
@@ -1199,14 +743,10 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         }
 
         if (transformMode == TRANSFORM_TARGET_POINTS) {
-            using HoudiniPositionAttribute = hvdb::HoudiniReadAttribute<openvdb::Vec3R>;
-
-            const int pointsPerVoxel(evalInt("pointspervoxel", 0, time));
-            HoudiniPositionAttribute positions(*(ptGeo->getP()));
-
+            const int pointsPerVoxel = static_cast<int>(evalInt("pointspervoxel", 0, time));
             const float voxelSize =
-                openvdb::points::computeVoxelSize<HoudiniPositionAttribute, hvdb::Interrupter>(
-                    positions, pointsPerVoxel, matrix, /*rounding*/ 5, &mBoss);
+                hvdb::computeVoxelSizeFromHoudini(*ptGeo, pointsPerVoxel,
+                    matrix, /*rounding*/ 5, mBoss);
 
             matrix.preScale(Vec3d(voxelSize) / math::getScale(matrix));
             transform = Transform::createLinearTransform(matrix);
@@ -1217,7 +757,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         }
 
         UT_String attrName;
-        AttributeInfoMap attributes;
+        openvdb_houdini::AttributeInfoMap attributes;
 
         GU_Detail nonConstDetail;
         const GU_Detail* detail;
@@ -1253,7 +793,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
         if (evalInt("mode", 0, time) != 0) {
             // Transfer point attributes.
             if (evalInt("attrList", 0, time) > 0) {
-                for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
+                for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, 0)); i <= N; ++i) {
                     evalStringInst("attribute#", &i, attrName, 0, 0);
                     const Name attributeName = Name(attrName);
 
@@ -1266,7 +806,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                     if (!attribute) continue;
 
-                    const GA_Storage storage(attributeStorageType(attribute));
+                    const GA_Storage storage(hvdb::attributeStorageType(attribute));
 
                     // only tuple and string tuple attributes are supported
 
@@ -1275,7 +815,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                         throw std::runtime_error(ss.str());
                     }
 
-                    const int16_t width(attributeTupleSize(attribute));
+                    const int16_t width(hvdb::attributeTupleSize(attribute));
                     assert(width > 0);
 
                     const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
@@ -1287,35 +827,36 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                     const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
-                    int valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
+                    int valueCompression = static_cast<int>(
+                        evalIntInst("valuecompression#", &i, 0, 0));
 
                     // check value compression compatibility with attribute type
 
-                    if (valueCompression != NONE) {
+                    if (valueCompression != hvdb::COMPRESSION_NONE) {
                         if (storage == GA_STORE_STRING) {
                             // disable value compression for strings and add a SOP warning
 
                             std::stringstream ss;
                             ss << "Value compression not supported on string attributes. "
                                 "Disabling compression for attribute \"" << attributeName << "\".";
-                            valueCompression = NONE;
+                            valueCompression = hvdb::COMPRESSION_NONE;
                             addWarning(SOP_MESSAGE, ss.str().c_str());
                         } else {
                             // disable value compression for incompatible types
                             // and add a SOP warning
 
-                            if (valueCompression == TRUNCATE &&
+                            if (valueCompression == hvdb::COMPRESSION_TRUNCATE &&
                                 (storage != GA_STORE_REAL32 || isQuaternion || isMatrix))
                             {
                                 std::stringstream ss;
                                 ss << "Truncate value compression only supported for 32-bit"
                                     " floating-point attributes. Disabling compression for"
                                     " attribute \"" << attributeName << "\".";
-                                valueCompression = NONE;
+                                valueCompression = hvdb::COMPRESSION_NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
                             }
 
-                            if (valueCompression == UNIT_VECTOR &&
+                            if (valueCompression == hvdb::COMPRESSION_UNIT_VECTOR &&
                                 (storage != GA_STORE_REAL32 || !isVector))
                             {
                                 std::stringstream ss;
@@ -1323,12 +864,13 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                                     " vector 3 x 32-bit floating-point attributes. "
                                     "Disabling compression for attribute \""
                                     << attributeName << "\".";
-                                valueCompression = NONE;
+                                valueCompression = hvdb::COMPRESSION_NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
                             }
 
-                            const bool isUnit = (valueCompression == UNIT_FIXED_POINT_8
-                                || valueCompression == UNIT_FIXED_POINT_16);
+                            const bool isUnit =
+                                (valueCompression == hvdb::COMPRESSION_UNIT_FIXED_POINT_8
+                              || valueCompression == hvdb::COMPRESSION_UNIT_FIXED_POINT_16);
                             if (isUnit && (storage != GA_STORE_REAL32 || (width != 1 && !isVector)))
                             {
                                 std::stringstream ss;
@@ -1336,7 +878,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                                     " 3 x 32-bit floating-point attributes. "
                                     "Disabling compression for attribute \""
                                     << attributeName << "\".";
-                                valueCompression = NONE;
+                                valueCompression = hvdb::COMPRESSION_NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
                             }
                         }
@@ -1351,8 +893,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             // point attribute names
             auto iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
-            const int normalCompression = evalInt("normalcompression", 0, time);
-            const int colorCompression = evalInt("colorcompression", 0, time);
+            const auto normalCompression = evalInt("normalcompression", 0, time);
+            const auto colorCompression = evalInt("colorcompression", 0, time);
 
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
@@ -1372,7 +914,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                     if (!attribute) continue;
 
-                    const GA_Storage storage(attributeStorageType(attribute));
+                    const GA_Storage storage(hvdb::attributeStorageType(attribute));
 
                     // only tuple and string tuple attributes are supported
 
@@ -1381,7 +923,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                         throw std::runtime_error(ss.str());
                     }
 
-                    const int16_t width(attributeTupleSize(attribute));
+                    const int16_t width(hvdb::attributeTupleSize(attribute));
                     assert(width > 0);
 
                     const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
@@ -1389,16 +931,23 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                     const bool isNormal = width == 3 && typeInfo == GA_TYPE_NORMAL;
                     const bool isColor = width == 3 && typeInfo == GA_TYPE_COLOR;
 
-                    int valueCompression = NONE;
+                    int valueCompression = hvdb::COMPRESSION_NONE;
 
                     if (isNormal) {
-                        if (normalCompression == 1)             valueCompression = UNIT_VECTOR;
-                        else if (normalCompression == 2)        valueCompression = TRUNCATE;
+                        if (normalCompression == 1) {
+                            valueCompression = hvdb::COMPRESSION_UNIT_VECTOR;
+                        } else if (normalCompression == 2) {
+                            valueCompression = hvdb::COMPRESSION_TRUNCATE;
+                        }
                     }
                     else if (isColor) {
-                        if (colorCompression == 1)              valueCompression = UNIT_FIXED_POINT_16;
-                        else if (colorCompression == 2)         valueCompression = UNIT_FIXED_POINT_8;
-                        else if (colorCompression == 3)         valueCompression = TRUNCATE;
+                        if (colorCompression == 1) {
+                            valueCompression = hvdb::COMPRESSION_UNIT_FIXED_POINT_16;
+                        } else if (colorCompression == 2) {
+                            valueCompression = hvdb::COMPRESSION_UNIT_FIXED_POINT_8;
+                        } else if (colorCompression == 3) {
+                            valueCompression = hvdb::COMPRESSION_TRUNCATE;
+                        }
                     }
 
                     // when converting all attributes apply no compression
@@ -1409,110 +958,16 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         // Determine position compression
 
-        const int positionCompression = evalInt("poscompression", 0, time);
+        const int positionCompression = static_cast<int>(evalInt("poscompression", 0, time));
 
-        PointDataGrid::Ptr pointDataGrid = createPointDataGrid(
+        PointDataGrid::Ptr pointDataGrid = hvdb::convertHoudiniToPointDataGrid(
             *detail, positionCompression, attributes, *transform);
 
-        for (GA_AttributeDict::iterator iter = detail->attribs().begin(GA_SCOPE_PUBLIC);
-            !iter.atEnd(); ++iter)
-        {
-            const GA_Attribute* const attribute = *iter;
-            if (!attribute) continue;
+        std::vector<std::string> warnings;
+        hvdb::populateMetadataFromHoudini(*pointDataGrid, warnings, *detail);
 
-            const Name name("global:" + Name(attribute->getName()));
-            Metadata::Ptr metadata = (*pointDataGrid)[name];
-            if (metadata) continue;
-
-            const GA_Storage storage(attributeStorageType(attribute));
-            const int16_t width(attributeTupleSize(attribute));
-            const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
-
-            const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
-                                                 typeInfo == GA_TYPE_NORMAL ||
-                                                 typeInfo == GA_TYPE_COLOR);
-            const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
-            const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
-
-            if (isVector) {
-                if (storage == GA_STORE_REAL16) {
-                    metadata = createTypedMetadataFromAttribute<Vec3<float> >(attribute);
-                } else if (storage == GA_STORE_REAL32) {
-                    metadata = createTypedMetadataFromAttribute<Vec3<float> >(attribute);
-                } else if (storage == GA_STORE_REAL64) {
-                    metadata = createTypedMetadataFromAttribute<Vec3<double> >(attribute);
-                } else {
-                    std::stringstream ss;
-                    ss << "Detail attribute \"" << attribute->getName() << "\" " <<
-                        "unsupported vector type for metadata conversion.";
-                    addWarning(SOP_MESSAGE, ss.str().c_str());
-                    continue;
-                }
-                assert(metadata);
-                pointDataGrid->insertMeta(name, *metadata);
-            } else if (isQuaternion) {
-                if (storage == GA_STORE_REAL16) {
-                    metadata = createTypedMetadataFromAttribute<Quat<float>>(attribute);
-                } else if (storage == GA_STORE_REAL32) {
-                    metadata = createTypedMetadataFromAttribute<Quat<float>>(attribute);
-                } else if (storage == GA_STORE_REAL64) {
-                    metadata = createTypedMetadataFromAttribute<Quat<double>>(attribute);
-                } else {
-                    std::stringstream ss;
-                    ss << "Detail attribute \"" << attribute->getName() << "\" " <<
-                        "unsupported quaternion type for metadata conversion.";
-                    addWarning(SOP_MESSAGE, ss.str().c_str());
-                    continue;
-                }
-            } else if (isMatrix) {
-                if (storage == GA_STORE_REAL16) {
-                    metadata = createTypedMetadataFromAttribute<Mat4<float>>(attribute);
-                } else if (storage == GA_STORE_REAL32) {
-                    metadata = createTypedMetadataFromAttribute<Mat4<float>>(attribute);
-                } else if (storage == GA_STORE_REAL64) {
-                    metadata = createTypedMetadataFromAttribute<Mat4<double>>(attribute);
-                } else {
-                    std::stringstream ss;
-                    ss << "Detail attribute \"" << attribute->getName() << "\" " <<
-                        "unsupported matrix type for metadata conversion.";
-                    addWarning(SOP_MESSAGE, ss.str().c_str());
-                    continue;
-                }
-            } else {
-                for (int i = 0; i < width; i++) {
-                    if (storage == GA_STORE_BOOL) {
-                        metadata = createTypedMetadataFromAttribute<bool>(attribute, i);
-                    } else if (storage == GA_STORE_INT16) {
-                        metadata = createTypedMetadataFromAttribute<int16_t>(attribute, i);
-                    } else if (storage == GA_STORE_INT32) {
-                        metadata = createTypedMetadataFromAttribute<int32_t>(attribute, i);
-                    } else if (storage == GA_STORE_INT64) {
-                        metadata = createTypedMetadataFromAttribute<int64_t>(attribute, i);
-                    } else if (storage == GA_STORE_REAL16) {
-                        metadata = createTypedMetadataFromAttribute<float>(attribute, i);
-                    } else if (storage == GA_STORE_REAL32) {
-                        metadata = createTypedMetadataFromAttribute<float>(attribute, i);
-                    } else if (storage == GA_STORE_REAL64) {
-                        metadata = createTypedMetadataFromAttribute<double>(attribute, i);
-                    } else if (storage == GA_STORE_STRING) {
-                        metadata = createTypedMetadataFromAttribute<openvdb::Name>(attribute, i);
-                    } else {
-                        std::stringstream ss;
-                        ss << "Detail attribute \"" << attribute->getName() << "\" " <<
-                            "unsupported type for metadata conversion.";
-                        addWarning(SOP_MESSAGE, ss.str().c_str());
-                        continue;
-                    }
-                    assert(metadata);
-                    if (width > 1) {
-                        const Name arrayName(name + Name("[") + std::to_string(i) + Name("]"));
-                        pointDataGrid->insertMeta(arrayName, *metadata);
-                    }
-                    else {
-                        pointDataGrid->insertMeta(name, *metadata);
-                    }
-                }
-            }
+        for (const auto& warning : warnings) {
+            addWarning(SOP_MESSAGE, warning.c_str());
         }
 
         UT_String nameStr = "";
