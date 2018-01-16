@@ -727,98 +727,106 @@ createTypedMetadataFromAttribute(const GA_Attribute* const attribute, const uint
     return openvdb::TypedMetadata<ValueType>(value).copy();
 }
 
-
-template<typename T> struct SizeTraits                          {
-    static const int Size = openvdb::VecTraits<T>::Size;
-};
-template<typename T> struct SizeTraits<openvdb::math::Quat<T> > {
-    static const int Size = 4;
-};
-template<unsigned SIZE, typename T> struct SizeTraits<openvdb::math::Mat<SIZE, T> > {
-    static const int Size = SIZE*SIZE;
-};
-
-
-template<typename ValueType, typename HoudiniType>
-void getValues(HoudiniType* values, const ValueType& value)
+template<typename HoudiniType, typename ValueType>
+GA_Defaults buildDefaults(const ValueType& value)
 {
+    HoudiniType	values[1];
     values[0] = value;
+    return GA_Defaults(values, 1);
 }
 
 template<>
-void getValues(int32* values, const openvdb::math::Vec3<int>& value)
+GA_Defaults buildDefaults<int32>(const openvdb::math::Vec3<int>& value)
 {
+    int32 values[3];
     for (unsigned i = 0; i < 3; ++i) {
         values[i] = value(i);
     }
+    return GA_Defaults(values, 3);
 }
 
 template<>
-void getValues(fpreal32* values, const openvdb::math::Vec3<float>& value)
+GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Vec3<float>& value)
 {
+    fpreal32 values[3];
     for (unsigned i = 0; i < 3; ++i) {
         values[i] = value(i);
     }
+    return GA_Defaults(values, 3);
 }
 
 template<>
-void getValues(fpreal64* values, const openvdb::math::Vec3<double>& value)
+GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Vec3<double>& value)
 {
+    fpreal64 values[3];
     for (unsigned i = 0; i < 3; ++i) {
         values[i] = value(i);
     }
+    return GA_Defaults(values, 3);
 }
 
 template<>
-void getValues(fpreal32* values, const openvdb::math::Quat<float>& value)
+GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Quat<float>& value)
 {
+    fpreal32 values[4];
     for (unsigned i = 0; i < 4; ++i) {
         values[i] = value(i);
     }
+    return GA_Defaults(values, 4);
 }
 
 template<>
-void getValues(fpreal64* values, const openvdb::math::Quat<double>& value)
+GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Quat<double>& value)
 {
+    fpreal64 values[4];
     for (unsigned i = 0; i < 4; ++i) {
         values[i] = value(i);
     }
+    return GA_Defaults(values, 4);
 }
 
 template<>
-void getValues(fpreal32* values, const openvdb::math::Mat3<float>& value)
+GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Mat3<float>& value)
 {
+    fpreal32 values[9];
     const float* data = value.asPointer();
     for (unsigned i = 0; i < 9; ++i) {
         values[i] = data[i];
     }
+    return GA_Defaults(values, 9);
 }
 
 template<>
-void getValues(fpreal64* values, const openvdb::math::Mat3<double>& value)
+GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Mat3<double>& value)
 {
+    fpreal64 values[9];
     const double* data = value.asPointer();
     for (unsigned i = 0; i < 9; ++i) {
         values[i] = data[i];
     }
+    return GA_Defaults(values, 9);
 }
 
 template<>
-void getValues(fpreal32* values, const openvdb::math::Mat4<float>& value)
+GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Mat4<float>& value)
 {
+    fpreal32 values[16];
     const float* data = value.asPointer();
     for (unsigned i = 0; i < 16; ++i) {
         values[i] = data[i];
     }
+    return GA_Defaults(values, 16);
 }
 
 template<>
-void getValues(fpreal64* values, const openvdb::math::Mat4<double>& value)
+GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Mat4<double>& value)
 {
+    fpreal64 values[16];
     const double* data = value.asPointer();
     for (unsigned i = 0; i < 16; ++i) {
         values[i] = data[i];
     }
+    return GA_Defaults(values, 16);
 }
 
 template <typename ValueType, typename HoudiniType>
@@ -826,14 +834,9 @@ GA_Defaults
 gaDefaultsFromDescriptorTyped(const openvdb::points::AttributeSet::Descriptor& descriptor,
     const openvdb::Name& name)
 {
-    const int size = SizeTraits<ValueType>::Size;
-
-    UT_UniquePtr<HoudiniType[]> values(new HoudiniType[size]);
     ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
 
-    getValues<ValueType, HoudiniType>(values.get(), defaultValue);
-
-    return GA_Defaults(values.get(), size);
+    return buildDefaults<HoudiniType, ValueType>(defaultValue);
 }
 
 inline GA_Defaults
