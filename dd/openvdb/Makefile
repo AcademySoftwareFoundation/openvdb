@@ -29,9 +29,10 @@ ARGS += -DOPENVDB_BUILD_HOUDINI_SOPS=OFF
 ARGS += -DUSE_GLFW3=ON
 ARGS += -DGLFW3_USE_STATIC_LIBS=ON
 
-# Disable abi 3 compatibility when the flavor tag _abi3 is not used.
-ifeq ($(filter abi3,$(subst _, ,$(PACKAGE_VERSION))),)
-  ARGS += -DOPENVDB_ENABLE_3_ABI_COMPATIBLE=OFF
+# If flavor tag contains abiN use abi version N
+abi = $(patsubst abi%,%,$(filter abi%,$(subst _, ,$(PACKAGE_VERSION))))
+ifneq ($(abi),)
+  ARGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 
 ARGS += -DBOOST_ROOT=$(BOOST_PACKAGE_ROOT)
