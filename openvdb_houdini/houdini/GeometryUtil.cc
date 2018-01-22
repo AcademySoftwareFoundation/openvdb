@@ -60,7 +60,7 @@ template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
 
-namespace openvdb_houdini  {
+namespace openvdb_houdini {
 
 
 void
