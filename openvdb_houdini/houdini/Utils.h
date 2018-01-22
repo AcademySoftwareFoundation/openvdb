@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,10 +37,10 @@
 
 #include "GU_PrimVDB.h"
 #include <OP/OP_Node.h> // for OP_OpTypeId
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
 #include <functional>
-#include <memory>
 #include <type_traits>
 
 
@@ -134,7 +134,7 @@ protected:
     VdbPrimCIterator(const GEO_Detail*, GA_Range::safedeletions,
         const GA_PrimitiveGroup* = nullptr, FilterFunc = FilterFunc());
 
-    std::shared_ptr<GA_GBPrimitiveIterator> mIter;
+    UT_SharedPtr<GA_GBPrimitiveIterator> mIter;
     FilterFunc mFilter;
 }; // class VdbPrimCIterator
 
@@ -200,11 +200,9 @@ public:
 class Interrupter
 {
 public:
-    Interrupter(const char* title = nullptr):
-        mUTI(UTgetInterrupt()), mRunning(false)
-    {
-        if (title) mUTI->setAppTitle(title);
-    }
+    explicit Interrupter(const char* title = nullptr):
+        mUTI{UTgetInterrupt()}, mRunning{false}, mTitle{title ? title : ""}
+    {}
     ~Interrupter() { if (mRunning) this->end(); }
 
     Interrupter(const Interrupter&) = default;
@@ -212,7 +210,9 @@ public:
 
     /// @brief Signal the start of an interruptible operation.
     /// @param name  an optional descriptive name for the operation
-    void start(const char* name = nullptr) {if (!mRunning) { mRunning=true; mUTI->opStart(name); }}
+    void start(const char* name = nullptr) {
+        if (!mRunning) { mRunning = true; mUTI->opStart(name ? name : mTitle.c_str()); }
+    }
     /// Signal the end of an interruptible operation.
     void end() { if (mRunning) { mUTI->opEnd(); mRunning = false; } }
 
@@ -224,6 +224,7 @@ public:
 private:
     UT_Interrupt* mUTI;
     bool mRunning;
+    std::string mTitle;
 };
 
 
@@ -465,6 +466,6 @@ processTypedScalarGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

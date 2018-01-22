@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -50,12 +50,12 @@
 
 #include <boost/integer.hpp> // boost::int_t<N>::least
 #include <boost/scoped_array.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
 
+#include <algorithm>
 #include <cmath> // for std::isfinite()
 #include <deque>
 #include <map>
@@ -1075,6 +1075,6 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::create(
 
 #endif // OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

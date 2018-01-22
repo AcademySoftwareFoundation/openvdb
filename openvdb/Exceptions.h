@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,10 +31,11 @@
 #ifndef OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 #define OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
-#include <exception>
-#include <string>
-#include <iostream>
 #include <openvdb/version.h>
+#include <exception>
+#include <sstream>
+#include <string>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -118,6 +119,6 @@ public:
 
 #endif // OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

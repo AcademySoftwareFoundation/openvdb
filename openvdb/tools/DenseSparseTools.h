@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -846,7 +846,7 @@ public:
         // Parallelize within each tile.
 
         typename MaskTreeT::ValueOnCIter citer = maskTree.cbeginValueOn();
-        citer.setMaxDepth(MaskTree::ValueOnCIter::LEAF_DEPTH - 1);
+        citer.setMaxDepth(MaskTreeT::ValueOnCIter::LEAF_DEPTH - 1);
 
         if (!citer) return;
 
@@ -1254,6 +1254,6 @@ void compositeToDense(
 
 #endif //OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

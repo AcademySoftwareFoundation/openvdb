@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,13 +41,19 @@
 #include "LevelSetUtil.h"
 #include "VolumeToMesh.h"
 
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/int.hpp>
 #include <boost/scoped_array.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <limits> // std::numeric_limits
+#include <algorithm> // for std::min(), std::max()
+#include <cmath> // for std::sqrt()
+#include <limits> // for std::numeric_limits
 #include <memory>
+#include <random>
+#include <utility> // for std::pair
 #include <vector>
 
 
@@ -817,7 +823,7 @@ ClosestSurfacePoint<GridT>::initialize(
         volume_to_mesh_internal::identifySurfaceIntersectingVoxels(mask, tree, ValueT(isovalue));
 
         mSignTreePt.reset(new Int16TreeT(0));
-        mIdxTreePt.reset(new Index32TreeT(boost::integer_traits<Index32>::const_max));
+        mIdxTreePt.reset(new Index32TreeT(std::numeric_limits<Index32>::max()));
 
 
         volume_to_mesh_internal::computeAuxiliaryData(
@@ -868,7 +874,8 @@ ClosestSurfacePoint<GridT>::initialize(
 
     using Index32RootNodeT = typename Index32TreeT::RootNodeType;
     using Index32NodeChainT = typename Index32RootNodeT::NodeChainType;
-    BOOST_STATIC_ASSERT(boost::mpl::size<Index32NodeChainT>::value > 1);
+    static_assert(boost::mpl::size<Index32NodeChainT>::value > 1,
+        "expected tree depth greater than one");
     using Index32InternalNodeT =
         typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type;
 
@@ -964,6 +971,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

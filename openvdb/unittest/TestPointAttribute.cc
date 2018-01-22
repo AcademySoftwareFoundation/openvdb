@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,9 +32,7 @@
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
-
-#include <iostream>
-#include <sstream>
+#include <vector>
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -42,8 +40,8 @@ using namespace openvdb::points;
 class TestPointAttribute: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointAttribute);
     CPPUNIT_TEST(testAppendDrop);
@@ -282,10 +280,17 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
     }
 
+    { // attempt to add an attribute with an unregistered type (Vec2R)
+        CPPUNIT_ASSERT_THROW(appendAttribute<Vec2R>(tree, "unregistered"), openvdb::KeyError);
+    }
+
     { // append attributes marked as hidden, transient, group and string
-        appendAttribute<float>(tree, "testHidden", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), true, false);
-        appendAttribute<float>(tree, "testTransient", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, true);
-        appendAttribute<Name>(tree, "testString", "", /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, false);
+        appendAttribute<float>(tree, "testHidden", 0,
+            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), true, false);
+        appendAttribute<float>(tree, "testTransient", 0,
+            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, true);
+        appendAttribute<Name>(tree, "testString", "",
+            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, false);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
@@ -329,7 +334,8 @@ TestPointAttribute::testRename()
 
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
-    appendAttribute<float>(tree, "test1", 0, /*stride=*/1, /*constantStride=*/true, defaultValue.copy());
+    appendAttribute<float>(tree, "test1", 0,
+        /*stride=*/1, /*constantStride=*/true, defaultValue.copy());
     appendAttribute<int>(tree, "id");
     appendAttribute<float>(tree, "test2");
 
@@ -460,10 +466,11 @@ TestPointAttribute::testBloscCompress()
     CPPUNIT_ASSERT(leafIter2->attributeArray("id").isCompressed());
     CPPUNIT_ASSERT(!leafIter2->attributeArray("id2").isCompressed());
 
-    CPPUNIT_ASSERT(leafIter->attributeArray("id").memUsage() < leafIter->attributeArray("id2").memUsage());
+    CPPUNIT_ASSERT(
+        leafIter->attributeArray("id").memUsage() < leafIter->attributeArray("id2").memUsage());
 #endif
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

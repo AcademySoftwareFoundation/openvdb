@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,9 +42,12 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Formats.h>
 #include "Prune.h"
-#include <boost/scoped_array.hpp>
 #include <tbb/parallel_for.h>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <utility> // for std::pair
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -394,7 +397,7 @@ private:
         mData = mArray.get();
     }
 
-    boost::scoped_array<ValueT> mArray;
+    std::unique_ptr<ValueT[]> mArray;
     ValueT* mData;//raw c-style pointer to values
 };// end of Dense
 
@@ -605,6 +608,6 @@ copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
 
 #endif // OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

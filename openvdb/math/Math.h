@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -337,14 +337,18 @@ template<typename Type>
 inline bool
 isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
-/// Return @c false, since @c bool values are never less than zero.
+// Return false, since bool values are never less than zero.
 template<> inline bool isNegative<bool>(const bool&) { return false; }
 
 
 /// Return @c true if @a x is finite.
+inline bool
+isFinite(const float x) { return std::isfinite(x); }
+
+/// Return @c true if @a x is finite.
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
-isFinite(const Type& x) { return std::isfinite(x); }
+isFinite(const Type& x) { return std::isfinite(static_cast<double>(x)); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
@@ -921,6 +925,6 @@ MaxIndex(const Vec3T& v)
 
 #endif // OPENVDB_MATH_MATH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

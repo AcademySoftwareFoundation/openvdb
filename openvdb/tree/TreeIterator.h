@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file TreeIterator.h
+/// @file tree/TreeIterator.h
 
 #ifndef OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
@@ -38,12 +38,14 @@
 #include <boost/mpl/push_back.hpp>
 #include <boost/mpl/size.hpp>
 #include <boost/mpl/vector.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/remove_const.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <algorithm>
+#include <sstream>
+#include <string>
+#include <type_traits>
 
 // Prior to 0.96.1, depth-bounded value iterators always descended to the leaf level
 // and iterated past leaf nodes.  Now, they never descend past the maximum depth.
@@ -63,10 +65,10 @@ namespace tree {
 /// - CopyConstness<const int, int>::Type is const int
 /// - CopyConstness<const int, const int>::Type is const int
 template<typename FromType, typename ToType> struct CopyConstness {
-    typedef typename boost::remove_const<ToType>::type Type;
+    using Type = typename std::remove_const<ToType>::type;
 };
 template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
-    typedef const ToType Type;
+    using Type = const ToType;
 };
 
 
@@ -77,12 +79,12 @@ namespace iter {
 
 template<typename HeadT, int HeadLevel>
 struct InvertedTree {
-    typedef typename InvertedTree<typename HeadT::ChildNodeType, HeadLevel-1>::Type SubtreeT;
-    typedef typename boost::mpl::push_back<SubtreeT, HeadT>::type Type;
+    using SubtreeT = typename InvertedTree<typename HeadT::ChildNodeType, HeadLevel-1>::Type;
+    using Type = typename boost::mpl::push_back<SubtreeT, HeadT>::type;
 };
 template<typename HeadT>
 struct InvertedTree<HeadT, /*HeadLevel=*/1> {
-    typedef typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type Type;
+    using Type = typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type;
 };
 
 } // namespace iter
@@ -101,144 +103,144 @@ struct InvertedTree<HeadT, /*HeadLevel=*/1> {
 ///   for example, IterTraits<LeafNode, LeafNode::ValueOnIter>::begin(leaf) returns
 ///   leaf.beginValueOn()
 /// - a getChild() function that returns a pointer to the child node to which the iterator
-///   is currently pointing (always NULL if the iterator is a Value iterator)
+///   is currently pointing (always null if the iterator is a Value iterator)
 template<typename NodeT, typename IterT>
 struct IterTraits
 {
-    template<typename ChildT> static ChildT* getChild(const IterT&) { return NULL; }
+    template<typename ChildT> static ChildT* getChild(const IterT&) { return nullptr; }
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildOnIter>
 {
-    typedef typename NodeT::ChildOnIter IterT;
+    using IterT = typename NodeT::ChildOnIter;
     static IterT begin(NodeT& node) { return node.beginChildOn(); }
     template<typename ChildT> static ChildT* getChild(const IterT& iter) {
         return &iter.getValue();
     }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildOnIter Type;
+        using Type = typename OtherNodeT::ChildOnIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildOnCIter>
 {
-    typedef typename NodeT::ChildOnCIter IterT;
+    using IterT = typename NodeT::ChildOnCIter;
     static IterT begin(const NodeT& node) { return node.cbeginChildOn(); }
     template<typename ChildT> static const ChildT* getChild(const IterT& iter) {
         return &iter.getValue();
     }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildOnCIter Type;
+        using Type = typename OtherNodeT::ChildOnCIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildOffIter>
 {
-    typedef typename NodeT::ChildOffIter IterT;
+    using IterT = typename NodeT::ChildOffIter;
     static IterT begin(NodeT& node) { return node.beginChildOff(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildOffIter Type;
+        using Type = typename OtherNodeT::ChildOffIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildOffCIter>
 {
-    typedef typename NodeT::ChildOffCIter IterT;
+    using IterT = typename NodeT::ChildOffCIter;
     static IterT begin(const NodeT& node) { return node.cbeginChildOff(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildOffCIter Type;
+        using Type = typename OtherNodeT::ChildOffCIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildAllIter>
 {
-    typedef typename NodeT::ChildAllIter IterT;
+    using IterT = typename NodeT::ChildAllIter;
     static IterT begin(NodeT& node) { return node.beginChildAll(); }
     template<typename ChildT> static ChildT* getChild(const IterT& iter) {
         typename IterT::NonConstValueType val;
         return iter.probeChild(val);
     }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildAllIter Type;
+        using Type = typename OtherNodeT::ChildAllIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ChildAllCIter>
 {
-    typedef typename NodeT::ChildAllCIter IterT;
+    using IterT = typename NodeT::ChildAllCIter;
     static IterT begin(const NodeT& node) { return node.cbeginChildAll(); }
     template<typename ChildT> static ChildT* getChild(const IterT& iter) {
         typename IterT::NonConstValueType val;
         return iter.probeChild(val);
     }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ChildAllCIter Type;
+        using Type = typename OtherNodeT::ChildAllCIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueOnIter>
 {
-    typedef typename NodeT::ValueOnIter IterT;
+    using IterT = typename NodeT::ValueOnIter;
     static IterT begin(NodeT& node) { return node.beginValueOn(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueOnIter Type;
+        using Type = typename OtherNodeT::ValueOnIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueOnCIter>
 {
-    typedef typename NodeT::ValueOnCIter IterT;
+    using IterT = typename NodeT::ValueOnCIter;
     static IterT begin(const NodeT& node) { return node.cbeginValueOn(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueOnCIter Type;
+        using Type = typename OtherNodeT::ValueOnCIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueOffIter>
 {
-    typedef typename NodeT::ValueOffIter IterT;
+    using IterT = typename NodeT::ValueOffIter;
     static IterT begin(NodeT& node) { return node.beginValueOff(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueOffIter Type;
+        using Type = typename OtherNodeT::ValueOffIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueOffCIter>
 {
-    typedef typename NodeT::ValueOffCIter IterT;
+    using IterT = typename NodeT::ValueOffCIter;
     static IterT begin(const NodeT& node) { return node.cbeginValueOff(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueOffCIter Type;
+        using Type = typename OtherNodeT::ValueOffCIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueAllIter>
 {
-    typedef typename NodeT::ValueAllIter IterT;
+    using IterT = typename NodeT::ValueAllIter;
     static IterT begin(NodeT& node) { return node.beginValueAll(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueAllIter Type;
+        using Type = typename OtherNodeT::ValueAllIter;
     };
 };
 
 template<typename NodeT>
 struct IterTraits<NodeT, typename NodeT::ValueAllCIter>
 {
-    typedef typename NodeT::ValueAllCIter IterT;
+    using IterT = typename NodeT::ValueAllCIter;
     static IterT begin(const NodeT& node) { return node.cbeginValueAll(); }
     template<typename OtherNodeT> struct NodeConverter {
-        typedef typename OtherNodeT::ValueAllCIter Type;
+        using Type = typename OtherNodeT::ValueAllCIter;
     };
 };
 
@@ -261,36 +263,37 @@ class IterListItem
 {
 public:
     /// The type of iterator stored in the previous list item
-    typedef typename PrevItemT::IterT PrevIterT;
+    using PrevIterT = typename PrevItemT::IterT;
     /// The type of node (non-const) whose iterator is stored in this list item
-    typedef typename boost::mpl::front<NodeVecT>::type _NodeT;
+    using _NodeT = typename boost::mpl::front<NodeVecT>::type;
     /// The type of iterator stored in this list item (e.g., InternalNode::ValueOnCIter)
-    typedef typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
-        NodeConverter<_NodeT>::Type IterT;
+    using IterT = typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
+        NodeConverter<_NodeT>::Type;
 
     /// The type of node (const or non-const) over which IterT iterates (e.g., const RootNode<...>)
-    typedef typename IterT::NodeType NodeT;
+    using NodeT = typename IterT::NodeType;
     /// The type of the node with const qualifiers removed ("Non-Const")
-    typedef typename IterT::NonConstNodeType NCNodeT;
+    using NCNodeT = typename IterT::NonConstNodeType;
     /// The type of value (with const qualifiers removed) to which the iterator points
-    typedef typename IterT::NonConstValueType NCValueT;
+    using NCValueT = typename IterT::NonConstValueType;
     /// NodeT's child node type, with the same constness (e.g., const InternalNode<...>)
-    typedef typename CopyConstness<NodeT, typename NodeT::ChildNodeType>::Type ChildT;
+    using ChildT = typename CopyConstness<NodeT, typename NodeT::ChildNodeType>::Type;
     /// NodeT's child node type with const qualifiers removed
-    typedef typename CopyConstness<NCNodeT, typename NCNodeT::ChildNodeType>::Type NCChildT;
-    typedef IterTraits<NCNodeT, IterT> ITraits;
+    using NCChildT = typename CopyConstness<NCNodeT, typename NCNodeT::ChildNodeType>::Type;
+    using ITraits = IterTraits<NCNodeT, IterT>;
     /// NodeT's level in its tree (0 = LeafNode)
     static const Index Level = _Level;
 
     IterListItem(PrevItemT* prev): mNext(this), mPrev(prev) {}
 
-    IterListItem(const IterListItem& other): mIter(other.mIter), mNext(other.mNext), mPrev(NULL) {}
+    IterListItem(const IterListItem& other):
+        mIter(other.mIter), mNext(other.mNext), mPrev(nullptr) {}
     IterListItem& operator=(const IterListItem& other)
     {
         if (&other != this) {
             mIter = other.mIter;
             mNext = other.mNext;
-            mPrev = NULL; ///< @note external call to updateBackPointers() required
+            mPrev = nullptr; ///< @note external call to updateBackPointers() required
         }
         return *this;
     }
@@ -304,7 +307,7 @@ public:
     /// Return the node over which this list element's iterator iterates.
     void getNode(Index lvl, NodeT*& node) const
     {
-        node = (lvl <= Level) ? mIter.getParentNode() : NULL;
+        node = (lvl <= Level) ? mIter.getParentNode() : nullptr;
     }
     /// Return the node over which one of the following list elements' iterator iterates.
     template<typename OtherNodeT>
@@ -319,9 +322,9 @@ public:
     void initLevel(Index lvl, OtherIterListItemT& otherListItem)
     {
         if (lvl == Level) {
-            const NodeT* node = NULL;
+            const NodeT* node = nullptr;
             otherListItem.getNode(lvl, node);
-            mIter = (node == NULL) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
+            mIter = (node == nullptr) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
         } else {
             // Forward to one of the following list elements.
             mNext.initLevel(lvl, otherListItem);
@@ -341,7 +344,7 @@ public:
     /// initialize the next iterator in this list with that child node.
     bool down(Index lvl)
     {
-        if (lvl == Level && mPrev != NULL && mIter) {
+        if (lvl == Level && mPrev != nullptr && mIter) {
             if (ChildT* child = ITraits::template getChild<ChildT>(mIter)) {
                 mPrev->setIter(PrevItemT::ITraits::begin(*child));
                 return true;
@@ -410,8 +413,8 @@ public:
     }
 
 private:
-    typedef typename boost::mpl::pop_front<NodeVecT>::type RestT; // NodeVecT minus its first item
-    typedef IterListItem<IterListItem, RestT, VecSize - 1, Level + 1> NextItem;
+    using RestT = typename boost::mpl::pop_front<NodeVecT>::type; // NodeVecT minus its first item
+    using NextItem = IterListItem<IterListItem, RestT, VecSize - 1, Level + 1>;
 
     IterT mIter;
     NextItem mNext;
@@ -425,37 +428,41 @@ class IterListItem<PrevItemT, NodeVecT, VecSize, /*Level=*/0U>
 {
 public:
     /// The type of iterator stored in the previous list item
-    typedef typename PrevItemT::IterT PrevIterT;
+    using PrevIterT = typename PrevItemT::IterT;
     /// The type of node (non-const) whose iterator is stored in this list item
-    typedef typename boost::mpl::front<NodeVecT>::type _NodeT;
+    using _NodeT = typename boost::mpl::front<NodeVecT>::type;
     /// The type of iterator stored in this list item (e.g., InternalNode::ValueOnCIter)
-    typedef typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
-        NodeConverter<_NodeT>::Type IterT;
+    using IterT = typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
+        NodeConverter<_NodeT>::Type;
 
     /// The type of node (const or non-const) over which IterT iterates (e.g., const RootNode<...>)
-    typedef typename IterT::NodeType NodeT;
+    using NodeT = typename IterT::NodeType;
     /// The type of the node with const qualifiers removed ("Non-Const")
-    typedef typename IterT::NonConstNodeType NCNodeT;
+    using NCNodeT = typename IterT::NonConstNodeType;
     /// The type of value (with const qualifiers removed) to which the iterator points
-    typedef typename IterT::NonConstValueType NCValueT;
-    typedef IterTraits<NCNodeT, IterT> ITraits;
+    using NCValueT = typename IterT::NonConstValueType;
+    using ITraits = IterTraits<NCNodeT, IterT>;
     /// NodeT's level in its tree (0 = LeafNode)
     static const Index Level = 0;
 
-    IterListItem(PrevItemT*): mNext(this), mPrev(NULL) {}
+    IterListItem(PrevItemT*): mNext(this), mPrev(nullptr) {}
 
-    IterListItem(const IterListItem& other): mIter(other.mIter), mNext(other.mNext), mPrev(NULL) {}
+    IterListItem(const IterListItem& other):
+        mIter(other.mIter), mNext(other.mNext), mPrev(nullptr) {}
     IterListItem& operator=(const IterListItem& other)
     {
         if (&other != this) {
             mIter = other.mIter;
             mNext = other.mNext;
-            mPrev = NULL;
+            mPrev = nullptr;
         }
         return *this;
     }
 
-    void updateBackPointers(PrevItemT* = NULL) { mPrev = NULL; mNext.updateBackPointers(this); }
+    void updateBackPointers(PrevItemT* = nullptr)
+    {
+        mPrev = nullptr; mNext.updateBackPointers(this);
+    }
 
     void setIter(const IterT& iter) { mIter = iter; }
     template<typename OtherIterT>
@@ -463,7 +470,7 @@ public:
 
     void getNode(Index lvl, NodeT*& node) const
     {
-        node = (lvl == 0) ? mIter.getParentNode() : NULL;
+        node = (lvl == 0) ? mIter.getParentNode() : nullptr;
     }
     template<typename OtherNodeT>
     void getNode(Index lvl, OtherNodeT*& node) const { mNext.getNode(lvl, node); }
@@ -472,9 +479,9 @@ public:
     void initLevel(Index lvl, OtherIterListItemT& otherListItem)
     {
         if (lvl == 0) {
-            const NodeT* node = NULL;
+            const NodeT* node = nullptr;
             otherListItem.getNode(lvl, node);
-            mIter = (node == NULL) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
+            mIter = (node == nullptr) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
         } else {
             mNext.initLevel(lvl, otherListItem);
         }
@@ -533,8 +540,8 @@ public:
     }
 
 private:
-    typedef typename boost::mpl::pop_front<NodeVecT>::type RestT; // NodeVecT minus its first item
-    typedef IterListItem<IterListItem, RestT, VecSize - 1, /*Level=*/1> NextItem;
+    using RestT = typename boost::mpl::pop_front<NodeVecT>::type; // NodeVecT minus its first item
+    using NextItem = IterListItem<IterListItem, RestT, VecSize - 1, /*Level=*/1>;
 
     IterT mIter;
     NextItem mNext;
@@ -547,35 +554,35 @@ template<typename PrevItemT, typename NodeVecT, Index _Level>
 class IterListItem<PrevItemT, NodeVecT, /*VecSize=*/1, _Level>
 {
 public:
-    typedef typename boost::mpl::front<NodeVecT>::type _NodeT;
+    using _NodeT = typename boost::mpl::front<NodeVecT>::type;
     /// The type of iterator stored in the previous list item
-    typedef typename PrevItemT::IterT PrevIterT;
+    using PrevIterT = typename PrevItemT::IterT;
     /// The type of iterator stored in this list item (e.g., RootNode::ValueOnCIter)
-    typedef typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
-        NodeConverter<_NodeT>::Type IterT;
+    using IterT = typename IterTraits<typename PrevIterT::NonConstNodeType, PrevIterT>::template
+        NodeConverter<_NodeT>::Type;
 
     /// The type of node over which IterT iterates (e.g., const RootNode<...>)
-    typedef typename IterT::NodeType NodeT;
+    using NodeT = typename IterT::NodeType;
     /// The type of the node with const qualifiers removed ("Non-Const")
-    typedef typename IterT::NonConstNodeType NCNodeT;
+    using NCNodeT = typename IterT::NonConstNodeType;
     /// The type of value (with const qualifiers removed) to which the iterator points
-    typedef typename IterT::NonConstValueType NCValueT;
+    using NCValueT = typename IterT::NonConstValueType;
     /// NodeT's child node type, with the same constness (e.g., const InternalNode<...>)
-    typedef typename CopyConstness<NodeT, typename NodeT::ChildNodeType>::Type ChildT;
+    using ChildT = typename CopyConstness<NodeT, typename NodeT::ChildNodeType>::Type;
     /// NodeT's child node type with const qualifiers removed
-    typedef typename CopyConstness<NCNodeT, typename NCNodeT::ChildNodeType>::Type NCChildT;
-    typedef IterTraits<NCNodeT, IterT> ITraits;
+    using NCChildT = typename CopyConstness<NCNodeT, typename NCNodeT::ChildNodeType>::Type;
+    using ITraits = IterTraits<NCNodeT, IterT>;
     /// NodeT's level in its tree (0 = LeafNode)
     static const Index Level = _Level;
 
     IterListItem(PrevItemT* prev): mPrev(prev) {}
 
-    IterListItem(const IterListItem& other): mIter(other.mIter), mPrev(NULL) {}
+    IterListItem(const IterListItem& other): mIter(other.mIter), mPrev(nullptr) {}
     IterListItem& operator=(const IterListItem& other)
     {
         if (&other != this) {
             mIter = other.mIter;
-            mPrev = NULL; ///< @note external call to updateBackPointers() required
+            mPrev = nullptr; ///< @note external call to updateBackPointers() required
         }
         return *this;
     }
@@ -589,16 +596,16 @@ public:
 
     void getNode(Index lvl, NodeT*& node) const
     {
-        node = (lvl <= Level) ? mIter.getParentNode() : NULL;
+        node = (lvl <= Level) ? mIter.getParentNode() : nullptr;
     }
 
     template<typename OtherIterListItemT>
     void initLevel(Index lvl, OtherIterListItemT& otherListItem)
     {
         if (lvl == Level) {
-            const NodeT* node = NULL;
+            const NodeT* node = nullptr;
             otherListItem.getNode(lvl, node);
-            mIter = (node == NULL) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
+            mIter = (node == nullptr) ? IterT() : ITraits::begin(*const_cast<NodeT*>(node));
         }
     }
 
@@ -610,7 +617,7 @@ public:
 
     bool down(Index lvl)
     {
-        if (lvl == Level && mPrev != NULL && mIter) {
+        if (lvl == Level && mPrev != nullptr && mIter) {
             if (ChildT* child = ITraits::template getChild<ChildT>(mIter)) {
                 mPrev->setIter(PrevItemT::ITraits::begin(*child));
                 return true;
@@ -658,13 +665,13 @@ template<typename _TreeT, typename _ValueIterT>
 class TreeValueIteratorBase
 {
 public:
-    typedef _TreeT TreeT;
-    typedef _ValueIterT ValueIterT;
-    typedef typename ValueIterT::NodeType NodeT;
-    typedef typename ValueIterT::NonConstValueType ValueT;
-    typedef typename NodeT::ChildOnCIter ChildOnIterT;
+    using TreeT = _TreeT;
+    using ValueIterT = _ValueIterT;
+    using NodeT = typename ValueIterT::NodeType;
+    using ValueT = typename ValueIterT::NonConstValueType;
+    using ChildOnIterT = typename NodeT::ChildOnCIter;
     static const Index ROOT_LEVEL = NodeT::LEVEL;
-    BOOST_STATIC_ASSERT(ValueIterT::NodeType::LEVEL == ROOT_LEVEL);
+    static_assert(ValueIterT::NodeType::LEVEL == ROOT_LEVEL, "invalid value iterator node type");
     static const Index LEAF_LEVEL = 0, ROOT_DEPTH = 0, LEAF_DEPTH = ROOT_LEVEL;
 
     TreeValueIteratorBase(TreeT&);
@@ -762,9 +769,9 @@ public:
 private:
     bool advance(bool dontIncrement = false);
 
-    typedef typename iter::InvertedTree<NodeT, NodeT::LEVEL>::Type InvTreeT;
-    struct PrevChildItem { typedef ChildOnIterT IterT; };
-    struct PrevValueItem { typedef ValueIterT IterT; };
+    using InvTreeT = typename iter::InvertedTree<NodeT, NodeT::LEVEL>::Type;
+    struct PrevChildItem { using IterT = ChildOnIterT; };
+    struct PrevValueItem { using IterT = ValueIterT; };
 
     IterListItem<PrevChildItem, InvTreeT, /*VecSize=*/ROOT_LEVEL+1, /*Level=*/0> mChildIterList;
     IterListItem<PrevValueItem, InvTreeT, /*VecSize=*/ROOT_LEVEL+1, /*Level=*/0> mValueIterList;
@@ -777,8 +784,8 @@ private:
 template<typename TreeT, typename ValueIterT>
 inline
 TreeValueIteratorBase<TreeT, ValueIterT>::TreeValueIteratorBase(TreeT& tree):
-    mChildIterList(NULL),
-    mValueIterList(NULL),
+    mChildIterList(nullptr),
+    mValueIterList(nullptr),
     mLevel(ROOT_LEVEL),
     mMinLevel(int(LEAF_LEVEL)),
     mMaxLevel(int(ROOT_LEVEL)),
@@ -977,15 +984,15 @@ template<typename _TreeT, typename RootChildOnIterT>
 class NodeIteratorBase
 {
 public:
-    typedef _TreeT TreeT;
-    typedef RootChildOnIterT RootIterT;
-    typedef typename RootIterT::NodeType RootNodeT;
-    typedef typename RootIterT::NonConstNodeType NCRootNodeT;
+    using TreeT = _TreeT;
+    using RootIterT = RootChildOnIterT;
+    using RootNodeT = typename RootIterT::NodeType;
+    using NCRootNodeT = typename RootIterT::NonConstNodeType;
     static const Index ROOT_LEVEL = RootNodeT::LEVEL;
-    typedef typename iter::InvertedTree<NCRootNodeT, ROOT_LEVEL>::Type InvTreeT;
+    using InvTreeT = typename iter::InvertedTree<NCRootNodeT, ROOT_LEVEL>::Type;
     static const Index LEAF_LEVEL = 0, ROOT_DEPTH = 0, LEAF_DEPTH = ROOT_LEVEL;
 
-    typedef IterTraits<NCRootNodeT, RootIterT> RootIterTraits;
+    using RootIterTraits = IterTraits<NCRootNodeT, RootIterT>;
 
     NodeIteratorBase();
     NodeIteratorBase(TreeT&);
@@ -1041,9 +1048,9 @@ public:
     /// @note This iterator doesn't have the usual dereference operators (* and ->),
     /// because they would have to be overloaded by the returned node type.
     template<typename NodeT>
-    void getNode(NodeT*& node) const { node = NULL; mIterList.getNode(mLevel, node); }
+    void getNode(NodeT*& node) const { node = nullptr; mIterList.getNode(mLevel, node); }
     template<typename NodeT>
-    void getNode(const NodeT*& node) const { node = NULL; mIterList.getNode(mLevel, node); }
+    void getNode(const NodeT*& node) const { node = nullptr; mIterList.getNode(mLevel, node); }
     //@}
 
     TreeT* getTree() const { return mTree; }
@@ -1051,7 +1058,7 @@ public:
     std::string summary() const;
 
 private:
-    struct PrevItem { typedef RootIterT IterT; };
+    struct PrevItem { using IterT = RootIterT; };
 
     IterListItem<PrevItem, InvTreeT, /*VecSize=*/ROOT_LEVEL+1, LEAF_LEVEL> mIterList;
     Index mLevel;
@@ -1064,12 +1071,12 @@ private:
 template<typename TreeT, typename RootChildOnIterT>
 inline
 NodeIteratorBase<TreeT, RootChildOnIterT>::NodeIteratorBase():
-    mIterList(NULL),
+    mIterList(nullptr),
     mLevel(ROOT_LEVEL),
     mMinLevel(int(LEAF_LEVEL)),
     mMaxLevel(int(ROOT_LEVEL)),
     mDone(true),
-    mTree(NULL)
+    mTree(nullptr)
 {
 }
 
@@ -1077,7 +1084,7 @@ NodeIteratorBase<TreeT, RootChildOnIterT>::NodeIteratorBase():
 template<typename TreeT, typename RootChildOnIterT>
 inline
 NodeIteratorBase<TreeT, RootChildOnIterT>::NodeIteratorBase(TreeT& tree):
-    mIterList(NULL),
+    mIterList(nullptr),
     mLevel(ROOT_LEVEL),
     mMinLevel(int(LEAF_LEVEL)),
     mMaxLevel(int(ROOT_LEVEL)),
@@ -1175,7 +1182,7 @@ inline Coord
 NodeIteratorBase<TreeT, RootChildOnIterT>::getCoord() const
 {
     if (mLevel != ROOT_LEVEL) return  mIterList.getCoord(mLevel + 1);
-    RootNodeT* root = NULL;
+    RootNodeT* root = nullptr;
     this->getNode(root);
     return root ? root->getMinIndex() : Coord::min();
 }
@@ -1186,9 +1193,9 @@ inline bool
 NodeIteratorBase<TreeT, RootChildOnIterT>::getBoundingBox(CoordBBox& bbox) const
 {
     if (mLevel == ROOT_LEVEL) {
-        RootNodeT* root = NULL;
+        RootNodeT* root = nullptr;
         this->getNode(root);
-        if (root == NULL) {
+        if (root == nullptr) {
             bbox = CoordBBox();
             return false;
         }
@@ -1228,20 +1235,20 @@ template<typename TreeT, typename RootChildOnIterT>
 class LeafIteratorBase
 {
 public:
-    typedef RootChildOnIterT RootIterT;
-    typedef typename RootIterT::NodeType RootNodeT;
-    typedef typename RootIterT::NonConstNodeType NCRootNodeT;
+    using RootIterT = RootChildOnIterT;
+    using RootNodeT = typename RootIterT::NodeType;
+    using NCRootNodeT = typename RootIterT::NonConstNodeType;
     static const Index ROOT_LEVEL = RootNodeT::LEVEL;
-    typedef typename iter::InvertedTree<NCRootNodeT, ROOT_LEVEL>::Type InvTreeT;
-    typedef typename boost::mpl::front<InvTreeT>::type NCLeafNodeT;
-    typedef typename CopyConstness<RootNodeT, NCLeafNodeT>::Type LeafNodeT;
+    using InvTreeT = typename iter::InvertedTree<NCRootNodeT, ROOT_LEVEL>::Type;
+    using NCLeafNodeT = typename boost::mpl::front<InvTreeT>::type;
+    using LeafNodeT = typename CopyConstness<RootNodeT, NCLeafNodeT>::Type;
     static const Index LEAF_LEVEL = 0, LEAF_PARENT_LEVEL = LEAF_LEVEL + 1;
 
-    typedef IterTraits<NCRootNodeT, RootIterT> RootIterTraits;
+    using RootIterTraits = IterTraits<NCRootNodeT, RootIterT>;
 
-    LeafIteratorBase(): mIterList(NULL), mTree(NULL) {}
+    LeafIteratorBase(): mIterList(nullptr), mTree(nullptr) {}
 
-    LeafIteratorBase(TreeT& tree): mIterList(NULL), mTree(&tree)
+    LeafIteratorBase(TreeT& tree): mIterList(nullptr), mTree(&tree)
     {
         // Initialize the iterator list with a root node iterator.
         mIterList.setIter(RootIterTraits::begin(tree.root()));
@@ -1268,7 +1275,12 @@ public:
 
     //@{
     /// Return the leaf node to which the iterator is pointing.
-    LeafNodeT* getLeaf() const { LeafNodeT* n = NULL; mIterList.getNode(LEAF_LEVEL, n); return n; }
+    LeafNodeT* getLeaf() const
+    {
+        LeafNodeT* n = nullptr;
+        mIterList.getNode(LEAF_LEVEL, n);
+        return n;
+    }
     LeafNodeT& operator*() const { return *this->getLeaf(); }
     LeafNodeT* operator->() const { return this->getLeaf(); }
     //@}
@@ -1288,7 +1300,7 @@ public:
     TreeT* getTree() const { return mTree; }
 
 private:
-    struct PrevItem { typedef RootIterT IterT; };
+    struct PrevItem { using IterT = RootIterT; };
 
     /// @note Even though a LeafIterator doesn't iterate over leaf voxels,
     /// the first item of this linked list of node iterators is a leaf node iterator,
@@ -1400,6 +1412,6 @@ private:
 
 #endif // OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
