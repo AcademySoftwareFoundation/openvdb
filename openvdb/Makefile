@@ -123,14 +123,14 @@ endif
 LOCAL_INCLUDE	:= $(prefix)/include
 LOCAL_LIB	:= $(prefix)/lib
 
-BOOST_VERSION	?= 1_55
+BOOST_VERSION	?= 1_61
 # The directory into which to install libraries (e.g., for Linux multiarch support)
 DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The parent directory of the boost/ header directory
-BOOST_INCL_DIR	:= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
+BOOST_INCL_DIR	?= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
 # The directory containing libboost_iostreams, libboost_system, etc.
-BOOST_LIB_DIR := $(LOCAL_LIB)
+BOOST_LIB_DIR   ?= $(LOCAL_LIB)
 ifdef WINDOWS_NT
   BOOST_LIB :=
 else
