@@ -62,11 +62,11 @@ for link in br.links():
         break
 
 # accept eula terms
-url = 'https://www.sidefx.com/download/eula/accept/?next=/download/download-houdini/%sget/' % id
-br.open(url)
-br.select_form(nr=0)
-br.form.find_control('terms').items[1].selected=True
-br.submit()
+#url = 'https://www.sidefx.com/download/eula/accept/?next=/download/download-houdini/%sget/' % id
+#br.open(url)
+#br.select_form(nr=0)
+#br.form.find_control('terms').items[1].selected=True
+#br.submit()
 
 # download houdini tarball in 50MB chunks
 url = 'https://www.sidefx.com/download/download-houdini/%sget/' % id
