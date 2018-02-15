@@ -11,6 +11,10 @@ New features:
 - Added a @c header_test Makefile target that checks library header files
   for dependencies on missing or indirectly included headers.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added support for @vdblink::math::Mat3s Mat3s@endlink and
+  @vdblink::math::Mat3d Mat3d@endlink point data
+  @vdblink::points::TypedAttributeArray typed attributes@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 
 @par
 Improvements:
@@ -19,10 +23,12 @@ Improvements:
   and @vdblink::math::Mat4d Mat4d@endlink, and it is now also defined
   (and returns a zero matrix) for @vdblink::math::Mat3s Mat3s@endlink
   and @vdblink::math::Mat3d Mat3d@endlink.
-- Added support for @vdblink::math::Mat3s Mat3s@endlink and
-  @vdblink::math::Mat3d Mat3d@endlink point data
-  @vdblink::points::TypedAttributeArray typed attributes@endlink.
-  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+@par
+Python:
+- Fixed a bug introduced in version&nbsp;3.2.0 that caused
+  boolean and integer values added to a grid&rsquo;s metadata
+  to be stored as floating-point values.
 
 @par
 Houdini:
@@ -33,6 +39,8 @@ Houdini:
 - Added a Keep&nbsp;Original&nbsp;Geometry toggle to the
   Points&nbsp;Convert&nbsp;SOP and improved the efficiency of point unpacking.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Fixed a rare crash when extracting points from a point data primitive.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
 - Added a @b SOP_NodeVDB::evalStdString method that facilitates
   string parameter evaluation in expressions, e.g.,
   <TT>matchGroup(*gdp,&nbsp;evalStdString("group",&nbsp;time))</TT>.

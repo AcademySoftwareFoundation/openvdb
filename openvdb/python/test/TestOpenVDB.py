@@ -165,7 +165,7 @@ class TestOpenVDB(unittest.TestCase):
 
         self.assertEqual(grid.metadata, {})
 
-        meta = { 'name': 'test', 'saveFloatAsHalf': True, 'xyz': (-1, 0, 1) }
+        meta = dict(name='test', saveFloatAsHalf=True, xyz=(-1, 0, 1), intval=42, floatval=1.25)
         grid.metadata = meta
         self.assertEqual(grid.metadata, meta)
 
@@ -178,10 +178,12 @@ class TestOpenVDB(unittest.TestCase):
         for name in meta:
             self.assertTrue(name in grid)
             self.assertEqual(grid[name], meta[name])
+            self.assertEqual(type(grid[name]), type(meta[name]))
 
         for name in grid:
             self.assertTrue(name in grid)
             self.assertEqual(grid[name], meta[name])
+            self.assertEqual(type(grid[name]), type(meta[name]))
 
         self.assertTrue('xyz' in grid)
         del grid['xyz']
