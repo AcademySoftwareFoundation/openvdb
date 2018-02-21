@@ -26,11 +26,17 @@
 #
 
 # yue.nicholas@gmail.com
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 
 PROJECT ( OpenVDB )
 
 ENABLE_TESTING()
+
+find_program(CCACHE_FOUND ccache)
+if(CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif(CCACHE_FOUND)
 
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
