@@ -36,6 +36,7 @@
 
 #include <UT/UT_DSOVersion.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_Ramp.h>
 #include <OP/OP_OperatorTable.h>
 #include <SHOP/SHOP_Node.h>
 #include <SHOP/SHOP_Operator.h>

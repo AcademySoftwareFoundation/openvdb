@@ -45,7 +45,7 @@ exportFloatGrid()
     // Add a module-level list that gives the types of all supported Grid classes.
     py::scope().attr("GridTypes") = py::list();
 
-#ifndef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
+#if defined(PY_OPENVDB_USE_NUMPY) && !defined(PY_OPENVDB_USE_BOOST_PYTHON_NUMPY)
     // Specify that py::numeric::array should refer to the Python type numpy.ndarray
     // (rather than the older Numeric.array).
     py::numeric::array::set_module_and_type("numpy", "ndarray");

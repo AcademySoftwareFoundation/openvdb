@@ -48,6 +48,7 @@
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/Prune.h>
 
+#include <UT/UT_Version.h>
 #include <CH/CH_Manager.h>
 #include <CVEX/CVEX_Context.h>
 #include <CVEX/CVEX_Value.h>
@@ -3395,7 +3396,11 @@ SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
 
             // Setup VEX context
 
+#if UT_MAJOR_VERSION_INT >= 17
+            OP_Caller caller(this, DEP_ContextOptionsReadHandle{});
+#else
             OP_Caller caller(this);
+#endif
             UT_SharedPtr<VEXContext> vexContextPtr;
 
             if (applyVEX) {

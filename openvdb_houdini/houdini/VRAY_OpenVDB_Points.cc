@@ -41,6 +41,7 @@
 #include <GU/GU_Detail.h>
 #include <OP/OP_OperatorTable.h>
 #include <UT/UT_BoundingBox.h>
+#include <UT/UT_Ramp.h>
 #include <VRAY/VRAY_Procedural.h>
 #include <VRAY/VRAY_ProceduralFactory.h>
 
@@ -51,10 +52,16 @@
 #include <openvdb/points/PointGroup.h>
 #include <openvdb_houdini/PointUtils.h>
 
+#include <algorithm>
+#include <sstream>
+#include <string>
+#include <vector>
+
+
 using namespace openvdb;
 using namespace openvdb::points;
-
 namespace hvdb = openvdb_houdini;
+
 
 // mantra renders points with a world-space radius of 0.05 by default
 static const float DEFAULT_PSCALE = 0.05f;
