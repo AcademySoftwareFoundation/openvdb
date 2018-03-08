@@ -33,9 +33,8 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDelete.h>
-
-#include <iostream>
-#include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef _MSC_VER
 #include <windows.h>

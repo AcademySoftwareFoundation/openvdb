@@ -8,6 +8,10 @@
 
 @par
 New features:
+- Added an option to
+  @vdblink::points::deleteFromGroups() points::deleteFromGroups@endlink
+  to delete the groups as well as the points.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 - Added a @c header_test Makefile target that checks library header files
   for dependencies on missing or indirectly included headers.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
@@ -18,6 +22,8 @@ New features:
 
 @par
 Improvements:
+- Added per-test timings to <TT>vdb_test</TT> to help in identifying
+  performance regressions.
 - @vdblink::zeroVal zeroVal@endlink now returns a zero matrix instead of
   an identity matrix for @vdblink::math::Mat4s Mat4s@endlink
   and @vdblink::math::Mat4d Mat4d@endlink, and it is now also defined
@@ -39,6 +45,8 @@ Houdini:
 - Added a Keep&nbsp;Original&nbsp;Geometry toggle to the
   Points&nbsp;Convert&nbsp;SOP and improved the efficiency of point unpacking.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added an option to the Points&nbsp;Delete&nbsp;SOP to delete point groups.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 - Fixed a rare crash when extracting points from a point data primitive.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
 - Added a @b SOP_NodeVDB::evalStdString method that facilitates

@@ -413,10 +413,10 @@ SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
     const bool hasMask = (this->nInputs() == 3);
     changed |= enableParm("mask", hasMask);
     const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
-    changed |= enableParm("invert",    useMask);
-    changed |= enableParm("minmask",   useMask);
-    changed |= enableParm("maxMask",   useMask);
-    changed |= enableParm("maskname",useMask);
+    changed |= enableParm("invert", useMask);
+    changed |= enableParm("minmask", useMask);
+    changed |= enableParm("maxmask", useMask);
+    changed |= enableParm("maskname", useMask);
 
     return changed;
 }

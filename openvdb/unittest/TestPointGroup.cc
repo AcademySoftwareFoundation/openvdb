@@ -33,8 +33,12 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cstdio> // for std::remove()
+#include <cstdlib> // for std::getenv()
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef _MSC_VER
 #include <windows.h>
@@ -46,8 +50,8 @@ using namespace openvdb::points;
 class TestPointGroup: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointGroup);
     CPPUNIT_TEST(testDescriptor);

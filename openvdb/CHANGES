@@ -4,6 +4,9 @@ OpenVDB Version History
 Version 5.1.0 - In development
 
     New features:
+    - Added an option to points::deleteFromGroups() to delete the groups
+      as well as the points.
+      [Contributed by Nick Avramoussis]
     - Added a header_test Makefile target that checks library header files
       for dependencies on missing or indirectly included headers.
       [Contributed by Dan Bailey]
@@ -11,6 +14,8 @@ Version 5.1.0 - In development
       [Contributed by Dan Bailey]
 
     Improvements:
+    - Added per-test timings to vdb_test to help in identifying
+      performance regressions.
     - zeroVal() now returns a zero matrix instead of an identity matrix
       for Mat4s and Mat4d, and it is now also defined (and returns
       a zero matrix) for Mat3s and Mat3d.
@@ -27,6 +32,8 @@ Version 5.1.0 - In development
     - Added a Keep Original Geometry toggle to the Points Convert SOP
       and improved the efficiency of point unpacking.
       [Contributed by Dan Bailey]
+    - Added an option to the Points Delete SOP to delete point groups.
+      [Contributed by Nick Avramoussis]
     - Fixed a rare crash when extracting points from a point data primitive.
       [Contributed by Jeff Lait]
     - Added a SOP_NodeVDB::evalStdString() method that facilitates

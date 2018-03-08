@@ -114,7 +114,7 @@ newSopOperator(OP_OperatorTable* table)
             "groups will be deleted."));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dropgroups", "Drop Points Groups")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Drop the vdb points groups that were used for deletion. This option is "
+        .setHelpText("Drop the VDB points groups that were used for deletion. This option is "
             "ignored if \"invert\" is enabled."));
 
     //////////
@@ -200,10 +200,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
         const bool drop = evalInt("dropgroups", 0, context.getTime());
 
         // select Houdini primitive groups we wish to use
-        const GA_PrimitiveGroup *group =
-            matchGroup(*gdp, evalStdString("group", context.getTime()));
-
-        hvdb::VdbPrimIterator vdbIt(gdp, group);
+        hvdb::VdbPrimIterator vdbIt(gdp,
+            matchGroup(*gdp, evalStdString("group", context.getTime())));
 
         for (; vdbIt; ++vdbIt) {
             if (progress.wasInterrupted()) {
@@ -215,11 +213,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
                     openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
 
             // early exit if the grid is of the wrong type
-            if (!inputGrid)    continue;
+            if (!inputGrid) continue;
 
             // early exit if the tree is empty
             auto leafIter = inputGrid->tree().cbeginLeaf();
-            if (!leafIter)    continue;
+            if (!leafIter) continue;
 
             // extract names of all selected VDB groups
 
@@ -236,10 +234,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
 
             const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
             const bool hasPointsToDrop = std::any_of(pointGroups.begin(), pointGroups.end(),
-                                                    [&descriptor](const std::string &group) ->
-                                                        bool{return descriptor.hasGroup(group);});
+                [&descriptor](const std::string& group) { return descriptor.hasGroup(group); });
 
-            if (!hasPointsToDrop)    continue;
+            if (!hasPointsToDrop) continue;
 
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();

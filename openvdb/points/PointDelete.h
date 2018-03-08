@@ -45,6 +45,11 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 
+#include <memory>
+#include <string>
+#include <vector>
+
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -155,7 +160,7 @@ struct DeleteByFilterOp
                 existingAttributeArrays.push_back(existingArray);
             }
 
-            size_t attributeIndex = 0;
+            Index attributeIndex = 0;
             std::vector<ValueType> endOffsets;
 
             endOffsets.reserve(LeafNodeT::NUM_VALUES);
@@ -171,7 +176,7 @@ struct DeleteByFilterOp
                     }
                     ++attributeIndex;
                 }
-                endOffsets.push_back(ValueType(attributeIndex));
+                endOffsets.push_back(static_cast<ValueType>(attributeIndex));
             }
 
             leaf->replaceAttributeSet(newAttributeSet);
