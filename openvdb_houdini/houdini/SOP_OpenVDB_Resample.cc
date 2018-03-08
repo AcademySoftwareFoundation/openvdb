@@ -44,6 +44,7 @@
 #include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbProcessTypedGridReal()
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
@@ -506,7 +507,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Resample)::cookVDBSop(OP_Conte
                 refGdp = gdp;
             }
             if (refGdp) {
-                refGroup = matchGroup(*gdp, evalStdString("reference", time));
+                refGroup = matchGroup(*refGdp, evalStdString("reference", time));
                 hvdb::VdbPrimCIterator it(refGdp, refGroup);
                 if (it) {
                     refGrid = it->getConstGridPtr();
@@ -526,6 +527,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Resample)::cookVDBSop(OP_Conte
             if (progress.wasInterrupted()) throw std::runtime_error("Was Interrupted");
 
             GU_PrimVDB* vdb = *it;
+
+            if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
+                addWarning(SOP_MESSAGE, "Point data grids cannot currently be resampled, skipping");
+                continue;
+            }
 
             const UT_VDBType valueType = vdb->getStorageType();
 

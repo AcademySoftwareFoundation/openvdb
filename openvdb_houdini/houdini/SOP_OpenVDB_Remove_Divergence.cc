@@ -981,8 +981,13 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remove_Divergence)::cookVDBSop
                         parms.colliderType = CT_STATIC;
                         ColliderMaskOp op;
                         op.mask = ColliderMaskGrid::create();
-                        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
-                            *parms.colliderGrid, op);
+                        if (!UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
+                            *parms.colliderGrid, op)) {
+#if UT_MAJOR_VERSION_INT >= 16
+                            UTvdbProcessTypedGridPoint(UTvdbGetGridType(*parms.colliderGrid),
+                                                        *parms.colliderGrid, op);
+#endif
+                        }
                         parms.colliderGrid = op.mask;
                     }
                 }

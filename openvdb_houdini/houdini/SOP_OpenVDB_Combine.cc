@@ -43,6 +43,7 @@
 #include <openvdb/tools/Morphology.h> // for deactivate()
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/SignedFloodFill.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
@@ -1498,8 +1499,21 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Combine)::combineGrids(
         needLS = needLevelSets(op);
 
     if (!needA && !needB) throw std::runtime_error("nothing to do");
-    if (needA && !aGrid) throw std::runtime_error("missing A grid");
-    if (needB && !bGrid) throw std::runtime_error("missing B grid");
+    if (needA)
+    {
+        if(!aGrid) throw std::runtime_error("missing A grid");
+        else if (aGrid->isType<openvdb::points::PointDataGrid>()) {
+            throw std::runtime_error("Unable to process Point Data Grids.");
+        }
+    }
+
+    if (needB)
+    {
+        if(!bGrid) throw std::runtime_error("missing B grid");
+        else if (bGrid->isType<openvdb::points::PointDataGrid>()) {
+            throw std::runtime_error("Unable to process Point Data Grids.");
+        }
+    }
 
     if (needLS &&
         ((aGrid && aGrid->getGridClass() != openvdb::GRID_LEVEL_SET) ||
