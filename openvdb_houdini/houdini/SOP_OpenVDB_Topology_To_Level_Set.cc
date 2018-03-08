@@ -343,8 +343,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Topology_To_Level_Set)::cookVD
 
         Converter converter(*gdp, boss);
         converter.worldSpaceUnits = evalInt("worldspaceunits", 0, time) != 0;
-        converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
-        converter.bandWidthVoxels = static_cast<int>(evalInt("bandWidth", 0, time));
+        converter.bandWidthWorld = float(evalFloat("bandwidthws", 0, time));
+        converter.bandWidthVoxels = static_cast<int>(evalInt("bandwidth", 0, time));
         converter.closingWidth = static_cast<int>(evalInt("closingwidth", 0, time));
         converter.dilation = static_cast<int>(evalInt("dilation", 0, time));
         converter.smoothingSteps = static_cast<int>(evalInt("smoothingsteps", 0, time));
