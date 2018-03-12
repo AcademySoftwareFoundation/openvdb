@@ -46,7 +46,7 @@
 FIND_PACKAGE( PackageHandleStandardArgs )
 
 FIND_PATH( OPENVDB_LOCATION include/openvdb/version.h 
-  "ENV{OPENVDB_ROOT}"
+  "$ENV{OPENVDB_ROOT}"
   NO_DEFAULT_PATH
   NO_SYSTEM_ENVIRONMENT_PATH
   )
