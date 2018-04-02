@@ -47,6 +47,8 @@ Version 5.1.0 - In development
     - Grid transforms are now more aggressively simplified, making it
       less likely to produce nonuniform voxels erroneously.
       [Contributed by Jeff Lait]
+    - Fixed a bug when copying and pasting a Create SOP that could cause
+      the Voxel Size toggle to change state.
     - Added a houdini_utils::OpFactory::setVerb() method to register
       compilable SOPs.
     - Made SOP_NodeVDB::cookMySop() final (that is, non-overridable)

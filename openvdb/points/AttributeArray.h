@@ -908,7 +908,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
 
 
 template<typename ValueType_, typename Codec_>
-typename TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray&
+TypedAttributeArray<ValueType_, Codec_>&
 TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rhs)
 {
     if (&rhs != this) {

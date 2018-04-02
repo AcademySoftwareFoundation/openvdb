@@ -697,7 +697,8 @@ void
 SOP_OpenVDB_Create::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
-    if (nullptr != obsoleteParms->getParmPtr("matchVoxelSize")) {
+    PRM_Parm* parm = obsoleteParms->getParmPtr("matchVoxelSize");
+    if (parm && !parm->isFactoryDefault()) {
         const bool matchVoxelSize = obsoleteParms->evalInt("matchVoxelSize", 0, /*time=*/0.0);
         setInt("useVoxelSize", 0, 0.0, !matchVoxelSize);
     }

@@ -617,21 +617,21 @@ struct VecTypeDescr
     {
         return
             "The type of a vector determines how transforms are applied to it.\n"
-            "- INVARIANT:\n"
-            "    does not transform (e.g., tuple, uvw, color)\n"
-            "- COVARIANT:\n"
-            "    apply inverse-transpose transformation with w = 0\n"
-            "    and ignore translation (e.g., gradient/normal)\n"
-            "- COVARIANT_NORMALIZE:\n"
-            "    apply inverse-transpose transformation with w = 0\n"
-            "    and ignore translation, vectors are renormalized\n"
-            "    (e.g., unit normal)\n"
-            "- CONTRAVARIANT_RELATIVE:\n"
-            "    apply \"regular\" transformation with w = 0 and ignore\n"
-            "    translation (e.g., displacement, velocity, acceleration)\n"
-            "- CONTRAVARIANT_ABSOLUTE:\n"
-            "    apply \"regular\" transformation with w = 1 so that\n"
-            "    vector translates (e.g., position)";
+            "  - INVARIANT:\n"
+            "      does not transform (e.g., tuple, uvw, color)\n"
+            "  - COVARIANT:\n"
+            "      apply inverse-transpose transformation with w = 0\n"
+            "      and ignore translation (e.g., gradient/normal)\n"
+            "  - COVARIANT_NORMALIZE:\n"
+            "      apply inverse-transpose transformation with w = 0\n"
+            "      and ignore translation, vectors are renormalized\n"
+            "      (e.g., unit normal)\n"
+            "  - CONTRAVARIANT_RELATIVE:\n"
+            "      apply \"regular\" transformation with w = 0 and ignore\n"
+            "      translation (e.g., displacement, velocity, acceleration)\n"
+            "  - CONTRAVARIANT_ABSOLUTE:\n"
+            "      apply \"regular\" transformation with w = 1 so that\n"
+            "      vector translates (e.g., position)\n";
     }
     static pyutil::CStringPair item(int i)
     {

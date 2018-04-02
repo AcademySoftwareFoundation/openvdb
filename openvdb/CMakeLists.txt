@@ -123,7 +123,7 @@ INCLUDE_DIRECTORIES ( . ) # So they can simulate referencing installed headers
 
 IF (WIN32)
   # Because of implicit linking!
-  LINK_DIRECTORIES ( SYSTEM ${Boost_LIBRARY_DIR} )
+  LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
 ENDIF ()
 
 INCLUDE_DIRECTORIES ( SYSTEM ${BLOSC_INCLUDE_DIR} )

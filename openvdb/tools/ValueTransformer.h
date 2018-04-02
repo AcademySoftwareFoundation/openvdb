@@ -646,17 +646,9 @@ public:
     OpAccumulator(const IterT& iter, OpT& op):
         mIsRoot(true),
         mIter(iter),
-////
-        //mOp(&op),
-        //mOrigOp(new OpT(op))
-mOp(NULL),
-mOrigOp(NULL)
-{
-    mOp = &op;
-    mOrigOp = new OpT(op);
-}
-    //{}
-////
+        mOp(&op),
+        mOrigOp(new OpT(op))
+    {}
 
     // When splitting this task, give the subtask a copy of the original functor,
     // not of this task's functor, which might have been modified arbitrarily.
@@ -687,10 +679,7 @@ private:
     const bool mIsRoot;
     const IterT mIter;
     OpT* mOp; // pointer to original functor, which might get modified
-////
-    //OpT const * const mOrigOp; // const copy of original functor
-OpT const * mOrigOp; // const copy of original functor
-////
+    OpT const * const mOrigOp; // const copy of original functor
 }; // class OpAccumulator
 
 } // namespace valxform

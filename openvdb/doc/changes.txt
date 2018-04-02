@@ -60,6 +60,8 @@ Houdini:
 - Grid transforms are now more aggressively simplified, making it less likely
   to produce nonuniform voxels erroneously.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a bug when copying and pasting a Create&nbsp;SOP that could cause
+  the Voxel&nbsp;Size toggle to change state.
 - Added a @b houdini_utils::OpFactory::setVerb method to register
   <A HREF="http://www.sidefx.com/docs/houdini/model/compile">
   compilable</A>&nbsp;SOPs.
