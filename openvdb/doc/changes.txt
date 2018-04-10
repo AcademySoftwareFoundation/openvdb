@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v5_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.1.0</B> - <I>In development</I>
+<B>Version 5.1.0</B> - <I>April 10, 2018</I>
 
 @par
 New features:

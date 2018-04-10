@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 5.1.0 - In development
+Version 5.1.0 - April 10, 2018
 
     New features:
     - Added an option to points::deleteFromGroups() to delete the groups

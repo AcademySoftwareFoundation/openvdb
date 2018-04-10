@@ -36,12 +36,12 @@ import os, os.path
 import sys
 import unittest
 try:
-    import pyopenvdb as openvdb
-except ImportError:
     import studioenv
     from studio.ani import Ani
     from studio import logging
     from studio import openvdb
+except ImportError:
+    import pyopenvdb as openvdb
 
 
 def valueFactory(zeroValue, elemValue):
