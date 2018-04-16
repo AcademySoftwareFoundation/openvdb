@@ -921,7 +921,8 @@ PointDataGrid::Ptr
 convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
                               const int compression,
                               const AttributeInfoMap& attributes,
-                              const math::Transform& transform)
+                              const math::Transform& transform,
+                              const WarnFunc& warnings)
 {
     using HoudiniPositionAttribute = HoudiniReadAttribute<Vec3d>;
 
@@ -1312,8 +1313,8 @@ convertPointDataGridToHoudini(
 
 void
 populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
-                            std::vector<std::string>& warnings,
-                            const GU_Detail& detail)
+                            const GU_Detail& detail,
+                            const WarnFunc& warnings)
 {
     using namespace openvdb::math;
 
@@ -1349,7 +1350,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 std::stringstream ss;
                 ss << "Detail attribute \"" << attribute->getName() << "\" " <<
                     "unsupported vector type for metadata conversion.";
-                warnings.push_back(ss.str().c_str());
+                warnings(ss.str());
                 continue;
             }
             UT_ASSERT(metadata);
@@ -1365,7 +1366,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 std::stringstream ss;
                 ss << "Detail attribute \"" << attribute->getName() << "\" " <<
                     "unsupported quaternion type for metadata conversion.";
-                warnings.push_back(ss.str().c_str());
+                warnings(ss.str());
                 continue;
             }
         } else if (isMatrix3) {
@@ -1379,7 +1380,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 std::stringstream ss;
                 ss << "Detail attribute \"" << attribute->getName() << "\" " <<
                     "unsupported matrix3 type for metadata conversion.";
-                warnings.push_back(ss.str().c_str());
+                warnings(ss.str());
                 continue;
             }
         } else if (isMatrix4) {
@@ -1393,7 +1394,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                 std::stringstream ss;
                 ss << "Detail attribute \"" << attribute->getName() << "\" " <<
                     "unsupported matrix4 type for metadata conversion.";
-                warnings.push_back(ss.str().c_str());
+                warnings(ss.str());
                 continue;
             }
         } else {
@@ -1418,7 +1419,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
                     std::stringstream ss;
                     ss << "Detail attribute \"" << attribute->getName() << "\" " <<
                         "unsupported type for metadata conversion.";
-                    warnings.push_back(ss.str().c_str());
+                    warnings(ss.str());
                     continue;
                 }
                 UT_ASSERT(metadata);
@@ -1438,7 +1439,7 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
 void
 convertMetadataToHoudini(GU_Detail& detail,
                          const openvdb::MetaMap& metaMap,
-                         std::vector<std::string>& warnings)
+                         const WarnFunc& warnings)
 {
     struct Local {
         static bool isGlobalMetadata(const Name& name) {
@@ -1561,7 +1562,7 @@ convertMetadataToHoudini(GU_Detail& detail,
             std::stringstream ss;
             ss << "Metadata value \"" << key
                 << "\" unsupported type for detail attribute conversion.";
-            warnings.push_back(ss.str());
+            warnings(ss.str());
         }
     }
 }

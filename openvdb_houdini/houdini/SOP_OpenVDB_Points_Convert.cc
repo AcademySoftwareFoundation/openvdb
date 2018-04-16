@@ -759,13 +759,12 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         geo, *grid, emptyNameVector, includeGroups, excludeGroups);
 
                     const MetaMap& metaMap = *grid;
-                    std::vector<std::string> warnings;
-                    hvdb::convertMetadataToHoudini(geo, metaMap, warnings);
-                    if (warnings.size() > 0) {
-                        for (const auto& warning: warnings) {
-                            addWarning(SOP_MESSAGE, warning.c_str());
-                        }
-                    }
+
+                    hvdb::WarnFunc warnFunction = [this](const std::string& msg) {
+                        this->addWarning(SOP_MESSAGE, msg.c_str());
+                    };
+
+                    hvdb::convertMetadataToHoudini(geo, metaMap, warnFunction);
 
                     gdp->merge(geo);
                 }

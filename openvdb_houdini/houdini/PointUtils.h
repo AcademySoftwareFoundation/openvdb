@@ -71,6 +71,7 @@ using OffsetPairListPtr = std::shared_ptr<OffsetPairList>;
 
 using AttributeInfoMap = std::map<openvdb::Name, std::pair<int, bool>>;
 
+using WarnFunc = std::function<void (const std::string&)>;
 
 /// Metadata name for viewport groups
 const std::string META_GROUP_VIEWPORT = "group_viewport";
@@ -122,6 +123,7 @@ convertHoudiniToPointDataGrid(
     const int compression,
     const AttributeInfoMap& attributes,
     const openvdb::math::Transform& transform);
+    const WarnFunc& warnings = [](const std::string&){});
 
 
 /// @brief Convert a VDB Points grid into Houdini points and append them to a Houdini Detail
@@ -155,8 +157,8 @@ OPENVDB_HOUDINI_API
 void
 populateMetadataFromHoudini(
     openvdb::points::PointDataGrid& grid,
-    std::vector<std::string>& warnings,
-    const GU_Detail& detail);
+    const GU_Detail& detail,
+    const WarnFunc& warnings = [](const std::string&){});
 
 
 /// @brief Convert VDB Points grid metadata into Houdini detail attributes
@@ -169,7 +171,7 @@ void
 convertMetadataToHoudini(
     GU_Detail& detail,
     const openvdb::MetaMap& metaMap,
-    std::vector<std::string>& warnings);
+    const WarnFunc& warnings = [](const std::string&){});
 
 
 /// @brief Returns supported tuple sizes for conversion from GA_Attribute
