@@ -117,6 +117,36 @@ Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name,
     const bool inCoreOnly = false);
 
 
+/// @brief Total points in a tree which are included by a filter
+/// @param tree PointDataTree.
+/// @param filter Filter of the specified template type
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterPointCount(const PointDataTreeT& tree,
+    const FilterT& filter,
+    const bool inCoreOnly = false);
+
+
+/// @brief Total active points in a tree which are included by a filter
+/// @param tree PointDataTree.
+/// @param filter Filter of the specified template type
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterActivePointCount(const PointDataTreeT& tree,
+    const FilterT& filter,
+    const bool inCoreOnly = false);
+
+
+/// @brief Total inactive points in a tree which are included by a filter
+/// @param tree PointDataTree.
+/// @param filter Filter of the specified template type
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterInactivePointCount(const PointDataTreeT& tree,
+    const FilterT& filter,
+    const bool inCoreOnly = false);
+
+
 /// @brief Generate a new grid with voxel values to store the number of points per voxel
 /// @param grid             the PointDataGrid to use to compute the count grid
 /// @param includeGroups    a vector of VDB Points groups to be included (default is all).
@@ -200,34 +230,33 @@ Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
     return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
 }
 
+/// @note  The following functions have been moved out of the point_count_internal
+///        namespace
 
 template <typename PointDataTreeT, typename FilterT>
-Index64 filterPointCount(const PointDataTreeT& tree,
+OPENVDB_DEPRECATED Index64 filterPointCount(const PointDataTreeT& tree,
                          const FilterT& filter,
                          const bool inCoreOnly = false)
 {
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueAllCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
+    return points::filterPointCount<PointDataTreeT, FilterT>(tree, filter, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT, typename FilterT>
-Index64 filterActivePointCount( const PointDataTreeT& tree,
+OPENVDB_DEPRECATED Index64 filterActivePointCount(const PointDataTreeT& tree,
                                 const FilterT& filter,
                                 const bool inCoreOnly = false)
 {
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOnCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
+    return points::filterActivePointCount<PointDataTreeT, FilterT>(tree, filter, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT, typename FilterT>
-Index64 filterInactivePointCount(   const PointDataTreeT& tree,
+OPENVDB_DEPRECATED Index64 filterInactivePointCount(const PointDataTreeT& tree,
                                     const FilterT& filter,
                                     const bool inCoreOnly = false)
 {
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOffCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
+    return points::filterInactivePointCount<PointDataTreeT, FilterT>(tree, filter, inCoreOnly);
 }
 
 
@@ -276,6 +305,39 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 }
 
 
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterPointCount(const PointDataTreeT& tree,
+                         const FilterT& filter,
+                         const bool inCoreOnly)
+{
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueAllCIter;
+    return point_count_internal::threadedFilterPointCount<PointDataTreeT, FilterT, ValueIterT>(tree,
+        filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterActivePointCount(const PointDataTreeT& tree,
+                               const FilterT& filter,
+                               const bool inCoreOnly)
+{
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOnCIter;
+    return point_count_internal::threadedFilterPointCount<PointDataTreeT, FilterT, ValueIterT>(tree,
+        filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT, typename FilterT>
+Index64 filterInactivePointCount(const PointDataTreeT& tree,
+                                 const FilterT& filter,
+                                 const bool inCoreOnly)
+{
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOffCIter;
+    return point_count_internal::threadedFilterPointCount<PointDataTreeT, FilterT, ValueIterT>(tree,
+        filter, inCoreOnly);
+}
+
+
 template <typename PointDataTreeT>
 Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
@@ -284,7 +346,7 @@ Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool
         return Index64(0);
     }
     GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterPointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
+    return filterPointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
 
@@ -296,7 +358,7 @@ Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, cons
         return Index64(0);
     }
     GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterActivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
+    return filterActivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
 
@@ -308,7 +370,7 @@ Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, co
         return Index64(0);
     }
     GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
+    return filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
 }
 
 
