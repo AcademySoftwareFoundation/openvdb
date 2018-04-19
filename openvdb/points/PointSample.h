@@ -318,7 +318,7 @@ private:
 } // namespace point_sample_internal
 
 
-template <typename SourceGridT, typename PointDataGridT, size_t Order = 1>
+template <typename SourceGridT, typename PointDataGridT, size_t Order>
 inline void sampleGrid(PointDataGridT& points,
                        const SourceGridT& sourceGrid,
                        const Name& targetAttribute,
