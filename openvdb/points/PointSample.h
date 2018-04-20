@@ -82,20 +82,15 @@ namespace point_sample_internal {
 template<typename SamplerT,
          typename AccessorT,
          typename TargetValueT,
-         typename PositionT = Vec3f,
          typename PointFilterT = points::NullFilter,
-         typename CodecT = points::UnknownCodec,
          typename PointDataTreeT = points::PointDataTree,
          bool Transform = false>
 class PointSampleOp
 {
 public:
     using LeafManagerT = tree::LeafManager<PointDataTreeT>;
-    using PointDataLeafNodeT = typename PointDataTreeT::LeafNodeType;
-    using PointIteratorT = IndexIter<points::ValueVoxelCIter, PointFilterT>;
-
-    using PositionAttributeHandleT = AttributeHandle<PositionT, CodecT>;
-    using TargetAttributeHandleT = AttributeWriteHandle<TargetValueT>;
+    using PositionHandleT = AttributeHandle<Vec3f>;
+    using TargetHandleT = AttributeWriteHandle<TargetValueT>;
 
     PointSampleOp(const AccessorT& sourceAccessor,
                   const size_t positionAttributeIndex,
@@ -118,50 +113,35 @@ public:
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
-        PointFilterT filterCopy(mFilter);
-
         for (auto leaf = range.begin(); leaf; ++leaf) {
-            // get the relevant point data attribute arrays for the voxel in question
-            typename PositionAttributeHandleT::Ptr positionHandle =
-                PositionAttributeHandleT::create(
-                    leaf->constAttributeArray(mPositionAttributeIndex));
+            PositionHandleT::Ptr positionHandle =
+                PositionHandleT::create(leaf->constAttributeArray(mPositionAttributeIndex));
+            typename TargetHandleT::Ptr targetHandle =
+                TargetHandleT::create(leaf->attributeArray(mTargetAttributeIndex));
 
-            typename TargetAttributeHandleT::Ptr targetHandle =
-                TargetAttributeHandleT::create(
-                    leaf->attributeArray(mTargetAttributeIndex));
+            for (auto iter = leaf->beginIndexOn(mFilter); iter; ++iter) {
 
-            filterCopy.reset(*leaf);
+                const Index index = *iter;
+                const Vec3d coord = iter.getCoord().asVec3d();
 
-            for (auto voxel = leaf->cbeginValueOn(); voxel; ++voxel) {
-                const Coord& coord = voxel.getCoord();
+                // get the position in index space. Do this in double precision to make sure
+                // we doesn't move points which are close to the -0.5/0.5 boundary into other
+                // voxels when doing a staggered offset by 0.5
 
-                PointIteratorT iter(leaf->beginValueVoxel(coord), filterCopy);
-                if (!iter) continue;
+                Vec3d position = Vec3d(positionHandle->get(index)) + coord;
 
-                const Vec3d coordVec3d = coord.asVec3d();
+                // transform it to source index space if transforms differ
 
-                for (; iter; ++iter) {
-                    const Index index = *iter;
-
-                    // get the position in index space. Do this in double precision to make sure
-                    // we doesn't move points which are close to the -0.5/0.5 boundary into other
-                    // voxels when doing a staggered offset by 0.5
-
-                    Vec3d position = Vec3d(positionHandle->get(index)) + coordVec3d;
-
-                    // transform it to source index space if transforms differ
-
-                    if (Transform) {
-                        Vec3d worldPosition = mPointDataGridTransform->indexToWorld(position);
-                        position = mSourceGridTransform->worldToIndex(worldPosition);
-                    }
-
-                    // Sample the grid at samplePosition
-                    typename AccessorT::ValueType sample =
-                        SamplerT::sample(mSourceAccessor, position);
-
-                    targetHandle->set(index, static_cast<TargetValueT>(sample));
+                if (Transform) {
+                    Vec3d worldPosition = mPointDataGridTransform->indexToWorld(position);
+                    position = mSourceGridTransform->worldToIndex(worldPosition);
                 }
+
+                // Sample the grid at samplePosition
+                typename AccessorT::ValueType sample =
+                    SamplerT::sample(mSourceAccessor, position);
+
+                targetHandle->set(index, static_cast<TargetValueT>(sample));
             }
         }
     }
@@ -239,15 +219,15 @@ public:
             using SamplerT = tools::Sampler<Order, SourceGridTraits::IsVec>;
 
             if (pointTransform != sourceTransform) {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, Vec3f, PointFilterT,
-                    UnknownCodec, PointDataTreeT, true>
+                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
+                    PointDataTreeT, true>
                     op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
                        &pointTransform, &sourceTransform);
                 tbb::parallel_for(leafManager.leafRange(), op);
             }
             else {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, Vec3f, PointFilterT,
-                    UnknownCodec, PointDataTreeT>
+                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
+                    PointDataTreeT>
                     op(sourceGridAccessor, positionIndex, targetIndex, mFilter);
                 tbb::parallel_for(leafManager.leafRange(), op);
             }
@@ -256,15 +236,15 @@ public:
             using SamplerT = tools::Sampler<Order, false>;
 
             if (pointTransform != sourceTransform) {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, Vec3f, PointFilterT,
-                    UnknownCodec, PointDataTreeT, true>
+                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
+                    PointDataTreeT, true>
                     op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
                         &pointTransform, &sourceTransform);
                 tbb::parallel_for(leafManager.leafRange(), op);
             }
             else {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, Vec3f, PointFilterT,
-                    UnknownCodec, PointDataTreeT>
+                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
+                    PointDataTreeT>
                     op(sourceGridAccessor, positionIndex, targetIndex, mFilter);
                 tbb::parallel_for(leafManager.leafRange(), op);
             }
