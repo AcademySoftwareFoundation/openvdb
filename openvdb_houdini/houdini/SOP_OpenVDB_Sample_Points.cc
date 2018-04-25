@@ -95,35 +95,71 @@ protected:
 namespace {  // anon namespace for the sampler
 
 using WarnFunc = std::function<void (const std::string&)>;
+using PointGridPtrVec = std::vector<openvdb::points::PointDataGrid::Ptr>;
 
-template <typename GridT, size_t Order = 1>
-void sampleToVdbPointsGrids(
-    const GU_PrimVDB* vdb,
-    const std::string& attributeName,
-    const std::vector<std::string>& includeGroups,
-    const std::vector<std::string>& excludeGroups,
-    const WarnFunc& warnFunction,
-    std::vector<openvdb::points::PointDataGrid::Ptr>& pointGrids
-    )
+struct VDBPointsSampler
 {
-    for (auto& pointGrid : pointGrids) {
-        assert(pointGrid);
-        auto& gridTree = pointGrid->tree();
-        auto leaf = gridTree.cbeginLeaf();
+    VDBPointsSampler(PointGridPtrVec& points,
+                     const std::vector<std::string>& includeGroups,
+                     const std::vector<std::string>& excludeGroups,
+                     const WarnFunc& warnFunc)
+        : mPointGrids(points)
+        , mIncludeGroups(includeGroups)
+        , mExcludeGroups(excludeGroups)
+        , mWarnFunction(warnFunc) {}
 
-        if (!leaf)  continue;
-
-        if (leaf->attributeSet().find(attributeName) !=
-            cvdb::points::AttributeSet::INVALID_POS) {
-            warnFunction("Attribute \"" + attributeName + "\" already exists in vdb grid");
+    template <typename GridType>
+    inline void
+    pointSample(const hvdb::Grid& sourceGrid,
+                const std::string& attributeName,
+                UT_AutoInterrupt* interrupter)
+    {
+        warnOnExisting(attributeName);
+        const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
+        for (auto& pointGrid : mPointGrids) {
+            cvdb::points::pointSample<GridType, cvdb::points::PointDataGrid, UT_AutoInterrupt>
+                (*pointGrid, grid, attributeName, mIncludeGroups,
+                    mExcludeGroups, interrupter);
         }
-        typename GridT::ConstPtr sourceGridPtr =
-            cvdb::gridConstPtrCast<GridT>(vdb->getConstGridPtr());
-        cvdb::points::sampleGrid<GridT, cvdb::points::PointDataGrid, Order>(*pointGrid,
-            *sourceGridPtr, attributeName, includeGroups,
-            excludeGroups);
     }
-}
+
+    template <typename GridType>
+    inline void
+    boxSample(const hvdb::Grid& sourceGrid,
+              const std::string& attributeName,
+              UT_AutoInterrupt* interrupter)
+    {
+        warnOnExisting(attributeName);
+        const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
+        for (auto& pointGrid : mPointGrids) {
+            cvdb::points::boxSample<GridType, cvdb::points::PointDataGrid, UT_AutoInterrupt>
+                (*pointGrid, grid, attributeName, mIncludeGroups,
+                    mExcludeGroups, interrupter);
+        }
+    }
+
+private:
+
+    inline void
+    warnOnExisting(const std::string& attributeName) const
+    {
+        for (const auto& pointGrid : mPointGrids) {
+            assert(pointGrid);
+            const auto leaf = pointGrid->tree().cbeginLeaf();
+            if (!leaf)  continue;
+            if (leaf->hasAttribute(attributeName)) {
+                mWarnFunction("Attribute \"" + attributeName +
+                    "\" already exists in vdb points grid \"" +
+                    pointGrid->getName() + "\"");
+            }
+        }
+    }
+
+    const PointGridPtrVec& mPointGrids;
+    const std::vector<std::string>& mIncludeGroups;
+    const std::vector<std::string>& mExcludeGroups;
+    const WarnFunc& mWarnFunction;
+};
 
 template <bool staggered = false>
 struct BoxSampler {
@@ -310,13 +346,13 @@ newSopOperator(OP_OperatorTable* table)
 
     // rename "vel" attribute to "v"
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "renamevel", "Rename Vel To V")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("When toggled on, if the input VDB's name is vel, "
-            "rename the VDB points attribute to v"));
+            "rename the points attribute to v"));
 
     // warn if attempting to overwrite existing attribute
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "attributeexists", "Attribute Exists Warning")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("When enabled, the SOP displays a warning when the attribute being sampled "
             " into already exists on the points."));
 
@@ -408,8 +444,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
         // total number of points in vdb grids - this is used when verbose execution is
         // requested, but will otherwise remain 0
         size_t nVDBPoints = 0;
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
+        std::vector<std::string> includeGroups, excludeGroups;
         UT_String vdbPointsGroups;
 
         // obtain names of vdb point groups to include / exclude
@@ -421,7 +456,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
 
         // extract VDB points grids
 
-        std::vector<cvdb::points::PointDataGrid::Ptr> pointGrids;
+        PointGridPtrVec pointGrids;
 
         for (openvdb_houdini::VdbPrimIterator it(gdp); it; ++it) {
             GU_PrimVDB* vdb = *it;
@@ -449,7 +484,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                 }
             }
 
-            pointGrids.push_back(pointDataGrid);
+            pointGrids.emplace_back(pointDataGrid);
         }
 
         const GA_Size nPoints = aGdp->getNumPoints();
@@ -493,6 +528,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
         tbb::tick_count time_start = tbb::tick_count::now();
         UT_AutoInterrupt progress("Sampling from VDB grids");
 
+        VDBPointsSampler vdbPointsSampler(pointGrids, includeGroups, excludeGroups, warnFunction);
 
         for (hvdb::VdbPrimCIterator it(bGdp, group); it; ++it) {
             if (progress.wasInterrupted()) {
@@ -556,20 +592,14 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                         grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                     theSampler.sample();
 
-                    // loop over vdb point grids
-                    sampleToVdbPointsGrids<cvdb::FloatGrid>(vdb, attributeName,
-                        includeGroups, excludeGroups,
-                        warnFunction, pointGrids);
-
+                    vdbPointsSampler.boxSample<cvdb::FloatGrid>(grid, attributeName, &scalarInterrupt);
                 } else {
                     // double scalar
                     PointSampler<cvdb::DoubleGrid, GA_RWPageHandleF> theSampler(
                         grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                     theSampler.sample();
 
-                    sampleToVdbPointsGrids<cvdb::DoubleGrid>(vdb, attributeName,
-                        includeGroups, excludeGroups,
-                        warnFunction, pointGrids);
+                    vdbPointsSampler.boxSample<cvdb::DoubleGrid>(grid, attributeName, &scalarInterrupt);
                 }
 
             } else if (gridType == UT_VDB_INT32 || gridType == UT_VDB_INT64) {
@@ -598,18 +628,15 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                     PointSampler<cvdb::Int32Grid, GA_RWPageHandleF, false, true>
                         theSampler(grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                     theSampler.sample();
-                    sampleToVdbPointsGrids<cvdb::Int32Grid, 0>(vdb, attributeName,
-                        includeGroups, excludeGroups,
-                        warnFunction, pointGrids);
 
+                    vdbPointsSampler.pointSample<cvdb::Int32Grid>(grid, attributeName, &scalarInterrupt);
 
                 } else {
                     PointSampler<cvdb::Int64Grid, GA_RWPageHandleF, false, true>
                         theSampler(grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                     theSampler.sample();
-                    sampleToVdbPointsGrids<cvdb::Int64Grid, 0>(vdb, attributeName,
-                        includeGroups, excludeGroups,
-                        warnFunction, pointGrids);
+
+                    vdbPointsSampler.pointSample<cvdb::Int64Grid>(grid, attributeName, &scalarInterrupt);
                 }
 
             } else if (gridType == UT_VDB_VEC3F || gridType == UT_VDB_VEC3D) {
@@ -628,6 +655,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                 }
                 aGdp->addVariableName(attributeName.c_str(), attributeVariableName.c_str());
 
+                std::unique_ptr<UT_AutoInterrupt> interrupter;
+
                 // user feedback
                 if (grid.getGridClass() != cvdb::GRID_STAGGERED) {
                     // regular (non-staggered) vec3 grid
@@ -636,24 +665,19 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                             << grid.valueType() << std::endl;
                     }
 
-                    UT_AutoInterrupt vectorInterrupt("Sampling from VDB vector-type grids");
+                    interrupter.reset(new UT_AutoInterrupt("Sampling from VDB vector-type grids"));
+
                     // do the sampling
-                if (gridType == UT_VDB_VEC3F) {
+                    if (gridType == UT_VDB_VEC3F) {
                         // Vec3f
                         PointSampler<cvdb::Vec3fGrid, GA_RWPageHandleV3> theSampler(
-                            grid, threaded, aGdp, attribHandle, &vectorInterrupt);
+                            grid, threaded, aGdp, attribHandle, interrupter.get());
                         theSampler.sample();
-                        sampleToVdbPointsGrids<cvdb::Vec3fGrid>(vdb, attributeName,
-                            includeGroups, excludeGroups,
-                            warnFunction, pointGrids);
                     } else {
                         // Vec3d
                         PointSampler<cvdb::Vec3dGrid, GA_RWPageHandleV3> theSampler(
-                            grid, threaded, aGdp, attribHandle, &vectorInterrupt);
+                            grid, threaded, aGdp, attribHandle, interrupter.get());
                         theSampler.sample();
-                        sampleToVdbPointsGrids<cvdb::Vec3dGrid>(vdb, attributeName,
-                            includeGroups, excludeGroups,
-                            warnFunction, pointGrids);
                     }
                 } else {
                     // staggered grid case
@@ -662,25 +686,29 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                             << grid.valueType() << std::endl;
                     }
 
-                    UT_AutoInterrupt vectorInterrupt("Sampling from VDB vector-type staggered grids");
+                    interrupter.reset(new UT_AutoInterrupt("Sampling from VDB vector-type staggered grids"));
+
                     // do the sampling
                     if (grid.isType<cvdb::Vec3fGrid>()) {
                         // Vec3f
                         PointSampler<cvdb::Vec3fGrid, GA_RWPageHandleV3, true> theSampler(
-                            grid, threaded, aGdp, attribHandle, &vectorInterrupt);
+                            grid, threaded, aGdp, attribHandle, interrupter.get());
                         theSampler.sample();
-                        sampleToVdbPointsGrids<cvdb::Vec3fGrid>(vdb, attributeName,
-                            includeGroups, excludeGroups,
-                            warnFunction, pointGrids);
                     } else {
                         // Vec3d
                         PointSampler<cvdb::Vec3dGrid, GA_RWPageHandleV3, true> theSampler(
-                            grid, threaded, aGdp, attribHandle, &vectorInterrupt);
+                            grid, threaded, aGdp, attribHandle, interrupter.get());
                         theSampler.sample();
-                        sampleToVdbPointsGrids<cvdb::Vec3dGrid>(vdb, attributeName,
-                            includeGroups, excludeGroups,
-                            warnFunction, pointGrids);
                     }
+                }
+
+                // staggered vector sampling is handled within the core library for vdb points
+
+                if (gridType == UT_VDB_VEC3F) {
+                    vdbPointsSampler.boxSample<cvdb::Vec3fGrid>(grid, attributeName, interrupter.get());
+                }
+                else {
+                    vdbPointsSampler.boxSample<cvdb::Vec3dGrid>(grid, attributeName, interrupter.get());
                 }
             } else {
                 std::cout << "Skipping grid " << gridName << " of unknown type" << std::endl;

@@ -77,7 +77,7 @@ testAttribute(points::PointDataGrid& points, const std::string& attributeName,
 
     grid->setTransform(xform);
     grid->tree().setValue(Coord(0,0,0), val);
-    points::sampleGrid<GridT>(points, *grid, attributeName);
+    points::boxSample<GridT>(points, *grid, attributeName);
 
     return(points::AttributeHandle<ValueType>::create(
         points.tree().cbeginLeaf()->attributeArray(attributeName)));
@@ -179,7 +179,7 @@ TestPointSample::testPointSample()
 
         VectorGrid::Ptr testGrid = VectorGrid::create();
 
-        points::sampleGrid<Vec3fGrid>(*points, *testGrid, "test");
+        points::boxSample<Vec3fGrid>(*points, *testGrid, "test");
 
         points::AttributeHandle<Vec3f>::Ptr handle =
             points::AttributeHandle<Vec3f>::create(
@@ -201,7 +201,7 @@ TestPointSample::testPointSample()
 
         points::appendAttribute<float>(points->tree(), "test");
 
-        CPPUNIT_ASSERT_NO_THROW(points::sampleGrid<FloatGrid>(*points, *testGrid, "test"));
+        CPPUNIT_ASSERT_NO_THROW(points::boxSample<FloatGrid>(*points, *testGrid, "test"));
     }
 
     {
@@ -217,7 +217,24 @@ TestPointSample::testPointSample()
         FloatGrid::Ptr testGrid = FloatGrid::create(1.0);
 
         CPPUNIT_ASSERT_THROW_MESSAGE("Cannot sample onto the \"P\" attribute",
-            points::sampleGrid<FloatGrid>(*points, *testGrid, "P"), RuntimeError);
+            points::boxSample<FloatGrid>(*points, *testGrid, "P"), RuntimeError);
+
+        // name of the grid is used if no attribute is provided
+
+        testGrid->setName("test_grid");
+
+        CPPUNIT_ASSERT(!points->tree().cbeginLeaf()->hasAttribute("test_grid"));
+
+        points::boxSample<FloatGrid>(*points, *testGrid);
+
+        CPPUNIT_ASSERT(points->tree().cbeginLeaf()->hasAttribute("test_grid"));
+
+        // name fails if the grid is called "P"
+
+        testGrid->setName("P");
+
+        CPPUNIT_ASSERT_THROW_MESSAGE("Cannot sample onto the \"P\" attribute",
+            points::boxSample<FloatGrid>(*points, *testGrid), RuntimeError);
     }
 
     {
@@ -251,7 +268,7 @@ TestPointSample::testPointSample()
 
         // check nearest-neighbour sampling
 
-        points::sampleGrid<FloatGrid, PointDataGrid, 0>(*points, *testGrid, "test");
+        points::pointSample<FloatGrid>(*points, *testGrid, "test");
 
         float expected = tools::PointSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
@@ -263,7 +280,7 @@ TestPointSample::testPointSample()
 
         // check tri-linear sampling
 
-        points::sampleGrid<FloatGrid, PointDataGrid, 1>(*points, *testGrid, "test");
+        points::boxSample<FloatGrid, PointDataGrid>(*points, *testGrid, "test");
 
         expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
@@ -275,7 +292,7 @@ TestPointSample::testPointSample()
 
         // check tri-quadratic sampling
 
-        points::sampleGrid<FloatGrid, PointDataGrid, 2>(*points, *testGrid, "test");
+        points::quadraticSample<FloatGrid, PointDataGrid>(*points, *testGrid, "test");
 
         expected = tools::QuadraticSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
@@ -317,7 +334,7 @@ TestPointSample::testPointSample()
 
         // nearest-neighbour staggered sampling
 
-        points::sampleGrid<Vec3fGrid, PointDataGrid, 0>(*points, *testGrid, "test");
+        points::pointSample<Vec3fGrid>(*points, *testGrid, "test");
 
         Vec3f expected = tools::StaggeredPointSampler::sample(testGridAccessor,
             Vec3f(0.03f, 0.0f, 0.0f));
@@ -330,7 +347,7 @@ TestPointSample::testPointSample()
 
         // tri-linear staggered sampling
 
-        points::sampleGrid<Vec3fGrid, PointDataGrid, 1>(*points, *testGrid, "test");
+        points::boxSample<Vec3fGrid>(*points, *testGrid, "test");
 
         expected = tools::StaggeredBoxSampler::sample(testGridAccessor,
             Vec3f(0.03f, 0.0f, 0.0f));
@@ -343,7 +360,7 @@ TestPointSample::testPointSample()
 
         // tri-quadratic staggered sampling
 
-        points::sampleGrid<Vec3fGrid, PointDataGrid, 2>(*points, *testGrid, "test");
+        points::quadraticSample<Vec3fGrid>(*points, *testGrid, "test");
 
         expected = tools::StaggeredQuadraticSampler::sample(testGridAccessor,
           Vec3f(0.03f, 0.0f, 0.0f));
@@ -376,7 +393,7 @@ TestPointSample::testPointSample()
         testFloatGrid->tree().setValue(Coord(0,1,0), 3.0f);
 
         points::appendAttribute<int>(points->tree(), "testint");
-        points::sampleGrid<FloatGrid>(*points, *testFloatGrid, "testint");
+        points::boxSample<FloatGrid>(*points, *testFloatGrid, "testint");
         points::AttributeHandle<int>::Ptr handle = points::AttributeHandle<int>::create(
             points->tree().cbeginLeaf()->attributeArray("testint"));
 
@@ -401,7 +418,7 @@ TestPointSample::testPointSample()
         testVec3fGrid->tree().setValue(Coord(0,1,0), Vec3f(2.0f, 3.0f, 4.0f));
 
         points::appendAttribute<Vec3i>(points->tree(), "testvec3i");
-        points::sampleGrid<Vec3fGrid>(*points, *testVec3fGrid, "testvec3i");
+        points::boxSample<Vec3fGrid>(*points, *testVec3fGrid, "testvec3i");
         points::AttributeHandle<Vec3i>::Ptr handle2 = points::AttributeHandle<Vec3i>::create(
             points->tree().cbeginLeaf()->attributeArray("testvec3i"));
 
@@ -446,7 +463,7 @@ TestPointSample::testPointSampleWithGroups()
     group1Handle.set(2, true);
 
     points::appendAttribute<double>(points->tree(), "test_include");
-    points::sampleGrid<DoubleGrid>(*points, *testGrid, "test_include",
+    points::boxSample<DoubleGrid>(*points, *testGrid, "test_include",
         std::vector<std::string>({"group1"}),
         std::vector<std::string>());
 
@@ -469,7 +486,7 @@ TestPointSample::testPointSampleWithGroups()
 
     // test with group treated as "exclusion" group
 
-    points::sampleGrid<DoubleGrid>(*points, *testGrid, "test_exclude",
+    points::boxSample<DoubleGrid>(*points, *testGrid, "test_exclude",
         std::vector<std::string>(),
         std::vector<std::string>({"group1"}));
 
