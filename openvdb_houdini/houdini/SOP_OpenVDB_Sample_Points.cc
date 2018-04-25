@@ -444,7 +444,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                         leaf->attributeSet());
 
                     nVDBPoints +=
-                        cvdb::points::filterPointCount<cvdb::points::PointDataTree,
+                        cvdb::points::point_count_internal::filterPointCount<cvdb::points::PointDataTree,
                             cvdb::points::MultiGroupFilter>(pointDataGrid->tree(), filter);
                 }
             }

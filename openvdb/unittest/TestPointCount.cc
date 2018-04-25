@@ -59,14 +59,12 @@ public:
 
     CPPUNIT_TEST_SUITE(TestPointCount);
     CPPUNIT_TEST(testCount);
-    CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testGroup);
     CPPUNIT_TEST(testOffsets);
     CPPUNIT_TEST(testCountGrid);
     CPPUNIT_TEST_SUITE_END();
 
     void testCount();
-    void testFilter();
     void testGroup();
     void testOffsets();
     void testCountGrid();
@@ -112,6 +110,8 @@ TestPointCount::testCount()
     leaf.setOffsetOn(1, 7);
 
     ValueVoxelCIter voxelIter = leaf.beginValueVoxel(openvdb::Coord(0, 0, 0));
+
+    IndexIter<ValueVoxelCIter, NullFilter> testIter(voxelIter, NullFilter());
 
     leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0));
 
@@ -212,92 +212,6 @@ TestPointCount::testCount()
     CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
 }
 
-
-void
-TestPointCount::testFilter()
-{
-    using namespace openvdb::math;
-
-    const float voxelSize(1.0);
-    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
-
-    // five points
-
-    std::vector<Vec3s> positions{{1, 1, 1}, {1, 3, 1}, {2, 3, 1}, {3, 1, 1}, {3, 3, 1}};
-
-    // test null filter
-
-    {
-        PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions,
-            *transform);
-        PointDataTree& tree = grid->tree();
-        const Index64 count = filterPointCount<PointDataTree, NullFilter>(tree, NullFilter(),
-            false);
-
-        CPPUNIT_ASSERT_EQUAL(count, Index64(5));
-
-        // Now disable 2 voxels and check active / inactive counts
-
-        PointDataGrid::Accessor gridAccessor = grid->getAccessor();
-
-        gridAccessor.setValueOff(Coord(1,1,1));
-        gridAccessor.setValueOff(Coord(1,3,1));
-
-        const Index64 inactiveCount = filterInactivePointCount<PointDataTree, NullFilter>(tree,
-            NullFilter(), false);
-
-        CPPUNIT_ASSERT_EQUAL(inactiveCount, Index64(2));
-
-        const Index64 activeCount = filterActivePointCount<PointDataTree, NullFilter>(tree,
-            NullFilter(), false);
-
-        CPPUNIT_ASSERT_EQUAL(activeCount, Index64(3));
-    }
-
-    // test multi-group filter
-
-    {
-        PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions,
-            *transform);
-        PointDataTree& tree = grid->tree();
-
-        appendGroup(tree, "group1");
-        appendGroup(tree, "group2");
-
-        auto leaf = tree.beginLeaf();
-        GroupWriteHandle group1Handle = leaf->groupWriteHandle("group1");
-
-        group1Handle.set(0, true);
-
-        GroupWriteHandle group2Handle = leaf->groupWriteHandle("group2");
-
-        group2Handle.set(1, true);
-
-        std::vector<std::string> includeGroups{"group1", "group2"};
-        MultiGroupFilter filter(includeGroups, std::vector<std::string>(), leaf->attributeSet());
-        const Index64 count = filterPointCount<PointDataTree, MultiGroupFilter>(tree, filter,
-            false);
-
-        CPPUNIT_ASSERT_EQUAL(count, Index64(2));
-
-        // check active / inactive counts
-
-        PointDataGrid::Accessor gridAccessor = grid->getAccessor();
-
-        gridAccessor.setValueOff(Coord(1,1,1));
-
-        const Index64 inactiveCount =
-            filterInactivePointCount<PointDataTree, MultiGroupFilter>(tree, filter, false);
-
-        CPPUNIT_ASSERT_EQUAL(inactiveCount, Index64(1));
-
-        const Index64 activeCount =
-            filterActivePointCount<PointDataTree, MultiGroupFilter>(tree, filter, false);
-
-        CPPUNIT_ASSERT_EQUAL(activeCount, Index64(1));
-    }
-
-}
 
 void
 TestPointCount::testGroup()
