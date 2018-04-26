@@ -907,16 +907,16 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
 
-        std::vector<Index64> pointOffsets;
-        getPointOffsets(pointOffsets, grid.tree(),
-                        includeGroups, excludeGroups, /*inCoreOnly=*/true);
+        MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
+
+        std::vector<Index64> offsets;
+        pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
 
         UT_UniquePtr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
 
         PositionAttribute positionAttribute(pdata.get(), mCentroid, static_cast<Index>(stride));
-        convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
-                                    /*startOffset=*/ 0, includeGroups, excludeGroups,
-                                    /*inCoreOnly=*/true);
+        convertPointDataGridPosition(positionAttribute, grid, offsets,
+                                    /*startOffset=*/ 0, filter, /*inCoreOnly=*/true);
 
         const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
 
@@ -1178,14 +1178,16 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
 
-        std::vector<Index64> pointOffsets;
-        getPointOffsets(pointOffsets, grid.tree(), includeGroups, excludeGroups, /*inCoreOnly=*/true);
+        MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
+
+        std::vector<Index64> offsets;
+        pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
 
         if (type == "vec3s") {
             VectorAttribute<Vec3f> typedAttribute(data.get());
-            convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets,
+            convertPointDataGridAttribute(typedAttribute, grid.tree(), offsets,
                 /*startOffset=*/ 0, static_cast<unsigned>(index), /*stride=*/1,
-                includeGroups, excludeGroups, /*inCoreOnly=*/true);
+                filter, /*inCoreOnly=*/true);
         }
 
         const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);

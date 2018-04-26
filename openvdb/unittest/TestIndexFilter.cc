@@ -101,7 +101,25 @@ public:
     ThresholdFilter(const int threshold)
         : mThreshold(threshold) { }
 
+    bool isPositiveInteger() const { return mThreshold > 0; }
+    bool isMax() const { return mThreshold == std::numeric_limits<int>::max(); }
+
     static bool initialized() { return true; }
+    inline index::State state() const
+    {
+        if (LessThan) {
+            if (isMax())                    return index::ALL;
+            else if (!isPositiveInteger())  return index::NONE;
+        }
+        else {
+            if (isMax())                    return index::NONE;
+            else if (!isPositiveInteger())  return index::ALL;
+        }
+        return index::PARTIAL;
+    }
+
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
 
     template <typename LeafT>
     void reset(const LeafT&) { }
@@ -222,6 +240,16 @@ TestIndexFilter::testMultiGroupFilter()
     { // first
         GroupWriteHandle groupHandle = leaf->groupWriteHandle("first");
         groupHandle.set(0, true);
+    }
+
+    { // test state()
+        std::vector<Name> include;
+        std::vector<Name> exclude;
+        MultiGroupFilter filter(include, exclude, leaf->attributeSet());
+        CPPUNIT_ASSERT(filter.state() == index::ALL);
+        include.push_back("all");
+        MultiGroupFilter filter2(include, exclude, leaf->attributeSet());
+        CPPUNIT_ASSERT(filter2.state() == index::PARTIAL);
     }
 
     // test multi group iteration
@@ -368,6 +396,8 @@ TestIndexFilter::testRandomLeafFilter()
 
         RandFilter filter(tree, 0);
 
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
+
         filter.mLeafMap[Coord(0, 0, 0)] = std::make_pair(0, 10);
         filter.mLeafMap[Coord(0, 0, 8)] = std::make_pair(1, 1);
         filter.mLeafMap[Coord(0, 8, 0)] = std::make_pair(2, 50);
@@ -462,6 +492,7 @@ TestIndexFilter::testAttributeHashFilter()
 
     { // construction, copy construction
         HashFilter filter(index, 0.0f);
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
         CPPUNIT_ASSERT(!filter.initialized());
         HashFilter filter2 = filter;
         CPPUNIT_ASSERT(!filter2.initialized());
@@ -605,6 +636,7 @@ TestIndexFilter::testLevelSetFilter()
 
     { // construction, copy construction
         LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
         CPPUNIT_ASSERT(!filter.initialized());
         LSFilter filter2 = filter;
         CPPUNIT_ASSERT(!filter2.initialized());
@@ -825,6 +857,9 @@ TestIndexFilter::testBBoxFilter()
 struct NeedsInitializeFilter
 {
     inline bool initialized() const { return mInitialized; }
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    inline index::State state(const LeafT&) { return index::PARTIAL; }
     template <typename LeafT>
     void reset(const LeafT&) { mInitialized = true; }
 private:
@@ -835,12 +870,15 @@ private:
 void
 TestIndexFilter::testBinaryFilter()
 {
+    const int intMax = std::numeric_limits<int>::max();
+
     { // construction, copy construction
         using InitializeBinaryFilter = BinaryFilter<NeedsInitializeFilter, NeedsInitializeFilter, /*And=*/true>;
 
         NeedsInitializeFilter needs1;
         NeedsInitializeFilter needs2;
         InitializeBinaryFilter filter(needs1, needs2);
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
         CPPUNIT_ASSERT(!filter.initialized());
         InitializeBinaryFilter filter2 = filter;
         CPPUNIT_ASSERT(!filter2.initialized());
@@ -855,6 +893,11 @@ TestIndexFilter::testBinaryFilter()
     using GreaterThanFilter = ThresholdFilter<false>;
 
     { // less than
+        LessThanFilter zeroFilter(0); // all invalid
+        CPPUNIT_ASSERT(zeroFilter.state() == index::NONE);
+        LessThanFilter maxFilter(intMax); // all valid
+        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
+
         LessThanFilter filter(5);
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
         std::vector<int> values;
@@ -871,6 +914,11 @@ TestIndexFilter::testBinaryFilter()
     }
 
     { // greater than
+        GreaterThanFilter zeroFilter(0); // all valid
+        CPPUNIT_ASSERT(zeroFilter.state() == index::ALL);
+        GreaterThanFilter maxFilter(intMax); // all invalid
+        CPPUNIT_ASSERT(maxFilter.state() == index::NONE);
+
         GreaterThanFilter filter(94);
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
         std::vector<int> values;
@@ -890,7 +938,13 @@ TestIndexFilter::testBinaryFilter()
     { // binary and
         using RangeFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/true>;
 
+        RangeFilter zeroFilter(LessThanFilter(0), GreaterThanFilter(10)); // all invalid
+        CPPUNIT_ASSERT(zeroFilter.state() == index::NONE);
+        RangeFilter maxFilter(LessThanFilter(intMax), GreaterThanFilter(0)); // all valid
+        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
+
         RangeFilter filter(LessThanFilter(55), GreaterThanFilter(45));
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
 
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
 
@@ -910,6 +964,11 @@ TestIndexFilter::testBinaryFilter()
 
     { // binary or
         using HeadTailFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/false>;
+
+        HeadTailFilter zeroFilter(LessThanFilter(0), GreaterThanFilter(10)); // some valid
+        CPPUNIT_ASSERT(zeroFilter.state() == index::PARTIAL);
+        HeadTailFilter maxFilter(LessThanFilter(intMax), GreaterThanFilter(0)); // all valid
+        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
 
         HeadTailFilter filter(LessThanFilter(5), GreaterThanFilter(95));
         filter.reset(OriginLeaf(Coord(0, 0, 0)));

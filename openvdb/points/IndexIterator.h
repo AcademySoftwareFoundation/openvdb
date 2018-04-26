@@ -58,11 +58,30 @@ inline Index64 iterCount(const IterT& iter);
 ////////////////////////////////////////
 
 
+namespace index {
+// Enum for informing early-exit optimizations
+// PARTIAL - No optimizations are possible
+// NONE - No indices to evaluate, can skip computation
+// ALL - All indices to evaluate, can skip filtering
+enum State
+{
+    PARTIAL=0,
+    NONE,
+    ALL
+};
+}
+
+
 /// @brief A no-op filter that can be used when iterating over all indices
+/// @see points/IndexFilter.h for the documented interface for an index filter
 class NullFilter
 {
 public:
     static bool initialized() { return true; }
+    static index::State state() { return index::ALL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::ALL; }
+
     template <typename LeafT> void reset(const LeafT&) { }
     template <typename IterT> static bool valid(const IterT&) { return true; }
 }; // class NullFilter

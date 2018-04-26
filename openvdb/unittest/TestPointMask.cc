@@ -114,12 +114,16 @@ TestPointMask::testMask()
     std::vector<std::string> excludeGroups;
 
     { // convert in turn "test" and not "test"
-        auto mask = convertPointsToMask(*points, includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups,
+            points->tree().cbeginLeaf()->attributeSet());
+        auto mask = convertPointsToMask(*points, filter);
 
         CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
         CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(1));
 
-        mask = convertPointsToMask(*points, excludeGroups, includeGroups);
+        MultiGroupFilter filter2(excludeGroups, includeGroups,
+            points->tree().cbeginLeaf()->attributeSet());
+        mask = convertPointsToMask(*points, filter2);
 
         CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(3));
     }
@@ -133,11 +137,15 @@ TestPointMask::testMask()
 
         CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(2));
 
-        mask = convertPointsToMask(*points, *newTransform, includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups,
+            points->tree().cbeginLeaf()->attributeSet());
+        mask = convertPointsToMask(*points, *newTransform, filter);
 
         CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(1));
 
-        mask = convertPointsToMask(*points, *newTransform, excludeGroups, includeGroups);
+        MultiGroupFilter filter2(excludeGroups, includeGroups,
+            points->tree().cbeginLeaf()->attributeSet());
+        mask = convertPointsToMask(*points, *newTransform, filter2);
 
         CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(2));
     }

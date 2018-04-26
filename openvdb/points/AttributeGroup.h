@@ -167,6 +167,10 @@ public:
 
     inline bool initialized() const { return bool(mHandle); }
 
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         mHandle.reset(new GroupHandle(leaf.groupHandle(mIndex)));

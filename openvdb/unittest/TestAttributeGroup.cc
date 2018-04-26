@@ -410,6 +410,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     { // group values all zero
         ValueVoxelCIter indexIter(0, size);
         GroupFilter filter(zeroIndex);
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         IndexGroupAllIter iter(indexIter, filter);
 
