@@ -62,7 +62,8 @@ namespace points {
 template <typename PointDataTreeT, typename FilterT = NullFilter>
 inline Index64 pointCount(  const PointDataTreeT& tree,
                             const FilterT& filter = NullFilter(),
-                            const bool inCoreOnly = false);
+                            const bool inCoreOnly = false,
+                            const bool threaded = true);
 
 
 /// @brief Populate an array of cumulative point offsets per leaf node.
@@ -76,7 +77,8 @@ template <typename PointDataTreeT, typename FilterT = NullFilter>
 inline Index64 pointOffsets(std::vector<Index64>& pointOffsets,
                             const PointDataTreeT& tree,
                             const FilterT& filter = NullFilter(),
-                            const bool inCoreOnly = false);
+                            const bool inCoreOnly = false,
+                            const bool threaded = true);
 
 
 /// @brief Generate a new grid with voxel values to store the number of points per voxel
@@ -111,57 +113,38 @@ pointCountGrid( const PointDataGridT& grid,
 ////////////////////////////////////////
 
 
-namespace point_count_internal {
-
-template <  typename PointDataTreeT,
-            typename FilterT>
-struct PointCountOp
-{
-    using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
-
-    PointCountOp(const FilterT& filter,
-                 const bool inCoreOnly = false)
-        : mFilter(filter)
-        , mInCoreOnly(inCoreOnly) { }
-
-    Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const
-    {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
-            auto iter = leaf->template beginIndexAll<FilterT>(mFilter);
-            size += iterCount(iter);
-        }
-        return size;
-    }
-
-    static Index64 join(Index64 size1, Index64 size2) {
-        return size1 + size2;
-    }
-
-private:
-    const FilterT& mFilter;
-    const bool mInCoreOnly;
-}; // struct PointCountOp
-
-
-} // namespace point_count_internal
-
-
-////////////////////////////////////////
-
-
 template <typename PointDataTreeT, typename FilterT>
 Index64 pointCount(const PointDataTreeT& tree,
                    const FilterT& filter,
-                   const bool inCoreOnly)
+                   const bool inCoreOnly,
+                   const bool threaded)
 {
-    (void) inCoreOnly;
-    Index64 size = 0;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-        size += iterCount(iter->beginIndexAll(filter));
+    using LeafManagerT = tree::LeafManager<const PointDataTreeT>;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
+
+    auto countLambda =
+        [&filter, &inCoreOnly] (const LeafRangeT& range, Index64 sum) -> Index64 {
+            FilterT newFilter(filter);
+            for (const auto& leaf : range) {
+                if (inCoreOnly && leaf.buffer().isOutOfCore())  continue;
+                auto state = filter.state(leaf);
+                if (state == index::ALL) {
+                    sum += leaf.pointCount();
+                } else if (state != index::NONE) {
+                    sum += iterCount(leaf.beginIndexAll(newFilter));
+                }
+            }
+            return sum;
+        };
+
+    LeafManagerT leafManager(tree);
+    if (threaded) {
+        return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), countLambda,
+            [] (Index64 n, Index64 m) -> Index64 { return n + m; });
     }
-    return size;
+    else {
+        return countLambda(leafManager.leafRange(), Index64(0));
+    }
 }
 
 
@@ -169,40 +152,41 @@ template <typename PointDataTreeT, typename FilterT>
 Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
                         const PointDataTreeT& tree,
                         const FilterT& filter,
-                        const bool inCoreOnly)
+                        const bool inCoreOnly,
+                        const bool threaded)
 {
-    using LeafNode = typename PointDataTreeT::LeafNodeType;
-    using IndexFilterIterT = IndexIter<typename LeafNode::ValueOnCIter, FilterT>;
+    using LeafT = typename PointDataTreeT::LeafNodeType;
+    using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
 
-    tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const size_t leafCount = leafManager.leafCount();
+    // allocate and zero values in point offsets array
 
-    pointOffsets.reserve(leafCount);
+    pointOffsets.assign(tree.leafCount(), Index64(0));
 
-    Index64 pointOffset = 0;
-    for (size_t n = 0; n < leafCount; n++)
-    {
-        const LeafNode& leaf = leafManager.leaf(n);
+    // compute total points per-leaf
 
-        // skip out-of-core leafs
-        if (inCoreOnly && leaf.buffer().isOutOfCore()) {
-            pointOffsets.push_back(pointOffset);
-            continue;
-        }
-
-        auto state = filter.state(leaf);
-        if (state == index::ALL) {
-            pointOffset += leaf.onPointCount();
-        }
-        else if (state != index::NONE) {
-            auto iter = leaf.beginValueOn();
+    LeafManagerT leafManager(tree);
+    leafManager.foreach(
+        [&pointOffsets, &filter, &inCoreOnly](const LeafT& leaf, size_t pos) {
             FilterT newFilter(filter);
-            newFilter.reset(leaf);
-            IndexFilterIterT filterIndexIter(iter, newFilter);
-            pointOffset += iterCount(filterIndexIter);
-        }
-        pointOffsets.push_back(pointOffset);
+            if (inCoreOnly && leaf.buffer().isOutOfCore())  return;
+            auto state = filter.state(leaf);
+            if (state == index::ALL) {
+                pointOffsets[pos] = leaf.pointCount();
+            } else if (state != index::NONE) {
+                newFilter.reset(leaf);
+                pointOffsets[pos] = iterCount(leaf.beginIndexAll(newFilter));
+            }
+        },
+    threaded);
+
+    // turn per-leaf totals into cumulative leaf totals
+
+    Index64 pointOffset(pointOffsets[0]);
+    for (size_t n = 1; n < pointOffsets.size(); n++) {
+        pointOffset += pointOffsets[n];
+        pointOffsets[n] = pointOffset;
     }
+
     return pointOffset;
 }
 
