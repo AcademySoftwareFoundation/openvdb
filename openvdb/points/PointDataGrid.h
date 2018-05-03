@@ -1099,7 +1099,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return iterCount(this->beginIndexAll());
+    return this->getLastValue();
 }
 
 template<typename T, Index Log2Dim>
@@ -1128,7 +1128,11 @@ PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
         return Index64(0);
     }
     GroupFilter filter(groupName, this->attributeSet());
-    return iterCount(this->beginIndexAll(filter));
+    if (filter.state() == index::ALL) {
+        return this->pointCount();
+    } else {
+        return iterCount(this->beginIndexAll(filter));
+    }
 }
 
 template<typename T, Index Log2Dim>
