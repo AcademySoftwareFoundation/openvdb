@@ -274,6 +274,8 @@ public:
 
         tree::LeafManager<PointDataTree> leafManager(mPoints.tree());
 
+        if (mInterrupter) mInterrupter->start();
+
         if (staggered) {
 
             // we can only use a staggered sampler if the source grid is a vector grid
@@ -312,6 +314,8 @@ public:
                 tbb::parallel_for(leafManager.leafRange(), op);
             }
         }
+
+        if (mInterrupter) mInterrupter->end();
     }
 
 private:

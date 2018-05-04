@@ -112,12 +112,12 @@ struct VDBPointsSampler
     inline void
     pointSample(const hvdb::Grid& sourceGrid,
                 const std::string& attributeName,
-                UT_AutoInterrupt* interrupter)
+                hvdb::Interrupter* interrupter)
     {
         warnOnExisting(attributeName);
         const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
         for (auto& pointGrid : mPointGrids) {
-            cvdb::points::pointSample<GridType, cvdb::points::PointDataGrid, UT_AutoInterrupt>
+            cvdb::points::pointSample<GridType, cvdb::points::PointDataGrid, hvdb::Interrupter>
                 (*pointGrid, grid, attributeName, mIncludeGroups,
                     mExcludeGroups, interrupter);
         }
@@ -127,12 +127,12 @@ struct VDBPointsSampler
     inline void
     boxSample(const hvdb::Grid& sourceGrid,
               const std::string& attributeName,
-              UT_AutoInterrupt* interrupter)
+              hvdb::Interrupter* interrupter)
     {
         warnOnExisting(attributeName);
         const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
         for (auto& pointGrid : mPointGrids) {
-            cvdb::points::boxSample<GridType, cvdb::points::PointDataGrid, UT_AutoInterrupt>
+            cvdb::points::boxSample<GridType, cvdb::points::PointDataGrid, hvdb::Interrupter>
                 (*pointGrid, grid, attributeName, mIncludeGroups,
                     mExcludeGroups, interrupter);
         }
@@ -215,7 +215,7 @@ public:
     // constructor. from grid and GU_Detail*
     PointSampler(const hvdb::Grid& grid, const bool threaded,
                  GU_Detail* gdp, GA_RWAttributeRef& handle,
-                 UT_AutoInterrupt* interrupter):
+                 hvdb::Interrupter* interrupter):
         mGrid(grid),
         mThreaded(threaded),
         mGdp(gdp),
@@ -236,6 +236,7 @@ public:
 
     void sample()
     {
+        mInterrupter->start();
         if (mThreaded) {
             // multi-threaded
             UTparallelFor(GA_SplittableRange(mGdp->getPointRange()), *this);
@@ -243,6 +244,7 @@ public:
             // single-threaded
             (*this)(GA_SplittableRange(mGdp->getPointRange()));
         }
+        mInterrupter->end();
     }
 
     // only the supported versions don't throw
@@ -313,7 +315,7 @@ private:
     bool                 mThreaded;
     GU_Detail*           mGdp;
     GA_RWPageHandleType  mAttribPageHandle;
-    UT_AutoInterrupt*    mInterrupter;
+    hvdb::Interrupter*   mInterrupter;
 }; // class PointSampler
 
 } // end anonymous namespace for this sampler
@@ -584,7 +586,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                         << grid.valueType() << std::endl;
                 }
 
-                UT_AutoInterrupt scalarInterrupt("Sampling from VDB floating-type grids");
+                hvdb::Interrupter scalarInterrupt("Sampling from VDB floating-type grids");
                 // do the sampling
                 if (gridType == UT_VDB_FLOAT) {
                     // float scalar
@@ -622,7 +624,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                         << grid.valueType() << std::endl;
                 }
 
-                UT_AutoInterrupt scalarInterrupt("Sampling from VDB integer-type grids");
+                hvdb::Interrupter scalarInterrupt("Sampling from VDB integer-type grids");
                 if (gridType == UT_VDB_INT32) {
 
                     PointSampler<cvdb::Int32Grid, GA_RWPageHandleF, false, true>
@@ -655,7 +657,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                 }
                 aGdp->addVariableName(attributeName.c_str(), attributeVariableName.c_str());
 
-                std::unique_ptr<UT_AutoInterrupt> interrupter;
+                std::unique_ptr<hvdb::Interrupter> interrupter;
 
                 // user feedback
                 if (grid.getGridClass() != cvdb::GRID_STAGGERED) {
@@ -665,7 +667,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                             << grid.valueType() << std::endl;
                     }
 
-                    interrupter.reset(new UT_AutoInterrupt("Sampling from VDB vector-type grids"));
+                    interrupter.reset(new hvdb::Interrupter("Sampling from VDB vector-type grids"));
 
                     // do the sampling
                     if (gridType == UT_VDB_VEC3F) {
@@ -686,7 +688,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_
                             << grid.valueType() << std::endl;
                     }
 
-                    interrupter.reset(new UT_AutoInterrupt("Sampling from VDB vector-type staggered grids"));
+                    interrupter.reset(new hvdb::Interrupter("Sampling from VDB vector-type staggered grids"));
 
                     // do the sampling
                     if (grid.isType<cvdb::Vec3fGrid>()) {
