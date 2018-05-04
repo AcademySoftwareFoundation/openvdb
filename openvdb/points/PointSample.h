@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-/// @author Nick Avramoussis, Francisco Gochez
+/// @author Nick Avramoussis, Francisco Gochez, Dan Bailey
 ///
 /// @file points/PointSample.h
 ///
@@ -37,12 +37,11 @@
 #ifndef OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
-#include <type_traits> // enable_if
-
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/tools/Interpolation.h>
 
 #include "PointDataGrid.h"
-#include "PointGroup.h"
+#include "PointAttribute.h"
 
 
 namespace openvdb {
@@ -50,77 +49,101 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
-/// @brief Performs closest point sampling from an OpenVDB grid onto VDB Points
-///
-/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
-///
-/// @param points           the PointDataGrid whose points will be sampled on to
-/// @param sourceGrid       VDB grid which will be sampled
-/// @param targetAttribute  a target attribute on the points which will hold samples. This
-///                         attribute will be created with the source grid type if it does
-///                         not exist, and with the source grid name if the name is empty
-/// @param includeGroups    names of groups to include
-/// @param excludeGroups    names of groups to exclude
-/// @param interrupter      an optional interrupter
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT = util::NullInterrupter>
-inline void
-pointSample(PointDataGridT& points,
-            const SourceGridT& sourceGrid,
-            const Name& targetAttribute = "",
-            const std::vector<Name>& includeGroups = std::vector<Name>(),
-            const std::vector<Name>& excludeGroups = std::vector<Name>(),
-            InterrupterT* const interrupter = nullptr);
 
-/// @brief Performs tri-linear sampling from an OpenVDB grid onto VDB Points
-///
-/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
-///
+/// @brief Performs closest point sampling from a VDB grid onto a VDB Points attribute
 /// @param points           the PointDataGrid whose points will be sampled on to
 /// @param sourceGrid       VDB grid which will be sampled
 /// @param targetAttribute  a target attribute on the points which will hold samples. This
 ///                         attribute will be created with the source grid type if it does
 ///                         not exist, and with the source grid name if the name is empty
-/// @param includeGroups    names of groups to include
-/// @param excludeGroups    names of groups to exclude
+/// @param filter           an optional index filter
 /// @param interrupter      an optional interrupter
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT = util::NullInterrupter>
-inline void
-boxSample(PointDataGridT& points,
-          const SourceGridT& sourceGrid,
-          const Name& targetAttribute = "",
-          const std::vector<Name>& includeGroups = std::vector<Name>(),
-          const std::vector<Name>& excludeGroups = std::vector<Name>(),
-          InterrupterT* const interrupter = nullptr);
+/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
+template<typename PointDataGridT, typename SourceGridT,
+    typename FilterT = NullFilter, typename InterrupterT = util::NullInterrupter>
+inline void pointSample(PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute = "",
+                        const FilterT& filter = NullFilter(),
+                        InterrupterT* const interrupter = nullptr);
 
-/// @brief Performs tri-quadratic samples values from an OpenVDB grid onto VDB Points
-///
-/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
-///
+
+/// @brief Performs tri-linear sampling from a VDB grid onto a VDB Points attribute
 /// @param points           the PointDataGrid whose points will be sampled on to
 /// @param sourceGrid       VDB grid which will be sampled
 /// @param targetAttribute  a target attribute on the points which will hold samples. This
 ///                         attribute will be created with the source grid type if it does
 ///                         not exist, and with the source grid name if the name is empty
-/// @param includeGroups    names of groups to include
-/// @param excludeGroups    names of groups to exclude
+/// @param filter           an optional index filter
 /// @param interrupter      an optional interrupter
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
+/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
+template<typename PointDataGridT, typename SourceGridT,
+    typename FilterT = NullFilter, typename InterrupterT = util::NullInterrupter>
+inline void boxSample(  PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute = "",
+                        const FilterT& filter = NullFilter(),
+                        InterrupterT* const interrupter = nullptr);
+
+
+/// @brief Performs tri-quadratic sampling from a VDB grid onto a VDB Points attribute
+/// @param points           the PointDataGrid whose points will be sampled on to
+/// @param sourceGrid       VDB grid which will be sampled
+/// @param targetAttribute  a target attribute on the points which will hold samples. This
+///                         attribute will be created with the source grid type if it does
+///                         not exist, and with the source grid name if the name is empty
+/// @param filter           an optional index filter
+/// @param interrupter      an optional interrupter
+/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
+template<typename PointDataGridT, typename SourceGridT,
+    typename FilterT = NullFilter, typename InterrupterT = util::NullInterrupter>
+inline void quadraticSample(PointDataGridT& points,
+                            const SourceGridT& sourceGrid,
+                            const Name& targetAttribute = "",
+                            const FilterT& filter = NullFilter(),
+                            InterrupterT* const interrupter = nullptr);
+
+
+// This struct samples the source grid accessor using the world-space position supplied,
+// with SamplerT providing the sampling scheme. In the case where ValueT does not match
+// the value type of the source grid, the sample() method will also convert the sampled
+// value into a ValueT value, using round-to-nearest for float-to-integer conversion.
+struct SampleWithRounding
+{
+    template<typename ValueT, typename SamplerT, typename AccessorT>
+    inline ValueT sample(const AccessorT& accessor, const Vec3d& position) const;
+};
+
+
+// A dummy struct that is used to mean that the sampled attribute should either match the type
+// of the existing attribute or the type of the source grid (if the attribute doesn't exist yet)
+struct DummySampleType { };
+
+
+/// @brief Performs sampling and conversion from a VDB grid onto a VDB Points attribute
+/// @param order            the sampling order - 0 = closest-point, 1 = trilinear, 2 = triquadratic
+/// @param points           the PointDataGrid whose points will be sampled on to
+/// @param sourceGrid       VDB grid which will be sampled
+/// @param targetAttribute  a target attribute on the points which will hold samples. This
+///                         attribute will be created with the source grid type if it does
+///                         not exist, and with the source grid name if the name is empty
+/// @param filter           an optional index filter
+/// @param sampler          handles sampling and conversion into the target attribute type,
+///                         which by default this uses the SampleWithRounding struct.
+/// @param interrupter      an optional interrupter
+/// @param threaded         enable or disable threading  (threading is enabled by default)
+/// @note  The target attribute may exist provided it can be cast to the SourceGridT ValueType
+template<typename PointDataGridT, typename SourceGridT, typename TargetValueT = DummySampleType,
+    typename SamplerT = SampleWithRounding, typename FilterT = NullFilter,
     typename InterrupterT = util::NullInterrupter>
-inline void
-quadraticSample(PointDataGridT& points,
-                const SourceGridT& sourceGrid,
-                const Name& targetAttribute = "",
-                const std::vector<Name>& includeGroups = std::vector<Name>(),
-                const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                InterrupterT* const interrupter = nullptr);
+inline void sampleGrid( size_t order,
+                        PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute,
+                        const FilterT& filter = NullFilter(),
+                        const SamplerT& sampler = SampleWithRounding(),
+                        InterrupterT* const interrupter = nullptr,
+                        const bool threaded = true);
 
 
 ///////////////////////////////////////////////////
@@ -128,254 +151,296 @@ quadraticSample(PointDataGridT& points,
 
 namespace point_sample_internal {
 
-template<typename SamplerT,
-         typename AccessorT,
-         typename TargetValueT,
-         typename PointFilterT = points::NullFilter,
-         typename PointDataTreeT = points::PointDataTree,
-         typename InterrupterT = util::NullInterrupter,
-         bool Transform = false>
-class PointSampleOp
-{
-public:
-    using LeafManagerT = tree::LeafManager<PointDataTreeT>;
-    using PositionHandleT = AttributeHandle<Vec3f>;
-    using TargetHandleT = AttributeWriteHandle<TargetValueT>;
 
-    PointSampleOp(const AccessorT& sourceAccessor,
-                  const size_t positionAttributeIndex,
-                  const size_t targetAttributeIndex,
-                  const PointFilterT& filter = PointFilterT(),
-                  const math::Transform* const pointDataGridTransform = nullptr,
-                  const math::Transform* const sourceGridTransform = nullptr,
-                  InterrupterT* const interrupter = nullptr)
-    : mSourceAccessor(sourceAccessor)
-    , mPositionAttributeIndex(positionAttributeIndex)
-    , mTargetAttributeIndex(targetAttributeIndex)
-    , mFilter(filter)
-    , mPointDataGridTransform(pointDataGridTransform)
-    , mSourceGridTransform(sourceGridTransform)
-    , mInterrupter(interrupter)
-    {
-        if (Transform) {
-            assert(mSourceGridTransform);
-            assert(mPointDataGridTransform);
-        }
-    }
+template<typename FromType, typename ToType>
+struct CompatibleTypes { enum { value = std::is_constructible<ToType, FromType>::value }; };
 
-    void operator()(const typename LeafManagerT::LeafRange& range) const
-    {
-        if (util::wasInterrupted(mInterrupter)) {
-            tbb::task::self().cancel_group_execution();
-            return;
-        }
+// Specializations for types that can be converted from source grid to target attribute
+template<typename T> struct CompatibleTypes<
+    T, T> {                             enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    T, math::Vec2<T>> {                 enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    T, math::Vec3<T>> {                 enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    T, math::Vec4<T>> {                 enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    math::Vec2<T>, math::Vec2<T>> {     enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    math::Vec3<T>, math::Vec3<T>> {     enum { value = true }; };
+template<typename T> struct CompatibleTypes<
+    math::Vec4<T>, math::Vec4<T>> {     enum { value = true }; };
+template<typename T0, typename T1> struct CompatibleTypes<
+    math::Vec2<T0>, math::Vec2<T1>> {   enum { value = CompatibleTypes<T0, T1>::value }; };
+template<typename T0, typename T1> struct CompatibleTypes<
+    math::Vec3<T0>, math::Vec3<T1>> {   enum { value = CompatibleTypes<T0, T1>::value }; };
+template<typename T0, typename T1> struct CompatibleTypes<
+    math::Vec4<T0>, math::Vec4<T1>> {   enum { value = CompatibleTypes<T0, T1>::value }; };
+template<typename T> struct CompatibleTypes<
+    ValueMask, T> {                     enum { value = CompatibleTypes<bool, T>::value }; };
 
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            PositionHandleT::Ptr positionHandle =
-                PositionHandleT::create(leaf->constAttributeArray(mPositionAttributeIndex));
-            typename TargetHandleT::Ptr targetHandle =
-                TargetHandleT::create(leaf->attributeArray(mTargetAttributeIndex));
 
-            for (auto iter = leaf->beginIndexOn(mFilter); iter; ++iter) {
-
-                const Index index = *iter;
-                const Vec3d coord = iter.getCoord().asVec3d();
-
-                // get the position in index space. Do this in double precision to make sure
-                // we doesn't move points which are close to the -0.5/0.5 boundary into other
-                // voxels when doing a staggered offset by 0.5
-
-                Vec3d position = Vec3d(positionHandle->get(index)) + coord;
-
-                // transform it to source index space if transforms differ
-
-                if (Transform) {
-                    Vec3d worldPosition = mPointDataGridTransform->indexToWorld(position);
-                    position = mSourceGridTransform->worldToIndex(worldPosition);
-                }
-
-                // Sample the grid at samplePosition
-                typename AccessorT::ValueType sample =
-                    SamplerT::sample(mSourceAccessor, position);
-
-                targetHandle->set(index, static_cast<TargetValueT>(sample));
-            }
-        }
-    }
-
-protected:
-    const AccessorT mSourceAccessor;
-    const size_t mPositionAttributeIndex;
-    const size_t mTargetAttributeIndex;
-    const PointFilterT& mFilter;
-    const math::Transform* const mPointDataGridTransform;
-    const math::Transform* const mSourceGridTransform;
-    InterrupterT* mInterrupter;
+// Ability to access the Staggered template parameter from tools::Sampler<Order, Staggered>
+template <typename T> struct SamplerTraits {
+    static const bool Staggered = false;
+};
+template <size_t T0, bool T1> struct SamplerTraits<tools::Sampler<T0, T1>> {
+    static const bool Staggered = T1;
 };
 
-template <typename SourceGridT,
-          typename PointDataGridT,
-          typename PointFilterT = points::NullFilter,
-          typename InterrupterT = util::NullInterrupter,
-          size_t Order = 1>
+
+// default sampling is incompatible, so throw an error
+template <typename ValueT, typename SamplerT, typename AccessorT, bool Round, bool Compatible = false>
+struct SampleWithRoundingOp
+{
+    static inline void sample(ValueT&, const AccessorT&, const Vec3d&)
+    {
+        std::ostringstream ostr;
+        ostr << "Cannot sample a " << typeNameAsString<typename AccessorT::ValueType>()
+            << " grid on to a " << typeNameAsString<ValueT>() << " attribute";
+        OPENVDB_THROW(TypeError, ostr.str());
+    }
+};
+// partial specialization to handle sampling and rounding of compatible conversion
+template <typename ValueT, typename SamplerT, typename AccessorT>
+struct SampleWithRoundingOp<ValueT, SamplerT, AccessorT, /*Round=*/true, /*Compatible=*/true>
+{
+    static inline void sample(ValueT& value, const AccessorT& accessor, const Vec3d& position)
+    {
+        value = ValueT(math::Round(SamplerT::sample(accessor, position)));
+    }
+};
+// partial specialization to handle sampling and simple casting of compatible conversion
+template <typename ValueT, typename SamplerT, typename AccessorT>
+struct SampleWithRoundingOp<ValueT, SamplerT, AccessorT, /*Round=*/false, /*Compatible=*/true>
+{
+    static inline void sample(ValueT& value, const AccessorT& accessor, const Vec3d& position)
+    {
+        value = ValueT(SamplerT::sample(accessor, position));
+    }
+};
+
+
+template <typename PointDataGridT, typename SamplerT, typename FilterT, typename InterrupterT>
 class PointDataSampler
 {
 public:
-    using SourceGridValueT = typename SourceGridT::ValueType;
-    using SourceGridTraits = VecTraits<SourceGridValueT>;
-
-    PointDataSampler(PointDataGridT& points,
-                     const SourceGridT& grid,
-                     const PointFilterT& filter = PointFilterT(),
-                     InterrupterT* const interrupter = nullptr)
-        : mPoints(points)
-        , mSourceGrid(grid)
+    PointDataSampler(size_t order,
+                     PointDataGridT& points,
+                     const SamplerT& sampler,
+                     const FilterT& filter,
+                     InterrupterT* const interrupter,
+                     const bool threaded)
+        : mOrder(order)
+        , mPoints(points)
+        , mSampler(sampler)
         , mFilter(filter)
-        , mInterrupter(interrupter) {}
+        , mInterrupter(interrupter)
+        , mThreaded(threaded) { }
 
-    /// @brief  Sample from the contained source VDB onto an attribute at position
-    ///         targetIndex. Throws if the attribute and source VDB are incompatible
-    ///         types.
-    inline void
-    sample(const size_t targetIndex) const
+private:
+    // No-op transformation
+    struct AlignedTransform
     {
-        const auto leafIter = mPoints.constTree().cbeginLeaf();
-        if (!leafIter) return;
+        inline Vec3d transform(const Vec3d& position) const { return position; };
+    }; // struct AlignedTransform
 
-        const AttributeSet::Descriptor& descriptor =
-            leafIter->attributeSet().descriptor();
-        const Name& targetType = descriptor.type(targetIndex).first;
-        sample<SourceGridTraits::IsVec>(targetType, targetIndex);
-    }
-
-    /// @brief  Sample from the contained source VDB onto an attribute at position
-    ///         targetIndex of type TargetValueT.
-    template <typename TargetValueT>
-    inline void
-    sample(const size_t targetIndex) const
+    // Re-sample world-space position from source to target transforms
+    struct NonAlignedTransform
     {
-        using PointDataTreeT = typename PointDataGridT::TreeType;
-        using AccessorT = typename SourceGridT::ConstAccessor;
+        NonAlignedTransform(const math::Transform& source, const math::Transform& target)
+            : mSource(source)
+            , mTarget(target) { }
 
-        const auto leafIter = mPoints.constTree().cbeginLeaf();
-        if (!leafIter) return;
-
-        const size_t positionIndex = leafIter->attributeSet().find("P");
-        if (positionIndex == AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(RuntimeError, "Failed to find position attribute");
+        inline Vec3d transform(const Vec3d& position) const
+        {
+            return mSource.worldToIndex(mTarget.indexToWorld(position));
         }
 
-        const math::Transform& pointTransform = mPoints.constTransform();
-        const math::Transform& sourceTransform = mSourceGrid.constTransform();
-        const AccessorT sourceGridAccessor = mSourceGrid.getConstAccessor();
+    private:
+        const math::Transform& mSource;
+        const math::Transform& mTarget;
+    }; // struct NonAlignedTransform
 
-        const bool staggered(SourceGridTraits::IsVec &&
-            mSourceGrid.getGridClass() == GRID_STAGGERED);
+    // A simple convenience wrapper that contains the source grid accessor and the sampler
+    template <typename ValueT, typename SourceGridT, typename GridSamplerT>
+    struct SamplerWrapper
+    {
+        using ValueType = ValueT;
+        using SourceAccessorT = typename SourceGridT::ConstAccessor;
 
-        tree::LeafManager<PointDataTree> leafManager(mPoints.tree());
+        SamplerWrapper(const SourceGridT& sourceGrid, const SamplerT& sampler)
+            : mAccessor(sourceGrid.getConstAccessor())
+            , mSampler(sampler) { }
+
+        // note that creating a new accessor from the underlying tree is faster than
+        // copying an existing accessor
+        SamplerWrapper(const SamplerWrapper& other)
+            : mAccessor(other.mAccessor.tree())
+            , mSampler(other.mSampler) { }
+
+        inline ValueT sample(const Vec3d& position) const {
+            return mSampler.template sample<ValueT, GridSamplerT, SourceAccessorT>(
+                mAccessor, position);
+        }
+
+    private:
+        SourceAccessorT mAccessor;
+        const SamplerT& mSampler;
+    }; // struct SamplerWrapper
+
+    template <typename SamplerWrapperT, typename TransformerT>
+    inline void doSample(const SamplerWrapperT& sampleWrapper, const Index targetIndex,
+        const TransformerT& transformer)
+    {
+        using PointDataTreeT = typename PointDataGridT::TreeType;
+        using LeafT = typename PointDataTreeT::LeafNodeType;
+        using LeafManagerT = typename tree::LeafManager<PointDataTreeT>;
+        using LeafRangeT = typename LeafManagerT::LeafRange;
+
+        const auto& filter(mFilter);
+        const auto& interrupter(mInterrupter);
+
+        auto sampleLambda = [targetIndex, &sampleWrapper, &transformer, &filter, &interrupter](
+            LeafT& leaf, size_t /*idx*/)
+        {
+            using TargetHandleT = AttributeWriteHandle<typename SamplerWrapperT::ValueType>;
+
+            if (util::wasInterrupted(interrupter)) {
+                tbb::task::self().cancel_group_execution();
+                return;
+            }
+
+            SamplerWrapperT newSampleWrapper(sampleWrapper);
+            auto positionHandle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+            auto targetHandle = TargetHandleT::create(leaf.attributeArray(targetIndex));
+            for (auto iter = leaf.beginIndexOn(filter); iter; ++iter) {
+                const Vec3d position = transformer.template transform(positionHandle->get(*iter) +
+                    iter.getCoord().asVec3d());
+                targetHandle->set(*iter, newSampleWrapper.sample(position));
+            }
+        };
+
+        LeafManagerT leafManager(mPoints.tree());
 
         if (mInterrupter) mInterrupter->start();
 
-        if (staggered) {
-
-            // we can only use a staggered sampler if the source grid is a vector grid
-            using SamplerT = tools::Sampler<Order, SourceGridTraits::IsVec>;
-
-            if (pointTransform != sourceTransform) {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
-                    PointDataTreeT, InterrupterT, true>
-                    op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
-                       &pointTransform, &sourceTransform, mInterrupter);
-                tbb::parallel_for(leafManager.leafRange(), op);
-            }
-            else {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
-                    PointDataTreeT, InterrupterT>
-                    op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
-                       nullptr, nullptr, mInterrupter);
-                tbb::parallel_for(leafManager.leafRange(), op);
-            }
-        }
-        else {
-            using SamplerT = tools::Sampler<Order, false>;
-
-            if (pointTransform != sourceTransform) {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
-                    PointDataTreeT, InterrupterT, true>
-                    op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
-                        &pointTransform, &sourceTransform, mInterrupter);
-                tbb::parallel_for(leafManager.leafRange(), op);
-            }
-            else {
-                PointSampleOp<SamplerT, AccessorT, TargetValueT, PointFilterT,
-                    PointDataTreeT, InterrupterT>
-                    op(sourceGridAccessor, positionIndex, targetIndex, mFilter,
-                       nullptr, nullptr, mInterrupter);
-                tbb::parallel_for(leafManager.leafRange(), op);
-            }
-        }
+        leafManager.foreach(sampleLambda, mThreaded);
 
         if (mInterrupter) mInterrupter->end();
     }
 
-private:
-
-    template<bool IsVectorGrid>
-    typename std::enable_if<IsVectorGrid, void>::type
-    sample(const std::string& type,
-           const size_t targetIndex) const
+    template <typename SourceGridT, typename SamplerWrapperT>
+    inline void resolveTransform(const SourceGridT& sourceGrid, const SamplerWrapperT& sampleWrapper,
+        const Index targetIndex)
     {
-        if (type == typeNameAsString<Vec3f>())      sample<Vec3f>(targetIndex);
-        else if (type == typeNameAsString<Vec3d>()) sample<Vec3d>(targetIndex);
-        else if (type == typeNameAsString<Vec3i>()) sample<Vec3i>(targetIndex);
-        else {
-            const std::string gridType = typeNameAsString<SourceGridValueT>();
-            OPENVDB_THROW(TypeError,
-                "Unsupported point sampling from a Source VDB of type \""
-                + gridType + "\" to a point attribute of type \"" + type + "\".");
+        const auto& sourceTransform = sourceGrid.constTransform();
+        const auto& pointsTransform = mPoints.constTransform();
+
+        if (sourceTransform == pointsTransform) {
+            AlignedTransform transformer;
+            doSample(sampleWrapper, targetIndex, transformer);
+        } else {
+            NonAlignedTransform transformer(sourceTransform, pointsTransform);
+            doSample(sampleWrapper, targetIndex, transformer);
         }
     }
 
-    template<bool IsVectorGrid>
-    typename std::enable_if<!IsVectorGrid, void>::type
-    sample(const std::string& type,
-           const size_t targetIndex) const
+    template <typename SourceGridT, typename TargetValueT, size_t Order>
+    inline void resolveStaggered(const SourceGridT& sourceGrid, const Index targetIndex)
     {
-        if (type == typeNameAsString<int16_t>())      sample<int16_t>(targetIndex);
-        else if (type == typeNameAsString<int32_t>()) sample<int32_t>(targetIndex);
-        else if (type == typeNameAsString<int64_t>()) sample<int64_t>(targetIndex);
-        else if (type == typeNameAsString<float>())   sample<float>(targetIndex);
-        else if (type == typeNameAsString<double>())  sample<double>(targetIndex);
-        else if (type == typeNameAsString<bool>())    sample<bool>(targetIndex);
-        else {
-            const std::string gridType = typeNameAsString<SourceGridValueT>();
-            OPENVDB_THROW(TypeError,
-                "Unsupported point sampling from a Source VDB of type \""
-                + gridType + "\" to a point attribute of type \"" + type + "\".");
+        using SamplerWrapperT = SamplerWrapper<TargetValueT, SourceGridT, tools::Sampler<Order, false>>;
+        using StaggeredSamplerWrapperT = SamplerWrapper<TargetValueT, SourceGridT, tools::Sampler<Order, true>>;
+
+        using SourceValueType = typename SourceGridT::ValueType;
+        if (VecTraits<SourceValueType>::Size == 3 && sourceGrid.getGridClass() == GRID_STAGGERED) {
+            StaggeredSamplerWrapperT sampleWrapper(sourceGrid, mSampler);
+            resolveTransform(sourceGrid, sampleWrapper, targetIndex);
+        } else {
+            SamplerWrapperT sampleWrapper(sourceGrid, mSampler);
+            resolveTransform(sourceGrid, sampleWrapper, targetIndex);
+        }
+    }
+
+public:
+    template <typename SourceGridT, typename TargetValueT = typename SourceGridT::ValueType>
+    inline void sample(const SourceGridT& sourceGrid, Index targetIndex)
+    {
+        if (mOrder == 0) {
+            resolveStaggered<SourceGridT, TargetValueT, 0>(sourceGrid, targetIndex);
+        } else if (mOrder == 1) {
+            resolveStaggered<SourceGridT, TargetValueT, 1>(sourceGrid, targetIndex);
+        } else if (mOrder == 2) {
+            resolveStaggered<SourceGridT, TargetValueT, 2>(sourceGrid, targetIndex);
         }
     }
 
 private:
-
+    size_t mOrder;
     PointDataGridT& mPoints;
-    const SourceGridT& mSourceGrid;
-    const PointFilterT mFilter;
-    InterrupterT* mInterrupter;
+    const SamplerT& mSampler;
+    const FilterT& mFilter;
+    InterrupterT* const mInterrupter;
+    const bool mThreaded;
+}; // class PointDataSampler
+
+
+template <typename PointDataGridT, typename ValueT>
+struct AppendAttributeOp
+{
+    static void append(PointDataGridT& points, const Name& attribute)
+    {
+        appendAttribute<ValueT>(points.tree(), attribute);
+    }
+};
+// partial specialization to disable attempts to append attribute type of DummySampleType
+template <typename PointDataGridT>
+struct AppendAttributeOp<PointDataGridT, DummySampleType>
+{
+    static void append(PointDataGridT&, const Name&) { }
 };
 
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT,
-    size_t Order = 1>
-inline void
-sampleGrid(PointDataGridT& points,
-           const SourceGridT& sourceGrid,
-           const Name& targetAttribute,
-           const std::vector<Name>& includeGroups,
-           const std::vector<Name>& excludeGroups,
-           InterrupterT* const interrupter)
+} // namespace point_sample_internal
+
+
+////////////////////////////////////////
+
+
+template<typename ValueT, typename SamplerT, typename AccessorT>
+ValueT SampleWithRounding::sample(const AccessorT& accessor, const Vec3d& position) const
 {
+    using namespace point_sample_internal;
+    using SourceValueT = typename AccessorT::ValueType;
+    static const bool staggered = SamplerTraits<SamplerT>::Staggered;
+    static const bool compatible = CompatibleTypes</*from=*/SourceValueT, /*to=*/ValueT>::value &&
+                                   (!staggered || (staggered && VecTraits<SourceValueT>::Size == 3));
+    static const bool round =   std::is_floating_point<SourceValueT>::value &&
+                                std::is_integral<ValueT>::value;
+    ValueT value;
+    SampleWithRoundingOp<ValueT, SamplerT, AccessorT, round, compatible>::sample(
+        value, accessor, position);
+    return value;
+}
+
+
+////////////////////////////////////////
+
+
+template<typename PointDataGridT, typename SourceGridT, typename TargetValueT,
+    typename SamplerT, typename FilterT, typename InterrupterT>
+inline void sampleGrid( size_t order,
+                        PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute,
+                        const FilterT& filter,
+                        const SamplerT& sampler,
+                        InterrupterT* const interrupter,
+                        const bool threaded)
+{
+    using point_sample_internal::AppendAttributeOp;
+    using point_sample_internal::PointDataSampler;
+
+    // use the name of the grid if no target attribute name supplied
     Name attribute(targetAttribute);
     if (targetAttribute.empty()) {
         attribute = sourceGrid.getName();
@@ -386,94 +451,108 @@ sampleGrid(PointDataGridT& points,
         OPENVDB_THROW(RuntimeError, "Cannot sample onto the \"P\" attribute");
     }
 
-    const auto leafIter = points.tree().cbeginLeaf();
-    if (!leafIter) return;
+    auto leaf = points.tree().cbeginLeaf();
+    if (!leaf)  return;
 
-    const AttributeSet::Descriptor& descriptor =
-        leafIter->attributeSet().descriptor();
+    PointDataSampler<PointDataGridT, SamplerT, FilterT, InterrupterT> pointDataSampler(
+        order, points, sampler, filter, interrupter, threaded);
+
+    const auto& descriptor = leaf->attributeSet().descriptor();
     size_t targetIndex = descriptor.find(attribute);
+    const bool attributeExists = targetIndex != AttributeSet::INVALID_POS;
 
-    if (targetIndex == AttributeSet::INVALID_POS) {
-        // if the attribute is missing, append one based on the source grid's value type
+    if (std::is_same<TargetValueT, DummySampleType>::value) {
+        if (!attributeExists) {
+            // append attribute of source grid value type
+            appendAttribute<typename SourceGridT::ValueType>(points.tree(), attribute);
+            targetIndex = leaf->attributeSet().descriptor().find(attribute);
+            assert(targetIndex != AttributeSet::INVALID_POS);
 
-        appendAttribute<typename SourceGridT::ValueType>(points.tree(), attribute);
-        targetIndex = leafIter->attributeSet().descriptor().find(attribute);
-        assert(targetIndex != AttributeSet::INVALID_POS);
-    }
+            // sample using same type as source grid
+            pointDataSampler.template sample<SourceGridT>(sourceGrid, targetIndex);
+        }
+        else {
+            // attempt to explicitly sample using type of existing attribute
+            const Name& targetType = descriptor.valueType(targetIndex);
+            if (targetType == typeNameAsString<Vec3f>()) {
+                pointDataSampler.template sample<SourceGridT, Vec3f>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<Vec3d>()) {
+                pointDataSampler.template sample<SourceGridT, Vec3d>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<Vec3i>()) {
+                pointDataSampler.template sample<SourceGridT, Vec3i>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<int16_t>()) {
+                pointDataSampler.template sample<SourceGridT, int16_t>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<int32_t>()) {
+                pointDataSampler.template sample<SourceGridT, int32_t>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<int64_t>()) {
+                pointDataSampler.template sample<SourceGridT, int64_t>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<float>()) {
+                pointDataSampler.template sample<SourceGridT, float>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<double>()) {
+                pointDataSampler.template sample<SourceGridT, double>(sourceGrid, targetIndex);
+            } else if (targetType == typeNameAsString<bool>()) {
+                pointDataSampler.template sample<SourceGridT, bool>(sourceGrid, targetIndex);
+            } else {
+                std::ostringstream ostr;
+                ostr << "Cannot sample attribute of type - " << targetType;
+                OPENVDB_THROW(TypeError, ostr.str());
+            }
+        }
+    } else {
+        if (!attributeExists) {
+            // append attribute of target value type
+            // (point_sample_internal wrapper disables the ability to use DummySampleType)
+            AppendAttributeOp<PointDataGridT, TargetValueT>::append(points, attribute);
+            targetIndex = leaf->attributeSet().descriptor().find(attribute);
+            assert(targetIndex != AttributeSet::INVALID_POS);
+        }
+        else {
+            const Name targetType = typeNameAsString<TargetValueT>();
+            const Name attributeType = descriptor.valueType(targetIndex);
+            if (targetType != attributeType) {
+                std::ostringstream ostr;
+                ostr << "Requested attribute type " << targetType << " for sampling "
+                    << " does not match existing attribute type " << attributeType;
+                OPENVDB_THROW(TypeError, ostr.str());
+            }
+        }
 
-    const bool filterByGroups = !includeGroups.empty() || !excludeGroups.empty();
-
-    if (filterByGroups) {
-        const points::MultiGroupFilter multiGroupfilter(includeGroups, excludeGroups,
-            leafIter->attributeSet());
-        point_sample_internal::PointDataSampler
-            <SourceGridT, PointDataGridT, points::MultiGroupFilter, InterrupterT, Order>
-                pointDataSampler(points, sourceGrid, multiGroupfilter);
-
-        pointDataSampler.sample(targetIndex);
-    }
-    else {
-        point_sample_internal::PointDataSampler
-            <SourceGridT, PointDataGridT, points::NullFilter, InterrupterT, Order>
-                pointDataSampler(points, sourceGrid);
-
-        pointDataSampler.sample(targetIndex);
+        // sample using target value type
+        pointDataSampler.template sample<SourceGridT, TargetValueT>(sourceGrid, targetIndex);
     }
 }
 
-
-} // namespace point_sample_internal
-
-
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT>
-inline void
-pointSample(PointDataGridT& points,
-            const SourceGridT& sourceGrid,
-            const Name& targetAttribute,
-            const std::vector<Name>& includeGroups,
-            const std::vector<Name>& excludeGroups,
-            InterrupterT* const interrupter)
+template<typename PointDataGridT, typename SourceGridT, typename FilterT, typename InterrupterT>
+inline void pointSample(PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute,
+                        const FilterT& filter,
+                        InterrupterT* const interrupter)
 {
-    using namespace point_sample_internal;
-    sampleGrid<SourceGridT, PointDataGridT, InterrupterT, 0>
-        (points, sourceGrid, targetAttribute, includeGroups, excludeGroups, interrupter);
+    SampleWithRounding sampler;
+    sampleGrid(/*order=*/0, points, sourceGrid, targetAttribute, filter, sampler, interrupter);
 }
 
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT>
-inline void
-boxSample(PointDataGridT& points,
-          const SourceGridT& sourceGrid,
-          const Name& targetAttribute,
-          const std::vector<Name>& includeGroups,
-          const std::vector<Name>& excludeGroups,
-          InterrupterT* const interrupter)
+template<typename PointDataGridT, typename SourceGridT, typename FilterT, typename InterrupterT>
+inline void boxSample(  PointDataGridT& points,
+                        const SourceGridT& sourceGrid,
+                        const Name& targetAttribute,
+                        const FilterT& filter,
+                        InterrupterT* const interrupter)
 {
-    using namespace point_sample_internal;
-    sampleGrid<SourceGridT, PointDataGridT, InterrupterT, 1>
-        (points, sourceGrid, targetAttribute, includeGroups, excludeGroups, interrupter);
+    SampleWithRounding sampler;
+    sampleGrid(/*order=*/1, points, sourceGrid, targetAttribute, filter, sampler, interrupter);
 }
 
-template<
-    typename SourceGridT,
-    typename PointDataGridT,
-    typename InterrupterT>
-inline void
-quadraticSample(PointDataGridT& points,
-                const SourceGridT& sourceGrid,
-                const Name& targetAttribute,
-                const std::vector<Name>& includeGroups,
-                const std::vector<Name>& excludeGroups,
-                InterrupterT* const interrupter)
+template<typename PointDataGridT, typename SourceGridT, typename FilterT, typename InterrupterT>
+inline void quadraticSample(PointDataGridT& points,
+                            const SourceGridT& sourceGrid,
+                            const Name& targetAttribute,
+                            const FilterT& filter,
+                            InterrupterT* const interrupter)
 {
-    using namespace point_sample_internal;
-    sampleGrid<SourceGridT, PointDataGridT, InterrupterT, 2>
-        (points, sourceGrid, targetAttribute, includeGroups, excludeGroups, interrupter);
+    SampleWithRounding sampler;
+    sampleGrid(/*order=*/2, points, sourceGrid, targetAttribute, filter, sampler, interrupter);
 }
 
 

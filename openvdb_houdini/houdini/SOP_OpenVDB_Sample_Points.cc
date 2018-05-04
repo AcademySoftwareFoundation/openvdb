@@ -43,7 +43,9 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 
 #include <openvdb/tools/Interpolation.h>  // for box sampler
+#include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointSample.h>
+#include <openvdb/points/IndexFilter.h>   // for MultiGroupFilter
 
 #include <tbb/tick_count.h>                 // for timing
 #include <tbb/task.h>                       // for cancel
@@ -117,9 +119,10 @@ struct VDBPointsSampler
         warnOnExisting(attributeName);
         const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
         for (auto& pointGrid : mPointGrids) {
-            cvdb::points::pointSample<GridType, cvdb::points::PointDataGrid, hvdb::Interrupter>
-                (*pointGrid, grid, attributeName, mIncludeGroups,
-                    mExcludeGroups, interrupter);
+            auto leaf = pointGrid->tree().cbeginLeaf();
+            if (!leaf)  continue;
+            cvdb::points::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf->attributeSet());
+            cvdb::points::pointSample(*pointGrid, grid, attributeName, filter, interrupter);
         }
     }
 
@@ -132,9 +135,10 @@ struct VDBPointsSampler
         warnOnExisting(attributeName);
         const GridType& grid = UTvdbGridCast<GridType>(sourceGrid);
         for (auto& pointGrid : mPointGrids) {
-            cvdb::points::boxSample<GridType, cvdb::points::PointDataGrid, hvdb::Interrupter>
-                (*pointGrid, grid, attributeName, mIncludeGroups,
-                    mExcludeGroups, interrupter);
+            auto leaf = pointGrid->tree().cbeginLeaf();
+            if (!leaf)  continue;
+            cvdb::points::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf->attributeSet());
+            cvdb::points::boxSample(*pointGrid, grid, attributeName, filter, interrupter);
         }
     }
 
