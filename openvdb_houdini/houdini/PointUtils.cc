@@ -926,48 +926,42 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
 {
     using HoudiniPositionAttribute = HoudiniReadAttribute<Vec3d>;
 
-    // store point group information
+    // initialize primitive offsets
 
-    const GA_ElementGroupTable& elementGroups = ptGeo.getElementGroupTable(GA_ATTRIB_POINT);
-
-    // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
-
-    const GA_Attribute& positionAttribute = *ptGeo.getP();
-
-    OffsetListPtr offsets;
-    OffsetPairListPtr offsetPairs;
-
-    size_t vertexCount = 0;
+    hvdb::OffsetListPtr offsets;
+    hvdb::OffsetPairListPtr offsetPairs;
 
     for (GA_Iterator primitiveIt(ptGeo.getPrimitiveRange()); !primitiveIt.atEnd(); ++primitiveIt) {
         const GA_Primitive* primitive = ptGeo.getPrimitiveList().get(*primitiveIt);
 
         if (primitive->getTypeId() != GA_PRIMNURBCURVE) continue;
 
-        vertexCount = primitive->getVertexCount();
-
+        size_t vertexCount = primitive->getVertexCount();
         if (vertexCount == 0)  continue;
 
-        if (!offsets)   offsets.reset(new OffsetList);
+        if (!offsets)  offsets.reset(new hvdb::OffsetList);
 
         GA_Offset firstOffset = primitive->getPointOffset(0);
         offsets->push_back(firstOffset);
 
         if (vertexCount > 1) {
-            if (!offsetPairs)   offsetPairs.reset(new OffsetPairList);
+            if (!offsetPairs)  offsetPairs.reset(new hvdb::OffsetPairList);
 
             for (size_t i = 1; i < vertexCount; i++) {
                 GA_Offset offset = primitive->getPointOffset(i);
-                offsetPairs->push_back(OffsetPair(firstOffset, offset));
+                offsetPairs->push_back(hvdb::OffsetPair(firstOffset, offset));
             }
         }
     }
 
+    // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
+
+    const GA_Attribute& positionAttribute = *ptGeo.getP();
     HoudiniPositionAttribute points(positionAttribute, offsets);
 
     // Create PointIndexGrid used for consistent index ordering in all attribute conversion
 
-    tools::PointIndexGrid::Ptr pointIndexGrid =
+    const tools::PointIndexGrid::Ptr pointIndexGrid =
         tools::createPointIndexGrid<tools::PointIndexGrid>(points, transform);
 
     // Create PointDataGrid using position attribute
@@ -975,61 +969,79 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
     PointDataGrid::Ptr pointDataGrid;
 
     if (compression == 1 /*FIXED_POSITION_16*/) {
-        pointDataGrid = points::createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
+        pointDataGrid = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
             *pointIndexGrid, points, transform);
     }
     else if (compression == 2 /*FIXED_POSITION_8*/) {
-        pointDataGrid = points::createPointDataGrid<FixedPointCodec<true>, PointDataGrid>(
+        pointDataGrid = createPointDataGrid<FixedPointCodec<true>, PointDataGrid>(
             *pointIndexGrid, points, transform);
     }
     else /*NONE*/ {
-        pointDataGrid = points::createPointDataGrid<NullCodec, PointDataGrid>(
+        pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(
             *pointIndexGrid, points, transform);
     }
 
-    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
+    const tools::PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
-    PointDataTree::LeafIter leafIter = tree.beginLeaf();
 
-    if (!leafIter)  return pointDataGrid;
+    const int64_t numHoudiniPoints = ptGeo.getNumPoints();
+    const Index64 numVDBPoints = pointCount(tree);
+    assert(numVDBPoints <= numHoudiniPoints);
 
-    // Append (empty) groups to tree
-
-    std::vector<Name> groupNames;
-    groupNames.reserve(elementGroups.entries());
-
-    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
-        it != itEnd; ++it)
-    {
-        groupNames.push_back((*it)->getName().toStdString());
+    if (numVDBPoints < numHoudiniPoints) {
+        warnings("Points contain NAN positional values. These points will not be converted.");
     }
 
-    appendGroups(tree, groupNames);
+    if (!tree.cbeginLeaf())  return pointDataGrid;
 
-    // Set group membership in tree
+    // store point group information
 
-    const int64_t numPoints = ptGeo.getNumPoints();
-    std::vector<short> inGroup(numPoints, short(0));
+    const GA_ElementGroupTable& elementGroups = ptGeo.getElementGroupTable(GA_ATTRIB_POINT);
+    const size_t numGroups = elementGroups.entries(); // including internal groups
 
-    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
-        it != itEnd; ++it)
-    {
-        // insert group offsets
+    if (numGroups > 0) {
 
-        GA_Offset start, end;
-        GA_Range range(**it);
-        for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
-            end = std::min(end, GA_Offset(numPoints));
-            for (GA_Offset off = start; off < end; ++off) {
-                UT_ASSERT(off < GA_Offset(numPoints));
-                inGroup[off] = short(1);
-            }
+        // Append (empty) groups to tree
+
+        std::vector<Name> groupNames;
+        groupNames.reserve(numGroups);
+
+        for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
+            it != itEnd; ++it) {
+            groupNames.emplace_back((*it)->getName().toStdString());
         }
 
-        const Name groupName = (*it)->getName().toStdString();
-        setGroup(tree, indexTree, inGroup, groupName);
+        appendGroups(tree, groupNames);
 
-        std::fill(inGroup.begin(), inGroup.end(), short(0));
+        std::vector<short> inGroup(numHoudiniPoints, short(0));
+
+        // Set group membership in tree
+        // @todo parallelize group membership construction
+
+        for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
+            it != itEnd; ++it) {
+
+            GA_Offset start, end;
+            GA_Range range(**it);
+            for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
+                end = std::min(end, numHoudiniPoints);
+                for (GA_Offset off = start; off < end; ++off) {
+                    UT_ASSERT(off < GA_Offset(numHoudiniPoints));
+                    inGroup[off] = short(1);
+                }
+            }
+
+            const Name groupName = (*it)->getName().toStdString();
+            setGroup(tree, indexTree, inGroup, groupName);
+
+            // reset groups to 0
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, inGroup.size()),
+                [&inGroup](const tbb::blocked_range<size_t>& range) {
+                    for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+                        inGroup[n] = short(0);
+                    }
+                });
+        }
     }
 
     // Add other attributes to PointDataGrid
