@@ -488,7 +488,6 @@ struct ConvertPointDataGridPositionOp {
 
     void operator()(const LeafRangeT& range) const
     {
-        FilterT newFilter(mFilter);
         HandleT pHandle(mAttribute);
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
@@ -508,7 +507,7 @@ struct ConvertPointDataGridPositionOp {
                 convert(iter, pHandle, *handle, offset);
             }
             else {
-                auto iter = leaf->beginIndexOn(newFilter);
+                auto iter = leaf->beginIndexOn(mFilter);
                 convert(iter, pHandle, *handle, offset);
             }
         }
@@ -577,7 +576,6 @@ struct ConvertPointDataGridAttributeOp {
 
     void operator()(const LeafRangeT& range) const
     {
-        FilterT newFilter(mFilter);
         HandleT pHandle(mAttribute);
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
@@ -597,7 +595,7 @@ struct ConvertPointDataGridAttributeOp {
                 auto iter = leaf->beginIndexOn();
                 convert(iter, pHandle, *handle, offset);
             } else {
-                auto iter = leaf->beginIndexOn(newFilter);
+                auto iter = leaf->beginIndexOn(mFilter);
                 convert(iter, pHandle, *handle, offset);
             }
         }
@@ -660,8 +658,6 @@ struct ConvertPointDataGridGroupOp {
 
     void operator()(const LeafRangeT& range) const
     {
-        FilterT newFilter(mFilter);
-
         for (auto leaf = range.begin(); leaf; ++leaf) {
 
             assert(leaf.pos() < mPointOffsets.size());
@@ -681,7 +677,7 @@ struct ConvertPointDataGridGroupOp {
                 convert(iter, groupArray, offset);
             }
             else {
-                auto iter = leaf->beginIndexOn(newFilter);
+                auto iter = leaf->beginIndexOn(mFilter);
                 convert(iter, groupArray, offset);
             }
         }

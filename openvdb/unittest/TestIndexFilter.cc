@@ -50,6 +50,7 @@ public:
     void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestIndexFilter);
+    CPPUNIT_TEST(testActiveFilter);
     CPPUNIT_TEST(testMultiGroupFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
     CPPUNIT_TEST(testAttributeHashFilter);
@@ -58,6 +59,7 @@ public:
     CPPUNIT_TEST(testBinaryFilter);
     CPPUNIT_TEST_SUITE_END();
 
+    void testActiveFilter();
     void testMultiGroupFilter();
     void testRandomLeafFilter();
     void testAttributeHashFilter();
@@ -186,6 +188,123 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
 
 
 void
+TestIndexFilter::testActiveFilter()
+{
+    // create a point grid, three points are stored in two leafs
+
+    PointDataGrid::Ptr points;
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1f, 10, 1}};
+
+    const double voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+
+    // check there are two leafs
+
+    CPPUNIT_ASSERT_EQUAL(Index32(2), points->tree().leafCount());
+
+    ActiveFilter activeFilter;
+    InActiveFilter inActiveFilter;
+
+    CPPUNIT_ASSERT_EQUAL(index::PARTIAL, activeFilter.state());
+    CPPUNIT_ASSERT_EQUAL(index::PARTIAL, inActiveFilter.state());
+
+    { // test default active / inactive values
+        auto leafIter = points->tree().cbeginLeaf();
+
+        CPPUNIT_ASSERT_EQUAL(index::PARTIAL, activeFilter.state(*leafIter));
+        CPPUNIT_ASSERT_EQUAL(index::PARTIAL, inActiveFilter.state(*leafIter));
+
+        auto indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+
+    auto firstLeaf = points->tree().beginLeaf();
+
+    { // set all voxels to be inactive in the first leaf
+        firstLeaf->getValueMask().set(false);
+
+        auto leafIter = points->tree().cbeginLeaf();
+
+        CPPUNIT_ASSERT_EQUAL(index::NONE, activeFilter.state(*leafIter));
+        CPPUNIT_ASSERT_EQUAL(index::ALL, inActiveFilter.state(*leafIter));
+
+        auto indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(!activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+
+    { // set all voxels to be active in the first leaf
+        firstLeaf->getValueMask().set(true);
+
+        auto leafIter = points->tree().cbeginLeaf();
+
+        CPPUNIT_ASSERT_EQUAL(index::ALL, activeFilter.state(*leafIter));
+        CPPUNIT_ASSERT_EQUAL(index::NONE, inActiveFilter.state(*leafIter));
+
+        auto indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndexAll();
+        activeFilter.reset(*leafIter);
+        inActiveFilter.reset(*leafIter);
+
+        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
+        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+}
+
+void
 TestIndexFilter::testMultiGroupFilter()
 {
     using LeafNode          = PointDataTree::LeafNodeType;
@@ -246,10 +365,10 @@ TestIndexFilter::testMultiGroupFilter()
         std::vector<Name> include;
         std::vector<Name> exclude;
         MultiGroupFilter filter(include, exclude, leaf->attributeSet());
-        CPPUNIT_ASSERT(filter.state() == index::ALL);
+        CPPUNIT_ASSERT_EQUAL(filter.state(), index::ALL);
         include.push_back("all");
         MultiGroupFilter filter2(include, exclude, leaf->attributeSet());
-        CPPUNIT_ASSERT(filter2.state() == index::PARTIAL);
+        CPPUNIT_ASSERT_EQUAL(filter2.state(), index::PARTIAL);
     }
 
     // test multi group iteration

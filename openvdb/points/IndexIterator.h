@@ -125,13 +125,16 @@ public:
     Index32 offset() { return mOffset; }
     inline bool next() { this->operator++(); return this->test(); }
 
-    /// @brief For efficiency, Coord assumed to be readily available
+    /// @brief For efficiency, Coord and active state assumed to be readily available
     /// when iterating over indices of a single voxel
     Coord getCoord [[noreturn]] () const {
         OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord.");
     }
     void getCoord [[noreturn]] (Coord& /*coord*/) const {
         OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord.");
+    }
+    bool isValueOn [[noreturn]] () const {
+        OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not test if voxel is active.");
     }
 
     /// @{
@@ -218,6 +221,9 @@ public:
         inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
         /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
         inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
+
+        /// @brief Return @c true if this iterator is pointing to an active value.
+        inline bool isValueOn() const { assert(mIter); return mIter.isValueOn(); }
 
         /// Return the const value iterator
         inline const IteratorT& valueIter() const { return mIter; }
@@ -314,6 +320,9 @@ public:
     inline Coord getCoord() const { assert(mIterator); return mIterator.getCoord(); }
     /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
     inline void getCoord(Coord& xyz) const { assert(mIterator); xyz = mIterator.getCoord(); }
+
+    /// @brief Return @c true if the value iterator is pointing to an active value.
+    inline bool isValueOn() const { assert(mIterator); return mIterator.valueIter().isValueOn(); }
 
     /// @brief Equality operators
     bool operator==(const IndexIter& other) const { return mIterator == other.mIterator; }

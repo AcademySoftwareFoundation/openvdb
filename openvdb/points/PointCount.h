@@ -124,14 +124,13 @@ Index64 pointCount(const PointDataTreeT& tree,
 
     auto countLambda =
         [&filter, &inCoreOnly] (const LeafRangeT& range, Index64 sum) -> Index64 {
-            FilterT newFilter(filter);
             for (const auto& leaf : range) {
                 if (inCoreOnly && leaf.buffer().isOutOfCore())  continue;
                 auto state = filter.state(leaf);
                 if (state == index::ALL) {
                     sum += leaf.pointCount();
                 } else if (state != index::NONE) {
-                    sum += iterCount(leaf.beginIndexAll(newFilter));
+                    sum += iterCount(leaf.beginIndexAll(filter));
                 }
             }
             return sum;
@@ -167,14 +166,12 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
     LeafManagerT leafManager(tree);
     leafManager.foreach(
         [&pointOffsets, &filter, &inCoreOnly](const LeafT& leaf, size_t pos) {
-            FilterT newFilter(filter);
             if (inCoreOnly && leaf.buffer().isOutOfCore())  return;
             auto state = filter.state(leaf);
             if (state == index::ALL) {
                 pointOffsets[pos] = leaf.pointCount();
             } else if (state != index::NONE) {
-                newFilter.reset(leaf);
-                pointOffsets[pos] = iterCount(leaf.beginIndexAll(newFilter));
+                pointOffsets[pos] = iterCount(leaf.beginIndexAll(filter));
             }
         },
     threaded);

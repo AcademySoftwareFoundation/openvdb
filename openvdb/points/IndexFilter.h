@@ -126,6 +126,7 @@ generateRandomSubset(const unsigned int seed, const IntType n, const IntType m)
 } // namespace index_filter_internal
 
 
+/// Index filtering on active / inactive state of host voxel
 template <bool On>
 class ValueMaskFilter
 {
@@ -146,7 +147,7 @@ public:
     template <typename IterT>
     bool valid(const IterT& iter) const
     {
-        const bool valueOn = iter.valueIter().isValueOn();
+        const bool valueOn = iter.isValueOn();
         return On ? valueOn : !valueOn;
     }
 };

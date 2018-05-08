@@ -999,14 +999,16 @@ template<typename ValueIterT, typename FilterT>
 inline IndexIter<ValueIterT, FilterT>
 PointDataLeafNode<T, Log2Dim>::beginIndex(const FilterT& filter) const
 {
-    FilterT newFilter(filter);
-    newFilter.reset(*this);
-
     // generate no-op iterator if filter evaluates no indices
 
     if (filter.state() == index::NONE) {
-        return IndexIter<ValueIterT, FilterT>(ValueIterT(), newFilter);
+        return IndexIter<ValueIterT, FilterT>(ValueIterT(), filter);
     }
+
+    // copy filter to ensure thread-safety
+
+    FilterT newFilter(filter);
+    newFilter.reset(*this);
 
     using IterTraitsT = tree::IterTraits<LeafNodeType, ValueIterT>;
 

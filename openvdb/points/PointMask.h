@@ -237,8 +237,6 @@ inline typename GridT::Ptr convertPointsToScalar(
 
     if (points.constTree().leafCount() == 0)            return grid;
 
-    FilterT newFilter(filter);
-
     // early exit if mask and no group logic
 
     if (std::is_same<ValueT, bool>::value && filter.state() == index::ALL) return grid;
@@ -254,9 +252,8 @@ inline typename GridT::Ptr convertPointsToScalar(
         tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
     } else {
         // build mask from points in parallel only where filter evaluates to true
-        FilterT newFilter(filter);
         PointsToScalarOp<GridT, PointDataGridT, FilterT> pointsToScalarOp(
-            points, newFilter);
+            points, filter);
         tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
     }
 
@@ -304,9 +301,8 @@ inline typename GridT::Ptr convertPointsToScalar(
             transform, pointsTransform, nullFilter, combiner);
         tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
     } else {
-        FilterT newFilter(filter);
         PointsToTransformedScalarOp<GridT, PointDataGridT, FilterT> pointsToScalarOp(
-            transform, pointsTransform, newFilter, combiner);
+            transform, pointsTransform, filter, combiner);
         tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
     }
 
