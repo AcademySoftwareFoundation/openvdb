@@ -26,11 +26,17 @@
 #
 
 # yue.nicholas@gmail.com
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 
 PROJECT ( OpenVDB )
 
 ENABLE_TESTING()
+
+find_program(CCACHE_FOUND ccache)
+if(CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif(CCACHE_FOUND)
 
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
@@ -41,6 +47,10 @@ OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
+
+SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "build for compatibility
+with version N of the OpenVDB Grid ABI, where N is 2, 3, 4, etc. 
+(some newer features will be disabled)")
 
 IF (OPENVDB_BUILD_HOUDINI_SOPS)
   SET ( OPENVDB_BUILD_PYTHON_MODULE OFF )
@@ -57,8 +67,14 @@ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 SET ( OPENVDB_TOP_LEVEL_DIR ${PROJECT_SOURCE_DIR} CACHE PATH "OpenVDB Top Level Directory to share among sub projects" )
 
 INCLUDE_DIRECTORIES ( ${OPENVDB_TOP_LEVEL_DIR} ) # To make sure we pick up headers from this version of OpenVDB we are building
+IF ( ${OPENVDB_ABI_VERSION_NUMBER} )
+  MESSAGE( STATUS "Using openvdb abi version ${OPENVDB_ABI_VERSION_NUMBER}")
+  
+  ADD_DEFINITIONS (-DOPENVDB_ABI_VERSION_NUMBER=${OPENVDB_ABI_VERSION_NUMBER} )
+ELSEIF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
 
-IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
+  MESSAGE( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated. Instead use OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version.")
+
   ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
 ENDIF ()
 

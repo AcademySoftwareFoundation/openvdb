@@ -4,25 +4,37 @@
 
 @htmlonly <a name="v5_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.1.0</B> - <I>In development</I>
+<B>Version 5.1.0</B> - <I>April 10, 2018</I>
 
 @par
 New features:
+- Added an option to
+  @vdblink::points::deleteFromGroups() points::deleteFromGroups@endlink
+  to delete the groups as well as the points.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 - Added a @c header_test Makefile target that checks library header files
   for dependencies on missing or indirectly included headers.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added support for @vdblink::math::Mat3s Mat3s@endlink and
+  @vdblink::math::Mat3d Mat3d@endlink point data
+  @vdblink::points::TypedAttributeArray typed attributes@endlink.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 
 @par
 Improvements:
+- Added per-test timings to <TT>vdb_test</TT> to help in identifying
+  performance regressions.
 - @vdblink::zeroVal zeroVal@endlink now returns a zero matrix instead of
   an identity matrix for @vdblink::math::Mat4s Mat4s@endlink
   and @vdblink::math::Mat4d Mat4d@endlink, and it is now also defined
   (and returns a zero matrix) for @vdblink::math::Mat3s Mat3s@endlink
   and @vdblink::math::Mat3d Mat3d@endlink.
-- Added support for @vdblink::math::Mat3s Mat3s@endlink and
-  @vdblink::math::Mat3d Mat3d@endlink point data
-  @vdblink::points::TypedAttributeArray typed attributes@endlink.
-  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+@par
+Python:
+- Fixed a bug introduced in version&nbsp;3.2.0 that caused
+  boolean and integer values added to a grid&rsquo;s metadata
+  to be stored as floating-point values.
 
 @par
 Houdini:
@@ -33,6 +45,10 @@ Houdini:
 - Added a Keep&nbsp;Original&nbsp;Geometry toggle to the
   Points&nbsp;Convert&nbsp;SOP and improved the efficiency of point unpacking.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added an option to the Points&nbsp;Delete&nbsp;SOP to delete point groups.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Fixed a rare crash when extracting points from a point data primitive.
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
 - Added a @b SOP_NodeVDB::evalStdString method that facilitates
   string parameter evaluation in expressions, e.g.,
   <TT>matchGroup(*gdp,&nbsp;evalStdString("group",&nbsp;time))</TT>.
@@ -44,6 +60,8 @@ Houdini:
 - Grid transforms are now more aggressively simplified, making it less likely
   to produce nonuniform voxels erroneously.
   <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a bug when copying and pasting a Create&nbsp;SOP that could cause
+  the Voxel&nbsp;Size toggle to change state.
 - Added a @b houdini_utils::OpFactory::setVerb method to register
   <A HREF="http://www.sidefx.com/docs/houdini/model/compile">
   compilable</A>&nbsp;SOPs.

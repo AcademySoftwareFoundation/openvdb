@@ -33,8 +33,12 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cstdio> // for std::remove()
+#include <cstdlib> // for std::getenv()
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef _MSC_VER
 #include <windows.h>
@@ -46,8 +50,8 @@ using namespace openvdb::points;
 class TestPointGroup: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointGroup);
     CPPUNIT_TEST(testDescriptor);
@@ -288,6 +292,50 @@ TestPointGroup::testAppendDrop()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(0));
     }
+
+    { // check that newly added groups have empty group membership
+
+        // recreate the grid with 3 points in one leaf
+
+        positions = {{1, 1, 1}, {1, 2, 1}, {2, 1, 1}};
+        grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+        PointDataTree& newTree = grid->tree();
+
+        appendGroup(newTree, "test");
+
+        // test that a completely new group (with a new group attribute)
+        // has empty membership
+
+        CPPUNIT_ASSERT(newTree.cbeginLeaf());
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "test"), Index64(0));
+
+        // check that membership in a group that was not created with a
+        // new attribute array is still empty.
+        // we will append a second group, set its membership, then
+        // drop it and append a new group with the same name again
+
+        appendGroup(newTree, "test2");
+
+        PointDataTree::LeafIter leafIter2 = newTree.beginLeaf();
+        CPPUNIT_ASSERT(leafIter2);
+
+        GroupWriteHandle test2Handle = leafIter2->groupWriteHandle("test2");
+
+        test2Handle.set(0, true);
+        test2Handle.set(2, true);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "test2"), Index64(2));
+
+        // drop and re-add group
+
+        dropGroup(newTree, "test2");
+        appendGroup(newTree, "test2");
+
+        // check that group is fully cleared and does not have previously existing data
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "test2"), Index64(0));
+    }
+
 }
 
 

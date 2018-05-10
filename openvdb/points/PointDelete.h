@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-/// @author Nick Avramoussis, Francisco Gochez
+/// @author Nick Avramoussis, Francisco Gochez, Dan Bailey
 ///
 /// @file PointDelete.h
 ///
@@ -45,6 +45,11 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 
+#include <memory>
+#include <string>
+#include <vector>
+
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -54,34 +59,42 @@ namespace points {
 /// @brief   Delete points that are members of specific groups
 ///
 /// @details This method will delete points which are members of any of the supplied groups and
-///          drop the groups from the tree. Optionally an invert flag can be used to delete
-///          points that belong to none of the groups.
+///          will optionally drop the groups from the tree. An invert flag can be used to
+///          delete points that belong to none of the groups.
 ///
 /// @param   pointTree    the point tree
 /// @param   groups       the groups from which to delete points
 /// @param   invert       if enabled, points not belonging to any of the groups will be deleted
+/// @param   drop         if enabled and invert is disabled, the groups will be dropped from the tree
 ///
-/// @note    If the invert flag is true, none of the groups will be dropped after deleting points.
+/// @note    If the invert flag is true, none of the groups will be dropped after deleting points
+///          regardless of the value of the drop parameter.
 
-template <typename PointDataTree>
-inline void deleteFromGroups(PointDataTree& pointTree, const std::vector<std::string>& groups,
-                             bool invert = false);
+template <typename PointDataTreeT>
+inline void deleteFromGroups(PointDataTreeT& pointTree,
+                             const std::vector<std::string>& groups,
+                             bool invert = false,
+                             bool drop = true);
 
 /// @brief   Delete points that are members of a group
 ///
-/// @details This method will delete points which are members of the supplied group and drop the
-///          group from the tree. Optionally an invert flag can be used to delete
-///          points that belong to none of the groups.
+/// @details This method will delete points which are members of the supplied group and will
+///          optionally drop the group from the tree. An invert flag can be used to
+///          delete points that belong to none of the groups.
 ///
 /// @param   pointTree    the point tree with the group to delete
 /// @param   group        the name of the group to delete
-/// @param   invert       If this flag is set to true, points *not* in this group will be deleted
+/// @param   invert       if enabled, points not belonging to any of the groups will be deleted
+/// @param   drop         if enabled and invert is disabled, the group will be dropped from the tree
 ///
-/// @note    If the invert flag is true, the group will not be dropped after deleting points.
+/// @note    If the invert flag is true, the group will not be dropped after deleting points
+///          regardless of the value of the drop parameter.
 
-template <typename PointDataTree>
-inline void deleteFromGroup(PointDataTree& pointTree, const std::string& group,
-                            bool invert = false);
+template <typename PointDataTreeT>
+inline void deleteFromGroup(PointDataTreeT& pointTree,
+                            const std::string& group,
+                            bool invert = false,
+                            bool drop = true);
 
 
 ////////////////////////////////////////
@@ -130,11 +143,24 @@ struct DeleteByFilterOp
             std::vector<const AttributeArray*> existingAttributeArrays;
 
             for (size_t i = 0; i < attributeSetSize; i++) {
-                newAttributeArrays.push_back(newAttributeSet->get(i));
-                existingAttributeArrays.push_back(existingAttributeSet.getConst(i));
+                AttributeArray* newArray = newAttributeSet->get(i);
+                const AttributeArray* existingArray = existingAttributeSet.getConst(i);
+
+                if (!newArray->hasConstantStride() || !existingArray->hasConstantStride()) {
+                    OPENVDB_THROW(openvdb::NotImplementedError,
+                        "Transfer of attribute values for dynamic arrays not currently supported.");
+                }
+
+                if (newArray->stride() != existingArray->stride()) {
+                    OPENVDB_THROW(openvdb::LookupError,
+                        "Cannot transfer attribute values with mis-matching strides.");
+                }
+
+                newAttributeArrays.push_back(newArray);
+                existingAttributeArrays.push_back(existingArray);
             }
 
-            typename ValueType::IntType attributeIndex = 0;
+            Index attributeIndex = 0;
             std::vector<ValueType> endOffsets;
 
             endOffsets.reserve(LeafNodeT::NUM_VALUES);
@@ -142,14 +168,15 @@ struct DeleteByFilterOp
             // now construct new attribute arrays which exclude data from deleted points
 
             for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
-                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter); iter; ++iter) {
+                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter);
+                     iter; ++iter) {
                     for (size_t i = 0; i < attributeSetSize; i++) {
-                        newAttributeArrays[i]->set(static_cast<Index>(attributeIndex),
-                            *(existingAttributeArrays[i]), *iter);
+                        newAttributeArrays[i]->set(attributeIndex, *(existingAttributeArrays[i]),
+                            *iter);
                     }
                     ++attributeIndex;
                 }
-                endOffsets.push_back(ValueType(attributeIndex));
+                endOffsets.push_back(static_cast<ValueType>(attributeIndex));
             }
 
             leaf->replaceAttributeSet(newAttributeSet);
@@ -168,8 +195,10 @@ private:
 
 
 template <typename PointDataTreeT>
-inline void deleteFromGroups(PointDataTreeT& pointTree, const std::vector<std::string>& groups,
-    bool invert)
+inline void deleteFromGroups(PointDataTreeT& pointTree,
+                             const std::vector<std::string>& groups,
+                             bool invert,
+                             bool drop)
 {
     const typename PointDataTreeT::LeafCIter leafIter = pointTree.cbeginLeaf();
 
@@ -207,19 +236,22 @@ inline void deleteFromGroups(PointDataTreeT& pointTree, const std::vector<std::s
 
     tools::pruneInactive(pointTree);
 
-    // drop the now-empty groups (unless invert = true)
+    // drop the now-empty groups if requested (unless invert = true)
 
-    if (!invert) {
+    if (drop && !invert) {
         dropGroups(pointTree, availableGroups);
     }
 }
 
 template <typename PointDataTreeT>
-inline void deleteFromGroup(PointDataTreeT& pointTree, const std::string& group, bool invert)
+inline void deleteFromGroup(PointDataTreeT& pointTree,
+                            const std::string& group,
+                            bool invert,
+                            bool drop)
 {
     std::vector<std::string> groups(1, group);
 
-    deleteFromGroups(pointTree, groups, invert);
+    deleteFromGroups(pointTree, groups, invert, drop);
 }
 
 

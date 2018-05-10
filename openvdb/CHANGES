@@ -1,19 +1,28 @@
 OpenVDB Version History
 =======================
 
-Version 5.1.0 - In development
+Version 5.1.0 - April 10, 2018
 
     New features:
+    - Added an option to points::deleteFromGroups() to delete the groups
+      as well as the points.
+      [Contributed by Nick Avramoussis]
     - Added a header_test Makefile target that checks library header files
       for dependencies on missing or indirectly included headers.
       [Contributed by Dan Bailey]
+    - Added support for Mat3s and Mat3d point data typed attributes.
+      [Contributed by Dan Bailey]
 
     Improvements:
+    - Added per-test timings to vdb_test to help in identifying
+      performance regressions.
     - zeroVal() now returns a zero matrix instead of an identity matrix
       for Mat4s and Mat4d, and it is now also defined (and returns
       a zero matrix) for Mat3s and Mat3d.
-    - Added support for Mat3s and Mat3d point data typed attributes.
-      [Contributed by Dan Bailey]
+
+    Python:
+    - Fixed a bug introduced in version 3.2.0 that caused boolean and integer
+      values added to a grid's metadata to be stored as floating-point values.
 
     Houdini:
     - Added options to the Clip SOP to expand or shrink the clipping region
@@ -23,6 +32,10 @@ Version 5.1.0 - In development
     - Added a Keep Original Geometry toggle to the Points Convert SOP
       and improved the efficiency of point unpacking.
       [Contributed by Dan Bailey]
+    - Added an option to the Points Delete SOP to delete point groups.
+      [Contributed by Nick Avramoussis]
+    - Fixed a rare crash when extracting points from a point data primitive.
+      [Contributed by Jeff Lait]
     - Added a SOP_NodeVDB::evalStdString() method that facilitates
       string parameter evaluation in expressions, e.g.,
       matchGroup(*gdp, evalStdString("group", time)).
@@ -34,6 +47,8 @@ Version 5.1.0 - In development
     - Grid transforms are now more aggressively simplified, making it
       less likely to produce nonuniform voxels erroneously.
       [Contributed by Jeff Lait]
+    - Fixed a bug when copying and pasting a Create SOP that could cause
+      the Voxel Size toggle to change state.
     - Added a houdini_utils::OpFactory::setVerb() method to register
       compilable SOPs.
     - Made SOP_NodeVDB::cookMySop() final (that is, non-overridable)

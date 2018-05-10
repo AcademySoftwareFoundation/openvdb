@@ -114,7 +114,7 @@ private:
         for (const auto& name : names) {
             try {
                 indices.emplace_back(attributeSet.groupIndex(name));
-            } catch (LookupError) {
+            } catch (LookupError&) {
                 // silently drop group names that don't exist
             }
         }

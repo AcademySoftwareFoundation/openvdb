@@ -81,6 +81,9 @@ public:
 protected:
     OP_ERROR cookVDBSop(OP_Context&) override;
 #endif
+
+protected:
+    bool updateParmsFlags() override;
 }; // class SOP_OpenVDB_Points_Delete
 
 
@@ -107,8 +110,12 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Invert point deletion so that points not belonging to any of the \
-            groups will be deleted."));
+        .setHelpText("Invert point deletion so that points not belonging to any of the "
+            "groups will be deleted."));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "dropgroups", "Drop Points Groups")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Drop the VDB points groups that were used for deletion. This option is "
+            "ignored if \"invert\" is enabled."));
 
     //////////
     // Register this operator.
@@ -141,6 +148,15 @@ members of the supplied group(s).\n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
 }
+
+bool
+SOP_OpenVDB_Points_Delete::updateParmsFlags()
+{
+    const bool invert = evalInt("invert", 0, 0) != 0;
+
+    return enableParm("dropgroups", !invert);
+}
+
 
 ////////////////////////////////////////
 
@@ -181,12 +197,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
         UT_AutoInterrupt progress("Processing points group deletion");
 
         const bool invert = evalInt("invert", 0, context.getTime());
+        const bool drop = evalInt("dropgroups", 0, context.getTime());
 
         // select Houdini primitive groups we wish to use
-        const GA_PrimitiveGroup *group =
-            matchGroup(*gdp, evalStdString("group", context.getTime()));
-
-        hvdb::VdbPrimIterator vdbIt(gdp, group);
+        hvdb::VdbPrimIterator vdbIt(gdp,
+            matchGroup(*gdp, evalStdString("group", context.getTime())));
 
         for (; vdbIt; ++vdbIt) {
             if (progress.wasInterrupted()) {
@@ -198,11 +213,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
                     openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
 
             // early exit if the grid is of the wrong type
-            if (!inputGrid)    continue;
+            if (!inputGrid) continue;
 
             // early exit if the tree is empty
             auto leafIter = inputGrid->tree().cbeginLeaf();
-            if (!leafIter)    continue;
+            if (!leafIter) continue;
 
             // extract names of all selected VDB groups
 
@@ -219,15 +234,15 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
 
             const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
             const bool hasPointsToDrop = std::any_of(pointGroups.begin(), pointGroups.end(),
-                [&descriptor](const std::string& grp) -> bool { return descriptor.hasGroup(grp); });
+                [&descriptor](const std::string& group) { return descriptor.hasGroup(group); });
 
-            if (!hasPointsToDrop)    continue;
+            if (!hasPointsToDrop) continue;
 
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();
 
             PointDataGrid& outputGrid = UTvdbGridCast<PointDataGrid>(vdbPrim->getGrid());
-            deleteFromGroups(outputGrid.tree(), pointGroups, invert);
+            deleteFromGroups(outputGrid.tree(), pointGroups, invert, drop);
         }
 
     } catch (const std::exception& e) {

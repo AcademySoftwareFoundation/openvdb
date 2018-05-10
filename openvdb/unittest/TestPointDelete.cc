@@ -33,9 +33,8 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDelete.h>
-
-#include <iostream>
-#include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef _MSC_VER
 #include <windows.h>
@@ -71,7 +70,7 @@ TestPointDelete::testDeleteFromGroups()
     const float voxelSize(1.0);
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
-    std::vector<Vec3s> positions6Points =  {
+    const std::vector<Vec3s> positions6Points =  {
                                                 {1, 1, 1},
                                                 {1, 2, 1},
                                                 {2, 1, 1},
@@ -89,7 +88,8 @@ TestPointDelete::testDeleteFromGroups()
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList6Points, *transform);
 
         PointDataGrid::Ptr grid =
-                createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList6Points, *transform);
+            createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList6Points,
+                *transform);
         PointDataTree& tree = grid->tree();
 
         // first test will delete 3 groups, with the third one empty.
@@ -146,8 +146,8 @@ TestPointDelete::testDeleteFromGroups()
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList4Points, *transform);
 
         PointDataGrid::Ptr grid =
-                createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
-                                                              pointList4Points, *transform);
+            createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
+                pointList4Points, *transform);
         PointDataTree& tree = grid->tree();
 
         appendGroup(tree, "test");
@@ -189,8 +189,8 @@ TestPointDelete::testDeleteFromGroups()
         PointIndexGrid::Ptr pointIndexGrid =
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList6Points, *transform);
         PointDataGrid::Ptr grid =
-                createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList6Points,
-                                                              *transform);
+            createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList6Points,
+                *transform);
         PointDataTree& tree = grid->tree();
 
         appendGroup(tree, "test1");
@@ -210,7 +210,7 @@ TestPointDelete::testDeleteFromGroups()
 
         std::vector<std::string> groupsToDelete{"test1", "test3"};
 
-        deleteFromGroups(tree, groupsToDelete, true);
+        deleteFromGroups(tree, groupsToDelete, /*invert=*/ true);
 
         const PointDataTree::LeafCIter leafIterAfterDeletion = tree.cbeginLeaf();
         const AttributeSet attributeSetAfterDeletion = leafIterAfterDeletion->attributeSet();
@@ -224,6 +224,55 @@ TestPointDelete::testDeleteFromGroups()
         CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(pointCount(tree)),
                              static_cast<size_t>(4));
     }
+
+    {
+        // similar to first test, but don't drop groups
+
+        PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList6Points, *transform);
+
+        PointDataGrid::Ptr grid =
+            createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList6Points,
+                *transform);
+        PointDataTree& tree = grid->tree();
+
+        // first test will delete 3 groups, with the third one empty.
+
+        appendGroup(tree, "test1");
+        appendGroup(tree, "test2");
+        appendGroup(tree, "test3");
+        appendGroup(tree, "test4");
+
+        std::vector<short> membership1{1, 0, 0, 0, 0, 1};
+
+        setGroup(tree, pointIndexGrid->tree(), membership1, "test1");
+
+        std::vector<short> membership2{0, 0, 1, 1, 0, 1};
+
+        setGroup(tree, pointIndexGrid->tree(), membership2, "test2");
+
+        std::vector<std::string> groupsToDelete{"test1", "test2", "test3"};
+
+        deleteFromGroups(tree, groupsToDelete, /*invert=*/ false, /*drop=*/ false);
+
+        // 4 points should have been deleted, so only 2 remain
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(2));
+
+        // check that first three groups are deleted but the last is not
+
+        const PointDataTree::LeafCIter leafIterAfterDeletion = tree.cbeginLeaf();
+
+        AttributeSet attributeSetAfterDeletion = leafIterAfterDeletion->attributeSet();
+        AttributeSet::Descriptor& descriptor = attributeSetAfterDeletion.descriptor();
+
+        // all group should still be present
+
+        CPPUNIT_ASSERT(descriptor.hasGroup("test1"));
+        CPPUNIT_ASSERT(descriptor.hasGroup("test2"));
+        CPPUNIT_ASSERT(descriptor.hasGroup("test3"));
+        CPPUNIT_ASSERT(descriptor.hasGroup("test4"));
+    }
+
 }
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC

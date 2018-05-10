@@ -746,7 +746,8 @@ GA_Defaults buildDefaults<int32>(const openvdb::math::Vec3<int>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Vec3<float>& value)
+GA_Defaults
+buildDefaults<fpreal32>(const openvdb::math::Vec3<float>& value)
 {
     fpreal32 values[3];
     for (unsigned i = 0; i < 3; ++i) {
@@ -756,7 +757,8 @@ GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Vec3<float>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Vec3<double>& value)
+GA_Defaults
+buildDefaults<fpreal64>(const openvdb::math::Vec3<double>& value)
 {
     fpreal64 values[3];
     for (unsigned i = 0; i < 3; ++i) {
@@ -766,7 +768,8 @@ GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Vec3<double>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Quat<float>& value)
+GA_Defaults
+buildDefaults<fpreal32>(const openvdb::math::Quat<float>& value)
 {
     fpreal32 values[4];
     for (unsigned i = 0; i < 4; ++i) {
@@ -776,7 +779,8 @@ GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Quat<float>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Quat<double>& value)
+GA_Defaults
+buildDefaults<fpreal64>(const openvdb::math::Quat<double>& value)
 {
     fpreal64 values[4];
     for (unsigned i = 0; i < 4; ++i) {
@@ -786,7 +790,32 @@ GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Quat<double>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Mat4<float>& value)
+GA_Defaults
+buildDefaults<fpreal32>(const openvdb::math::Mat3<float>& value)
+{
+    fpreal32 values[9];
+    const float* data = value.asPointer();
+    for (unsigned i = 0; i < 9; ++i) {
+        values[i] = data[i];
+    }
+    return GA_Defaults(values, 9);
+}
+
+template<>
+GA_Defaults
+buildDefaults<fpreal64>(const openvdb::math::Mat3<double>& value)
+{
+    fpreal64 values[9];
+    const double* data = value.asPointer();
+    for (unsigned i = 0; i < 9; ++i) {
+        values[i] = data[i];
+    }
+    return GA_Defaults(values, 9);
+}
+
+template<>
+GA_Defaults
+buildDefaults<fpreal32>(const openvdb::math::Mat4<float>& value)
 {
     fpreal32 values[16];
     const float* data = value.asPointer();
@@ -797,7 +826,8 @@ GA_Defaults buildDefaults<fpreal32>(const openvdb::math::Mat4<float>& value)
 }
 
 template<>
-GA_Defaults buildDefaults<fpreal64>(const openvdb::math::Mat4<double>& value)
+GA_Defaults
+buildDefaults<fpreal64>(const openvdb::math::Mat4<double>& value)
 {
     fpreal64 values[16];
     const double* data = value.asPointer();

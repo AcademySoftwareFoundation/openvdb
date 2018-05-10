@@ -48,6 +48,12 @@ OPTION ( HDK_AUTO_GENERATE_SESITAG "Automatically generate <Target>_sesitag.C an
 
 # Houdini 15 and above defines version in SYS/SYS_Version.h
 SET ( HDK_VERSION_FILE_PATH "toolkit/include/SYS/SYS_Version.h" )
+
+if(NOT ENV{HFS})
+  message (STATUS "$HFS not set, using provided HDK_LOCATION: " ${HDK_LOCATION} )
+  SET(ENV{HFS} ${HDK_LOCATION})
+endif()
+
 FIND_PATH( HDK_LOCATION ${HDK_VERSION_FILE_PATH}
   "$ENV{HFS}"
   NO_DEFAULT_PATH

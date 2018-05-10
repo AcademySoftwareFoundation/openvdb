@@ -413,10 +413,10 @@ SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
     const bool hasMask = (this->nInputs() == 3);
     changed |= enableParm("mask", hasMask);
     const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
-    changed |= enableParm("invert",    useMask);
-    changed |= enableParm("minMask",   useMask);
-    changed |= enableParm("maxMask",   useMask);
-    changed |= enableParm("maskGroup",useMask);
+    changed |= enableParm("invert", useMask);
+    changed |= enableParm("minmask", useMask);
+    changed |= enableParm("maxmask", useMask);
+    changed |= enableParm("maskname", useMask);
 
     return changed;
 }
@@ -481,39 +481,39 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
 {
     const fpreal now = context.getTime();
 
-    parms.mLSGroup = matchGroup(*gdp, evalStdString("lsGroup", now));
+    parms.mLSGroup = matchGroup(*gdp, evalStdString("sourcegroup", now));
 
     parms.mTimeStep = static_cast<float>(evalFloat("timestep", 0, now));
 
     parms.mAdvectSpatial =
-        openvdb::math::stringToBiasedGradientScheme(evalStdString("advectSpatial", now));
+        openvdb::math::stringToBiasedGradientScheme(evalStdString("advectspatial", now));
     if (parms.mAdvectSpatial == openvdb::math::UNKNOWN_BIAS) {
         addError(SOP_MESSAGE, "Morph: Unknown biased gradient");
         return UT_ERROR_ABORT;
     }
 
     parms.mRenormSpatial =
-        openvdb::math::stringToBiasedGradientScheme(evalStdString("renormSpatial", now));
+        openvdb::math::stringToBiasedGradientScheme(evalStdString("renormspatial", now));
     if (parms.mRenormSpatial == openvdb::math::UNKNOWN_BIAS) {
         addError(SOP_MESSAGE, "Renorm: Unknown biased gradient");
         return UT_ERROR_ABORT;
     }
 
     parms.mAdvectTemporal =
-        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("advectTemporal", now));
+        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("advecttemporal", now));
     if (parms.mAdvectTemporal == openvdb::math::UNKNOWN_TIS) {
         addError(SOP_MESSAGE, "Morph: Unknown temporal integration");
         return UT_ERROR_ABORT;
     }
 
     parms.mRenormTemporal =
-        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("renormTemporal", now));
+        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("renormtemporal", now));
     if (parms.mRenormTemporal == openvdb::math::UNKNOWN_TIS) {
         addError(SOP_MESSAGE, "Renorm: Unknown temporal integration");
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = static_cast<int>(evalInt("normSteps", 0, now));
+    parms.mNormCount = static_cast<int>(evalInt("normsteps", 0, now));
 
     const GU_Detail* targetGeo = inputGeo(1);
 
@@ -523,7 +523,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
     }
 
     const GA_PrimitiveGroup* targetGroup =
-        matchGroup(*targetGeo, evalStdString("targetGroup", now));
+        matchGroup(*targetGeo, evalStdString("targetgroup", now));
 
     hvdb::VdbPrimCIterator it(targetGeo, targetGroup);
     if (it) {
@@ -543,7 +543,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
 
     if (maskGeo) {
         const GA_PrimitiveGroup* maskGroup =
-            matchGroup(*maskGeo, evalStdString("maskGroup", now));
+            matchGroup(*maskGeo, evalStdString("maskname", now));
 
         hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
         if (maskIt) {
@@ -560,8 +560,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
         }
     }
 
-    parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));
-    parms.mMaxMask      = static_cast<float>(evalFloat("maxMask", 0, now));
+    parms.mMinMask      = static_cast<float>(evalFloat("minmask", 0, now));
+    parms.mMaxMask      = static_cast<float>(evalFloat("maxmask", 0, now));
     parms.mInvertMask   = evalInt("invert", 0, now);
 
     return error();

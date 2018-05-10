@@ -306,13 +306,17 @@ struct MetaMapConverter
             if (py::extract<std::string>(val).check()) {
                 value.reset(
                     new StringMetadata(py::extract<std::string>(val)));
-            } else if (PyLong_Check(val.ptr())
-                && PyLong_AsLong(val.ptr()) <= std::numeric_limits<Int32>::max()
-                && PyLong_AsLong(val.ptr()) >= std::numeric_limits<Int32>::min())
-            {
-                value.reset(new Int32Metadata(py::extract<Int32>(val)));
-            } else if (PyLong_Check(val.ptr()) || PyLong_Check(val.ptr())) {
-                value.reset(new Int64Metadata(py::extract<Int64>(val)));
+            } else if (PyBool_Check(val.ptr())) {
+                value.reset(new BoolMetadata(py::extract<bool>(val)));
+            } else if (py::extract<Int64>(val).check()) {
+                const Int64 n = py::extract<Int64>(val);
+                if (n <= std::numeric_limits<Int32>::max()
+                    && n >= std::numeric_limits<Int32>::min())
+                {
+                    value.reset(new Int32Metadata(static_cast<Int32>(n)));
+                } else {
+                    value.reset(new Int64Metadata(n));
+                }
             //} else if (py::extract<float>(val).check()) {
             //    value.reset(new FloatMetadata(py::extract<float>(val)));
             } else if (py::extract<double>(val).check()) {
@@ -613,21 +617,21 @@ struct VecTypeDescr
     {
         return
             "The type of a vector determines how transforms are applied to it.\n"
-            "- INVARIANT:\n"
-            "    does not transform (e.g., tuple, uvw, color)\n"
-            "- COVARIANT:\n"
-            "    apply inverse-transpose transformation with w = 0\n"
-            "    and ignore translation (e.g., gradient/normal)\n"
-            "- COVARIANT_NORMALIZE:\n"
-            "    apply inverse-transpose transformation with w = 0\n"
-            "    and ignore translation, vectors are renormalized\n"
-            "    (e.g., unit normal)\n"
-            "- CONTRAVARIANT_RELATIVE:\n"
-            "    apply \"regular\" transformation with w = 0 and ignore\n"
-            "    translation (e.g., displacement, velocity, acceleration)\n"
-            "- CONTRAVARIANT_ABSOLUTE:\n"
-            "    apply \"regular\" transformation with w = 1 so that\n"
-            "    vector translates (e.g., position)";
+            "  - INVARIANT:\n"
+            "      does not transform (e.g., tuple, uvw, color)\n"
+            "  - COVARIANT:\n"
+            "      apply inverse-transpose transformation with w = 0\n"
+            "      and ignore translation (e.g., gradient/normal)\n"
+            "  - COVARIANT_NORMALIZE:\n"
+            "      apply inverse-transpose transformation with w = 0\n"
+            "      and ignore translation, vectors are renormalized\n"
+            "      (e.g., unit normal)\n"
+            "  - CONTRAVARIANT_RELATIVE:\n"
+            "      apply \"regular\" transformation with w = 0 and ignore\n"
+            "      translation (e.g., displacement, velocity, acceleration)\n"
+            "  - CONTRAVARIANT_ABSOLUTE:\n"
+            "      apply \"regular\" transformation with w = 1 so that\n"
+            "      vector translates (e.g., position)\n";
     }
     static pyutil::CStringPair item(int i)
     {

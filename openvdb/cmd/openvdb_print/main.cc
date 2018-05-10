@@ -28,15 +28,15 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <openvdb/openvdb.h>
 #include <openvdb/util/logging.h>
-#ifdef DWA_OPENVDB
-#include <usagetrack.h>
-#endif
 
 
 namespace {
@@ -262,10 +262,6 @@ printShortListing(const StringVec& filenames, bool metadata)
 int
 main(int argc, char *argv[])
 {
-#ifdef DWA_OPENVDB
-    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-#endif
-
     OPENVDB_START_THREADSAFE_STATIC_WRITE
     gProgName = argv[0];
     if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
@@ -340,7 +336,6 @@ main(int argc, char *argv[])
     }
     catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
-        std::unexpected();
     }
 
     return exitStatus;

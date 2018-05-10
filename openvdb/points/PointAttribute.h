@@ -53,7 +53,10 @@ namespace points {
 namespace point_attribute_internal {
 
 template <typename ValueType>
-inline ValueType defaultValue() { return zeroVal<ValueType>(); }
+struct Default
+{
+    static inline ValueType value() { return zeroVal<ValueType>(); }
+};
 
 } // namespace point_attribute_internal
 
@@ -93,7 +96,7 @@ template <typename ValueType, typename CodecType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::defaultValue<ValueType>(),
+                                point_attribute_internal::Default<ValueType>::value(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
                             Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
@@ -114,7 +117,7 @@ template <typename ValueType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
-                                point_attribute_internal::defaultValue<ValueType>(),
+                                point_attribute_internal::Default<ValueType>::value(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
                             Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
@@ -130,7 +133,7 @@ template <typename ValueType, typename PointDataTree>
 inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const ValueType& uniformValue =
-                                    point_attribute_internal::defaultValue<ValueType>());
+                                    point_attribute_internal::Default<ValueType>::value());
 
 /// @brief Drops attributes from the VDB tree.
 ///
@@ -527,13 +530,13 @@ inline void appendAttribute(PointDataTree& tree,
         "ValueType must not be derived from AttributeArray");
 
     using point_attribute_internal::AttributeTypeConversion;
-    using point_attribute_internal::defaultValue;
+    using point_attribute_internal::Default;
     using point_attribute_internal::MetadataStorage;
 
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
         strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
 
-    if (!math::isExactlyEqual(uniformValue, defaultValue<ValueType>())) {
+    if (!math::isExactlyEqual(uniformValue, Default<ValueType>::value())) {
         MetadataStorage<PointDataTree, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
