@@ -135,7 +135,7 @@ ifeq (full,$(strip $(debug)))
     DEBUG_FLAGS		+= -RTC1
 endif
 
-    OPTIMIZE_FLAGS	+= -O2 -DNDEBUG
+    OPTIMIZE_FLAGS	+= -O2 -DNDEBUG -Z7
     CXX			:= $(TOOL_BINPATH)/cl -nologo
     CXXFLAGS		+= -bigobj -EHsc -Zc:forScope -TP \
                         $(RUNTIME) \
@@ -150,6 +150,7 @@ endif
     LDFLAGS		+= -VERSION:$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION) \
                            -libpath:"$(TOOL_LIBPATH)" \
 			   -libpath:"$(TOOL_SDKLIBPATH)" \
+			   -DEBUG \
 			   $(NULL)
     LDOUTPUT		:= -out:
     LDDIROPT		:= -libpath:
