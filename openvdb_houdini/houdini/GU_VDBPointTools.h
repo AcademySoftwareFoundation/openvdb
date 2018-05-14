@@ -38,15 +38,20 @@
 
 #if defined(SESI_OPENVDB)
     #include "GU_Detail.h"
+    #include "GU_DetailHandle.h"
+    #include "GU_PackedContext.h"
+    #include "GU_PackedFragment.h"
+    #include "GU_PackedGeometry.h"
+    #include "GU_PrimPacked.h"
 #else
     #include <GU/GU_Detail.h>
+    #include <GU/GU_DetailHandle.h>
+    #include <GU/GU_PackedContext.h>
+    #include <GU/GU_PackedFragment.h>
+    #include <GU/GU_PackedGeometry.h>
+    #include <GU/GU_PrimPacked.h>
 #endif
 #include <GA/GA_ElementGroup.h>
-#include <GU/GU_DetailHandle.h>
-#include <GU/GU_PackedContext.h>
-#include <GU/GU_PackedFragment.h>
-#include <GU/GU_PackedGeometry.h>
-#include <GU/GU_PrimPacked.h>
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_VectorTypes.h>
 #include <UT/UT_Version.h>

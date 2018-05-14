@@ -42,10 +42,11 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDataGrid.h>
 
-#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Iterator.h>
+
+#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
 #include <UT/UT_Version.h>
@@ -728,7 +729,8 @@ createTypedMetadataFromAttribute(const GA_Attribute* const attribute, const uint
 }
 
 template<typename HoudiniType, typename ValueType>
-GA_Defaults buildDefaults(const ValueType& value)
+GA_Defaults
+buildDefaults(const ValueType& value)
 {
     HoudiniType	values[1];
     values[0] = value;
@@ -736,7 +738,8 @@ GA_Defaults buildDefaults(const ValueType& value)
 }
 
 template<>
-GA_Defaults buildDefaults<int32>(const openvdb::math::Vec3<int>& value)
+GA_Defaults
+buildDefaults<int32>(const openvdb::math::Vec3<int>& value)
 {
     int32 values[3];
     for (unsigned i = 0; i < 3; ++i) {
