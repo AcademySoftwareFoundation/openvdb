@@ -166,6 +166,8 @@ UTvdbGetGridTupleSize(UT_VDBType type)
     case UT_VDB_VEC3I:
 	return 3;
 
+    case UT_VDB_POINTINDEX:
+    case UT_VDB_POINTDATA:
     case UT_VDB_INVALID:
     default:
 	break;
@@ -441,6 +443,10 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
     else if (TYPE == UT_VDB_POINTDATA)	\
 	UT_VDB_CALL(openvdb::points::PointDataGrid,(void),FNAME,GRIDBASE,__VA_ARGS__) \
     /**/
+#define UTvdbCallBoolType(TYPE, FNAME, GRIDBASE, ...)	\
+    if (TYPE == UT_VDB_BOOL) \
+	UT_VDB_CALL(openvdb::BoolGrid,(void),FNAME,GRIDBASE,__VA_ARGS__) \
+    /**/
 #define UTvdbCallAllType(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbCallScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__)		\
     else UTvdbCallVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__); \
@@ -448,8 +454,7 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
 #define UTvdbCallAllTopology(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbCallScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__)		\
     else UTvdbCallVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
-    else if (TYPE == UT_VDB_BOOL) \
-	UT_VDB_CALL(openvdb::BoolGrid,(void),FNAME,GRIDBASE,__VA_ARGS__) \
+    else UTvdbCallBoolType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     /**/
 //@}
 
@@ -498,6 +503,10 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
     else if (TYPE == UT_VDB_POINTDATA)	\
 	UT_VDB_CALL(openvdb::points::PointDataGrid,return,FNAME,GRIDBASE,__VA_ARGS__) \
     /**/
+#define UTvdbReturnBoolType(TYPE, FNAME, GRIDBASE, ...)		\
+    if (TYPE == UT_VDB_BOOL) \
+	UT_VDB_CALL(openvdb::BoolGrid,return,FNAME,GRIDBASE,__VA_ARGS__) \
+    /**/
 #define UTvdbReturnAllType(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbReturnScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     else UTvdbReturnVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__); \
@@ -505,8 +514,7 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
 #define UTvdbReturnAllTopology(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbReturnScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     else UTvdbReturnVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
-    else if (TYPE == UT_VDB_BOOL) \
-	UT_VDB_CALL(openvdb::BoolGrid,return,FNAME,GRIDBASE,__VA_ARGS__) \
+    else UTvdbReturnBoolType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     /**/
 //@}
 
@@ -625,6 +633,29 @@ UTvdbConvert(const openvdb::CoordBBox &bbox)
 	UTvdbConvert(bbox.getEnd().asVec3d()));
 }
 
+/// Bounding box conversion from openvdb to UT
+inline openvdb::math::CoordBBox
+UTvdbConvert(const UT_BoundingBoxI &bbox)
+{
+    return openvdb::math::CoordBBox(
+	openvdb::math::Coord(bbox.xmin(), bbox.ymin(), bbox.zmin()),
+	openvdb::math::Coord(bbox.xmax(), bbox.ymax(), bbox.zmax()));
+}
+
+/// Utility method to construct a Transform that lines up with a
+/// cell-centered Houdini volume with specified origin and voxel size.
+inline openvdb::math::Transform::Ptr
+UTvdbCreateTransform(const UT_Vector3 &orig, const UT_Vector3 &voxsize)
+{
+    // Transforms only valid for square voxels.
+    UT_ASSERT(SYSalmostEqual(voxsize.minComponent(), voxsize.maxComponent()));
+    fpreal vs = voxsize.maxComponent();
+    openvdb::math::Transform::Ptr xform =
+			    openvdb::math::Transform::createLinearTransform(vs);
+    // Ensure voxel centers line up.
+    xform->postTranslate(UTvdbConvert(orig) + vs / 2);
+    return xform;
+}
 
 template <typename T>
 inline openvdb::math::Vec4<T>	SYSabs(const openvdb::math::Vec4<T> &v1)

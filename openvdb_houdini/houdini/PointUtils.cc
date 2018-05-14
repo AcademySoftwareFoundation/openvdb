@@ -42,10 +42,11 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDataGrid.h>
 
-#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Iterator.h>
+
+#include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
 #include <UT/UT_Version.h>

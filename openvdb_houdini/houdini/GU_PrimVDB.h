@@ -64,7 +64,9 @@ using ::GU_PrimVDB;
 #include <GA/GA_PrimitiveDefinition.h>
 #include "GEO_PrimVDB.h"
 #include <GU/GU_Detail.h>
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
 #include <GU/GU_Prim.h>
+#endif
 #include <UT/UT_Matrix4.h>
 #include <UT/UT_VoxelArray.h>
 #include <openvdb/Platform.h>
@@ -74,9 +76,16 @@ using ::GU_PrimVDB;
 class GA_Attribute;
 class GEO_PrimVolume;
 class UT_MemoryCounter;
+#if (UT_VERSION_INT >= 0x0d050000) // 13.5 or later
+class GEO_ConvertParms;
+typedef GEO_ConvertParms GU_ConvertParms;
+#endif
 
 
-class OPENVDB_HOUDINI_API GU_PrimVDB : public GEO_PrimVDB, public GU_Primitive
+class GU_API GU_PrimVDB : public GEO_PrimVDB
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
+    , public GU_Primitive
+#endif
 {
 protected:
     /// NOTE: Primitives should not be deleted directly.  They are managed
@@ -87,18 +96,23 @@ public:
     /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
     GU_PrimVDB(GU_Detail *gdp, GA_Offset offset=GA_INVALID_OFFSET)
         : GEO_PrimVDB(gdp, offset)
-        , GU_Primitive()
     {}
 
+#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
     /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
     GU_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
                GA_Offset offset, const GU_PrimVDB &src_prim)
         : GEO_PrimVDB(map, detail, offset, src_prim)
-        , GU_Primitive()
     {}
+#endif
 
     /// Report approximate memory usage.
     virtual int64 getMemoryUsage() const;
+
+    /// Count memory usage using a UT_MemoryCounter in order to count
+    /// shared memory correctly.
+    /// NOTE: This should always include sizeof(*this).
+    virtual void countMemory(UT_MemoryCounter &counter) const;
 
 #ifndef SESI_OPENVDB
     /// Allows you to find out what this primitive type was named.
@@ -131,7 +145,8 @@ public:
 					bool flood_sdf,
 					bool prune,
 					fpreal tolerance,
-					bool keep_original);
+					bool keep_original,
+					bool activate_inside = true);
 
     /// Convert all GEO_PrimVDB primitives in geometry to parms.toType,
     /// preserving prim/vertex/point attributes (and prim/point groups if
@@ -185,7 +200,8 @@ public:
 			    const char *name,
 			    const bool flood_sdf = false,
 			    const bool prune = false,
-			    const float tolerance = 0.0);
+			    const float tolerance = 0.0,
+			    const bool activate_inside_sdf = true);
 
     /// A fast method for converting a primitive volume to a polysoup via VDB
     /// into the given gdp. It will _not_ copy attributes because this is a

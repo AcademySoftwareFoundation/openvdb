@@ -455,9 +455,6 @@ GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, std::ostream &,
 
 } // unnamed namespace
 
-
-void new_VDBGeometryIO(void*);
-
 void
 new_VDBGeometryIO(void *)
 {
