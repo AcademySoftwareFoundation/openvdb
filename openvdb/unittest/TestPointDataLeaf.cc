@@ -1213,24 +1213,90 @@ TestPointDataLeaf::testIO()
             LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
             CPPUNIT_ASSERT(leafFromDisk);
 
-            const AttributeF& attribute(
+            const AttributeVec3s& position(
+                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
+            const AttributeF& density(
                 AttributeF::cast(leafFromDisk->constAttributeArray("density")));
 
             CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
-
 #if OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attribute.isOutOfCore());
+            CPPUNIT_ASSERT(position.isOutOfCore());
+            CPPUNIT_ASSERT(density.isOutOfCore());
 #else
             // delayed-loading is only available on attribute arrays when using Blosc
-            CPPUNIT_ASSERT(!attribute.isOutOfCore());
+            CPPUNIT_ASSERT(!position.isOutOfCore());
+            CPPUNIT_ASSERT(!density.isOutOfCore());
 #endif
 
-            prefetch(gridFromDisk->tree());
+            // prefetch voxel data only
+            prefetch(gridFromDisk->tree(), /*position=*/false, /*attributes=*/false);
 
             // ensure out-of-core data is now in-core after pre-fetching
 
             CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
-            CPPUNIT_ASSERT(!attribute.isOutOfCore());
+#if OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(position.isOutOfCore());
+            CPPUNIT_ASSERT(density.isOutOfCore());
+#else
+            CPPUNIT_ASSERT(!position.isOutOfCore());
+            CPPUNIT_ASSERT(!density.isOutOfCore());
+#endif
+
+            { // re-open
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            const AttributeVec3s& position2(
+                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
+            const AttributeF& density2(
+                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
+
+            // prefetch voxel and position attribute data
+            prefetch(gridFromDisk->tree(), /*position=*/true, /*attribute=*/false);
+
+            // ensure out-of-core voxel and position data is now in-core after pre-fetching
+
+            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
+            CPPUNIT_ASSERT(!position2.isOutOfCore());
+#if OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(density2.isOutOfCore());
+#else
+            CPPUNIT_ASSERT(!density2.isOutOfCore());
+#endif
+
+            { // re-open
+                io::File file("leaf.vdb");
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
+
+                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+            }
+
+            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+            CPPUNIT_ASSERT(leafFromDisk);
+
+            const AttributeVec3s& position3(
+                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
+            const AttributeF& density3(
+                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
+
+            // prefetch all data
+            prefetch(gridFromDisk->tree());
+
+            // ensure out-of-core voxel and position data is now in-core after pre-fetching
+
+            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
+            CPPUNIT_ASSERT(!position3.isOutOfCore());
+            CPPUNIT_ASSERT(!density3.isOutOfCore());
         }
 #endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
