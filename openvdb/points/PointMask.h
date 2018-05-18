@@ -87,10 +87,46 @@ convertPointsToMask(const PointDataGridT& grid,
                     bool threaded = true);
 
 
+/// @brief No-op deformer (adheres to the deformer interface documented in PointMove.h)
+struct NullDeformer
+{
+    template <typename LeafT>
+    void reset(LeafT& leaf, size_t idx = 0) { }
+
+    template <typename IterT>
+    void apply(Vec3d&, IterT&) const { }
+};
+
+/// @brief Deformer Traits for optionally configuring deformers to be applied
+/// in index-space. The default is world-space.
+template <typename DeformerT>
+struct DeformerTraits
+{
+    static const bool IndexSpace = false;
+};
+
+
 ////////////////////////////////////////
 
 
 namespace point_mask_internal {
+
+template <typename LeafT>
+void voxelSum(LeafT& leaf, const Index offset, const typename LeafT::ValueType& value)
+{
+    leaf.modifyValue(offset, tools::valxform::SumOp<typename LeafT::ValueType>(value));
+}
+
+// overload PointDataLeaf access to use setOffsetOn(), as modifyValue()
+// is intentionally disabled to avoid accidental usage
+
+template <typename T, Index Log2Dim>
+void voxelSum(PointDataLeafNode<T, Log2Dim>& leaf, const Index offset,
+    const typename PointDataLeafNode<T, Log2Dim>::ValueType& value)
+{
+    leaf.setOffsetOn(offset, leaf.getValue(offset) + value);
+}
+
 
 /// @brief Combines multiple grids into one by stealing leaf nodes and summing voxel values
 /// This class is designed to work with thread local storage containers such as tbb::combinable
@@ -120,7 +156,7 @@ struct GridCombinerOp
             else {
                 // otherwise increment existing values
                 for (auto iter = leaf->cbeginValueOn(); iter; ++iter) {
-                    newLeaf->modifyValue(iter.getCoord(), SumOp(*iter));
+                    voxelSum(*newLeaf, iter.offset(), ValueType(*iter));
                 }
             }
         }
@@ -138,7 +174,7 @@ struct PointsToScalarOp
     using LeafT = typename GridT::TreeType::LeafNodeType;
     using ValueT = typename LeafT::ValueType;
 
-    PointsToScalarOp(   const PointDataGridT& grid,
+    PointsToScalarOp(   PointDataGridT& grid,
                         const FilterT& filter)
         : mPointDataAccessor(grid.getConstAccessor())
         , mFilter(filter) { }
@@ -171,7 +207,7 @@ private:
 
 /// @brief Compute scalar grid from PointDataGrid using a different transform
 ///        and while evaluating the point filter
-template <typename GridT, typename PointDataGridT, typename FilterT>
+template <typename GridT, typename PointDataGridT, typename FilterT, typename DeformerT>
 struct PointsToTransformedScalarOp
 {
     using PointDataLeafT = typename PointDataGridT::TreeType::LeafNodeType;
@@ -179,43 +215,71 @@ struct PointsToTransformedScalarOp
     using HandleT = AttributeHandle<Vec3f>;
     using CombinableT = typename GridCombinerOp<GridT>::CombinableT;
 
-    PointsToTransformedScalarOp(const math::Transform& newTransform,
-                         const math::Transform& transform,
-                         const FilterT& filter,
-                         CombinableT& combinable)
-        : mNewTransform(newTransform)
-        , mTransform(transform)
+    PointsToTransformedScalarOp(const math::Transform& targetTransform,
+                                const math::Transform& sourceTransform,
+                                const FilterT& filter,
+                                const DeformerT& deformer,
+                                CombinableT& combinable)
+        : mTargetTransform(targetTransform)
+        , mSourceTransform(sourceTransform)
         , mFilter(filter)
-        , mCombinable(combinable) { }
+        , mCombinable(combinable)
+        , mDeformer(deformer) { }
 
-    void operator()(const PointDataLeafT& leaf, size_t /*idx*/) const
+    void operator()(const PointDataLeafT& leaf, size_t idx) const
     {
+        DeformerT deformer(mDeformer);
+
         auto& grid = mCombinable.local();
         auto& countTree = grid.tree();
         tree::ValueAccessor<typename GridT::TreeType> accessor(countTree);
 
+        deformer.reset(leaf, idx);
+
         auto handle = HandleT::create(leaf.constAttributeArray("P"));
 
         for (auto iter = leaf.beginIndexOn(mFilter); iter; iter++) {
-            const Vec3d position = mTransform.indexToWorld(handle->get(*iter) +
-                iter.getCoord().asVec3d());
-            const Coord ijk = mNewTransform.worldToIndexCellCentered(position);
 
-            accessor.modifyValue(ijk, tools::valxform::SumOp<ValueT>(1));
+            // extract index-space position
+
+            Vec3d position = handle->get(*iter) + iter.getCoord().asVec3d();
+
+            // if deformer is designed to be used in index-space, perform deformation prior
+            // to transforming position to world-space, otherwise perform deformation afterwards
+
+            if (DeformerTraits<DeformerT>::IndexSpace) {
+                deformer.template apply(position, iter);
+                position = mSourceTransform.indexToWorld(position);
+            }
+            else {
+                position = mSourceTransform.indexToWorld(position);
+                deformer.template apply(position, iter);
+            }
+
+            // determine coord of target grid
+
+            const Coord ijk = mTargetTransform.worldToIndexCellCentered(position);
+
+            // increment count in target voxel
+
+            auto* newLeaf = accessor.touchLeaf(ijk);
+            assert(newLeaf);
+            voxelSum(*newLeaf, newLeaf->coordToOffset(ijk), ValueT(1));
         }
     }
 
 private:
-    const openvdb::math::Transform& mNewTransform;
-    const openvdb::math::Transform& mTransform;
+    const openvdb::math::Transform& mTargetTransform;
+    const openvdb::math::Transform& mSourceTransform;
     const FilterT& mFilter;
+    const DeformerT& mDeformer;
     CombinableT& mCombinable;
 }; // struct PointsToTransformedScalarOp
 
 
-template<typename PointDataGridT, typename GridT, typename FilterT>
+template<typename GridT, typename PointDataGridT, typename FilterT>
 inline typename GridT::Ptr convertPointsToScalar(
-    const PointDataGridT& points,
+    PointDataGridT& points,
     const FilterT& filter,
     bool threaded = true)
 {
@@ -259,11 +323,12 @@ inline typename GridT::Ptr convertPointsToScalar(
 }
 
 
-template<typename PointDataGridT, typename GridT, typename FilterT>
+template<typename GridT, typename PointDataGridT, typename FilterT, typename DeformerT>
 inline typename GridT::Ptr convertPointsToScalar(
-    const PointDataGridT& points,
+    PointDataGridT& points,
     const openvdb::math::Transform& transform,
     const FilterT& filter,
+    const DeformerT& deformer,
     bool threaded = true)
 {
     using point_mask_internal::PointsToTransformedScalarOp;
@@ -276,9 +341,8 @@ inline typename GridT::Ptr convertPointsToScalar(
 
     const openvdb::math::Transform& pointsTransform = points.constTransform();
 
-    if (transform == pointsTransform) {
-        return convertPointsToScalar<PointDataGridT, GridT>(
-            points, filter, threaded);
+    if (transform == pointsTransform && std::is_same<NullDeformer, DeformerT>()) {
+        return convertPointsToScalar<GridT>(points, filter, threaded);
     }
 
     typename GridT::Ptr grid = GridT::create();
@@ -292,16 +356,16 @@ inline typename GridT::Ptr convertPointsToScalar(
 
     CombinableT combiner;
 
-    tree::LeafManager<const typename PointDataGridT::TreeType> leafManager(points.tree());
+    tree::LeafManager<typename PointDataGridT::TreeType> leafManager(points.tree());
 
     if (filter.state() == index::ALL) {
         NullFilter nullFilter;
-        PointsToTransformedScalarOp<GridT, PointDataGridT, NullFilter> pointsToScalarOp(
-            transform, pointsTransform, nullFilter, combiner);
+        PointsToTransformedScalarOp<GridT, PointDataGridT, NullFilter, DeformerT> pointsToScalarOp(
+            transform, pointsTransform, nullFilter, deformer, combiner);
         leafManager.foreach(pointsToScalarOp, threaded);
     } else {
-        PointsToTransformedScalarOp<GridT, PointDataGridT, FilterT> pointsToScalarOp(
-            transform, pointsTransform, filter, combiner);
+        PointsToTransformedScalarOp<GridT, PointDataGridT, FilterT, DeformerT> pointsToScalarOp(
+            transform, pointsTransform, filter, deformer, combiner);
         leafManager.foreach(pointsToScalarOp, threaded);
     }
 
@@ -328,8 +392,12 @@ convertPointsToMask(
     const FilterT& filter,
     bool threaded)
 {
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, MaskT>(
-        points, filter, threaded);
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    return point_mask_internal::convertPointsToScalar<MaskT>(
+        nonConstPoints, filter, threaded);
 }
 
 
@@ -342,8 +410,13 @@ convertPointsToMask(
     const FilterT& filter,
     bool threaded)
 {
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, MaskT>(
-        points, transform, filter, threaded);
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    NullDeformer deformer;
+    return point_mask_internal::convertPointsToScalar<MaskT>(
+        nonConstPoints, transform, filter, deformer, threaded);
 }
 
 

@@ -194,8 +194,13 @@ pointCountGrid( const PointDataGridT& points,
     static_assert(  std::is_integral<typename GridT::ValueType>::value ||
                     std::is_floating_point<typename GridT::ValueType>::value,
         "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
-        points, filter);
+
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    return point_mask_internal::convertPointsToScalar<GridT>(
+        nonConstPoints, filter);
 }
 
 
@@ -208,8 +213,14 @@ pointCountGrid( const PointDataGridT& points,
     static_assert(  std::is_integral<typename GridT::ValueType>::value ||
                     std::is_floating_point<typename GridT::ValueType>::value,
         "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
-        points, transform, filter);
+
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    NullDeformer deformer;
+    return point_mask_internal::convertPointsToScalar<GridT>(
+        nonConstPoints, transform, filter, deformer);
 }
 
 
