@@ -58,6 +58,7 @@ namespace points {
 /// @brief Extract a Mask Grid from a Point Data Grid
 /// @param grid         the PointDataGrid to extract the mask from.
 /// @param filter       an optional index filter
+/// @param threaded     enable or disable threading  (threading is enabled by default)
 /// @note this method is only available for Bool Grids and Mask Grids
 template <typename PointDataGridT,
           typename MaskT = typename PointDataGridT::template ValueConverter<bool>::Type,
@@ -65,13 +66,15 @@ template <typename PointDataGridT,
 inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::value,
     typename MaskT::Ptr>::type
 convertPointsToMask(const PointDataGridT& grid,
-                    const FilterT& filter = NullFilter());
+                    const FilterT& filter = NullFilter(),
+                    bool threaded = true);
 
 
 /// @brief Extract a Mask Grid from a Point Data Grid using a new transform
 /// @param grid         the PointDataGrid to extract the mask from.
 /// @param transform    target transform for the mask.
 /// @param filter       an optional index filter
+/// @param threaded     enable or disable threading  (threading is enabled by default)
 /// @note this method is only available for Bool Grids and Mask Grids
 template <typename PointDataGridT,
           typename MaskT = typename PointDataGridT::template ValueConverter<bool>::Type,
@@ -80,7 +83,8 @@ inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::va
     typename MaskT::Ptr>::type
 convertPointsToMask(const PointDataGridT& grid,
                     const openvdb::math::Transform& transform,
-                    const FilterT& filter = NullFilter());
+                    const FilterT& filter = NullFilter(),
+                    bool threaded = true);
 
 
 ////////////////////////////////////////
@@ -131,34 +135,30 @@ private:
 template <typename GridT, typename PointDataGridT, typename FilterT>
 struct PointsToScalarOp
 {
-    using TreeT = typename GridT::TreeType;
-    using LeafManagerT = typename tree::LeafManager<TreeT>;
-    using ValueT = typename TreeT::LeafNodeType::ValueType;
+    using LeafT = typename GridT::TreeType::LeafNodeType;
+    using ValueT = typename LeafT::ValueType;
 
     PointsToScalarOp(   const PointDataGridT& grid,
                         const FilterT& filter)
         : mPointDataAccessor(grid.getConstAccessor())
         , mFilter(filter) { }
 
-    void operator()(const typename LeafManagerT::LeafRange& range) const {
+    void operator()(LeafT& leaf, size_t /*idx*/) const {
 
-        for (auto leaf = range.begin(); leaf; ++leaf) {
+        const auto* const pointLeaf =
+            mPointDataAccessor.probeConstLeaf(leaf.origin());
 
-            const auto* const pointLeaf =
-                mPointDataAccessor.probeConstLeaf(leaf->origin());
+        // assumes matching topology
+        assert(pointLeaf);
 
-            // assumes matching topology
-            assert(pointLeaf);
-
-            for (auto value = leaf->beginValueOn(); value; ++value) {
-                const Index64 count = points::iterCount(
-                    pointLeaf->beginIndexVoxel(value.getCoord(), mFilter));
-                if (count > Index64(0)) {
-                    value.setValue(static_cast<ValueT>(count));}
-                else {
-                    // disable any empty voxels
-                    value.setValueOn(false);
-                }
+        for (auto value = leaf.beginValueOn(); value; ++value) {
+            const Index64 count = points::iterCount(
+                pointLeaf->beginIndexVoxel(value.getCoord(), mFilter));
+            if (count > Index64(0)) {
+                value.setValue(static_cast<ValueT>(count));}
+            else {
+                // disable any empty voxels
+                value.setValueOn(false);
             }
         }
     }
@@ -174,8 +174,8 @@ private:
 template <typename GridT, typename PointDataGridT, typename FilterT>
 struct PointsToTransformedScalarOp
 {
-    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
-    using ValueType = typename GridT::TreeType::LeafNodeType::ValueType;
+    using PointDataLeafT = typename PointDataGridT::TreeType::LeafNodeType;
+    using ValueT = typename GridT::TreeType::ValueType;
     using HandleT = AttributeHandle<Vec3f>;
     using CombinableT = typename GridCombinerOp<GridT>::CombinableT;
 
@@ -188,23 +188,20 @@ struct PointsToTransformedScalarOp
         , mFilter(filter)
         , mCombinable(combinable) { }
 
-    void operator()(const typename LeafManagerT::LeafRange& range) const
+    void operator()(const PointDataLeafT& leaf, size_t /*idx*/) const
     {
         auto& grid = mCombinable.local();
         auto& countTree = grid.tree();
         tree::ValueAccessor<typename GridT::TreeType> accessor(countTree);
 
-        for (auto leaf = range.begin(); leaf; ++leaf) {
+        auto handle = HandleT::create(leaf.constAttributeArray("P"));
 
-            auto handle = HandleT::create(leaf->constAttributeArray("P"));
+        for (auto iter = leaf.beginIndexOn(mFilter); iter; iter++) {
+            const Vec3d position = mTransform.indexToWorld(handle->get(*iter) +
+                iter.getCoord().asVec3d());
+            const Coord ijk = mNewTransform.worldToIndexCellCentered(position);
 
-            for (auto iter = leaf->beginIndexOn(mFilter); iter; iter++) {
-                const Vec3d position = mTransform.indexToWorld(handle->get(*iter) +
-                    iter.getCoord().asVec3d());
-                const Coord ijk = mNewTransform.worldToIndexCellCentered(position);
-
-                accessor.modifyValue(ijk, tools::valxform::SumOp<ValueType>(1));
-            }
+            accessor.modifyValue(ijk, tools::valxform::SumOp<ValueT>(1));
         }
     }
 
@@ -219,7 +216,8 @@ private:
 template<typename PointDataGridT, typename GridT, typename FilterT>
 inline typename GridT::Ptr convertPointsToScalar(
     const PointDataGridT& points,
-    const FilterT& filter)
+    const FilterT& filter,
+    bool threaded = true)
 {
     using point_mask_internal::PointsToScalarOp;
 
@@ -249,12 +247,12 @@ inline typename GridT::Ptr convertPointsToScalar(
         NullFilter nullFilter;
         PointsToScalarOp<GridT, PointDataGridT, NullFilter> pointsToScalarOp(
             points, nullFilter);
-        tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
+        leafManager.foreach(pointsToScalarOp, threaded);
     } else {
         // build mask from points in parallel only where filter evaluates to true
         PointsToScalarOp<GridT, PointDataGridT, FilterT> pointsToScalarOp(
             points, filter);
-        tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
+        leafManager.foreach(pointsToScalarOp, threaded);
     }
 
     return grid;
@@ -265,7 +263,8 @@ template<typename PointDataGridT, typename GridT, typename FilterT>
 inline typename GridT::Ptr convertPointsToScalar(
     const PointDataGridT& points,
     const openvdb::math::Transform& transform,
-    const FilterT& filter)
+    const FilterT& filter,
+    bool threaded = true)
 {
     using point_mask_internal::PointsToTransformedScalarOp;
     using point_mask_internal::GridCombinerOp;
@@ -279,7 +278,7 @@ inline typename GridT::Ptr convertPointsToScalar(
 
     if (transform == pointsTransform) {
         return convertPointsToScalar<PointDataGridT, GridT>(
-            points, filter);
+            points, filter, threaded);
     }
 
     typename GridT::Ptr grid = GridT::create();
@@ -299,11 +298,11 @@ inline typename GridT::Ptr convertPointsToScalar(
         NullFilter nullFilter;
         PointsToTransformedScalarOp<GridT, PointDataGridT, NullFilter> pointsToScalarOp(
             transform, pointsTransform, nullFilter, combiner);
-        tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
+        leafManager.foreach(pointsToScalarOp, threaded);
     } else {
         PointsToTransformedScalarOp<GridT, PointDataGridT, FilterT> pointsToScalarOp(
             transform, pointsTransform, filter, combiner);
-        tbb::parallel_for(leafManager.leafRange(), pointsToScalarOp);
+        leafManager.foreach(pointsToScalarOp, threaded);
     }
 
     // combine the mask grids into one
@@ -326,10 +325,11 @@ inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::va
     typename MaskT::Ptr>::type
 convertPointsToMask(
     const PointDataGridT& points,
-    const FilterT& filter)
+    const FilterT& filter,
+    bool threaded)
 {
     return point_mask_internal::convertPointsToScalar<PointDataGridT, MaskT>(
-        points, filter);
+        points, filter, threaded);
 }
 
 
@@ -339,10 +339,11 @@ inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::va
 convertPointsToMask(
     const PointDataGridT& points,
     const openvdb::math::Transform& transform,
-    const FilterT& filter)
+    const FilterT& filter,
+    bool threaded)
 {
     return point_mask_internal::convertPointsToScalar<PointDataGridT, MaskT>(
-        points, transform, filter);
+        points, transform, filter, threaded);
 }
 
 
