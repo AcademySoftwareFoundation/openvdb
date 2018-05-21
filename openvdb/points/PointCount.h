@@ -84,12 +84,11 @@ inline Index64 pointOffsets(std::vector<Index64>& pointOffsets,
 /// @brief Generate a new grid with voxel values to store the number of points per voxel
 /// @param grid             the PointDataGrid to use to compute the count grid
 /// @param filter           an optional index filter
+/// @note The return type of the grid must be an integer or floating-point scalar grid.
 template <typename PointDataGridT,
     typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type,
     typename FilterT = NullFilter>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+inline typename GridT::Ptr
 pointCountGrid( const PointDataGridT& grid,
                 const FilterT& filter = NullFilter());
 
@@ -99,12 +98,11 @@ pointCountGrid( const PointDataGridT& grid,
 /// @param grid             the PointDataGrid to use to compute the count grid
 /// @param transform        the transform to use to compute the count grid
 /// @param filter           an optional index filter
+/// @note The return type of the grid must be an integer or floating-point scalar grid.
 template <typename PointDataGridT,
     typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type,
     typename FilterT = NullFilter>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+inline typename GridT::Ptr
 pointCountGrid( const PointDataGridT& grid,
                 const openvdb::math::Transform& transform,
                 const FilterT& filter = NullFilter());
@@ -189,25 +187,27 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
 
 
 template <typename PointDataGridT, typename GridT, typename FilterT>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+typename GridT::Ptr
 pointCountGrid( const PointDataGridT& points,
                 const FilterT& filter)
 {
+    static_assert(  std::is_integral<typename GridT::ValueType>::value ||
+                    std::is_floating_point<typename GridT::ValueType>::value,
+        "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
     return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
         points, filter);
 }
 
 
 template <typename PointDataGridT, typename GridT, typename FilterT>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+typename GridT::Ptr
 pointCountGrid( const PointDataGridT& points,
                 const openvdb::math::Transform& transform,
                 const FilterT& filter)
 {
+    static_assert(  std::is_integral<typename GridT::ValueType>::value ||
+                    std::is_floating_point<typename GridT::ValueType>::value,
+        "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
     return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
         points, transform, filter);
 }
@@ -303,9 +303,7 @@ inline Index64 getPointOffsets(std::vector<Index64>& offsets, const PointDataTre
 template <typename PointDataGridT,
     typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
 OPENVDB_DEPRECATED
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+inline typename GridT::Ptr
 pointCountGrid(const PointDataGridT& grid,
     const std::vector<Name>& includeGroups,
     const std::vector<Name>& excludeGroups)
@@ -320,9 +318,7 @@ pointCountGrid(const PointDataGridT& grid,
 template <typename PointDataGridT,
     typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
 OPENVDB_DEPRECATED
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
+inline typename GridT::Ptr
 pointCountGrid(const PointDataGridT& grid,
     const openvdb::math::Transform& transform,
     const std::vector<Name>& includeGroups,
