@@ -205,7 +205,7 @@ TestIndexFilter::testActiveFilter()
     CPPUNIT_ASSERT_EQUAL(Index32(2), points->tree().leafCount());
 
     ActiveFilter activeFilter;
-    InActiveFilter inActiveFilter;
+    InactiveFilter inActiveFilter;
 
     CPPUNIT_ASSERT_EQUAL(index::PARTIAL, activeFilter.state());
     CPPUNIT_ASSERT_EQUAL(index::PARTIAL, inActiveFilter.state());

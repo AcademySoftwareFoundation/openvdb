@@ -162,7 +162,7 @@ TestPointCount::testCount()
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE - 1));
     CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 
     // manually de-activate two voxels
 
@@ -175,7 +175,7 @@ TestPointCount::testCount()
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE - 1));
     CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE - 3));
-    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(2));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(2));
 
     // one point per every other voxel and de-activate empty voxels
 
@@ -194,7 +194,7 @@ TestPointCount::testCount()
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 
     // add a new non-empty leaf and check totalPointCount is correct
 
@@ -209,7 +209,7 @@ TestPointCount::testCount()
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
     CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 }
 
 
@@ -265,7 +265,7 @@ TestPointCount::testGroup()
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
         CPPUNIT_ASSERT_EQUAL(leafIter->pointCount(), Index64(4));
         CPPUNIT_ASSERT_EQUAL(leafIter->onPointCount(), Index64(4));
         CPPUNIT_ASSERT_EQUAL(leafIter->offPointCount(), Index64(0));
@@ -301,8 +301,8 @@ TestPointCount::testGroup()
         {
             CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
                 groupFilter, ActiveFilter())), Index64(2));
-            CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InActiveFilter>(
-                groupFilter, InActiveFilter())), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter())), Index64(0));
         }
 
         CPPUNIT_ASSERT_NO_THROW(leafIter->validateOffsets());
@@ -339,12 +339,12 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
             groupFilter, ActiveFilter())), Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InActiveFilter>(
-            groupFilter, InActiveFilter())), Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+            groupFilter, InactiveFilter())), Index64(1));
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(1));
 
         // write out grid to a temp file
         {
@@ -382,33 +382,33 @@ TestPointCount::testGroup()
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InActiveFilter(), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
                 groupFilter, ActiveFilter()), inCoreOnly), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InActiveFilter>(
-                groupFilter, InActiveFilter()), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(0));
 #else
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InActiveFilter(), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
                 groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InActiveFilter>(
-                groupFilter, InActiveFilter()), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
 #endif
 
             inCoreOnly = false;
 
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InActiveFilter(), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
                 groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InActiveFilter>(
-                groupFilter, InActiveFilter()), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
         }
 
         // update the value mask and confirm point counts once again
@@ -423,12 +423,12 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
             groupFilter, ActiveFilter())), Index64(2));
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InActiveFilter>(
-            groupFilter, InActiveFilter())), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+            groupFilter, InactiveFilter())), Index64(0));
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InActiveFilter()), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
     }
 
     // create a tree with multiple leaves

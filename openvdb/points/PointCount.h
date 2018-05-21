@@ -241,7 +241,7 @@ template <typename PointDataTreeT>
 OPENVDB_DEPRECATED
 inline Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly = true)
 {
-    InActiveFilter filter;
+    InactiveFilter filter;
     return pointCount(tree, filter, inCoreOnly);
 }
 
@@ -283,7 +283,7 @@ inline Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& n
     if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
         return Index64(0);
     }
-    BinaryFilter<GroupFilter, InActiveFilter> filter(GroupFilter(name, iter->attributeSet()), InActiveFilter());
+    BinaryFilter<GroupFilter, InactiveFilter> filter(GroupFilter(name, iter->attributeSet()), InactiveFilter());
     return pointCount(tree, filter, inCoreOnly);
 }
 

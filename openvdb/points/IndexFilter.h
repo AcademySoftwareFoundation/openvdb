@@ -154,7 +154,7 @@ public:
 
 
 using ActiveFilter = ValueMaskFilter<true>;
-using InActiveFilter = ValueMaskFilter<false>;
+using InactiveFilter = ValueMaskFilter<false>;
 
 
 /// Index filtering on multiple group membership for inclusion and exclusion
