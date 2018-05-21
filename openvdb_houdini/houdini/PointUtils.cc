@@ -1710,7 +1710,8 @@ pointDataGridSpecificInfoText(std::ostream& infoStr, const GridBase& grid)
                 infoStr << "out-of-core";
             }
             else {
-                infoStr << util::formattedInt(groupPointCount(pointDataTree, it->first));
+                GroupFilter filter(it->first, iter->attributeSet());
+                infoStr << util::formattedInt(pointCount(pointDataTree, filter));
             }
 
             infoStr << ")";

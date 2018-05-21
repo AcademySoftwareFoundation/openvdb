@@ -871,9 +871,14 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     // count up total points ignoring any leaf nodes that are out of core
 
-    int numPoints = static_cast<int>(useGroup ?
-        groupPointCount(tree, groupName, /*inCoreOnly=*/true) :
-        pointCount(tree, /*inCoreOnly=*/true));
+    int numPoints = 0;
+    if (useGroup) {
+        GroupFilter filter(groupName, iter->attributeSet());
+        numPoints = static_cast<int>(pointCount(tree, filter, /*inCoreOnly=*/true));
+    } else {
+        NullFilter filter;
+        numPoints = static_cast<int>(pointCount(tree, filter, /*inCoreOnly=*/true));
+    }
 
     if (numPoints == 0)    return;
 
