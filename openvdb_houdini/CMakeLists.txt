@@ -142,6 +142,7 @@ TARGET_LINK_LIBRARIES ( openvdb_houdini
   HoudiniUT
   HoudiniOP2
   HoudiniOP3
+  HoudiniAPPS3
   )
 
 SET_TARGET_PROPERTIES(
