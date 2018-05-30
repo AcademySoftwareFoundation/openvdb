@@ -787,13 +787,19 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
 
                     if (conversion == MODE_GENERATE_MASK) {
                         openvdb::BoolGrid::Ptr maskGrid;
-                        if (transform) {
-                            maskGrid = openvdb::points::convertPointsToMask(
-                                *grid, *transform, includeGroups, excludeGroups);
-                        }
-                        else {
-                            maskGrid = openvdb::points::convertPointsToMask(
-                                *grid, includeGroups, excludeGroups);
+                        auto leaf = grid->tree().cbeginLeaf();
+                        if (leaf) {
+                            MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
+                            if (transform) {
+                                maskGrid = openvdb::points::convertPointsToMask(
+                                    *grid, *transform, filter);
+                            }
+                            else {
+                                maskGrid = openvdb::points::convertPointsToMask(
+                                    *grid, filter);
+                            }
+                        } else {
+                            maskGrid = openvdb::BoolGrid::create();
                         }
 
                         const std::string customName = evalStdString("maskname", time);
@@ -808,13 +814,20 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                     }
                     else {
                         openvdb::Int32Grid::Ptr countGrid;
-                        if (transform) {
-                            countGrid = openvdb::points::pointCountGrid(
-                                *grid, *transform, includeGroups, excludeGroups);
+                        auto leaf = grid->tree().cbeginLeaf();
+                        if (leaf) {
+                            MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
+                            if (transform) {
+                                countGrid = openvdb::points::pointCountGrid(
+                                    *grid, *transform, filter);
+                            }
+                            else {
+                                countGrid = openvdb::points::pointCountGrid(
+                                    *grid, filter);
+                            }
                         }
                         else {
-                            countGrid = openvdb::points::pointCountGrid(
-                                *grid, includeGroups, excludeGroups);
+                            countGrid = openvdb::Int32Grid::create();
                         }
 
                         const std::string customName = evalStdString("maskname", time);

@@ -46,12 +46,14 @@ class TestIndexIterator: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestIndexIterator);
+    CPPUNIT_TEST(testNullFilter);
     CPPUNIT_TEST(testValueIndexIterator);
     CPPUNIT_TEST(testFilterIndexIterator);
     CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
 
+    void testNullFilter();
     void testValueIndexIterator();
     void testFilterIndexIterator();
     void testProfile();
@@ -113,6 +115,17 @@ private:
 
 
 ////////////////////////////////////////
+
+
+void
+TestIndexIterator::testNullFilter()
+{
+    NullFilter filter;
+    CPPUNIT_ASSERT(filter.initialized());
+    CPPUNIT_ASSERT(filter.state() == index::ALL);
+    int a;
+    CPPUNIT_ASSERT(filter.valid(a));
+}
 
 
 void
@@ -267,6 +280,8 @@ TestIndexIterator::testValueIndexIterator()
 struct EvenIndexFilter
 {
     static bool initialized() { return true; }
+    static bool all() { return false; }
+    static bool none() { return false; }
     template <typename IterT>
     bool valid(const IterT& iter) const {
         return ((*iter) % 2) == 0;
@@ -277,6 +292,8 @@ struct EvenIndexFilter
 struct OddIndexFilter
 {
     static bool initialized() { return true; }
+    static bool all() { return false; }
+    static bool none() { return false; }
     OddIndexFilter() : mFilter() { }
     template <typename IterT>
     bool valid(const IterT& iter) const {
