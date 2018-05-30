@@ -1,7 +1,25 @@
 OpenVDB Version History
 =======================
 
-Version 5.1.1 - In development
+Version 5.2.0 - In development
+
+    Improvements:
+    - Added state() methods to point data index filters to improve
+      optimization opportunities.
+      [Contributed by Dan Bailey]
+    - Added active and inactive value mask point data index filters.
+      [Contributed by Dan Bailey]
+    - Replaced include/exclude group list parameters with filter functors
+      in various point data functions.
+      [Contributed by Dan Bailey]
+    - Refactored and simplified the point count API.
+      [Contributed by Dan Bailey]
+    - Computing cumulative per-leaf point offsets is now parallelized.
+      [Contributed by Dan Bailey]
+
+    Bug fixes:
+    - Fixed a bug that could cause an infinite loop when iterating over
+      an empty root node.
 
 
 Version 5.1.0 - April 10, 2018

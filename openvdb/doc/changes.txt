@@ -2,9 +2,33 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v5_1_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.1.1</B> - <I>In development</I>
+<B>Version 5.2.0</B> - <I>In development</I>
+
+@par
+Improvements:
+- Added @b state methods to point data
+  @link points/IndexFilter.h index filters@endlink to improve
+  optimization opportunities.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added @vdblink::points::ActiveFilter active@endlink
+  and @vdblink::points::InactiveFilter inactive@endlink value mask
+  point data index filters.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Replaced include/exclude group list parameters with filter functors
+  in various point data functions.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Refactored and simplified the
+  @link points/PointCount.h point count@endlink API.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Computing cumulative per-leaf point offsets is now parallelized.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
+@par
+Bug fixes:
+- Fixed a bug that could cause an infinite loop when iterating over
+  an empty root node.
 
 
 @htmlonly <a name="v5_1_0_changes"></a>@endhtmlonly

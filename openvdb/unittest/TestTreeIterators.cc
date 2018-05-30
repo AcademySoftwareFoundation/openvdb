@@ -598,6 +598,14 @@ TestTreeIterators::testDepthBounds()
             ASSERT_DOUBLES_EXACTLY_EQUAL(sphereTree.getValue(ijk), *iter);
         }
     }
+    {
+        // FX-10221 regression test
+        // This code generated an infinite loop in OpenVDB 5.1.0 and earlier:
+        openvdb::FloatTree emptyTree;
+        auto iter = emptyTree.cbeginValueAll();
+        iter.setMinDepth(2);
+        CPPUNIT_ASSERT(!iter);
+    }
 }
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC

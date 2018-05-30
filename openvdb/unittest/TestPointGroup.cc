@@ -548,8 +548,8 @@ TestPointGroup::testSet()
             CPPUNIT_ASSERT_EQUAL(descriptor.groupMap().size(), size_t(1));
 
             CPPUNIT_ASSERT_EQUAL(pointCount(treex), Index64(6));
-            GroupFilter filter2("test", leaf.attributeSet());
-            CPPUNIT_ASSERT_EQUAL(pointCount(treex, filter2), Index64(4));
+            GroupFilter filter3("test", leaf.attributeSet());
+            CPPUNIT_ASSERT_EQUAL(pointCount(treex, filter3), Index64(4));
         }
         std::remove(filename.c_str());
     }

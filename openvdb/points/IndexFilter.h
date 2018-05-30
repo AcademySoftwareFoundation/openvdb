@@ -142,7 +142,7 @@ public:
     }
 
     template <typename LeafT>
-    void reset(const LeafT& leaf) { }
+    void reset(const LeafT&) { }
 
     template <typename IterT>
     bool valid(const IterT& iter) const

@@ -175,8 +175,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
 /// @param pointOffsets         a vector of cumulative point offsets for each leaf
 /// @param startOffset          a value to shift all the point offsets by
 /// @param index                the group index to be converted.
-/// @param includeGroups        a vector of VDB Points groups to be included (default is all)
-/// @param excludeGroups        a vector of VDB Points groups to be excluded (default is none)
+/// @param filter               an index filter
 /// @param inCoreOnly           true if out-of-core leaf nodes are to be ignored
 ///
 
