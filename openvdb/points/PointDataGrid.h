@@ -999,13 +999,22 @@ template<typename ValueIterT, typename FilterT>
 inline IndexIter<ValueIterT, FilterT>
 PointDataLeafNode<T, Log2Dim>::beginIndex(const FilterT& filter) const
 {
+    // generate no-op iterator if filter evaluates no indices
+
+    if (filter.state() == index::NONE) {
+        return IndexIter<ValueIterT, FilterT>(ValueIterT(), filter);
+    }
+
+    // copy filter to ensure thread-safety
+
+    FilterT newFilter(filter);
+    newFilter.reset(*this);
+
     using IterTraitsT = tree::IterTraits<LeafNodeType, ValueIterT>;
 
     // construct the value iterator and reset the filter to use this leaf
 
     ValueIterT valueIter = IterTraitsT::begin(*this);
-    FilterT newFilter(filter);
-    newFilter.reset(*this);
 
     return IndexIter<ValueIterT, FilterT>(valueIter, newFilter);
 }
@@ -1092,7 +1101,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return iterCount(this->beginIndexAll());
+    return this->getLastValue();
 }
 
 template<typename T, Index Log2Dim>
@@ -1121,7 +1130,11 @@ PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
         return Index64(0);
     }
     GroupFilter filter(groupName, this->attributeSet());
-    return iterCount(this->beginIndexAll(filter));
+    if (filter.state() == index::ALL) {
+        return this->pointCount();
+    } else {
+        return iterCount(this->beginIndexAll(filter));
+    }
 }
 
 template<typename T, Index Log2Dim>
