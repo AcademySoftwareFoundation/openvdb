@@ -73,25 +73,35 @@
 #include <UT/UT_Debug.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Lock.h>
+#include <UT/UT_MemoryCounter.h>
 #include <UT/UT_ParallelUtil.h>
-#include <UT/UT_ScopedPtr.h>
-#include <UT/UT_ScopeExit.h>
+#include <UT/UT_UniquePtr.h>
+
+#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
+typedef UT_Vector2T<int32> UT_Vector2i;
+typedef UT_Vector3T<int32> UT_Vector3i;
+#else
 #include <UT/UT_Singleton.h>
+#endif
+
 #include <UT/UT_StopWatch.h>
 
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
+#endif
 #include <SYS/SYS_Types.h>
+#include <SYS/SYS_TypeTraits.h>
 
 #include <openvdb/tools/VolumeToMesh.h>
+
+#include <hboost/function.hpp>
+#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
+#include <hboost/scope_exit.hpp>
+#endif
+
 #include <openvdb/tools/SignedFloodFill.h>
 
 #include <algorithm>
-#include <functional>
-#include <limits>
-#include <map>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
 #include <vector>
 
 #include <stddef.h>
@@ -119,23 +129,26 @@ GU_PrimVDB::build(GU_Detail *gdp, bool append_points)
     if (!GU_PrimVDB::theDefinition)
 	GU_PrimVDB::registerMyself(&GUgetFactory());
 
-    GU_PrimVDB* primVdb = (GU_PrimVDB *)gdp->appendPrimitive(GU_PrimVDB::theTypeId());
+    GU_PrimVDB* primvdb = (GU_PrimVDB *)gdp->appendPrimitive(GU_PrimVDB::theTypeId());
 
 #else
 
-    GU_PrimVDB* primVdb = (GU_PrimVDB *)gdp->appendPrimitive(GEO_PRIMVDB);
+    GU_PrimVDB* primvdb = UTverify_cast<GU_PrimVDB *>(gdp->appendPrimitive(GEO_PRIMVDB));
+#if UT_VERSION_INT >= 0x1000011F // 16.0.287 or later
+    primvdb->assignVertex(gdp->appendVertex(), true);
+#endif
 
 #endif
 
     if (append_points) {
-
-    	GEO_Primitive *prim = primVdb;
-    	const int npts = primVdb->getVertexCount();
-    	for (int i = 0; i < npts; i++) {
-    	    prim->getVertexElement(i).setPointOffset(gdp->appendPointOffset());
-    	}
+        GEO_Primitive *prim = primvdb;
+        const GA_Size npts = primvdb->getVertexCount();
+        GA_Offset startptoff = gdp->appendPointBlock(npts);
+        for (GA_Size i = 0; i < npts; i++) {
+            prim->setPointOffset(i, startptoff+i);
+        }
     }
-    return primVdb;
+    return primvdb;
 }
 
 GU_PrimVDB*
@@ -168,12 +181,21 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
 	if (name != nullptr) grid->setName(name);
 	grid->removeMeta("value_type");
 	grid->insertMeta("value_type", openvdb::StringMetadata(grid->valueType()));
-	// For each of the following, force any existing metadata's value
-	// to be one of the supported values.
-	grid->setGridClass(grid->getGridClass());
-	grid->setVectorType(grid->getVectorType());
-	grid->setIsInWorldSpace(grid->isInWorldSpace());
-	grid->setSaveFloatAsHalf(grid->saveFloatAsHalf());
+	// For each of the following, force any existing metadata's value to be
+	// one of the supported values. Note the careful 3 statement sequences
+	// so that it works with type mismatches.
+	openvdb::GridClass grid_class = grid->getGridClass();
+	grid->removeMeta(openvdb::GridBase::META_GRID_CLASS);
+	grid->setGridClass(grid_class);
+	openvdb::VecType vec_type = grid->getVectorType();
+	grid->removeMeta(openvdb::GridBase::META_VECTOR_TYPE);
+	grid->setVectorType(vec_type);
+	bool is_in_world_space = grid->isInWorldSpace();
+	grid->removeMeta(openvdb::GridBase::META_IS_LOCAL_SPACE);
+	grid->setIsInWorldSpace(is_in_world_space);
+	bool save_as_half = grid->saveFloatAsHalf();
+	grid->removeMeta(openvdb::GridBase::META_SAVE_HALF_FLOAT);
+	grid->setSaveFloatAsHalf(save_as_half);
 
         // Transfer the grid's metadata to primitive attributes.
         GU_PrimVDB::createGridAttrsFromMetadata(*vdb, *grid, gdp);
@@ -205,6 +227,13 @@ GU_PrimVDB::getMemoryUsage() const
     int64 mem = sizeof(*this);
     mem += GEO_PrimVDB::getBaseMemoryUsage();
     return mem;
+}
+
+void
+GU_PrimVDB::countMemory(UT_MemoryCounter &counter) const
+{
+    counter.countUnshared(sizeof(*this));
+    GEO_PrimVDB::countBaseMemory(counter);
 }
 
 namespace // anonymous
@@ -271,16 +300,20 @@ public:
     gu_ConvertToVDB(
 	    const UT_VoxelArrayReadHandleF &vox,
 	    float background,
-	    UT_AutoInterrupt &progress)
+	    UT_AutoInterrupt &progress,
+	    bool activateInsideSDF
+	    )
 	: myVox(vox)
 	, myGrid(openvdb::FloatGrid::create(background))
 	, myProgress(progress)
+	, myActivateInsideSDF(activateInsideSDF)
     {
     }
     gu_ConvertToVDB(const gu_ConvertToVDB &other, UT_Split)
 	: myVox(other.myVox)
 	, myGrid(openvdb::FloatGrid::create(other.myGrid->background()))
 	, myProgress(other.myProgress)
+	, myActivateInsideSDF(other.myActivateInsideSDF)
     {
     }
 
@@ -352,7 +385,8 @@ public:
 		CoordBBox   bbox(org, org + dim.offsetBy(-1));
 		float	    value = tile(0, 0, 0);
 
-		if (!SYSisEqual(value, background)) {
+		if (!SYSisEqual(value, background) && 
+		    (myActivateInsideSDF || !SYSisEqual(value, -background))) {
 		    grid.fill(bbox, value);
 		}
 	    } else {
@@ -361,7 +395,8 @@ public:
 		    for (ijk[1] = 0; ijk[1] < dim[1]; ++ijk[1]) {
 			for (ijk[0] = 0; ijk[0] < dim[0]; ++ijk[0]) {
 			    float value = tile(ijk[0], ijk[1], ijk[2]);
-			    if (!SYSisEqual(value, background)) {
+			    if (!SYSisEqual(value, background) && 
+				(myActivateInsideSDF || !SYSisEqual(value, -background))) {
 				Coord pos = ijk.offsetBy(org[0], org[1], org[2]);
 				acc.setValue(pos, value);
 			    }
@@ -389,6 +424,7 @@ private:
     const UT_VoxelArrayReadHandleF &	myVox;
     openvdb::FloatGrid::Ptr		myGrid;
     UT_AutoInterrupt &			myProgress;
+    bool				myActivateInsideSDF;
 
 }; // class gu_ConvertToVDB
 
@@ -401,7 +437,8 @@ GU_PrimVDB::buildFromPrimVolume(
 	const char *name,
 	const bool flood_sdf,
 	const bool prune,
-	const float tolerance)
+	const float tolerance,
+	const bool activate_inside_sdf)
 {
     using namespace openvdb;
 
@@ -424,7 +461,12 @@ GU_PrimVDB::buildFromPrimVolume(
 	    background = 0.0;
     }
 
-    gu_ConvertToVDB converter(vox, background, progress);
+    // When flood-filling SDFs, the inactive interior voxels will be set to
+    // -background.  In that case we can avoid activating all inside voxels
+    // that already have that value, maintaining the narrow band (if any) of the
+    // original native volume.  For non-SDF we always activate interior voxels.
+    gu_ConvertToVDB converter(vox, background, progress,
+			      activate_inside_sdf || !flood_sdf || !vol.isSDF());
     FloatGrid::Ptr grid = converter.run();
     if (progress.wasInterrupted())
 	return nullptr;
@@ -509,7 +551,8 @@ GU_PrimVDB::expandBorderFromPrimVolume(const GEO_PrimVolume &vol, int pad)
 #ifndef SESI_OPENVDB
 // Static callback for our factory.
 static GA_Primitive*
-gu_newPrimVDB(GA_Detail &detail, GA_Offset offset)
+gu_newPrimVDB(GA_Detail &detail, GA_Offset offset,
+	const GA_PrimitiveDefinition &)
 {
     return new GU_PrimVDB(static_cast<GU_Detail *>(&detail), offset);
 }
@@ -579,9 +622,11 @@ GU_PrimVDB::convertToNewPrim(
 
     success = false;
     if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLY) {
-	prim = convertToPoly(dst_geo, parms, adaptivity, /*polysoup*/false, success);
+	prim = convertToPoly(dst_geo, parms, adaptivity,
+			     /*polysoup*/false, success);
     } else if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLYSOUP) {
-	prim = convertToPoly(dst_geo, parms, adaptivity, /*polysoup*/true, success);
+	prim = convertToPoly(dst_geo, parms, adaptivity,
+			     /*polysoup*/true, success);
     } else if (parmType == GEO_PrimTypeCompat::GEOPRIMVOLUME) {
 	prim = convertToPrimVolume(dst_geo, parms, split_disjoint_volumes);
 	if (prim)
@@ -616,7 +661,7 @@ guCopyMesh(
     // Construct the points
     GA_Size npoints = mesher.pointListSize();
     GA_Offset startpt = detail.appendPointBlock(npoints);
-    UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
+    SYS_STATIC_ASSERT(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
     GA_RWHandleV3 pthandle(detail.getP());
     pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
 
@@ -778,6 +823,23 @@ GU_PrimVDB::convertToPoly(
     return dst_geo.getGEOPrimitive(marker.primitiveBegin());
 }
 
+namespace {
+class gu_DestroyVDBPrimGuard
+{
+public:
+    gu_DestroyVDBPrimGuard(GU_PrimVDB &vdb)
+	: myVDB(vdb)
+    {
+    }
+    ~gu_DestroyVDBPrimGuard()
+    {
+	myVDB.getDetail().destroyPrimitive(myVDB, /*and_points*/true);
+    }
+private:
+    GU_PrimVDB &myVDB;
+};
+} // anonymous namespace
+
 /*static*/ void
 GU_PrimVDB::convertPrimVolumeToPolySoup(
 	GU_Detail &dst_geo,
@@ -788,12 +850,9 @@ GU_PrimVDB::convertPrimVolumeToPolySoup(
 
     GU_PrimVDB &vdb = *buildFromPrimVolume(
 			    dst_geo, src_vol, nullptr,
-			    /*flood*/false, /*prune*/true, /*tol*/0);
-    UT_SCOPE_EXIT(&vdb, &dst_geo)
-    {
-	dst_geo.destroyPrimitive(vdb, /*and_points*/true);
-    }
-    UT_SCOPE_EXIT_END
+			    /*flood*/false, /*prune*/true, /*tol*/0,
+			    /*activate_inside*/true);
+    gu_DestroyVDBPrimGuard destroy_guard(vdb);
 
     if (progress.wasInterrupted())
 	return;
@@ -835,10 +894,10 @@ namespace // anonymous
 {
 
 #define SCALAR_RET(T) \
-	typename std::enable_if<std::is_arithmetic<T>::value, T>::type
+	typename SYS_EnableIf< SYS_IsArithmetic<T>::value, T >::type
 
 #define NON_SCALAR_RET(T) \
-	typename std::enable_if<!std::is_arithmetic<T>::value, T>::type
+	typename SYS_DisableIf< SYS_IsArithmetic<T>::value, T >::type
 
 /// Houdini Volume wrapper to abstract multiple volumes with a consistent API.
 template <int TUPLE_SIZE>
@@ -1541,8 +1600,8 @@ gu_ConvertFromVDB<VolumeT>::vdbToVolume(
 	mDstComponents.append(i);
 
     // Copy the VDB bbox data to voxel array coord (0,0,0).
-    UT_ASSERT_COMPILETIME(LeafNodeType::DIM <= TILESIZE);
-    UT_ASSERT_COMPILETIME((TILESIZE % LeafNodeType::DIM) == 0);
+    SYS_STATIC_ASSERT(LeafNodeType::DIM <= TILESIZE);
+    SYS_STATIC_ASSERT((TILESIZE % LeafNodeType::DIM) == 0);
     if (aligned) {
 	gu_SparseTreeCopy<typename GridType::TreeType, VolumeT, true>
 	    copy(grid.tree(), vol, space_bbox.min(), mProgress);
@@ -1726,7 +1785,8 @@ GU_PrimVDB::convertVolumesToVDBs(
 	bool flood_sdf,
 	bool prune,
 	fpreal tolerance,
-	bool keep_original)
+	bool keep_original,
+	bool activate_inside_sdf)
 {
     UT_AutoInterrupt progress("Convert");
 
@@ -1745,7 +1805,8 @@ GU_PrimVDB::convertVolumesToVDBs(
 
 	GU_PrimVDB *new_prim;
 	new_prim = GU_PrimVDB::buildFromPrimVolume(
-			dst_geo, *vol, nullptr, flood_sdf, prune, tolerance);
+			dst_geo, *vol, nullptr, flood_sdf, prune, tolerance,
+			activate_inside_sdf);
 	if (!new_prim || progress.wasInterrupted())
 	    break;
 
@@ -1813,10 +1874,12 @@ GU_PrimVDB::normal(NormalComp& /*output*/) const
 
 namespace {
 
-template <typename T> struct IsScalarMeta: public std::true_type {};
+template <typename T> struct IsScalarMeta
+{ HBOOST_STATIC_CONSTANT(bool, value = true); };
 
 #define DECLARE_VECTOR(METADATA_T) \
-    template <> struct IsScalarMeta<METADATA_T>: public std::false_type {};
+    template <> struct IsScalarMeta<METADATA_T> \
+    { HBOOST_STATIC_CONSTANT(bool, value = false); }; \
     /**/
 DECLARE_VECTOR(openvdb::Vec2IMetadata)
 DECLARE_VECTOR(openvdb::Vec2SMetadata)
@@ -1835,7 +1898,7 @@ struct MetaTuple
 };
 
 template<typename T, typename MetadataT, int I>
-struct MetaTuple<T, MetadataT, I, typename std::enable_if<IsScalarMeta<MetadataT>::value>::type>
+struct MetaTuple<T, MetadataT, I, typename SYS_EnableIf< IsScalarMeta<MetadataT>::value >::type>
 {
     static T get(const MetadataT& meta) {
         UT_ASSERT(I == 0);
@@ -1857,10 +1920,10 @@ template <typename MetadataT> struct MetaAttr;
 #define META_ATTR(METADATA_T, STORAGE, TUPLE_T, TUPLE_SIZE) \
     template <> \
     struct MetaAttr<METADATA_T> { \
-   using TupleT = TUPLE_T; \
-   using RWHandleT = GA_HandleT<TupleT>::RWType; \
-   static const int theTupleSize = TUPLE_SIZE; \
-   static const GA_Storage theStorage = STORAGE; \
+	using TupleT = TUPLE_T; \
+	using RWHandleT = GA_HandleT<TupleT>::RWType; \
+	static const int theTupleSize = TUPLE_SIZE; \
+	static const GA_Storage theStorage = STORAGE; \
     }; \
     /**/
 
@@ -1903,7 +1966,9 @@ setAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
     switch (MetaAttrT::theTupleSize) {
     case 3: handle.set(elem, 2, MetaTuple<TupleT,MetadataT,2>::get(meta));
+            SYS_FALLTHROUGH;
     case 2: handle.set(elem, 1, MetaTuple<TupleT,MetadataT,1>::get(meta));
+            SYS_FALLTHROUGH;
     case 1: handle.set(elem, 0, MetaTuple<TupleT,MetadataT,0>::get(meta));
     }
     UT_ASSERT(MetaAttrT::theTupleSize >= 1 && MetaAttrT::theTupleSize <= 3);
@@ -1995,15 +2060,12 @@ GU_PrimVDB::createAttrsFromMetadataAdapter(
         if (openvdb::Metadata::Ptr meta = metaIt->second) {
             std::string name = metaIt->first;
 
-            // Prefix attribute names (except for the "name" attribute)
-            // with "vdb_" to avoid conflicts with existing attributes.
             UT_String str(name);
             str.toLower();
             str.forceValidVariableName();
-            if (str != "name" && !str.startsWith("vdb_")) {
-                name = "vdb_" + name;
-            }
-            if (isIntrinsicMetadata(name.c_str()))
+	    UT_String prefixed(name);
+	    prefixed.prepend("vdb_");
+            if (isIntrinsicMetadata(prefixed))
                 continue;
 
             // If this grid's name is empty and a "name" attribute
@@ -2012,7 +2074,11 @@ GU_PrimVDB::createAttrsFromMetadataAdapter(
                 && meta->typeName() == openvdb::StringMetadata::staticTypeName()
                 && meta->str().empty())
             {
+#if (UT_VERSION_INT >= 0x0e0000AC) // 14.0.172 or later
+                if (!geo.findAttribute(owner, name.c_str())) continue;
+#else
                 if (geo.findAttribute(owner, name.c_str()).isInvalid()) continue;
+#endif
             }
 
             MetaToAttrMap::const_iterator creatorIt =
@@ -2059,20 +2125,12 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
 
         if (!it.name()) continue;
 
-        // For global attributes, only save them if they begin with vdb_
-        if (owner == GA_ATTRIB_GLOBAL) {
-            UT_String str = it.name();
-            str.toLower();
-            if (!str.startsWith("vdb_")) continue;
-        }
-
         std::string name = it.name();
-        {
-            // Strip off the "vdb_" prefix for export.
-            UT_String str = it.name();
-            str.toLower();
-            if (str.startsWith("vdb_")) name = name.substr(4);
-        }
+
+	UT_String prefixed(name);
+	prefixed.prepend("vdb_");
+	if (isIntrinsicMetadata(prefixed))
+	    continue;
 
         const GA_Attribute* attrib = it.attrib();
         const GA_AIFTuple* tuple = attrib->getAIFTuple();

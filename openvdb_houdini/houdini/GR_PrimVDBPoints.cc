@@ -65,7 +65,6 @@
 #include <RE/RE_ShaderHandle.h>
 #include <RE/RE_VertexArray.h>
 #include <UT/UT_DSOVersion.h>
-#include <UT/UT_Version.h>
 
 #include <tbb/mutex.h>
 
@@ -245,25 +244,36 @@ OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 }
 
 
+static inline bool
+grIsPointDataGrid(const GT_PrimitiveHandle& gt_prim)
+{
+    if (gt_prim->getPrimitiveType() != GT_PRIM_VDB_VOLUME)
+	return false;
+
+    const GT_PrimVDB* gt_vdb = static_cast<const GT_PrimVDB*>(gt_prim.get());
+    const GEO_PrimVDB* gr_vdb = gt_vdb->getGeoPrimitive();
+
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+    return (gr_vdb->getStorageType() == UT_VDB_POINTDATA);
+#else
+    return (gr_vdb->getGrid().isType<openvdb::points::PointDataGrid>());
+#endif
+}
+
+
 GR_Primitive*
 GUI_PrimVDBPointsHook::createPrimitive(
     const GT_PrimitiveHandle& gt_prim,
     const GEO_Primitive* geo_prim,
     const GR_RenderInfo* info,
     const char* cache_name,
-    GR_PrimAcceptResult&)
+    GR_PrimAcceptResult& processed)
 {
-    if (gt_prim->getPrimitiveType() != GT_PRIM_VDB_VOLUME) {
-        return nullptr;
-    }
-
-    const GT_PrimVDB* gtPrimVDB = static_cast<const GT_PrimVDB*>(gt_prim.get());
-    const GEO_PrimVDB* primVDB = gtPrimVDB->getGeoPrimitive();
-
-    if (primVDB->getGrid().isType<openvdb::points::PointDataGrid>()) {
+    if (grIsPointDataGrid(gt_prim)) {
+	processed = GR_PROCESSED;
         return new GR_PrimVDBPoints(info, cache_name, geo_prim);
     }
-
+    processed = GR_NOT_PROCESSED;
     return nullptr;
 }
 
@@ -446,13 +456,11 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
 GR_PrimAcceptResult
 GR_PrimVDBPoints::acceptPrimitive(GT_PrimitiveType,
                   int geo_type,
-                  const GT_PrimitiveHandle&,
+                  const GT_PrimitiveHandle& gt_prim,
                   const GEO_Primitive*)
 {
-    if (geo_type == GT_PRIM_VDB_VOLUME)
-    {
-        return GR_PROCESSED;
-    }
+    if (geo_type == GT_PRIM_VDB_VOLUME && grIsPointDataGrid(gt_prim))
+	return GR_PROCESSED;
 
     return GR_NOT_PROCESSED;
 }
@@ -1292,7 +1300,7 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
 
     // draw leaf bboxes
 
-    if (myWire) {
+    if (myWire && myWire->getNumPoints() > 0) {
 
         // bind the shader
 
