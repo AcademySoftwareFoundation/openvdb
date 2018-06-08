@@ -2062,7 +2062,7 @@ for (auto leafIter = points->tree().beginLeaf(); leafIter; ++leafIter) {
 
 @section sPointMove Moving Points in Space
 
-As points are stored within voxels in an implicit spatially organised data structure, moving points in space requires re-sorting the data.
+As points are stored within voxels in an implicit spatially organised data structure, moving points in space requires re-bucketing the data.
 
 @subsection sPointAdvect Advecting Points
 

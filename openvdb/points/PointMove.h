@@ -65,8 +65,6 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointMask.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
 #include <tbb/concurrent_vector.h>
 
 #include <vector>
@@ -476,23 +474,20 @@ struct GlobalMovePointsOp
         }
     }
 
-    void operator()(const typename LeafManagerT::LeafRange& range) const
+    void operator()(LeafT& leaf, size_t idx) const
     {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
+        const auto& moveIndices = mMoveLeafMap.at(idx);
+        if (moveIndices.empty())  return;
 
-            const auto& moveIndices = mMoveLeafMap.at(leaf.pos());
-            if (moveIndices.empty())  continue;
+        // extract per-voxel offsets for this leaf
 
-            // extract per-voxel offsets for this leaf
+        auto& offsets = mOffsetMap[idx];
 
-            auto& offsets = mOffsetMap[leaf.pos()];
+        const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
-            const auto& array = leaf->constAttributeArray(mAttributeIndex);
-
-            PerformTypedMoveOp op(mTargetHandles, mSourceHandles, leaf.pos(), *leaf, offsets, moveIndices);
-            if (!processTypedArray(array, op)) {
-                this->performMove(leaf.pos(), *leaf, offsets, moveIndices);
-            }
+        PerformTypedMoveOp op(mTargetHandles, mSourceHandles, idx, leaf, offsets, moveIndices);
+        if (!processTypedArray(array, op)) {
+            this->performMove(idx, leaf, offsets, moveIndices);
         }
     }
 
@@ -595,31 +590,28 @@ struct LocalMovePointsOp
         }
     }
 
-    void operator()(const typename LeafManagerT::LeafRange& range) const
+    void operator()(const LeafT& leaf, size_t idx) const
     {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
+        const auto& moveIndices = mMoveLeafMap.at(idx);
+        if (moveIndices.empty())  return;
 
-            const auto& moveIndices = mMoveLeafMap.at(leaf.pos());
-            if (moveIndices.empty())  continue;
+        // extract target leaf and per-voxel offsets for this leaf
 
-            // extract target leaf and per-voxel offsets for this leaf
+        auto& offsets = mOffsetMap[idx];
 
-            auto& offsets = mOffsetMap[leaf.pos()];
+        // extract source leaf that has the same origin as the target leaf (if any)
 
-            // extract source leaf that has the same origin as the target leaf (if any)
+        const auto it = mTargetToSourceMap.find(idx);
+        assert(it != mTargetToSourceMap.end());
 
-            const auto it = mTargetToSourceMap.find(leaf.pos());
-            assert(it != mTargetToSourceMap.end());
+        const Index sourceOffset(it->second);
 
-            const Index sourceOffset(it->second);
+        const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
-            const auto& array = leaf->constAttributeArray(mAttributeIndex);
-
-            PerformTypedMoveOp op(mTargetHandles, mSourceHandles,
-                leaf.pos(), sourceOffset, *leaf, offsets, moveIndices);
-            if (!processTypedArray(array, op)) {
-                this->performMove(leaf.pos(), sourceOffset, *leaf, offsets, moveIndices);
-            }
+        PerformTypedMoveOp op(mTargetHandles, mSourceHandles,
+            idx, sourceOffset, leaf, offsets, moveIndices);
+        if (!processTypedArray(array, op)) {
+            this->performMove(idx, sourceOffset, leaf, offsets, moveIndices);
         }
     }
 
@@ -646,7 +638,7 @@ inline void movePoints( PointDataGridT& points,
                         bool threaded)
 {
     using PointDataTreeT = typename PointDataGridT::TreeType;
-    using LeafNode = typename PointDataTreeT::LeafNodeType;
+    using LeafT = typename PointDataTreeT::LeafNodeType;
     using LeafManagerT = typename tree::LeafManager<PointDataTreeT>;
     using LeafRangeT = typename LeafManagerT::LeafRange;
 
@@ -679,19 +671,14 @@ inline void movePoints( PointDataGridT& points,
     AttributeHandles targetHandles(targetLeafManager.leafCount());
 
     // map frequency to cumulative histogram
-    auto histogramLambda = [](const LeafRangeT& range) {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            auto* buffer = leaf->buffer().data();
-            for (int i = 1; i < leaf->buffer().size(); i++) {
+    targetLeafManager.foreach(
+        [](LeafT& leaf, size_t /*idx*/) {
+            auto* buffer = leaf.buffer().data();
+            for (int i = 1; i < leaf.buffer().size(); i++) {
                 buffer[i] = buffer[i-1] + buffer[i];
             }
-        }
-    };
-    if (threaded) {
-        tbb::parallel_for(targetLeafManager.leafRange(), histogramLambda);
-    } else {
-        histogramLambda(targetLeafManager.leafRange());
-    }
+        },
+    threaded);
 
     // build a coord -> index map for looking up target leafs by origin and a faster
     // unordered map for finding the source index from a target index
@@ -717,17 +704,12 @@ inline void movePoints( PointDataGridT& points,
 
     // replace attribute set with a copy of the existing one
     const auto& existingAttributeSet = points.tree().cbeginLeaf()->attributeSet();
-    auto replaceAttributeSetLambda = [&existingAttributeSet](const LeafRangeT& range) {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            leaf->replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf->getLastValue()),
+    targetLeafManager.foreach(
+        [&existingAttributeSet](LeafT& leaf, size_t /*idx*/) {
+            leaf.replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf.getLastValue()),
                 /*allowMismatchingDescriptors=*/true);
-        }
-    };
-    if (threaded) {
-        tbb::parallel_for(targetLeafManager.leafRange(),replaceAttributeSetLambda);
-    } else {
-        replaceAttributeSetLambda(targetLeafManager.leafRange());
-    }
+        },
+    threaded);
 
     // moving leaf
 
@@ -741,7 +723,7 @@ inline void movePoints( PointDataGridT& points,
     for (size_t n = 0; n < targetLeafManager.leafCount(); n++) {
         globalMoveLeafMap.insert({n, IndexTripleArray()});
         localMoveLeafMap.insert({n, IndexPairArray()});
-        offsetMap.insert({n, IndexArray(LeafNode::SIZE)});
+        offsetMap.insert({n, IndexArray(LeafT::SIZE)});
     }
 
     // build global and local move leaf maps and update local positions
@@ -764,16 +746,11 @@ inline void movePoints( PointDataGridT& points,
         const Index attributeIndex = it.second;
 
         // zero offsets
-        auto zeroOffsetsLambda = [&offsetMap](const LeafRangeT& range) {
-            for (auto leaf = range.begin(); leaf; ++leaf) {
-                std::fill(offsetMap[leaf.pos()].begin(), offsetMap[leaf.pos()].end(), 0);
-            }
-        };
-        if (threaded) {
-            tbb::parallel_for(targetLeafManager.leafRange(), zeroOffsetsLambda);
-        } else {
-            zeroOffsetsLambda(targetLeafManager.leafRange());
-        }
+        targetLeafManager.foreach(
+            [&offsetMap](const LeafT& /*leaf*/, size_t idx) {
+                std::fill(offsetMap[idx].begin(), offsetMap[idx].end(), 0);
+            },
+        threaded);
 
         // cache attribute handles
 
@@ -784,22 +761,14 @@ inline void movePoints( PointDataGridT& points,
 
         GlobalMovePointsOp<PointDataTreeT> globalMoveOp(offsetMap, targetHandles,
             sourceHandles, attributeIndex, globalMoveLeafMap);
-        if (threaded) {
-            tbb::parallel_for(targetLeafManager.leafRange(), globalMoveOp);
-        } else {
-            globalMoveOp(targetLeafManager.leafRange());
-        }
+        targetLeafManager.foreach(globalMoveOp, threaded);
 
         // move points within leaf nodes
 
         LocalMovePointsOp<PointDataTreeT> localMoveOp(offsetMap, targetHandles,
             targetToSourceMap, sourceHandles,
             attributeIndex, localMoveLeafMap);
-        if (threaded) {
-            tbb::parallel_for(targetLeafManager.leafRange(), localMoveOp);
-        } else {
-            localMoveOp(targetLeafManager.leafRange());
-        }
+        targetLeafManager.foreach(localMoveOp, threaded);
     }
 
     points.setTree(newPoints->treePtr());
@@ -833,88 +802,80 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
 
     // insert deformed positions into the cache
 
-    auto cachePositionsLambda = [&transform, &deformer, &leafs, &filter](
-        const LeafRangeT& range) {
+    auto cachePositionsOp = [&](const LeafT& leaf, size_t idx) {
+
+        const Index64 totalPointCount = leaf.pointCount();
+        if (totalPointCount == 0)   return;
 
         // deformer is copied to ensure that it is unique per-thread
 
         DeformerT newDeformer(deformer);
 
-        for (auto leaf = range.begin(); leaf; ++leaf) {
+        // if more than half the number of total points are evaluated by the filter, prefer
+        // accessing the data from a vector instead of a hash map for faster performance
+        const Index64 vectorThreshold = totalPointCount / 2;
 
-            const Index64 totalPointCount = leaf->pointCount();
-            if (totalPointCount == 0)   continue;
+        newDeformer.reset(leaf, idx);
 
-            // if more than half the number of total points are evaluated by the filter, prefer
-            // accessing the data from a vector instead of a hash map for faster performance
-            const Index64 vectorThreshold = totalPointCount / 2;
+        auto handle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
 
-            newDeformer.reset(*leaf, leaf.pos());
+        auto& cache = leafs[idx];
+        cache.clear();
 
-            auto handle = AttributeHandle<Vec3f>::create(leaf->constAttributeArray("P"));
+        // only insert into a vector directly if the filter evaluates all points and the
+        // number of active points is greater than the vector threshold
+        const bool useVector = filter.state() == index::ALL &&
+            (leaf.isDense() || (leaf.onPointCount() > vectorThreshold));
+        if (useVector) {
+            cache.vecData.resize(totalPointCount);
+        }
 
-            auto& cache = leafs[leaf.pos()];
-            cache.clear();
+        for (auto iter = leaf.beginIndexOn(filter); iter; iter++) {
 
-            // only insert into a vector directly if the filter evaluates all points and the
-            // number of active points is greater than the vector threshold
-            const bool useVector = filter.state() == index::ALL &&
-                (leaf->isDense() || (leaf->onPointCount() > vectorThreshold));
+            // extract index-space position and apply index-space deformation (if defined)
+
+            Vec3d position = handle->get(*iter) + iter.getCoord().asVec3d();
+
+            // if deformer is designed to be used in index-space, perform deformation prior
+            // to transforming position to world-space, otherwise perform deformation afterwards
+
+            if (DeformerTraits<DeformerT>::IndexSpace) {
+                newDeformer.apply(position, iter);
+                position = transform.indexToWorld(position);
+            }
+            else {
+                position = transform.indexToWorld(position);
+                newDeformer.apply(position, iter);
+            }
+
+            // insert new position into the cache
+
             if (useVector) {
-                cache.vecData.resize(totalPointCount);
+                cache.vecData[*iter] = static_cast<Vec3T>(position);
             }
-
-            for (auto iter = leaf->beginIndexOn(filter); iter; iter++) {
-
-                // extract index-space position and apply index-space deformation (if defined)
-
-                Vec3d position = handle->get(*iter) + iter.getCoord().asVec3d();
-
-                // if deformer is designed to be used in index-space, perform deformation prior
-                // to transforming position to world-space, otherwise perform deformation afterwards
-
-                if (DeformerTraits<DeformerT>::IndexSpace) {
-                    newDeformer.apply(position, iter);
-                    position = transform.indexToWorld(position);
-                }
-                else {
-                    position = transform.indexToWorld(position);
-                    newDeformer.apply(position, iter);
-                }
-
-                // insert new position into the cache
-
-                if (useVector) {
-                    cache.vecData[*iter] = static_cast<Vec3T>(position);
-                }
-                else {
-                    cache.mapData.insert({*iter, static_cast<Vec3T>(position)});
-                }
+            else {
+                cache.mapData.insert({*iter, static_cast<Vec3T>(position)});
             }
+        }
 
-            // after insertion, move the data into a vector if the threshold is reached
+        // after insertion, move the data into a vector if the threshold is reached
 
-            if (!useVector && cache.mapData.size() > vectorThreshold) {
-                cache.vecData.resize(totalPointCount);
-                for (const auto& it : cache.mapData) {
-                    cache.vecData[it.first] = it.second;
-                }
-                cache.mapData.clear();
+        if (!useVector && cache.mapData.size() > vectorThreshold) {
+            cache.vecData.resize(totalPointCount);
+            for (const auto& it : cache.mapData) {
+                cache.vecData[it.first] = it.second;
             }
+            cache.mapData.clear();
+        }
 
-            // store the total number of points to allow use of an expanded vector on access
+        // store the total number of points to allow use of an expanded vector on access
 
-            if (!cache.mapData.empty()) {
-                cache.totalSize = totalPointCount;
-            }
+        if (!cache.mapData.empty()) {
+            cache.totalSize = totalPointCount;
         }
     };
 
-    if (threaded) {
-        tbb::parallel_for(leafManager.leafRange(), cachePositionsLambda);
-    } else {
-        cachePositionsLambda(leafManager.leafRange());
-    }
+    leafManager.foreach(cachePositionsOp, threaded);
 }
 
 
