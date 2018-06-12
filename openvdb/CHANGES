@@ -3,6 +3,11 @@ OpenVDB Version History
 
 Version 5.2.0 - In development
 
+    New features:
+    - Added tools to sample voxel values onto points stored in
+      point data grids.
+      [Contributed by Double Negative]
+
     Improvements:
     - Added state() methods to point data index filters to improve
       optimization opportunities.
@@ -16,10 +21,23 @@ Version 5.2.0 - In development
       [Contributed by Dan Bailey]
     - Computing cumulative per-leaf point offsets is now parallelized.
       [Contributed by Dan Bailey]
+    - Made various small changes for Visual Studio 2017 compatibility.
+      [Contributed by Edward Lam]
 
     Bug fixes:
     - Fixed a bug that could cause an infinite loop when iterating over
       an empty root node.
+    - Fixed a bug in the mesh to volume converter that made it uninterruptible
+      in certain cases even though an interrupter was provided.
+      [Reported by Doug Epps]
+
+    Houdini:
+    - Added options to the Metadata SOP to set the grid name
+      and to propagate metadata to primitive attributes and vice-versa.
+    - Added support to the Sample Points SOP for sampling onto points
+      stored in point data grids.
+      [Contributed by Double Negative]
+
 
 
 Version 5.1.0 - April 10, 2018
@@ -95,7 +113,7 @@ Version 5.0.0 - November 6, 2017
       up to and including Houdini 16.  To preserve ABI compatibility,
       when compiling OpenVDB or any dependent code define the macro
       OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
-      Houdini 15, 15.5 and 16 and 4 for the upcoming release.
+      Houdini 15, 15.5 and 16 and 4 for Houdini 16.5.
 
     New features:
     - Added a getLibraryAbiVersionString() function, which returns a

@@ -29,12 +29,13 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-
 #include <openvdb/openvdb.h>
-#include <openvdb/unittest/util.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointSample.h>
+#include "util.h"
+#include <string>
+#include <vector>
 
 using namespace openvdb;
 
@@ -42,8 +43,8 @@ class TestPointSample: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { initialize(); }
-    virtual void tearDown() { uninitialize(); }
+    void setUp() override { initialize(); }
+    void tearDown() override { uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointSample);
     CPPUNIT_TEST(testPointSample);
@@ -77,6 +78,7 @@ testAttribute(points::PointDataGrid& points, const std::string& attributeName,
 
     grid->setTransform(xform);
     grid->tree().setValue(Coord(0,0,0), val);
+
     points::boxSample(points, *grid, attributeName);
 
     return(points::AttributeHandle<ValueType>::create(
@@ -91,21 +93,19 @@ TestPointSample::testPointSample()
 {
     using points::PointDataGrid;
     using points::NullCodec;
-    using Int16Tree = tree::Tree4<int16_t, 5, 4, 3>::Type;
-    using Int16Grid = Grid<Int16Tree>;
 
     const float voxelSize = 0.1f;
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
     {
-        // check that all supported grid types can be sampled.  This check will use very basic grids
-        // with a point at a cell-centered positions
+        // check that all supported grid types can be sampled.
+        // This check will use very basic grids with a point at a cell-centered positions
 
         // create test point grid with a single point
 
         std::vector<Vec3f> pointPositions{Vec3f(0.0f, 0.0f, 0.0f)};
-        PointDataGrid::Ptr points =
-            points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions, *transform);
+        PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
+            pointPositions, *transform);
 
         CPPUNIT_ASSERT(points);
 
@@ -118,10 +118,15 @@ TestPointSample::testPointSample()
 
         // int16
 
+#if (defined _MSC_VER) || (defined __INTEL_COMPILER) || (defined __clang__)
+        // GCC warns warns of narrowing conversions from int to int16_t,
+        // and GCC 4.8, at least, ignores the -Wconversion suppression pragma.
+        // So for now, skip this test if compiling with GCC.
         points::AttributeHandle<int16_t>::Ptr int16Handle =
             testAttribute<int16_t>(*points, "test_int16", transform, int16_t(10));
 
         CPPUNIT_ASSERT_EQUAL(int16Handle->get(0), int16_t(10));
+#endif
 
         // int32
 
@@ -171,8 +176,8 @@ TestPointSample::testPointSample()
 
         std::vector<Vec3f> pointPositions{Vec3f(0.0f, 0.0f, 0.0f)};
 
-        PointDataGrid::Ptr points =
-            points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions, *transform);
+        PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
+            pointPositions, *transform);
 
         points::appendAttribute<Vec3f>(points->tree(), "test");
 
@@ -191,8 +196,8 @@ TestPointSample::testPointSample()
         // empty point grid
 
         std::vector<Vec3f> pointPositions;
-        PointDataGrid::Ptr points =
-            points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions, *transform);
+        PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
+            pointPositions, *transform);
 
         CPPUNIT_ASSERT(points);
 
@@ -208,8 +213,8 @@ TestPointSample::testPointSample()
 
         std::vector<Vec3f> pointPositions{Vec3f(0.0f, 0.0f, 0.0f)};
 
-        PointDataGrid::Ptr points =
-            points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions, *transform);
+        PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
+            pointPositions, *transform);
 
         CPPUNIT_ASSERT(points);
 
@@ -242,8 +247,8 @@ TestPointSample::testPointSample()
 
         std::vector<Vec3f> pointPositions{Vec3f(0.03f, 0.0f, 0.0f), Vec3f(0.11f, 0.03f, 0.0f)};
 
-        PointDataGrid::Ptr points =
-            points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions, *transform);
+        PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
+            pointPositions, *transform);
 
         CPPUNIT_ASSERT(points);
 
@@ -450,15 +455,23 @@ TestPointSample::testPointSample()
 
         points::appendAttribute<float>(points->tree(), "testfloat");
 
-        CPPUNIT_ASSERT_THROW_MESSAGE("Cannot sample a vec3s grid on to a float attribute",
-            points::boxSample(*points, *testVec3fGrid, "testfloat"), std::exception);
+        // The following is a substitute for CPPUNIT_ASSERT_THROW_MESSAGE(),
+        // which generates a compiler warning when the expected exception type
+        // is std::exception.
+        try {
+            points::boxSample(*points, *testVec3fGrid, "testfloat");
+            CPPUNIT_FAIL("expected exception not thrown:"
+                " cannot sample a vec3s grid on to a float attribute");
+        } catch (std::exception&) {
+        } catch (...) {
+            CPPUNIT_FAIL("expected std::exception or derived");
+        }
 
         // check invalid existing attribute type (Vec4s attribute)
 
         points::TypedAttributeArray<Vec4s>::registerType();
         points::appendAttribute<Vec4s>(points->tree(), "testv4f");
-        CPPUNIT_ASSERT_THROW(points::boxSample(*points, *testVec3fGrid, "testv4f"),
-            TypeError);
+        CPPUNIT_ASSERT_THROW(points::boxSample(*points, *testVec3fGrid, "testv4f"), TypeError);
     }
 
     { // sample a non-standard grid type (a Vec4<float> grid)
@@ -564,6 +577,6 @@ TestPointSample::testPointSampleWithGroups()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle2->get(1), 1e-6);
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

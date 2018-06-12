@@ -43,6 +43,9 @@
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
 
+#include <sstream>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -242,7 +245,7 @@ private:
     // No-op transformation
     struct AlignedTransform
     {
-        inline Vec3d transform(const Vec3d& position) const { return position; };
+        inline Vec3d transform(const Vec3d& position) const { return position; }
     }; // struct AlignedTransform
 
     // Re-sample world-space position from source to target transforms
@@ -296,7 +299,6 @@ private:
         using PointDataTreeT = typename PointDataGridT::TreeType;
         using LeafT = typename PointDataTreeT::LeafNodeType;
         using LeafManagerT = typename tree::LeafManager<PointDataTreeT>;
-        using LeafRangeT = typename LeafManagerT::LeafRange;
 
         const auto& filter(mFilter);
         const auto& interrupter(mInterrupter);
@@ -315,8 +317,8 @@ private:
             auto positionHandle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
             auto targetHandle = TargetHandleT::create(leaf.attributeArray(targetIndex));
             for (auto iter = leaf.beginIndexOn(filter); iter; ++iter) {
-                const Vec3d position = transformer.template transform(positionHandle->get(*iter) +
-                    iter.getCoord().asVec3d());
+                const Vec3d position = transformer.transform(
+                    positionHandle->get(*iter) + iter.getCoord().asVec3d());
                 targetHandle->set(*iter, newSampleWrapper.sample(position));
             }
         };
@@ -469,29 +471,29 @@ inline void sampleGrid( size_t order,
             assert(targetIndex != AttributeSet::INVALID_POS);
 
             // sample using same type as source grid
-            pointDataSampler.template sample<SourceGridT>(sourceGrid, targetIndex);
-        }
-        else {
+            pointDataSampler.template sample<SourceGridT>(sourceGrid, Index(targetIndex));
+        } else {
+            auto targetIdx = static_cast<Index>(targetIndex);
             // attempt to explicitly sample using type of existing attribute
             const Name& targetType = descriptor.valueType(targetIndex);
             if (targetType == typeNameAsString<Vec3f>()) {
-                pointDataSampler.template sample<SourceGridT, Vec3f>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, Vec3f>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<Vec3d>()) {
-                pointDataSampler.template sample<SourceGridT, Vec3d>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, Vec3d>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<Vec3i>()) {
-                pointDataSampler.template sample<SourceGridT, Vec3i>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, Vec3i>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int16_t>()) {
-                pointDataSampler.template sample<SourceGridT, int16_t>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, int16_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int32_t>()) {
-                pointDataSampler.template sample<SourceGridT, int32_t>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, int32_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int64_t>()) {
-                pointDataSampler.template sample<SourceGridT, int64_t>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, int64_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<float>()) {
-                pointDataSampler.template sample<SourceGridT, float>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, float>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<double>()) {
-                pointDataSampler.template sample<SourceGridT, double>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, double>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<bool>()) {
-                pointDataSampler.template sample<SourceGridT, bool>(sourceGrid, targetIndex);
+                pointDataSampler.template sample<SourceGridT, bool>(sourceGrid, targetIdx);
             } else {
                 std::ostringstream ostr;
                 ostr << "Cannot sample attribute of type - " << targetType;
@@ -518,7 +520,8 @@ inline void sampleGrid( size_t order,
         }
 
         // sample using target value type
-        pointDataSampler.template sample<SourceGridT, TargetValueT>(sourceGrid, targetIndex);
+        pointDataSampler.template sample<SourceGridT, TargetValueT>(
+            sourceGrid, static_cast<Index>(targetIndex));
     }
 }
 
@@ -565,6 +568,6 @@ inline void quadraticSample(PointDataGridT& points,
 
 #endif // OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
