@@ -223,8 +223,8 @@ struct PointsToTransformedScalarOp
         : mTargetTransform(targetTransform)
         , mSourceTransform(sourceTransform)
         , mFilter(filter)
-        , mCombinable(combinable)
-        , mDeformer(deformer) { }
+        , mDeformer(deformer)
+        , mCombinable(combinable) { }
 
     void operator()(const PointDataLeafT& leaf, size_t idx) const
     {
