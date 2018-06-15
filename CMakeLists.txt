@@ -38,6 +38,11 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
 
+# More specific options for windows
+OPTION ( OPENVDB_BUILD_TOOLS "Build OpenVDB utilities" ON )
+OPTION ( OPENVDB_STATIC "Build statically linked library" ON )
+OPTION ( OPENVDB_SHARED "Build dynamically linked library" ON )
+
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
 OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
@@ -61,6 +66,10 @@ IF ( APPLE )
 	MESSAGE ( FATAL_ERROR "On OSX, Houdini linked with libc++ whereas Maya is linked with libstdc++, the different runtimes are not mutually compatible, build them Houdini SOPs and Maya plugins separately with the requisite DCC's compiler" )
   ENDIF ()
 ENDIF ()
+
+IF (MSVC)
+  ADD_DEFINITIONS("/bigobj")
+ENDIF()
 
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 

@@ -30,7 +30,7 @@
 
 /// @file OpenVDBTransformNode.cc
 /// @author FX R&D OpenVDB team
-
+#define MNoPluginEntry
 #include "OpenVDBPlugin.h"
 #include <openvdb_maya/OpenVDBData.h>
 #include <openvdb_maya/OpenVDBUtil.h>

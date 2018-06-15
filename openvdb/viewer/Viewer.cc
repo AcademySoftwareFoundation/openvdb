@@ -58,6 +58,8 @@
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
+#elif defined(WIN32)
+#include <GL/glew.h>
 #else
 #include <GL/gl.h>
 #include <GL/glu.h>
@@ -540,7 +542,15 @@ ViewerImpl::open(int width, int height)
             std::shared_ptr<GLFWwindow> curWindow(
                 glfwGetCurrentContext(), glfwMakeContextCurrent);
             glfwMakeContextCurrent(mWindow);
-            BitmapFont13::initialize();
+            BitmapFont13::initialize();            
+#ifdef WIN32
+            if (glewInit() == GLEW_OK) {
+                OPENVDB_LOG_DEBUG_RUNTIME("initialized GLEW from thread "
+                    << boost::this_thread::get_id());
+            } else {
+                OPENVDB_LOG_ERROR("GLEW initialization failed");
+            }
+#endif
         }
     }
     mCamera->setWindow(mWindow);

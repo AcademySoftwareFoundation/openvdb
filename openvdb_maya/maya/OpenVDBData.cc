@@ -31,7 +31,7 @@
 /// @file OpenVDBData.cc
 /// @author FX R&D OpenVDB team
 
-
+#define MNoPluginEntry
 #include "OpenVDBData.h"
 #include <openvdb/io/Stream.h>
 

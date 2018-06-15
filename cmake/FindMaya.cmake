@@ -97,7 +97,7 @@ IF ( MAYA_FOUND )
   IF ( MAYA_SEARCH_SHIPPED_BOOST )
 
 	# TODO : How to determine shipping version of Boost assocated with Maya
-	SET ( MAYA_BOOST_VERSION "1_52" )
+	SET ( MAYA_BOOST_VERSION "1_61" )
 	
 	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_filesystem )
 	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_python )

@@ -29,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 /// @author FX R&D OpenVDB team
-
+#define MNoPluginEntry
 #include <openvdb_maya/OpenVDBData.h>
 #include "OpenVDBPlugin.h"
 

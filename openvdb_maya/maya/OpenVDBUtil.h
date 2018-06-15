@@ -34,7 +34,18 @@
 #ifndef OPENVDB_MAYA_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_MAYA_UTIL_HAS_BEEN_INCLUDED
 
+#define MNoPluginEntry
 #include "OpenVDBData.h"
+
+#if defined(__APPLE__) || defined(MACOSX)
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#elif defined(WIN32)
+#include <GL/glew.h>
+#else
+#include <GL/gl.h>
+#include <GL/glu.h>
+#endif
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
@@ -50,14 +61,6 @@
 #include <maya/MDataHandle.h>
 #include <maya/MFnPluginData.h>
 #include <maya/MTime.h>
-
-#if defined(__APPLE__) || defined(MACOSX)
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#else
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
 
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::abs(), std::floor()

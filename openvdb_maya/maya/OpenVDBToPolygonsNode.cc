@@ -31,7 +31,7 @@
 /// @file OpenVDBToPolygonsNode.cc
 ///
 /// @author Fredrik Salomonsson (fredriks@d2.com)
-
+#define MNoPluginEntry
 #include "OpenVDBPlugin.h"
 #include <openvdb_maya/OpenVDBData.h>
 #include <openvdb_maya/OpenVDBUtil.h>

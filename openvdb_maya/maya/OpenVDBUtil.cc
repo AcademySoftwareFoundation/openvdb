@@ -31,7 +31,7 @@
 /// @file OpenVDBUtil.cc
 ///
 /// @author FX R&D OpenVDB team
-
+#define MNoPluginEntry
 #include "OpenVDBUtil.h"
 #include <openvdb/math/Math.h>
 

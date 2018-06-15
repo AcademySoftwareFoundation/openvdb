@@ -1,0 +1,79 @@
+clone_depth: 10
+
+version: 5.2.0.{build}
+
+test: off
+
+branches:
+  only:
+    - win_build
+
+skip_tags: true
+
+build:
+  parallel: true
+  verbosity: detailed
+
+platform:
+  - x64
+  # - x86
+
+configuration:
+  #- Debug
+  - Release
+
+environment:
+  OPENVDB_ABI: 5
+  OPENVDB_CORE_SHARED: ON
+  OPENVDB_CORE_STATIC: ON
+  OPENVDB_UNITTESTS: ON
+  OPENVDB_DOCS: OFF
+  OPENVDB_TOOLS: ON
+  OPENVDB_PYTHON: OFF
+  OPENVDB_MAYA_PLUGIN: OFF
+  OPENVDB_HOUDINI_PLUGIN: OFF
+  CMAKE_GENERATOR: Visual Studio 14 2015 Win64
+  VCPKG_DEFAULT_TRIPLET: x64-windows
+  VCPKG_x64_SHARED_ROOT: C:/tools/vcpkg/installed/x64-windows
+  VCPKG_x64_STATIC_ROOT: C:/tools/vcpkg/installed/x64-windows-static
+
+os:
+  - Visual Studio 2015
+
+cache: c:\tools\vcpkg\installed\
+# cache: c:\tools\vcpkg\installed\ -> appveyor.yml
+
+before_build:
+  - cmd: cd C:\tools\vcpkg
+  - cmd: vcpkg install glew glfw3 zlib blosc openexr tbb
+  - cmd: vcpkg install cppunit --triplet x64-windows-static
+  - cmd: vcpkg integrate install
+
+  - cmd: set BOOST_ROOT=C:\Libraries\boost_1_67_0
+  - cmd: set BOOST_LIBRARYDIR=C:\Libraries\boost_1_67_0\lib64-msvc-14.0
+  - cmd: set CMAKE_PREFIX_PATH=%CMAKE_PREFIX_PATH%;%BOOST_ROOT%
+
+  - cmd: set PYTHON_ROOT="C:\Python27-x64"
+  - cmd: set CMAKE_PREFIX_PATH=%CMAKE_PREFIX_PATH%;%PYTHON_ROOT%
+
+build_script:
+  - cmd: cd %APPVEYOR_BUILD_FOLDER%
+  - cmd: mkdir build
+  - cmd: cd build
+  - cmd: cmake .. -G"%CMAKE_GENERATOR%" -DCMAKE_CONFIGURATION_TYPES=%CONFIGURATION% -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%/install -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake -DOPENVDB_ABI_VERSION_NUMBER=%OPENVDB_ABI% -DUSE_GLFW3=ON -DOPENVDB_SHARED=%OPENVDB_CORE_SHARED% -DOPENVDB_STATIC=%OPENVDB_CORE_STATIC% -DOPENVDB_BUILD_PYTHON_MODULE=%OPENVDB_PYTHON% -DOPENVDB_BUILD_UNITTESTS=%OPENVDB_UNITTESTS% -DOPENVDB_BUILD_DOCS=%OPENVDB_DOCS% -DOPENVDB_BUILD_TOOLS=%OPENVDB_TOOLS% -DOPENEXR_LOCATION=%VCPKG_x64_SHARED_ROOT% -DILMBASE_LOCATION=%VCPKG_x64_SHARED_ROOT% -DTBB_LOCATION=%VCPKG_x64_SHARED_ROOT% -DBLOSC_LOCATION=%VCPKG_x64_SHARED_ROOT% -DGLEW_LOCATION=%VCPKG_x64_SHARED_ROOT% -DGLFW3_LOCATION=%VCPKG_x64_SHARED_ROOT% -DGLFW3_glfw_LIBRARY=%VCPKG_x64_SHARED_ROOT%/lib/glfw3dll.lib -DCPPUNIT_LOCATION=%VCPKG_x64_STATIC_ROOT% -DCPPUNIT_USE_STATIC_LIBS=ON
+  - cmd: cmake --build . --config %CONFIGURATION% --target install
+
+after_build:
+  - cmd: 7z a %APPVEYOR_BUILD_FOLDER%\openvdb.zip %APPVEYOR_BUILD_FOLDER%\install
+  - cmd: appveyor PushArtifact %APPVEYOR_BUILD_FOLDER%\openvdb.zip
+
+test_script:
+  - cmd: ctest -VV -C %configuration%
+
+#init:
+#- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+#on_failure:
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+
