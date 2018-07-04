@@ -7,6 +7,12 @@
 <B>Version 5.2.0</B> - <I>In development</I>
 
 @par
+New features:
+- Added @link points/PointSample.h tools@endlink to sample voxel values
+  onto points stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
 Improvements:
 - Added @b state methods to point data
   @link points/IndexFilter.h index filters@endlink to improve
@@ -24,11 +30,25 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Computing cumulative per-leaf point offsets is now parallelized.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Made various small changes for Visual Studio&nbsp;2017 compatibility.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
 
 @par
 Bug fixes:
 - Fixed a bug that could cause an infinite loop when iterating over
   an empty root node.
+- Fixed a bug in the @link MeshToVolume.h mesh to volume@endlink converter
+  that made it uninterruptible in certain cases even though
+  an interrupter was provided.
+  <I>[Reported&nbsp;by&nbsp;Doug&nbsp;Epps]</I>
+
+@par
+Houdini:
+- Added options to the Metadata&nbsp;SOP to set the grid name
+  and to propagate metadata to primitive attributes and vice-versa.
+- Added support to the Sample&nbsp;Points&nbsp;SOP for sampling onto points
+  stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 
 
 @htmlonly <a name="v5_1_0_changes"></a>@endhtmlonly
@@ -123,7 +143,7 @@ Houdini&nbsp;16.
 To preserve ABI compatibility, when compiling OpenVDB or any dependent code
 define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
 for example, <I>N</I> is 3 for Houdini&nbsp;15, 15.5 and&nbsp;16 and 4
-for the upcoming release.
+for Houdini&nbsp;16.5.
 </BLOCKQUOTE>
 
 @par

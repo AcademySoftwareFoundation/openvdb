@@ -240,7 +240,7 @@ public:
     }
 
     /// this = normalized this
-    bool normalize(T eps=1.0e-8)
+    bool normalize(T eps = static_cast<T>(1.0e-8))
     {
         T d = length();
         if (isApproxEqual(d, T(0), eps)) {
@@ -353,7 +353,7 @@ public:
 
     /// Returns the scalar component of v in the direction of onto, onto need
     /// not be unit. e.g   float c = Vec2f::component(v1,v2);
-    T component(const Vec2<T> &onto, T eps=1.0e-8) const
+    T component(const Vec2<T> &onto, T eps = static_cast<T>(1.0e-8)) const
     {
         T l = onto.length();
         if (isApproxEqual(l,  T(0), eps)) return 0;
@@ -363,7 +363,7 @@ public:
 
     /// Return the projection of v onto the vector, onto need not be unit
     /// e.g.   Vec2f v = Vec2f::projection(v,n);
-    Vec2<T> projection(const Vec2<T> &onto, T eps=1.0e-8) const
+    Vec2<T> projection(const Vec2<T> &onto, T eps = static_cast<T>(1.0e-8)) const
     {
         T l = onto.lengthSqr();
         if (isApproxEqual(l, T(0), eps)) return Vec2::zero();

@@ -253,7 +253,7 @@ grIsPointDataGrid(const GT_PrimitiveHandle& gt_prim)
     const GT_PrimVDB* gt_vdb = static_cast<const GT_PrimVDB*>(gt_prim.get());
     const GEO_PrimVDB* gr_vdb = gt_vdb->getGeoPrimitive();
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
     return (gr_vdb->getStorageType() == UT_VDB_POINTDATA);
 #else
     return (gr_vdb->getGrid().isType<openvdb::points::PointDataGrid>());

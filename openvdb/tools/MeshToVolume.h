@@ -3438,14 +3438,16 @@ doMeshConversion(
         QuadAndTriangleDataAdapter<Vec3s, Vec3I>
             mesh(indexSpacePoints.get(), numPoints, &triangles[0], triangles.size());
 
-        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+        return meshToVolume<GridType>(
+            interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
 
     } else if (triangles.empty()) {
 
         QuadAndTriangleDataAdapter<Vec3s, Vec4I>
             mesh(indexSpacePoints.get(), numPoints, &quads[0], quads.size());
 
-        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+        return meshToVolume<GridType>(
+            interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
     }
 
     // pack primitives
