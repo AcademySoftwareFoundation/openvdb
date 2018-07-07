@@ -34,6 +34,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointMove.h>
+#include <openvdb/points/PointScatter.h>
 #include <openvdb/openvdb.h>
 
 #include <openvdb/Types.h>
@@ -56,6 +57,7 @@ public:
     CPPUNIT_TEST(testMoveGlobal);
     CPPUNIT_TEST(testCustomDeformer);
     CPPUNIT_TEST(testPointData);
+    CPPUNIT_TEST(testPointOrder);
     CPPUNIT_TEST_SUITE_END();
 
     void testCachedDeformer();
@@ -63,6 +65,7 @@ public:
     void testMoveGlobal();
     void testCustomDeformer();
     void testPointData();
+    void testPointOrder();
 }; // class TestPointMove
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointMove);
@@ -1120,6 +1123,60 @@ TestPointMove::testPointData()
         CPPUNIT_ASSERT_EQUAL(short(0), nonZeroGroups2[2]);
         CPPUNIT_ASSERT_EQUAL(short(1), nonZeroGroups2[3]);
     }
+}
+
+
+void
+TestPointMove::testPointOrder()
+{
+    struct Local
+    {
+        using GridT = points::PointDataGrid;
+
+        static void populate(std::vector<Vec3s>& positions, const GridT& points,
+            const math::Transform& transform, bool threaded)
+        {
+            auto newPoints1 = points.deepCopy();
+
+            points::NullDeformer nullDeformer;
+            points::NullFilter nullFilter;
+            points::movePoints(*newPoints1, transform, nullDeformer, nullFilter);
+
+            size_t totalPoints = points::pointCount(newPoints1->tree());
+
+            positions.reserve(totalPoints);
+
+            for (auto leaf = newPoints1->tree().cbeginLeaf(); leaf; ++leaf) {
+                AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
+                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                    positions.push_back(handle.get(*iter));
+                }
+            }
+        }
+    };
+
+    auto sourceTransform = math::Transform::createLinearTransform(/*voxelSize=*/0.1);
+    auto targetTransform = math::Transform::createLinearTransform(/*voxelSize=*/1.0);
+
+    auto mask = MaskGrid::create();
+    mask->setTransform(sourceTransform);
+    mask->denseFill(CoordBBox(Coord(-20,-20,-20), Coord(20,20,20)), true);
+
+    auto points = points::denseUniformPointScatter(*mask, /*pointsPerVoxel=*/8);
+
+    // three copies of the points, two multi-threaded and one single-threaded
+    std::vector<Vec3s> positions1;
+    std::vector<Vec3s> positions2;
+    std::vector<Vec3s> positions3;
+
+    Local::populate(positions1, *points, *targetTransform, true);
+    Local::populate(positions2, *points, *targetTransform, true);
+    Local::populate(positions3, *points, *targetTransform, false);
+
+    // verify all sequences are identical to confirm that points are ordered deterministically
+
+    ASSERT_APPROX_EQUAL(positions1, positions2, __LINE__);
+    ASSERT_APPROX_EQUAL(positions1, positions3, __LINE__);
 }
 
 

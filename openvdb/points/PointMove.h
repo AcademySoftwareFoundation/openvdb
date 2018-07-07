@@ -97,6 +97,22 @@ inline void movePoints(PointDataGridT& points,
                        bool threaded = true);
 
 
+/// @brief Move points in a PointDataGrid using a custom deformer and a new transform
+/// @param points           the PointDataGrid containing the points to be moved.
+/// @param transform        target transform to use for the resulting points.
+/// @param deformer         a custom deformer that defines how to move the points.
+/// @param filter           an optional index filter
+/// @param objectNotInUse   for future use, this object is currently ignored
+/// @param threaded         enable or disable threading  (threading is enabled by default)
+template <typename PointDataGridT, typename DeformerT, typename FilterT = NullFilter>
+inline void movePoints(PointDataGridT& points,
+                       const math::Transform& transform,
+                       DeformerT& deformer,
+                       const FilterT& filter = NullFilter(),
+                       future::Advect* objectNotInUse = nullptr,
+                       bool threaded = true);
+
+
 /// @brief A Deformer that caches the resulting positions from evaluating another Deformer
 template <typename T>
 class CachedDeformer
@@ -443,7 +459,24 @@ struct GlobalMovePointsOp
             auto& targetHandle = mTargetHandles.getWriteHandle<ValueT>(mTargetOffset);
             targetHandle.expand();
 
-            for (const auto& it : mIndices) {
+            // build a sorted index vector that references the indices in order of their source
+            // leafs and voxels to ensure determinism in the resulting point orders
+
+            std::vector<int> sortedIndices(mIndices.size());
+            std::iota(std::begin(sortedIndices), std::end(sortedIndices), 0);
+            std::sort(std::begin(sortedIndices), std::end(sortedIndices),
+                [&](int i, int j)
+                {
+                    const Index& indexI0(std::get<0>(mIndices[i]));
+                    const Index& indexJ0(std::get<0>(mIndices[j]));
+                    if (indexI0 < indexJ0)          return true;
+                    if (indexI0 > indexJ0)          return false;
+                    return std::get<2>(mIndices[i]) < std::get<2>(mIndices[j]);
+                }
+            );
+
+            for (const auto& index : sortedIndices) {
+                const auto& it = mIndices[index];
                 const auto& sourceHandle = mSourceHandles.getHandle<ValueT>(std::get<0>(it));
                 const Index targetIndex = indexOffsetFromVoxel(std::get<1>(it), mTargetLeaf, mOffsets);
                 for (Index i = 0; i < sourceHandle.stride(); i++) {
@@ -632,6 +665,7 @@ private:
 
 template <typename PointDataGridT, typename DeformerT, typename FilterT>
 inline void movePoints( PointDataGridT& points,
+                        const math::Transform& transform,
                         DeformerT& deformer,
                         const FilterT& filter,
                         future::Advect* objectNotInUse,
@@ -658,7 +692,7 @@ inline void movePoints( PointDataGridT& points,
     // build voxel topology taking into account any point group deletion
 
     auto newPoints = point_mask_internal::convertPointsToScalar<PointDataGrid>(
-        points, points.transform(), filter, deformer, threaded);
+        points, transform, filter, deformer, threaded);
     auto& newTree = newPoints->tree();
 
     // create leaf managers for both trees
@@ -732,12 +766,12 @@ inline void movePoints( PointDataGridT& points,
         NullFilter nullFilter;
         BuildMoveMapsOp<DeformerT, PointDataTreeT, NullFilter> op(deformer,
             globalMoveLeafMap, localMoveLeafMap, targetLeafMap,
-            points.transform(), points.transform(), nullFilter);
+            transform, points.transform(), nullFilter);
         sourceLeafManager.foreach(op, threaded);
     } else {
         BuildMoveMapsOp<DeformerT, PointDataTreeT, FilterT> op(deformer,
             globalMoveLeafMap, localMoveLeafMap, targetLeafMap,
-            points.transform(), points.transform(), filter);
+            transform, points.transform(), filter);
         sourceLeafManager.foreach(op, threaded);
     }
 
@@ -772,6 +806,17 @@ inline void movePoints( PointDataGridT& points,
     }
 
     points.setTree(newPoints->treePtr());
+}
+
+
+template <typename PointDataGridT, typename DeformerT, typename FilterT>
+inline void movePoints( PointDataGridT& points,
+                        DeformerT& deformer,
+                        const FilterT& filter,
+                        future::Advect* objectNotInUse,
+                        bool threaded)
+{
+    movePoints(points, points.transform(), deformer, filter, objectNotInUse, threaded);
 }
 
 
