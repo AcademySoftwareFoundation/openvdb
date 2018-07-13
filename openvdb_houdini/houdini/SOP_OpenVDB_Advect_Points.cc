@@ -210,6 +210,8 @@ struct AdvectionParms
         : mOutputGeo(outputGeo)
         , mPointGeo(nullptr)
         , mPointGroup(nullptr)
+        , mGroup(nullptr)
+        , mOffsetsToSkip()
         , mIncludeGroups()
         , mExcludeGroups()
         , mVelPrim(nullptr)
@@ -227,6 +229,8 @@ struct AdvectionParms
     GU_Detail* mOutputGeo;
     const GU_Detail* mPointGeo;
     const GA_PointGroup* mPointGroup;
+    const GA_PrimitiveGroup* mGroup;
+    std::vector<GA_Offset> mOffsetsToSkip;
     std::vector<std::string> mIncludeGroups;
     std::vector<std::string> mExcludeGroups;
     const GU_PrimVDB *mVelPrim;
@@ -306,9 +310,10 @@ class ProjectionOp
 public:
 
     ProjectionOp(const GridType& cptGrid, int cptIterations, GU_Detail& geo,
-        hvdb::Interrupter& boss)
+        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss)
         : mProjector(cptGrid, cptIterations)
         , mGeo(geo)
+        , mOffsetsToSkip(offsetsToSkip)
         , mBoss(boss)
     {
     }
@@ -329,6 +334,11 @@ public:
 
                 for (GA_Offset i = start; i < end; ++i) {
 
+                    // skip any offsets requested
+                    if (std::binary_search(mOffsetsToSkip.begin(), mOffsetsToSkip.end(), i)) {
+                        continue;
+                    }
+
                     p = mGeo.getPos3(i);
                     w[0] = ElementType(p[0]);
                     w[1] = ElementType(p[1]);
@@ -348,6 +358,7 @@ public:
 private:
     ProjectorType mProjector;
     GU_Detail& mGeo;
+    const std::vector<GA_Offset>& mOffsetsToSkip;
     hvdb::Interrupter& mBoss;
 };
 
@@ -366,7 +377,7 @@ public:
     {
         if (mBoss.wasInterrupted()) return;
 
-        ProjectionOp<GridType> op(grid, mParms.mIterations, *mParms.mOutputGeo, mBoss);
+        ProjectionOp<GridType> op(grid, mParms.mIterations, *mParms.mOutputGeo, mParms.mOffsetsToSkip, mBoss);
         UTparallelFor(GA_SplittableRange(mParms.mOutputGeo->getPointRange(mParms.mPointGroup)), op);
     }
 
@@ -389,11 +400,13 @@ class AdvectionOp
 
 public:
 
-    AdvectionOp(const GridType& velocityGrid, GU_Detail& geo, hvdb::Interrupter& boss,
+    AdvectionOp(const GridType& velocityGrid, GU_Detail& geo,
+        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss,
         double timeStep, GA_ROHandleF traillen, int steps)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(nullptr)
         , mGeo(geo)
+        , mOffsetsToSkip(offsetsToSkip)
         , mBoss(boss)
         , mTimeStep(timeStep)
         , mTrailLen(traillen)
@@ -403,10 +416,12 @@ public:
     }
 
     AdvectionOp(const GridType& velocityGrid, const GridType& cptGrid, GU_Detail& geo,
-        hvdb::Interrupter& boss, double timeStep, int steps, int cptIterations)
+        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss,
+        double timeStep, int steps, int cptIterations)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(&cptGrid)
         , mGeo(geo)
+        , mOffsetsToSkip(offsetsToSkip)
         , mBoss(boss)
         , mTimeStep(timeStep)
         , mSteps(steps)
@@ -438,6 +453,11 @@ public:
 
                 for (GA_Offset i = start; i < end; ++i) {
 
+                    // skip any point offsets requested
+                    if (std::binary_search(mOffsetsToSkip.begin(), mOffsetsToSkip.end(), i)) {
+                        continue;
+                    }
+
                     p = mGeo.getPos3(i);
                     w[0] = ElementType(p[0]);
                     w[1] = ElementType(p[1]);
@@ -467,6 +487,7 @@ private:
     const GridType& mVelocityGrid;
     const GridType* mCptGrid;
     GU_Detail& mGeo;
+    const std::vector<GA_Offset>& mOffsetsToSkip;
     hvdb::Interrupter& mBoss;
     double mTimeStep;
     GA_ROHandleF mTrailLen;
@@ -493,8 +514,8 @@ public:
             GA_ROHandleF traillen_h(mParms.mOutputGeo, GA_ATTRIB_POINT, "traillen");
 
             AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
-                op(velocityGrid, *mParms.mOutputGeo, mBoss, mParms.mTimeStep,
-                    traillen_h, mParms.mSteps);
+                op(velocityGrid, *mParms.mOutputGeo, mParms.mOffsetsToSkip,
+                   mBoss, mParms.mTimeStep, traillen_h, mParms.mSteps);
 
             UTparallelFor(
                 GA_SplittableRange(mParms.mOutputGeo->getPointRange(mParms.mPointGroup)), op);
@@ -515,7 +536,8 @@ public:
                 GA_ROHandleF traillen_h(&geo, GA_ATTRIB_POINT, "traillen");
 
                 AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
-                    op(velocityGrid, geo, mBoss, mParms.mTimeStep, traillen_h, 1);
+                    op(velocityGrid, geo, mParms.mOffsetsToSkip, mBoss,
+                       mParms.mTimeStep, traillen_h, 1);
 
                 UTparallelFor(GA_SplittableRange(geo.getPointRange()), op);
 
@@ -534,8 +556,8 @@ public:
         if (mBoss.wasInterrupted()) return;
 
         if (!mParms.mStreamlines) { // Advect points
-            AdvectionOp op(velocityGrid, cptGrid, *mParms.mOutputGeo, mBoss,
-                mParms.mTimeStep, mParms.mSteps, mParms.mIterations);
+            AdvectionOp op(velocityGrid, cptGrid, *mParms.mOutputGeo, mParms.mOffsetsToSkip,
+                mBoss, mParms.mTimeStep, mParms.mSteps, mParms.mIterations);
 
             UTparallelFor(
                 GA_SplittableRange(mParms.mOutputGeo->getPointRange(mParms.mPointGroup)), op);
@@ -553,8 +575,8 @@ public:
 
                 if (mBoss.wasInterrupted()) return;
 
-                AdvectionOp op(velocityGrid, cptGrid, geo, mBoss,
-                    mParms.mTimeStep, 1, mParms.mIterations);
+                AdvectionOp op(velocityGrid, cptGrid, geo, mParms.mOffsetsToSkip,
+                    mBoss, mParms.mTimeStep, 1, mParms.mIterations);
 
                 UTparallelFor(GA_SplittableRange(geo.getPointRange()), op);
 
@@ -682,7 +704,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Points to process
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Point Group")
-        .setChoiceList(&SOP_Node::pointGroupMenu)
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("A subset of points in the first input to move using the velocity field"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroups", "VDB Points Groups")
@@ -796,6 +818,18 @@ newSopOperator(OP_OperatorTable* table)
             "This is useful for visualizing the effect of the node."
             " It may also be useful for special effects (see also the"
             " [Trail SOP|Node:sop/trail])."));
+
+    // Disable VDB Points advection
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "disablevdbpointsadvection",
+        "Disable VDB Points Advection")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Disable advection of VDB Points.")
+        .setDocumentation(
+            "Disable advection of the points in a VDB Point grid and instead apply advection"
+            " to the Houdini point to which the VDB primitive is attached. This is faster to"
+            " compute but updates the VDB transform only and not the relative position of"
+            " the points within the grid.\n\n This is primarily useful when instancing"
+            " multiple static VDB point sets onto a dynamically advected Houdini point set."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -916,17 +950,24 @@ SOP_OpenVDB_Advect_Points::updateParmsFlags()
 
     const auto op = stringToPropagationType(evalStdString("operation", 0));
 
+    bool disableVDBPointsAdvection  = bool(evalInt("disablevdbpointsadvection", 0, 0));
+
     changed |= enableParm("iterations", op != PROPAGATION_TYPE_ADVECTION);
     changed |= enableParm("integration", op != PROPAGATION_TYPE_PROJECTION);
     changed |= enableParm("timestep", op != PROPAGATION_TYPE_PROJECTION);
     changed |= enableParm("steps", op != PROPAGATION_TYPE_PROJECTION);
     changed |= enableParm("outputstreamlines", op != PROPAGATION_TYPE_PROJECTION);
+    changed |= enableParm("disablevdbpointsadvection", op == PROPAGATION_TYPE_ADVECTION);
+    changed |= enableParm("vdbpointsgroups", op == PROPAGATION_TYPE_ADVECTION &&
+        !disableVDBPointsAdvection);
 
     changed |= setVisibleState("iterations", getEnableState("iterations"));
     changed |= setVisibleState("integration", getEnableState("integration"));
     changed |= setVisibleState("timestep", getEnableState("timestep"));
     changed |= setVisibleState("steps", getEnableState("steps"));
     changed |= setVisibleState("outputstreamlines", getEnableState("outputstreamlines"));
+    changed |= setVisibleState("disablevdbpointsadvection", getEnableState("disablevdbpointsadvection"));
+    changed |= setVisibleState("vdbpointsgroups", getEnableState("vdbpointsgroups"));
 
     return changed;
 }
@@ -967,39 +1008,51 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
         AdvectionParms parms(gdp);
         if (!evalAdvectionParms(context, parms)) return error();
 
+        bool disableVDBPointsAdvection  = bool(evalInt("disablevdbpointsadvection", 0,
+            context.getTime()));
+
         hvdb::Interrupter boss("Processing points");
 
-        hvdb::VdbPrimIterator vdbIt(gdp);
+        if (!disableVDBPointsAdvection) {
 
-        for (; vdbIt; ++vdbIt) {
-            GU_PrimVDB* vdbPrim = *vdbIt;
+            hvdb::VdbPrimIterator vdbIt(gdp, parms.mGroup);
 
-            // only process if grid is a PointDataGrid with leaves
-            if(!openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
-            auto&& pointDataGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGrid());
-            auto leafIter = pointDataGrid.tree().cbeginLeaf();
-            if (!leafIter) continue;
+            for (; vdbIt; ++vdbIt) {
+                GU_PrimVDB* vdbPrim = *vdbIt;
 
-            // deep copy the VDB tree if it is not already unique
-            vdbPrim->makeGridUnique();
+                // only process if grid is a PointDataGrid with leaves
+                if(!openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
+                auto&& pointDataGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getConstGrid());
+                auto leafIter = pointDataGrid.tree().cbeginLeaf();
+                if (!leafIter) continue;
 
-            auto&& outputGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getGrid());
+                // build a list of point offsets to skip during Houdini point advection
+                parms.mOffsetsToSkip.push_back(vdbPrim->getPointOffset(0));
 
-            switch (parms.mPropagationType) {
+                // deep copy the VDB tree if it is not already unique
+                vdbPrim->makeGridUnique();
 
-                case PROPAGATION_TYPE_ADVECTION:
-                case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
-                {
-                    VDBPointsAdvection<openvdb::points::PointDataGrid> advection(outputGrid, parms, boss);
-                    GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
-                    break;
+                auto&& outputGrid = UTvdbGridCast<openvdb::points::PointDataGrid>(vdbPrim->getGrid());
+
+                switch (parms.mPropagationType) {
+
+                    case PROPAGATION_TYPE_ADVECTION:
+                    case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
+                    {
+                        VDBPointsAdvection<openvdb::points::PointDataGrid> advection(outputGrid, parms, boss);
+                        GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+                        break;
+                    }
+                    case PROPAGATION_TYPE_PROJECTION:
+                    {
+                        // not implemented
+                    }
+                    case PROPAGATION_TYPE_UNKNOWN: break;
                 }
-                case PROPAGATION_TYPE_PROJECTION:
-                {
-                    // not implemented
-                }
-                case PROPAGATION_TYPE_UNKNOWN: break;
             }
+
+            // ensure the offsets to skip are sorted to make lookups faster
+            std::sort(parms.mOffsetsToSkip.begin(), parms.mOffsetsToSkip.end());
         }
 
         switch (parms.mPropagationType) {
@@ -1051,6 +1104,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
     evalString(ptGroupStr, "group", 0, now);
 
     parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
+    parms.mGroup = matchGroup(*parms.mPointGeo, evalStdString("group", now));
 
     const std::string groups = evalStdString("vdbpointsgroups", now);
 
