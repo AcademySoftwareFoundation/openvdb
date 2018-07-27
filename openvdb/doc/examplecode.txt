@@ -249,7 +249,7 @@ template<class GridType>
 void
 makeSphere(GridType& grid, float radius, const openvdb::Vec3f& c)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
 
     // Distance value for the constant region exterior to the narrow band
     const ValueT outside = grid.background();
@@ -308,6 +308,7 @@ makeSphere(GridType& grid, float radius, const openvdb::Vec3f& c)
 @section sModifyingGrids Reading and modifying a grid
 @code
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
 
 openvdb::initialize();
 
@@ -362,7 +363,7 @@ for (openvdb::FloatGrid::ValueOffIter iter = grid->beginValueOff(); iter; ++iter
 }
 
 // Set exterior voxels to 0.
-grid->setBackground(0.0);
+openvdb::tools::changeBackground(grid->tree(), 0.0);
 @endcode
 
 
@@ -508,22 +509,22 @@ on trees of arbitrary depth.
 @code
 #include <openvdb/openvdb.h>
 
-typedef openvdb::FloatGrid GridType;
-typedef GridType::TreeType TreeType;
-typedef TreeType::RootNodeType  RootType;  // level 3 RootNode
+using GridType = openvdb::FloatGrid;
+using TreeType = GridType::TreeType;
+using RootType = TreeType::RootNodeType;   // level 3 RootNode
 assert(RootType::LEVEL == 3);
-typedef RootType::ChildNodeType Int1Type;  // level 2 InternalNode
-typedef Int1Type::ChildNodeType Int2Type;  // level 1 InternalNode
-typedef TreeType::LeafNodeType  LeafType;  // level 0 LeafNode
+using Int1Type = RootType::ChildNodeType;  // level 2 InternalNode
+using Int2Type = Int1Type::ChildNodeType;  // level 1 InternalNode
+using LeafType = TreeType::LeafNodeType;   // level 0 LeafNode
 
 GridType::Ptr grid = ...;
 
 for (TreeType::NodeIter iter = grid->tree().beginNode(); iter; ++iter) {
     switch (iter.getDepth()) {
-    case 0: { RootType* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 1: { Int1Type* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 2: { Int2Type* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 3: { LeafType* node = NULL; iter.getNode(node); if (node) ...; break; }
+    case 0: { RootType* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 1: { Int1Type* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 2: { Int2Type* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 3: { LeafType* node = nullptr; iter.getNode(node); if (node) ...; break; }
     }
 }
 @endcode
@@ -535,8 +536,8 @@ node in a tree exactly once.
 @code
 #include <openvdb/openvdb.h>
 
-typedef openvdb::FloatGrid GridType;
-typedef GridType::TreeType TreeType;
+using GridType = openvdb::FloatGrid;
+using TreeType = GridType::TreeType;
 
 GridType::Ptr grid = ...;
 
@@ -573,9 +574,10 @@ the node iterators described above) can be accessed either through a
 grid's tree or directly through the grid itself, as in the following example:
 @code
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
 
-typedef openvdb::Vec3SGrid GridType;
-typedef GridType::TreeType TreeType;
+using GridType = openvdb::Vec3SGrid;
+using TreeType = GridType::TreeType;
 
 GridType::Ptr grid = ...;
 
@@ -605,7 +607,7 @@ for (GridType::ValueOffIter iter = grid->beginValueOff(); iter.test(); ++iter) {
 }
 
 // Normalize the (inactive) background value as well.
-grid->setBackground(grid->background().unit());
+openvdb::tools::changeBackground(grid->tree(), grid->background().unit());
 @endcode
 See the @ref treeValueIterRef "Overview" for more on value iterators.
 
@@ -645,10 +647,10 @@ tbb::atomic<openvdb::Index64> activeLeafVoxelCount;
 template<typename GridType>
 struct LeafProcessor
 {
-    typedef typename GridType::TreeType TreeType;
-    typedef typename TreeType::LeafNodeType LeafNode;
+    using TreeType = typename GridType::TreeType;
+    using LeafNode = typename TreeType::LeafNodeType;
     // Define an IteratorRange that splits the iteration space of a leaf iterator.
-    typedef openvdb::tree::IteratorRange<typename TreeType::LeafCIter> IterRange;
+    using IterRange = openvdb::tree::IteratorRange<typename TreeType::LeafCIter>;
 
     void operator()(IterRange& range) const
     {
@@ -677,7 +679,7 @@ main()
 
     // Construct a functor for use with tbb::parallel_for()
     // that processes the leaf nodes of a FloatGrid.
-    typedef LeafProcessor<openvdb::FloatGrid> FloatLeafProc;
+    using FloatLeafProc = LeafProcessor<openvdb::FloatGrid>;
     FloatLeafProc proc;
 
     // Wrap a leaf iterator in an IteratorRange.

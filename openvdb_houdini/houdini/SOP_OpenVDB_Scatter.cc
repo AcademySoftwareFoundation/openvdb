@@ -37,15 +37,23 @@
 
 #include <UT/UT_Assert.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_ParallelUtil.h> // for UTparallelForLightItems()
+#include <GA/GA_SplittableRange.h>
 #include <houdini_utils/ParmFactory.h>
-#include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb_houdini/Utils.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Stencils.h>
 #include <openvdb/points/PointDelete.h>
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointScatter.h>
-#include <openvdb/math/Stencils.h>
-#include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/GridOperators.h> // for tools::cpt()
+#include <openvdb/tools/Interpolation.h> // for tools::BoxSampler
+#include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Morphology.h> // for tools::dilateVoxels()
+#include <openvdb/tools/PointScatter.h>
+#include <openvdb/tree/LeafManager.h>
 #include <boost/algorithm/string/join.hpp>
 #if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
@@ -104,82 +112,68 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setTooltip("Specify a subset of the input VDBs over which to scatter points.")
         .setDocumentation(
-            "A subset of the input VDBs to be processed"
+            "A subset of the input VDBs over which to scatter points"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    // Export VDBs
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Input VDBs")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Original Geometry")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("If enabled, the output will contain the input VDB grids."));
+        .setTooltip("If enabled, the incoming geometry will not be deleted."));
 
-    // Enable VDB Points
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "vdbpoints", "Scatter VDB Points")
         .setDefault(PRMzeroDefaults)
         .setTooltip("Generate VDB Points instead of Houdini Points."));
 
-    // VDB points grid name
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_ORD, "outputname", "Output Name")
+        .setDefault(PRMzeroDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "keep",     "Keep Original Name",
             "append",   "Add Suffix",
             "replace",  "Custom Name",
-            nullptr
-        };
+        })
+        .setTooltip(
+            "Give the output VDB Points volumes the same names as the input VDBs,\n"
+            "or add a suffix to the input name, or use a custom name."));
 
-        parms.add(hutil::ParmFactory(PRM_ORD, "outputname", "Output Name")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Output VDB naming scheme")
-            .setDocumentation(
-                "Give the output VDB Points the same name as the input VDB,"
-                " or add a suffix to the input name, or use a custom name."));
+    parms.add(hutil::ParmFactory(PRM_STRING, "customname", "Custom Name")
+        .setDefault("points")
+        .setTooltip("The suffix or custom name to be used"));
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "customname", "Custom Name")
-            .setDefault("points")
-            .setTooltip("The suffix or custom name to be used"));
-    }
-
-    // Group scattered points
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dogroup", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setDefault(PRMzeroDefaults));
 
-    // Scatter group name
     parms.add(hutil::ParmFactory(PRM_STRING, "sgroup", "Scatter Group")
         .setDefault(0, "scatter")
-        .setTooltip("If enabled, add scattered points to the group with the given name."));
+        .setTooltip("If enabled, add scattered points to the group with this name."));
 
-    // Random seed
     parms.add(hutil::ParmFactory(PRM_INT_J, "seed", "Random Seed")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Specify the random number seed."));
+        .setTooltip("The random number seed"));
 
-    // Spread
     parms.add(hutil::ParmFactory(PRM_FLT_J, "spread", "Spread")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
         .setTooltip(
-            "How far each point may be displaced from the center of its voxel or tile\n\n"
+            "How far each point may be displaced from the center of its voxel or tile,\n"
+            "as a fraction of the voxel or tile size\n\n"
             "A value of zero means that the point is placed exactly at the center."
             " A value of one means that the point can be placed randomly anywhere"
-            " inside the voxel or tile."));
+            " inside the voxel or tile.\n\n"
+            "When the __SDF Domain__ is an __Isosurface__, a value of zero means that the point"
+            " is placed exactly on the isosurface, and a value of one means that the point"
+            " can be placed randomly anywhere within one voxel of the isosurface.\n"
+            "Frustum grids are currently not properly supported, however."));
 
-    parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
-
-    // Mode for point scattering
-    char const * const items[] = {
-        "count",            "Point Total",
-        "density",          "Point Density",
-        "pointspervoxel",   "Points Per Voxel",
-        nullptr
-    };
     parms.add(hutil::ParmFactory(PRM_ORD, "pointmode", "Mode")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "count",           "Point Total",
+            "density",         "Point Density",
+            "pointspervoxel",  "Points Per Voxel",
+        })
         .setTooltip(
             "How to determine the number of points to scatter\n\n"
             "Point Total:\n"
@@ -189,59 +183,70 @@ newSopOperator(OP_OperatorTable* table)
             "Points Per Voxel:\n"
             "    Specify the number of points per voxel."));
 
-    // Point count
-    parms.add(hutil::ParmFactory(PRM_INT_J, "count", "Count")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "count", "Point Total")
         .setDefault(5000)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10000)
-        .setTooltip("Specify the total number of points to scatter."));
+        .setTooltip("The total number of points to scatter"));
 
-    // Point density
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "density", "Density")
+    parms.add(hutil::ParmFactory(PRM_FLT_J , "ppv", "Points Per Voxel")
+        .setDefault(8)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip("The number of points per voxel"));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_LOG, "density", "Point Density")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1000)
-        .setTooltip("The number of points per unit volume (when __Mode__ is Point Density)"));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1000000)
+        .setTooltip("The number of points per unit volume"));
 
-    // Toggle to use voxel value as local point density multiplier
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "multiply", "Scale Density by Voxel Values")
         .setDefault(PRMzeroDefaults)
         .setTooltip(
-            "If enabled, use voxel values as local multipliers for the point density."
-            " Has no impact if interior scattering is enabled."));
+            "For scalar-valued VDBs other than signed distance fields,"
+            " use voxel values as local multipliers for point density."));
 
-    // Points per voxel
-    parms.add(hutil::ParmFactory(PRM_FLT_J , "ppv", "Count")
-        .setDefault(8)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setTooltip("Specify the number of points per voxel."));
-
-    // Toggle to scatter inside level sets
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "interior", "Scatter Points Inside Level Sets")
-        .setDefault(PRMzeroDefaults)
+    parms.add(hutil::ParmFactory(PRM_STRING, "sdfdomain", "SDF Domain")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "interior",  "Interior",
+            "surface",   "Isosurface",
+            "band",      "Narrow Band",
+        })
+        .setDefault("band")
         .setTooltip(
-            "If enabled, scatter points in the interior region of a level set."
-            " Otherwise, scatter points only in the narrow band."));
+            "For signed distance field VDBs, the region over which to scatter points\n\n"
+            "Interior:\n"
+            "    Scatter points inside the specified isosurface.\n"
+            "Isosurface:\n"
+            "    Scatter points only on the specified isosurface.\n"
+            "Narrow Band:\n"
+            "    Scatter points only in the narrow band surrounding the zero crossing."));
 
-    // scatter to the iso surface for interior and vdb points scattering
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "cliptoisosurface", "Clip To Isosurface")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("If enabled, removes scattered points outside the zero iso surface."
-                    " Only available when scattering VDB Points."));
+        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
+        .setTooltip("The voxel value that determines the isosurface")
+        .setDocumentation(
+            "The voxel value that determines the isosurface\n\n"
+            "For fog volumes, use a value larger than zero."));
 
-    parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", ""));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "cliptoisosurface", "Clip to Isosurface")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("When scattering VDB Points, remove points outside the isosurface."));
 
-    // Verbose output toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("If enabled, print the sequence of operations to the terminal."));
+        .setTooltip("Print the sequence of operations to the terminal."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_ORD| PRM_TYPE_JOIN_NEXT, "pointMode", "Point"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "interior", "Scatter Points Inside Level Sets")        .setDefault(PRMzeroDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", ""));
 
     // Register the SOP.
     hvdb::OpenVDBOpFactory("OpenVDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addInput("VDB on which points will be scattered")
+        .addInput("VDBs on which points will be scattered")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })
 #endif
@@ -253,16 +258,20 @@ newSopOperator(OP_OperatorTable* table)
 \n\
 @overview\n\
 \n\
-This node scatters points randomly on or inside a VDB volume. It can produce a set\n\
-of Houdini points or a VDB Points grid for every provided VDB. Each VDB Points grid\n\
-created will copy the transform and topology of each source VDB.\n\
+This node scatters points randomly on or inside VDB volumes.\n\
 The number of points generated can be specified either by fixed count\n\
 or by global or local point density.\n\
 \n\
-For level set VDBs, points can be scattered either throughout the interior\n\
-of the volume or only in the\n\
+Output can be in the form of either Houdini points or VDB Points volumes.\n\
+In the latter case, a VDB Points volume is created for each source VDB,\n\
+with the same transform and topology as the source.\n\
+\n\
+For signed distance field or fog volume VDBs, points can be scattered\n\
+either throughout the interior of the volume or only on an isosurface.\n\
+For level sets, an additional option is to scatter points only in the\n\
 [narrow band|http://www.openvdb.org/documentation/doxygen/overview.html#secGrid]\n\
-region surrounding the zero crossing.\n\
+surrounding the zero crossing.\n\
+For all other volumes, points are scattered in active voxels.\n\
 \n\
 @related\n\
 - [Node:sop/scatter]\n\
@@ -279,9 +288,11 @@ SOP_OpenVDB_Scatter::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
 
-    this->resolveRenamedParm(*obsoleteParms, "pointMode", "pointmode");
+    PRM_Parm* parm = obsoleteParms->getParmPtr("interior");
+    if (parm && !parm->isFactoryDefault()) { // default was to scatter in the narrow band
+        setString(UT_String("interior"), CH_STRING_LITERAL, "sdfdomain", 0, 0.0);
+    }
 
-    // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
@@ -290,9 +301,12 @@ bool
 SOP_OpenVDB_Scatter::updateParmsFlags()
 {
     bool changed = false;
-    const auto vdbpoints = evalInt("vdbpoints", /*idx=*/0, /*time=*/0);
-    const auto pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
-    const auto interior = evalInt("interior", /*idx=*/0, /*time=*/0);
+
+    const fpreal time = 0;
+
+    const auto vdbpoints = evalInt("vdbpoints", /*idx=*/0, time);
+    const auto pmode = evalInt("pointmode", /*idx=*/0, time);
+    const auto sdfdomain = evalStdString("sdfdomain", time);
 
     changed |= setVisibleState("count",      (0 == pmode));
     changed |= setVisibleState("density",    (1 == pmode));
@@ -301,13 +315,12 @@ SOP_OpenVDB_Scatter::updateParmsFlags()
     changed |= setVisibleState("name",       (1 == vdbpoints));
     changed |= setVisibleState("outputname", (1 == vdbpoints));
     changed |= setVisibleState("customname", (1 == vdbpoints));
-    changed |= setVisibleState("cliptoisosurface", interior == 1 && vdbpoints == 1);
+    changed |= setVisibleState("cliptoisosurface", (1 == vdbpoints));
 
-    const bool useCustomName = evalInt("outputname", 0, 0) != 0;
-    changed |= enableParm("customname", useCustomName);
-
-    const auto dogroup = evalInt("dogroup", 0, 0);
-    changed |= enableParm("sgroup", 1 == dogroup);
+    changed |= enableParm("customname", (0 != evalInt("outputname", 0, time)));
+    changed |= enableParm("sgroup", (1 == evalInt("dogroup", 0, time)));
+    changed |= enableParm("isovalue", (sdfdomain != "band"));
+    changed |= enableParm("cliptoisosurface", (sdfdomain != "band"));
 
     return changed;
 }
@@ -337,17 +350,163 @@ SOP_OpenVDB_Scatter::SOP_OpenVDB_Scatter(OP_Network* net, const char* name, OP_O
 class PointAccessor
 {
 public:
-    PointAccessor(GEO_Detail* gdp) : mGdp(gdp)
+    PointAccessor(GEO_Detail* gdp): mGdp(gdp) {}
+
+    void add(const openvdb::Vec3R& pos)
     {
-    }
-    void add(const openvdb::Vec3R &pos)
-    {
-        GA_Offset ptoff = mGdp->appendPointOffset();
+        const GA_Offset ptoff = mGdp->appendPointOffset();
         mGdp->setPos3(ptoff, pos.x(), pos.y(), pos.z());
     }
+
 protected:
-    GEO_Detail*    mGdp;
+    GEO_Detail* mGdp;
 };
+
+
+////////////////////////////////////////
+
+
+/// @brief Functor to translate points toward an isosurface
+class SnapPointsOp
+{
+public:
+    using Sampler = openvdb::tools::BoxSampler;
+
+    enum class PointType { kInvalid, kHoudini, kVDB };
+
+    // Constructor for Houdini points
+    SnapPointsOp(GEO_Detail& detail, const GA_Range& range, float spread, float isovalue,
+        bool rebuild, bool dilate, openvdb::BoolGrid::Ptr mask, hvdb::Interrupter* interrupter)
+        : mPointType(range.isValid() && !range.empty() ? PointType::kHoudini : PointType::kInvalid)
+        , mDetail(&detail)
+        , mRange(range)
+        , mSpread(spread)
+        , mIsovalue(isovalue)
+        , mRebuild(rebuild)
+        , mDilate(dilate)
+        , mMask(mask)
+        , mBoss(interrupter)
+    {
+    }
+
+    // Constructor for VDB points
+    SnapPointsOp(openvdb::points::PointDataGrid& vdbpts, float spread, float isovalue,
+        bool rebuild, bool dilate, openvdb::BoolGrid::Ptr mask, hvdb::Interrupter* interrupter)
+        : mVdbPoints(&vdbpts)
+        , mSpread(spread)
+        , mIsovalue(isovalue)
+        , mRebuild(rebuild)
+        , mDilate(dilate)
+        , mMask(mask)
+        , mBoss(interrupter)
+    {
+        const auto leafIter = vdbpts.tree().cbeginLeaf();
+        const auto descriptor = leafIter->attributeSet().descriptor();
+        mAttrIdx = descriptor.find("P");
+        mPointType = (mAttrIdx != openvdb::points::AttributeSet::INVALID_POS) ?
+            PointType::kVDB : PointType::kInvalid;
+    }
+
+    template<typename GridT>
+    void operator()(const GridT& aGrid)
+    {
+        if (mPointType == PointType::kInvalid) return;
+
+        const GridT* grid = &aGrid;
+
+        // Replace the input grid with a rebuilt narrow-band level set, if requested
+        // (typically because the isovalue is nonzero).
+        typename GridT::Ptr sdf;
+        if (mRebuild) {
+            const float width = openvdb::LEVEL_SET_HALF_WIDTH;
+            sdf = openvdb::tools::levelSetRebuild(*grid, mIsovalue,
+                /*exterior=*/width, /*interior=*/width, /*xform=*/nullptr, mBoss);
+            if (sdf) {
+                grid = sdf.get();
+                mMask.reset(); // no need for a mask now that the input is a narrow-band level set
+            }
+        }
+
+        // Compute the closest point transform of the SDF.
+        const auto cpt = [&]() {
+            if (!mMask) {
+                return openvdb::tools::cpt(*grid, /*threaded=*/true, mBoss);
+            } else {
+                if (mDilate) {
+                    // Dilate the isosurface mask to produce a suitably large CPT mask,
+                    // to avoid unnecessary work in case the input is a dense SDF.
+                    const int iterations = static_cast<int>(openvdb::LEVEL_SET_HALF_WIDTH);
+                    openvdb::tools::dilateVoxels(
+                        mMask->tree(), iterations, openvdb::tools::NN_FACE_EDGE);
+                }
+                return openvdb::tools::cpt(*grid, *mMask, /*threaded=*/true, mBoss);
+            }
+        }();
+
+        const auto& xform = aGrid.transform();
+        if (mPointType == PointType::kHoudini) {
+            // Translate Houdini points toward the isosurface.
+            UTparallelForLightItems(GA_SplittableRange(mRange), [&](const GA_SplittableRange& r) {
+                const auto cptAcc = cpt->getConstAccessor();
+                GA_Offset start = 0, end = 0;
+                for (GA_Iterator it(r); it.blockAdvance(start, end); ) {
+                    if (mBoss && mBoss->wasInterrupted()) break;
+                    for (auto offset = start; offset < end; ++offset) {
+                        openvdb::Vec3d p{UTvdbConvert(mDetail->getPos3(offset))};
+                        // Compute the closest surface point by linear interpolation.
+                        const auto surfaceP = Sampler::sample(cptAcc, xform.worldToIndex(p));
+                        // Translate the input point toward the surface.
+                        p = surfaceP + mSpread * (p - surfaceP); // (1-spread)*surfaceP + spread*p
+                        mDetail->setPos3(offset, p.x(), p.y(), p.z());
+                    }
+                }
+            });
+        } else /*if (mPointType == PointType::kVDB)*/ {
+            // Translate VDB points toward the isosurface.
+            using LeafMgr = openvdb::tree::LeafManager<openvdb::points::PointDataTree>;
+            LeafMgr leafMgr(mVdbPoints->tree());
+            UTparallelForLightItems(leafMgr.leafRange(), [&](const LeafMgr::LeafRange& range) {
+                const auto cptAcc = cpt->getConstAccessor();
+                for (auto leafIter = range.begin(); leafIter; ++leafIter) {
+                    if (mBoss && mBoss->wasInterrupted()) break;
+                    // Get a handle to this leaf node's point position array.
+                    auto& posArray = leafIter->attributeArray(mAttrIdx);
+                    openvdb::points::AttributeWriteHandle<openvdb::Vec3f> posHandle(posArray);
+                    // For each point in this leaf node...
+                    for (auto idxIter = leafIter->beginIndexOn(); idxIter; ++idxIter) {
+                        // The point position is in index space and is relative to
+                        // the center of the voxel.
+                        const auto idxCenter = idxIter.getCoord().asVec3d();
+                        const auto idxP = posHandle.get(*idxIter) + idxCenter;
+                        // Compute the closest surface point by linear interpolation.
+                        const openvdb::Vec3f surfaceP(Sampler::sample(cptAcc, idxP));
+                        // Translate the input point toward the surface.
+                        auto p = xform.indexToWorld(idxP);
+                        p = surfaceP + mSpread * (p - surfaceP); // (1-spread)*surfaceP + spread*p
+                        // Transform back to index space relative to the voxel center.
+                        posHandle.set(*idxIter, xform.worldToIndex(p) - idxCenter);
+                    }
+                }
+            });
+        }
+    }
+
+private:
+    PointType mPointType = PointType::kInvalid;
+    openvdb::points::PointDataGrid* mVdbPoints = nullptr; // VDB points to be processed
+    openvdb::Index64 mAttrIdx = openvdb::points::AttributeSet::INVALID_POS;
+    GEO_Detail* mDetail = nullptr; // the detail containing Houdini points to be processed
+    GA_Range mRange;               // the range of points to be processed
+    float mSpread = 1;             // if 0, place points on the isosurface; if 1, don't move them
+    float mIsovalue = 0;
+    bool mRebuild = false;         // if true, generate a new SDF from the input grid
+    bool mDilate = false;          // if true, dilate the isosurface mask
+    openvdb::BoolGrid::Ptr mMask;  // an optional isosurface mask
+    hvdb::Interrupter* mBoss = nullptr;
+}; // class SnapPointsOp
+
+
+////////////////////////////////////////
 
 
 struct BaseScatter
@@ -544,23 +703,33 @@ process(const UT_VDBType type, const openvdb::GridBase& grid, OpType& op, const 
 }
 
 
-// Method to extract the interior mask before scattering points.
-inline openvdb::GridBase::ConstPtr
-extractInteriorMask(const openvdb::GridBase::ConstPtr grid, const float offset)
+// Extract an SDF interior mask in which to scatter points.
+inline openvdb::BoolGrid::Ptr
+extractInteriorMask(const openvdb::GridBase::ConstPtr grid, const float isovalue)
 {
     if (grid->isType<openvdb::FloatGrid>()) {
-        using MaskT = openvdb::Grid<openvdb::FloatTree::ValueConverter<bool>::Type>;
-        const openvdb::FloatGrid& typedGrid = static_cast<const openvdb::FloatGrid&>(*grid);
-        MaskT::Ptr mask = openvdb::tools::sdfInteriorMask(typedGrid, offset);
-        return mask;
-
+        return openvdb::tools::sdfInteriorMask(
+            static_cast<const openvdb::FloatGrid&>(*grid), isovalue);
     } else if (grid->isType<openvdb::DoubleGrid>()) {
-        using MaskT = openvdb::Grid<openvdb::DoubleTree::ValueConverter<bool>::Type>;
-        const openvdb::DoubleGrid& typedGrid = static_cast<const openvdb::DoubleGrid&>(*grid);
-        MaskT::Ptr mask = openvdb::tools::sdfInteriorMask(typedGrid, offset);
-        return mask;
+        return openvdb::tools::sdfInteriorMask(
+            static_cast<const openvdb::DoubleGrid&>(*grid), isovalue);
     }
-    return openvdb::GridBase::ConstPtr();
+    return nullptr;
+}
+
+
+// Extract an SDF isosurface mask in which to scatter points.
+inline openvdb::BoolGrid::Ptr
+extractIsosurfaceMask(const openvdb::GridBase::ConstPtr grid, const float isovalue)
+{
+    if (grid->isType<openvdb::FloatGrid>()) {
+        return openvdb::tools::extractIsosurfaceMask(
+            static_cast<const openvdb::FloatGrid&>(*grid), isovalue);
+    } else if (grid->isType<openvdb::DoubleGrid>()) {
+        return openvdb::tools::extractIsosurfaceMask(
+            static_cast<const openvdb::DoubleGrid&>(*grid), double(isovalue));
+    }
+    return nullptr;
 }
 
 
@@ -629,13 +798,14 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
 #endif
 
         const int seed = static_cast<int>(evalInt("seed", 0, time));
-        const auto spread = static_cast<float>(evalFloat("spread", 0, time));
+        const auto theSpread = static_cast<float>(evalFloat("spread", 0, time));
         const bool verbose = evalInt("verbose", 0, time) != 0;
         const openvdb::Index64 pointCount = evalInt("count", 0, time);
         const float ptsPerVox = static_cast<float>(evalFloat("ppv", 0, time));
-        const bool interior = evalInt("interior", 0, time) != 0;
+        const auto sdfdomain = evalStdString("sdfdomain", time);
         const float density = static_cast<float>(evalFloat("density", 0, time));
         const bool multiplyDensity = evalInt("multiply", 0, time) != 0;
+        const auto theIsovalue = static_cast<float>(evalFloat("isovalue", 0, time));
         const int outputName = static_cast<int>(evalInt("outputname", 0, time));
         const std::string customName = evalStdString("customname", time);
 
@@ -651,6 +821,12 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
         const auto pmode = evalInt("pointmode", 0, time);
         const bool vdbPoints = evalInt("vdbpoints", 0, time) == 1;
         const bool clipPoints = vdbPoints && bool(evalInt("cliptoisosurface", 0, time));
+        const bool snapPointsToSurface =
+            ((sdfdomain == "surface") && !openvdb::math::isApproxEqual(theSpread, 1.0f));
+
+        // If the domain is the isosurface, set the spread to 1 while generating points
+        // so that each point ends up snapping to a unique point on the surface.
+        const float spread = (snapPointsToSurface ? 1.f : theSpread);
 
         std::vector<std::string> emptyGrids;
         std::vector<openvdb::points::PointDataGrid::Ptr> pointGrids;
@@ -677,19 +853,33 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
             const bool isSignedDistance = (gridClass == openvdb::GRID_LEVEL_SET);
             bool performCull = false;
 
-            if (interior && isSignedDistance) {
-                float iso = 0.0f;
+            const auto isovalue = (gridClass != openvdb::GRID_FOG_VOLUME) ? theIsovalue
+                : openvdb::math::Clamp(theIsovalue, openvdb::math::Tolerance<float>::value(), 1.f);
+
+            openvdb::BoolGrid::Ptr mask;
+            if (sdfdomain != "band") {
+                auto iso = isovalue;
                 if (clipPoints) {
                     const openvdb::Vec3d voxelSize = grid->voxelSize();
                     const double maxVoxelSize =
                         openvdb::math::Max(voxelSize.x(), voxelSize.y(), voxelSize.z());
-                    iso = static_cast<float>(maxVoxelSize / 2.0);
+                    iso += static_cast<float>(maxVoxelSize / 2.0);
                     performCull = true;
                 }
 
-                grid = extractInteriorMask(grid, iso);
-                gridType = UT_VDB_BOOL;
-                if (!grid) continue;
+                if (sdfdomain == "interior") {
+                    if (isSignedDistance) {
+                        // If the input is an SDF, compute a mask of its interior.
+                        // (Fog volumes are their own interior masks.)
+                        mask = extractInteriorMask(grid, iso);
+                    }
+                } else if (sdfdomain == "surface") {
+                    mask = extractIsosurfaceMask(grid, iso);
+                }
+                if (mask) {
+                    grid = mask;
+                    gridType = UT_VDB_BOOL;
+                }
             }
 
             std::string vdbName;
@@ -699,92 +889,106 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
                 else vdbName = customName;
             }
 
-            if (pmode == 0) { // fixed point count
-                if (vdbPoints) { // vdb points
+            openvdb::points::PointDataGrid::Ptr pointGrid;
+
+            const auto postprocessVDBPoints = [&](BaseScatter& scatter, bool cull) {
+                pointGrid = scatter.points();
+                if (cull) { cullVDBPoints(pointGrid->tree(), primIter->getConstGridPtr()); }
+                pointGrid->setName(vdbName);
+                pointGrids.push_back(pointGrid);
+                if (verbose) scatter.print(gridName);
+            };
+
+            using DenseScatterer = openvdb::tools::DenseUniformPointScatter<
+                PointAccessor, RandGen, hvdb::Interrupter>;
+            using NonuniformScatterer = openvdb::tools::NonUniformPointScatter<
+                PointAccessor, RandGen, hvdb::Interrupter>;
+            using UniformScatterer = openvdb::tools::UniformPointScatter<
+                PointAccessor, RandGen, hvdb::Interrupter>;
+
+            const GA_Offset startOffset = gdp->getNumPointOffsets();
+
+            switch (pmode) {
+
+            case 0: // fixed point count
+                if (vdbPoints) { // VDB points
                     VDBUniformScatter scatter(pointCount, seed, spread, &boss);
                     if (process(gridType, *grid, scatter, name))  {
-                        openvdb::points::PointDataGrid::Ptr points = scatter.points();
-                        if (performCull) {
-                            cullVDBPoints(points->tree(), primIter->getConstGridPtr());
-                        }
-                        points->setName(vdbName);
-                        pointGrids.push_back(points);
+                        postprocessVDBPoints(scatter, performCull);
                     }
-                }
-                else { // houdini points
-                    openvdb::tools::UniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
-                        scatter(pointAccessor, pointCount, mtRand, spread, &boss);
+                } else { // Houdini points
+                    UniformScatterer scatter(pointAccessor, pointCount, mtRand, spread, &boss);
                     process(gridType, *grid, scatter, name);
                 }
+                break;
 
-            } else if (pmode == 1) { // points per unit volume
+            case 1: // points per unit volume
                 if (multiplyDensity && !isSignedDistance) { // local density
-                    if (vdbPoints) { // vdb points
-                        const openvdb::Vec3d dim = openvdb::Vec3f(grid->transform().voxelSize());
+                    if (vdbPoints) { // VDB points
+                        const auto dim = grid->transform().voxelSize();
                         VDBNonUniformScatter scatter(
                             static_cast<float>(density * dim.product()), seed, spread, &boss);
                         if (!UTvdbProcessTypedGridScalar(gridType, *grid, scatter)) {
-                            throw std::runtime_error
-                                ("Only scalar grids support voxel scaling of density");
+                            throw std::runtime_error(
+                                "Only scalar grids support voxel scaling of density");
                         }
-                        openvdb::points::PointDataGrid::Ptr points = scatter.points();
-                        points->setName(vdbName);
-                        pointGrids.push_back(points);
-                        if (verbose) scatter.print(gridName);
-                    }
-                    else { // houdini points
-                        openvdb::tools::NonUniformPointScatter<
-                            PointAccessor,RandGen,hvdb::Interrupter> scatter(
-                                pointAccessor, density, mtRand, spread, &boss);
-
+                        postprocessVDBPoints(scatter, /*cull=*/false);
+                    } else { // Houdini points
+                        NonuniformScatterer scatter(pointAccessor, density, mtRand, spread, &boss);
                         if (!UTvdbProcessTypedGridScalar(gridType, *grid, scatter)) {
-                            throw std::runtime_error
-                                ("Only scalar grids support voxel scaling of density");
+                            throw std::runtime_error(
+                                "Only scalar grids support voxel scaling of density");
                         }
                         if (verbose) scatter.print(gridName);
                     }
                 } else { // global density
-                    if (vdbPoints) { // vdb points
-                        const openvdb::Vec3f dim = openvdb::Vec3f(grid->transform().voxelSize());
-                        const openvdb::Index64 totalPointCount =
-                            openvdb::Index64(density * dim.product()) * grid->activeVoxelCount();
+                    if (vdbPoints) { // VDB points
+                        const auto dim = grid->transform().voxelSize();
+                        const auto totalPointCount = openvdb::Index64(
+                            density * dim.product() * double(grid->activeVoxelCount()));
                         VDBUniformScatter scatter(totalPointCount, seed, spread, &boss);
                         if (process(gridType, *grid, scatter, name))  {
-                            openvdb::points::PointDataGrid::Ptr points = scatter.points();
-                            if (performCull) {
-                                cullVDBPoints(points->tree(), primIter->getConstGridPtr());
-                            }
-                            points->setName(vdbName);
-                            pointGrids.push_back(points);
+                            postprocessVDBPoints(scatter, performCull);
                         }
-                    }
-                    else { // houdini points
-                        openvdb::tools::UniformPointScatter<
-                            PointAccessor, RandGen, hvdb::Interrupter> scatter(
-                                pointAccessor, density, mtRand, spread, &boss);
+                    } else { // Houdini points
+                        UniformScatterer scatter(pointAccessor, density, mtRand, spread, &boss);
                         process(gridType, *grid, scatter, name);
                     }
                 }
-            } else if (pmode == 2) { // points per voxel
-                if (vdbPoints) { // vdb points
+                break;
+
+            case 2: // points per voxel
+                if (vdbPoints) { // VDB points
                     VDBDenseUniformScatter scatter(ptsPerVox, seed, spread, &boss);
                     if (process(gridType, *grid, scatter, name))  {
-                        openvdb::points::PointDataGrid::Ptr points = scatter.points();
-                        if (performCull) {
-                            cullVDBPoints(points->tree(), primIter->getConstGridPtr());
-                        }
-                        points->setName(vdbName);
-                        pointGrids.push_back(scatter.points());
+                        postprocessVDBPoints(scatter, performCull);
                     }
-                }
-                else { // houdini points
-                    openvdb::tools::DenseUniformPointScatter<
-                        PointAccessor, RandGen, hvdb::Interrupter> scatter(
-                            pointAccessor, ptsPerVox, mtRand, spread, &boss);
+                } else { // Houdini points
+                    DenseScatterer scatter(pointAccessor, ptsPerVox, mtRand, spread, &boss);
                     process(gridType, *grid, scatter, name);
                 }
-            }
+                break;
 
+            default:
+                throw std::runtime_error(
+                    "Expected 0, 1 or 2 for \"pointmode\", got " + std::to_string(pmode));
+            } // switch pmode
+
+            if (snapPointsToSurface) {
+                // Dilate the mask if it is a single-voxel-wide isosurface mask.
+                const bool dilate = (mask && (sdfdomain == "surface"));
+                // Generate a new SDF if the input is a fog volume or if the isovalue is nonzero.
+                const bool rebuild = (!isSignedDistance || !openvdb::math::isApproxZero(isovalue));
+                if (!vdbPoints) {
+                    const GA_Range range(gdp->getPointMap(),startOffset,gdp->getNumPointOffsets());
+                    // Use the original spread value to control how close to the surface points lie.
+                    SnapPointsOp op{*gdp, range, theSpread, isovalue, rebuild, dilate, mask, &boss};
+                    GEOvdbProcessTypedGridReal(**primIter, op); // process the original input grid
+                } else if (vdbPoints && pointGrid) {
+                    SnapPointsOp op{*pointGrid, theSpread, isovalue, rebuild, dilate, mask, &boss};
+                    GEOvdbProcessTypedGridReal(**primIter, op);
+                }
+            }
         } // for each grid
 
         if (!emptyGrids.empty()) {
@@ -803,13 +1007,13 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
             const GA_Offset lastOffset = gdp->getNumPointOffsets();
             ptgroup->addRange(GA_Range(gdp->getPointMap(), firstOffset, lastOffset));
 
-            for (auto& pointGrid : pointGrids) {
+            for (auto& pointGrid: pointGrids) {
                 openvdb::points::appendGroup(pointGrid->tree(), groupName);
                 openvdb::points::setGroup(pointGrid->tree(), groupName);
             }
         }
 
-        for (auto& pointGrid : pointGrids) {
+        for (auto& pointGrid: pointGrids) {
             hvdb::createVdbPrimitive(*gdp, pointGrid, pointGrid->getName().c_str());
         }
     }

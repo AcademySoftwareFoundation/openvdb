@@ -62,11 +62,28 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+namespace lstrack {
+
+/// @brief How to handle voxels that fall outside the narrow band
+/// @sa @link LevelSetTracker::trimming() trimming@endlink,
+///     @link LevelSetTracker::setTrimming() setTrimming@endlink
+enum class TrimMode {
+    kNone,     ///< Leave out-of-band voxels intact
+    kInterior, ///< Set out-of-band interior voxels to the background value
+    kExterior, ///< Set out-of-band exterior voxels to the background value
+    kAll       ///< Set all out-of-band voxels to the background value
+};
+
+} // namespace lstrack
+
+
 /// @brief Performs multi-threaded interface tracking of narrow band level sets
 template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetTracker
 {
 public:
+    using TrimMode = lstrack::TrimMode;
+
     using GridType = GridT;
     using TreeType = typename GridT::TreeType;
     using LeafType = typename TreeType::LeafNodeType;
@@ -108,7 +125,10 @@ public:
     /// narrow band of the level set.
     void track();
 
-    /// @brief Remove voxels that are outside the narrow band. (substep of track)
+    /// @brief Set voxels that are outside the narrow band to the background value
+    /// (if trimming is enabled) and prune the grid.
+    /// @details Pruning is done automatically as a step in tracking.
+    /// @sa @link setTrimming() setTrimming@endlink, @link trimming() trimming@endlink
     void prune();
 
     /// @brief Fast but approximate dilation of the narrow band - one
@@ -143,34 +163,42 @@ public:
     State getState() const { return mState; }
 
     /// @brief Set the state of the tracker (see struct defined above)
-    void setState(const State& s) { mState =s; }
+    void setState(const State& s) { mState = s; }
 
     /// @return the spatial finite difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mState.spatialScheme; }
 
     /// @brief Set the spatial finite difference scheme
-    void setSpatialScheme(math::BiasedGradientScheme scheme) { mState.spatialScheme = scheme; }
+    void setSpatialScheme(math::BiasedGradientScheme s) { mState.spatialScheme = s; }
 
     /// @return the temporal integration scheme
     math::TemporalIntegrationScheme getTemporalScheme() const { return mState.temporalScheme; }
 
     /// @brief Set the spatial finite difference scheme
-    void setTemporalScheme(math::TemporalIntegrationScheme scheme) { mState.temporalScheme = scheme;}
+    void setTemporalScheme(math::TemporalIntegrationScheme s) { mState.temporalScheme = s;}
 
     /// @return The number of normalizations performed per track or
     /// normalize call.
-    int  getNormCount() const { return mState.normCount; }
+    int getNormCount() const { return mState.normCount; }
 
     /// @brief Set the number of normalizations performed per track or
     /// normalize call.
     void setNormCount(int n) { mState.normCount = n; }
 
     /// @return the grain-size used for multi-threading
-    int  getGrainSize() const { return mState.grainSize; }
+    int getGrainSize() const { return mState.grainSize; }
 
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mState.grainSize = grainsize; }
+
+    /// @brief Return the trimming mode for voxels outside the narrow band.
+    /// @details Trimming is enabled by default and is applied automatically prior to pruning.
+    /// @sa @link setTrimming() setTrimming@endlink, @link prune() prune@endlink
+    TrimMode trimming() const { return mTrimMode; }
+    /// @brief Specify whether to trim voxels outside the narrow band prior to pruning.
+    /// @sa @link trimming() trimming@endlink, @link prune() prune@endlink
+    void setTrimming(TrimMode mode) { mTrimMode = mode; }
 
     ValueType voxelSize() const { return mDx; }
 
@@ -188,13 +216,13 @@ public:
     const LeafManagerType& leafs() const { return *mLeafs; }
 
 private:
-
     // disallow copy construction and copy by assignment!
     LevelSetTracker(const LevelSetTracker&);// not implemented
     LevelSetTracker& operator=(const LevelSetTracker&);// not implemented
 
     // Private class to perform multi-threaded trimming of
     // voxels that are too far away from the zero-crossing.
+    template<TrimMode Trimming>
     struct Trim
     {
         Trim(LevelSetTracker& tracker) : mTracker(tracker) {}
@@ -249,6 +277,7 @@ private:
     InterruptT*      mInterrupter;
     const ValueType  mDx;
     State            mState;
+    TrimMode         mTrimMode = TrimMode::kAll;
 }; // end of LevelSetTracker class
 
 template<typename GridT, typename InterruptT>
@@ -279,9 +308,13 @@ prune()
 {
     this->startInterrupter("Pruning Level Set");
 
-    // Prune voxels that are too far away from the zero-crossing
-    Trim t(*this);
-    t.trim();
+    // Set voxels that are too far away from the zero crossing to the background value.
+    switch (mTrimMode) {
+        case TrimMode::kNone:     break;
+        case TrimMode::kInterior: Trim<TrimMode::kInterior>(*this).trim(); break;
+        case TrimMode::kExterior: Trim<TrimMode::kExterior>(*this).trim(); break;
+        case TrimMode::kAll:      Trim<TrimMode::kAll>(*this).trim(); break;
+    }
 
     // Remove inactive nodes from tree
     tools::pruneLevelSet(mGrid->tree());
@@ -436,44 +469,66 @@ normalize2(const MaskT* mask)
     tmp.normalize();
 }
 
+
 ////////////////////////////////////////////////////////////////////////////
 
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetTracker<GridT, InterruptT>::
-Trim::trim()
-{
-    const int grainSize = mTracker.getGrainSize();
-    const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
-    if (grainSize>0) {
-        tbb::parallel_for(range, *this);
-    } else {
-        (*this)(range);
+template<typename GridT, typename InterruptT>
+template<lstrack::TrimMode Trimming>
+inline void
+LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
+{
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    if (Trimming != TrimMode::kNone) {
+        const int grainSize = mTracker.getGrainSize();
+        const LeafRange range = mTracker.leafs().leafRange(grainSize);
+
+        if (grainSize>0) {
+            tbb::parallel_for(range, *this);
+        } else {
+            (*this)(range);
+        }
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
-/// Prunes away voxels that have moved outside the narrow band
+
+/// Trim away voxels that have moved outside the narrow band
 template<typename GridT, typename InterruptT>
+template<lstrack::TrimMode Trimming>
 inline void
-LevelSetTracker<GridT, InterruptT>::
-Trim::operator()(const LeafRange& range) const
+LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::operator()(const LeafRange& range) const
 {
-    using VoxelIterT = typename LeafType::ValueOnIter;
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
 
-    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        LeafType &leaf = *leafIter;
-        for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {
-            const ValueType val = *iter;
-            if (val <= -gamma)
-                leaf.setValueOff(iter.pos(), -gamma);
-            else if (val >= gamma)
-                leaf.setValueOff(iter.pos(),  gamma);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    for (auto leafIter = range.begin(); leafIter; ++leafIter) {
+        auto& leaf = *leafIter;
+        for (auto iter = leaf.beginValueOn(); iter; ++iter) {
+            const auto val = *iter;
+            switch (Trimming) { // resolved at compile time
+                case TrimMode::kNone:
+                    break;
+                case TrimMode::kInterior:
+                    if (val <= -gamma) { leaf.setValueOff(iter.pos(), -gamma); }
+                    break;
+                case TrimMode::kExterior:
+                    if (val >= gamma) { leaf.setValueOff(iter.pos(), gamma); }
+                    break;
+                case TrimMode::kAll:
+                    if (val <= -gamma) {
+                        leaf.setValueOff(iter.pos(), -gamma);
+                    } else if (val >= gamma) {
+                        leaf.setValueOff(iter.pos(), gamma);
+                    }
+                    break;
+            }
         }
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 

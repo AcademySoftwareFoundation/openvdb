@@ -319,39 +319,31 @@ buildFilterMenu(std::vector<std::string>& items, OperatorType op)
     }
 }
 
-struct FilterParms {
-    FilterParms()
-        : mGroup()
-        , mMaskName()
-        , mSecondInputConnected(false)
-        , mFilterType(FILTER_TYPE_NONE)
-        , mIterations(0)
-        , mHalfWidth(3)
-        , mStencilWidth(0)
-        , mVoxelOffset(0.0f)
-        , mHalfWidthWorld(0.1f)
-        , mStencilWidthWorld(0.1f)
-        , mWorldUnits(false)
-        , mMinMask(0)
-        , mMaxMask(1)
-        , mInvertMask(false)
-        , mAccuracy(ACCURACY_UPWIND_FIRST)
-    {
-    }
 
-    std::string mGroup, mMaskName;
-    bool mSecondInputConnected;
-    FilterType mFilterType;
-    int mIterations, mHalfWidth, mStencilWidth;
-    float mVoxelOffset, mHalfWidthWorld, mStencilWidthWorld;
-    bool  mWorldUnits;
-    float mMinMask, mMaxMask;
-    bool  mInvertMask;
-    Accuracy mAccuracy;
+struct FilterParms
+{
+    using TrimMode = openvdb::tools::lstrack::TrimMode;
+
+    std::string mGroup;
+    std::string mMaskName;
+    bool        mSecondInputConnected = false;
+    FilterType  mFilterType           = FILTER_TYPE_NONE;
+    int         mIterations           = 0;
+    int         mHalfWidth            = 3;
+    int         mStencilWidth         = 0;
+    float       mVoxelOffset          = 0.0f;
+    float       mHalfWidthWorld       = 0.1f;
+    float       mStencilWidthWorld    = 0.1f;
+    bool        mWorldUnits           = false;
+    float       mMinMask              = 0;
+    float       mMaxMask              = 1;
+    bool        mInvertMask           = false;
+    Accuracy    mAccuracy             = ACCURACY_UPWIND_FIRST;
+    TrimMode    mTrimMode             = TrimMode::kAll;
 #if VDB_COMPILABLE_SOP
-    bool mMaskInputNode = false;
+    bool        mMaskInputNode        = false;
 #else
-    OP_Node* mMaskInputNode = nullptr;
+    OP_Node*    mMaskInputNode        = nullptr;
 #endif
 };
 
@@ -460,7 +452,6 @@ newSopOperator(OP_OperatorTable* table)
 
         hutil::ParmList parms;
 
-        // Define a string-valued group name pattern parameter and add it to the list.
         parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
             .setChoiceList(&hutil::PrimGroupMenuInput1)
             .setTooltip("Specify a subset of the input VDB grids to be processed.")
@@ -496,11 +487,9 @@ newSopOperator(OP_OperatorTable* table)
                 .setTooltip("The operation to be applied"));
         }
 
-        // Toggle between world- and index-space units for offset
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "useworldspaceunits", "Use World Space Units")
             .setTooltip("If enabled, use world-space units, otherwise use voxels."));
 
-        // Stencil width
         parms.add(hutil::ParmFactory(PRM_INT_J, "radius", "Filter Voxel Radius")
             .setDefault(PRMoneDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5)
@@ -511,27 +500,24 @@ newSopOperator(OP_OperatorTable* table)
             .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
             .setDocumentation("The desired radius of the filter"));
 
-        // steps
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
             .setTooltip("The number of times to apply the operation"));
 
-        // Narrow-Band half-width
-        parms.add(hutil::ParmFactory(PRM_INT_J, "halfwidth", "Half-Width")
+        parms.add(hutil::ParmFactory(PRM_INT_J, "halfwidth", "Half Width")
             .setDefault(PRMthreeDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
             .setTooltip(
                 "Half the width of the narrow band, in voxels\n\n"
                 "(Many level set operations require this to be a minimum of three voxels.)"));
 
-        parms.add(hutil::ParmFactory(PRM_FLT_J, "halfwidthworld", "Half-Width")
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "halfwidthworld", "Half Width")
             .setDefault(0.1)
             .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
-            .setTooltip("Desired narrow band half-width in world units")
+            .setTooltip("Half the width of the narrow band, in world units")
             .setDocumentation(nullptr));
 
-        // Offset
         parms.add(hutil::ParmFactory(PRM_FLT_J, "voxeloffset", "Offset")
             .setDefault(PRMoneDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
@@ -539,16 +525,13 @@ newSopOperator(OP_OperatorTable* table)
                 "The distance in voxels by which to offset the level set surface"
                 " along its normals"));
 
-        { // Renormalization accuracy
-
+        {
             std::vector<std::string> items;
             for (int i = 0; i < NUM_ACCURACY_TYPES; ++i) {
                 Accuracy ac = Accuracy(i);
-
 #ifndef DWA_DEBUG_MODE // Exclude some of the menu options
                 if (ac == ACCURACY_UPWIND_THIRD || ac == ACCURACY_WENO) continue;
 #endif
-
                 items.push_back(accuracyToString(ac)); // token
                 items.push_back(accuracyToMenuName(ac)); // label
             }
@@ -558,24 +541,35 @@ newSopOperator(OP_OperatorTable* table)
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
 
-        //Invert mask.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
             .setTooltip("Invert the optional alpha mask, mapping 0 to 1 and 1 to 0."));
 
-        // Min mask range
         parms.add(hutil::ParmFactory(PRM_FLT_J, "minmask", "Min Mask Cutoff")
             .setDefault(PRMzeroDefaults)
             .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
             .setTooltip("Threshold below which voxel values in the mask map to zero"));
 
-        // Max mask range
         parms.add(hutil::ParmFactory(PRM_FLT_J, "maxmask", "Max Mask Cutoff")
             .setDefault(PRMoneDefaults)
             .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
             .setTooltip("Threshold above which voxel values in the mask map to one"));
 
+        parms.add(hutil::ParmFactory(PRM_STRING, "trim", "Trim")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+                "none",     "None",
+                "interior", "Interior",
+                "exterior", "Exterior",
+                "all",      "All",
+            })
+            .setDefault("all")
+            .setTooltip("Set voxels that lie outside the narrow band to the background value.")
+            .setDocumentation(
+                "Optionally set interior, exterior, or all voxels that lie outside"
+                " the narrow band to the background value.\n\n"
+                "Trimming reduces memory usage, but it also reduces dense SDFs\n"
+                "to narrow-band level sets."));
+
 #ifndef SESI_OPENVDB
-        // Verbosity toggle.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
             .setTooltip("If enabled, print the sequence of operations to the terminal."));
 #endif
@@ -990,6 +984,19 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::evalFilterP
     parms.mAccuracy     = stringToAccuracy(evalStdString("accuracy", now));
     parms.mGroup        = evalStdString("group", now);
 
+    {
+        const auto trimMode = evalStdString("trim", now);
+        if (trimMode == "none")          { parms.mTrimMode = FilterParms::TrimMode::kNone; }
+        else if (trimMode == "interior") { parms.mTrimMode = FilterParms::TrimMode::kInterior; }
+        else if (trimMode == "exterior") { parms.mTrimMode = FilterParms::TrimMode::kExterior; }
+        else if (trimMode == "all")      { parms.mTrimMode = FilterParms::TrimMode::kAll; }
+        else {
+            addError(SOP_MESSAGE,
+                ("Expected \"none\", \"interior\", \"exterior\" or \"all\" for \"trim\", got \""
+                     + trimMode + "\".").c_str());
+        }
+    }
+
     if (OP_TYPE_RENORM == mOpType) {
         parms.mFilterType = FILTER_TYPE_RENORMALIZE;
     } else if (OP_TYPE_RESIZE == mOpType) {
@@ -1114,6 +1121,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::filterGrid(
         filter.setMaskRange(parms.mMinMask, parms.mMaxMask);
         filter.invertMask(parms.mInvertMask);
     }
+
+    filter.setTrimming(parms.mTrimMode);
 
     switch (parms.mAccuracy) {
         case ACCURACY_UPWIND_FIRST:  filter.setSpatialScheme(openvdb::math::FIRST_BIAS);   break;
@@ -1358,6 +1367,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::resizeNarro
     }
 
     filter.resize(width);
+
+    filter.prune();
 
     filter.setState(s);
 }

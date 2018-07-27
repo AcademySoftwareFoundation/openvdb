@@ -135,9 +135,9 @@ CONCURRENT_MALLOC_LIB_DIR := $(HDSO)
 
 # The parent directory of the cppunit/ header directory
 # (leave blank if CppUnit is unavailable)
-CPPUNIT_INCL_DIR := /rel/map/generic-2013.22/sys_include
+CPPUNIT_INCL_DIR :=
 # The directory containing libcppunit
-CPPUNIT_LIB_DIR := /rel/depot/third_party_build/cppunit/1.10.2-7/opt-ws5-x86_64-gccWS5_64/lib
+CPPUNIT_LIB_DIR :=
 CPPUNIT_LIB := -lcppunit
 
 # The parent directory of the log4cplus/ header directory
