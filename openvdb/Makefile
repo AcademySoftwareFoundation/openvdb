@@ -357,6 +357,7 @@ INCLUDE_NAMES := \
     points/AttributeSet.h \
     points/IndexFilter.h \
     points/IndexIterator.h \
+    points/PointAdvect.h \
     points/PointAttribute.h \
     points/PointConversion.h \
     points/PointCount.h \
@@ -364,6 +365,7 @@ INCLUDE_NAMES := \
     points/PointDelete.h \
     points/PointGroup.h \
     points/PointMask.h \
+    points/PointMove.h \
     points/PointSample.h \
     points/PointScatter.h \
     points/StreamCompression.h \
@@ -525,6 +527,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeMask.cc \
     unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointAdvect.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
@@ -533,6 +536,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointMask.cc \
+    unittest/TestPointMove.cc \
     unittest/TestPointPartitioner.cc \
     unittest/TestPointSample.cc \
     unittest/TestPointScatter.cc \

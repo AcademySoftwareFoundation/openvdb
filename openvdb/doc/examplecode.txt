@@ -45,7 +45,9 @@ illustrate how to use OpenVDB and how to perform common tasks.
   - @ref sPointCustomFiltering
 - @ref sPointStride
   - @ref sConstantStride
-
+- @ref sPointMove
+  - @ref sPointAdvect
+  - @ref sPointCustomDeformer
 
 @section sHelloWorld &ldquo;Hello, World&rdquo; for OpenVDB
 This is a very simple example showing how to create a grid and access
@@ -1553,8 +1555,6 @@ Leaf[0, 0, 0]
 This example demonstrates how to create a new point grid and to populate it with
 random point positions initialized inside a level set sphere.
 
-Note that multi-threaded scattering tools are currently in development for
-introduction to the library to handle this use-case.
 @code
 #include <iostream>
 #include <openvdb/openvdb.h>
@@ -2060,6 +2060,59 @@ for (auto leafIter = points->tree().beginLeaf(); leafIter; ++leafIter) {
         }
     }
 }
+@endcode
+
+@section sPointMove Moving Points in Space
+
+As points are stored within voxels in an implicit spatially organised data structure, moving points in space requires re-bucketing the data.
+
+@subsection sPointAdvect Advecting Points
+
+Advection uses a specified integration order (4 = runge-kutta 4th) as well as delta time and time-step parameters
+to advect the points in-place using the supplied velocity grid.
+
+@code
+// Create an empty velocity grid with gravity as background value
+auto gravity = openvdb::Vec3SGrid::create(openvdb::Vec3s(0, -9.81, 0));
+
+// Advect points in-place using gravity velocity grid
+openvdb::points::advectPoints(*points, *gravity,
+    /*integrationOrder=*/4, /*dt=*/1.0/24.0, /*timeSteps=*/1);
+@endcode
+
+@subsection sPointCustomDeformer Moving Points with a Custom Deformer
+
+A custom deformer generates the new position of each existing point in a point set. This can use any number of
+mechanisms to achieve this such as a static value, a hard-coded list of positions, a function that uses the
+existing position to compute the new one or a function that uses the index of the point within the leaf array in
+some other way. This example simply takes the input position and adds a Y offset. Note that it is also possible
+to configure a custom deformer to operate in index-space.
+
+@code
+// This custom deformer is also used in the TestPointMove unit tests.
+struct OffsetDeformer
+{
+    OffsetDeformer(const openvdb::Vec3d& _offset)
+        : offset(_offset){ }
+
+    template <typename LeafIterT>
+    void reset(const LeafIterT&) { }
+
+    template <typename IndexIterT>
+    void apply(openvdb::Vec3d& position, const IndexIterT&) const
+    {
+        position += offset;
+    }
+
+    openvdb::Vec3d offset;
+};
+
+// Create an OffsetDeformer that moves the points downwards in Y by 10 world-space units.
+openvdb::Vec3d offset(0, -10, 0);
+OffsetDeformer deformer(offset);
+
+// Move the points using this deformer
+openvdb::points::movePoints(*points, deformer);
 @endcode
 
 */
