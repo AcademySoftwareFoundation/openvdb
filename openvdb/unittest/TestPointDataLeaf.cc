@@ -446,17 +446,12 @@ TestPointDataLeaf::testOffsets()
 void
 TestPointDataLeaf::testSetValue()
 {
+    // the following tests are not run when in debug mode due to assertions firing
+#ifdef NDEBUG
     LeafType leaf(openvdb::Coord(0, 0, 0));
 
     openvdb::Coord xyz(0, 0, 0);
     openvdb::Index index(LeafType::coordToOffset(xyz));
-
-    // the following tests are not run when in debug mode
-    // due to assertions firing
-
-#ifndef NDEBUG
-    return;
-#endif
 
     // ensure all non-modifiable operations are no-ops
 
@@ -474,6 +469,7 @@ TestPointDataLeaf::testSetValue()
     leaf.modifyValueAndActiveState(xyz, Local::op);
 
     CPPUNIT_ASSERT_EQUAL(0, int(leaf.getValue(xyz)));
+#endif
 }
 
 

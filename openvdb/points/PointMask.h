@@ -91,7 +91,7 @@ convertPointsToMask(const PointDataGridT& grid,
 struct NullDeformer
 {
     template <typename LeafT>
-    void reset(LeafT& leaf, size_t idx = 0) { }
+    void reset(LeafT&, size_t /*idx*/ = 0) { }
 
     template <typename IterT>
     void apply(Vec3d&, IterT&) const { }
@@ -191,8 +191,8 @@ struct PointsToScalarOp
             const Index64 count = points::iterCount(
                 pointLeaf->beginIndexVoxel(value.getCoord(), mFilter));
             if (count > Index64(0)) {
-                value.setValue(static_cast<ValueT>(count));}
-            else {
+                value.setValue(ValueT(count));
+            } else {
                 // disable any empty voxels
                 value.setValueOn(false);
             }
@@ -248,12 +248,12 @@ struct PointsToTransformedScalarOp
             // to transforming position to world-space, otherwise perform deformation afterwards
 
             if (DeformerTraits<DeformerT>::IndexSpace) {
-                deformer.template apply(position, iter);
+                deformer.template apply<decltype(iter)>(position, iter);
                 position = mSourceTransform.indexToWorld(position);
             }
             else {
                 position = mSourceTransform.indexToWorld(position);
-                deformer.template apply(position, iter);
+                deformer.template apply<decltype(iter)>(position, iter);
             }
 
             // determine coord of target grid

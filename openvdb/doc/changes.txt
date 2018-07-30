@@ -8,6 +8,9 @@
 
 @par
 New features:
+- Added @link points/PointAdvect.h tools@endlink to advect points
+  stored in point data grids through velocity fields.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Added @link points/PointSample.h tools@endlink to sample voxel values
   onto points stored in point data grids.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
@@ -92,6 +95,9 @@ Houdini:
   The remaining minimum and maximum parameters, formerly the voxel space
   radii, are now used in both world unit and voxel unit modes.
 - Added transform and rotation order options to the Transform&nbsp;SOP.
+- Added support to the Advect&nbsp;Points&nbsp;SOP for advecting points
+  stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Added support to the Sample&nbsp;Points&nbsp;SOP for sampling onto points
   stored in point data grids.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>

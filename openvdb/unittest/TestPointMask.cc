@@ -29,13 +29,11 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-
-#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
-
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointMask.h>
-
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -317,9 +315,9 @@ TestPointMask::testMaskDeformer()
 
         for (int i = 0; i < int(pointVoxels.size()); i++) {
             Coord newCoord(pointVoxels[i]);
-            newCoord.x() = (newCoord.x() + offset.x());
-            newCoord.y() = math::Round((newCoord.y() + offset.y()));
-            newCoord.z() = (newCoord.z() + offset.z());
+            newCoord.x() = static_cast<Int32>(newCoord.x() + offset.x());
+            newCoord.y() = static_cast<Int32>(math::Round(newCoord.y() + offset.y()));
+            newCoord.z() = static_cast<Int32>(newCoord.z() + offset.z());
             CPPUNIT_ASSERT_EQUAL(maskVoxels[i], newCoord);
             CPPUNIT_ASSERT_EQUAL(maskVoxelsWS[i], newCoord);
         }
@@ -347,9 +345,9 @@ TestPointMask::testMaskDeformer()
 
         for (int i = 0; i < int(maskVoxels.size()); i++) {
             Coord newCoord(pointVoxels[i]);
-            newCoord.x() = (newCoord.x() + offset.x()) * 5;
-            newCoord.y() = math::Round((newCoord.y() + offset.y()) * 5);
-            newCoord.z() = (newCoord.z() + offset.z()) * 5;
+            newCoord.x() = static_cast<Int32>((newCoord.x() + offset.x()) * 5);
+            newCoord.y() = static_cast<Int32>(math::Round((newCoord.y() + offset.y()) * 5));
+            newCoord.z() = static_cast<Int32>((newCoord.z() + offset.z()) * 5);
             CPPUNIT_ASSERT_EQUAL(maskVoxels2[i], newCoord);
         }
 
@@ -368,9 +366,9 @@ TestPointMask::testMaskDeformer()
         for (auto leaf = mask3->tree().cbeginLeaf(); leaf; ++leaf) {
             for (auto iter = leaf->cbeginValueOn(); iter; ++iter) {
                 Coord newCoord(pointVoxels[2]);
-                newCoord.x() = (newCoord.x() + offset.x());
-                newCoord.y() = math::Round((newCoord.y() + offset.y()));
-                newCoord.z() = (newCoord.z() + offset.z());
+                newCoord.x() = static_cast<Int32>(newCoord.x() + offset.x());
+                newCoord.y() = static_cast<Int32>(math::Round(newCoord.y() + offset.y()));
+                newCoord.z() = static_cast<Int32>(newCoord.z() + offset.z());
                 CPPUNIT_ASSERT_EQUAL(iter.getCoord(), newCoord);
             }
         }

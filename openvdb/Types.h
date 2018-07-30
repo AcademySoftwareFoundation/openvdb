@@ -188,6 +188,9 @@ struct PointIndex
 
     PointIndex(IntType i = IntType(0)): mIndex(i) {}
 
+    /// Explicit type conversion constructor
+    template<typename T> explicit PointIndex(T i): mIndex(static_cast<IntType>(i)) {}
+
     operator IntType() const { return mIndex; }
 
     /// Needed to support the <tt>(zeroVal<PointIndex>() + val)</tt> idiom.

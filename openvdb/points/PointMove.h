@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Dan Bailey
 ///
 /// @file PointMove.h
@@ -56,7 +56,6 @@
 /// @note The DeformerTraits struct (defined in PointMask.h) can be used to configure
 /// a deformer to evaluate in index space.
 
-
 #ifndef OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
@@ -67,9 +66,13 @@
 
 #include <tbb/concurrent_vector.h>
 
-#include <vector>
+#include <algorithm>
+#include <iterator> // for std::begin(), std::end()
 #include <map>
+#include <numeric> // for std::iota()
+#include <tuple>
 #include <unordered_map>
+#include <vector>
 
 class TestPointMove;
 
@@ -502,13 +505,14 @@ struct GlobalMovePointsOp
 
         for (const auto& it : indices) {
             const auto& sourceArray = mSourceHandles.getConstArray(std::get<0>(it));
-            const Index targetOffset = indexOffsetFromVoxel(std::get<1>(it), targetLeaf, offsets);
-            targetArray.set(targetOffset, sourceArray, std::get<2>(it));
+            const Index tgtOffset = indexOffsetFromVoxel(std::get<1>(it), targetLeaf, offsets);
+            targetArray.set(tgtOffset, sourceArray, std::get<2>(it));
         }
     }
 
-    void operator()(LeafT& leaf, size_t idx) const
+    void operator()(LeafT& leaf, size_t aIdx) const
     {
+        const Index idx = Index(aIdx);
         const auto& moveIndices = mMoveLeafMap.at(idx);
         if (moveIndices.empty())  return;
 
@@ -603,10 +607,10 @@ struct LocalMovePointsOp
         targetHandle.expand();
 
         for (const auto& it : indices) {
-            const Index targetOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
+            const Index tgtOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
             for (Index i = 0; i < sourceHandle.stride(); i++) {
                 ValueT sourceValue = sourceHandle.get(it.second, i);
-                targetHandle.set(targetOffset, i, sourceValue);
+                targetHandle.set(tgtOffset, i, sourceValue);
             }
         }
     }
@@ -618,13 +622,14 @@ struct LocalMovePointsOp
         const auto& sourceArray = mSourceHandles.getConstArray(sourceOffset);
 
         for (const auto& it : indices) {
-            const Index targetOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
-            targetArray.set(targetOffset, sourceArray, it.second);
+            const Index tgtOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
+            targetArray.set(tgtOffset, sourceArray, it.second);
         }
     }
 
-    void operator()(const LeafT& leaf, size_t idx) const
+    void operator()(const LeafT& leaf, size_t aIdx) const
     {
+        const Index idx = Index(aIdx);
         const auto& moveIndices = mMoveLeafMap.at(idx);
         if (moveIndices.empty())  return;
 
@@ -674,12 +679,12 @@ inline void movePoints( PointDataGridT& points,
     using PointDataTreeT = typename PointDataGridT::TreeType;
     using LeafT = typename PointDataTreeT::LeafNodeType;
     using LeafManagerT = typename tree::LeafManager<PointDataTreeT>;
-    using LeafRangeT = typename LeafManagerT::LeafRange;
 
     using namespace point_move_internal;
 
     // this object is for future use only
     assert(!objectNotInUse);
+    (void)objectNotInUse;
 
     PointDataTreeT& tree = points.tree();
 
@@ -708,7 +713,7 @@ inline void movePoints( PointDataGridT& points,
     targetLeafManager.foreach(
         [](LeafT& leaf, size_t /*idx*/) {
             auto* buffer = leaf.buffer().data();
-            for (int i = 1; i < leaf.buffer().size(); i++) {
+            for (Index i = 1; i < leaf.buffer().size(); i++) {
                 buffer[i] = buffer[i-1] + buffer[i];
             }
         },
@@ -777,12 +782,12 @@ inline void movePoints( PointDataGridT& points,
 
     for (const auto& it : existingAttributeSet.descriptor().map()) {
 
-        const Index attributeIndex = it.second;
+        const Index attributeIndex = static_cast<Index>(it.second);
 
         // zero offsets
         targetLeafManager.foreach(
             [&offsetMap](const LeafT& /*leaf*/, size_t idx) {
-                std::fill(offsetMap[idx].begin(), offsetMap[idx].end(), 0);
+                std::fill(offsetMap[Index(idx)].begin(), offsetMap[Index(idx)].end(), 0);
             },
         threaded);
 
@@ -836,7 +841,6 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
     using TreeT = typename PointDataGridT::TreeType;
     using LeafT = typename TreeT::LeafNodeType;
     using LeafManagerT = typename tree::LeafManager<TreeT>;
-    using LeafRangeT = typename LeafManagerT::LeafRange;
     LeafManagerT leafManager(grid.tree());
 
     // initialize cache
@@ -916,7 +920,7 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
         // store the total number of points to allow use of an expanded vector on access
 
         if (!cache.mapData.empty()) {
-            cache.totalSize = totalPointCount;
+            cache.totalSize = static_cast<Index>(totalPointCount);
         }
     };
 

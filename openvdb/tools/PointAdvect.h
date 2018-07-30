@@ -29,7 +29,8 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @author Ken Museth, D.J. Hill (openvdb port, added staggered grid support)
-/// @file PointAdvect.h
+///
+/// @file tools/PointAdvect.h
 ///
 /// @brief Class PointAdvect advects points (with position) in a static velocity field
 

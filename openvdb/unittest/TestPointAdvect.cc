@@ -29,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/unittest/util.h>
+#include "util.h"
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
@@ -39,8 +39,9 @@
 #include <openvdb/tools/Composite.h> // csgDifference
 #include <openvdb/tools/MeshToVolume.h> // createLevelSetBox
 #include <openvdb/openvdb.h>
-
 #include <openvdb/Types.h>
+#include <string>
+#include <vector>
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -49,8 +50,8 @@ class TestPointAdvect: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointAdvect);
     CPPUNIT_TEST(testAdvect);
@@ -137,10 +138,10 @@ TestPointAdvect::testAdvect()
             AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
             AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                int id = idHandle.get(*iter);
+                int theId = idHandle.get(*iter);
                 Vec3s position = transform.indexToWorld(
                     positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                Vec3s expectedPosition(positions[id]);
+                Vec3s expectedPosition(positions[theId]);
                 if (integrationOrder > 0)   expectedPosition += velocityBackground;
                 CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
             }
@@ -168,10 +169,10 @@ TestPointAdvect::testAdvect()
             AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
             AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                int id = idHandle.get(*iter);
+                int theId = idHandle.get(*iter);
                 Vec3s position = transform.indexToWorld(
                     positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                Vec3s expectedPosition(positions[id] + velocityBackground * 10);
+                Vec3s expectedPosition(positions[theId] + velocityBackground * 10);
                 CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
             }
         }
@@ -193,7 +194,8 @@ TestPointAdvect::testAdvect()
             advectIncludeGroups.push_back("test");
 
             auto leaf = points->tree().cbeginLeaf();
-            MultiGroupFilter advectFilter(advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
+            MultiGroupFilter advectFilter(
+                advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
             MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
 
             auto pointsToAdvect = points->deepCopy();
@@ -204,15 +206,15 @@ TestPointAdvect::testAdvect()
 
             CPPUNIT_ASSERT_EQUAL(Index64(4), pointCount(pointsToAdvect->tree()));
 
-            for (auto leaf = pointsToAdvect->tree().beginLeaf(); leaf; ++leaf) {
-                AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
-                AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
-                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                    int id = idHandle.get(*iter);
+            for (auto leafIter = pointsToAdvect->tree().beginLeaf(); leafIter; ++leafIter) {
+                AttributeHandle<Vec3s> positionHandle(leafIter->constAttributeArray("P"));
+                AttributeHandle<int> idHandle(leafIter->constAttributeArray("id"));
+                for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+                    int theId = idHandle.get(*iter);
                     Vec3s position = transform.indexToWorld(
                         positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                    Vec3s expectedPosition(positions[id]);
-                    if (id == 2)    expectedPosition += velocityBackground;
+                    Vec3s expectedPosition(positions[theId]);
+                    if (theId == 2)    expectedPosition += velocityBackground;
                     CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
                 }
             }
@@ -224,7 +226,8 @@ TestPointAdvect::testAdvect()
             includeGroups.push_back("test");
 
             auto leaf = points->tree().cbeginLeaf();
-            MultiGroupFilter advectFilter(advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
+            MultiGroupFilter advectFilter(
+                advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
             MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
 
             auto pointsToAdvect = points->deepCopy();
@@ -235,14 +238,14 @@ TestPointAdvect::testAdvect()
 
             CPPUNIT_ASSERT_EQUAL(Index64(1), pointCount(pointsToAdvect->tree()));
 
-            for (auto leaf = pointsToAdvect->tree().beginLeaf(); leaf; ++leaf) {
-                AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
-                AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
-                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                    int id = idHandle.get(*iter);
+            for (auto leafIter = pointsToAdvect->tree().beginLeaf(); leafIter; ++leafIter) {
+                AttributeHandle<Vec3s> positionHandle(leafIter->constAttributeArray("P"));
+                AttributeHandle<int> idHandle(leafIter->constAttributeArray("id"));
+                for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+                    int theId = idHandle.get(*iter);
                     Vec3s position = transform.indexToWorld(
                         positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                    Vec3s expectedPosition(positions[id]);
+                    Vec3s expectedPosition(positions[theId]);
                     expectedPosition += velocityBackground;
                     CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
                 }
@@ -256,7 +259,8 @@ TestPointAdvect::testAdvect()
             excludeGroups.push_back("test");
 
             auto leaf = points->tree().cbeginLeaf();
-            MultiGroupFilter advectFilter(advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
+            MultiGroupFilter advectFilter(
+                advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
             MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
 
             auto pointsToAdvect = points->deepCopy();
@@ -267,15 +271,15 @@ TestPointAdvect::testAdvect()
 
             CPPUNIT_ASSERT_EQUAL(Index64(3), pointCount(pointsToAdvect->tree()));
 
-            for (auto leaf = pointsToAdvect->tree().beginLeaf(); leaf; ++leaf) {
-                AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
-                AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
-                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                    int id = idHandle.get(*iter);
+            for (auto leafIter = pointsToAdvect->tree().beginLeaf(); leafIter; ++leafIter) {
+                AttributeHandle<Vec3s> positionHandle(leafIter->constAttributeArray("P"));
+                AttributeHandle<int> idHandle(leafIter->constAttributeArray("id"));
+                for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+                    int theId = idHandle.get(*iter);
                     Vec3s position = transform.indexToWorld(
                         positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                    Vec3s expectedPosition(positions[id]);
-                    if (id == 1)    expectedPosition += velocityBackground;
+                    Vec3s expectedPosition(positions[theId]);
+                    if (theId == 1)    expectedPosition += velocityBackground;
                     CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
                 }
             }
@@ -289,7 +293,8 @@ TestPointAdvect::testAdvect()
             const auto& transform = pointsToAdvect->transform();
 
             auto leaf = points->tree().cbeginLeaf();
-            MultiGroupFilter advectFilter(advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
+            MultiGroupFilter advectFilter(
+                advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
             MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
 
             advectPoints(*pointsToAdvect, *velocity, integrationOrder, timeStep, steps,
@@ -297,14 +302,14 @@ TestPointAdvect::testAdvect()
 
             CPPUNIT_ASSERT_EQUAL(Index64(4), pointCount(pointsToAdvect->tree()));
 
-            for (auto leaf = pointsToAdvect->tree().beginLeaf(); leaf; ++leaf) {
-                AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
-                AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
-                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                    int id = idHandle.get(*iter);
+            for (auto leafIter = pointsToAdvect->tree().beginLeaf(); leafIter; ++leafIter) {
+                AttributeHandle<Vec3s> positionHandle(leafIter->constAttributeArray("P"));
+                AttributeHandle<int> idHandle(leafIter->constAttributeArray("id"));
+                for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+                    int theId = idHandle.get(*iter);
                     Vec3s position = transform.indexToWorld(
                         positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                    Vec3s expectedPosition(positions[id]);
+                    Vec3s expectedPosition(positions[theId]);
                     expectedPosition += velocityBackground;
                     CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
                 }
@@ -316,7 +321,8 @@ TestPointAdvect::testAdvect()
             excludeGroups.push_back("test");
 
             auto leaf = points->tree().cbeginLeaf();
-            MultiGroupFilter advectFilter(advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
+            MultiGroupFilter advectFilter(
+                advectIncludeGroups, advectExcludeGroups, leaf->attributeSet());
             MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
 
             auto pointsToAdvect = points->deepCopy();
@@ -327,15 +333,15 @@ TestPointAdvect::testAdvect()
 
             CPPUNIT_ASSERT_EQUAL(Index64(3), pointCount(pointsToAdvect->tree()));
 
-            for (auto leaf = pointsToAdvect->tree().beginLeaf(); leaf; ++leaf) {
-                AttributeHandle<Vec3s> positionHandle(leaf->constAttributeArray("P"));
-                AttributeHandle<int> idHandle(leaf->constAttributeArray("id"));
-                for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                    int id = idHandle.get(*iter);
+            for (auto leafIter = pointsToAdvect->tree().beginLeaf(); leafIter; ++leafIter) {
+                AttributeHandle<Vec3s> positionHandle(leafIter->constAttributeArray("P"));
+                AttributeHandle<int> idHandle(leafIter->constAttributeArray("id"));
+                for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+                    int theId = idHandle.get(*iter);
                     Vec3s position = transform.indexToWorld(
                         positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                    Vec3s expectedPosition(positions[id]);
-                    if (id == 1)    expectedPosition += velocityBackground;
+                    Vec3s expectedPosition(positions[theId]);
+                    if (theId == 1)    expectedPosition += velocityBackground;
                     CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
                 }
             }
@@ -347,15 +353,16 @@ TestPointAdvect::testAdvect()
 }
 
 
-void TestPointAdvect::testZalesaksDisk()
+void
+TestPointAdvect::testZalesaksDisk()
 {
     // advect a notched sphere known as Zalesak's disk in a rotational velocity field
 
     // build the level set sphere
 
     Vec3s center(0, 0, 0);
-    float radius(10);
-    float voxelSize(0.2);
+    float radius = 10;
+    float voxelSize = 0.2f;
 
     auto zalesak = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize);
 
@@ -370,11 +377,11 @@ void TestPointAdvect::testZalesaksDisk()
 
     min.x() -= (radius * notchWidth) / 2;
     min.y() -= (radius * (notchDepth - 1));
-    min.z() -= radius * 1.1;
+    min.z() -= radius * 1.1f;
 
     max.x() += (radius * notchWidth) / 2;
-    max.y() += radius * 1.1;
-    max.z() += radius * 1.1;
+    max.y() += radius * 1.1f;
+    max.z() += radius * 1.1f;
 
     math::BBox<Vec3f> bbox(min, max);
 
@@ -420,14 +427,14 @@ void TestPointAdvect::testZalesaksDisk()
     for (auto leaf = velocity->tree().beginLeaf(); leaf; ++leaf) {
         for (auto iter = leaf->beginValueOn(); iter; ++iter) {
             Vec3s position = xform->indexToWorld(iter.getCoord().asVec3d());
-            Vec3s velocity = (position.cross(Vec3s(0, 0, 1)) * 2 * M_PI) / 10;
-            iter.setValue(velocity);
+            Vec3s vel = (position.cross(Vec3s(0, 0, 1)) * 2 * M_PI) / 10;
+            iter.setValue(vel);
         }
     }
 
     // extract original positions
 
-    const Index count(pointCount(points->constTree()));
+    const Index count = Index(pointCount(points->constTree()));
 
     std::vector<Vec3f> preAdvectPositions(count, Vec3f(0));
 
@@ -436,7 +443,7 @@ void TestPointAdvect::testZalesaksDisk()
         AttributeHandle<Vec3f> posHandle(leaf->constAttributeArray("P"));
         for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
             Vec3f position = posHandle.get(*iter) + iter.getCoord().asVec3d();
-            preAdvectPositions[idHandle.get(*iter)] = xform->indexToWorld(position);
+            preAdvectPositions[idHandle.get(*iter)] = Vec3f(xform->indexToWorld(position));
         }
     }
 
@@ -453,12 +460,13 @@ void TestPointAdvect::testZalesaksDisk()
         AttributeHandle<Vec3f> posHandle(leaf->constAttributeArray("P"));
         for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
             Vec3f position = posHandle.get(*iter) + iter.getCoord().asVec3d();
-            postAdvectPositions[idHandle.get(*iter)] = xform->indexToWorld(position);
+            postAdvectPositions[idHandle.get(*iter)] = Vec3f(xform->indexToWorld(position));
         }
     }
 
     for (Index i = 0; i < count; i++) {
-        CPPUNIT_ASSERT(!math::isApproxEqual(preAdvectPositions[i], postAdvectPositions[i], Vec3f(0.1)));
+        CPPUNIT_ASSERT(!math::isApproxEqual(
+            preAdvectPositions[i], postAdvectPositions[i], Vec3f(0.1)));
     }
 
     // advect points another half revolution
@@ -470,15 +478,15 @@ void TestPointAdvect::testZalesaksDisk()
         AttributeHandle<Vec3f> posHandle(leaf->constAttributeArray("P"));
         for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
             Vec3f position = posHandle.get(*iter) + iter.getCoord().asVec3d();
-            postAdvectPositions[idHandle.get(*iter)] = xform->indexToWorld(position);
+            postAdvectPositions[idHandle.get(*iter)] = Vec3f(xform->indexToWorld(position));
         }
     }
 
     for (Index i = 0; i < count; i++) {
-        CPPUNIT_ASSERT(math::isApproxEqual(preAdvectPositions[i], postAdvectPositions[i], Vec3f(0.1)));
+        CPPUNIT_ASSERT(math::isApproxEqual(
+            preAdvectPositions[i], postAdvectPositions[i], Vec3f(0.1)));
     }
 }
-
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

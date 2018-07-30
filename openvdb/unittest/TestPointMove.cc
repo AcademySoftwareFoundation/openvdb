@@ -29,17 +29,20 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/unittest/util.h>
+#include "util.h"
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointMove.h>
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/openvdb.h>
-
 #include <openvdb/Types.h>
-
 #include <tbb/atomic.h>
+#include <algorithm>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -104,25 +107,25 @@ struct OffsetFilteredDeformer
     template <typename LeafT>
     void reset(const LeafT& leaf, size_t /*idx*/)
     {
-        filter.template reset(leaf);
+        filter.template reset<LeafT>(leaf);
     }
 
     template <typename IndexIterT>
     void apply(Vec3d& position, const IndexIterT& iter) const
     {
-        if (!filter.template valid(iter))    return;
+        if (!filter.template valid<IndexIterT>(iter))    return;
         position += offset;
     }
 
-    void finalize() const { }
+    //void finalize() const { }
 
     Vec3d offset;
     FilterT filter;
 }; // struct OffsetFilteredDeformer
 
 
-PointDataGrid::Ptr positionsToGrid(const std::vector<Vec3s>& positions,
-                                   const float voxelSize = 1.0)
+PointDataGrid::Ptr
+positionsToGrid(const std::vector<Vec3s>& positions, const float voxelSize = 1.0)
 {
     const PointAttributeVector<Vec3s> pointList(positions);
 
@@ -151,7 +154,8 @@ PointDataGrid::Ptr positionsToGrid(const std::vector<Vec3s>& positions,
 }
 
 
-std::vector<Vec3s> gridToPositions(const PointDataGrid::Ptr& points, bool sort = true)
+std::vector<Vec3s>
+gridToPositions(const PointDataGrid::Ptr& points, bool sort = true)
 {
     std::vector<Vec3s> positions;
 
@@ -175,7 +179,8 @@ std::vector<Vec3s> gridToPositions(const PointDataGrid::Ptr& points, bool sort =
 }
 
 
-std::vector<Vec3s> applyOffset(const std::vector<Vec3s>& positions, const Vec3s& offset)
+std::vector<Vec3s>
+applyOffset(const std::vector<Vec3s>& positions, const Vec3s& offset)
 {
     std::vector<Vec3s> newPositions;
 
@@ -191,7 +196,7 @@ std::vector<Vec3s> applyOffset(const std::vector<Vec3s>& positions, const Vec3s&
 template<typename T>
 inline void
 ASSERT_APPROX_EQUAL(const std::vector<T>& a, const std::vector<T>& b,
-                    const Index lineNumber, const double tolerance = 1e-6)
+                    const Index lineNumber, const double /*tolerance*/ = 1e-6)
 {
     std::stringstream ss;
     ss << "Assertion Line Number: " << lineNumber;
@@ -207,14 +212,14 @@ ASSERT_APPROX_EQUAL(const std::vector<T>& a, const std::vector<T>& b,
 template<typename T>
 inline void
 ASSERT_APPROX_EQUAL(const std::vector<math::Vec3<T>>& a, const std::vector<math::Vec3<T>>& b,
-                    const Index lineNumber, const double tolerance = 1e-6)
+                    const Index lineNumber, const double /*tolerance*/ = 1e-6)
 {
     std::stringstream ss;
     ss << "Assertion Line Number: " << lineNumber;
 
     CPPUNIT_ASSERT_EQUAL_MESSAGE(ss.str(), a.size(), b.size());
 
-    for (int i = 0; i < a.size(); i++) {
+    for (size_t i = 0; i < a.size(); i++) {
         CPPUNIT_ASSERT_MESSAGE(ss.str(), math::isApproxEqual(a[i], b[i]));
     }
 }
@@ -225,7 +230,7 @@ struct NullObject { };
 struct DummyIter
 {
     DummyIter(Index _index): index(_index) { }
-    Index pos() const { return index; }
+    //Index pos() const { return index; }
     Index operator*() const { return index; }
     Index index;
 };
@@ -235,7 +240,7 @@ struct OddIndexFilter
     static bool initialized() { return true; }
     static index::State state() { return index::PARTIAL; }
     template <typename LeafT>
-    static index::State state(const LeafT& leaf) { return index::PARTIAL; }
+    static index::State state(const LeafT&) { return index::PARTIAL; }
 
     template <typename LeafT>
     void reset(const LeafT&) { }
@@ -346,7 +351,7 @@ TestPointMove::testCachedDeformer()
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
 
     // use total size that represents a sequential dataset
-    leaf.totalSize = leaf.mapData.size();
+    leaf.totalSize = Index(leaf.mapData.size());
 
     CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
 
@@ -382,12 +387,12 @@ TestPointMove::testCachedDeformer()
     CPPUNIT_ASSERT_EQUAL(size_t(points->tree().leafCount()), cache.leafs.size());
 
     int leafIndex = 0;
-    for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
-        for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
-            Vec3f position(handle.get(*iter) + iter.getCoord());
+    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
+            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s());
             Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            CPPUNIT_ASSERT(math::isApproxEqual(position, cachePosition));
+            CPPUNIT_ASSERT(math::isApproxEqual(pos, cachePosition));
         }
         leafIndex++;
     }
@@ -402,12 +407,12 @@ TestPointMove::testCachedDeformer()
     CPPUNIT_ASSERT_EQUAL(size_t(points->tree().leafCount()), cache.leafs.size());
 
     leafIndex = 0;
-    for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
-        for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
-            Vec3f position(handle.get(*iter) + iter.getCoord() + yOffset);
+    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
+            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
             Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            CPPUNIT_ASSERT(math::isApproxEqual(position, cachePosition));
+            CPPUNIT_ASSERT(math::isApproxEqual(pos, cachePosition));
         }
         leafIndex++;
     }
@@ -420,12 +425,12 @@ TestPointMove::testCachedDeformer()
     CPPUNIT_ASSERT_EQUAL(size_t(points->tree().leafCount()), cache.leafs.size());
 
     leafIndex = 0;
-    for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
-        for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
-            Vec3f position(handle.get(*iter) + iter.getCoord() + yOffset);
+    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
+            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
+            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
             Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            CPPUNIT_ASSERT(math::isApproxEqual(position, cachePosition));
+            CPPUNIT_ASSERT(math::isApproxEqual(pos, cachePosition));
         }
         leafIndex++;
     }
@@ -465,7 +470,7 @@ TestPointMove::testMoveLocal()
 
         std::vector<Vec3s> positions =          {
                                                     {10, 10, 10},
-                                                    {10, 10.1, 10},
+                                                    {10, 10.1f, 10},
                                                 };
 
         std::vector<Vec3s> desiredPositions = applyOffset(positions, offset);
@@ -507,9 +512,9 @@ TestPointMove::testMoveLocal()
 
         std::vector<Vec3s> positions =          {
                                                     {10, 10, 10},
-                                                    {10, 10.1, 10},
-                                                    {10, 10.2, 10},
-                                                    {10, 10.3, 10},
+                                                    {10, 10.1f, 10},
+                                                    {10, 10.2f, 10},
+                                                    {10, 10.3f, 10},
                                                 };
 
         std::vector<Vec3s> desiredPositions;
@@ -570,7 +575,7 @@ TestPointMove::testMoveLocal()
                                                 };
 
         std::vector<Vec3s> desiredPositions(positions);
-        desiredPositions[2] = positions[2] + offset;
+        desiredPositions[2] = Vec3s(positions[2] + offset);
 
         std::sort(desiredPositions.begin(), desiredPositions.end());
 
@@ -601,7 +606,7 @@ TestPointMove::testMoveGlobal()
 
         std::vector<Vec3s> positions =          {
                                                     {1, 1, 1},
-                                                    {1, 5.05, 1},
+                                                    {1, 5.05f, 1},
                                                     {2, 1, 1},
                                                     {2, 2, 1},
                                                 };
@@ -624,7 +629,7 @@ TestPointMove::testMoveGlobal()
 
         std::vector<Vec3s> positions =          {
                                                     {1, 1, 1},
-                                                    {1, 5.05, 1},
+                                                    {1, 5.05f, 1},
                                                     {2, 1, 1},
                                                     {2, 2, 1},
                                                 };
@@ -653,7 +658,7 @@ TestPointMove::testMoveGlobal()
 
         std::vector<Vec3s> positions =          {
                                                     {1, 1, 1},
-                                                    {1, 5.05, 1},
+                                                    {1, 5.05f, 1},
                                                     {2, 1, 1},
                                                     {2, 2, 1},
                                                 };
@@ -683,12 +688,12 @@ TestPointMove::testMoveGlobal()
         OffsetDeformer deformer(offset);
 
         std::vector<Vec3s> positions =          {
-                                                    {1, 1, 1},
-                                                    {1.01,1.01,1.01},
-                                                    {1, 5.05, 1},
-                                                    {2, 1, 1},
-                                                    {2.01,1.01,1.01},
-                                                    {2, 2, 1},
+                                                    {1,     1,     1},
+                                                    {1.01f, 1.01f, 1.01f},
+                                                    {1,     5.05f, 1},
+                                                    {2,     1,     1},
+                                                    {2.01f, 1.01f, 1.01f},
+                                                    {2,     2,     1},
                                                 };
 
         std::vector<Vec3s> desiredPositions = applyOffset(positions, offset);
@@ -708,13 +713,13 @@ TestPointMove::testMoveGlobal()
 
         std::vector<Vec3s> positions =          {
                                                     {1, 1, 1},
-                                                    {1, 5.05, 1},
+                                                    {1, 5.05f, 1},
                                                     {2, 1, 1},
                                                     {2, 2, 1},
                                                 };
 
         std::vector<Vec3s> desiredPositions(positions);
-        desiredPositions[2] = positions[2] + offset;
+        desiredPositions[2] = Vec3s(positions[2] + offset);
 
         std::sort(desiredPositions.begin(), desiredPositions.end());
 
@@ -739,7 +744,7 @@ TestPointMove::testMoveGlobal()
 
         std::vector<Vec3s> positions =          {
                                                     {1, 1, 1},
-                                                    {1, 5.05, 1},
+                                                    {1, 5.05f, 1},
                                                     {2, 1, 1},
                                                     {2, 2, 1},
                                                 };
@@ -849,7 +854,7 @@ TestPointMove::testCustomDeformer()
         PointDataGrid::Ptr cachedPoints = points->deepCopy();
 
         const int leafCount = points->tree().leafCount();
-        const int pointCount = positions.size();
+        const int pointCount = int(positions.size());
 
         tbb::atomic<int> resetCalls = 0;
         tbb::atomic<int> applyCalls = 0;
@@ -1006,10 +1011,10 @@ TestPointMove::testPointData()
         id.push_back(3);
 
         std::vector<float> radius;
-        radius.push_back(0.1);
-        radius.push_back(0.15);
-        radius.push_back(0.2);
-        radius.push_back(0.5);
+        radius.push_back(0.1f);
+        radius.push_back(0.15f);
+        radius.push_back(0.2f);
+        radius.push_back(0.5f);
 
         // manually construct point data grid instead of using positionsToGrid()
 
@@ -1134,7 +1139,7 @@ TestPointMove::testPointOrder()
         using GridT = points::PointDataGrid;
 
         static void populate(std::vector<Vec3s>& positions, const GridT& points,
-            const math::Transform& transform, bool threaded)
+            const math::Transform& transform, bool /*threaded*/)
         {
             auto newPoints1 = points.deepCopy();
 
@@ -1178,7 +1183,6 @@ TestPointMove::testPointOrder()
     ASSERT_APPROX_EQUAL(positions1, positions2, __LINE__);
     ASSERT_APPROX_EQUAL(positions1, positions3, __LINE__);
 }
-
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

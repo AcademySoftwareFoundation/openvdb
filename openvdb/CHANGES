@@ -4,6 +4,9 @@ OpenVDB Version History
 Version 5.2.0 - In development
 
     New features:
+    - Added tools to advect points stored in point data grids
+      through velocity fields.
+      [Contributed by Dan Bailey]
     - Added tools to sample voxel values onto points stored in
       point data grids.
       [Contributed by Double Negative]
@@ -70,6 +73,9 @@ Version 5.2.0 - In development
       The remaining minimum and maximum parameters, formerly the voxel space
       radii, are now used in both world unit and voxel unit modes.
     - Added transform and rotation order options to the Transform SOP.
+    - Added support to the Advect Points SOP for advecting points stored
+      in point data grids.
+      [Contributed by Dan Bailey]
     - Added support to the Sample Points SOP for sampling onto points
       stored in point data grids.
       [Contributed by Double Negative]

@@ -27,13 +27,12 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Dan Bailey
 ///
-/// @file PointAdvect.h
+/// @file points/PointAdvect.h
 ///
 /// @brief Ability to advect VDB Points through a velocity field.
-///
 
 #ifndef OPENVDB_POINTS_POINT_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_ADVECT_HAS_BEEN_INCLUDED
@@ -46,6 +45,8 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointMove.h>
+
+#include <memory>
 
 
 namespace openvdb {
@@ -109,7 +110,8 @@ public:
     {
         if (mFilter.valid(iter)) {
             for (int n = 0; n < mSteps; ++n) {
-                mIntegrator.template rungeKutta<IntegrationOrder, openvdb::Vec3d>(mTimeStep, position);
+                mIntegrator.template rungeKutta<IntegrationOrder, openvdb::Vec3d>(
+                    static_cast<typename IntegratorT::ElementType>(mTimeStep), position);
             }
         }
     }
