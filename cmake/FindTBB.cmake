@@ -100,7 +100,7 @@ IF ( TBB_FOUND )
 		SET ( TBB_PATH_SUFFIXES intel64/gcc4.4 )
 	  ENDIF ()
 	ELSE ()
-      MESSAGE ( FATAL_ERROR "Can't hanlde non-GCC compiler")
+      MESSAGE ( FATAL_ERROR "Can't handle non-GCC compiler")
 	ENDIF ()
 	FIND_LIBRARY ( TBB_LIBRARY_PATH tbb PATHS ${TBB_LIBRARYDIR} PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
       NO_DEFAULT_PATH
