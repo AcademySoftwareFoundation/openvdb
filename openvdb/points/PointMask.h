@@ -174,7 +174,7 @@ struct PointsToScalarOp
     using LeafT = typename GridT::TreeType::LeafNodeType;
     using ValueT = typename LeafT::ValueType;
 
-    PointsToScalarOp(   PointDataGridT& grid,
+    PointsToScalarOp(   const PointDataGridT& grid,
                         const FilterT& filter)
         : mPointDataAccessor(grid.getConstAccessor())
         , mFilter(filter) { }
@@ -279,7 +279,7 @@ private:
 
 template<typename GridT, typename PointDataGridT, typename FilterT>
 inline typename GridT::Ptr convertPointsToScalar(
-    PointDataGridT& points,
+    const PointDataGridT& points,
     const FilterT& filter,
     bool threaded = true)
 {
@@ -392,12 +392,8 @@ convertPointsToMask(
     const FilterT& filter,
     bool threaded)
 {
-    // This is safe because the PointDataGrid can only be modified by the deformer
-    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
-    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
-
     return point_mask_internal::convertPointsToScalar<MaskT>(
-        nonConstPoints, filter, threaded);
+        points, filter, threaded);
 }
 
 

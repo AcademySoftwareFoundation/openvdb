@@ -40,8 +40,8 @@
 /// struct MyDeformer
 /// {
 ///     // A reset is performed on each leaf in turn before the points in that leaf are
-///     // deformed. A leaf and depth-first index within the tree are supplied as the
-///     // arguments, which matches the functor interface for LeafManager::foreach().
+///     // deformed. A leaf and leaf index (standard leaf traversal order) are supplied as
+///     // the arguments, which matches the functor interface for LeafManager::foreach().
 ///     template <typename LeafNoteType>
 ///     void reset(LeafNoteType& leaf, size_t idx);
 ///
@@ -184,15 +184,14 @@ namespace point_move_internal {
 
 using IndexTriple = std::tuple<Index, Index, Index>;
 using IndexTripleArray = tbb::concurrent_vector<IndexTriple>;
-using GlobalPointIndexMap = std::unordered_map<Index, IndexTripleArray>;
+using GlobalPointIndexMap = std::vector<IndexTripleArray>;
 
 using IndexPair = std::pair<Index, Index>;
 using IndexPairArray = std::vector<IndexPair>;
-using LocalPointIndexMap = std::unordered_map<Index, IndexPairArray>;
+using LocalPointIndexMap = std::vector<IndexPairArray>;
 
 using IndexArray = std::vector<Index>;
-using IndexToIndexMap = std::unordered_map<Index, Index>;
-using OffsetMap = std::unordered_map<Index, IndexArray>;
+using OffsetMap = std::vector<IndexArray>;
 
 // TODO: The following infrastructure - ArrayProcessor, PerformTypedMoveOp, processTypedArray()
 // is required to improve AttributeArray copying performance beyond using the virtual function
@@ -542,17 +541,16 @@ struct LocalMovePointsOp
     using LeafT = typename TreeT::LeafNodeType;
     using LeafArrayT = std::vector<LeafT*>;
     using LeafManagerT = typename tree::LeafManager<TreeT>;
-    using IndexToIndexMap = std::unordered_map<Index, Index>;
 
     LocalMovePointsOp(OffsetMap& offsetMap,
                        AttributeHandles& targetHandles,
-                       const IndexToIndexMap& targetToSourceMap,
+                       const IndexArray& sourceIndices,
                        AttributeHandles& sourceHandles,
                        const Index attributeIndex,
                        const LocalPointIndexMap& moveLeafMap)
         : mOffsetMap(offsetMap)
         , mTargetHandles(targetHandles)
-        , mTargetToSourceMap(targetToSourceMap)
+        , mSourceIndices(sourceIndices)
         , mSourceHandles(sourceHandles)
         , mAttributeIndex(attributeIndex)
         , mMoveLeafMap(moveLeafMap) { }
@@ -639,10 +637,8 @@ struct LocalMovePointsOp
 
         // extract source leaf that has the same origin as the target leaf (if any)
 
-        const auto it = mTargetToSourceMap.find(idx);
-        assert(it != mTargetToSourceMap.end());
-
-        const Index sourceOffset(it->second);
+        assert(idx < mSourceIndices.size());
+        const Index sourceOffset(mSourceIndices[idx]);
 
         const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
@@ -656,7 +652,7 @@ struct LocalMovePointsOp
 private:
     OffsetMap& mOffsetMap;
     AttributeHandles& mTargetHandles;
-    const IndexToIndexMap& mTargetToSourceMap;
+    const IndexArray& mSourceIndices;
     AttributeHandles& mSourceHandles;
     const Index mAttributeIndex;
     const LocalPointIndexMap& mMoveLeafMap;
@@ -709,21 +705,17 @@ inline void movePoints( PointDataGridT& points,
     AttributeHandles sourceHandles(sourceLeafManager.leafCount());
     AttributeHandles targetHandles(targetLeafManager.leafCount());
 
-    // map frequency to cumulative histogram
-    targetLeafManager.foreach(
-        [](LeafT& leaf, size_t /*idx*/) {
-            auto* buffer = leaf.buffer().data();
-            for (Index i = 1; i < leaf.buffer().size(); i++) {
-                buffer[i] = buffer[i-1] + buffer[i];
-            }
-        },
-    threaded);
+    // extract the existing attribute set
+    const auto& existingAttributeSet = points.tree().cbeginLeaf()->attributeSet();
 
     // build a coord -> index map for looking up target leafs by origin and a faster
     // unordered map for finding the source index from a target index
 
     std::map<Coord, Index> targetLeafMap;
-    std::unordered_map<Index, Index> targetToSourceMap;
+    std::vector<Index> sourceIndices(targetLeafManager.leafCount(),
+        std::numeric_limits<Index>::max());
+
+    OffsetMap offsetMap(targetLeafManager.leafCount());
 
     {
         std::map<Coord, Index> sourceLeafMap;
@@ -734,36 +726,34 @@ inline void movePoints( PointDataGridT& points,
         auto targetRange = targetLeafManager.leafRange();
         for (auto leaf = targetRange.begin(); leaf; ++leaf) {
             targetLeafMap.insert({leaf->origin(), leaf.pos()});
-            const auto it = sourceLeafMap.find(leaf->origin());
-            if (it != sourceLeafMap.end()) {
-                targetToSourceMap.insert({leaf.pos(), it->second});
-            }
         }
-    }
 
-    // replace attribute set with a copy of the existing one
-    const auto& existingAttributeSet = points.tree().cbeginLeaf()->attributeSet();
-    targetLeafManager.foreach(
-        [&existingAttributeSet](LeafT& leaf, size_t /*idx*/) {
-            leaf.replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf.getLastValue()),
-                /*allowMismatchingDescriptors=*/true);
-        },
-    threaded);
+        // perform four independent per-leaf operations in parallel
+        targetLeafManager.foreach(
+            [&](LeafT& leaf, size_t idx) {
+                // map frequency => cumulative histogram
+                auto* buffer = leaf.buffer().data();
+                for (Index i = 1; i < leaf.buffer().size(); i++) {
+                    buffer[i] = buffer[i-1] + buffer[i];
+                }
+                // replace attribute set with a copy of the existing one
+                leaf.replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf.getLastValue()),
+                    /*allowMismatchingDescriptors=*/true);
+                // store the index of the source leaf in a corresponding target leaf array
+                const auto it = sourceLeafMap.find(leaf.origin());
+                if (it != sourceLeafMap.end()) {
+                    sourceIndices[idx] = it->second;
+                }
+                // allocate offset maps
+                offsetMap[idx].resize(LeafT::SIZE);
+            },
+        threaded);
+    }
 
     // moving leaf
 
-    GlobalPointIndexMap globalMoveLeafMap;
-    LocalPointIndexMap localMoveLeafMap;
-
-    // initialize move leaf maps and offsets
-
-    OffsetMap offsetMap;
-
-    for (size_t n = 0; n < targetLeafManager.leafCount(); n++) {
-        globalMoveLeafMap.insert({n, IndexTripleArray()});
-        localMoveLeafMap.insert({n, IndexPairArray()});
-        offsetMap.insert({n, IndexArray(LeafT::SIZE)});
-    }
+    GlobalPointIndexMap globalMoveLeafMap(targetLeafManager.leafCount());
+    LocalPointIndexMap localMoveLeafMap(targetLeafManager.leafCount());
 
     // build global and local move leaf maps and update local positions
 
@@ -805,7 +795,7 @@ inline void movePoints( PointDataGridT& points,
         // move points within leaf nodes
 
         LocalMovePointsOp<PointDataTreeT> localMoveOp(offsetMap, targetHandles,
-            targetToSourceMap, sourceHandles,
+            sourceIndices, sourceHandles,
             attributeIndex, localMoveLeafMap);
         targetLeafManager.foreach(localMoveOp, threaded);
     }
