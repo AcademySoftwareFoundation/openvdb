@@ -4,12 +4,16 @@
 
 @htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.2.0</B> - <I>In development</I>
+<B>Version 5.2.0</B> - <I>August 13, 2018</I>
 
 @par
 New features:
 - Added @link points/PointAdvect.h tools@endlink to advect points
   stored in point data grids through velocity fields.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- For point data grids, voxel data can now be
+  @vdblink::points::prefetch() prefetched@endlink independently of
+  position or other attributes.
   <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
 - Added @link points/PointSample.h tools@endlink to sample voxel values
   onto points stored in point data grids.

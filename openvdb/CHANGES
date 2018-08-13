@@ -1,11 +1,14 @@
 OpenVDB Version History
 =======================
 
-Version 5.2.0 - In development
+Version 5.2.0 - August 13, 2018
 
     New features:
     - Added tools to advect points stored in point data grids
       through velocity fields.
+      [Contributed by Dan Bailey]
+    - For point data grids, voxel data can now be prefetched independently
+      of position or other attributes.
       [Contributed by Dan Bailey]
     - Added tools to sample voxel values onto points stored in
       point data grids.
