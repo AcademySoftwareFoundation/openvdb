@@ -153,7 +153,7 @@ public:
 
     /// Test if "this" vector is equivalent to vector v with tolerance
     /// of eps
-    bool eq(const Vec4<T> &v, T eps=1.0e-8) const
+    bool eq(const Vec4<T> &v, T eps = static_cast<T>(1.0e-8)) const
     {
         return isApproxEqual(this->mm[0], v.mm[0], eps) &&
             isApproxEqual(this->mm[1], v.mm[1], eps) &&
@@ -283,7 +283,7 @@ public:
     }
 
     /// this = normalized this
-    bool normalize(T eps=1.0e-8)
+    bool normalize(T eps = static_cast<T>(1.0e-8))
     {
         T d = length();
         if (isApproxEqual(d, T(0), eps)) {

@@ -259,7 +259,7 @@ private:
         bool test() const { assert(mParentNode); return mIter != mParentNode->mTable.end(); }
         operator bool() const { return this->test(); }
 
-        void increment() { ++mIter; this->skip(); }
+        void increment() { if (this->test()) { ++mIter; } this->skip(); }
         bool next() { this->increment(); return this->test(); }
         void increment(Index n) { for (int i = 0; i < n && this->next(); ++i) {} }
 

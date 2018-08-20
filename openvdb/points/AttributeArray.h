@@ -671,6 +671,8 @@ public:
 
     ValueType get(Index n, Index m = 0) const;
 
+    const AttributeArray& array() const;
+
 protected:
     Index index(Index n, Index m) const;
 
@@ -740,6 +742,8 @@ public:
 
     void set(Index n, const ValueType& value);
     void set(Index n, Index m, const ValueType& value);
+
+    AttributeArray& array();
 
 private:
     friend class ::TestAttributeArray;
@@ -1934,6 +1938,13 @@ AttributeHandle<ValueType, CodecType>::compatibleType() const
 }
 
 template <typename ValueType, typename CodecType>
+const AttributeArray& AttributeHandle<ValueType, CodecType>::array() const
+{
+    assert(mArray);
+    return *mArray;
+}
+
+template <typename ValueType, typename CodecType>
 Index AttributeHandle<ValueType, CodecType>::index(Index n, Index m) const
 {
     Index index = n * mStrideOrTotalSize + m;
@@ -2058,6 +2069,13 @@ AttributeWriteHandle<ValueType, CodecType>::set(Index index, const ValueType& va
     // if the codec is known, call the method on the attribute array directly
 
     TypedAttributeArray<ValueType, CodecType>::setUnsafe(const_cast<AttributeArray*>(this->mArray), index, value);
+}
+
+template <typename ValueType, typename CodecType>
+AttributeArray& AttributeWriteHandle<ValueType, CodecType>::array()
+{
+    assert(this->mArray);
+    return *const_cast<AttributeArray*>(this->mArray);
 }
 
 

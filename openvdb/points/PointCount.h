@@ -32,7 +32,7 @@
 ///
 /// @author Dan Bailey
 ///
-/// @brief  Various point counting methods using a VDB Point Grid.
+/// @brief  Methods for counting points in VDB Point grids.
 
 #ifndef OPENVDB_POINTS_POINT_COUNT_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_COUNT_HAS_BEEN_INCLUDED
@@ -40,12 +40,11 @@
 #include <openvdb/openvdb.h>
 
 #include "PointDataGrid.h"
-#include "PointMask.h" // GridCombinerOp
+#include "PointMask.h"
 #include "IndexFilter.h"
 
 #include <tbb/parallel_reduce.h>
 
-#include <type_traits>
 #include <vector>
 
 
@@ -55,328 +54,291 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 
-/// @brief Total points in the PointDataTree
-/// @param tree PointDataTree.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
-
-
-/// @brief Total active points in the PointDataTree
-/// @param tree PointDataTree.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
-
-
-/// @brief Total inactive points in the PointDataTree
-/// @param tree PointDataTree.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
+/// @brief Count the total number of points in a PointDataTree
+/// @param tree         the PointDataTree in which to count the points
+/// @param filter       an optional index filter
+/// @param inCoreOnly   if true, points in out-of-core leaf nodes are not counted
+/// @param threaded     enable or disable threading  (threading is enabled by default)
+template <typename PointDataTreeT, typename FilterT = NullFilter>
+inline Index64 pointCount(  const PointDataTreeT& tree,
+                            const FilterT& filter = NullFilter(),
+                            const bool inCoreOnly = false,
+                            const bool threaded = true);
 
 
 /// @brief Populate an array of cumulative point offsets per leaf node.
-/// @param pointOffsets     array of offsets to be populated.
-/// @param tree             PointDataTree from which to populate the offsets.
-/// @param includeGroups    the group of names to include.
-/// @param excludeGroups    the group of names to exclude.
+/// @param pointOffsets     array of offsets to be populated
+/// @param tree             the PointDataTree from which to populate the offsets
+/// @param filter           an optional index filter
 /// @param inCoreOnly       if true, points in out-of-core leaf nodes are ignored
-/// @note returns the final cumulative point offset.
-template <typename PointDataTreeT>
-Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT& tree,
-                     const std::vector<Name>& includeGroups = std::vector<Name>(),
-                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                     const bool inCoreOnly = false);
-
-
-/// @brief Total points in the group in the PointDataTree
-/// @param tree PointDataTree.
-/// @param name group name.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 groupPointCount(const PointDataTreeT& tree, const Name& name,
-    const bool inCoreOnly = false);
-
-
-/// @brief Total active points in the group in the PointDataTree
-/// @param tree PointDataTree.
-/// @param name group name.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name,
-    const bool inCoreOnly = false);
-
-
-/// @brief Total inactive points in the group in the PointDataTree
-/// @param tree PointDataTree.
-/// @param name group name.
-/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
-template <typename PointDataTreeT>
-Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name,
-    const bool inCoreOnly = false);
+/// @param threaded         enable or disable threading  (threading is enabled by default)
+/// @return The final cumulative point offset.
+template <typename PointDataTreeT, typename FilterT = NullFilter>
+inline Index64 pointOffsets(std::vector<Index64>& pointOffsets,
+                            const PointDataTreeT& tree,
+                            const FilterT& filter = NullFilter(),
+                            const bool inCoreOnly = false,
+                            const bool threaded = true);
 
 
 /// @brief Generate a new grid with voxel values to store the number of points per voxel
 /// @param grid             the PointDataGrid to use to compute the count grid
-/// @param includeGroups    a vector of VDB Points groups to be included (default is all).
-/// @param excludeGroups    a vector of VDB Points groups to be excluded (default is none).
-/// @note this method is only available for integer or floating point grid types
+/// @param filter           an optional index filter
+/// @note The return type of the grid must be an integer or floating-point scalar grid.
 template <typename PointDataGridT,
-    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
-pointCountGrid(const PointDataGridT& grid,
-    const std::vector<Name>& includeGroups = std::vector<Name>(),
-    const std::vector<Name>& excludeGroups = std::vector<Name>());
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type,
+    typename FilterT = NullFilter>
+inline typename GridT::Ptr
+pointCountGrid( const PointDataGridT& grid,
+                const FilterT& filter = NullFilter());
 
 
 /// @brief Generate a new grid that uses the supplied transform with voxel values to store the
 ///        number of points per voxel.
 /// @param grid             the PointDataGrid to use to compute the count grid
 /// @param transform        the transform to use to compute the count grid
-/// @param includeGroups    a vector of VDB Points groups to be included (default is all).
-/// @param excludeGroups    a vector of VDB Points groups to be excluded (default is none).
-/// @note this method is only available for integer or floating point grid types
+/// @param filter           an optional index filter
+/// @note The return type of the grid must be an integer or floating-point scalar grid.
 template <typename PointDataGridT,
-    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
-pointCountGrid(const PointDataGridT& grid,
-    const openvdb::math::Transform& transform,
-    const std::vector<Name>& includeGroups = std::vector<Name>(),
-    const std::vector<Name>& excludeGroups = std::vector<Name>());
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type,
+    typename FilterT = NullFilter>
+inline typename GridT::Ptr
+pointCountGrid( const PointDataGridT& grid,
+                const openvdb::math::Transform& transform,
+                const FilterT& filter = NullFilter());
 
 
 ////////////////////////////////////////
 
 
-namespace point_count_internal {
-
-template <  typename PointDataTreeT,
-            typename ValueIterT,
-            typename FilterT>
-struct PointCountOp
+template <typename PointDataTreeT, typename FilterT>
+Index64 pointCount(const PointDataTreeT& tree,
+                   const FilterT& filter,
+                   const bool inCoreOnly,
+                   const bool threaded)
 {
+    using LeafManagerT = tree::LeafManager<const PointDataTreeT>;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
+
+    auto countLambda =
+        [&filter, &inCoreOnly] (const LeafRangeT& range, Index64 sum) -> Index64 {
+            for (const auto& leaf : range) {
+                if (inCoreOnly && leaf.buffer().isOutOfCore())  continue;
+                auto state = filter.state(leaf);
+                if (state == index::ALL) {
+                    sum += leaf.pointCount();
+                } else if (state != index::NONE) {
+                    sum += iterCount(leaf.beginIndexAll(filter));
+                }
+            }
+            return sum;
+        };
+
+    LeafManagerT leafManager(tree);
+    if (threaded) {
+        return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), countLambda,
+            [] (Index64 n, Index64 m) -> Index64 { return n + m; });
+    }
+    else {
+        return countLambda(leafManager.leafRange(), Index64(0));
+    }
+}
+
+
+template <typename PointDataTreeT, typename FilterT>
+Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
+                        const PointDataTreeT& tree,
+                        const FilterT& filter,
+                        const bool inCoreOnly,
+                        const bool threaded)
+{
+    using LeafT = typename PointDataTreeT::LeafNodeType;
     using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
 
-    PointCountOp(const FilterT& filter,
-                 const bool inCoreOnly = false)
-        : mFilter(filter)
-        , mInCoreOnly(inCoreOnly) { }
+    // allocate and zero values in point offsets array
 
-    Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
+    pointOffsets.assign(tree.leafCount(), Index64(0));
 
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
-            auto iter = leaf->template beginIndex<ValueIterT, FilterT>(mFilter);
-            size += iterCount(iter);
-        }
+    // compute total points per-leaf
 
-        return size;
+    LeafManagerT leafManager(tree);
+    leafManager.foreach(
+        [&pointOffsets, &filter, &inCoreOnly](const LeafT& leaf, size_t pos) {
+            if (inCoreOnly && leaf.buffer().isOutOfCore())  return;
+            auto state = filter.state(leaf);
+            if (state == index::ALL) {
+                pointOffsets[pos] = leaf.pointCount();
+            } else if (state != index::NONE) {
+                pointOffsets[pos] = iterCount(leaf.beginIndexAll(filter));
+            }
+        },
+    threaded);
+
+    // turn per-leaf totals into cumulative leaf totals
+
+    Index64 pointOffset(pointOffsets[0]);
+    for (size_t n = 1; n < pointOffsets.size(); n++) {
+        pointOffset += pointOffsets[n];
+        pointOffsets[n] = pointOffset;
     }
 
-    static Index64 join(Index64 size1, Index64 size2) {
-        return size1 + size2;
-    }
-
-private:
-    const FilterT& mFilter;
-    const bool mInCoreOnly;
-}; // struct PointCountOp
-
-
-template <typename PointDataTreeT, typename FilterT, typename ValueIterT>
-Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
-                                    const FilterT& filter,
-                                    const bool inCoreOnly = false)
-{
-    using PointCountOp = point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterT>;
-
-    typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const PointCountOp pointCountOp(filter, inCoreOnly);
-    return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
-}
-
-
-template <typename PointDataTreeT, typename FilterT>
-Index64 filterPointCount(const PointDataTreeT& tree,
-                         const FilterT& filter,
-                         const bool inCoreOnly = false)
-{
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueAllCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
-}
-
-
-template <typename PointDataTreeT, typename FilterT>
-Index64 filterActivePointCount( const PointDataTreeT& tree,
-                                const FilterT& filter,
-                                const bool inCoreOnly = false)
-{
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOnCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
-}
-
-
-template <typename PointDataTreeT, typename FilterT>
-Index64 filterInactivePointCount(   const PointDataTreeT& tree,
-                                    const FilterT& filter,
-                                    const bool inCoreOnly = false)
-{
-    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOffCIter;
-    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
-}
-
-
-} // namespace point_count_internal
-
-
-////////////////////////////////////////
-
-
-template <typename PointDataTreeT>
-Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
-{
-    (void) inCoreOnly;
-    Index64 size = 0;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-        size += iter->pointCount();
-    }
-    return size;
-}
-
-
-template <typename PointDataTreeT>
-Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
-{
-    (void) inCoreOnly;
-    Index64 size = 0;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-        size += iter->onPointCount();
-    }
-    return size;
-}
-
-
-template <typename PointDataTreeT>
-Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
-{
-    (void) inCoreOnly;
-    Index64 size = 0;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-        size += iter->offPointCount();
-    }
-    return size;
-}
-
-
-template <typename PointDataTreeT>
-Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
-{
-    auto iter = tree.cbeginLeaf();
-    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
-        return Index64(0);
-    }
-    GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterPointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
-}
-
-
-template <typename PointDataTreeT>
-Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
-{
-    auto iter = tree.cbeginLeaf();
-    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
-        return Index64(0);
-    }
-    GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterActivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
-}
-
-
-template <typename PointDataTreeT>
-Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
-{
-    auto iter = tree.cbeginLeaf();
-    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
-        return Index64(0);
-    }
-    GroupFilter groupFilter(name, iter->attributeSet());
-    return point_count_internal::filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilter, inCoreOnly);
-}
-
-
-template <typename PointDataTreeT>
-Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT& tree,
-                     const std::vector<Name>& includeGroups, const std::vector<Name>& excludeGroups,
-                     const bool inCoreOnly)
-{
-    using LeafNode = typename PointDataTreeT::LeafNodeType;
-
-    const bool useGroup = includeGroups.size() > 0 || excludeGroups.size() > 0;
-
-    tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const size_t leafCount = leafManager.leafCount();
-
-    pointOffsets.reserve(leafCount);
-
-    Index64 pointOffset = 0;
-    for (size_t n = 0; n < leafCount; n++)
-    {
-        const LeafNode& leaf = leafManager.leaf(n);
-
-        // skip out-of-core leafs
-        if (inCoreOnly && leaf.buffer().isOutOfCore()) {
-            pointOffsets.push_back(pointOffset);
-            continue;
-        }
-
-        if (useGroup) {
-            auto iter = leaf.beginValueOn();
-            MultiGroupFilter filter(includeGroups, excludeGroups, leaf.attributeSet());
-            filter.reset(leaf);
-            IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter> filterIndexIter(iter, filter);
-            pointOffset += iterCount(filterIndexIter);
-        }
-        else {
-            pointOffset += leaf.onPointCount();
-        }
-        pointOffsets.push_back(pointOffset);
-    }
     return pointOffset;
 }
 
 
-template <typename PointDataGridT, typename GridT>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
-pointCountGrid(const PointDataGridT& points,
-                                   const std::vector<Name>& includeGroups,
-                                   const std::vector<Name>& excludeGroups)
+template <typename PointDataGridT, typename GridT, typename FilterT>
+typename GridT::Ptr
+pointCountGrid( const PointDataGridT& points,
+                const FilterT& filter)
 {
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
-        points, includeGroups, excludeGroups);
+    static_assert(  std::is_integral<typename GridT::ValueType>::value ||
+                    std::is_floating_point<typename GridT::ValueType>::value,
+        "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
+
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    return point_mask_internal::convertPointsToScalar<GridT>(
+        nonConstPoints, filter);
 }
 
 
-template <typename PointDataGridT, typename GridT>
-inline typename std::enable_if< std::is_integral<typename GridT::ValueType>::value ||
-                                std::is_floating_point<typename GridT::ValueType>::value,
-    typename GridT::Ptr>::type
-pointCountGrid(const PointDataGridT& points,
+template <typename PointDataGridT, typename GridT, typename FilterT>
+typename GridT::Ptr
+pointCountGrid( const PointDataGridT& points,
+                const openvdb::math::Transform& transform,
+                const FilterT& filter)
+{
+    static_assert(  std::is_integral<typename GridT::ValueType>::value ||
+                    std::is_floating_point<typename GridT::ValueType>::value,
+        "openvdb::points::pointCountGrid must return an integer or floating-point scalar grid");
+
+    // This is safe because the PointDataGrid can only be modified by the deformer
+    using AdapterT = TreeAdapter<typename PointDataGridT::TreeType>;
+    auto& nonConstPoints = const_cast<typename AdapterT::NonConstGridType&>(points);
+
+    NullDeformer deformer;
+    return point_mask_internal::convertPointsToScalar<GridT>(
+        nonConstPoints, transform, filter, deformer);
+}
+
+
+////////////////////////////////////////
+
+
+// deprecated functions
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
+{
+    NullFilter filter;
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly = true)
+{
+    ActiveFilter filter;
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly = true)
+{
+    InactiveFilter filter;
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 groupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = true)
+{
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    GroupFilter filter(name, iter->attributeSet());
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = true)
+{
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    BinaryFilter<GroupFilter, ActiveFilter> filter(GroupFilter(name, iter->attributeSet()), ActiveFilter());
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name,
+    const bool inCoreOnly = true)
+{
+    auto iter = tree.cbeginLeaf();
+    if (!iter || !iter->attributeSet().descriptor().hasGroup(name)) {
+        return Index64(0);
+    }
+    BinaryFilter<GroupFilter, InactiveFilter> filter(GroupFilter(name, iter->attributeSet()), InactiveFilter());
+    return pointCount(tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+OPENVDB_DEPRECATED
+inline Index64 getPointOffsets(std::vector<Index64>& offsets, const PointDataTreeT& tree,
+                        const std::vector<Name>& includeGroups,
+                        const std::vector<Name>& excludeGroups,
+                        const bool inCoreOnly = false)
+{
+    MultiGroupFilter filter(includeGroups, excludeGroups, tree.cbeginLeaf()->attributeSet());
+    return pointOffsets(offsets, tree, filter, inCoreOnly);
+}
+
+
+template <typename PointDataGridT,
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
+OPENVDB_DEPRECATED
+inline typename GridT::Ptr
+pointCountGrid(const PointDataGridT& grid,
+    const std::vector<Name>& includeGroups,
+    const std::vector<Name>& excludeGroups)
+{
+    auto leaf = grid.tree().cbeginLeaf();
+    if (!leaf)  return GridT::create(0);
+    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
+    return pointCountGrid(grid, filter);
+}
+
+
+template <typename PointDataGridT,
+    typename GridT = typename PointDataGridT::template ValueConverter<Int32>::Type>
+OPENVDB_DEPRECATED
+inline typename GridT::Ptr
+pointCountGrid(const PointDataGridT& grid,
     const openvdb::math::Transform& transform,
     const std::vector<Name>& includeGroups,
     const std::vector<Name>& excludeGroups)
 {
-    return point_mask_internal::convertPointsToScalar<PointDataGridT, GridT>(
-        points, transform, includeGroups, excludeGroups);
+    auto leaf = grid.tree().cbeginLeaf();
+    if (!leaf)  return GridT::create(0);
+    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
+    return pointCountGrid(grid, transform, filter);
 }
 
 

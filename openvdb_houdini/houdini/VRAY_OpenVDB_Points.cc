@@ -272,24 +272,16 @@ struct PopulateColorFromVelocityOp {
             const bool uniform = velocityHandle->isUniform();
             const Vec3f uniformColor = getColorFromRamp(velocityHandle->get(0));
 
-            if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
-
-                MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf.attributeSet());
-                auto iter = leaf.beginIndexOn(filter);
-
-                for (; iter; ++iter) {
-
+            MultiGroupFilter filter(mIncludeGroups, mExcludeGroups, leaf.attributeSet());
+            if (filter.state() == points::index::ALL) {
+                for (auto iter = leaf.beginIndexOn(); iter; ++iter) {
                     Vec3f color = uniform ?
                         uniformColor : getColorFromRamp(velocityHandle->get(*iter));
                     colorHandle->set(*iter, color);
                 }
             }
             else {
-
-                auto iter = leaf.beginIndexOn();
-
-                for (; iter; ++iter) {
-
+                for (auto iter = leaf.beginIndexOn(filter); iter; ++iter) {
                     Vec3f color = uniform ?
                         uniformColor : getColorFromRamp(velocityHandle->get(*iter));
                     colorHandle->set(*iter, color);

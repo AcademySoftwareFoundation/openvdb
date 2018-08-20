@@ -1116,16 +1116,16 @@ convertPointDataGridToHoudini(
     std::sort(sortedAttributes.begin(), sortedAttributes.end());
 
     // obtain cumulative point offsets and total points
-    std::vector<Index64> pointOffsets;
-    const Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups,
-        inCoreOnly);
+    std::vector<Index64> offsets;
+    MultiGroupFilter filter(includeGroups, excludeGroups, leafIter->attributeSet());
+    const Index64 total = pointOffsets(offsets, tree, filter, inCoreOnly);
 
     // a block's global offset is needed to transform its point offsets to global offsets
     const Index64 startOffset = detail.appendPointBlock(total);
 
     HoudiniWriteAttribute<Vec3f> positionAttribute(*detail.getP());
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, includeGroups,
-        excludeGroups, inCoreOnly);
+    convertPointDataGridPosition(positionAttribute, grid, offsets, startOffset,
+        filter, inCoreOnly);
 
     // add other point attributes to the hdk detail
     const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
@@ -1207,83 +1207,83 @@ convertPointDataGridToHoudini(
 
         if (valueType == "string") {
             HoudiniWriteAttribute<Name> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "bool") {
             HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "int16") {
             HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "int32") {
             HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "int64") {
             HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "float") {
             HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "double") {
             HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "vec3i") {
             HoudiniWriteAttribute<Vec3<int> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "vec3s") {
             HoudiniWriteAttribute<Vec3<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "vec3d") {
             HoudiniWriteAttribute<Vec3<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "quats") {
             HoudiniWriteAttribute<Quat<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "quatd") {
             HoudiniWriteAttribute<Quat<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "mat3s") {
             HoudiniWriteAttribute<Mat3<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "mat3d") {
             HoudiniWriteAttribute<Mat3<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "mat4s") {
             HoudiniWriteAttribute<Mat4<float> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else if (valueType == "mat4d") {
             HoudiniWriteAttribute<Mat4<double> > attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride,
-                includeGroups, excludeGroups, inCoreOnly);
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
         }
         else {
             throw std::runtime_error("Unknown Attribute Type for Conversion: " + valueType);
@@ -1305,8 +1305,7 @@ convertPointDataGridToHoudini(
             attributeSet.groupIndex(name);
 
         HoudiniGroup group(*pointGroup, startOffset, total);
-        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index,
-            includeGroups, excludeGroups, inCoreOnly);
+        convertPointDataGridGroup(group, tree, offsets, startOffset, index, filter, inCoreOnly);
     }
 }
 
@@ -1712,7 +1711,8 @@ pointDataGridSpecificInfoText(std::ostream& infoStr, const GridBase& grid)
                 infoStr << "out-of-core";
             }
             else {
-                infoStr << util::formattedInt(groupPointCount(pointDataTree, it->first));
+                GroupFilter filter(it->first, iter->attributeSet());
+                infoStr << util::formattedInt(pointCount(pointDataTree, filter));
             }
 
             infoStr << ")";

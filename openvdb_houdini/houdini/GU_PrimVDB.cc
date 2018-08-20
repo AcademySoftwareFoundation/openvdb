@@ -1790,28 +1790,33 @@ GU_PrimVDB::convertVolumesToVDBs(
 {
     UT_AutoInterrupt progress("Convert");
 
+    const GA_ROHandleS nameHandle(&src_geo, GA_ATTRIB_PRIMITIVE, "name");
+
     GEO_Primitive *prim;
     GEO_Primitive *next;
     GA_FOR_SAFE_GROUP_PRIMITIVES(&src_geo, parms.primGroup, prim, next)
     {
-        if (progress.wasInterrupted())
+	if (progress.wasInterrupted())
 	    break;
 	if (prim->getTypeId() != GEO_PRIMVOLUME)
 	    continue;
 
 	GEO_PrimVolume *vol = UTverify_cast<GEO_PrimVolume*>(prim);
 	GA_Offset voloff = vol->getMapOffset();
-        GA_Detail::OffsetMarker marker(dst_geo);
+	GA_Detail::OffsetMarker marker(dst_geo);
+
+	// Get the volume's name, if it has one.
+	char const * const volname = (nameHandle.isValid() ? nameHandle.get(voloff) : nullptr);
 
 	GU_PrimVDB *new_prim;
 	new_prim = GU_PrimVDB::buildFromPrimVolume(
-			dst_geo, *vol, nullptr, flood_sdf, prune, tolerance,
-			activate_inside_sdf);
+		dst_geo, *vol, nullptr, flood_sdf, prune, tolerance,
+		activate_inside_sdf);
 	if (!new_prim || progress.wasInterrupted())
 	    break;
 
-        GA_Range pointrange(marker.pointRange());
-        GA_Range primitiverange(marker.primitiveRange());
+	GA_Range pointrange(marker.pointRange());
+	GA_Range primitiverange(marker.primitiveRange());
 	GUconvertCopySingleVertexPrimAttribsAndGroups(
 		parms, src_geo, voloff, dst_geo,
 		primitiverange, pointrange);

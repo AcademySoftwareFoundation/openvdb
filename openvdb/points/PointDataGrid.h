@@ -249,10 +249,12 @@ setStreamingMode(PointDataTreeT& tree, bool on = true);
 /// @brief  Sequentially pre-fetch all delayed-load voxel and attribute data from disk in order
 ///         to accelerate subsequent random access.
 ///
-/// @param  tree the PointDataTree.
+/// @param  tree                the PointDataTree.
+/// @param  position            if enabled, prefetch the position attribute (default is on)
+/// @param  otherAttributes     if enabled, prefetch all other attributes (default is on)
 template <typename PointDataTreeT>
 inline void
-prefetch(PointDataTreeT& tree);
+prefetch(PointDataTreeT& tree, bool position = true, bool otherAttributes = true);
 
 
 ////////////////////////////////////////
@@ -1020,13 +1022,22 @@ template<typename ValueIterT, typename FilterT>
 inline IndexIter<ValueIterT, FilterT>
 PointDataLeafNode<T, Log2Dim>::beginIndex(const FilterT& filter) const
 {
+    // generate no-op iterator if filter evaluates no indices
+
+    if (filter.state() == index::NONE) {
+        return IndexIter<ValueIterT, FilterT>(ValueIterT(), filter);
+    }
+
+    // copy filter to ensure thread-safety
+
+    FilterT newFilter(filter);
+    newFilter.reset(*this);
+
     using IterTraitsT = tree::IterTraits<LeafNodeType, ValueIterT>;
 
     // construct the value iterator and reset the filter to use this leaf
 
     ValueIterT valueIter = IterTraitsT::begin(*this);
-    FilterT newFilter(filter);
-    newFilter.reset(*this);
 
     return IndexIter<ValueIterT, FilterT>(valueIter, newFilter);
 }
@@ -1065,7 +1076,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return iterCount(this->beginIndexAll());
+    return this->getLastValue();
 }
 
 template<typename T, Index Log2Dim>
@@ -1094,7 +1105,11 @@ PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
         return Index64(0);
     }
     GroupFilter filter(groupName, this->attributeSet());
-    return iterCount(this->beginIndexAll(filter));
+    if (filter.state() == index::ALL) {
+        return this->pointCount();
+    } else {
+        return iterCount(this->beginIndexAll(filter));
+    }
 }
 
 template<typename T, Index Log2Dim>
@@ -1616,26 +1631,42 @@ setStreamingMode(PointDataTreeT& tree, bool on)
 
 template <typename PointDataTreeT>
 inline void
-prefetch(PointDataTreeT& tree)
+prefetch(PointDataTreeT& tree, bool position, bool otherAttributes)
 {
-    // sequential pre-fetch of out-of-core data for faster performance
+    // NOTE: the following is intentionally not multi-threaded, as the I/O
+    // is faster if done in the order in which it is stored in the file
 
-    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
-    if (leafIter) {
-        const size_t attributes = leafIter->attributeSet().size();
-        // load voxel buffer data
-        for ( ; leafIter; ++leafIter) {
-            const PointDataTree::LeafNodeType::Buffer& buffer = leafIter->buffer();
-            buffer.data();
+    auto leaf = tree.cbeginLeaf();
+    if (!leaf)  return;
+
+    const auto& attributeSet = leaf->attributeSet();
+
+    // pre-fetch leaf data
+
+    for ( ; leaf; ++leaf) {
+        leaf->buffer().data();
+    }
+
+    // pre-fetch position attribute data (position will typically have index 0)
+
+    size_t positionIndex = attributeSet.find("P");
+
+    if (position && positionIndex != AttributeSet::INVALID_POS) {
+        for (leaf = tree.cbeginLeaf(); leaf; ++leaf) {
+            assert(leaf->hasAttribute(positionIndex));
+            leaf->constAttributeArray(positionIndex).loadData();
         }
-        // load attribute data
-        for (size_t pos = 0; pos < attributes; pos++) {
-            leafIter = tree.cbeginLeaf();
-            for ( ; leafIter; ++leafIter) {
-                if (leafIter->hasAttribute(pos)) {
-                    const AttributeArray& array = leafIter->constAttributeArray(pos);
-                    array.loadData();
-                }
+    }
+
+    // pre-fetch other attribute data
+
+    if (otherAttributes) {
+        const size_t attributes = attributeSet.size();
+        for (size_t attributeIndex = 0; attributeIndex < attributes; attributeIndex++) {
+            if (attributeIndex == positionIndex)     continue;
+            for (leaf = tree.cbeginLeaf(); leaf; ++leaf) {
+                assert(leaf->hasAttribute(attributeIndex));
+                leaf->constAttributeArray(attributeIndex).loadData();
             }
         }
     }

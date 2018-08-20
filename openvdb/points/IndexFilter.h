@@ -33,6 +33,33 @@
 /// @author Dan Bailey
 ///
 /// @brief  Index filters primarily designed to be used with a FilterIndexIter.
+///
+/// Filters must adhere to the interface described in the example below:
+/// @code
+/// struct MyFilter
+/// {
+///     // Return true when the filter has been initialized for first use
+///     bool initialized() { return true; }
+///
+///     // Return index::ALL if all points are valid, index::NONE if no points are valid
+///     // and index::PARTIAL if some points are valid
+///     index::State state() { return index::PARTIAL; }
+///
+///     // Return index::ALL if all points in this leaf are valid, index::NONE if no points
+///     // in this leaf are valid and index::PARTIAL if some points in this leaf are valid
+///     template <typename LeafT>
+///     index::State state(const LeafT&) { return index::PARTIAL; }
+///
+///     // Resets the filter to refer to the specified leaf, all subsequent valid() calls
+///     // will be relative to this leaf until reset() is called with a different leaf.
+///     // Although a required method, many filters will provide an empty implementation if
+///     // there is no leaf-specific logic needed.
+///     template <typename LeafT> void reset(const LeafT&) { }
+///
+///     // Returns true if the filter is valid for the supplied iterator
+///     template <typename IterT> bool valid(const IterT&) { return true; }
+/// };
+/// @endcode
 
 #ifndef OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
@@ -63,6 +90,7 @@ namespace points {
 
 
 ////////////////////////////////////////
+
 
 
 namespace index_filter_internal {
@@ -96,6 +124,37 @@ generateRandomSubset(const unsigned int seed, const IntType n, const IntType m)
 
 
 } // namespace index_filter_internal
+
+
+/// Index filtering on active / inactive state of host voxel
+template <bool On>
+class ValueMaskFilter
+{
+public:
+    static bool initialized() { return true; }
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT& leaf)
+    {
+        if (leaf.isDense())         return On ? index::ALL : index::NONE;
+        else if (leaf.isEmpty())    return On ? index::NONE : index::ALL;
+        return index::PARTIAL;
+    }
+
+    template <typename LeafT>
+    void reset(const LeafT&) { }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const
+    {
+        const bool valueOn = iter.isValueOn();
+        return On ? valueOn : !valueOn;
+    }
+};
+
+
+using ActiveFilter = ValueMaskFilter<true>;
+using InactiveFilter = ValueMaskFilter<false>;
 
 
 /// Index filtering on multiple group membership for inclusion and exclusion
@@ -142,15 +201,23 @@ public:
 
     inline bool initialized() const { return mInitialized; }
 
+    inline index::State state() const
+    {
+        return (mInclude.empty() && mExclude.empty()) ? index::ALL : index::PARTIAL;
+    }
+
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         mIncludeHandles.clear();
         mExcludeHandles.clear();
-        for (const AttributeSet::Descriptor::GroupIndex& index : mInclude) {
-            mIncludeHandles.emplace_back(leaf.groupHandle(index));
+        for (const auto& i : mInclude) {
+            mIncludeHandles.emplace_back(leaf.groupHandle(i));
         }
-        for (const AttributeSet::Descriptor::GroupIndex& index : mExclude) {
-            mExcludeHandles.emplace_back(leaf.groupHandle(index));
+        for (const auto& i : mExclude) {
+            mExcludeHandles.emplace_back(leaf.groupHandle(i));
         }
         mInitialized = true;
     }
@@ -226,6 +293,10 @@ public:
 
     inline bool initialized() const { return mNextIndex == -1; }
 
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         using index_filter_internal::generateRandomSubset;
@@ -297,6 +368,10 @@ public:
 
     inline bool initialized() const { return bool(mIdHandle); }
 
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         assert(leaf.hasAttribute(mIndex));
@@ -349,6 +424,10 @@ public:
     }
 
     inline bool initialized() const { return bool(mPositionHandle); }
+
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
 
     template <typename LeafT>
     void reset(const LeafT& leaf) {
@@ -410,6 +489,13 @@ public:
 
     inline bool initialized() const { return bool(mPositionHandle); }
 
+    inline index::State state() const
+    {
+        return mBbox.empty() ? index::NONE : index::PARTIAL;
+    }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         mPositionHandle.reset(new Handle(leaf.constAttributeArray("P")));
@@ -450,6 +536,16 @@ public:
 
     inline bool initialized() const { return mFilter1.initialized() && mFilter2.initialized(); }
 
+    inline index::State state() const
+    {
+        return this->computeState(mFilter1.state(), mFilter2.state());
+    }
+    template <typename LeafT>
+    inline index::State state(const LeafT& leaf) const
+    {
+        return this->computeState(mFilter1.state(leaf), mFilter2.state(leaf));
+    }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         mFilter1.reset(leaf);
@@ -463,6 +559,19 @@ public:
     }
 
 private:
+    inline index::State computeState(   index::State state1,
+                                        index::State state2) const
+    {
+        if (And) {
+            if (state1 == index::NONE || state2 == index::NONE)       return index::NONE;
+            else if (state1 == index::ALL && state2 == index::ALL)    return index::ALL;
+        } else {
+            if (state1 == index::NONE && state2 == index::NONE)       return index::NONE;
+            else if (state1 == index::ALL && state2 == index::ALL)    return index::ALL;
+        }
+        return index::PARTIAL;
+    }
+
     T1 mFilter1;
     T2 mFilter2;
 }; // class BinaryFilter

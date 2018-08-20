@@ -188,7 +188,7 @@ public:
     /// True if all elements are exactly zero
     bool isZero() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (!isZero(mm[i])) return false;
+            if (!math::isZero(mm[i])) return false;
         }
         return true;
     }

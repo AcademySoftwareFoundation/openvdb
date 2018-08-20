@@ -161,8 +161,8 @@ TestPointCount::testCount()
     CPPUNIT_ASSERT_EQUAL(leaf.offPointCount(), Index64(0));
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 
     // manually de-activate two voxels
 
@@ -174,8 +174,8 @@ TestPointCount::testCount()
     CPPUNIT_ASSERT_EQUAL(leaf.offPointCount(), Index64(2));
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(LeafType::SIZE - 3));
-    CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(2));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE - 3));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(2));
 
     // one point per every other voxel and de-activate empty voxels
 
@@ -193,8 +193,8 @@ TestPointCount::testCount()
     CPPUNIT_ASSERT_EQUAL(leaf.offPointCount(), Index64(0));
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE / 2));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 
     // add a new non-empty leaf and check totalPointCount is correct
 
@@ -208,8 +208,8 @@ TestPointCount::testCount()
     }
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
 }
 
 
@@ -253,34 +253,34 @@ TestPointCount::testGroup()
     // retrieve first and last leaf attribute sets
 
     PointDataTree::LeafIter leafIter = tree.beginLeaf();
-    const AttributeSet& attributeSet = leafIter->attributeSet();
+    const AttributeSet& firstAttributeSet = leafIter->attributeSet();
 
     // ensure zero groups
-    CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
+    CPPUNIT_ASSERT_EQUAL(firstAttributeSet.descriptor().groupMap().size(), size_t(0));
 
     {// add an empty group
         appendGroup(tree, "test");
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(firstAttributeSet.descriptor().groupMap().size(), size_t(1));
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
         CPPUNIT_ASSERT_EQUAL(leafIter->pointCount(), Index64(4));
         CPPUNIT_ASSERT_EQUAL(leafIter->onPointCount(), Index64(4));
         CPPUNIT_ASSERT_EQUAL(leafIter->offPointCount(), Index64(0));
 
         // no points found when filtered by the empty group
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, GroupFilter("test", firstAttributeSet)), Index64(0));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(0));
     }
 
     { // assign two points to the group, test offsets and point counts
-        const Descriptor::GroupIndex index = attributeSet.groupIndex("test");
+        const Descriptor::GroupIndex index = firstAttributeSet.groupIndex("test");
 
         CPPUNIT_ASSERT(index.first != AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(index.first < attributeSet.size());
+        CPPUNIT_ASSERT(index.first < firstAttributeSet.size());
 
         AttributeArray& array = leafIter->attributeArray(index.first);
 
@@ -293,12 +293,16 @@ TestPointCount::testGroup()
 
         // only two out of four points should be found when group filtered
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        GroupFilter firstGroupFilter("test", firstAttributeSet);
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, GroupFilter("test", firstAttributeSet)), Index64(2));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
 
         {
-            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(2));
-            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(tree, "test"), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
+                firstGroupFilter, ActiveFilter())), Index64(2));
+            CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+                firstGroupFilter, InactiveFilter())), Index64(0));
         }
 
         CPPUNIT_ASSERT_NO_THROW(leafIter->validateOffsets());
@@ -331,14 +335,16 @@ TestPointCount::testGroup()
 
         // ensure active / inactive point counts are correct
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, GroupFilter("test", firstAttributeSet)), Index64(2));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
-        CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(1));
-        CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(tree, "test"), Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
+            firstGroupFilter, ActiveFilter())), Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+            firstGroupFilter, InactiveFilter())), Index64(1));
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(3));
-        CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(1));
 
         // write out grid to a temp file
         {
@@ -367,29 +373,42 @@ TestPointCount::testGroup()
             CPPUNIT_ASSERT(inputGrid);
 
             PointDataTree& inputTree = inputGrid->tree();
+            const auto& attributeSet = inputTree.cbeginLeaf()->attributeSet();
+
+            GroupFilter groupFilter("test", attributeSet);
+
+            bool inCoreOnly = true;
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
-            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
+                groupFilter, ActiveFilter()), inCoreOnly), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(0));
 #else
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(4));
-            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(3));
-            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(2));
-            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
+                groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
 #endif
 
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/false), Index64(4));
-            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/false), Index64(3));
-            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/false), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(2));
-            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(1));
+            inCoreOnly = false;
+
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
+                groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
+                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
         }
 
         // update the value mask and confirm point counts once again
@@ -398,14 +417,18 @@ TestPointCount::testGroup()
 
         CPPUNIT_ASSERT_NO_THROW(leafIter->validateOffsets());
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        auto& attributeSet = tree.cbeginLeaf()->attributeSet();
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, GroupFilter("test", attributeSet)), Index64(2));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
-        CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(2));
-        CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(tree, "test"), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, ActiveFilter>(
+            firstGroupFilter, ActiveFilter())), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, BinaryFilter<GroupFilter, InactiveFilter>(
+            firstGroupFilter, InactiveFilter())), Index64(0));
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, ActiveFilter()), Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, InactiveFilter()), Index64(0));
     }
 
     // create a tree with multiple leaves
@@ -424,10 +447,11 @@ TestPointCount::testGroup()
     appendGroup(tree2, "test");
 
     { // assign two points to the group
-        const Descriptor::GroupIndex index = leafIter->attributeSet().groupIndex("test");
+        const auto& attributeSet = leafIter->attributeSet();
+        const Descriptor::GroupIndex index = attributeSet.groupIndex("test");
 
         CPPUNIT_ASSERT(index.first != AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(index.first < leafIter->attributeSet().size());
+        CPPUNIT_ASSERT(index.first < attributeSet.size());
 
         AttributeArray& array = leafIter->attributeArray(index.first);
 
@@ -438,7 +462,7 @@ TestPointCount::testGroup()
         groupArray.set(0, GroupType(1) << index.second);
         groupArray.set(3, GroupType(1) << index.second);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree2, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree2, GroupFilter("test", attributeSet)), Index64(2));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree2), Index64(7));
     }
@@ -448,7 +472,8 @@ TestPointCount::testGroup()
     CPPUNIT_ASSERT(leafIter);
 
     { // assign another point to the group in a different leaf
-        const Descriptor::GroupIndex index = leafIter->attributeSet().groupIndex("test");
+        const auto& attributeSet = leafIter->attributeSet();
+        const Descriptor::GroupIndex index = attributeSet.groupIndex("test");
 
         CPPUNIT_ASSERT(index.first != AttributeSet::INVALID_POS);
         CPPUNIT_ASSERT(index.first < leafIter->attributeSet().size());
@@ -461,7 +486,7 @@ TestPointCount::testGroup()
 
         groupArray.set(0, GroupType(1) << index.second);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree2, "test"), Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree2, GroupFilter("test", attributeSet)), Index64(3));
         CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(1));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree2), Index64(7));
     }
@@ -484,31 +509,32 @@ TestPointCount::testOffsets()
     PointDataTree& tree = grid->tree();
 
     { // all point offsets
-        std::vector<Index64> pointOffsets;
-        Index64 total = getPointOffsets(pointOffsets, tree);
+        std::vector<Index64> offsets;
+        Index64 total = pointOffsets(offsets, tree);
 
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(5));
         CPPUNIT_ASSERT_EQUAL(total, Index64(5));
     }
 
     { // all point offsets when using a non-existant exclude group
 
-        std::vector<Index64> pointOffsets;
+        std::vector<Index64> offsets;
 
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups{"empty"};
 
-        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups, tree.cbeginLeaf()->attributeSet());
+        Index64 total = pointOffsets(offsets, tree, filter);
 
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(5));
         CPPUNIT_ASSERT_EQUAL(total, Index64(5));
     }
 
@@ -521,34 +547,36 @@ TestPointCount::testOffsets()
     groupHandle.set(0, true);
 
     { // include this group
-        std::vector<Index64> pointOffsets;
+        std::vector<Index64> offsets;
 
         std::vector<Name> includeGroups{"test"};
         std::vector<Name> excludeGroups;
 
-        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups, tree.cbeginLeaf()->attributeSet());
+        Index64 total = pointOffsets(offsets, tree, filter);
 
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(1));
         CPPUNIT_ASSERT_EQUAL(total, Index64(1));
     }
 
     { // exclude this group
-        std::vector<Index64> pointOffsets;
+        std::vector<Index64> offsets;
 
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups{"test"};
 
-        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+        MultiGroupFilter filter(includeGroups, excludeGroups, tree.cbeginLeaf()->attributeSet());
+        Index64 total = pointOffsets(offsets, tree, filter);
 
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(2));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(2));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(4));
         CPPUNIT_ASSERT_EQUAL(total, Index64(4));
     }
 
@@ -597,37 +625,38 @@ TestPointCount::testOffsets()
 
         PointDataTree& inputTree = inputGrid->tree();
 
-        std::vector<Index64> pointOffsets;
+        std::vector<Index64> offsets;
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
 
-        Index64 total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/true);
+        MultiGroupFilter filter(includeGroups, excludeGroups, inputTree.cbeginLeaf()->attributeSet());
+        Index64 total = pointOffsets(offsets, inputTree, filter, /*inCoreOnly=*/true);
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(0));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(0));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(0));
         CPPUNIT_ASSERT_EQUAL(total, Index64(0));
 #else
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(5));
         CPPUNIT_ASSERT_EQUAL(total, Index64(5));
 #endif
 
-        pointOffsets.clear();
+        offsets.clear();
 
-        total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/false);
+        total = pointOffsets(offsets, inputTree, filter, /*inCoreOnly=*/false);
 
-        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
-        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(5));
         CPPUNIT_ASSERT_EQUAL(total, Index64(5));
     }
     std::remove(filename.c_str());
@@ -782,31 +811,35 @@ TestPointCount::testCountGrid()
                     createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
                                                                   pointList, *transform);
 
+            auto& tree = points->tree();
+
             // assign point 3 to new group "test"
 
-            appendGroup(points->tree(), "test");
+            appendGroup(tree, "test");
 
             std::vector<short> groups{0,0,1,0,0};
 
-            setGroup(points->tree(), pointIndexGrid->tree(), groups, "test");
+            setGroup(tree, pointIndexGrid->tree(), groups, "test");
 
             std::vector<std::string> includeGroups{"test"};
             std::vector<std::string> excludeGroups;
 
             // generate a count grid with the same transform
 
-            Int32Grid::Ptr count = pointCountGrid(*points, includeGroups, excludeGroups);
+            MultiGroupFilter filter(includeGroups, excludeGroups,
+                tree.cbeginLeaf()->attributeSet());
+            Int32Grid::Ptr count = pointCountGrid(*points, filter);
 
             CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), Index64(1));
             CPPUNIT_ASSERT_EQUAL(voxelSum(*count), Index64(1));
 
-            count = pointCountGrid(*points, excludeGroups, includeGroups);
+            MultiGroupFilter filter2(excludeGroups, includeGroups,
+                tree.cbeginLeaf()->attributeSet());
+            count = pointCountGrid(*points, filter2);
 
             CPPUNIT_ASSERT_EQUAL(count->activeVoxelCount(), Index64(4));
             CPPUNIT_ASSERT_EQUAL(voxelSum(*count), Index64(4));
         }
-
-        // TODO: test include and exclude groups
     }
 
     { // 40,000 points on a unit sphere

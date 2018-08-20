@@ -273,17 +273,20 @@ TestAttributeArray::testFixedPointConversion()
     }
 }
 
-namespace {
-
-static AttributeArray::Ptr factory1(Index, Index, bool) { return AttributeArray::Ptr(); }
-static AttributeArray::Ptr factory2(Index, Index, bool) { return AttributeArray::Ptr(); }
-
+namespace
+{
+// use a dummy factory as TypedAttributeArray::factory is private
+static AttributeArray::Ptr factoryInt(Index n, Index strideOrTotalSize, bool constantStride)
+{
+    return TypedAttributeArray<int>::create(n, strideOrTotalSize, constantStride);
+}
 } // namespace
 
 void
 TestAttributeArray::testRegistry()
 {
     using AttributeF = TypedAttributeArray<float>;
+    using AttributeFTrnc = TypedAttributeArray<float, TruncateCodec>;
 
     AttributeArray::clearRegistry();
 
@@ -292,22 +295,29 @@ TestAttributeArray::testRegistry()
         CPPUNIT_ASSERT_THROW(AttributeArray::create(AttributeF::attributeType(), Index(5)), LookupError);
     }
 
-    // manually register the type and factory
+    { // throw when attempting to register a float type with an integer factory
+        CPPUNIT_ASSERT_THROW(AttributeArray::registerType(
+            AttributeF::attributeType(), factoryInt), KeyError);
+    }
 
-    AttributeArray::registerType(AttributeF::attributeType(), factory1);
+    // register the attribute array
 
-    { // cannot re-register an already registered AttributeArray
+    AttributeF::registerType();
+
+    { // can register an AttributeArray with the same value type but different codec
+        CPPUNIT_ASSERT_NO_THROW(AttributeFTrnc::registerType());
         CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeF::attributeType()));
-        CPPUNIT_ASSERT_THROW(AttributeArray::registerType(AttributeF::attributeType(), factory2), KeyError);
+        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
     }
 
     { // un-registering
         AttributeArray::unregisterType(AttributeF::attributeType());
         CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
+        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
     }
 
     { // clearing registry
-        AttributeArray::registerType(AttributeF::attributeType(), factory1);
+        AttributeF::registerType();
         AttributeArray::clearRegistry();
         CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
     }
@@ -812,6 +822,9 @@ TestAttributeArray::testAccessorEval()
 
         AttributeHandle<float, NullCodec> handle(array);
 
+        const AttributeArray& constArray(array);
+        CPPUNIT_ASSERT_EQUAL(&constArray, &handle.array());
+
         handle.mGetter = TestAccessor::getterError;
 
         const float result1 = handle.get(4);
@@ -831,6 +844,8 @@ TestAttributeArray::testAccessorEval()
         // unknown codec is used here so getter and setter are called
 
         AttributeWriteHandle<float, UnknownCodec> writeHandle(array);
+
+        CPPUNIT_ASSERT_EQUAL(&array, &writeHandle.array());
 
         writeHandle.mSetter = TestAccessor::setterError;
 

@@ -447,8 +447,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Resample)::cookVDBSop(OP_Conte
 
         const fpreal time = context.getTime();
 
-        const GU_Detail* refGdp = inputGeo(1, context);
-
         // Get parameters.
         const int samplingOrder = static_cast<int>(evalInt("order", 0, time));
         if (samplingOrder < 0 || samplingOrder > 2) {
@@ -498,24 +496,17 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Resample)::cookVDBSop(OP_Conte
             // Create a dummy reference grid with a default (linear) transform.
             refGrid = openvdb::FloatGrid::create();
         } else if (mode == MODE_REF_GRID) {
-            // Get the (optional) reference grid.
-            const GA_PrimitiveGroup* refGroup = nullptr;
-            if (refGdp == nullptr) {
-                // If the second input is unconnected, the reference_grid parameter
-                // specifies a reference grid from the first input.
-                refGdp = gdp;
-            }
-            if (refGdp) {
-                refGroup = matchGroup(*gdp, evalStdString("reference", time));
-                hvdb::VdbPrimCIterator it(refGdp, refGroup);
-                if (it) {
-                    refGrid = it->getConstGridPtr();
-                    if (++it) {
-                        addWarning(SOP_MESSAGE, "more than one reference grid was found");
-                    }
-                } else {
-                    throw std::runtime_error("no reference grid was found");
-                }
+            // Get the user-specified reference grid from the second input,
+            // if it is connected, or else from the first input.
+            const GU_Detail* refGdp = inputGeo(1, context);
+            if (!refGdp) { refGdp = gdp; }
+            if (auto it = hvdb::VdbPrimCIterator(refGdp,
+                matchGroup(*refGdp, evalStdString("reference", time))))
+            {
+                refGrid = it->getConstGridPtr();
+                if (++it) { addWarning(SOP_MESSAGE, "more than one reference grid was found"); }
+            } else {
+                throw std::runtime_error("no reference grid was found");
             }
         }
 

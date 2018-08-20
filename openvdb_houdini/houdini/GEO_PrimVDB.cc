@@ -3015,6 +3015,41 @@ GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
 	    src_points.indexFromOffset(src->vertexPoint(0)) + basept);
     wireVertex(v, ppt);
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
+#endif
+
+    myVis = src->myVis;
+}
+#endif
+
+#if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
+#if (UT_VERSION_INT >= 0x0c050132) // 12.5.306 or later
+void
+GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, GA_Index basept)
+#else
+void
+GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
+#endif
+{
+    if (psrc == this) return;
+
+    const GEO_PrimVDB	*src = (const GEO_PrimVDB *)psrc;
+    const GA_IndexMap	&points = getParent()->getPointMap();
+    const GA_IndexMap	&src_points = src->getParent()->getPointMap();
+    GA_Offset		 ppt;
+
+    copyGridFrom(*src); // makes a shallow copy
+
+    // TODO: Well and good to reuse the attribute handle for all our
+    //       points/vertices, but we should do so across primitives
+    //       as well.
+    GA_VertexWrangler		 vertex_wrangler(*getParent(),
+						 *src->getParent());
+
+    GA_Offset	v = fastVertexOffset(0);
+    ppt = points.offsetFromIndex(
+	    src_points.indexFromOffset(src->vertexPoint(0)) + basept);
+    wireVertex(v, ppt);
+    vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
     myVis = src->myVis;
 }
 #endif

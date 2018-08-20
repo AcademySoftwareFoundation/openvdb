@@ -288,6 +288,10 @@ ifdef WINDOWS_NT
 else
   CPPUNIT_LIB := -lcppunit
 endif
+CPPUNIT_INCL_DIR :=
+# The directory containing libcppunit
+CPPUNIT_LIB_DIR :=
+CPPUNIT_LIB := -lcppunit
 
 # The parent directory of the log4cplus/ header directory
 # (leave blank if log4cplus is unavailable)
@@ -536,6 +540,7 @@ INCLUDE_NAMES := \
     points/AttributeSet.h \
     points/IndexFilter.h \
     points/IndexIterator.h \
+    points/PointAdvect.h \
     points/PointAttribute.h \
     points/PointConversion.h \
     points/PointCount.h \
@@ -543,6 +548,8 @@ INCLUDE_NAMES := \
     points/PointDelete.h \
     points/PointGroup.h \
     points/PointMask.h \
+    points/PointMove.h \
+    points/PointSample.h \
     points/PointScatter.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
@@ -703,6 +710,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeMask.cc \
     unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointAdvect.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
@@ -711,7 +719,9 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointMask.cc \
+    unittest/TestPointMove.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointSample.cc \
     unittest/TestPointScatter.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \

@@ -45,7 +45,9 @@ illustrate how to use OpenVDB and how to perform common tasks.
   - @ref sPointCustomFiltering
 - @ref sPointStride
   - @ref sConstantStride
-
+- @ref sPointMove
+  - @ref sPointAdvect
+  - @ref sPointCustomDeformer
 
 @section sHelloWorld &ldquo;Hello, World&rdquo; for OpenVDB
 This is a very simple example showing how to create a grid and access
@@ -249,7 +251,7 @@ template<class GridType>
 void
 makeSphere(GridType& grid, float radius, const openvdb::Vec3f& c)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
 
     // Distance value for the constant region exterior to the narrow band
     const ValueT outside = grid.background();
@@ -308,6 +310,7 @@ makeSphere(GridType& grid, float radius, const openvdb::Vec3f& c)
 @section sModifyingGrids Reading and modifying a grid
 @code
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
 
 openvdb::initialize();
 
@@ -362,7 +365,7 @@ for (openvdb::FloatGrid::ValueOffIter iter = grid->beginValueOff(); iter; ++iter
 }
 
 // Set exterior voxels to 0.
-grid->setBackground(0.0);
+openvdb::tools::changeBackground(grid->tree(), 0.0);
 @endcode
 
 
@@ -508,22 +511,22 @@ on trees of arbitrary depth.
 @code
 #include <openvdb/openvdb.h>
 
-typedef openvdb::FloatGrid GridType;
-typedef GridType::TreeType TreeType;
-typedef TreeType::RootNodeType  RootType;  // level 3 RootNode
+using GridType = openvdb::FloatGrid;
+using TreeType = GridType::TreeType;
+using RootType = TreeType::RootNodeType;   // level 3 RootNode
 assert(RootType::LEVEL == 3);
-typedef RootType::ChildNodeType Int1Type;  // level 2 InternalNode
-typedef Int1Type::ChildNodeType Int2Type;  // level 1 InternalNode
-typedef TreeType::LeafNodeType  LeafType;  // level 0 LeafNode
+using Int1Type = RootType::ChildNodeType;  // level 2 InternalNode
+using Int2Type = Int1Type::ChildNodeType;  // level 1 InternalNode
+using LeafType = TreeType::LeafNodeType;   // level 0 LeafNode
 
 GridType::Ptr grid = ...;
 
 for (TreeType::NodeIter iter = grid->tree().beginNode(); iter; ++iter) {
     switch (iter.getDepth()) {
-    case 0: { RootType* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 1: { Int1Type* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 2: { Int2Type* node = NULL; iter.getNode(node); if (node) ...; break; }
-    case 3: { LeafType* node = NULL; iter.getNode(node); if (node) ...; break; }
+    case 0: { RootType* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 1: { Int1Type* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 2: { Int2Type* node = nullptr; iter.getNode(node); if (node) ...; break; }
+    case 3: { LeafType* node = nullptr; iter.getNode(node); if (node) ...; break; }
     }
 }
 @endcode
@@ -535,8 +538,8 @@ node in a tree exactly once.
 @code
 #include <openvdb/openvdb.h>
 
-typedef openvdb::FloatGrid GridType;
-typedef GridType::TreeType TreeType;
+using GridType = openvdb::FloatGrid;
+using TreeType = GridType::TreeType;
 
 GridType::Ptr grid = ...;
 
@@ -573,9 +576,10 @@ the node iterators described above) can be accessed either through a
 grid's tree or directly through the grid itself, as in the following example:
 @code
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
 
-typedef openvdb::Vec3SGrid GridType;
-typedef GridType::TreeType TreeType;
+using GridType = openvdb::Vec3SGrid;
+using TreeType = GridType::TreeType;
 
 GridType::Ptr grid = ...;
 
@@ -605,7 +609,7 @@ for (GridType::ValueOffIter iter = grid->beginValueOff(); iter.test(); ++iter) {
 }
 
 // Normalize the (inactive) background value as well.
-grid->setBackground(grid->background().unit());
+openvdb::tools::changeBackground(grid->tree(), grid->background().unit());
 @endcode
 See the @ref treeValueIterRef "Overview" for more on value iterators.
 
@@ -645,10 +649,10 @@ tbb::atomic<openvdb::Index64> activeLeafVoxelCount;
 template<typename GridType>
 struct LeafProcessor
 {
-    typedef typename GridType::TreeType TreeType;
-    typedef typename TreeType::LeafNodeType LeafNode;
+    using TreeType = typename GridType::TreeType;
+    using LeafNode = typename TreeType::LeafNodeType;
     // Define an IteratorRange that splits the iteration space of a leaf iterator.
-    typedef openvdb::tree::IteratorRange<typename TreeType::LeafCIter> IterRange;
+    using IterRange = openvdb::tree::IteratorRange<typename TreeType::LeafCIter>;
 
     void operator()(IterRange& range) const
     {
@@ -677,7 +681,7 @@ main()
 
     // Construct a functor for use with tbb::parallel_for()
     // that processes the leaf nodes of a FloatGrid.
-    typedef LeafProcessor<openvdb::FloatGrid> FloatLeafProc;
+    using FloatLeafProc = LeafProcessor<openvdb::FloatGrid>;
     FloatLeafProc proc;
 
     // Wrap a leaf iterator in an IteratorRange.
@@ -1551,8 +1555,6 @@ Leaf[0, 0, 0]
 This example demonstrates how to create a new point grid and to populate it with
 random point positions initialized inside a level set sphere.
 
-Note that multi-threaded scattering tools are currently in development for
-introduction to the library to handle this use-case.
 @code
 #include <iostream>
 #include <openvdb/openvdb.h>
@@ -2058,6 +2060,59 @@ for (auto leafIter = points->tree().beginLeaf(); leafIter; ++leafIter) {
         }
     }
 }
+@endcode
+
+@section sPointMove Moving Points in Space
+
+As points are stored within voxels in an implicit spatially organised data structure, moving points in space requires re-bucketing the data.
+
+@subsection sPointAdvect Advecting Points
+
+Advection uses a specified integration order (4 = runge-kutta 4th) as well as delta time and time-step parameters
+to advect the points in-place using the supplied velocity grid.
+
+@code
+// Create an empty velocity grid with gravity as background value
+auto gravity = openvdb::Vec3SGrid::create(openvdb::Vec3s(0, -9.81, 0));
+
+// Advect points in-place using gravity velocity grid
+openvdb::points::advectPoints(*points, *gravity,
+    /*integrationOrder=*/4, /*dt=*/1.0/24.0, /*timeSteps=*/1);
+@endcode
+
+@subsection sPointCustomDeformer Moving Points with a Custom Deformer
+
+A custom deformer generates the new position of each existing point in a point set. This can use any number of
+mechanisms to achieve this such as a static value, a hard-coded list of positions, a function that uses the
+existing position to compute the new one or a function that uses the index of the point within the leaf array in
+some other way. This example simply takes the input position and adds a Y offset. Note that it is also possible
+to configure a custom deformer to operate in index-space.
+
+@code
+// This custom deformer is also used in the TestPointMove unit tests.
+struct OffsetDeformer
+{
+    OffsetDeformer(const openvdb::Vec3d& _offset)
+        : offset(_offset){ }
+
+    template <typename LeafIterT>
+    void reset(const LeafIterT&) { }
+
+    template <typename IndexIterT>
+    void apply(openvdb::Vec3d& position, const IndexIterT&) const
+    {
+        position += offset;
+    }
+
+    openvdb::Vec3d offset;
+};
+
+// Create an OffsetDeformer that moves the points downwards in Y by 10 world-space units.
+openvdb::Vec3d offset(0, -10, 0);
+OffsetDeformer deformer(offset);
+
+// Move the points using this deformer
+openvdb::points::movePoints(*points, deformer);
 @endcode
 
 */

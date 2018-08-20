@@ -37,7 +37,9 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
+#include <algorithm> // for std::min()
 #include <cmath> // for std::abs(), std::fabs(), std::floor()
+#include <limits>
 #include <type_traits> // for std::is_const
 
 
@@ -1422,7 +1424,7 @@ public:
 
         // obtain cumulative point offsets and total points
         std::vector<openvdb::Index64> pointOffsets;
-        const openvdb::Index64 total = openvdb::points::getPointOffsets(pointOffsets, tree);
+        const openvdb::Index64 total = openvdb::points::pointOffsets(pointOffsets, tree);
 
         // @todo use glDrawArrays with GL_POINTS to avoid generating indices
         GLfloatVec values(total * 3);

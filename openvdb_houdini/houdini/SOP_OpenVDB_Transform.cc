@@ -42,7 +42,10 @@
 #else
 #include <boost/math/constants/constants.hpp>
 #endif
+#include <set>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 
 #if UT_MAJOR_VERSION_INT >= 16
 #define VDB_COMPILABLE_SOP 1
@@ -81,64 +84,65 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the input VDB grids to be transformed.")
+        .setTooltip("Specify a subset of the input VDBs to be transformed.")
         .setDocumentation(
-            "A subset of the input VDB grids to be transformed"
+            "A subset of the input VDBs to be transformed"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    // Translation
+    parms.add(hutil::ParmFactory(PRM_STRING, "xOrd", "Transform Order")
+        .setDefault("tsr") ///< @todo Houdini default is "srt"
+        .setChoiceList(&PRMtrsMenu)
+        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+        .setTooltip("The order in which transformations and rotations occur"));
+
+    parms.add(hutil::ParmFactory(
+        PRM_STRING | PRM_Type(PRM_Type::PRM_INTERFACE_LABEL_NONE), "rOrd", "")
+        .setDefault("zyx") ///< @todo Houdini default is "xyz"
+        .setChoiceList(&PRMxyzMenu));
+
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate")
         .setVectorSize(3)
         .setDefault(PRMzeroDefaults)
-        .setDocumentation("Apply a translation to the transform."));
+        .setDocumentation("The amount of translation along the _x_, _y_ and _z_ axes"));
 
-    // Rotation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "r", "Rotate")
         .setVectorSize(3)
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Rotation specified in ZYX order")
-        .setDocumentation("Apply a rotation, in ZYX order, to the transform."));
+        .setDocumentation("The amount of rotation about the _x_, _y_ and _z_ axes"));
 
-    // Scale
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "s", "Scale")
         .setVectorSize(3)
         .setDefault(PRMoneDefaults)
-        .setDocumentation("Apply a scale to the transform."));
+        .setDocumentation("Nonuniform scaling along the _x_, _y_ and _z_ axes"));
 
-    // Pivot
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "p", "Pivot")
         .setVectorSize(3)
         .setDefault(PRMzeroDefaults)
         .setDocumentation("The pivot point for scaling and rotation"));
 
-    // Uniform scale
     parms.add(hutil::ParmFactory(PRM_FLT_J, "uniformScale", "Uniform Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10)
-        .setDocumentation("Apply a uniform scale to the transform."));
+        .setDocumentation("Uniform scaling along all three axes"));
 
-    // Toggle, inverse
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Transformation")
         .setDefault(PRMzeroDefaults)
         .setDocumentation("Perform the inverse transformation."));
 
-    // Toggle, apply transform to vector values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "xformvectors", "Transform Vectors")
         .setDefault(PRMzeroDefaults)
         .setTooltip(
-            "Apply the transform to the voxel values of vector-valued grids,\n"
-            "in accordance with those grids' Vector Type attributes.\n")
+            "Apply the transform to the voxel values of vector-valued VDBs,\n"
+            "in accordance with those VDBs' Vector Type attributes.\n")
         .setDocumentation(
-            "Apply the transform to the voxel values of vector-valued grids,"
-            " in accordance with those grids' __Vector Type__ attributes (as set,"
-            " for example, with the [OpenVDB Create node|Node:sop/DW_OpenVDBCreate])."));
+            "Apply the transform to the voxel values of vector-valued VDBs,"
+            " in accordance with those VDBs' __Vector Type__ attributes (as set,"
+            " for example, with the [OpenVDB Create|Node:sop/DW_OpenVDBCreate] node)."));
 
-    // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
-        .addInput("Input with VDB grids to transform")
+        .addInput("VDBs to transform")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Transform::Cache; })
 #endif
@@ -151,7 +155,7 @@ newSopOperator(OP_OperatorTable* table)
 @overview\n\
 \n\
 This node modifies the transform associated with each input VDB volume.\n\
-It is usually preferable to use Houdini's native [Transform node|Node:sop/xform],\n\
+It is usually preferable to use Houdini's native [Transform|Node:sop/xform] node,\n\
 except if you want to also transform the _values_ of a vector-valued VDB.\n\
 \n\
 @related\n\
@@ -219,14 +223,34 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Transform)::cookVDBSop(OP_Cont
 
         s *= evalFloat("uniformScale", 0, time);
 
+        const auto xformOrder = evalStdString("xOrd", time);
+        const auto rotOrder = evalStdString("rOrd", time);
         const bool flagInverse = evalInt("invert", 0, time);
-
         const bool xformVec = evalInt("xformvectors", 0, time);
 
+        const auto isValidOrder = [](const std::string& expected, const std::string& actual) {
+            if (actual.size() != expected.size()) return false;
+            using CharSet = std::set<std::string::value_type>;
+            return (CharSet(actual.begin(), actual.end())
+                == CharSet(expected.begin(), expected.end()));
+        };
+
+        if (!isValidOrder("rst", xformOrder)) {
+            std::ostringstream mesg;
+            mesg << "Invalid transform order \"" << xformOrder
+                << "\"; expected \"tsr\", \"rst\", etc.";
+            throw std::runtime_error(mesg.str());
+        }
+
+        if (!isValidOrder("xyz", rotOrder)) {
+            std::ostringstream mesg;
+            mesg << "Invalid rotation order \"" << rotOrder
+                << "\"; expected \"xyz\", \"zyx\", etc.";
+            throw std::runtime_error(mesg.str());
+        }
+
         // Get the group of grids to be transformed.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         UT_AutoInterrupt progress("Transform");
 
@@ -234,13 +258,56 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Transform)::cookVDBSop(OP_Cont
         const double deg2rad = hboost::math::constants::pi<double>() / 180.0;
 
         openvdb::Mat4R mat(openvdb::Mat4R::identity());
-        mat.preTranslate(p);
-        mat.preRotate(openvdb::math::X_AXIS, deg2rad*r[0]);
-        mat.preRotate(openvdb::math::Y_AXIS, deg2rad*r[1]);
-        mat.preRotate(openvdb::math::Z_AXIS, deg2rad*r[2]);
-        mat.preScale(s);
-        mat.preTranslate(-p);
-        mat.preTranslate(t);
+        const auto rotate = [&]() {
+            for (auto axis = rotOrder.rbegin(); axis != rotOrder.rend(); ++axis) {
+                switch (*axis) {
+                    case 'x': mat.preRotate(openvdb::math::X_AXIS, deg2rad*r[0]); break;
+                    case 'y': mat.preRotate(openvdb::math::Y_AXIS, deg2rad*r[1]); break;
+                    case 'z': mat.preRotate(openvdb::math::Z_AXIS, deg2rad*r[2]); break;
+                }
+            }
+        };
+        if (xformOrder == "trs") {
+            mat.preTranslate(p);
+            mat.preScale(s);
+            rotate();
+            mat.preTranslate(-p);
+            mat.preTranslate(t);
+        } else if (xformOrder == "tsr") {
+            mat.preTranslate(p);
+            rotate();
+            mat.preScale(s);
+            mat.preTranslate(-p);
+            mat.preTranslate(t);
+        } else if (xformOrder == "rts") {
+            mat.preTranslate(p);
+            mat.preScale(s);
+            mat.preTranslate(-p);
+            mat.preTranslate(t);
+            mat.preTranslate(p);
+            rotate();
+            mat.preTranslate(-p);
+        } else if (xformOrder == "rst") {
+            mat.preTranslate(t);
+            mat.preTranslate(p);
+            mat.preScale(s);
+            rotate();
+            mat.preTranslate(-p);
+        } else if (xformOrder == "str") {
+            mat.preTranslate(p);
+            rotate();
+            mat.preTranslate(-p);
+            mat.preTranslate(t);
+            mat.preTranslate(p);
+            mat.preScale(s);
+            mat.preTranslate(-p);
+        } else /*if (xformOrder == "srt")*/ {
+            mat.preTranslate(t);
+            mat.preTranslate(p);
+            rotate();
+            mat.preScale(s);
+            mat.preTranslate(-p);
+        }
 
         if (flagInverse) mat = mat.inverse();
 
@@ -251,7 +318,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Transform)::cookVDBSop(OP_Cont
 
         // For each VDB primitive in the given group...
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
-            if (progress.wasInterrupted()) throw std::runtime_error("Was Interrupted");
+            if (progress.wasInterrupted()) throw std::runtime_error("Interrupted");
 
             GU_PrimVDB* vdb = *it;
 

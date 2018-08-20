@@ -1,6 +1,89 @@
 OpenVDB Version History
 =======================
 
+Version 5.2.0 - August 13, 2018
+
+    New features:
+    - Added tools to advect points stored in point data grids
+      through velocity fields.
+      [Contributed by Dan Bailey]
+    - For point data grids, voxel data can now be prefetched independently
+      of position or other attributes.
+      [Contributed by Dan Bailey]
+    - Added tools to sample voxel values onto points stored in
+      point data grids.
+      [Contributed by Double Negative]
+
+    Improvements:
+    - The UniformPointScatter tool now generates points in "points per volume"
+      mode even when the product of the density and the voxel volume is less
+      than one, and the point count now varies continuously with the density.
+    - Added a min/max sphere count argument to the fillWithSpheres() tool.
+      (The previous version, now deprecated, supported only a maximum
+      sphere count.)
+    - Added a method to tools::LevelSetTracker to enable and disable
+      trimming of voxels outside the narrow band.
+      Previously, trimming was always enabled, which caused dense SDFs
+      to be converted to narrow-band level sets.
+    - Added state() methods to point data index filters to improve
+      optimization opportunities.
+      [Contributed by Dan Bailey]
+    - Added active and inactive value mask point data index filters.
+      [Contributed by Dan Bailey]
+    - Replaced include/exclude group list parameters with filter functors
+      in various point data functions.
+      [Contributed by Dan Bailey]
+    - Refactored and simplified the point count API.
+      [Contributed by Dan Bailey]
+    - Computing cumulative per-leaf point offsets is now parallelized.
+      [Contributed by Dan Bailey]
+    - Made various small changes for Visual Studio 2017 compatibility.
+      [Contributed by Edward Lam]
+
+    Bug fixes:
+    - Fixed a bug that could cause an infinite loop when iterating over
+      an empty root node.
+    - Fixed namespace-related bugs in math::Tuple::isZero() and
+      math::Mat::isZero() that led to compile-time errors.
+    - Fixed type conversion bugs in the vector-to-vector math::rotation()
+      function that made it impossible for it to return a single-precision
+      rotation matrix, and modified the function to accept Vec3 arguments
+      of any value type.
+    - Fixed a bug in the mesh to volume converter that made it uninterruptible
+      in certain cases even though an interrupter was provided.
+      [Reported by Doug Epps]
+
+    Houdini:
+    - Added options to the Metadata SOP to set the grid name
+      and to propagate metadata to primitive attributes and vice-versa.
+    - Modified GU_PrimVDB::convertVolumesToVDBs() to set the output VDBs'
+      grid names to the names of the volume primitives.
+    - Added an option to the Offset Level Set, Renormalize Level Set,
+      Smooth Level Set, and Resize Narrow Band SOPs to enable and disable
+      trimming of voxels outside the narrow band.
+      Previously, trimming was always enabled, which caused dense SDFs
+      to be converted to narrow-band level sets.
+    - Fixed a bug in the Resample SOP that prevented it from reading
+      a reference VDB from the second input.
+    - Added an option to the Scatter SOP to scatter points only on
+      an isosurface of a signed distance field.
+    - The Scatter SOP now generates points in Point Density mode even when
+      the product of the density and the voxel volume is less than one,
+      and the point count now varies continuously with the density.
+    - Added a minimum sphere count option to the To Spheres SOP.
+    - Added enable/disable toggles to the To Spheres SOP's minimum and maximum
+      radius parameters and eliminated the world space radius parameters.
+      The remaining minimum and maximum parameters, formerly the voxel space
+      radii, are now used in both world unit and voxel unit modes.
+    - Added transform and rotation order options to the Transform SOP.
+    - Added support to the Advect Points SOP for advecting points stored
+      in point data grids.
+      [Contributed by Dan Bailey]
+    - Added support to the Sample Points SOP for sampling onto points
+      stored in point data grids.
+      [Contributed by Double Negative]
+
+
 Version 5.1.0 - April 10, 2018
 
     New features:
@@ -74,7 +157,7 @@ Version 5.0.0 - November 6, 2017
       up to and including Houdini 16.  To preserve ABI compatibility,
       when compiling OpenVDB or any dependent code define the macro
       OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
-      Houdini 15, 15.5 and 16 and 4 for the upcoming release.
+      Houdini 15, 15.5 and 16 and 4 for Houdini 16.5.
 
     New features:
     - Added a getLibraryAbiVersionString() function, which returns a

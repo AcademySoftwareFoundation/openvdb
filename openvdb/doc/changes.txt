@@ -2,6 +2,111 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
+@par
+<B>Version 5.2.0</B> - <I>August 13, 2018</I>
+
+@par
+New features:
+- Added @link points/PointAdvect.h tools@endlink to advect points
+  stored in point data grids through velocity fields.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- For point data grids, voxel data can now be
+  @vdblink::points::prefetch() prefetched@endlink independently of
+  position or other attributes.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added @link points/PointSample.h tools@endlink to sample voxel values
+  onto points stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+@par
+Improvements:
+- The @vdblink::tools::UniformPointScatter UniformPointScatter@endlink tool
+  now generates points in &ldquo;points per volume&rdquo; mode even when
+  the product of the density and the voxel volume is less than one,
+  and the point count now varies continuously with the density.
+- Added a minimum/maximum sphere count argument to the
+  @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink tool.
+  (The previous version, now deprecated, supported only a maximum
+  sphere count.)
+- Added a method to the level set tracking tool to enable and disable
+  @vdblink::tools::LevelSetTracker::setTrimming() trimming@endlink
+  of voxels outside the narrow band.
+  Previously, trimming was always enabled, which caused dense SDFs
+  to be converted to narrow-band level sets.
+- Added @b state methods to point data
+  @link points/IndexFilter.h index filters@endlink to improve
+  optimization opportunities.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added @vdblink::points::ActiveFilter active@endlink
+  and @vdblink::points::InactiveFilter inactive@endlink value mask
+  point data index filters.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Replaced include/exclude group list parameters with filter functors
+  in various point data functions.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Refactored and simplified the
+  @link points/PointCount.h point count@endlink API.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Computing cumulative per-leaf point offsets is now parallelized.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Made various small changes for Visual Studio&nbsp;2017 compatibility.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
+
+@par
+Bug fixes:
+- Fixed a bug that could cause an infinite loop when iterating over
+  an empty root node.
+- Fixed namespace-related bugs in
+  @vdblink::math::Tuple::isZero() Tuple::isZero@endlink
+  and @vdblink::math::Mat::isZero() Mat::isZero@endlink that led to
+  compile-time errors.
+- Fixed type conversion bugs in the vector-to-vector <A HREF=
+  "namespaceopenvdb_1_1v5__2_1_1math.html#rotation_v1_v2"><B>rotation</B></A>
+  function that made it impossible for it to return a single-precision
+  rotation matrix, and modified the function to accept @b Vec3 arguments
+  of any value type.
+- Fixed a bug in the @link MeshToVolume.h mesh to volume@endlink converter
+  that made it uninterruptible in certain cases even though
+  an interrupter was provided.
+  <I>[Reported&nbsp;by&nbsp;Doug&nbsp;Epps]</I>
+
+@par
+Houdini:
+- Added options to the Metadata&nbsp;SOP to set the grid name
+  and to propagate metadata to primitive attributes and vice-versa.
+- Modified <A HREF=
+  "http://www.sidefx.com/docs/hdk16.5/class_g_u___prim_v_d_b.html#af9274e93cc2d5d8d1f001aa7a286180a">
+  <B>convertVolumesToVDBs</B></A> to set the output VDBs&rsquo; grid names
+  to the names of the volume primitives.
+- Added an option to the Offset&nbsp;Level&nbsp;Set,
+  Renormalize&nbsp;Level&nbsp;Set, Smooth&nbsp;Level&nbsp;Set
+  and Resize&nbsp;Narrow&nbsp;Band&nbsp;SOPs to enable and disable
+  trimming of voxels outside the narrow band.
+  Previously, trimming was always enabled, which caused dense SDFs
+  to be converted to narrow-band level sets.
+- Fixed a bug in the Resample&nbsp;SOP that prevented it from reading
+  a reference VDB from the second input.
+- Added an option to the Scatter&nbsp;SOP to scatter points only on
+  an isosurface of a signed distance field.
+- The Scatter&nbsp;SOP now generates points in Point&nbsp;Density mode
+  even when the product of the density and the voxel volume is less than one,
+  and the point count now varies continuously with the density.
+- Added a minimum sphere count option to the To&nbsp;Spheres&nbsp;SOP.
+- Added enable/disable toggles to the To&nbsp;Spheres&nbsp;SOP&rsquo;s
+  minimum and maximum radius parameters and eliminated the world space
+  radius parameters.
+  The remaining minimum and maximum parameters, formerly the voxel space
+  radii, are now used in both world unit and voxel unit modes.
+- Added transform and rotation order options to the Transform&nbsp;SOP.
+- Added support to the Advect&nbsp;Points&nbsp;SOP for advecting points
+  stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+- Added support to the Sample&nbsp;Points&nbsp;SOP for sampling onto points
+  stored in point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+
+
 @htmlonly <a name="v5_1_0_changes"></a>@endhtmlonly
 @par
 <B>Version 5.1.0</B> - <I>April 10, 2018</I>
@@ -94,7 +199,7 @@ Houdini&nbsp;16.
 To preserve ABI compatibility, when compiling OpenVDB or any dependent code
 define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
 for example, <I>N</I> is 3 for Houdini&nbsp;15, 15.5 and&nbsp;16 and 4
-for the upcoming release.
+for Houdini&nbsp;16.5.
 </BLOCKQUOTE>
 
 @par
