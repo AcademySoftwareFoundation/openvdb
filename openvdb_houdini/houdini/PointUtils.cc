@@ -1005,7 +1005,10 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
 
         appendGroups(tree, groupNames);
 
-        std::vector<short> inGroup(numHoudiniPoints, short(0));
+        // create the group membership vector at a multiple of 1024 for fast parallel resetting
+
+        const size_t groupVectorSize = numHoudiniPoints + (1024 - (numHoudiniPoints % 1024));
+        std::vector<short> inGroup(groupVectorSize, short(0));
 
         // Set group membership in tree
         // @todo parallelize group membership construction
@@ -1027,10 +1030,11 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
             setGroup(tree, indexTree, inGroup, groupName);
 
             // reset groups to 0
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, inGroup.size()),
+
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, groupVectorSize / 1024),
                 [&inGroup](const tbb::blocked_range<size_t>& range) {
                     for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-                        inGroup[n] = short(0);
+                        std::fill_n(inGroup.begin() + n*1024, 1024, 0);
                     }
                 });
         }
