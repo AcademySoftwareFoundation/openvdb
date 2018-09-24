@@ -732,7 +732,7 @@ inline void setGroup(   PointDataTree& tree,
             }
         );
 
-        if (max != -1 && membership.size() <= max) {
+        if (max != -1 && membership.size() <= static_cast<size_t>(max)) {
             OPENVDB_THROW(IndexError, "Group membership vector size must be larger than "
                 " the maximum index within the provided index tree.");
         }

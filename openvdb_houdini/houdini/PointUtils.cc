@@ -929,29 +929,19 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
     // initialize primitive offsets
 
     hvdb::OffsetListPtr offsets;
-    hvdb::OffsetPairListPtr offsetPairs;
 
     for (GA_Iterator primitiveIt(ptGeo.getPrimitiveRange()); !primitiveIt.atEnd(); ++primitiveIt) {
         const GA_Primitive* primitive = ptGeo.getPrimitiveList().get(*primitiveIt);
 
         if (primitive->getTypeId() != GA_PRIMNURBCURVE) continue;
 
-        size_t vertexCount = primitive->getVertexCount();
-        if (vertexCount == 0)  continue;
+        const size_t vertexCount = primitive->getVertexCount();
+        if (vertexCount == 0) continue;
 
-        if (!offsets)  offsets.reset(new hvdb::OffsetList);
+        if (!offsets) offsets.reset(new hvdb::OffsetList);
 
-        GA_Offset firstOffset = primitive->getPointOffset(0);
+        const GA_Offset firstOffset = primitive->getPointOffset(0);
         offsets->push_back(firstOffset);
-
-        if (vertexCount > 1) {
-            if (!offsetPairs)  offsetPairs.reset(new hvdb::OffsetPairList);
-
-            for (size_t i = 1; i < vertexCount; i++) {
-                GA_Offset offset = primitive->getPointOffset(i);
-                offsetPairs->push_back(hvdb::OffsetPair(firstOffset, offset));
-            }
-        }
     }
 
     // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
@@ -984,11 +974,13 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
     const tools::PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
 
-    const int64_t numHoudiniPoints = ptGeo.getNumPoints();
-    const Index64 numVDBPoints = pointCount(tree);
-    assert(numVDBPoints <= numHoudiniPoints);
+    const GA_Size numHoudiniPoints = ptGeo.getNumPoints();
+    UT_ASSERT(numHoudiniPoints >= 0);
 
-    if (numVDBPoints < numHoudiniPoints) {
+    const Index64 numVDBPoints = pointCount(tree);
+    UT_ASSERT(numVDBPoints <= static_cast<Index64>(numHoudiniPoints));
+
+    if (numVDBPoints < static_cast<Index64>(numHoudiniPoints)) {
         warnings("Points contain NAN positional values. These points will not be converted.");
     }
 
@@ -997,7 +989,7 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
     // store point group information
 
     const GA_ElementGroupTable& elementGroups = ptGeo.getElementGroupTable(GA_ATTRIB_POINT);
-    const size_t numGroups = elementGroups.entries(); // including internal groups
+    const int64_t numGroups = elementGroups.entries(); // including internal groups
 
     if (numGroups > 0) {
 
