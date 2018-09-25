@@ -288,10 +288,6 @@ ifdef WINDOWS_NT
 else
   CPPUNIT_LIB := -lcppunit
 endif
-CPPUNIT_INCL_DIR :=
-# The directory containing libcppunit
-CPPUNIT_LIB_DIR :=
-CPPUNIT_LIB := -lcppunit
 
 # The parent directory of the log4cplus/ header directory
 # (leave blank if log4cplus is unavailable)
