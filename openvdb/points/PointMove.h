@@ -454,7 +454,7 @@ struct GlobalMovePointsOp
     struct PerformTypedMoveOp
     {
         PerformTypedMoveOp(AttributeHandles& targetHandles, AttributeHandles& sourceHandles,
-            int targetOffset, const LeafT& targetLeaf,
+            Index targetOffset, const LeafT& targetLeaf,
             IndexArray& offsets, const IndexTripleArray& indices)
             : mTargetHandles(targetHandles)
             , mSourceHandles(sourceHandles)
@@ -499,13 +499,13 @@ struct GlobalMovePointsOp
     private:
         AttributeHandles& mTargetHandles;
         AttributeHandles& mSourceHandles;
-        int mTargetOffset;
+        Index mTargetOffset;
         const LeafT& mTargetLeaf;
         IndexArray& mOffsets;
         const IndexTripleArray& mIndices;
     }; // struct PerformTypedMoveOp
 
-    void performMove(int targetOffset, const LeafT& targetLeaf,
+    void performMove(Index targetOffset, const LeafT& targetLeaf,
         IndexArray& offsets, const IndexTripleArray& indices) const
     {
         auto& targetArray = mTargetHandles.getArray(targetOffset);
@@ -519,13 +519,13 @@ struct GlobalMovePointsOp
 
     void operator()(LeafT& leaf, size_t aIdx) const
     {
-        const LeafIndex idx(aIdx);
-        const auto& moveIndices = mMoveLeafMap.at(idx);
+        const Index idx(aIdx);
+        const auto& moveIndices = mMoveLeafMap.at(aIdx);
         if (moveIndices.empty())  return;
 
         // extract per-voxel offsets for this leaf
 
-        auto& offsets = mOffsetMap[idx];
+        auto& offsets = mOffsetMap[aIdx];
 
         const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
@@ -566,7 +566,7 @@ struct LocalMovePointsOp
     struct PerformTypedMoveOp
     {
         PerformTypedMoveOp(AttributeHandles& targetHandles, AttributeHandles& sourceHandles,
-            int targetOffset, int sourceOffset, const LeafT& targetLeaf,
+            Index targetOffset, Index sourceOffset, const LeafT& targetLeaf,
             IndexArray& offsets, const IndexPairArray& indices)
             : mTargetHandles(targetHandles)
             , mSourceHandles(sourceHandles)
@@ -596,15 +596,15 @@ struct LocalMovePointsOp
     private:
         AttributeHandles& mTargetHandles;
         AttributeHandles& mSourceHandles;
-        int mTargetOffset;
-        int mSourceOffset;
+        Index mTargetOffset;
+        Index mSourceOffset;
         const LeafT& mTargetLeaf;
         IndexArray& mOffsets;
         const IndexPairArray& mIndices;
     }; // struct PerformTypedMoveOp
 
     template <typename ValueT>
-    void performTypedMove(int sourceOffset, int targetOffset, const LeafT& targetLeaf,
+    void performTypedMove(Index sourceOffset, Index targetOffset, const LeafT& targetLeaf,
         IndexArray& offsets, const IndexPairArray& indices) const
     {
         auto& targetHandle = mTargetHandles.getWriteHandle<ValueT>(targetOffset);
@@ -621,7 +621,7 @@ struct LocalMovePointsOp
         }
     }
 
-    void performMove(int targetOffset, int sourceOffset, const LeafT& targetLeaf,
+    void performMove(Index targetOffset, Index sourceOffset, const LeafT& targetLeaf,
         IndexArray& offsets, const IndexPairArray& indices) const
     {
         auto& targetArray = mTargetHandles.getArray(targetOffset);
@@ -635,18 +635,18 @@ struct LocalMovePointsOp
 
     void operator()(const LeafT& leaf, size_t aIdx) const
     {
-        const LeafIndex idx(aIdx);
-        const auto& moveIndices = mMoveLeafMap.at(idx);
+        const Index idx(aIdx);
+        const auto& moveIndices = mMoveLeafMap.at(aIdx);
         if (moveIndices.empty())  return;
 
         // extract target leaf and per-voxel offsets for this leaf
 
-        auto& offsets = mOffsetMap[idx];
+        auto& offsets = mOffsetMap[aIdx];
 
         // extract source leaf that has the same origin as the target leaf (if any)
 
         assert(aIdx < mSourceIndices.size());
-        const Index sourceOffset(mSourceIndices[idx]);
+        const Index sourceOffset(mSourceIndices[aIdx]);
 
         const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
@@ -869,7 +869,7 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
 
         auto handle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
 
-        auto& cache = leafs[LeafIndex(idx)];
+        auto& cache = leafs[idx];
         cache.clear();
 
         // only insert into a vector directly if the filter evaluates all points and the
@@ -933,14 +933,14 @@ template <typename T>
 template <typename LeafT>
 void CachedDeformer<T>::reset(const LeafT& /*leaf*/, size_t idx)
 {
-    if (size_t(idx) >= mCache.leafs.size()) {
+    if (idx >= mCache.leafs.size()) {
         if (mCache.leafs.empty()) {
             throw IndexError("No leafs in cache, perhaps CachedDeformer has not been evaluated?");
         } else {
             throw IndexError("Leaf index is out-of-range of cache leafs.");
         }
     }
-    auto& cache = mCache.leafs[LeafIndex(idx)];
+    auto& cache = mCache.leafs[idx];
     if (!cache.mapData.empty()) {
         // expand into a local vector if there are greater than 16 values in the hash map
         // and the expanded vector would contain fewer values than 256 times those in the
