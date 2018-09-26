@@ -402,8 +402,8 @@ struct BuildMoveMapsOp
                 mLocalMoveLeafMap[targetLeafOffset].emplace_back(targetOffset, *iter);
             }
             else {
-                mGlobalMoveLeafMap[targetLeafOffset].push_back(IndexTriple(LeafIndex(idx),
-                    targetOffset, *iter));
+                mGlobalMoveLeafMap[targetLeafOffset].push_back(IndexTriple(
+                    LeafIndex(static_cast<LeafIndex>(idx)), targetOffset, *iter));
             }
         }
     }
@@ -426,9 +426,9 @@ indexOffsetFromVoxel(const Index voxelOffset, const LeafT& leaf, IndexArray& off
     // voxel with the current number of points added to this voxel, tracked by the
     // offsets array
 
-    Index targetOffset = Index(offsets[voxelOffset]++);
+    Index targetOffset = offsets[voxelOffset]++;
     if (voxelOffset > 0) {
-        targetOffset += Index(leaf.getValue(voxelOffset - 1));
+        targetOffset += static_cast<Index>(leaf.getValue(voxelOffset - 1));
     }
     return targetOffset;
 }
@@ -519,7 +519,7 @@ struct GlobalMovePointsOp
 
     void operator()(LeafT& leaf, size_t aIdx) const
     {
-        const Index idx(aIdx);
+        const Index idx(static_cast<Index>(aIdx));
         const auto& moveIndices = mMoveLeafMap.at(aIdx);
         if (moveIndices.empty())  return;
 
@@ -635,7 +635,7 @@ struct LocalMovePointsOp
 
     void operator()(const LeafT& leaf, size_t aIdx) const
     {
-        const Index idx(aIdx);
+        const Index idx(static_cast<Index>(aIdx));
         const auto& moveIndices = mMoveLeafMap.at(aIdx);
         if (moveIndices.empty())  return;
 
@@ -730,17 +730,16 @@ inline void movePoints( PointDataGridT& points,
         LeafMap sourceLeafMap;
         auto sourceRange = sourceLeafManager.leafRange();
         for (auto leaf = sourceRange.begin(); leaf; ++leaf) {
-            sourceLeafMap.insert({leaf->origin(), LeafIndex(leaf.pos())});
+            sourceLeafMap.insert({leaf->origin(), LeafIndex(static_cast<LeafIndex>(leaf.pos()))});
         }
         auto targetRange = targetLeafManager.leafRange();
         for (auto leaf = targetRange.begin(); leaf; ++leaf) {
-            targetLeafMap.insert({leaf->origin(), LeafIndex(leaf.pos())});
+            targetLeafMap.insert({leaf->origin(), LeafIndex(static_cast<LeafIndex>(leaf.pos()))});
         }
 
         // perform four independent per-leaf operations in parallel
         targetLeafManager.foreach(
-            [&](LeafT& leaf, size_t aIdx) {
-                const LeafIndex idx(aIdx);
+            [&](LeafT& leaf, size_t idx) {
                 // map frequency => cumulative histogram
                 auto* buffer = leaf.buffer().data();
                 for (Index i = 1; i < leaf.buffer().size(); i++) {
@@ -786,8 +785,7 @@ inline void movePoints( PointDataGridT& points,
 
         // zero offsets
         targetLeafManager.foreach(
-            [&offsetMap](const LeafT& /*leaf*/, size_t aIdx) {
-                const LeafIndex idx(aIdx);
+            [&offsetMap](const LeafT& /*leaf*/, size_t idx) {
                 std::fill(offsetMap[idx].begin(), offsetMap[idx].end(), 0);
             },
         threaded);
