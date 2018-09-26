@@ -867,8 +867,6 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
 
     if (index == AttributeSet::INVALID_POS) return false;
 
-    const openvdb::Name type = descriptor.type(index).first;
-
     // fetch vector attribute, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
@@ -879,27 +877,27 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
 
     if (bufferGeo->getCacheVersion() != version)
     {
-        // check if group viewport is in use
-
-        const openvdb::StringMetadata::ConstPtr s =
-            grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT);
-
-        const std::string groupName = s ? s->value() : "";
-        const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
-
         UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
-        std::vector<Name> includeGroups, excludeGroups;
-        if (useGroup) includeGroups.emplace_back(groupName);
-
-        MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
-
-        std::vector<Index64> offsets;
-        pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
+        const openvdb::Name& type = descriptor.type(index).first;
 
         if (type == "vec3s") {
-            std::vector<Index64> pointOffsets;
-            getPointOffsets(pointOffsets, grid.tree(), includeGroups, excludeGroups, /*inCoreOnly=*/true);
+
+            // check if group viewport is in use
+
+            const openvdb::StringMetadata::ConstPtr s =
+                grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT);
+
+            const std::string groupName = s ? s->value() : "";
+            const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
+
+            std::vector<Name> includeGroups, excludeGroups;
+            if (useGroup) includeGroups.emplace_back(groupName);
+
+            MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
+
+            std::vector<Index64> offsets;
+            pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
 
             VectorAttribute<Vec3f> typedAttribute(data.get());
             convertPointDataGridAttribute(typedAttribute, grid.tree(), offsets,
