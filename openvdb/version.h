@@ -92,8 +92,8 @@
 
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 5
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
@@ -174,7 +174,7 @@
 
 /// By default, the @b OPENVDB_REQUIRE_VERSION_NAME macro is undefined, and
 /// symbols from the version namespace are promoted to the top-level namespace
-/// so that, for example, @b openvdb::v5_0::io::File can be referred to
+/// so that, for example, @b openvdb::v6_0::io::File can be referred to
 /// simply as @b openvdb::io::File.
 ///
 /// When @b OPENVDB_REQUIRE_VERSION_NAME is defined, symbols must be

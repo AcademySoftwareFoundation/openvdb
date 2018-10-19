@@ -1,6 +1,17 @@
 OpenVDB Version History
 =======================
 
+Version 6.0.0 - In development
+
+      Some changes in this release (see "ABI changes" below) alter
+      the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones built into Houdini
+      up to and including Houdini 16.  To preserve ABI compatibility,
+      when compiling OpenVDB or any dependent code define the macro
+      OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
+      Houdini 15, 15.5 and 16, 4 for Houdini 16.5 and 5 for Houdini 17.0
+
+
 Version 5.2.0 - August 13, 2018
 
     New features:
