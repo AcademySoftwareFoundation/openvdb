@@ -201,6 +201,12 @@ void StringAttributeHandle::get(Name& name, Index n, Index m) const
 }
 
 
+const AttributeArray& StringAttributeHandle::array() const
+{
+    return mHandle.array();
+}
+
+
 ////////////////////////////////////////
 
 // StringAttributeWriteHandle implementation
@@ -292,6 +298,20 @@ void StringAttributeWriteHandle::resetCache()
         // add to the cache
         mCache[stringMeta->value()] = index;
     }
+}
+
+
+bool StringAttributeWriteHandle::hasIndex(const Name& name) const
+{
+    // empty strings always have an index at index zero
+    if (name.empty())   return true;
+    return mCache.find(name) != mCache.end();
+}
+
+
+AttributeArray& StringAttributeWriteHandle::array()
+{
+    return mWriteHandle.array();
 }
 
 

@@ -148,6 +148,8 @@ public:
     Name get(Index n, Index m = 0) const;
     void get(Name& name, Index n, Index m = 0) const;
 
+    const AttributeArray& array() const;
+
 protected:
     AttributeHandle<StringIndexType, StringCodec<false>>    mHandle;
     const MetaMap&                                          mMetadata;
@@ -191,6 +193,10 @@ public:
 
     /// Reset the value cache from the metadata
     void resetCache();
+
+    AttributeArray& array();
+
+    bool hasIndex(const Name& name) const;
 
 private:
     /// Retrieve the index of this string value from the cache

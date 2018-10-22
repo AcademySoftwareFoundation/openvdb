@@ -363,9 +363,27 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
         CPPUNIT_ASSERT_THROW(handle.set(1, "testB"), LookupError);
     }
 
+    { // empty string always has index 0
+        CPPUNIT_ASSERT(handle.hasIndex(""));
+    }
+
+    { // cache won't contain metadata until it has been reset
+        CPPUNIT_ASSERT(!handle.hasIndex("testA"));
+        CPPUNIT_ASSERT(!handle.hasIndex("testB"));
+        CPPUNIT_ASSERT(!handle.hasIndex("testC"));
+    }
+
     handle.resetCache();
 
+    { // empty string always has index 0 regardless of cache reset
+        CPPUNIT_ASSERT(handle.hasIndex(""));
+    }
+
     { // cache now reset
+        CPPUNIT_ASSERT(handle.hasIndex("testA"));
+        CPPUNIT_ASSERT(handle.hasIndex("testB"));
+        CPPUNIT_ASSERT(handle.hasIndex("testC"));
+
         CPPUNIT_ASSERT_NO_THROW(handle.set(1, "testB"));
 
         CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
