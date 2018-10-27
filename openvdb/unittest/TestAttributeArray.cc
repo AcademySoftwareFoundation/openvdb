@@ -174,6 +174,7 @@ public:
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testRegistry);
     CPPUNIT_TEST(testAttributeArray);
+    CPPUNIT_TEST(testAttributeArrayCopy);
     CPPUNIT_TEST(testAccessorEval);
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testStrided);
@@ -187,6 +188,7 @@ public:
     void testFixedPointConversion();
     void testRegistry();
     void testAttributeArray();
+    void testAttributeArrayCopy();
     void testAccessorEval();
     void testAttributeHandle();
     void testStrided();
@@ -969,6 +971,191 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*constArray));
         CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*constArray), TypeError);
     }
+}
+
+struct VectorWrapper
+{
+    using T = std::vector<std::pair<Index, Index>>;
+
+    VectorWrapper(const T& _data) : data(_data) { }
+    operator bool() const { return index < data.size(); }
+    VectorWrapper& operator++() { index++; return *this; }
+    Index sourceIndex() const { assert(*this); return data[index].first; }
+    Index targetIndex() const { assert(*this); return data[index].second; }
+
+private:
+    const T& data;
+    T::size_type index = 0;
+}; // struct VectorWrapper
+
+void
+TestAttributeArray::testAttributeArrayCopy()
+{
+    using AttributeArrayF = TypedAttributeArray<float>;
+    using AttributeArrayD = TypedAttributeArray<double>;
+
+    Index size(50);
+
+    // initialize some test data
+
+    AttributeArrayD sourceTypedAttr(size);
+    AttributeArray& sourceAttr(sourceTypedAttr);
+    CPPUNIT_ASSERT_EQUAL(size, sourceAttr.size());
+
+    sourceAttr.expand();
+    for (Index i = 0; i < size; i++) {
+        sourceTypedAttr.set(i, double(i)/2);
+    }
+
+    // initialize source -> target pairs that reverse the order
+
+    std::vector<std::pair<Index, Index>> indexPairs;
+    for (Index i = 0; i < size; i++) {
+        indexPairs.push_back(std::make_pair(i, size-i-1));
+    }
+
+    // create a new index pair wrapper
+
+    VectorWrapper wrapper(indexPairs);
+
+    // build a target attribute array
+
+    AttributeArrayD targetTypedAttr(size);
+    AttributeArray& targetAttr(targetTypedAttr);
+    for (const auto& pair : indexPairs) {
+        targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
+    }
+
+    { // verify behaviour with slow virtual function
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+// disable deprecated warnings for virtual set() method (from ABI=6 onwards)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        for (const auto& pair : indexPairs) {
+            attr.set(pair.second, sourceAttr, pair.first);
+        }
+#pragma
+
+        CPPUNIT_ASSERT(targetAttr == attr);
+    }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        attr.copyValues(sourceAttr, wrapper);
+
+        CPPUNIT_ASSERT(targetAttr == attr);
+    }
+
+    { // attempt to copy values between attribute arrays with different storage sizes
+        AttributeArrayF typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+    }
+
+    { // attempt to copy values between integer and float attribute arrays
+        AttributeArrayF typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+    }
+
+    { // copy values between attribute arrays with different value types, but the same storage type
+        // target half array
+        TypedAttributeArray<half> targetTypedAttr1(size);
+        AttributeArray& targetAttr1(targetTypedAttr1);
+        for (Index i = 0; i < size; i++) {
+            targetTypedAttr1.set(i, sourceTypedAttr.get(i));
+        }
+
+        // truncated float array
+        TypedAttributeArray<float, TruncateCodec> targetTypedAttr2(size);
+        AttributeArray& targetAttr2(targetTypedAttr2);
+
+        targetAttr2.copyValues(targetAttr1, wrapper);
+
+        // equality fails as attribute types are not the same
+        CPPUNIT_ASSERT(targetAttr2 != targetAttr);
+        CPPUNIT_ASSERT(targetAttr2.type() != targetAttr.type());
+        // however testing value equality succeeds
+        for (Index i = 0; i < size; i++) {
+            CPPUNIT_ASSERT(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
+        }
+    }
+
+    { // out-of-range checking
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        decltype(indexPairs) rangeIndexPairs(indexPairs);
+
+        rangeIndexPairs[10].first = size+1;
+
+        VectorWrapper rangeWrapper(rangeIndexPairs);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+
+        rangeIndexPairs[10].first = 0;
+
+        CPPUNIT_ASSERT_NO_THROW(attr.copyValues(sourceAttr, rangeWrapper));
+
+        rangeIndexPairs[10].second = size+1;
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+        CPPUNIT_ASSERT_THROW(attr.copyValuesUnsafe(sourceAttr, rangeWrapper,
+            /*range-checking=*/true), IndexError);
+
+        // TODO: find a good way of testing the following without reading invalid memory
+        // CPPUNIT_ASSERT_THROW(attr.copyValuesUnsafe(sourceAttr, rangeWrapper,
+        //     /*range-checking=*/false), IndexError);
+    }
+
+    { // source attribute array is uniform
+        AttributeArrayD uniformTypedAttr(size);
+        AttributeArray& uniformAttr(uniformTypedAttr);
+
+        uniformTypedAttr.collapse(5.3);
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        attr.copyValues(uniformAttr, wrapper);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        attr.copyValues(uniformAttr, wrapper, /*preserveUniformity=*/false);
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+
+        typedAttr.collapse(1.4);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        // resize the vector to be smaller than the size of the array
+
+        decltype(indexPairs) subsetIndexPairs(indexPairs);
+        subsetIndexPairs.resize(size-1);
+
+        decltype(wrapper) subsetWrapper(subsetIndexPairs);
+
+        // now copy the values attempting to preserve uniformity
+
+        attr.copyValues(uniformAttr, subsetWrapper, /*preserveUniformity=*/true);
+
+        // verify that the array cannot be kept uniform
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+    }
+#endif
 }
 
 

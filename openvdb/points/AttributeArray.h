@@ -257,7 +257,41 @@ public:
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
+    /// @note deprecated from ABI=6, use set()/setUnsafe() with source-target index pairs
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    OPENVDB_DEPRECATED
+#endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    //@{
+    /// Copies values into this array from a source array to a target array as referenced by an
+    /// iterator. Iterators must adhere to the ForwardIterator interface described
+    /// in the example below:
+    /// @code
+    /// struct MyIterator
+    /// {
+    ///     // returns true if the iterator is referencing valid copying indices
+    ///     operator bool() const;
+    ///     // increments the iterator
+    ///     MyIterator& operator++();
+    ///     // returns the source index that the iterator is referencing for copying
+    ///     Index sourceIndex() const;
+    ///     // returns the target index that the iterator is referencing for copying
+    ///     Index targetIndex() const;
+    /// };
+    /// @endcode
+    /// @note assumes that the strided storage sizes match, the arrays are both in-core and that
+    /// both value types are floating-point or both integer
+    /// @param rangeChecking        if true, checks for out-of-range errors on source or target and
+    ///                             checks that this array is not uniform
+    template <typename IterT>
+    void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter, bool rangeChecking = false);
+    /// @param preserveUniformity   if true, attempts to collapse this array if the array started as uniform
+    template <typename IterT>
+    void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool preserveUniformity = true);
+    //@}
+#endif
 
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const = 0;
@@ -352,6 +386,12 @@ private:
     /// Virtual function used by the comparison operator to perform
     /// comparisons on inherited types
     virtual bool isEqual(const AttributeArray& other) const = 0;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Virtual function to retrieve the data buffer cast to a char byte array
+    virtual char* dataAsByteArray() = 0;
+    virtual const char* dataAsByteArray() const = 0;
+#endif
 
 protected:
     /// @brief Specify whether this attribute has a constant stride or not.
@@ -743,6 +783,12 @@ private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
     bool isEqual(const AttributeArray& other) const override;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Virtual function to retrieve the data buffer from the derived class cast to a char byte array
+    char* dataAsByteArray() override;
+    const char* dataAsByteArray() const override;
+#endif
+
     size_t arrayMemUsage() const;
     void allocate();
     void deallocate();
@@ -966,6 +1012,92 @@ UnitVecCodec::encode(const math::Vec3<T>& val, StorageType& data)
 
 ////////////////////////////////////////
 
+// AttributeArray implementation
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+template <typename IterT>
+void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter,
+    bool rangeChecking/* = false*/)
+{
+    // ensure both arrays have float-float or integer-integer value types
+    assert(sourceArray.valueTypeIsFloatingPoint() != this->valueTypeIsFloatingPoint());
+    // ensure both arrays have been loaded from disk (if delay-loaded)
+    assert(sourceArray.isDataLoaded() && this->isDataLoaded());
+    // ensure storage size * stride matches on both arrays
+    assert(this->storageTypeSize()*this->stride() == sourceArray.storageTypeSize()*sourceArray.stride());
+
+    const size_t bytes(sourceArray.storageTypeSize()*sourceArray.stride());
+    const char* const sourceBuffer = sourceArray.dataAsByteArray();
+    char* const targetBuffer = this->dataAsByteArray();
+    assert(sourceBuffer && targetBuffer);
+
+    if (rangeChecking && this->isUniform()) {
+        OPENVDB_THROW(IndexError, "Cannot copy array data as target array is uniform.");
+    }
+
+    const bool sourceIsUniform = sourceArray.isUniform();
+
+    const Index sourceDataSize = rangeChecking ? sourceArray.dataSize() : 0;
+    const Index targetDataSize = rangeChecking ? this->dataSize() : 0;
+
+    for (IterT it(iter); it; ++it) {
+        const Index sourceIndex = sourceIsUniform ? 0 : it.sourceIndex();
+        const Index targetIndex = it.targetIndex();
+
+        if (rangeChecking) {
+            if (sourceIndex >= sourceDataSize) {
+                OPENVDB_THROW(IndexError,
+                    "Cannot copy array data as source index exceeds size of source array.");
+            }
+            if (targetIndex >= targetDataSize) {
+                OPENVDB_THROW(IndexError,
+                    "Cannot copy array data as target index exceeds size of target array.");
+            }
+        } else {
+            // range-checking asserts
+            assert(sourceIndex < sourceArray.dataSize());
+            assert(targetIndex < this->dataSize());
+        }
+
+        const size_t targetOffset(targetIndex * bytes);
+        const size_t sourceOffset(sourceIndex * bytes);
+
+        std::memcpy(targetBuffer + targetOffset, sourceBuffer + sourceOffset, bytes);
+    }
+}
+
+template <typename IterT>
+void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& iter,
+    bool preserveUniformity/* = true*/)
+{
+    const Index bytes = sourceArray.storageTypeSize();
+    if (bytes != this->storageTypeSize()) {
+        OPENVDB_THROW(TypeError, "Cannot copy array data due to mis-match in storage type sizes.");
+    }
+
+    // ensure both arrays have been loaded from disk
+    sourceArray.loadData();
+    this->loadData();
+
+    const bool uniform = this->isUniform();
+
+    // if the target array is uniform, expand it first
+    if (uniform) {
+        this->expand();
+    }
+
+    this->copyValuesUnsafe(sourceArray, iter, /*rangeChecking = */true);
+
+    // attempt to compact target array if previously uniform
+    if (preserveUniformity && uniform) {
+        this->compact();
+    }
+}
+#endif
+
+
+////////////////////////////////////////
+
 // TypedAttributeArray implementation
 
 template<typename ValueType_, typename Codec_>
@@ -1033,7 +1165,7 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 
         if (!rhs.isOutOfCore()) {
             this->allocate();
-            std::memcpy(this->dataAsByteArray(), rhs.dataAsByteArray(), this->arrayMemUsage());
+            std::memcpy(this->newDataAsByteArray(), rhs.newDataAsByteArray(), this->arrayMemUsage());
         }
     }
 }
@@ -1851,6 +1983,25 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
     while (n && math::isExactlyEqual(*target++, *source++)) --n;
     return n == 0;
 }
+
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+template<typename ValueType_, typename Codec_>
+char*
+TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray()
+{
+    return reinterpret_cast<char*>(mData.get());
+}
+
+
+template<typename ValueType_, typename Codec_>
+const char*
+TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray() const
+{
+    return reinterpret_cast<const char*>(mData.get());
+}
+#endif
+
 
 ////////////////////////////////////////
 
