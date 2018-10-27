@@ -53,13 +53,6 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
     // load data if delay-loaded
 
     mArray.loadData();
-
-    // if array is compressed and preserve compression is true, copy and decompress
-    // into a local copy that is destroyed with handle to maintain thread-safety
-
-    if (mArray.isCompressed()) {
-        const_cast<GroupAttributeArray&>(mArray).decompress();
-    }
 }
 
 
@@ -73,13 +66,6 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     // load data if delay-loaded
 
     mArray.loadData();
-
-    // if array is compressed and preserve compression is true, copy and decompress
-    // into a local copy that is destroyed with handle to maintain thread-safety
-
-    if (mArray.isCompressed()) {
-        const_cast<GroupAttributeArray&>(mArray).decompress();
-    }
 }
 
 

@@ -734,7 +734,11 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
@@ -749,12 +753,19 @@ TestAttributeArray::testAttributeArray()
         attr.set(2, 8);
         attr.set(6, 100);
 
+        // note that in-memory compression has been deprecated, verify all
+        // isCompressed() calls return false
+
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+        CPPUNIT_ASSERT(!attr.isCompressed());
+
         { // test compressed copy construction
             attr.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attr.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attr.isCompressed());
 
             AttributeArray::Ptr attrCopy = attr.copy();
             AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
@@ -777,9 +788,7 @@ TestAttributeArray::testAttributeArray()
         { // test compressed copy construction (uncompress on copy)
             attr.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attr.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attr.isCompressed());
 
             AttributeArray::Ptr attrCopy = attr.copyUncompressed();
             AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
@@ -803,6 +812,8 @@ TestAttributeArray::testAttributeArray()
             }
         }
     }
+
+#pragma GCC diagnostic pop
 
     { // Fixed codec (position range)
         AttributeArray::Ptr attr1(new AttributeArrayC(50));
@@ -917,7 +928,11 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
         CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -1132,6 +1147,10 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
     {
         AttributeArray* array = attrSet.get(1);
 
@@ -1145,22 +1164,21 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT(!array->isCompressed());
 
-#ifdef OPENVDB_USE_BLOSC
         array->compress();
 
-        CPPUNIT_ASSERT(array->isCompressed());
+        CPPUNIT_ASSERT(!array->isCompressed());
 
         {
             AttributeHandle<float> handleRO(*array);
 
-            CPPUNIT_ASSERT(array->isCompressed());
+            CPPUNIT_ASSERT(!array->isCompressed());
 
             CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
 
-            CPPUNIT_ASSERT(array->isCompressed());
+            CPPUNIT_ASSERT(!array->isCompressed());
         }
 
-        CPPUNIT_ASSERT(array->isCompressed());
+        CPPUNIT_ASSERT(!array->isCompressed());
 
         {
             AttributeHandle<float> handleRO(*array, /*preserveCompression=*/false);
@@ -1175,8 +1193,9 @@ TestAttributeArray::testAttributeHandle()
         }
 
         CPPUNIT_ASSERT(!array->isCompressed());
-#endif
     }
+
+#pragma GCC diagnostic pop
 
     // check values have been correctly set without using handles
 
@@ -1394,7 +1413,11 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             AttributeArrayI attrBcopy(attrB);
             AttributeArrayI attrBequal = attrB;
@@ -1445,7 +1468,11 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attrA2.isCompressed(), attrB2.isCompressed());
+#pragma GCC diagnostic pop
 
             AttributeArrayF attrB2copy(attrB2);
             AttributeArrayF attrB2equal = attrB2;
@@ -1601,17 +1628,16 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
             attrB.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#else
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrB.isCompressed());
-#endif
+#pragma GCC diagnostic pop
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -1879,7 +1905,11 @@ TestAttributeArray::testDelayedLoad()
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             attrA.compress();
+#pragma GCC diagnostic pop
             attrA.writeMetadata(fileout, false, /*paged=*/true);
 
             compression::PagedOutputStream outputStreamSize(fileout);
@@ -1914,17 +1944,17 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#endif
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
@@ -1975,13 +2005,19 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             attrB.compress();
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+
+#pragma GCC diagnostic pop
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -2040,12 +2076,15 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(attrB.isCompressed());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             AttributeHandle<int> handle(attrB);
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), handle.get(i));
@@ -2053,6 +2092,7 @@ TestAttributeArray::testDelayedLoad()
 
             AttributeHandle<int> handle2(attrB, /*preserveCompression=*/false);
             CPPUNIT_ASSERT(!attrB.isCompressed());
+#pragma GCC diagnostic pop
         }
 #endif
 

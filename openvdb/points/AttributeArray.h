@@ -136,6 +136,7 @@ public:
         WRITESTRIDED = 0x1,         /// data is marked as strided when written
         WRITEUNIFORM = 0x2,         /// data is marked as uniform when written
         WRITEMEMCOMPRESS = 0x4,     /// data is marked as compressed in-memory when written
+                                    /// (deprecated flag as of ABI=6)
         WRITEPAGED = 0x8            /// data is written out in pages
     };
 
@@ -234,11 +235,11 @@ public:
     virtual bool compact() = 0;
 
     /// Return @c true if this array is compressed.
-    bool isCompressed() const { return mCompressedBytes != 0; }
+    OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// Compress the attribute array.
-    virtual bool compress() = 0;
+    OPENVDB_DEPRECATED virtual bool compress() = 0;
     /// Uncompress the attribute array.
-    virtual bool decompress() = 0;
+    OPENVDB_DEPRECATED virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
     /// @details This is useful if the attribute is used for blind data or as scratch space
@@ -629,9 +630,9 @@ public:
     static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
-    bool compress() override;
+    OPENVDB_DEPRECATED bool compress() override;
     /// Uncompress the attribute array.
-    bool decompress() override;
+    OPENVDB_DEPRECATED bool decompress() override;
 
     /// Read attribute data from a stream.
     void read(std::istream&) override;
@@ -730,9 +731,9 @@ protected:
     using ValuePtr  = void (*)(AttributeArray* array, const ValueType& value);
 
 public:
-    static Ptr create(const AttributeArray& array, const bool preserveCompression = true);
+    static Ptr create(const AttributeArray& array, const bool collapseOnDestruction = true);
 
-    AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
+    AttributeHandle(const AttributeArray& array, const bool collapseOnDestruction = true);
 
     AttributeHandle(const AttributeHandle&) = default;
     AttributeHandle& operator=(const AttributeHandle&) = default;
@@ -949,38 +950,13 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 
 
 template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool uncompress)
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
     : AttributeArray(rhs)
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
     , mIsUniform(rhs.mIsUniform)
 {
-    // disable uncompress if data is not compressed
-
-    if (!this->isCompressed())  uncompress = false;
-
-    if (this->isOutOfCore()) {
-        // do nothing
-    } else if (mIsUniform) {
-        this->allocate();
-        mData.get()[0] = rhs.mData.get()[0];
-    } else if (this->isCompressed()) {
-        std::unique_ptr<char[]> buffer;
-        if (uncompress) {
-            const char* charBuffer = reinterpret_cast<const char*>(rhs.mData.get());
-            size_t uncompressedBytes = compression::bloscUncompressedSize(charBuffer);
-            buffer = compression::bloscDecompress(charBuffer, uncompressedBytes);
-        }
-        if (buffer) {
-            mCompressedBytes = 0;
-        } else {
-            // decompression wasn't requested or failed so deep copy instead
-            buffer.reset(new char[mCompressedBytes]);
-            std::memcpy(buffer.get(), rhs.mData.get(), mCompressedBytes);
-        }
-        assert(buffer);
-        mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-    } else {
+    if (!this->isOutOfCore()) {
         this->allocate();
         std::memcpy(mData.get(), rhs.mData.get(), this->arrayMemUsage());
     }
@@ -998,23 +974,13 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 
         mFlags = rhs.mFlags;
         mSerializationFlags = rhs.mSerializationFlags;
-        mCompressedBytes = rhs.mCompressedBytes;
         mSize = rhs.mSize;
         mStrideOrTotalSize = rhs.mStrideOrTotalSize;
         mIsUniform = rhs.mIsUniform;
 
-        if (rhs.isOutOfCore()) {
-            mPageHandle = rhs.mPageHandle;
-        } else if (mIsUniform) {
+        if (!rhs.isOutOfCore()) {
             this->allocate();
-            mData.get()[0] = rhs.mData.get()[0];
-        } else if (this->isCompressed()) {
-            std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
-            std::memcpy(buffer.get(), rhs.mData.get(), mCompressedBytes);
-            mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-        } else {
-            this->allocate();
-            std::memcpy(mData.get(), rhs.mData.get(), arrayMemUsage());
+            std::memcpy(this->dataAsByteArray(), rhs.dataAsByteArray(), this->arrayMemUsage());
         }
     }
 }
@@ -1104,7 +1070,6 @@ size_t
 TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
 {
     if (this->isOutOfCore())        return 0;
-    if (this->isCompressed())       return mCompressedBytes;
 
     return (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
 }
@@ -1200,7 +1165,6 @@ TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
     assert(n < this->dataSize());
     assert(!this->isOutOfCore());
-    assert(!this->isCompressed());
 
     ValueType val;
     Codec::decode(/*in=*/mData.get()[mIsUniform ? 0 : n], /*out=*/val);
@@ -1214,7 +1178,6 @@ TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
     if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
-    if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
 
     return this->getUnsafe(n);
 }
@@ -1252,7 +1215,6 @@ TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val
 {
     assert(n < this->dataSize());
     assert(!this->isOutOfCore());
-    assert(!this->isCompressed());
     assert(!this->isUniform());
 
     // this unsafe method assumes the data is not uniform, however if it is, this redirects the index
@@ -1268,7 +1230,6 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
     if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
-    if (this->isCompressed())           this->decompress();
     if (this->isUniform())              this->expand();
 
     this->setUnsafe(n, val);
@@ -1328,8 +1289,6 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
         mIsUniform = false;
         this->allocate();
     }
-
-    mCompressedBytes = 0;
 
     if (fill) {
         for (Index i = 0; i < this->dataSize(); ++i)  mData.get()[i] = val;
@@ -1413,19 +1372,6 @@ template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::compress()
 {
-    if (!compression::bloscCanCompress())     return false;
-
-    if (!mIsUniform && !this->isCompressed()) {
-
-        tbb::spin_mutex::scoped_lock lock(mMutex);
-
-        this->doLoadUnsafe(/*compression=*/false);
-
-        if (this->isCompressed())   return true;
-
-        return this->compressUnsafe();
-    }
-
     return false;
 }
 
@@ -1434,25 +1380,6 @@ template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::compressUnsafe()
 {
-    if (!compression::bloscCanCompress())     return false;
-    if (mIsUniform)                           return false;
-
-    // assumes mutex is locked and data is not out-of-core
-
-    const bool writeCompress = (mSerializationFlags & WRITEMEMCOMPRESS);
-    const size_t inBytes = writeCompress ? mCompressedBytes : this->arrayMemUsage();
-
-    if (inBytes > 0) {
-        size_t outBytes;
-        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
-        std::unique_ptr<char[]> buffer = compression::bloscCompress(charBuffer, inBytes, outBytes);
-        if (buffer) {
-            mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-            mCompressedBytes = outBytes;
-            return true;
-        }
-    }
-
     return false;
 }
 
@@ -1461,27 +1388,6 @@ template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::decompress()
 {
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-
-    const bool writeCompress = (mSerializationFlags & WRITEMEMCOMPRESS);
-
-    if (writeCompress) {
-        this->doLoadUnsafe(/*compression=*/false);
-        return true;
-    }
-
-    if (this->isCompressed()) {
-        this->doLoadUnsafe();
-        const char* charBuffer = reinterpret_cast<const char*>(this->mData.get());
-        size_t uncompressedBytes = compression::bloscUncompressedSize(charBuffer);
-        std::unique_ptr<char[]> buffer = compression::bloscDecompress(charBuffer, uncompressedBytes);
-        if (buffer) {
-            mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-            mCompressedBytes = 0;
-            return true;
-        }
-    }
-
     return false;
 }
 
@@ -1622,15 +1528,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
 
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
-
-    if (mIsUniform) {
-        // zero compressed bytes as uniform values are not compressed in memory
-        mCompressedBytes = Index64(0);
-    }
-    else if (!(mSerializationFlags & WRITEMEMCOMPRESS)) {
-        // zero compressed bytes if not compressed in memory
-        mCompressedBytes = Index64(0);
-    }
+    mCompressedBytes = 0;
 
     // compressed on-disk
 
@@ -1682,20 +1580,11 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     this->setOutOfCore(delayLoad);
     is.read(mPageHandle, mCompressedBytes, delayLoad);
+    mCompressedBytes = 0;
 
     if (!delayLoad) {
         std::unique_ptr<char[]> buffer = mPageHandle->read();
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-    }
-
-    // zero compressed bytes as not compressed in memory
-
-    if (mIsUniform) {
-        // zero compressed bytes as uniform values are not compressed in memory
-        mCompressedBytes = Index64(0);
-    }
-    else if (!(mSerializationFlags & WRITEMEMCOMPRESS)) {
-        mCompressedBytes = Index64(0);
     }
 
     // clear all write flags
@@ -1741,7 +1630,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     bool bloscCompression = io::getDataCompression(os) & io::COMPRESS_BLOSC;
 
     // any compressed data needs to be loaded if out-of-core
-    if (bloscCompression || this->isCompressed())    this->doLoad();
+    if (bloscCompression)    this->doLoad();
 
     size_t compressedBytes = 0;
 
@@ -1755,25 +1644,14 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
         serializationFlags |= WRITEUNIFORM;
         if (bloscCompression && paged)      serializationFlags |= WRITEPAGED;
     }
-    else if (bloscCompression && paged)
-    {
-        serializationFlags |= WRITEPAGED;
-        if (this->isCompressed()) {
-            serializationFlags |= WRITEMEMCOMPRESS;
-            const char* charBuffer = reinterpret_cast<const char*>(mData.get());
-            compressedBytes = compression::bloscUncompressedSize(charBuffer);
-        }
-    }
-    else if (this->isCompressed())
-    {
-        serializationFlags |= WRITEMEMCOMPRESS;
-        compressedBytes = mCompressedBytes;
-    }
     else if (bloscCompression)
     {
-        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
-        const size_t inBytes = this->arrayMemUsage();
-        compressedBytes = compression::bloscCompressedSize(charBuffer, inBytes);
+        if (paged)      serializationFlags |= WRITEPAGED;
+        else {
+            const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+            const size_t inBytes = this->arrayMemUsage();
+            compressedBytes = compression::bloscCompressedSize(charBuffer, inBytes);
+        }
     }
 
     Index64 bytes = /*flags*/ sizeof(Int16) + /*size*/ sizeof(Index);
@@ -1802,12 +1680,6 @@ TypedAttributeArray<ValueType_, Codec_>::writeBuffers(std::ostream& os, bool out
 
     if (this->isUniform()) {
         os.write(reinterpret_cast<const char*>(mData.get()), sizeof(StorageType));
-    }
-    else if (this->isCompressed())
-    {
-        uint8_t bloscCompressed(0);
-        os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
-        os.write(reinterpret_cast<const char*>(mData.get()), mCompressedBytes);
     }
     else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
     {
@@ -1851,24 +1723,7 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 
     this->doLoad();
 
-    const char* buffer;
-    size_t bytes;
-
-    std::unique_ptr<char[]> uncompressedBuffer;
-    if (this->isCompressed()) {
-        // paged streams require uncompressed buffers, so locally decompress
-
-        const char* charBuffer = reinterpret_cast<const char*>(this->mData.get());
-        bytes = compression::bloscUncompressedSize(charBuffer);
-        uncompressedBuffer = compression::bloscDecompress(charBuffer, bytes);
-        buffer = reinterpret_cast<const char*>(uncompressedBuffer.get());
-    }
-    else {
-        buffer = reinterpret_cast<const char*>(mData.get());
-        bytes = this->arrayMemUsage();
-    }
-
-    os.write(buffer, bytes);
+    os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
 }
 
 
@@ -1889,13 +1744,6 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool compression) co
     self->mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
 
     self->mPageHandle.reset();
-
-    // if data was compressed prior to being written to disk, re-compress
-
-    if (self->mSerializationFlags & WRITEMEMCOMPRESS) {
-        if (compression)    self->compressUnsafe();
-        else                self->mCompressedBytes = 0;
-    }
 
     // clear all write and out-of-core flags
 
@@ -1994,18 +1842,18 @@ struct AccessorEval<UnknownCodec, ValueType>
 
 template <typename ValueType, typename CodecType>
 typename AttributeHandle<ValueType, CodecType>::Ptr
-AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const bool preserveCompression)
+AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const bool collapseOnDestruction)
 {
     return  typename AttributeHandle<ValueType, CodecType>::Ptr(
-            new AttributeHandle<ValueType, CodecType>(array, preserveCompression));
+            new AttributeHandle<ValueType, CodecType>(array, collapseOnDestruction));
 }
 
 template <typename ValueType, typename CodecType>
-AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
+AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool collapseOnDestruction)
     : mArray(&array)
     , mStrideOrTotalSize(array.hasConstantStride() ? array.stride() : 1)
     , mSize(array.hasConstantStride() ? array.size() : array.dataSize())
-    , mCollapseOnDestruction(preserveCompression && array.isStreaming())
+    , mCollapseOnDestruction(collapseOnDestruction && array.isStreaming())
 {
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
@@ -2014,21 +1862,6 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
     // load data if delay-loaded
 
     mArray->loadData();
-
-    // if array is compressed and preserve compression is true, copy and decompress
-    // into a local copy that is destroyed with handle to maintain thread-safety
-
-    if (array.isCompressed())
-    {
-        if (preserveCompression && !array.isStreaming()) {
-            mLocalArray = array.copyUncompressed();
-            mLocalArray->decompress();
-            mArray = mLocalArray.get();
-        }
-        else {
-            const_cast<AttributeArray*>(mArray)->decompress();
-        }
-    }
 
     // bind getter and setter methods
 
@@ -2137,7 +1970,7 @@ AttributeWriteHandle<ValueType, CodecType>::create(AttributeArray& array, const 
 
 template <typename ValueType, typename CodecType>
 AttributeWriteHandle<ValueType, CodecType>::AttributeWriteHandle(AttributeArray& array, const bool expand)
-    : AttributeHandle<ValueType, CodecType>(array, /*preserveCompression = */ false)
+    : AttributeHandle<ValueType, CodecType>(array, /*collapseOnDestruction=*/false)
 {
     if (expand)     array.expand();
 }
