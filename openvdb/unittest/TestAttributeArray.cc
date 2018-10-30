@@ -1288,12 +1288,12 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(Index(3), handle.stride());
         CPPUNIT_ASSERT_EQUAL(Index(2), handle.size());
 
+// as of ABI=6, the base memory requirements of an AttributeArray have been lowered
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-        size_t arrayMem = 56;
+        size_t arrayMem = 40;
 #else
         size_t arrayMem = 64;
 #endif
-
         CPPUNIT_ASSERT_EQUAL(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 

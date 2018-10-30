@@ -209,6 +209,9 @@ public:
     /// @brief Retrieve a reference to the stored page
     Page& page();
 
+    /// @brief Return the size of the buffer
+    int size() const { return mSize; }
+
     /// @brief Read and return the buffer, loading and decompressing
     /// the Page if necessary.
     std::unique_ptr<char[]> read();

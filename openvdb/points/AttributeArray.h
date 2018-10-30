@@ -129,7 +129,8 @@ public:
         HIDDEN = 0x2,               /// hidden from UIs or iterators
         OUTOFCORE = 0x4,            /// data not yet loaded from disk (deprecated flag as of ABI=5)
         CONSTANTSTRIDE = 0x8,       /// stride size does not vary in the array
-        STREAMING = 0x10            /// streaming mode collapses attributes when first accessed
+        STREAMING = 0x10,           /// streaming mode collapses attributes when first accessed
+        PARTIALREAD = 0x20          /// data has been partially read (compressed bytes is used)
     };
 
     enum SerializationFlag {
@@ -147,25 +148,36 @@ public:
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
-    AttributeArray() = default;
+    AttributeArray() : mPageHandle() { }
+    virtual ~AttributeArray()
+    {
+        // if this AttributeArray has been partially read, zero the compressed bytes,
+        // so the page handle won't attempt to clean up invalid memory
+        if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
+    }
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     AttributeArray(const AttributeArray& rhs)
-        : mCompressedBytes(rhs.mCompressedBytes)
+        : mIsUniform(rhs.mIsUniform)
         , mFlags(rhs.mFlags)
         , mSerializationFlags(rhs.mSerializationFlags)
         , mOutOfCore(rhs.mOutOfCore)
+        , mPageHandle()
     {
-        if (rhs.mPageHandle)    mPageHandle = rhs.mPageHandle->copy();
-        else                    mPageHandle = compression::PageHandle::Ptr();
+        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
+        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
     }
     AttributeArray& operator=(const AttributeArray& rhs)
     {
-        mCompressedBytes = rhs.mCompressedBytes;
+        // if this AttributeArray has been partially read, zero the compressed bytes,
+        // so the page handle won't attempt to clean up invalid memory
+        if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
+        mIsUniform = rhs.mIsUniform;
         mFlags = rhs.mFlags;
         mSerializationFlags = rhs.mSerializationFlags;
         mOutOfCore = rhs.mOutOfCore;
-        if (rhs.mPageHandle)    mPageHandle = rhs.mPageHandle->copy();
-        else                    mPageHandle = compression::PageHandle::Ptr();
+        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
+        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
+        else                            mPageHandle.reset();
         return *this;
     }
 #else
@@ -174,7 +186,6 @@ public:
 #endif
     AttributeArray(AttributeArray&&) = default;
     AttributeArray& operator=(AttributeArray&&) = default;
-    virtual ~AttributeArray() = default;
 
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
@@ -354,16 +365,30 @@ protected:
     /// Remove a attribute type from the registry.
     static void unregisterType(const NamePair& type);
 
+#if OPENVDB_ABI_VERSION_NUMBER < 6
+
     size_t mCompressedBytes = 0;
     uint8_t mFlags = 0;
     uint8_t mSerializationFlags = 0;
-
 #if OPENVDB_ABI_VERSION_NUMBER >= 5
     tbb::atomic<Index32> mOutOfCore = 0; // interpreted as bool
 #endif
-
-    /// used for out-of-core, paged reading
     compression::PageHandle::Ptr mPageHandle;
+
+#else // #if OPENVDB_ABI_VERSION_NUMBER < 6
+
+    bool mIsUniform = true;
+    tbb::spin_mutex mMutex;
+    uint8_t mFlags = 0;
+    uint8_t mSerializationFlags = 0;
+    tbb::atomic<Index32> mOutOfCore = 0; // interpreted as bool
+    /// used for out-of-core, paged reading
+    union {
+        compression::PageHandle::Ptr mPageHandle;
+        size_t mCompressedBytes; // as of ABI=6, this data is packed together to save memory
+    };
+
+#endif
 }; // class AttributeArray
 
 
@@ -731,8 +756,10 @@ private:
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
-    bool                                mIsUniform = false;
+#if OPENVDB_ABI_VERSION_NUMBER < 6 // as of ABI=6, this data lives in the base class to reduce memory
+    bool                                mIsUniform = true;
     tbb::spin_mutex                     mMutex;
+#endif
 }; // class TypedAttributeArray
 
 
@@ -948,10 +975,10 @@ tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
     Index n, Index strideOrTotalSize, bool constantStride, const ValueType& uniformValue)
-    : mData(new StorageType[1])
+    : AttributeArray()
+    , mData(new StorageType[1])
     , mSize(n)
     , mStrideOrTotalSize(strideOrTotalSize)
-    , mIsUniform(true)
 {
     if (constantStride) {
         this->setConstantStride(true);
@@ -978,7 +1005,9 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     : AttributeArray(rhs)
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
+#if OPENVDB_ABI_VERSION_NUMBER < 6
     , mIsUniform(rhs.mIsUniform)
+#endif
 {
     if (!this->isOutOfCore()) {
         this->allocate();
@@ -1520,6 +1549,7 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
 
     mIsUniform = mSerializationFlags & WRITEUNIFORM;
     mCompressedBytes = bytes;
+    mFlags |= PARTIALREAD; // mark data as having been partially read
 
     // read strided value (set to 1 if array is not strided)
 
@@ -1550,9 +1580,11 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
     uint8_t bloscCompressed(0);
     if (!mIsUniform)    is.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
 
+    assert(mFlags & PARTIALREAD);
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
     mCompressedBytes = 0;
+    mFlags &= ~PARTIALREAD; // mark data read as having completed
 
     // compressed on-disk
 
@@ -1592,7 +1624,11 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     if (is.sizeOnly())
     {
-        mPageHandle = is.createHandle(mCompressedBytes);
+        size_t compressedBytes(mCompressedBytes);
+        mCompressedBytes = 0; // if not set to zero, mPageHandle will attempt to destroy invalid memory
+        mFlags &= ~PARTIALREAD; // mark data read as having completed
+        assert(!mPageHandle);
+        mPageHandle = is.createHandle(compressedBytes);
         return;
     }
 
@@ -1603,8 +1639,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     this->deallocate();
 
     this->setOutOfCore(delayLoad);
-    is.read(mPageHandle, mCompressedBytes, delayLoad);
-    mCompressedBytes = 0;
+    is.read(mPageHandle, std::streamsize(mPageHandle->size()), delayLoad);
 
     if (!delayLoad) {
         std::unique_ptr<char[]> buffer = mPageHandle->read();
