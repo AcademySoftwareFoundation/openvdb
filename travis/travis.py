@@ -50,15 +50,17 @@ br.form['password'] = 'L3_M2f2W'
 br.submit()
 
 # retrieve download id
-br.open('http://www.sidefx.com/download/daily-builds/')
+br.open('https://www.sidefx.com/download/daily-builds/')
+
+houid = -1
 
 for link in br.links():
-    if not link.url.startswith('/download/download-houdini'):
+    if '/download/download-houdini' not in link.url:
         continue
     if link.text.startswith('houdini-%s' % version) and 'linux_x86_64' in link.text:
         response = br.follow_link(text=link.text, nr=0)
         url = response.geturl()
-        id = url.split('/download-houdini/')[-1]
+        houid = url.split('/download-houdini/')[-1]
         break
 
 # accept eula terms
@@ -69,7 +71,7 @@ for link in br.links():
 #br.submit()
 
 # download houdini tarball in 50MB chunks
-url = 'https://www.sidefx.com/download/download-houdini/%sget/' % id
+url = 'https://www.sidefx.com/download/download-houdini/%sget/' % houid
 response = br.open(url)
 mb = 1024*1024
 chunk = 50

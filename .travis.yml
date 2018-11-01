@@ -55,11 +55,9 @@ env:
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
 
-  # Build Houdini plug-ins for H15.0, H15.5, H16.0, H16.5
+  # Build Houdini plug-ins for H16.0, H16.5
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.5
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.0
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.5
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=15.0
 
   # Build and run unit tests for ABI={3,4,5} with Blosc disabled
   - ABI=5 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none
