@@ -705,6 +705,18 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
+    // VDB Points advection
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "advectvdbpoints", "Advect VDB Points")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Enable/disable advection of VDB Points.")
+        .setDocumentation(
+            "If enabled, advect the points in a VDB Points grid, otherwise apply advection"
+            " only to the Houdini point associated with the VDB primitive.\n\n"
+            "The latter is faster to compute but updates the VDB transform only"
+            " and not the relative positions of the points within the grid."
+            " It is useful primarily when instancing multiple static VDB point sets"
+            " onto a dynamically advected Houdini point set."));
+
     // Points to process
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Point Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
@@ -822,17 +834,6 @@ newSopOperator(OP_OperatorTable* table)
             " It may also be useful for special effects (see also the"
             " [Trail SOP|Node:sop/trail])."));
 
-    // VDB Points advection
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "advectvdbpoints", "Advect VDB Points")
-        .setDefault(PRMoneDefaults)
-        .setTooltip("Enable/disable advection of VDB Points.")
-        .setDocumentation(
-            "If enabled, advect the points in a VDB Points grid, otherwise apply advection"
-            " only to the Houdini point associated with the VDB primitive.\n\n"
-            "The latter is faster to compute but updates the VDB transform only"
-            " and not the relative positions of the points within the grid."
-            " It is useful primarily when instancing multiple static VDB point sets"
-            " onto a dynamically advected Houdini point set."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -1053,24 +1054,26 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
             // ensure the offsets to skip are sorted to make lookups faster
             std::sort(parms.mOffsetsToSkip.begin(), parms.mOffsetsToSkip.end());
         }
+	else
+	{
+	    switch (parms.mPropagationType) {
 
-        switch (parms.mPropagationType) {
-
-            case PROPAGATION_TYPE_ADVECTION:
-            case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
-            {
-                Advection advection(parms, boss);
-                GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
-                break;
-            }
-            case PROPAGATION_TYPE_PROJECTION:
-            {
-                Projection projection(parms, boss);
-                GEOvdbProcessTypedGridVec3(*parms.mCptPrim, projection);
-                break;
-            }
-            case PROPAGATION_TYPE_UNKNOWN: break;
-        }
+		case PROPAGATION_TYPE_ADVECTION:
+		case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
+		{
+		    Advection advection(parms, boss);
+		    GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+		    break;
+		}
+		case PROPAGATION_TYPE_PROJECTION:
+		{
+		    Projection projection(parms, boss);
+		    GEOvdbProcessTypedGridVec3(*parms.mCptPrim, projection);
+		    break;
+		}
+		case PROPAGATION_TYPE_UNKNOWN: break;
+	    }
+	}
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "processing was interrupted");
         boss.end();
@@ -1094,6 +1097,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
 
     parms.mPointGeo = inputGeo(0);
 
+    const bool advectVdbPoints = (0 != evalInt("advectvdbpoints", 0, now));
+
     if (!parms.mPointGeo) {
         addError(SOP_MESSAGE, "Missing point input");
         return false;
@@ -1102,18 +1107,26 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
     UT_String ptGroupStr;
     evalString(ptGroupStr, "group", 0, now);
 
-    parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
-    parms.mGroup = matchGroup(*parms.mPointGeo, evalStdString("group", now));
+    if (advectVdbPoints)
+    {
+	parms.mPointGroup = 0;
+	parms.mGroup = matchGroup(*parms.mPointGeo, ptGroupStr);
 
-    const std::string groups = evalStdString("vdbpointsgroups", now);
+	if (!parms.mPointGroup && ptGroupStr.length() > 0) {
+	    addWarning(SOP_MESSAGE, "Point group not found");
+	    return false;
+	}
+    }
+    else
+    {
+	parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
+	parms.mGroup = 0;
 
-    // Get and parse the vdb points groups
-    openvdb::points::AttributeSet::Descriptor::parseNames(
-        parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
+	const std::string groups = evalStdString("vdbpointsgroups", now);
 
-    if (!parms.mPointGroup && ptGroupStr.length() > 0) {
-        addWarning(SOP_MESSAGE, "Point group not found");
-        return false;
+	// Get and parse the vdb points groups
+	openvdb::points::AttributeSet::Descriptor::parseNames(
+	    parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
     }
 
     parms.mPropagationType = stringToPropagationType(evalStdString("operation", now));
