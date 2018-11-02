@@ -37,7 +37,7 @@
 # ABI (3/4/5) - the ABI version of OpenVDB
 # BLOSC (yes/no) - to build with Blosc support
 # RELEASE (yes/no) - to build in release or debug mode
-# HOUDINI_MAJOR (15.0/15.5/16.0/16.5) - the major version of Houdini
+# HOUDINI_MAJOR (16.0/16.5) - the major version of Houdini
 #
 # (Note Travis instances allow only 7.5GB of memory per VM, so limit concurrent builds to 4)
 #
