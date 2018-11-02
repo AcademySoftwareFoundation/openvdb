@@ -1054,26 +1054,26 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
             // ensure the offsets to skip are sorted to make lookups faster
             std::sort(parms.mOffsetsToSkip.begin(), parms.mOffsetsToSkip.end());
         }
-	else
-	{
-	    switch (parms.mPropagationType) {
+        else
+        {
+            switch (parms.mPropagationType) {
 
-		case PROPAGATION_TYPE_ADVECTION:
-		case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
-		{
-		    Advection advection(parms, boss);
-		    GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
-		    break;
-		}
-		case PROPAGATION_TYPE_PROJECTION:
-		{
-		    Projection projection(parms, boss);
-		    GEOvdbProcessTypedGridVec3(*parms.mCptPrim, projection);
-		    break;
-		}
-		case PROPAGATION_TYPE_UNKNOWN: break;
-	    }
-	}
+                case PROPAGATION_TYPE_ADVECTION:
+                case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
+                {
+                    Advection advection(parms, boss);
+                    GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+                    break;
+                }
+                case PROPAGATION_TYPE_PROJECTION:
+                {
+                    Projection projection(parms, boss);
+                    GEOvdbProcessTypedGridVec3(*parms.mCptPrim, projection);
+                    break;
+                }
+                case PROPAGATION_TYPE_UNKNOWN: break;
+            }
+        }
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "processing was interrupted");
         boss.end();
@@ -1109,24 +1109,23 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
 
     if (advectVdbPoints)
     {
-	parms.mPointGroup = 0;
-	parms.mGroup = matchGroup(*parms.mPointGeo, ptGroupStr);
+        parms.mPointGroup = 0;
+        parms.mGroup = matchGroup(*parms.mPointGeo, ptGroupStr);
 
-	if (!parms.mPointGroup && ptGroupStr.length() > 0) {
-	    addWarning(SOP_MESSAGE, "Point group not found");
-	    return false;
-	}
+        const std::string groups = evalStdString("vdbpointsgroups", now);
+
+        // Get and parse the vdb points groups
+        openvdb::points::AttributeSet::Descriptor::parseNames(
+            parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
     }
     else
     {
-	parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
-	parms.mGroup = 0;
-
-	const std::string groups = evalStdString("vdbpointsgroups", now);
-
-	// Get and parse the vdb points groups
-	openvdb::points::AttributeSet::Descriptor::parseNames(
-	    parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
+        parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
+        parms.mGroup = 0;
+        if (!parms.mPointGroup && ptGroupStr.length() > 0) {
+            addWarning(SOP_MESSAGE, "Point group not found");
+            return false;
+        }
     }
 
     parms.mPropagationType = stringToPropagationType(evalStdString("operation", now));
