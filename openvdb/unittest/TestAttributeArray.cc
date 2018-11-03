@@ -64,52 +64,15 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <sys/stat.h> // for stat()
 #endif
 
-/// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
-class ProxyMappedFile
+
+/// @brief io::MappedFile has a private constructor, so declare a class that acts as the friend
+struct TestMappedFile
 {
-public:
-    explicit ProxyMappedFile(const std::string& filename)
-        : mImpl(new Impl(filename)) { }
-
-private:
-    class Impl
+    static openvdb::io::MappedFile::Ptr create(const std::string& filename)
     {
-    public:
-        Impl(const std::string& filename)
-            : mMap(filename.c_str(), boost::interprocess::read_only)
-            , mRegion(mMap, boost::interprocess::read_only)
-        {
-            mLastWriteTime = 0;
-            const char* regionFilename = mMap.get_name();
-#ifdef _MSC_VER
-            using namespace boost::interprocess::detail;
-            using namespace boost::interprocess::ipcdetail;
-            using openvdb::Index64;
-
-            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
-                FILETIME mtime;
-                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
-                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
-                }
-                close_file(fh);
-            }
-#else
-            struct stat info;
-            if (0 == ::stat(regionFilename, &info)) {
-                mLastWriteTime = openvdb::Index64(info.st_mtime);
-            }
-#endif
-        }
-
-        using Notifier = std::function<void(std::string /*filename*/)>;
-        boost::interprocess::file_mapping mMap;
-        boost::interprocess::mapped_region mRegion;
-        bool mAutoDelete = false;
-        Notifier mNotifier;
-        mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
-    }; // class Impl
-    std::unique_ptr<Impl> mImpl;
-}; // class ProxyMappedFile
+        return openvdb::SharedPtr<openvdb::io::MappedFile>(new openvdb::io::MappedFile(filename));
+    }
+};
 
 
 /// @brief Functionality similar to openvdb::util::CpuTimer except with prefix padding and no decimals.
@@ -1135,6 +1098,8 @@ TestAttributeArray::testDelayedLoad()
     AttributeArrayI::registerType();
     AttributeArrayF::registerType();
 
+    SharedPtr<io::MappedFile> mappedFile;
+
     io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
     std::string tempDir;
@@ -1192,10 +1157,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        ProxyMappedFile* proxy = new ProxyMappedFile(filename);
-        SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check manual loading of data
         {
@@ -1596,10 +1558,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check fill()
         {
@@ -1656,10 +1615,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check fill()
         {
@@ -1705,10 +1661,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check manual loading of data
         {
@@ -1893,10 +1846,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check metadata fail due to serialization flags
         {
