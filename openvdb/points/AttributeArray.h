@@ -169,6 +169,37 @@ public:
     /// @note This counts each data element in a strided array
     virtual Index dataSize() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Return the name of the value type of a single element in this array (e.g., "float" or "vec3d").
+    virtual Name valueType() const = 0;
+
+    /// Return the name of the codec used by this array (e.g., "trnc" or "fxpt").
+    virtual Name codecType() const = 0;
+
+    /// Return the size in bytes of the value type of a single element in this array.
+    /// (e.g. "float" -> 4 bytes, "vec3d" -> 24 bytes").
+    virtual Index valueTypeSize() const = 0;
+
+    /// Return the size in bytes of the storage type of a single element of this array.
+    /// @note If the Codec is a NullCodec, valueSize() == storageSize()
+    virtual Index storageTypeSize() const = 0;
+
+    /// Return @c true if the value type is floating point
+    virtual bool valueTypeIsFloatingPoint() const = 0;
+
+    /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
+    virtual bool valueTypeIsScalar() const = 0;
+
+    /// Return @c true if the value type is a vector
+    virtual bool valueTypeIsVector() const = 0;
+
+    /// Return @c true if the value type is a quaternion
+    virtual bool valueTypeIsQuaternion() const = 0;
+
+    /// Return @c true if the value type is a matrix
+    virtual bool valueTypeIsMatrix() const = 0;
+#endif
+
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
@@ -267,6 +298,11 @@ public:
 
     /// Ensures all data is in-core
     virtual void loadData() const = 0;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Return @c true if all data has been loaded
+    virtual bool isDataLoaded() const = 0;
+#endif
 
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
     /// comparison check necessary on the inherited types (TypedAttributeArray)
@@ -437,8 +473,13 @@ struct UnitVecCodec
 
 
 /// Typed class for storing attribute data
+
 template<typename ValueType_, typename Codec_ = NullCodec>
+#if OPENVDB_ABI_VERSION_NUMBER >= 6 // for ABI=6, class is final to allow for de-virtualization
+class TypedAttributeArray final: public AttributeArray
+#else
 class TypedAttributeArray: public AttributeArray
+#endif
 {
 public:
     using Ptr           = std::shared_ptr<TypedAttributeArray>;
@@ -502,6 +543,36 @@ public:
     Index dataSize() const override {
         return hasConstantStride() ? mSize * mStrideOrTotalSize : mStrideOrTotalSize;
     }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Return the name of the value type of a single element in this array (e.g., "float" or "vec3d").
+    Name valueType() const override { return typeNameAsString<ValueType>(); }
+
+    /// Return the name of the codec used by this array (e.g., "trnc" or "fxpt").
+    Name codecType() const override { return Codec::name(); }
+
+    /// Return the size in bytes of the value type of a single element in this array.
+    Index valueTypeSize() const override { return sizeof(ValueType); }
+
+    /// Return the size in bytes of the storage type of a single element of this array.
+    /// @note If the Codec is a NullCodec, valueSize() == storageSize()
+    Index storageTypeSize() const override { return sizeof(StorageType); }
+
+    /// Return @c true if the value type is floating point
+    bool valueTypeIsFloatingPoint() const override;
+
+    /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
+    bool valueTypeIsScalar() const override;
+
+    /// Return @c true if the value type is a vector
+    bool valueTypeIsVector() const override;
+
+    /// Return @c true if the value type is a quaternion
+    bool valueTypeIsQuaternion() const override;
+
+    /// Return @c true if the value type is a matrix
+    bool valueTypeIsMatrix() const override;
+#endif
 
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
@@ -598,6 +669,11 @@ public:
 
     /// Ensures all data is in-core
     void loadData() const override;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    /// Return @c true if all data has been loaded
+    bool isDataLoaded() const override;
+#endif
 
 protected:
     AccessorBasePtr getAccessor() const override;
@@ -1063,6 +1139,53 @@ TypedAttributeArray<ValueType_, Codec_>::deallocate()
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
+{
+    // std::is_floating_point evaluates to false for half so use std::is_integral
+    return !std::is_integral<typename VecTraits<ValueType>::ElementType>::value;
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsScalar() const
+{
+    return  !this->valueTypeIsVector() &&
+            !this->valueTypeIsQuaternion() &&
+            !this->valueTypeIsMatrix();
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsVector() const
+{
+    return VecTraits<ValueType>::IsVec;
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsQuaternion() const
+{
+    // TODO: improve performance by making this a compile-time check using type traits
+    return !this->valueType().compare(0, 4, "quat");
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsMatrix() const
+{
+    // TODO: improve performance by making this a compile-time check using type traits
+    return !this->valueType().compare(0, 3, "mat");
+}
+#endif
+
+
 template<typename ValueType_, typename Codec_>
 size_t
 TypedAttributeArray<ValueType_, Codec_>::memUsage() const
@@ -1410,6 +1533,16 @@ TypedAttributeArray<ValueType_, Codec_>::loadData() const
 {
     this->doLoad();
 }
+
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::isDataLoaded() const
+{
+    return !this->isOutOfCore();
+}
+#endif
 
 
 template<typename ValueType_, typename Codec_>

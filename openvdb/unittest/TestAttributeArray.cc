@@ -404,6 +404,182 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT(attrF->hasValueType<float>());
     }
 
+    { // lots of type checking
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        Index size(50);
+        {
+            TypedAttributeArray<bool> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("bool"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int16_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int16"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int32_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int32"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int64_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int64"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            // half is not registered by default, but for complete-ness
+            TypedAttributeArray<half> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("half"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<double> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("double"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Vec3<int32_t>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("vec3i"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(12), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(12), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Vec3<double>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("vec3d"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(24), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(24), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Mat3<float>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("mat3s"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(36), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(36), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Mat4<double>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("mat4d"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(128), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(128), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Quat<float>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("quats"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(16), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(16), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, TruncateCodec> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("trnc"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+#endif
+    }
+
     {
         AttributeArray::Ptr attr(new AttributeArrayC(50));
 
@@ -1226,6 +1402,13 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrBcopy.isOutOfCore());
             CPPUNIT_ASSERT(attrBequal.isOutOfCore());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrB).isDataLoaded());
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+#endif
+
             attrB.loadData();
             attrBcopy.loadData();
             attrBequal.loadData();
@@ -1233,6 +1416,12 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrBcopy.isOutOfCore());
             CPPUNIT_ASSERT(!attrBequal.isOutOfCore());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrB).isDataLoaded());
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+#endif
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBcopy.memUsage());
