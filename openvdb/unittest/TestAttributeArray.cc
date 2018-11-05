@@ -2154,6 +2154,64 @@ TestAttributeArray::testDelayedLoad()
             }
         }
 
+        // read in using delayed load and check partial read state
+        {
+            std::unique_ptr<AttributeArrayI> attrB(new AttributeArrayI);
+
+            CPPUNIT_ASSERT(!(attrB->flags() & AttributeArray::PARTIALREAD));
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB->readMetadata(filein);
+
+            // PARTIALREAD flag should now be set
+            CPPUNIT_ASSERT(attrB->flags() & AttributeArray::PARTIALREAD);
+
+            // copy-construct and assign AttributeArray
+            AttributeArrayI attrC(*attrB);
+            CPPUNIT_ASSERT(attrC.flags() & AttributeArray::PARTIALREAD);
+            AttributeArrayI attrD = *attrB;
+            CPPUNIT_ASSERT(attrD.flags() & AttributeArray::PARTIALREAD);
+
+            // verify deleting attrB is safe
+            attrB.reset();
+
+            // verify data is not valid
+            CPPUNIT_ASSERT(!attrC.validData());
+
+            { // attempting to write a partially-read AttributeArray throws
+                std::string filename = tempDir + "/openvdb_partial1";
+                std::ofstream fileout(filename.c_str(), std::ios_base::binary);
+                io::setStreamMetadataPtr(fileout, streamMetadata);
+                io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+                CPPUNIT_ASSERT_THROW(attrC.writeMetadata(fileout, false, /*paged=*/true), IoError);
+            }
+
+            // continue loading with copy-constructed AttributeArray
+
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrC.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrC.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrC.isOutOfCore());
+            attrC.loadData();
+            CPPUNIT_ASSERT(!attrC.isOutOfCore());
+
+            // verify data is now valid
+            CPPUNIT_ASSERT(attrC.validData());
+
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrC.memUsage());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
+            }
+        }
+
         // read in using delayed load and check implicit load through get()
         {
             AttributeArrayI attrB;

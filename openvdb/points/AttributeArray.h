@@ -768,7 +768,16 @@ public:
 protected:
     AccessorBasePtr getAccessor() const override;
 
+    /// Return the raw data buffer
+    inline StorageType* data() { assert(validData()); return mData.get(); }
+    inline const StorageType* data() const { assert(validData()); return mData.get(); }
+
+    /// Verify that data is not out-of-core or in a partially-read state
+    inline bool validData() const { return !(isOutOfCore() || (flags() & PARTIALREAD)); }
+
 private:
+    friend class ::TestAttributeArray;
+
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
@@ -1128,7 +1137,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
     }
     mSize = std::max(Index(1), mSize);
     mStrideOrTotalSize = std::max(Index(1), mStrideOrTotalSize);
-    Codec::encode(uniformValue, mData.get()[0]);
+    Codec::encode(uniformValue, this->data()[0]);
 }
 
 
@@ -1143,7 +1152,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
 {
     if (!this->isOutOfCore()) {
         this->allocate();
-        std::memcpy(mData.get(), rhs.mData.get(), this->arrayMemUsage());
+        std::memcpy(this->data(), rhs.data(), this->arrayMemUsage());
     }
 }
 
@@ -1349,10 +1358,9 @@ typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
     assert(n < this->dataSize());
-    assert(!this->isOutOfCore());
 
     ValueType val;
-    Codec::decode(/*in=*/mData.get()[mIsUniform ? 0 : n], /*out=*/val);
+    Codec::decode(/*in=*/this->data()[mIsUniform ? 0 : n], /*out=*/val);
     return val;
 }
 
@@ -1405,7 +1413,7 @@ TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val
     // this unsafe method assumes the data is not uniform, however if it is, this redirects the index
     // to zero, which is marginally less efficient but ensures not writing to an illegal address
 
-    Codec::encode(/*in=*/val, /*out=*/mData.get()[mIsUniform ? 0 : n]);
+    Codec::encode(/*in=*/val, /*out=*/this->data()[mIsUniform ? 0 : n]);
 }
 
 
@@ -1466,7 +1474,7 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
 {
     if (!mIsUniform)    return;
 
-    const StorageType val = mData.get()[0];
+    const StorageType val = this->data()[0];
 
     {
         tbb::spin_mutex::scoped_lock lock(mMutex);
@@ -1476,7 +1484,7 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
     }
 
     if (fill) {
-        for (Index i = 0; i < this->dataSize(); ++i)  mData.get()[i] = val;
+        for (Index i = 0; i < this->dataSize(); ++i)  this->data()[i] = val;
     }
 }
 
@@ -1516,7 +1524,7 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
         mIsUniform = true;
         this->allocate();
     }
-    Codec::encode(uniformValue, mData.get()[0]);
+    Codec::encode(uniformValue, this->data()[0]);
 }
 
 
@@ -1540,7 +1548,7 @@ TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
 
     const Index size = mIsUniform ? 1 : this->dataSize();
     for (Index i = 0; i < size; ++i)  {
-        Codec::encode(value, mData.get()[i]);
+        Codec::encode(value, this->data()[i]);
     }
 }
 
@@ -1808,6 +1816,10 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
 {
     if (!outputTransient && this->isTransient())    return;
 
+    if (mFlags & PARTIALREAD) {
+        OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
+    }
+
 #if OPENVDB_ABI_VERSION_NUMBER >= 5
     uint8_t flags(mFlags);
 #else
@@ -1839,7 +1851,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     {
         if (paged)      serializationFlags |= WRITEPAGED;
         else {
-            const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+            const char* charBuffer = reinterpret_cast<const char*>(this->data());
             const size_t inBytes = this->arrayMemUsage();
             compressedBytes = compression::bloscCompressedSize(charBuffer, inBytes);
         }
@@ -1867,16 +1879,20 @@ TypedAttributeArray<ValueType_, Codec_>::writeBuffers(std::ostream& os, bool out
 {
     if (!outputTransient && this->isTransient())    return;
 
+    if (mFlags & PARTIALREAD) {
+        OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
+    }
+
     this->doLoad();
 
     if (this->isUniform()) {
-        os.write(reinterpret_cast<const char*>(mData.get()), sizeof(StorageType));
+        os.write(reinterpret_cast<const char*>(this->data()), sizeof(StorageType));
     }
     else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
     {
         std::unique_ptr<char[]> compressedBuffer;
         size_t compressedBytes = 0;
-        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+        const char* charBuffer = reinterpret_cast<const char*>(this->data());
         const size_t inBytes = this->arrayMemUsage();
         compressedBuffer = compression::bloscCompress(charBuffer, inBytes, compressedBytes);
         if (compressedBuffer) {
@@ -1887,14 +1903,14 @@ TypedAttributeArray<ValueType_, Codec_>::writeBuffers(std::ostream& os, bool out
         else {
             uint8_t bloscCompressed(0);
             os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
-            os.write(reinterpret_cast<const char*>(mData.get()), inBytes);
+            os.write(reinterpret_cast<const char*>(this->data()), inBytes);
         }
     }
     else
     {
         uint8_t bloscCompressed(0);
         os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
-        os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
+        os.write(reinterpret_cast<const char*>(this->data()), this->arrayMemUsage());
     }
 }
 
@@ -1912,9 +1928,13 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
         return;
     }
 
+    if (mFlags & PARTIALREAD) {
+        OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
+    }
+
     this->doLoad();
 
-    os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
+    os.write(reinterpret_cast<const char*>(this->data()), this->arrayMemUsage());
 }
 
 
@@ -1976,7 +1996,7 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
     this->doLoad();
     otherT->doLoad();
 
-    const StorageType *target = this->mData.get(), *source = otherT->mData.get();
+    const StorageType *target = this->data(), *source = otherT->data();
     if (!target && !source) return true;
     if (!target || !source) return false;
     Index n = this->mIsUniform ? 1 : mSize;
@@ -1990,7 +2010,7 @@ template<typename ValueType_, typename Codec_>
 char*
 TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray()
 {
-    return reinterpret_cast<char*>(mData.get());
+    return reinterpret_cast<char*>(this->data());
 }
 
 
@@ -1998,7 +2018,7 @@ template<typename ValueType_, typename Codec_>
 const char*
 TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray() const
 {
-    return reinterpret_cast<const char*>(mData.get());
+    return reinterpret_cast<const char*>(this->data());
 }
 #endif
 
