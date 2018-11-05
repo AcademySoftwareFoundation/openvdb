@@ -148,8 +148,32 @@ public:
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
     AttributeArray() = default;
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    AttributeArray(const AttributeArray& rhs)
+        : mCompressedBytes(rhs.mCompressedBytes)
+        , mFlags(rhs.mFlags)
+        , mSerializationFlags(rhs.mSerializationFlags)
+        , mOutOfCore(rhs.mOutOfCore)
+    {
+        if (rhs.mPageHandle)    mPageHandle = rhs.mPageHandle->copy();
+        else                    mPageHandle = compression::PageHandle::Ptr();
+    }
+    AttributeArray& operator=(const AttributeArray& rhs)
+    {
+        mCompressedBytes = rhs.mCompressedBytes;
+        mFlags = rhs.mFlags;
+        mSerializationFlags = rhs.mSerializationFlags;
+        mOutOfCore = rhs.mOutOfCore;
+        if (rhs.mPageHandle)    mPageHandle = rhs.mPageHandle->copy();
+        else                    mPageHandle = compression::PageHandle::Ptr();
+        return *this;
+    }
+#else
     AttributeArray(const AttributeArray&) = default;
     AttributeArray& operator=(const AttributeArray&) = default;
+#endif
+    AttributeArray(AttributeArray&&) = default;
+    AttributeArray& operator=(AttributeArray&&) = default;
     virtual ~AttributeArray() = default;
 
     /// Return a copy of this attribute.

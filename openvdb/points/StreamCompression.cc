@@ -511,7 +511,12 @@ PagedInputStream::createHandle(std::streamsize n)
         mByteIndex = 0;
     }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    // TODO: C++14 introduces std::make_unique
+    PageHandle::Ptr pageHandle(new PageHandle(mPage, mByteIndex, n));
+#else
     PageHandle::Ptr pageHandle = std::make_shared<PageHandle>(mPage, mByteIndex, n);
+#endif
 
     mByteIndex += int(n);
 
