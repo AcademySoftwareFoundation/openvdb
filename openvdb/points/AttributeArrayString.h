@@ -196,7 +196,7 @@ public:
 
     AttributeArray& array();
 
-    bool hasIndex(const Name& name) const;
+    bool contains(const Name& name) const;
 
 private:
     /// Retrieve the index of this string value from the cache

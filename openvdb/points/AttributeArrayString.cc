@@ -301,7 +301,7 @@ void StringAttributeWriteHandle::resetCache()
 }
 
 
-bool StringAttributeWriteHandle::hasIndex(const Name& name) const
+bool StringAttributeWriteHandle::contains(const Name& name) const
 {
     // empty strings always have an index at index zero
     if (name.empty())   return true;
