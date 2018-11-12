@@ -301,17 +301,17 @@ void StringAttributeWriteHandle::resetCache()
 }
 
 
+AttributeArray& StringAttributeWriteHandle::array()
+{
+    return mWriteHandle.array();
+}
+
+
 bool StringAttributeWriteHandle::contains(const Name& name) const
 {
     // empty strings always have an index at index zero
     if (name.empty())   return true;
     return mCache.find(name) != mCache.end();
-}
-
-
-AttributeArray& StringAttributeWriteHandle::array()
-{
-    return mWriteHandle.array();
 }
 
 
