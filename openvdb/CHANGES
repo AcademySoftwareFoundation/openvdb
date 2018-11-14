@@ -21,7 +21,7 @@ Version 5.2.1 - In development
       and converted them from ordinal to string-valued.
     - Made various improvements to viewport rendering of point data grids.
       [Contributed by Nick Avramoussis]
-
+ 
 
 Version 5.2.0 - August 13, 2018
 
