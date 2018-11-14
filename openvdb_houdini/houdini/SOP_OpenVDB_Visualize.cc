@@ -153,7 +153,7 @@ newSopOperator(OP_OperatorTable* table)
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the input VDB grids to be processed.")
+        .setTooltip("Specify a subset of the input VDBs to be processed.")
         .setDocumentation(
             "The VDBs to be visualized (see [specifying volumes|/model/volumes#group])"));
 
@@ -207,7 +207,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewfrustum", "Frustum")
         .setTooltip(
             "Specify whether to draw the camera frustums\n"
-            "of grids with frustum transforms.")
+            "of VDBs with frustum transforms.")
         .setDocumentation(
             "For VDBs with [frustum transforms|http://www.openvdb.org/documentation/"
             "doxygen/transformsAndMaps.html#sFrustumTransforms],"
@@ -217,7 +217,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", "Region of Interest")
         .setDocumentation(
             "If enabled, generate geometry representing the region of interest"
-            " (for grids with ROI metadata)."));
+            " (for VDBs with ROI metadata)."));
 #endif
 
     char const * const boxItems[] = {
@@ -235,17 +235,20 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawleafnodes", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
-    parms.add(hutil::ParmFactory(PRM_ORD, "leafmode", "Leaf Nodes")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems)
+    parms.add(hutil::ParmFactory(PRM_STRING, "leafstyle", "Leaf Nodes")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems)
+        .setDefault("wirebox")
         .setDocumentation(
             "Specify whether to render the leaf nodes of VDB trees"
-            " as wireframe boxes or as solid boxes.\n\n"
+            " as wireframe boxes, as solid boxes, or as a single point"
+            " in the middle of each node.\n\n"
             "If __Color__ is enabled, leaf nodes will be blue."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawinternalnodes", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
-    parms.add(hutil::ParmFactory(PRM_ORD, "internalmode", "Internal Nodes")
+    parms.add(hutil::ParmFactory(PRM_STRING, "internalstyle", "Internal Nodes")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems)
+        .setDefault("wirebox")
         .setDocumentation(
             "Specify whether to render the internal nodes of VDB trees"
             " as wireframe boxes or as solid boxes.\n\n"
@@ -257,9 +260,9 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
-    parms.add(hutil::ParmFactory(PRM_ORD, "tilemode", "Active Tiles")
-        .setDefault(PRMoneDefaults)
+    parms.add(hutil::ParmFactory(PRM_STRING, "tilestyle", "Active Tiles")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems)
+        .setDefault("wirebox")
         .setDocumentation(
             "Specify whether to render the active tiles of VDB trees"
             " as wireframe boxes, as solid boxes, or as a single point"
@@ -271,8 +274,9 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawvoxels", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
-    parms.add(hutil::ParmFactory(PRM_ORD, "voxelmode", "Active Voxels")
+    parms.add(hutil::ParmFactory(PRM_ORD, "voxelstyle", "Active Voxels")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems)
+        .setDefault("points")
         .setDocumentation(
             "Specify whether to render the active voxels of VDB trees"
             " as wireframe boxes, as solid boxes, or as a single point"
@@ -288,8 +292,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addindexcoord", "Points with Index Coordinates")
         .setTooltip("Add a voxel/tile index coordinate attribute to points.")
         .setDocumentation(
-            "For voxels and tiles rendered as points, add an attribute to the points"
-            " that gives the coordinates of the points in the VDB's [index space|"
+            "For voxels, tiles, and leaf nodes rendered as points, add an attribute to"
+            " the points that gives the coordinates of the points in the VDB's [index space|"
             "http://www.openvdb.org/documentation/doxygen/overview.html#secSpaceAndTrans]."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addvalue", "Points with Values")
@@ -298,11 +302,11 @@ newSopOperator(OP_OperatorTable* table)
             "For voxels and tiles rendered as points, add an attribute to the points"
             " that gives the voxel and tile values."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usegridname", "Name Point Attributes After Grids")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usegridname", "Name Point Attributes After VDBs")
         .setTooltip(
-            "If enabled, use the grid name as the attribute name when\n"
+            "If enabled, use the VDB name as the attribute name when\n"
             "displaying points with values.\n"
-            "If disabled or if a grid has no name, use either \"vdb_int\",\n"
+            "If disabled or if a VDB has no name, use either \"vdb_int\",\n"
             "\"vdb_float\" or \"vdb_vec3f\" as the attribute name.")
         .setDocumentation(
             "If enabled, name the attribute added by __Points with Values__ after"
@@ -357,6 +361,15 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "previewFrustum", "Frustum"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "leafmode", "Leaf Nodes")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems));
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "internalmode", "Internal Nodes")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, boxItems));
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "tilemode", "Active Tiles")
+        .setDefault(PRMoneDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
+    obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "voxelmode", "Active Voxels")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
 
 #ifndef DWA_OPENVDB
     // We probably need this to share hip files.
@@ -457,19 +470,19 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
         // Enable leaf nodes if the old mode was not "Disabled".
         setInt("drawleafnodes", 0, time, mode > 0);
         // Set the leaf style to wire box, but only if leaf nodes are displayed.
-        if (mode > 0) setString(wireStr, CH_STRING_LITERAL, "leafmode", 0, time);
+        if (mode > 0) setString(wireStr, CH_STRING_LITERAL, "leafstyle", 0, time);
         // Enable internal nodes if the old mode was "Leaf and Internal Nodes".
         setInt("drawinternalnodes", 0, time, mode == 2);
         // Set the internal node style to wire box, but only if internal nodes are displayed.
         if (mode == 2) {
-            setString(wireStr, CH_STRING_LITERAL, "internalmode", 0, time);
+            setString(wireStr, CH_STRING_LITERAL, "internalstyle", 0, time);
         }
         // Disable tiles if the old mode was not "Leaf Nodes and Active Tiles".
         setInt("drawtiles", 0, time, mode == 1);
         if (mode == 1) {
             // Display tiles as wire boxes if the old mode was "Leaf Nodes and Active Tiles".
             // (This setting took precedence over the tile mode, below.)
-            setString(wireStr, CH_STRING_LITERAL, "tilemode", 0, time);
+            setString(wireStr, CH_STRING_LITERAL, "tilestyle", 0, time);
         }
     }
 
@@ -480,15 +493,15 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
         if (mode > 0) setInt("drawtiles", 0, time, true);
         switch (mode) {
             case 1:
-                setString(pointStr, CH_STRING_LITERAL, "tilemode", 0, time);
+                setString(pointStr, CH_STRING_LITERAL, "tilestyle", 0, time);
                 setInt("addvalue", 0, time, false);
                 break;
             case 2:
-                setString(pointStr, CH_STRING_LITERAL, "tilemode", 0, time);
+                setString(pointStr, CH_STRING_LITERAL, "tilestyle", 0, time);
                 setInt("addvalue", 0, time, true);
                 break;
-            case 3: setString(wireStr, CH_STRING_LITERAL, "tilemode", 0, time); break;
-            case 4: setString(boxStr, CH_STRING_LITERAL, "tilemode", 0, time); break;
+            case 3: setString(wireStr, CH_STRING_LITERAL, "tilestyle", 0, time); break;
+            case 4: setString(boxStr, CH_STRING_LITERAL, "tilestyle", 0, time); break;
         }
     }
 
@@ -499,15 +512,38 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
         setInt("drawvoxels", 0, time, mode > 0);
         switch (mode) {
             case 1:
-                setString(pointStr, CH_STRING_LITERAL, "voxelmode", 0, time);
+                setString(pointStr, CH_STRING_LITERAL, "voxelstyle", 0, time);
                 setInt("addvalue", 0, time, false);
                 break;
             case 2:
-                setString(pointStr, CH_STRING_LITERAL, "voxelmode", 0, time);
+                setString(pointStr, CH_STRING_LITERAL, "voxelstyle", 0, time);
                 setInt("addvalue", 0, time, true);
                 break;
-            case 3: setString(wireStr, CH_STRING_LITERAL, "voxelmode", 0, time); break;
-            case 4: setString(boxStr, CH_STRING_LITERAL, "voxelmode", 0, time); break;
+            case 3: setString(wireStr, CH_STRING_LITERAL, "voxelstyle", 0, time); break;
+            case 4: setString(boxStr, CH_STRING_LITERAL, "voxelstyle", 0, time); break;
+        }
+    }
+
+    for (const auto* name: {"leaf", "internal"}) {
+        const auto oldName = std::string(name) + "mode";
+        const auto newName = std::string(name) + "style";
+        parm = obsoleteParms->getParmPtr(oldName.c_str());
+        if (parm && !parm->isFactoryDefault()) {
+            const int mode = obsoleteParms->evalInt(oldName.c_str(), 0, time);
+            setString(mode == 0 ? wireStr : boxStr, CH_STRING_LITERAL, newName.c_str(), 0, time);
+        }
+    }
+
+    for (const auto* name: {"tile", "voxel"}) {
+        const auto oldName = std::string(name) + "mode";
+        const auto newName = std::string(name) + "style";
+        parm = obsoleteParms->getParmPtr(oldName.c_str());
+        if (parm && !parm->isFactoryDefault()) {
+            switch (obsoleteParms->evalInt(oldName.c_str(), 0, time)) {
+                case 0: setString(pointStr, CH_STRING_LITERAL, newName.c_str(), 0, time); break;
+                case 1: setString(wireStr, CH_STRING_LITERAL, newName.c_str(), 0, time); break;
+                case 2: setString(boxStr, CH_STRING_LITERAL, newName.c_str(), 0, time); break;
+            }
         }
     }
 
@@ -536,20 +572,22 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
 #endif
 
     const std::string
-        tileMode = evalStdString("tilemode", time),
-        voxelMode = evalStdString("voxelmode", time);
+        leafMode = evalStdString("leafstyle", time),
+        tileMode = evalStdString("tilestyle", time),
+        voxelMode = evalStdString("voxelstyle", time);
     const bool
+        drawLeafNodes = bool(evalInt("drawleafnodes", 0, time)),
         drawVoxels = bool(evalInt("drawvoxels", 0, time)),
         drawTiles = bool(evalInt("drawtiles", 0, time)),
         drawPoints = (drawTiles && tileMode == "points") || (drawVoxels && voxelMode == "points");
 
-    changed |= enableParm("leafmode", bool(evalInt("drawleafnodes", 0, time)));
-    changed |= enableParm("internalmode", bool(evalInt("drawinternalnodes", 0, time)));
-    changed |= enableParm("tilemode", drawTiles);
-    changed |= enableParm("voxelmode", drawVoxels);
+    changed |= enableParm("leafstyle", drawLeafNodes);
+    changed |= enableParm("internalstyle", bool(evalInt("drawinternalnodes", 0, time)));
+    changed |= enableParm("tilestyle", drawTiles);
+    changed |= enableParm("voxelstyle", drawVoxels);
     changed |= enableParm("ignorestaggered", drawVoxels);
     changed |= enableParm("addvalue", drawPoints);
-    changed |= enableParm("addindexcoord", drawPoints);
+    changed |= enableParm("addindexcoord", drawPoints || (drawLeafNodes && leafMode == "points"));
     changed |= enableParm("usegridname", drawPoints);
 
     return changed;
@@ -642,27 +680,15 @@ createBox(GU_Detail& geo, const openvdb::math::Transform& xform,
 
 struct TreeParms
 {
-    TreeParms()
-        : internalStyle(STYLE_NONE)
-        , tileStyle(STYLE_NONE)
-        , leafStyle(STYLE_NONE)
-        , voxelStyle(STYLE_NONE)
-        , addColor(true)
-        , ignoreStaggeredVectors(false)
-        , addValue(false)
-        , addIndexCoord(false)
-        , useGridName(false)
-    {}
-
-    RenderStyle internalStyle;
-    RenderStyle tileStyle;
-    RenderStyle leafStyle;
-    RenderStyle voxelStyle;
-    bool addColor;
-    bool ignoreStaggeredVectors;
-    bool addValue;
-    bool addIndexCoord;
-    bool useGridName;
+    RenderStyle internalStyle = STYLE_NONE;
+    RenderStyle tileStyle = STYLE_NONE;
+    RenderStyle leafStyle = STYLE_NONE;
+    RenderStyle voxelStyle = STYLE_NONE;
+    bool addColor = true;
+    bool ignoreStaggeredVectors = false;
+    bool addValue = false;
+    bool addIndexCoord = false;
+    bool useGridName = false;
 };
 
 
@@ -734,6 +760,112 @@ TreeVisualizer::operator()(const GridType& grid)
 
     mXform = &grid.transform();
 
+    const bool staggered = !mParms.ignoreStaggeredVectors &&
+        (grid.getGridClass() == openvdb::GRID_STAGGERED);
+
+    //{
+    // Create point attributes.
+
+    if (mParms.addColor) {
+        mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT));
+        if (!mCdHandle.isValid()) {
+            mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT));
+        }
+    }
+
+    if (mParms.addIndexCoord &&
+        ((mParms.tileStyle == STYLE_POINTS)
+        || (mParms.voxelStyle == STYLE_POINTS)
+        || (mParms.leafStyle == STYLE_POINTS)))
+    {
+        const UT_String attrName = "vdb_ijk";
+
+        GA_RWAttributeRef attribHandle = mGeo->findIntTuple(GA_ATTRIB_POINT, attrName, 3);
+        if (!attribHandle.isValid()) {
+            attribHandle = mGeo->addIntTuple(GA_ATTRIB_POINT, attrName, 3, GA_Defaults(0));
+        }
+
+        mIndexCoordHandle = attribHandle.getAttribute();
+
+        UT_String varName = attrName;
+        varName.toUpper();
+        mGeo->addVariableName(attrName, varName);
+    }
+
+    if (mParms.addValue &&
+        ((mParms.tileStyle == STYLE_POINTS) || (mParms.voxelStyle == STYLE_POINTS)))
+    {
+        const std::string valueType = grid.valueType();
+
+        UT_String attrName;
+        if (mParms.useGridName) {
+            attrName = grid.getName();
+            attrName.forceValidVariableName();
+        }
+
+        if (valueType == openvdb::typeNameAsString<float>() ||
+            valueType == openvdb::typeNameAsString<double>())
+        {
+            if (!attrName.isstring()) attrName = "vdb_float";
+            UT_String varName = attrName;
+            varName.toUpper();
+
+            GA_RWAttributeRef attribHandle =
+                mGeo->findFloatTuple(GA_ATTRIB_POINT, attrName, 1);
+
+            if (!attribHandle.isValid()) {
+                attribHandle = mGeo->addFloatTuple(
+                    GA_ATTRIB_POINT, attrName, 1, GA_Defaults(0));
+            }
+
+            mFloatHandle = attribHandle.getAttribute();
+            mGeo->addVariableName(attrName, varName);
+
+        } else if (valueType == openvdb::typeNameAsString<int32_t>() ||
+            valueType == openvdb::typeNameAsString<int64_t>() ||
+            valueType == openvdb::typeNameAsString<bool>())
+        {
+            if (!attrName.isstring()) attrName = "vdb_int";
+            UT_String varName = attrName;
+            varName.toUpper();
+
+            GA_RWAttributeRef attribHandle =
+                mGeo->findIntTuple(GA_ATTRIB_POINT, attrName, 1);
+
+            if (!attribHandle.isValid()) {
+                attribHandle = mGeo->addIntTuple(
+                    GA_ATTRIB_POINT, attrName, 1, GA_Defaults(0));
+            }
+
+            mInt32Handle = attribHandle.getAttribute();
+            mGeo->addVariableName(attrName, varName);
+
+        } else if (valueType == openvdb::typeNameAsString<openvdb::Vec3s>() ||
+            valueType == openvdb::typeNameAsString<openvdb::Vec3d>())
+        {
+            if (!attrName.isstring()) attrName = "vdb_vec3f";
+            UT_String varName = attrName;
+            varName.toUpper();
+
+            GA_RWAttributeRef attribHandle =
+                mGeo->findFloatTuple(GA_ATTRIB_POINT, attrName, 3);
+
+            if (!attribHandle.isValid()) {
+                attribHandle = mGeo->addFloatTuple(
+                    GA_ATTRIB_POINT, attrName, 3, GA_Defaults(0));
+            }
+
+            mVec3fHandle = attribHandle.getAttribute();
+            mGeo->addVariableName(attrName, varName);
+
+        } else {
+            throw std::runtime_error(
+                "value attributes are not supported for values of type " + valueType);
+        }
+    }
+
+    //}
+
     // Render nodes.
     if (mParms.internalStyle || mParms.leafStyle) {
         openvdb::CoordBBox bbox;
@@ -745,117 +877,25 @@ TreeVisualizer::operator()(const GridType& grid)
             if (isLeaf && !mParms.leafStyle) continue;
             if (!isLeaf && !mParms.internalStyle) continue;
 
-            bool solid = (isLeaf ? mParms.leafStyle == STYLE_SOLID_BOX
+            const bool solid = (isLeaf ? mParms.leafStyle == STYLE_SOLID_BOX
                 : mParms.internalStyle == STYLE_SOLID_BOX);
 
+            const auto color = SOP_OpenVDB_Visualize::colorLevel(iter.getLevel());
+
             iter.getBoundingBox(bbox);
-            addBox(bbox, SOP_OpenVDB_Visualize::colorLevel(iter.getLevel()), solid);
+            if (isLeaf && mParms.leafStyle == STYLE_POINTS) {
+                addPoint(bbox, color, staggered);
+            } else {
+                addBox(bbox, color, solid);
+            }
         }
     }
 
     if (!mParms.tileStyle && !mParms.voxelStyle) return;
 
-    // Create point attributes.
-    if (mParms.tileStyle == STYLE_POINTS || mParms.voxelStyle == STYLE_POINTS) {
-
-        const std::string valueType = grid.valueType();
-
-        if (mParms.addIndexCoord) {
-            UT_String attrName = "vdb_ijk";
-            UT_String varName = attrName;
-            varName.toUpper();
-
-            GA_RWAttributeRef attribHandle = mGeo->findIntTuple(GA_ATTRIB_POINT, attrName, 3);
-            if (!attribHandle.isValid()) {
-                attribHandle = mGeo->addIntTuple(GA_ATTRIB_POINT, attrName, 3, GA_Defaults(0));
-            }
-
-            mIndexCoordHandle = attribHandle.getAttribute();
-            mGeo->addVariableName(attrName, varName);
-        }
-
-        if (mParms.addValue) {
-            UT_String attrName;
-            if (mParms.useGridName) {
-                attrName = grid.getName();
-                attrName.forceValidVariableName();
-            }
-
-            if (valueType == openvdb::typeNameAsString<float>() ||
-                valueType == openvdb::typeNameAsString<double>())
-            {
-                if (!attrName.isstring()) attrName = "vdb_float";
-                UT_String varName = attrName;
-                varName.toUpper();
-
-                GA_RWAttributeRef attribHandle =
-                    mGeo->findFloatTuple(GA_ATTRIB_POINT, attrName, 1);
-
-                if (!attribHandle.isValid()) {
-                    attribHandle = mGeo->addFloatTuple(
-                        GA_ATTRIB_POINT, attrName, 1, GA_Defaults(0));
-                }
-
-                mFloatHandle = attribHandle.getAttribute();
-                mGeo->addVariableName(attrName, varName);
-
-            } else if (valueType == openvdb::typeNameAsString<int32_t>() ||
-                valueType == openvdb::typeNameAsString<int64_t>() ||
-                valueType == openvdb::typeNameAsString<bool>())
-            {
-                if (!attrName.isstring()) attrName = "vdb_int";
-                UT_String varName = attrName;
-                varName.toUpper();
-
-                GA_RWAttributeRef attribHandle =
-                mGeo->findIntTuple(GA_ATTRIB_POINT, attrName, 1);
-
-                if (!attribHandle.isValid()) {
-                    attribHandle = mGeo->addIntTuple(
-                        GA_ATTRIB_POINT, attrName, 1, GA_Defaults(0));
-                }
-
-                mInt32Handle = attribHandle.getAttribute();
-                mGeo->addVariableName(attrName, varName);
-
-            } else if (valueType == openvdb::typeNameAsString<openvdb::Vec3s>() ||
-                valueType == openvdb::typeNameAsString<openvdb::Vec3d>())
-            {
-                if (!attrName.isstring()) attrName = "vdb_vec3f";
-                UT_String varName = attrName;
-                varName.toUpper();
-
-                GA_RWAttributeRef attribHandle =
-                    mGeo->findFloatTuple(GA_ATTRIB_POINT, attrName, 3);
-
-                if (!attribHandle.isValid()) {
-                    attribHandle = mGeo->addFloatTuple(
-                        GA_ATTRIB_POINT, attrName, 3, GA_Defaults(0));
-                }
-
-                mVec3fHandle = attribHandle.getAttribute();
-                mGeo->addVariableName(attrName, varName);
-
-            } else {
-                throw std::runtime_error(
-                    "value attributes are not supported for values of type " + valueType);
-            }
-        }
-    }
-
-    if (mParms.addColor) {
-        mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT));
-        if (!mCdHandle.isValid()) {
-            mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT));
-        }
-    }
-
-    const bool staggered = !mParms.ignoreStaggeredVectors &&
-        (grid.getGridClass() == openvdb::GRID_STAGGERED);
-
     // Render tiles and voxels.
     openvdb::CoordBBox bbox;
-    for (typename TreeType::ValueOnCIter iter = grid.cbeginValueOn(); iter; ++iter) {
+    for (auto iter = grid.cbeginValueOn(); iter; ++iter) {
         if (wasInterrupted()) break;
 
         const int style = iter.isVoxelValue() ? mParms.voxelStyle : mParms.tileStyle;
@@ -1154,10 +1194,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Cont
 #endif
 
         TreeParms treeParms;
-        treeParms.internalStyle = evalRenderStyle(*this, "drawinternalnodes", "internalmode", time);
-        treeParms.tileStyle = evalRenderStyle(*this, "drawtiles", "tilemode", time);
-        treeParms.leafStyle = evalRenderStyle(*this, "drawleafnodes", "leafmode", time);
-        treeParms.voxelStyle = evalRenderStyle(*this, "drawvoxels", "voxelmode", time);
+        treeParms.internalStyle =
+            evalRenderStyle(*this, "drawinternalnodes", "internalstyle", time);
+        treeParms.tileStyle = evalRenderStyle(*this, "drawtiles", "tilestyle", time);
+        treeParms.leafStyle = evalRenderStyle(*this, "drawleafnodes", "leafstyle", time);
+        treeParms.voxelStyle = evalRenderStyle(*this, "drawvoxels", "voxelstyle", time);
         treeParms.addColor = bool(evalInt("addcolor", 0, time));
         treeParms.addValue = bool(evalInt("addvalue", 0, time));
         treeParms.addIndexCoord = bool(evalInt("addindexcoord", 0, time));
@@ -1194,11 +1235,15 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Cont
 #if UT_MAJOR_VERSION_INT < 16
             parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);
 #else
-            // parms.primGroup might be modified, so make a copy.
             UT_UniquePtr<GA_PrimitiveGroup> groupDeleter;
-            parms.primGroup = new GA_PrimitiveGroup(*refGdp);
-            groupDeleter.reset(parms.primGroup);
-            parms.primGroup->copyMembership(*group);
+            if (!group) {
+                parms.primGroup = nullptr;
+            } else {
+                // parms.primGroup might be modified, so make a copy.
+                parms.primGroup = new GA_PrimitiveGroup(*refGdp);
+                groupDeleter.reset(parms.primGroup);
+                parms.primGroup->copyMembership(*group);
+            }
 #endif
             GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms, adaptivity, /*keep_original*/true);
         }

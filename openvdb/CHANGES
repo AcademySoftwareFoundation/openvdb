@@ -1,6 +1,28 @@
 OpenVDB Version History
 =======================
 
+Version 5.2.1 - In development
+
+    New features:
+    - Added support to the ParticlesToLevelSet tool for fast rasterization
+      of particles into boolean mask grids.
+    - Added convenience functions particlesToSdf(), particleTrailsToSdf(),
+      particlesToMask() and particleTrailsToMask() for common particle
+      rasterization use cases.
+
+    Improvements:
+    - Improved the responsiveness of the mesh to volume converter to
+      interrupt requests.
+
+    Houdini:
+    - Added an option to the Visualize SOP to display leaf nodes as points.
+    - Renamed the Visualize SOP's "leafmode", "internalmode", "tilemode"
+      and "voxelmode" parameters to "leafstyle", "internalstyle", etc.
+      and converted them from ordinal to string-valued.
+    - Made various improvements to viewport rendering of point data grids.
+      [Contributed by Nick Avramoussis]
+
+
 Version 5.2.0 - August 13, 2018
 
     New features:
@@ -54,6 +76,8 @@ Version 5.2.0 - August 13, 2018
       [Reported by Doug Epps]
 
     Houdini:
+    - Added an option to the From Particles SOP to output an
+      interior mask grid.
     - Added options to the Metadata SOP to set the grid name
       and to propagate metadata to primitive attributes and vice-versa.
     - Modified GU_PrimVDB::convertVolumesToVDBs() to set the output VDBs'
