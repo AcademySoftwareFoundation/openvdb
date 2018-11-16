@@ -11,6 +11,30 @@ Version 6.0.0 - In development
       OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
       Houdini 15, 15.5 and 16, 4 for Houdini 16.5 and 5 for Houdini 17.0
 
+    New features:
+    - Added support to the ParticlesToLevelSet tool for fast rasterization
+      of particles into boolean mask grids.
+    - Added convenience functions particlesToSdf(), particleTrailsToSdf(),
+      particlesToMask() and particleTrailsToMask() for common particle
+      rasterization use cases.
+
+    Improvements:
+    - Improved the responsiveness of the mesh to volume converter to
+      interrupt requests.
+
+    ABI changes:
+    - Added new virtual functions to AttributeArray.
+    - Changed the order and size of member variables in AttributeArray
+      and TypedAttributeArray classes.
+
+    Houdini:
+    - Added an option to the Visualize SOP to display leaf nodes as points.
+    - Renamed the Visualize SOP's "leafmode", "internalmode", "tilemode"
+      and "voxelmode" parameters to "leafstyle", "internalstyle", etc.
+      and converted them from ordinal to string-valued.
+    - Made various improvements to viewport rendering of point data grids.
+      [Contributed by Nick Avramoussis]
+
 
 Version 5.2.0 - August 13, 2018
 
@@ -65,6 +89,8 @@ Version 5.2.0 - August 13, 2018
       [Reported by Doug Epps]
 
     Houdini:
+    - Added an option to the From Particles SOP to output an
+      interior mask grid.
     - Added options to the Metadata SOP to set the grid name
       and to propagate metadata to primitive attributes and vice-versa.
     - Modified GU_PrimVDB::convertVolumesToVDBs() to set the output VDBs'
