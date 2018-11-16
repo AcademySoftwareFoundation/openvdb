@@ -1155,6 +1155,36 @@ TestAttributeArray::testAttributeArrayCopy()
 
         CPPUNIT_ASSERT(!attr.isUniform());
     }
+
+    { // target attribute array is uniform
+        AttributeArrayD uniformTypedAttr(size);
+        AttributeArray& uniformAttr(uniformTypedAttr);
+
+        uniformTypedAttr.collapse(5.3);
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        typedAttr.set(5, 1.2);
+        typedAttr.set(10, 3.1);
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+
+        std::vector<std::pair<Index, Index>> uniformIndexPairs;
+        uniformIndexPairs.push_back(std::make_pair(10, 0));
+        uniformIndexPairs.push_back(std::make_pair(5, 0));
+        VectorWrapper uniformWrapper(uniformIndexPairs);
+
+        CPPUNIT_ASSERT_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper,
+            /*rangeChecking=*/true), IndexError);
+
+        CPPUNIT_ASSERT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+        CPPUNIT_ASSERT(uniformTypedAttr.get(0) == typedAttr.get(5));
+    }
 #endif
 }
 

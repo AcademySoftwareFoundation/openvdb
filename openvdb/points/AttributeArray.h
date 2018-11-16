@@ -285,11 +285,13 @@ public:
     /// both value types are floating-point or both integer
     /// @param rangeChecking        if true, checks for out-of-range errors on source or target and
     ///                             checks that this array is not uniform
+    /// @note it is possible to use this method to write to a uniform target array if the iterator
+    /// does not have non-zero target indices, simply disable range-checking for this case
     template <typename IterT>
     void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter, bool rangeChecking = false);
-    /// @param preserveUniformity   if true, attempts to collapse this array if the array started as uniform
+    /// @param compact   if true, attempts to collapse this array
     template <typename IterT>
-    void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool preserveUniformity = true);
+    void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
     //@}
 #endif
 
@@ -303,11 +305,12 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// Return @c true if this array is compressed.
+    /// Deprecated method that previously returned true if this array is compressed,
+    /// now always returns false.
     OPENVDB_DEPRECATED bool isCompressed() const { return false; }
-    /// Compress the attribute array.
+    /// Deprecated method that previously compressed the attribute array, now it does nothing.
     OPENVDB_DEPRECATED virtual bool compress() = 0;
-    /// Uncompress the attribute array.
+    /// Deprecated method that previously uncompressed the attribute array, now it does nothing.
     OPENVDB_DEPRECATED virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
@@ -1029,7 +1032,7 @@ void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const I
     bool rangeChecking/* = false*/)
 {
     // ensure both arrays have float-float or integer-integer value types
-    assert(sourceArray.valueTypeIsFloatingPoint() != this->valueTypeIsFloatingPoint());
+    assert(sourceArray.valueTypeIsFloatingPoint() == this->valueTypeIsFloatingPoint());
     // ensure both arrays have been loaded from disk (if delay-loaded)
     assert(sourceArray.isDataLoaded() && this->isDataLoaded());
     // ensure storage size * stride matches on both arrays
@@ -1066,6 +1069,7 @@ void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const I
             // range-checking asserts
             assert(sourceIndex < sourceArray.dataSize());
             assert(targetIndex < this->dataSize());
+            if (this->isUniform())  assert(targetIndex == Index(0));
         }
 
         const size_t targetOffset(targetIndex * bytes);
@@ -1077,7 +1081,7 @@ void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const I
 
 template <typename IterT>
 void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& iter,
-    bool preserveUniformity/* = true*/)
+    bool compact/* = true*/)
 {
     const Index bytes = sourceArray.storageTypeSize();
     if (bytes != this->storageTypeSize()) {
@@ -1088,17 +1092,13 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
     sourceArray.loadData();
     this->loadData();
 
-    const bool uniform = this->isUniform();
-
     // if the target array is uniform, expand it first
-    if (uniform) {
-        this->expand();
-    }
+    this->expand();
 
     this->copyValuesUnsafe(sourceArray, iter, /*rangeChecking = */true);
 
-    // attempt to compact target array if previously uniform
-    if (preserveUniformity && uniform) {
+    // attempt to compact target array
+    if (compact) {
         this->compact();
     }
 }
@@ -1150,7 +1150,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     , mIsUniform(rhs.mIsUniform)
 #endif
 {
-    if (!this->isOutOfCore()) {
+    if (this->validData()) {
         this->allocate();
         std::memcpy(this->data(), rhs.data(), this->arrayMemUsage());
     }
@@ -1172,7 +1172,7 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         mStrideOrTotalSize = rhs.mStrideOrTotalSize;
         mIsUniform = rhs.mIsUniform;
 
-        if (!rhs.isOutOfCore()) {
+        if (this->validData()) {
             this->allocate();
             std::memcpy(this->newDataAsByteArray(), rhs.newDataAsByteArray(), this->arrayMemUsage());
         }
@@ -1304,6 +1304,10 @@ bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
 {
     // std::is_floating_point evaluates to false for half so use std::is_integral
+    // Note that as implemented, this only works as expected for vectors, not matrices
+    // and quaternions. However, because we don't use integer matrices or quaternions,
+    // this still performs correctly for all the types we care about.
+    // TODO: Update to use Traits that correctly handle matrices and quaternions.
     return !std::is_integral<typename VecTraits<ValueType>::ElementType>::value;
 }
 
