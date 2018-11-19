@@ -2,6 +2,38 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v5_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 5.2.1</B> - <I>In development</I>
+
+@par
+New features:
+- Added support to the
+  @link ParticlesToLevelSet.h ParticlesToLevelSet@endlink tool
+  for fast rasterization of particles into boolean mask grids.
+- Added convenience functions
+  @vdblink::tools::particlesToSdf() particlesToSdf@endlink,
+  @vdblink::tools::particleTrailsToSdf() particleTrailsToSdf@endlink,
+  @vdblink::tools::particlesToMask() particlesToMask@endlink
+  and @vdblink::tools::particleTrailsToMask() particleTrailsToMask@endlink
+  for common particle rasterization use cases.
+
+@par
+Improvements:
+- Improved the responsiveness of the
+  @link MeshToVolume.h mesh to volume@endlink converter to interrupt requests.
+
+@par
+Houdini:
+- Added an option to the Visualize&nbsp;SOP to display leaf nodes as points.
+- Renamed the Visualize&nbsp;SOP&rsquo;s <TT>leafmode</TT>,
+  <TT>internalmode</TT>, <TT>tilemode</TT> and <TT>voxelmode</TT> parameters
+  to <TT>leafstyle</TT>, <TT>internalstyle</TT>, etc. and converted them
+  from ordinals to strings.
+- Made various improvements to viewport rendering of point data grids.
+  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+
+
 @htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 5.2.0</B> - <I>August 13, 2018</I>
@@ -73,6 +105,8 @@ Bug fixes:
 
 @par
 Houdini:
+- Added an option to the From&nbsp;Particles&nbsp;SOP to output an
+  interior mask grid.
 - Added options to the Metadata&nbsp;SOP to set the grid name
   and to propagate metadata to primitive attributes and vice-versa.
 - Modified <A HREF=
