@@ -219,16 +219,8 @@ int main()
     // Name the grid "LevelSetSphere".
     grid->setName("LevelSetSphere");
 
-    // Create a VDB file object.
-    openvdb::io::File file("mygrids.vdb");
-
-    // Add the grid pointer to a container.
-    openvdb::GridPtrVec grids;
-    grids.push_back(grid);
-
-    // Write out the contents of the container.
-    file.write(grids);
-    file.close();
+    // Create a VDB file object and write out the grid.
+    openvdb::io::File("mygrids.vdb").write({grid});
 }
 @endcode
 
@@ -1337,16 +1329,8 @@ int main()
     // Set the name of the grid
     grid->setName("Points");
 
-    // Create a VDB file object for writing.
-    openvdb::io::File file("mypoints.vdb");
-
-    // Add the PointDataGrid pointer to a container.
-    openvdb::GridPtrVec grids;
-    grids.push_back(grid);
-
-    // Write out the contents of the container.
-    file.write(grids);
-    file.close();
+    // Create a VDB file object and write out the grid.
+    openvdb::io::File("mypoints.vdb").write({grid});
 
     // Create a new VDB file object for reading.
     openvdb::io::File newFile("mypoints.vdb");
