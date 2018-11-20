@@ -224,7 +224,7 @@ public:
     virtual bool valueTypeIsFloatingPoint() const = 0;
 
     /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
-    virtual bool valueTypeIsScalar() const = 0;
+    virtual bool valueTypeIsClass() const = 0;
 
     /// Return @c true if the value type is a vector
     virtual bool valueTypeIsVector() const = 0;
@@ -283,12 +283,10 @@ public:
     /// @endcode
     /// @note assumes that the strided storage sizes match, the arrays are both in-core and that
     /// both value types are floating-point or both integer
-    /// @param rangeChecking        if true, checks for out-of-range errors on source or target and
-    ///                             checks that this array is not uniform
     /// @note it is possible to use this method to write to a uniform target array if the iterator
-    /// does not have non-zero target indices, simply disable range-checking for this case
+    /// does not have non-zero target indices
     template <typename IterT>
-    void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter, bool rangeChecking = false);
+    void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter);
     /// @param compact   if true, attempts to collapse this array
     template <typename IterT>
     void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
@@ -394,6 +392,11 @@ private:
     /// Virtual function to retrieve the data buffer cast to a char byte array
     virtual char* dataAsByteArray() = 0;
     virtual const char* dataAsByteArray() const = 0;
+
+    /// Private implementation for copyValues/copyValuesUnsafe
+    template <typename IterT>
+    void doCopyValues(const AttributeArray& sourceArray, const IterT& iter,
+        bool rangeChecking = true);
 #endif
 
 protected:
@@ -655,7 +658,7 @@ public:
     bool valueTypeIsFloatingPoint() const override;
 
     /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
-    bool valueTypeIsScalar() const override;
+    bool valueTypeIsClass() const override;
 
     /// Return @c true if the value type is a vector
     bool valueTypeIsVector() const override;
@@ -1027,16 +1030,18 @@ UnitVecCodec::encode(const math::Vec3<T>& val, StorageType& data)
 // AttributeArray implementation
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
+
 template <typename IterT>
-void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter,
-    bool rangeChecking/* = false*/)
+void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT& iter,
+    bool rangeChecking/*=true*/)
 {
     // ensure both arrays have float-float or integer-integer value types
     assert(sourceArray.valueTypeIsFloatingPoint() == this->valueTypeIsFloatingPoint());
     // ensure both arrays have been loaded from disk (if delay-loaded)
     assert(sourceArray.isDataLoaded() && this->isDataLoaded());
     // ensure storage size * stride matches on both arrays
-    assert(this->storageTypeSize()*this->stride() == sourceArray.storageTypeSize()*sourceArray.stride());
+    assert(this->storageTypeSize()*this->stride() ==
+        sourceArray.storageTypeSize()*sourceArray.stride());
 
     const size_t bytes(sourceArray.storageTypeSize()*sourceArray.stride());
     const char* const sourceBuffer = sourceArray.dataAsByteArray();
@@ -1080,6 +1085,12 @@ void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const I
 }
 
 template <typename IterT>
+void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter)
+{
+    this->doCopyValues(sourceArray, iter, /*range-checking=*/false);
+}
+
+template <typename IterT>
 void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& iter,
     bool compact/* = true*/)
 {
@@ -1095,7 +1106,7 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
     // if the target array is uniform, expand it first
     this->expand();
 
-    this->copyValuesUnsafe(sourceArray, iter, /*rangeChecking = */true);
+    this->doCopyValues(sourceArray, iter, true);
 
     // attempt to compact target array
     if (compact) {
@@ -1314,11 +1325,10 @@ TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
 
 template<typename ValueType_, typename Codec_>
 bool
-TypedAttributeArray<ValueType_, Codec_>::valueTypeIsScalar() const
+TypedAttributeArray<ValueType_, Codec_>::valueTypeIsClass() const
 {
-    return  !this->valueTypeIsVector() &&
-            !this->valueTypeIsQuaternion() &&
-            !this->valueTypeIsMatrix();
+    // half is not defined as a non-class type as expected, so explicitly exclude it
+    return std::is_class<ValueType>::value && !std::is_same<half, ValueType>::value;
 }
 
 

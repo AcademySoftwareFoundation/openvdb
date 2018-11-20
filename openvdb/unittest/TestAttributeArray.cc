@@ -417,7 +417,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
             CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -430,7 +430,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
             CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -443,7 +443,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
             CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -456,7 +456,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
             CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -470,7 +470,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -483,7 +483,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -496,7 +496,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -509,7 +509,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(12), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(12), attr.storageTypeSize());
             CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
             CPPUNIT_ASSERT(attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -522,7 +522,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(24), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(24), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
             CPPUNIT_ASSERT(attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -535,7 +535,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(36), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(36), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
@@ -548,7 +548,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(128), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(128), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
@@ -561,7 +561,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(16), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(16), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -574,7 +574,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
             CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsScalar());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
@@ -1107,12 +1107,6 @@ TestAttributeArray::testAttributeArrayCopy()
         rangeIndexPairs[10].second = size+1;
 
         CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
-        CPPUNIT_ASSERT_THROW(attr.copyValuesUnsafe(sourceAttr, rangeWrapper,
-            /*range-checking=*/true), IndexError);
-
-        // TODO: find a good way of testing the following without reading invalid memory
-        // CPPUNIT_ASSERT_THROW(attr.copyValuesUnsafe(sourceAttr, rangeWrapper,
-        //     /*range-checking=*/false), IndexError);
     }
 
     { // source attribute array is uniform
@@ -1177,8 +1171,7 @@ TestAttributeArray::testAttributeArrayCopy()
         uniformIndexPairs.push_back(std::make_pair(5, 0));
         VectorWrapper uniformWrapper(uniformIndexPairs);
 
-        CPPUNIT_ASSERT_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper,
-            /*rangeChecking=*/true), IndexError);
+        // note that calling copyValues() will implicitly expand the uniform target
 
         CPPUNIT_ASSERT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
 
