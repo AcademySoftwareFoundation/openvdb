@@ -1314,12 +1314,19 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
 {
-    // std::is_floating_point evaluates to false for half so use std::is_integral
-    // Note that as implemented, this only works as expected for vectors, not matrices
-    // and quaternions. However, because we don't use integer matrices or quaternions,
-    // this still performs correctly for all the types we care about.
     // TODO: Update to use Traits that correctly handle matrices and quaternions.
-    return !std::is_integral<typename VecTraits<ValueType>::ElementType>::value;
+
+    if (std::is_same<ValueType, Quats>::value ||
+        std::is_same<ValueType, Quatd>::value ||
+        std::is_same<ValueType, Mat3s>::value ||
+        std::is_same<ValueType, Mat3d>::value ||
+        std::is_same<ValueType, Mat4s>::value ||
+        std::is_same<ValueType, Mat4d>::value)      return true;
+
+    using ElementT = typename VecTraits<ValueType>::ElementType;
+
+    // half is not defined as float point as expected, so explicitly handle it
+    return std::is_floating_point<ElementT>::value || std::is_same<half, ElementT>::value;
 }
 
 
