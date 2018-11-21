@@ -2416,8 +2416,15 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     // 3. Group connected segments
 
     std::deque<NodeMaskSegmentRawPtrVector> nodeSegmentGroups;
+    
+    size_t idx = 0;
+    while(nodeSegmentArray[idx].size() == 0 && idx < leafnodes.size())
+      ++idx;
 
-    NodeMaskSegmentType* nextSegment = nodeSegmentArray[0][0].get();
+    if(idx == leafnodes.size())
+      return;
+    
+    NodeMaskSegmentType* nextSegment = nodeSegmentArray[idx][0].get();
     while (nextSegment) {
 
         nodeSegmentGroups.push_back(NodeMaskSegmentRawPtrVector());
@@ -2534,6 +2541,8 @@ segmentActiveVoxels(const GridOrTreeType& volume,
     extractActiveVoxelSegmentMasks(inputTree, maskSegmentArray);
 
     const size_t numSegments = maskSegmentArray.size();
+
+    if(numSegments == 0) return;
 
     if (numSegments < 2) {
         // single segment early-out
