@@ -1,6 +1,6 @@
 # Overview
 
-This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affilation. Participants all our bound the ASWF Code of Conduct.
+This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affilation. Participants all our bound to the ASWF Code of Conduct.
 
 # Project roles
 
@@ -10,13 +10,14 @@ The contributor role is the starting role for anyone participating in the projec
 
 # Process for becoming a contributor
 
-* Review the CONTRIBUTING.md guidelines to ensure your contribution is inline with the project's coding and styling guidelines.
-* Submit your code as a PR with the appropriate DCO signoff
-* Have you submission approved by the maintainer(s) and merged into the codebase.
+* Review the [coding standards](http://www.openvdb.org/documentation/doxygen/codingStyle.html) to ensure your contribution is in line with the project's coding and styling guidelines.
+* Sign the Individual CLA and have your organization sign the Corporate CLA.
+* Submit your code as a PR with the appropriate DCO signoff.
+* Have your submission approved by the maintainer(s) and merged into the codebase.
 
 ## Committer
 
-The committer role enables the participation to commit code directly to the repository, but also comes with the responsibility of being a responsible leader in the community.
+The committer role enables the participant to commit code directly to the repository, but also comes with the obligation to be a responsible leader in the community.
 
 ### Process for becoming a committer
 
@@ -30,10 +31,10 @@ The committer role enables the participation to commit code directly to the repo
 * Monitor email aliases.
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other committers and the community.
-* Make sure that ongoing PRs are moving forward at the right pace or closing them.
+* Make sure that ongoing PRs are moving forward at the right pace or close them.
 * In general continue to be willing to spend at least 25% of ones time working on the project (~1.25 business days per week).
 
-### When does a committer lose committer status
+### When does a committer lose committer status?
 
 If a committer is no longer interested or cannot perform the committer duties listed above, they
 should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
@@ -41,9 +42,9 @@ the committers per the voting process below.
 
 ## Technical Steering Committee (TSC) member
 
-The Techincal Steering Committee (TSC) oversees the overall techincal direction of OpenVDB, as defined in the [charter](charter.md).
+The Technical Steering Committee (TSC) oversees the overall technical direction of OpenVDB, as defined in the [charter](charter.md).
 
-TSC voting members consist of committers that have been nominated by the committers, with a super majority of committers required to have a committer elected to be a TSC voting member. TSC voting members term and succession is defined in the [charter](charter.md).
+TSC voting members consist of committers that have been nominated by the committers, with a supermajority of voting members required to have a committer elected to be a TSC voting member. TSC voting members term and succession is defined in the [charter](charter.md).
 
 All meetings of the TSC are open to participation by any member of the OpenVDB community. Meeting times are listed in the [ASWF techincal community calendar](https://lists.aswf.io/g/tac/calendar).
 
