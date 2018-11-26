@@ -12,7 +12,7 @@ The contributor role is the starting role for anyone participating in the projec
 
 * Review the [coding standards](http://www.openvdb.org/documentation/doxygen/codingStyle.html) to ensure your contribution is in line with the project's coding and styling guidelines.
 * Sign the Individual CLA and have your organization sign the Corporate CLA.
-* Submit your code as a PR with the appropriate DCO signoff.
+* Submit your code as a PR with the appropriate DCO sign-off.
 * Have your submission approved by the maintainer(s) and merged into the codebase.
 
 ## Committer
@@ -32,7 +32,7 @@ The committer role enables the participant to commit code directly to the reposi
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other committers and the community.
 * Make sure that ongoing PRs are moving forward at the right pace or close them.
-* In general continue to be willing to spend at least 25% of ones time working on the project (~1.25 business days per week).
+* In general continue to be willing to spend at least 25% of one's time working on the project (~1.25 business days per week).
 
 ### When does a committer lose committer status?
 
@@ -46,7 +46,7 @@ The Technical Steering Committee (TSC) oversees the overall technical direction 
 
 TSC voting members consist of committers that have been nominated by the committers, with a supermajority of voting members required to have a committer elected to be a TSC voting member. TSC voting members term and succession is defined in the [charter](charter.md).
 
-All meetings of the TSC are open to participation by any member of the OpenVDB community. Meeting times are listed in the [ASWF techincal community calendar](https://lists.aswf.io/g/tac/calendar).
+All meetings of the TSC are open to participation by any member of the OpenVDB community. Meeting times are listed in the [ASWF technical community calendar](https://lists.aswf.io/g/tac/calendar).
 
 ## Current TSC members
 
@@ -71,7 +71,7 @@ be resolved by voting. The voting process is a simple majority in which each TSC
 
 This project, just like all of open source, is a global community. In addition to the Code of Conduct, this project will:
 
-* Keep all communucation on open channels ( mailing list, forums, chat ).
+* Keep all communication on open channels ( mailing list, forums, chat ).
 * Be respectful of time and language differences between community members ( such as scheduling meetings, email/issue responsiveness, etc ).
 * Ensure tools are able to be used by community members regardless of their region.
 
