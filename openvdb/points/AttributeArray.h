@@ -223,7 +223,7 @@ public:
     /// Return @c true if the value type is floating point
     virtual bool valueTypeIsFloatingPoint() const = 0;
 
-    /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
+    /// Return @c true if the value type is a class (ie vector, matrix or quaternion return true)
     virtual bool valueTypeIsClass() const = 0;
 
     /// Return @c true if the value type is a vector
@@ -257,7 +257,7 @@ public:
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
-    /// @note deprecated from ABI=6, use set()/setUnsafe() with source-target index pairs
+    /// @note deprecated from ABI=6, use copyValues() with source-target index pairs
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     OPENVDB_DEPRECATED
 #endif
@@ -657,7 +657,7 @@ public:
     /// Return @c true if the value type is floating point
     bool valueTypeIsFloatingPoint() const override;
 
-    /// Return @c true if the value type is scalar (not vector, quaternion or matrix)
+    /// Return @c true if the value type is a class (ie vector, matrix or quaternion return true)
     bool valueTypeIsClass() const override;
 
     /// Return @c true if the value type is a vector
