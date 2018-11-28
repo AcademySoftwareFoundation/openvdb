@@ -234,6 +234,22 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
     if (UT_InfoTree* child = tree.addChildMap("OpenVDB")) {
         child->addProperties("OpenVDB Version", openvdb::getLibraryAbiVersionString());
     }
+
+    UT_StringArray sparseVolumeTreePath({"SOP Info", "Sparse Volumes"});
+    if (UT_InfoTree* sparseVolumes = tree.getDescendentPtr(sparseVolumeTreePath)) {
+        if (UT_InfoTree* info = sparseVolumes->addChildBranch("OpenVDB Points")) {
+
+            OP_Context context(parms.getTime());
+            GU_DetailHandle gdHandle = getCookedGeoHandle(context);
+            if (gdHandle.isNull()) return;
+
+            GU_DetailHandleAutoReadLock gdLock(gdHandle);
+            const GU_Detail* tmpGdp = gdLock.getGdp();
+            if (!tmpGdp) return;
+
+            populateInfoTree(*info, *tmpGdp);
+        }
+    }
 }
 #endif
 

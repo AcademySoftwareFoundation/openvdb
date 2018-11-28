@@ -44,6 +44,7 @@
 #include <GA/GA_Attribute.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_ChoiceList.h>
+#include <UT/UT_InfoTree.h>
 
 #include <iosfwd>
 #include <map>
@@ -187,11 +188,19 @@ attributeStorageType(const GA_Attribute* const attribute);
 ///////////////////////////////////////
 
 
-/// @brief If the given grid is a PointDataGrid, add node specific info text to the stream provided
+/// @brief If the given grid is a PointDataGrid, add node specific info text to
+///        the stream provided. This is used to populate the MMB window in Houdini
+///        versions 15 and earlier, as well as the Operator Information Window.
 OPENVDB_HOUDINI_API
 void
 pointDataGridSpecificInfoText(std::ostream&, const openvdb::GridBase&);
 
+/// @brief Populate a UT_InfoTree with VDB Points information, structured for
+///        the mako templates in Houdini 16 and above. All valid OpenVDB Point
+///        grids contained in the provided GU_Detail are added.
+OPENVDB_HOUDINI_API
+void
+populateInfoTree(UT_InfoTree&, const GU_Detail&);
 
 ///////////////////////////////////////
 
