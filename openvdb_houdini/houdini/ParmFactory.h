@@ -342,7 +342,7 @@ public:
     /// @note Marking parameters as obsolete is preferable to making them invisible as changing
     /// invisible parameter values will still trigger a re-cook, however this is not possible
     /// when using multi-parms.
-    ParmFactory& setInvisible(bool);
+    ParmFactory& setInvisible();
 
     /// Construct and return the parameter template.
     PRM_Template get() const;

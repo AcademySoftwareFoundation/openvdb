@@ -695,7 +695,7 @@ ParmFactory&
 ParmFactory::setVectorSize(int n) { mImpl->vectorSize = n; return *this; }
 
 ParmFactory&
-ParmFactory::setInvisible(bool invisible) { mImpl->invisible = invisible; return *this; }
+ParmFactory::setInvisible() { mImpl->invisible = true; return *this; }
 
 PRM_Template
 ParmFactory::get() const

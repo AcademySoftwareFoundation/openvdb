@@ -418,7 +418,7 @@ Unit Vector:\n\
     }
 
     attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
-        .setInvisible(true) // this parm is now a no-op as in-memory blosc compression is deprecated
+        .setInvisible() // this parm is now a no-op as in-memory blosc compression is deprecated
         .setDefault(PRMzeroDefaults));
 
     // Add multi parm
