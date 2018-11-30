@@ -1076,15 +1076,6 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
 
     compactAttributes(tree);
 
-    // Apply blosc compression to attributes
-
-    for (const auto& attrInfo : attributes)
-    {
-        if (!attrInfo.second.second)  continue;
-
-        bloscCompressAttribute(tree, attrInfo.first);
-    }
-
     return pointDataGrid;
 }
 
