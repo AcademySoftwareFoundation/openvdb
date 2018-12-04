@@ -30,7 +30,7 @@
 //
 /// @file AttributeTransferUtil.h
 /// @author FX R&D Simulation team
-/// @brief Utility methods used by the From Mesh and From Particle SOPs
+/// @brief Utility methods used by the From/To Polygons and From Particles SOPs
 
 #ifndef OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
@@ -43,6 +43,7 @@
 
 #include <GA/GA_PageIterator.h>
 #include <GA/GA_SplittableRange.h>
+#include <GEO/GEO_PrimPolySoup.h>
 #include <SYS/SYS_Types.h>
 #include <UT/UT_Version.h>
 
@@ -1192,193 +1193,236 @@ template<class GridType>
 class TransferPrimitiveAttributesOp
 {
 public:
-    TransferPrimitiveAttributesOp(
-        const GU_Detail& sourceGeo, GU_Detail& targetGeo, const GridType& indexGrid,
-        std::vector<AttributeCopyBase::Ptr>& primAttributes,
-        std::vector<AttributeCopyBase::Ptr>& vertAttributes);
+    using IndexT = typename GridType::ValueType;
+    using IndexAccT = typename GridType::ConstAccessor;
+    using AttrCopyPtrVec = std::vector<AttributeCopyBase::Ptr>;
 
-    void operator()(const GA_SplittableRange&) const;
+    TransferPrimitiveAttributesOp(
+        const GU_Detail& sourceGeo,
+        GU_Detail& targetGeo,
+        const GridType& indexGrid,
+        AttrCopyPtrVec& primAttributes,
+        AttrCopyPtrVec& vertAttributes)
+        : mSourceGeo(sourceGeo)
+        , mTargetGeo(targetGeo)
+        , mIndexGrid(indexGrid)
+        , mPrimAttributes(primAttributes)
+        , mVertAttributes(vertAttributes)
+    {
+    }
+
+    inline void operator()(const GA_SplittableRange&) const;
+
 private:
+    inline void copyPrimAttrs(const GA_Primitive&, const UT_Vector3&, IndexAccT&) const;
+
+    template<typename PrimT>
+    inline void copyVertAttrs(const PrimT&, const UT_Vector3&, IndexAccT&) const;
+
     const GU_Detail& mSourceGeo;
     GU_Detail& mTargetGeo;
     const GridType& mIndexGrid;
-    std::vector<AttributeCopyBase::Ptr>& mPrimAttributes;
-    std::vector<AttributeCopyBase::Ptr>& mVertAttributes;
+    AttrCopyPtrVec& mPrimAttributes;
+    AttrCopyPtrVec& mVertAttributes;
 };
 
-template<class GridType>
-TransferPrimitiveAttributesOp<GridType>::TransferPrimitiveAttributesOp(
-    const GU_Detail& sourceGeo, GU_Detail& targetGeo, const GridType& indexGrid,
-    std::vector<AttributeCopyBase::Ptr>& primAttributes,
-    std::vector<AttributeCopyBase::Ptr>& vertAttributes)
-    : mSourceGeo(sourceGeo)
-    , mTargetGeo(targetGeo)
-    , mIndexGrid(indexGrid)
-    , mPrimAttributes(primAttributes)
-    , mVertAttributes(vertAttributes)
-{
-
-}
 
 template<class GridType>
-void
+inline void
 TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& range) const
 {
-    using IndexT = typename GridType::ValueType;
+    if (mPrimAttributes.empty() && mVertAttributes.empty()) return;
 
-    GA_Offset start, end, source, target, v0, v1, v2;
-    const GA_Primitive * primRef = nullptr;
-#if UT_MAJOR_VERSION_INT <= 15
-    GA_Primitive::const_iterator vtxIt;
-#endif
-
-    typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
-    const openvdb::math::Transform& transform = mIndexGrid.transform();
-    openvdb::Vec3d pos, indexPos, uvw;
-    openvdb::Coord ijk, coord;
-    std::vector<GA_Index> primitives(8), similar_primitives(8);
-
-    UT_Vector3 targetN, sourceN;
+    auto polyIdxAcc = mIndexGrid.getConstAccessor();
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
+        auto start = GA_Offset(), end = GA_Offset();
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
-            for (target = start; target < end; ++target) {
+            for (auto targetOffset = start; targetOffset < end; ++targetOffset) {
+                const auto* target = mTargetGeo.getPrimitiveList().get(targetOffset);
+                if (!target) continue;
 
-                primRef = mTargetGeo.getPrimitiveList().get(target);
-                targetN = mTargetGeo.getGEOPrimitive(target)->computeNormal();
+                const auto targetN = mTargetGeo.getGEOPrimitive(targetOffset)->computeNormal();
 
-                if (mPrimAttributes.size() != 0) {
-
-                    // Compute avg. vertex position
-                    pos[0] = 0.0;
-                    pos[1] = 0.0;
-                    pos[2] = 0.0;
-
-#if UT_MAJOR_VERSION_INT >= 16
-                    int count = static_cast<int>(primRef->getVertexCount());
-                    for (int vtx = 0; vtx < count; ++vtx) {
-                        const UT_Vector3 p = primRef->getPos3(vtx);
-                        pos[0] += p.x();
-                        pos[1] += p.y();
-                        pos[2] += p.z();
-                    }
-#else
-                    int count = 0;
-                    for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
-                        pos[0] += p.x();
-                        pos[1] += p.y();
-                        pos[2] += p.z();
-                    }
-#endif
-
-                    if (count > 1) pos *= (1.0 / float(count));
-                    indexPos = transform.worldToIndex(pos);
-
-                    // Find closest source primitive to current avg. vertex position.
-                    coord[0] = int(std::floor(indexPos[0]));
-                    coord[1] = int(std::floor(indexPos[1]));
-                    coord[2] = int(std::floor(indexPos[2]));
-
-                    primitives.clear();
-                    similar_primitives.clear();
-                    IndexT primIndex;
-
-                    for (int d = 0; d < 8; ++d) {
-                        ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
-                        ijk[1] = coord[1] + ((d & 0x02) >> 1);
-                        ijk[2] = coord[2] + ((d & 0x04) >> 2);
-
-                        if (acc.probeValue(ijk, primIndex) &&
-                            openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
-
-                            GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
-                            sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
-
-                            if (sourceN.dot(targetN) > 0.5) {
-                                similar_primitives.push_back(primIndex);
-                            } else {
-                                primitives.push_back(primIndex);
-                            }
-                        }
-                    }
-
-                    if (!primitives.empty() || !similar_primitives.empty()) {
-
-                        if (!similar_primitives.empty()) {
-                            source = findClosestPrimitiveToPoint(
-                                mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
-                        } else {
-                            source = findClosestPrimitiveToPoint(
-                                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
-                        }
-
-                        // Transfer attributes
-                        for (size_t n = 0, N = mPrimAttributes.size(); n < N; ++n) {
-                            mPrimAttributes[n]->copy(source, target);
-                        }
-                    }
+                if (!mPrimAttributes.empty()) {
+                    // Transfer primitive attributes.
+                    copyPrimAttrs(*target, targetN, polyIdxAcc);
                 }
 
-                if (mVertAttributes.size() != 0) {
-#if UT_MAJOR_VERSION_INT >= 16
-                    for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
-                        const UT_Vector3 p = primRef->getPos3(vtx);
+                if (!mVertAttributes.empty()) {
+#if UT_MAJOR_VERSION_INT < 16
+                    // Some required GEO_PrimPolySoup::PolygonIterator methods exist only in H16+.
+                    copyVertAttrs(*target, targetN, polyIdxAcc);
 #else
-                    for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
-#endif
-                        pos[0] = p.x();
-                        pos[1] = p.y();
-                        pos[2] = p.z();
-
-                        indexPos = transform.worldToIndex(pos);
-                        coord[0] = int(std::floor(indexPos[0]));
-                        coord[1] = int(std::floor(indexPos[1]));
-                        coord[2] = int(std::floor(indexPos[2]));
-
-                        int primIndex;
-                        primitives.clear();
-                        similar_primitives.clear();
-
-                        for (int d = 0; d < 8; ++d) {
-                            ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
-                            ijk[1] = coord[1] + ((d & 0x02) >> 1);
-                            ijk[2] = coord[2] + ((d & 0x04) >> 2);
-
-                            if (acc.probeValue(ijk, primIndex) &&
-                                openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
-
-                                GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
-                                sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
-
-                                if (sourceN.dot(targetN) > 0.5) {
-                                    primitives.push_back(primIndex);
+                    if (target->getTypeId() != GA_PRIMPOLYSOUP) {
+                        copyVertAttrs(*target, targetN, polyIdxAcc);
+                    } else {
+                        if (const auto* soup = UTverify_cast<const GEO_PrimPolySoup*>(target)) {
+                            // Iterate in parallel over the member polygons of a polygon soup.
+                            using SizeRange = UT_BlockedRange<GA_Size>;
+                            const auto processPolyRange = [&](const SizeRange& range) {
+                                auto threadLocalPolyIdxAcc = mIndexGrid.getConstAccessor();
+                                for (GEO_PrimPolySoup::PolygonIterator it(*soup, range.begin());
+                                    !it.atEnd() && (it.polygon() < range.end()); ++it)
+                                {
+                                    copyVertAttrs(it, it.computeNormal(), threadLocalPolyIdxAcc);
                                 }
-                            }
-                        }
-
-                        if (!primitives.empty() || !similar_primitives.empty()) {
-
-                            if (!similar_primitives.empty()) {
-                                findClosestPrimitiveToPoint(
-                                    mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
-                            } else {
-                                findClosestPrimitiveToPoint(
-                                    mSourceGeo, primitives, pos, v0, v1, v2, uvw);
-                            }
-
-                            for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
-#if UT_MAJOR_VERSION_INT >= 16
-                                mVertAttributes[n]->copy(v0, v1, v2,
-                                    primRef->getVertexOffset(vtx), uvw);
-#else
-                                mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);
-#endif
-                            }
+                            };
+                            UTparallelFor(SizeRange(0, soup->getPolygonCount()), processPolyRange);
                         }
                     }
+#endif
                 }
+            }
+        }
+    }
+}
+
+
+/// @brief Find the closest match to the target primitive from among the source primitives
+/// and copy primitive attributes from that primitive to the target primitive.
+/// @note This isn't a particularly useful operation when the target is a polygon soup,
+/// because the entire soup is a single primitive, whereas the source primitives
+/// are likely to be individual polygons.
+template<class GridType>
+inline void
+TransferPrimitiveAttributesOp<GridType>::copyPrimAttrs(
+    const GA_Primitive& targetPrim,
+    const UT_Vector3& targetNormal,
+    IndexAccT& polyIdxAcc) const
+{
+    const auto& transform = mIndexGrid.transform();
+
+    UT_Vector3 sourceN, targetN = targetNormal;
+    const bool isPolySoup = (targetPrim.getTypeId() == GA_PRIMPOLYSOUP);
+
+    // Compute avg. vertex position.
+    openvdb::Vec3d pos(0, 0, 0);
+#if UT_MAJOR_VERSION_INT >= 16
+    int count = static_cast<int>(targetPrim.getVertexCount());
+    for (int vtx = 0; vtx < count; ++vtx) {
+        pos += UTvdbConvert(targetPrim.getPos3(vtx));
+    }
+#else
+    int count = 0;
+    GA_Primitive::const_iterator vtxIt;
+    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
+        pos += UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
+    }
+#endif
+    if (count > 1) pos /= double(count);
+
+    // Find closest source primitive to current avg. vertex position.
+    const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
+
+    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+    IndexT primIndex;
+    openvdb::Coord ijk;
+    for (int d = 0; d < 8; ++d) {
+        ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
+        ijk[1] = coord[1] + ((d & 0x02) >> 1);
+        ijk[2] = coord[2] + ((d & 0x04) >> 2);
+
+        if (polyIdxAcc.probeValue(ijk, primIndex) &&
+            openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
+
+            GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+            sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+
+            // Skip the normal test when the target is a polygon soup, because
+            // the entire soup is a single primitive, whose normal is unlikely
+            // to coincide with any of the source primitives.
+            if (isPolySoup || sourceN.dot(targetN) > 0.5) {
+                similarPrimitives.push_back(primIndex);
+            } else {
+                primitives.push_back(primIndex);
+            }
+        }
+    }
+
+    if (!primitives.empty() || !similarPrimitives.empty()) {
+        GA_Offset source, v0, v1, v2;
+        openvdb::Vec3d uvw;
+        if (!similarPrimitives.empty()) {
+            source = findClosestPrimitiveToPoint(
+                mSourceGeo, similarPrimitives, pos, v0, v1, v2, uvw);
+        } else {
+            source = findClosestPrimitiveToPoint(
+                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+        }
+
+        // Transfer attributes
+        const auto targetOffset = targetPrim.getMapOffset();
+        for (size_t n = 0, N = mPrimAttributes.size(); n < N; ++n) {
+            mPrimAttributes[n]->copy(source, targetOffset);
+        }
+    }
+}
+
+
+/// @brief Find the closest match to the target primitive from among the source primitives
+/// (using slightly different criteria than copyPrimAttrs()) and copy vertex attributes
+/// from that primitive's vertices to the target primitive's vertices.
+/// @note When the target is a polygon soup, @a targetPrim should be a
+/// @b GEO_PrimPolySoup::PolygonIterator that points to one of the member polygons of the soup.
+template<typename GridType>
+template<typename PrimT>
+inline void
+TransferPrimitiveAttributesOp<GridType>::copyVertAttrs(
+    const PrimT& targetPrim,
+    const UT_Vector3& targetNormal,
+    IndexAccT& polyIdxAcc) const
+{
+    const auto& transform = mIndexGrid.transform();
+
+    openvdb::Vec3d pos, uvw;
+    openvdb::Coord ijk;
+    UT_Vector3 sourceNormal;
+    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+
+#if UT_MAJOR_VERSION_INT >= 16
+    for (GA_Size vtx = 0, vtxN = targetPrim.getVertexCount(); vtx < vtxN; ++vtx) {
+        pos = UTvdbConvert(targetPrim.getPos3(vtx));
+#else
+    GA_Primitive::const_iterator vtxIt;
+    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
+        pos = UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
+#endif
+        const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
+
+        primitives.clear();
+        similarPrimitives.clear();
+        int primIndex;
+        for (int d = 0; d < 8; ++d) {
+            ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
+            ijk[1] = coord[1] + ((d & 0x02) >> 1);
+            ijk[2] = coord[2] + ((d & 0x04) >> 2);
+
+            if (polyIdxAcc.probeValue(ijk, primIndex) &&
+                (openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX))
+            {
+                GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+                sourceNormal = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+                if (sourceNormal.dot(targetNormal) > 0.5) {
+                    primitives.push_back(primIndex);
+                }
+            }
+        }
+
+        if (!primitives.empty() || !similarPrimitives.empty()) {
+            GA_Offset v0, v1, v2;
+            if (!similarPrimitives.empty()) {
+                findClosestPrimitiveToPoint(mSourceGeo, similarPrimitives, pos, v0, v1, v2, uvw);
+            } else {
+                findClosestPrimitiveToPoint(mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+            }
+
+            for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
+#if UT_MAJOR_VERSION_INT >= 16
+                mVertAttributes[n]->copy(v0, v1, v2, targetPrim.getVertexOffset(vtx), uvw);
+#else
+                mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);
+#endif
             }
         }
     }
@@ -1427,7 +1471,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
 
     GA_Offset start, end, vtxOffset, primOffset, target, v0, v1, v2;
 
-    typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
+    typename GridType::ConstAccessor polyIdxAcc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
     std::vector<GA_Index> primitives(8);
@@ -1477,7 +1521,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
                     ijk[1] = coord[1] + ((d & 0x02) >> 1);
                     ijk[2] = coord[2] + ((d & 0x04) >> 2);
 
-                    if (acc.probeValue(ijk, primIndex) &&
+                    if (polyIdxAcc.probeValue(ijk, primIndex) &&
                         openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
                         primitives.push_back(primIndex);
                     }
