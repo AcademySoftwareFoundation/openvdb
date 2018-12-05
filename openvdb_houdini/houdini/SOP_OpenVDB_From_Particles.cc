@@ -1118,14 +1118,24 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::cookVDBSop(OP
             outputInteriorMaskGrid = (0 != evalInt("buildinteriormask", 0, time)),
             outputBoundingMaskGrid = (0 != evalInt("buildmask", 0, time)),
             outputAttributeGrid =
-                ((0 != evalInt("buildattrs", 0, time)) && (evalInt("attrList", 0, time) > 0)),
-            needLeveLSet = (outputLevelSetGrid || outputFogVolumeGrid || outputBoundingMaskGrid);
+                ((0 != evalInt("buildattrs", 0, time)) && (evalInt("attrList", 0, time) > 0));
 
         if (!outputFogVolumeGrid && !outputLevelSetGrid
             && !outputAttributeGrid && !outputInteriorMaskGrid)
         {
              addWarning(SOP_MESSAGE, "No output selected");
              return error();
+        }
+
+        bool needLeveLSet = (outputLevelSetGrid || outputFogVolumeGrid || outputBoundingMaskGrid);
+
+        // Backwards compatibility for when attribute grids are being requested
+        // but no level set output is desired. outputInteriorMaskGrid will always
+        // be false for older nodes. We need to provide convertWithAttributes()
+        // a valid level set in this case.
+
+        if (outputAttributeGrid && !outputLevelSetGrid && !outputInteriorMaskGrid) {
+            needLeveLSet = true;
         }
 
         ParticleList paList(ptGeo,
