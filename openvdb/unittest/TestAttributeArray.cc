@@ -174,6 +174,7 @@ public:
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testRegistry);
     CPPUNIT_TEST(testAttributeArray);
+    CPPUNIT_TEST(testAttributeArrayCopy);
     CPPUNIT_TEST(testAccessorEval);
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testStrided);
@@ -187,6 +188,7 @@ public:
     void testFixedPointConversion();
     void testRegistry();
     void testAttributeArray();
+    void testAttributeArrayCopy();
     void testAccessorEval();
     void testAttributeHandle();
     void testStrided();
@@ -404,6 +406,182 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT(attrF->hasValueType<float>());
     }
 
+    { // lots of type checking
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        Index size(50);
+        {
+            TypedAttributeArray<bool> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("bool"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int16_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int16"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int32_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int32"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int64_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int64"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            // half is not registered by default, but for complete-ness
+            TypedAttributeArray<half> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("half"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<double> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("double"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Vec3<int32_t>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("vec3i"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(12), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(12), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Vec3<double>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("vec3d"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(24), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(24), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Mat3<float>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("mat3s"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(36), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(36), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Mat4<double>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("mat4d"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(128), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(128), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<math::Quat<float>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("quats"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(16), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(16), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, TruncateCodec> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("trnc"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
+            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+#endif
+    }
+
     {
         AttributeArray::Ptr attr(new AttributeArrayC(50));
 
@@ -558,7 +736,11 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
@@ -573,12 +755,19 @@ TestAttributeArray::testAttributeArray()
         attr.set(2, 8);
         attr.set(6, 100);
 
+        // note that in-memory compression has been deprecated, verify all
+        // isCompressed() calls return false
+
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+        CPPUNIT_ASSERT(!attr.isCompressed());
+
         { // test compressed copy construction
             attr.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attr.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attr.isCompressed());
 
             AttributeArray::Ptr attrCopy = attr.copy();
             AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
@@ -601,9 +790,7 @@ TestAttributeArray::testAttributeArray()
         { // test compressed copy construction (uncompress on copy)
             attr.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attr.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attr.isCompressed());
 
             AttributeArray::Ptr attrCopy = attr.copyUncompressed();
             AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
@@ -627,6 +814,8 @@ TestAttributeArray::testAttributeArray()
             }
         }
     }
+
+#pragma GCC diagnostic pop
 
     { // Fixed codec (position range)
         AttributeArray::Ptr attr1(new AttributeArrayC(50));
@@ -741,7 +930,11 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
         CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -778,6 +971,214 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*constArray));
         CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*constArray), TypeError);
     }
+}
+
+struct VectorWrapper
+{
+    using T = std::vector<std::pair<Index, Index>>;
+
+    VectorWrapper(const T& _data) : data(_data) { }
+    operator bool() const { return index < data.size(); }
+    VectorWrapper& operator++() { index++; return *this; }
+    Index sourceIndex() const { assert(*this); return data[index].first; }
+    Index targetIndex() const { assert(*this); return data[index].second; }
+
+private:
+    const T& data;
+    T::size_type index = 0;
+}; // struct VectorWrapper
+
+void
+TestAttributeArray::testAttributeArrayCopy()
+{
+    using AttributeArrayF = TypedAttributeArray<float>;
+    using AttributeArrayD = TypedAttributeArray<double>;
+
+    Index size(50);
+
+    // initialize some test data
+
+    AttributeArrayD sourceTypedAttr(size);
+    AttributeArray& sourceAttr(sourceTypedAttr);
+    CPPUNIT_ASSERT_EQUAL(size, sourceAttr.size());
+
+    sourceAttr.expand();
+    for (Index i = 0; i < size; i++) {
+        sourceTypedAttr.set(i, double(i)/2);
+    }
+
+    // initialize source -> target pairs that reverse the order
+
+    std::vector<std::pair<Index, Index>> indexPairs;
+    for (Index i = 0; i < size; i++) {
+        indexPairs.push_back(std::make_pair(i, size-i-1));
+    }
+
+    // create a new index pair wrapper
+
+    VectorWrapper wrapper(indexPairs);
+
+    // build a target attribute array
+
+    AttributeArrayD targetTypedAttr(size);
+    AttributeArray& targetAttr(targetTypedAttr);
+    for (const auto& pair : indexPairs) {
+        targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
+    }
+
+    { // verify behaviour with slow virtual function
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+// disable deprecated warnings for virtual set() method (from ABI=6 onwards)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        for (const auto& pair : indexPairs) {
+            attr.set(pair.second, sourceAttr, pair.first);
+        }
+#pragma
+
+        CPPUNIT_ASSERT(targetAttr == attr);
+    }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        attr.copyValues(sourceAttr, wrapper);
+
+        CPPUNIT_ASSERT(targetAttr == attr);
+    }
+
+    { // attempt to copy values between attribute arrays with different storage sizes
+        AttributeArrayF typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+    }
+
+    { // attempt to copy values between integer and float attribute arrays
+        AttributeArrayF typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+    }
+
+    { // copy values between attribute arrays with different value types, but the same storage type
+        // target half array
+        TypedAttributeArray<half> targetTypedAttr1(size);
+        AttributeArray& targetAttr1(targetTypedAttr1);
+        for (Index i = 0; i < size; i++) {
+            targetTypedAttr1.set(i, sourceTypedAttr.get(i));
+        }
+
+        // truncated float array
+        TypedAttributeArray<float, TruncateCodec> targetTypedAttr2(size);
+        AttributeArray& targetAttr2(targetTypedAttr2);
+
+        targetAttr2.copyValues(targetAttr1, wrapper);
+
+        // equality fails as attribute types are not the same
+        CPPUNIT_ASSERT(targetAttr2 != targetAttr);
+        CPPUNIT_ASSERT(targetAttr2.type() != targetAttr.type());
+        // however testing value equality succeeds
+        for (Index i = 0; i < size; i++) {
+            CPPUNIT_ASSERT(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
+        }
+    }
+
+    { // out-of-range checking
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        decltype(indexPairs) rangeIndexPairs(indexPairs);
+
+        rangeIndexPairs[10].first = size+1;
+
+        VectorWrapper rangeWrapper(rangeIndexPairs);
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+
+        rangeIndexPairs[10].first = 0;
+
+        CPPUNIT_ASSERT_NO_THROW(attr.copyValues(sourceAttr, rangeWrapper));
+
+        rangeIndexPairs[10].second = size+1;
+
+        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+    }
+
+    { // source attribute array is uniform
+        AttributeArrayD uniformTypedAttr(size);
+        AttributeArray& uniformAttr(uniformTypedAttr);
+
+        uniformTypedAttr.collapse(5.3);
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        attr.copyValues(uniformAttr, wrapper);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        attr.copyValues(uniformAttr, wrapper, /*preserveUniformity=*/false);
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+
+        typedAttr.collapse(1.4);
+
+        CPPUNIT_ASSERT(attr.isUniform());
+
+        // resize the vector to be smaller than the size of the array
+
+        decltype(indexPairs) subsetIndexPairs(indexPairs);
+        subsetIndexPairs.resize(size-1);
+
+        decltype(wrapper) subsetWrapper(subsetIndexPairs);
+
+        // now copy the values attempting to preserve uniformity
+
+        attr.copyValues(uniformAttr, subsetWrapper, /*preserveUniformity=*/true);
+
+        // verify that the array cannot be kept uniform
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+    }
+
+    { // target attribute array is uniform
+        AttributeArrayD uniformTypedAttr(size);
+        AttributeArray& uniformAttr(uniformTypedAttr);
+
+        uniformTypedAttr.collapse(5.3);
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+
+        AttributeArrayD typedAttr(size);
+        AttributeArray& attr(typedAttr);
+
+        typedAttr.set(5, 1.2);
+        typedAttr.set(10, 3.1);
+
+        CPPUNIT_ASSERT(!attr.isUniform());
+
+        std::vector<std::pair<Index, Index>> uniformIndexPairs;
+        uniformIndexPairs.push_back(std::make_pair(10, 0));
+        uniformIndexPairs.push_back(std::make_pair(5, 0));
+        VectorWrapper uniformWrapper(uniformIndexPairs);
+
+        // note that calling copyValues() will implicitly expand the uniform target
+
+        CPPUNIT_ASSERT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
+
+        CPPUNIT_ASSERT(uniformAttr.isUniform());
+        CPPUNIT_ASSERT(uniformTypedAttr.get(0) == typedAttr.get(5));
+    }
+#endif
 }
 
 
@@ -956,6 +1357,10 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
     {
         AttributeArray* array = attrSet.get(1);
 
@@ -969,22 +1374,21 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT(!array->isCompressed());
 
-#ifdef OPENVDB_USE_BLOSC
         array->compress();
 
-        CPPUNIT_ASSERT(array->isCompressed());
+        CPPUNIT_ASSERT(!array->isCompressed());
 
         {
             AttributeHandle<float> handleRO(*array);
 
-            CPPUNIT_ASSERT(array->isCompressed());
+            CPPUNIT_ASSERT(!array->isCompressed());
 
             CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
 
-            CPPUNIT_ASSERT(array->isCompressed());
+            CPPUNIT_ASSERT(!array->isCompressed());
         }
 
-        CPPUNIT_ASSERT(array->isCompressed());
+        CPPUNIT_ASSERT(!array->isCompressed());
 
         {
             AttributeHandle<float> handleRO(*array, /*preserveCompression=*/false);
@@ -999,8 +1403,9 @@ TestAttributeArray::testAttributeHandle()
         }
 
         CPPUNIT_ASSERT(!array->isCompressed());
-#endif
     }
+
+#pragma GCC diagnostic pop
 
     // check values have been correctly set without using handles
 
@@ -1093,8 +1498,12 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(Index(3), handle.stride());
         CPPUNIT_ASSERT_EQUAL(Index(2), handle.size());
 
+// as of ABI=6, the base memory requirements of an AttributeArray have been lowered
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        size_t arrayMem = 40;
+#else
         size_t arrayMem = 64;
-
+#endif
         CPPUNIT_ASSERT_EQUAL(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 
@@ -1218,7 +1627,11 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             AttributeArrayI attrBcopy(attrB);
             AttributeArrayI attrBequal = attrB;
@@ -1226,6 +1639,13 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrBcopy.isOutOfCore());
             CPPUNIT_ASSERT(attrBequal.isOutOfCore());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrB).isDataLoaded());
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+#endif
+
             attrB.loadData();
             attrBcopy.loadData();
             attrBequal.loadData();
@@ -1233,6 +1653,12 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrBcopy.isOutOfCore());
             CPPUNIT_ASSERT(!attrBequal.isOutOfCore());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrB).isDataLoaded());
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+#endif
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBcopy.memUsage());
@@ -1256,7 +1682,11 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT_EQUAL(attrA2.isCompressed(), attrB2.isCompressed());
+#pragma GCC diagnostic pop
 
             AttributeArrayF attrB2copy(attrB2);
             AttributeArrayF attrB2equal = attrB2;
@@ -1412,17 +1842,16 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
             attrB.compress();
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#else
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrB.isCompressed());
-#endif
+#pragma GCC diagnostic pop
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -1690,7 +2119,11 @@ TestAttributeArray::testDelayedLoad()
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
             attrA.compress();
+#pragma GCC diagnostic pop
             attrA.writeMetadata(fileout, false, /*paged=*/true);
 
             compression::PagedOutputStream outputStreamSize(fileout);
@@ -1725,22 +2158,80 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#endif
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
 
-#ifdef OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(attrB.isCompressed());
-#endif
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+#pragma GCC diagnostic pop
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+        // read in using delayed load and check partial read state
+        {
+            std::unique_ptr<AttributeArrayI> attrB(new AttributeArrayI);
+
+            CPPUNIT_ASSERT(!(attrB->flags() & AttributeArray::PARTIALREAD));
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB->readMetadata(filein);
+
+            // PARTIALREAD flag should now be set
+            CPPUNIT_ASSERT(attrB->flags() & AttributeArray::PARTIALREAD);
+
+            // copy-construct and assign AttributeArray
+            AttributeArrayI attrC(*attrB);
+            CPPUNIT_ASSERT(attrC.flags() & AttributeArray::PARTIALREAD);
+            AttributeArrayI attrD = *attrB;
+            CPPUNIT_ASSERT(attrD.flags() & AttributeArray::PARTIALREAD);
+
+            // verify deleting attrB is safe
+            attrB.reset();
+
+            // verify data is not valid
+            CPPUNIT_ASSERT(!attrC.validData());
+
+            { // attempting to write a partially-read AttributeArray throws
+                std::string filename = tempDir + "/openvdb_partial1";
+                std::ofstream fileout(filename.c_str(), std::ios_base::binary);
+                io::setStreamMetadataPtr(fileout, streamMetadata);
+                io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+                CPPUNIT_ASSERT_THROW(attrC.writeMetadata(fileout, false, /*paged=*/true), IoError);
+            }
+
+            // continue loading with copy-constructed AttributeArray
+
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrC.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrC.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrC.isOutOfCore());
+            attrC.loadData();
+            CPPUNIT_ASSERT(!attrC.isOutOfCore());
+
+            // verify data is now valid
+            CPPUNIT_ASSERT(attrC.validData());
+
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrC.memUsage());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
             }
         }
 
@@ -1786,13 +2277,19 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             attrB.compress();
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+
+#pragma GCC diagnostic pop
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -1851,12 +2348,15 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(attrB.isCompressed());
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             AttributeHandle<int> handle(attrB);
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isCompressed());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), handle.get(i));
@@ -1864,6 +2364,7 @@ TestAttributeArray::testDelayedLoad()
 
             AttributeHandle<int> handle2(attrB, /*preserveCompression=*/false);
             CPPUNIT_ASSERT(!attrB.isCompressed());
+#pragma GCC diagnostic pop
         }
 #endif
 

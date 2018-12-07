@@ -195,8 +195,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.5.2.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.5.2.0
+    openvdb/libopenvdb.so.6.0.0         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.6.0.0
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -242,8 +242,8 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.5.2
-            libopenvdb.so.5.2.0
+            libopenvdb.so.6.0
+            libopenvdb.so.6.0.0
 
         python/
             include/
@@ -252,7 +252,7 @@ Installation
             lib/
                 python$(PYTHON_VERSION)/
                     pyopenvdb.so
-                    pyopenvdb.so.5.2
+                    pyopenvdb.so.6.0
 
         share/
             doc/

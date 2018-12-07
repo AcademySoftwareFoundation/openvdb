@@ -1,7 +1,15 @@
 OpenVDB Version History
 =======================
 
-Version 5.2.1 - In development
+Version 6.0.0 - In development
+
+      Some changes in this release (see "ABI changes" below) alter
+      the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones built into Houdini
+      up to and including Houdini 16.  To preserve ABI compatibility,
+      when compiling OpenVDB or any dependent code define the macro
+      OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
+      Houdini 15, 15.5 and 16, 4 for Houdini 16.5 and 5 for Houdini 17.0
 
     New features:
     - Added support to the ParticlesToLevelSet tool for fast rasterization
@@ -13,6 +21,11 @@ Version 5.2.1 - In development
     Improvements:
     - Improved the responsiveness of the mesh to volume converter to
       interrupt requests.
+
+    ABI changes:
+    - Added new virtual functions to AttributeArray.
+    - Changed the order and size of member variables in AttributeArray
+      and TypedAttributeArray classes.
 
     Houdini:
     - Added an option to the Visualize SOP to display leaf nodes as points.

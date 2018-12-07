@@ -120,6 +120,15 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
         CPPUNIT_ASSERT_EQUAL(isGroup(attr), isGroup(attrB));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        AttributeArray& baseAttr(attr);
+        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<GroupType>()), baseAttr.valueType());
+        CPPUNIT_ASSERT_EQUAL(Name("grp"), baseAttr.codecType());
+        CPPUNIT_ASSERT_EQUAL(Index(1), baseAttr.valueTypeSize());
+        CPPUNIT_ASSERT_EQUAL(Index(1), baseAttr.storageTypeSize());
+        CPPUNIT_ASSERT(!baseAttr.valueTypeIsFloatingPoint());
+#endif
     }
 
     { // casting

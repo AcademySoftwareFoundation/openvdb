@@ -219,6 +219,15 @@ TestAttributeArrayString::testStringAttribute()
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
         CPPUNIT_ASSERT_EQUAL(isString(attr), isString(attrB));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        AttributeArray& baseAttr(attr);
+        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<StringIndexType>()), baseAttr.valueType());
+        CPPUNIT_ASSERT_EQUAL(Name("str"), baseAttr.codecType());
+        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.valueTypeSize());
+        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.storageTypeSize());
+        CPPUNIT_ASSERT(!baseAttr.valueTypeIsFloatingPoint());
+#endif
     }
 
     { // IO

@@ -458,17 +458,20 @@ TestPointAttribute::testBloscCompress()
     CPPUNIT_ASSERT(leafIter->attributeArray("compact").isUniform());
     CPPUNIT_ASSERT(leafIter2->attributeArray("compact").isUniform());
 
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
     bloscCompressAttribute(tree, "id");
 
 #ifdef OPENVDB_USE_BLOSC
-    CPPUNIT_ASSERT(leafIter->attributeArray("id").isCompressed());
+    CPPUNIT_ASSERT(!leafIter->attributeArray("id").isCompressed());
     CPPUNIT_ASSERT(!leafIter->attributeArray("id2").isCompressed());
-    CPPUNIT_ASSERT(leafIter2->attributeArray("id").isCompressed());
+    CPPUNIT_ASSERT(!leafIter2->attributeArray("id").isCompressed());
     CPPUNIT_ASSERT(!leafIter2->attributeArray("id2").isCompressed());
-
-    CPPUNIT_ASSERT(
-        leafIter->attributeArray("id").memUsage() < leafIter->attributeArray("id2").memUsage());
 #endif
+
+#pragma GCC diagnostic pop
 }
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC

@@ -418,11 +418,8 @@ Unit Vector:\n\
     }
 
     attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
-        .setDefault(PRMzeroDefaults)
-        .setTooltip(
-            "Enable Blosc compression\n\n"
-            "Blosc is a lossless compression codec that is effective with"
-            " floating-point data and is very fast to compress and decompress."));
+        .setInvisible() // this parm is now a no-op as in-memory blosc compression is deprecated
+        .setDefault(PRMzeroDefaults));
 
     // Add multi parm
     parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Point Attributes")
@@ -949,7 +946,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                     const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
                     const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
-                    const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
                     int valueCompression = static_cast<int>(
                         evalIntInst("valuecompression#", &i, 0, 0));
 
@@ -1003,8 +999,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         }
                     }
 
-                    attributes[attributeName] =
-                        std::pair<int, bool>(valueCompression, bloscCompression);
+                    attributes[attributeName] = std::pair<int, bool>(valueCompression, false);
                 }
             }
         } else {
@@ -1068,7 +1063,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         }
                     }
 
-                    // when converting all attributes apply no compression
                     attributes[attributeName] = std::pair<int, bool>(valueCompression, false);
                 }
             }

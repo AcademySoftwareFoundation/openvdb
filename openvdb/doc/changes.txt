@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v5_2_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 5.2.1</B> - <I>In development</I>
+<B>Version 6.0.0</B> - <I>In development</I>
 
 @par
 New features:
@@ -22,6 +22,17 @@ New features:
 Improvements:
 - Improved the responsiveness of the
   @link MeshToVolume.h mesh to volume@endlink converter to interrupt requests.
+
+@par
+ABI changes:
+- Added multiple new virtual functions to
+  @vdblink::points::AttributeArray AttributeArray@endlink.
+- Changed the order and size of member variables in
+  @vdblink::points::AttributeArray AttributeArray@endlink
+  and @vdblink::points::TypedAttributeArray TypedAttributeArray@endlink
+  classes.
+- Added a new faster implementation for point deletion that uses new
+  ABI=6 functionality.
 
 @par
 Houdini:
