@@ -69,6 +69,7 @@ using OffsetPair = std::pair<GA_Offset, GA_Offset>;
 using OffsetPairList = std::vector<OffsetPair>;
 using OffsetPairListPtr = std::shared_ptr<OffsetPairList>;
 
+// note that the bool parameter here for toggling in-memory compression is now deprecated
 using AttributeInfoMap = std::map<openvdb::Name, std::pair<int, bool>>;
 
 

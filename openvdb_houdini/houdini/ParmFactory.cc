@@ -272,7 +272,8 @@ struct ParmFactory::Impl
         spareData(nullptr),
         multiparms(nullptr),
         typeExtended(PRM_TYPE_NONE),
-        vectorSize(1)
+        vectorSize(1),
+        invisible(false)
     {
         const_cast<PRM_Name*>(name)->harden();
     }
@@ -295,6 +296,7 @@ struct ParmFactory::Impl
     PRM_Type                   type;
     PRM_TypeExtended           typeExtended;
     int                        vectorSize;
+    bool                       invisible;
 
     static PRM_SpareData* const sSOPInputSpareData[4];
 };
@@ -692,6 +694,9 @@ ParmFactory::setTypeExtended(PRM_TypeExtended t) { mImpl->typeExtended = t; retu
 ParmFactory&
 ParmFactory::setVectorSize(int n) { mImpl->vectorSize = n; return *this; }
 
+ParmFactory&
+ParmFactory::setInvisible() { mImpl->invisible = true; return *this; }
+
 PRM_Template
 ParmFactory::get() const
 {
@@ -701,21 +706,26 @@ ParmFactory::get() const
 #else
     const char *tooltip = mImpl->tooltip.c_str();
 #endif
+
+    PRM_Template parm;
     if (mImpl->multiType != PRM_MULTITYPE_NONE) {
-        return PRM_Template(
+        parm.initMulti(
             mImpl->multiType,
             const_cast<PRM_Template*>(mImpl->multiparms),
+            PRM_Template::PRM_EXPORT_MIN,
             fpreal(mImpl->vectorSize),
             const_cast<PRM_Name*>(mImpl->name),
             const_cast<PRM_Default*>(mImpl->defaults),
             const_cast<PRM_Range*>(mImpl->range),
+            0, // no callback
             mImpl->spareData,
             tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     } else {
-        return PRM_Template(
+        parm.initialize(
             mImpl->type,
             mImpl->typeExtended,
+            PRM_Template::PRM_EXPORT_MIN,
             mImpl->vectorSize,
             const_cast<PRM_Name*>(mImpl->name),
             const_cast<PRM_Default*>(mImpl->defaults),
@@ -727,6 +737,10 @@ ParmFactory::get() const
             tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     }
+    if (mImpl->invisible) {
+        parm.setInvisible(true);
+    }
+    return parm;
 }
 
 
@@ -754,7 +768,7 @@ documentParms(std::ostream& os, PRM_Template const * const parmList, int level =
         ++parmIdx, ++parm)
     {
         const auto parmType = parm->getType();
-        if (parmType == PRM_LABEL) continue;
+        if (parmType == PRM_LABEL || parm->getInvisible()) continue;
 
         const auto parmLabel = [parm]() {
             UT_String lbl = parm->getLabel();

@@ -82,7 +82,11 @@ matchingAttributeSets(const AttributeSet& lhs,
 
         if (a->size() != b->size()) return false;
         if (a->isUniform() != b->isUniform()) return false;
+// disable deprecated warnings for in-memory compression
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         if (a->isCompressed() != b->isCompressed()) return false;
+#pragma GCC diagnostic pop
         if (a->isHidden() != b->isHidden()) return false;
         if (a->type() != b->type()) return false;
     }
