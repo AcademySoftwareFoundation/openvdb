@@ -256,17 +256,17 @@ public:
     template<typename ValueType>
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
-    /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
-    /// @note deprecated from ABI=6, use copyValues() with source-target index pairs
+    /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
+    /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     OPENVDB_DEPRECATED
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-    //@{
-    /// Copies values into this array from a source array to a target array as referenced by an
-    /// iterator. Iterators must adhere to the ForwardIterator interface described
+    /// @brief Copy values into this array from a source array to a target array
+    /// as referenced by an iterator.
+    /// @details Iterators must adhere to the ForwardIterator interface described
     /// in the example below:
     /// @code
     /// struct MyIterator
@@ -281,16 +281,15 @@ public:
     ///     Index targetIndex() const;
     /// };
     /// @endcode
-    /// @note assumes that the strided storage sizes match, the arrays are both in-core and that
-    /// both value types are floating-point or both integer
-    /// @note it is possible to use this method to write to a uniform target array if the iterator
-    /// does not have non-zero target indices
-    template <typename IterT>
+    /// @note It is assumed that the strided storage sizes match, the arrays are both in-core,
+    /// and both value types are floating-point or both integer.
+    /// @note It is possible to use this method to write to a uniform target array
+    /// if the iterator does not have non-zero target indices.
+    template<typename IterT>
     void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter);
-    /// @param compact   if true, attempts to collapse this array
-    template <typename IterT>
+    /// @brief Like copyValuesUnsafe(), but if @a compact is true, attempt to collapse this array.
+    template<typename IterT>
     void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
-    //@}
 #endif
 
     /// Return @c true if this array is stored as a single uniform value.
@@ -303,12 +302,12 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// Deprecated method that previously returned true if this array is compressed,
-    /// now always returns false.
+    /// @deprecated Previously this returned @c true if the array was compressed,
+    /// now it always returns @c false.
     OPENVDB_DEPRECATED bool isCompressed() const { return false; }
-    /// Deprecated method that previously compressed the attribute array, now it does nothing.
+    /// @deprecated Previously this compressed the attribute array, now it does nothing.
     OPENVDB_DEPRECATED virtual bool compress() = 0;
-    /// Deprecated method that previously uncompressed the attribute array, now it does nothing.
+    /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
     OPENVDB_DEPRECATED virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
@@ -1745,7 +1744,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
     mCompressedBytes = 0;
-    mFlags &= ~PARTIALREAD; // mark data read as having completed
+    mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD); // mark data read as having completed
 
     // compressed on-disk
 
@@ -1787,7 +1786,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     {
         size_t compressedBytes(mCompressedBytes);
         mCompressedBytes = 0; // if not set to zero, mPageHandle will attempt to destroy invalid memory
-        mFlags &= ~PARTIALREAD; // mark data read as having completed
+        mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD); // mark data read as having completed
         assert(!mPageHandle);
         mPageHandle = is.createHandle(compressedBytes);
         return;
@@ -1961,13 +1960,13 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool compression) const
+TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool /*compression*/) const
 {
-    if (!(this->isOutOfCore()))     return;
+    if (!(this->isOutOfCore())) return;
 
     // this function expects the mutex to already be locked
 
-    TypedAttributeArray<ValueType_, Codec_>* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
+    auto* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
 
     assert(self->mPageHandle);
 

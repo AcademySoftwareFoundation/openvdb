@@ -991,7 +991,6 @@ private:
 void
 TestAttributeArray::testAttributeArrayCopy()
 {
-    using AttributeArrayF = TypedAttributeArray<float>;
     using AttributeArrayD = TypedAttributeArray<double>;
 
     Index size(50);
@@ -1036,12 +1035,14 @@ TestAttributeArray::testAttributeArrayCopy()
         for (const auto& pair : indexPairs) {
             attr.set(pair.second, sourceAttr, pair.first);
         }
-#pragma
+#pragma GCC diagnostic pop
 
         CPPUNIT_ASSERT(targetAttr == attr);
     }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
+    using AttributeArrayF = TypedAttributeArray<float>;
+
     { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
