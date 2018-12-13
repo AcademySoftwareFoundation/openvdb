@@ -64,22 +64,6 @@ public:
 };
 
 
-class OPENVDB_HOUDINI_API DWAOpenVDBOpFactory: public OpenVDBOpFactory
-{
-public:
-    /// @brief Construct an OpFactory that on destruction registers a new
-    /// OpenVDB operator type using the DreamWorks naming convention.
-    /// @deprecated Use OpenVDBOpFactory instead.
-    OPENVDB_DEPRECATED
-    DWAOpenVDBOpFactory(const std::string& english, OP_Constructor ctor,
-        houdini_utils::ParmList& plist, OP_OperatorTable& optable,
-        houdini_utils::OpFactory::OpFlavor flavor = SOP)
-        : OpenVDBOpFactory(english, ctor, plist, optable, flavor)
-    {
-    }
-};
-
-
 ////////////////////////////////////////
 
 
