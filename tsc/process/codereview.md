@@ -5,6 +5,7 @@ The Technical Steering Committee have write-access to the OpenVDB repository and
 ***Policy***
 
 * No direct commits to the master (or any other protected) branch, every code change should be a pull request
+* Any member of the community can provide feedback on any pull request (and is encouraged to do so)
 * A CODEOWNERS file introduced to the root of the repo to configure ownership (global, per-directory and/or per-file) - this will automatically request pull request reviews from the relevant maintainers (https://help.github.com/articles/about-codeowners/)
 * Minimum of one non-author TSC member approval on every pull request before merging
 * Non fast-forward merges must be used (ie the merge must not be rebased onto master)
