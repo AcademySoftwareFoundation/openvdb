@@ -95,7 +95,7 @@ private:
 ////////////////////////////////////////
 
 
-/// @brief GridResampleOp is a functor class for use with processTypedGrid()
+/// @brief GridResampleOp is a functor class for use with UTvdbProcessTypedGrid()
 /// that samples an input grid into an output grid of the same type through
 /// a given transform.
 /// @details The output grid's transform is unchanged by this operation.
@@ -121,7 +121,7 @@ private:
 /// // Resolve the input grid's type and resample it into the output grid,
 /// // using a trilinear sampling kernel.
 /// GridResampleOp<openvdb::tools::BoxSampler, MyXform> op(outGrid, MyXform());
-/// processTypedGrid(inGrid, op);
+/// UTvdbProcessTypedGrid(UTvdbGetGridType(inGrid), inGrid, op);
 /// @endcode
 template<typename Sampler, typename TransformerType>
 class GridResampleOp
