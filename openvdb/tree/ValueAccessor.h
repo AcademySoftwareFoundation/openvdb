@@ -300,14 +300,6 @@ public:
         mCache.setValueOnly(xyz, value);
     }
 
-    /// Set the value of the voxel at the given coordinates and mark the voxel
-    /// as active.  [Experimental]
-    void newSetValue(const Coord& xyz, const ValueType& value)
-    {
-        LockT lock(mMutex);
-        mCache.newSetValue(xyz, value);
-    }
-
     /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, const ValueType& value)
     {

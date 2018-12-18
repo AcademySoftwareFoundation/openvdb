@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 6.0.0</B> - <I>In development</I>
+<B>Version 6.0.0</B> - <I>December 18, 2018</I>
 
 @par
 New features:
@@ -17,11 +17,27 @@ New features:
   @vdblink::tools::particlesToMask() particlesToMask@endlink
   and @vdblink::tools::particleTrailsToMask() particleTrailsToMask@endlink
   for common particle rasterization use cases.
+- Added batch copying functions
+  @vdblink::points::AttributeArray::copyValues() AttributeArray::copyValues()@endlink
+  @vdblink::points::AttributeArray::copyValuesUnsafe() AttributeArray::copyValuesUnsafe()@endlink
+  that significantly out-performs the older
+  @vdblink::points::AttributeArray::set() AttributeArray@endlink method.
 
 @par
 Improvements:
 - Improved the responsiveness of the
   @link MeshToVolume.h mesh to volume@endlink converter to interrupt requests.
+- Attempts to use a partially deserialized
+  @vdblink::points::AttributeArray AttributeArray@endlink now errors.
+- Updated point deletion to use faster batch copying for ABI=6+.
+- Methods relating to in-memory Blosc compression for
+  @vdblink::points::AttributeArray AttributeArray@endlink now do nothing and
+  have been marked deprecated resulting in memory savings for ABI=6+.
+
+@par
+Bug fixes:
+- Fixed various signed/unsigned casting issues when moving points in point
+  data grids to resolve compiler warnings.
 
 @par
 ABI changes:
@@ -31,8 +47,14 @@ ABI changes:
   @vdblink::points::AttributeArray AttributeArray@endlink
   and @vdblink::points::TypedAttributeArray TypedAttributeArray@endlink
   classes.
-- Added a new faster implementation for point deletion that uses new
-  ABI=6 functionality.
+
+@par
+API changes:
+- Removed a number of methods that were deprecated in version&nbsp;5.0.0 or
+  earlier.
+- Removed the experimental
+  @vdblink::tree::ValueAccessor::newSetValue() ValueAccessor::newSetValue@endlink
+  method.
 
 @par
 Houdini:
@@ -42,7 +64,11 @@ Houdini:
   to <TT>leafstyle</TT>, <TT>internalstyle</TT>, etc. and converted them
   from ordinals to strings.
 - Made various improvements to viewport rendering of point data grids.
-  <I>[Contributed&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
+- Updated ParmFactory to allow parameters to be marked as hidden, this is
+  useful for multi-parms where it is not possible to mark them as obsolete.
+- Removed the option to use in-memory Blosc compression from the
+  Points&nbsp;Convert&nbsp;SOP as this feature has now been deprecated.
+- Made various small changes for Houdini&nbsp;17 compatibility.
 
 
 @htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
