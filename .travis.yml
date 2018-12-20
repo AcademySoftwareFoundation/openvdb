@@ -28,11 +28,8 @@
 #
 # Author: Dan Bailey
 
-# OpenVDB requires Ubuntu Trusty 14.04 or later which Travis does not yet
-# support using the faster Container-based infrastructure
-# (https://docs.travis-ci.com/user/ci-environment/#Virtualization-environments)
-sudo: required
-dist: trusty
+# OpenVDB now uses Ubuntu Xenial 16.04 (so as to be able to build for H17+)
+dist: xenial
 
 language: cpp
 
