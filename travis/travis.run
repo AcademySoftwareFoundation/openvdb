@@ -126,6 +126,12 @@ if [ "$TASK" = "install" ]; then
         cd hou
         tar -xzf houdini.tar.gz
         cd -
+        # copy libGL and libGLU and setup sym-links
+        sudo apt-get install libglu1-mesa
+        cp /usr/lib/x86_64-linux-gnu/libGLU.so* /test/hou/dsolib
+        cp /usr/lib/x86_64-linux-gnu/mesa/libGL.so* /test/hou/dsolib
+        sudo ln -s /test/hou/dsolib/libGLU.so.1 /test/hou/dsolib/libGLU.so
+        sudo ln -s /test/hou/dsolib/libGL.so.1 /test/hou/dsolib/libGL.so
         # boost no longer shipped with Houdini from 16.5 onwards
         if [ $HOUDINI_HAS_BOOST -eq 0 ]; then
             sudo apt-get install -y libboost-all-dev
