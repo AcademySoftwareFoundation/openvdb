@@ -64,7 +64,9 @@ COMMON_ARGS="   CXX=$HOME/ccache_clang++\
 STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     EXR_INCL_DIR=/usr/include/OpenEXR\
                     EXR_LIB_DIR=/usr/local/lib\
-                    TBB_LIB_DIR=/usr/lib"
+                    TBB_LIB_DIR=/usr/lib\
+                    CPPUNIT_INCL_DIR=/test/cppunit/include\
+                    CPPUNIT_LIB_DIR=/test/cppunit/lib"
 HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
                     BOOST_LIB_DIR=/test/hou/dsolib\
                     TBB_LIB_DIR=/test/hou/dsolib\
@@ -101,7 +103,6 @@ if [ "$TASK" = "install" ]; then
     if [ "$HOUDINI_MAJOR" = "none" ]; then
         sudo apt-get install -y libboost-all-dev
         sudo apt-get install -y libtbb-dev
-        sudo apt-get install -y libcppunit-dev
         # download and build Blosc 1.5.0  if required
         if [ "$BLOSC" = "yes" ]; then
             wget https://github.com/Blosc/c-blosc/archive/v1.5.0.zip
@@ -113,6 +114,15 @@ if [ "$TASK" = "install" ]; then
             make install
             cd -
         fi
+        # compile and install cppunit
+        wget http://dev-www.libreoffice.org/src/cppunit-1.13.2.tar.gz
+        tar -xvzf cppunit-1.13.2.tar.gz
+        cd cppunit-1.13.2
+        mkdir -p /test/cppunit
+        ./configure --prefix=/test/cppunit
+        make
+        make install
+        cd -
     else
         # install houdini pre-requisites
         sudo apt-get install -y libxi-dev
