@@ -53,7 +53,8 @@ env:
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
 
-  # Build Houdini plug-ins for H16.0, H16.5
+  # Build Houdini plug-ins for H17.0, H16.0, H16.5
+  - ABI=5 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=17.0
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.5
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.0
 
