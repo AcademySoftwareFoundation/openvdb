@@ -171,6 +171,7 @@ elif [ "$TASK" = "script" ]; then
         # debug mode - build OpenVDB unit tests
         if [ "$BLOSC" = "yes" ]; then
             if [ "$RELEASE" = "yes" ]; then
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" -j4
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" -j4
                 # check for any indirect includes
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" -j4
