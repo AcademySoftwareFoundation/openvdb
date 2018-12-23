@@ -51,27 +51,36 @@ BLOSC="$3"
 RELEASE="$4"
 HOUDINI_MAJOR="$5"
 
-# Disable Doxygen, Log4CPlus, Python and GLFW for now
-COMMON_ARGS="   CXX=$HOME/ccache_clang++\
-                DESTDIR=/tmp/OpenVDB\
-                CONCURRENT_MALLOC_LIB=\
-                DOXYGEN=\
-                LOG4CPLUS_INCL_DIR=\
-                PYTHON_INCL_DIR=\
-                GLFW_INCL_DIR="
+COMMON_ARGS="CXX=$HOME/ccache_compiler DESTDIR=/tmp/OpenVDB"
 
-# Boost, OpenEXR and TBB
+# Location of third-party dependencies for standalone and houdini builds
 STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     EXR_INCL_DIR=/usr/include/OpenEXR\
                     EXR_LIB_DIR=/usr/local/lib\
                     TBB_LIB_DIR=/usr/lib\
+                    CONCURRENT_MALLOC_LIB=\
                     CPPUNIT_INCL_DIR=/test/cppunit/include\
-                    CPPUNIT_LIB_DIR=/test/cppunit/lib"
+                    CPPUNIT_LIB_DIR=/test/cppunit/lib\
+                    LOG4CPLUS_INCL_DIR=/usr/include\
+                    LOG4CPLUS_LIB_DIR=/usr/lib/x86_64-linux-gnu\
+                    GLFW_INCL_DIR=/usr/include/GL\
+                    GLFW_LIB_DIR=/usr/lib/x86_64-linux-gnu\
+                    PYTHON_INCL_DIR=/usr/include/python2.7\
+                    PYTHON_LIB_DIR=/usr/lib/x86_64-linux-gnu\
+                    BOOST_PYTHON_LIB_DIR=/usr/lib/x86_64-linux-gnu\
+                    BOOST_PYTHON_LIB=-lboost_python\
+                    NUMPY_INCL_DIR=/usr/lib/python2.7/dist-packages/numpy/core/include/numpy\
+                    EPYDOC=/usr/bin/epydoc\
+                    DOXYGEN=/usr/bin/doxygen"
 HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
                     BOOST_LIB_DIR=/test/hou/dsolib\
                     TBB_LIB_DIR=/test/hou/dsolib\
                     EXR_INCL_DIR=/test/hou/toolkit/include\
-                    EXR_LIB_DIR=/test/hou/dsolib"
+                    EXR_LIB_DIR=/test/hou/dsolib\
+                    LOG4CPLUS_INCL_DIR=\
+                    GLFW_INCL_DIR=\
+                    PYTHON_INCL_DIR=\
+                    DOXYGEN="
 
 # Blosc
 STANDALONE_BLOSC_ARGS=" BLOSC_INCL_DIR=/test/blosc/include\
@@ -83,23 +92,22 @@ NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
 
 HOUDINI_HAS_BOOST=$(echo "$HOUDINI_MAJOR < 16.5" | bc -l)
 
-# introduce wrapper to clang++ that uses ccache, this is mainly
-# for use in hcustom where changing the compiler is hard
-echo '#!/bin/bash' > $HOME/ccache_clang++
-echo 'export CCACHE_MAXSIZE=20G' >> $HOME/ccache_clang++
-echo 'ccache clang++ -Qunused-arguments $*' >> $HOME/ccache_clang++
-chmod 755 $HOME/ccache_clang++
-
 # zero ccache stats
 ccache -z
 
 if [ "$TASK" = "install" ]; then
+    # introduce wrapper to compiler that uses ccache, this is mainly
+    # for use in hcustom where changing the compiler is hard
+    echo '#!/bin/bash' > $HOME/ccache_compiler
+    echo 'export CCACHE_MAXSIZE=20G' >> $HOME/ccache_compiler
+    echo 'ccache clang++ -Qunused-arguments $*' >> $HOME/ccache_compiler
+    chmod 755 $HOME/ccache_compiler
     # update OS
     sudo apt-get update
     # sym-link to reduce command word lengths
     sudo ln -s $PWD /test
     cd /test
-    # install OpenVDB pre-requisites when built without Houdini
+    # install OpenVDB pre-requisites when built without Houdini (in order of Makefile)
     if [ "$HOUDINI_MAJOR" = "none" ]; then
         sudo apt-get install -y libboost-all-dev
         sudo apt-get install -y libtbb-dev
@@ -123,6 +131,13 @@ if [ "$TASK" = "install" ]; then
         make
         make install
         cd -
+        sudo apt-get install -y liblog4cplus-dev
+        sudo apt-get install -y libglfw3-dev
+        sudo apt-get install -y python-dev
+        sudo apt-get install -y libboost-python-dev
+        sudo apt-get install -y python-numpy
+        sudo apt-get install -y python-epydoc
+        sudo apt-get install -y doxygen
     else
         # install houdini pre-requisites
         sudo apt-get install -y libxi-dev
