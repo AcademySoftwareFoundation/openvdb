@@ -109,7 +109,9 @@ if [ "$TASK" = "install" ]; then
     cd /test
     # install OpenVDB pre-requisites when built without Houdini (in order of Makefile)
     if [ "$HOUDINI_MAJOR" = "none" ]; then
-        sudo apt-get install -y libboost-all-dev
+        sudo apt-get install -y libboost-iostreams-dev
+        sudo apt-get install -y libboost-system-dev
+        sudo apt-get install -y libboost-thread-dev
         sudo apt-get install -y libtbb-dev
         # download and build Blosc 1.5.0  if required
         if [ "$BLOSC" = "yes" ]; then
@@ -159,7 +161,8 @@ if [ "$TASK" = "install" ]; then
         sudo ln -s /test/hou/dsolib/libGL.so.1 /test/hou/dsolib/libGL.so
         # boost no longer shipped with Houdini from 16.5 onwards
         if [ $HOUDINI_HAS_BOOST -eq 0 ]; then
-            sudo apt-get install -y libboost-all-dev
+            sudo apt-get install -y libboost-iostreams-dev
+            sudo apt-get install -y libboost-system-dev
             cp -r /usr/include/boost /test/hou/toolkit/include
             cp /usr/lib/x86_64-linux-gnu/libboost_iostreams.so* /test/hou/dsolib
             cp /usr/lib/x86_64-linux-gnu/libboost_system.so* /test/hou/dsolib
