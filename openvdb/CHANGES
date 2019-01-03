@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 6.1.0 - In development
+Version 6.0.1 - In development
 
 
 Version 6.0.0 - December 18, 2018
@@ -52,8 +52,9 @@ Version 6.0.0 - December 18, 2018
       and "voxelmode" parameters to "leafstyle", "internalstyle", etc.
       and converted them from ordinal to string-valued.
     - Made various improvements to viewport rendering of point data grids.
-    - Updated ParmFactory to allow parameters to be marked as hidden, this is
-      useful for multi-parms where it is not possible to mark them as obsolete.
+    - Added a ParmFactory::setInvisible() method to allow parameters
+      to be marked as hidden.  This is useful for multi-parms,
+      whose child parameters cannot be made obsolete.
     - Removed the option to use in-memory Blosc compression from the Points
       Convert SOP as this feature has now been deprecated.
     - Made various small changes for Houdini 17 compatibility.

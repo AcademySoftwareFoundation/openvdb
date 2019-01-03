@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
+@htmlonly <a name="v6_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 6.1.0</B> - <I>In development</I>
+<B>Version 6.0.1</B> - <I>In development</I>
 
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
@@ -69,8 +69,9 @@ Houdini:
   to <TT>leafstyle</TT>, <TT>internalstyle</TT>, etc. and converted them
   from ordinals to strings.
 - Made various improvements to viewport rendering of point data grids.
-- Updated ParmFactory to allow parameters to be marked as hidden, this is
-  useful for multi-parms where it is not possible to mark them as obsolete.
+- Added a <B>ParmFactory::setInvisible</B> method to allow parameters
+  to be marked as hidden.  This is useful for multi-parms,
+  whose child parameters cannot be made obsolete.
 - Removed the option to use in-memory Blosc compression from the
   Points&nbsp;Convert&nbsp;SOP as this feature has now been deprecated.
 - Made various small changes for Houdini&nbsp;17 compatibility.
