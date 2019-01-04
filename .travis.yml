@@ -28,11 +28,8 @@
 #
 # Author: Dan Bailey
 
-# OpenVDB requires Ubuntu Trusty 14.04 or later which Travis does not yet
-# support using the faster Container-based infrastructure
-# (https://docs.travis-ci.com/user/ci-environment/#Virtualization-environments)
-sudo: required
-dist: trusty
+# OpenVDB now uses Ubuntu Xenial 16.04 (so as to be able to build for H17+)
+dist: xenial
 
 language: cpp
 
@@ -56,7 +53,8 @@ env:
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none
 
-  # Build Houdini plug-ins for H16.0, H16.5
+  # Build Houdini plug-ins for H17.0, H16.0, H16.5
+  - ABI=5 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=17.0
   - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.5
   - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.0
 
