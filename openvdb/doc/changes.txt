@@ -57,9 +57,7 @@ ABI changes:
 API changes:
 - Removed a number of methods that were deprecated in version&nbsp;5.0.0 or
   earlier.
-- Removed the experimental
-  @vdblink::tree::ValueAccessor::newSetValue() ValueAccessor::newSetValue@endlink
-  method.
+- Removed the experimental @b ValueAccessor::newSetValue method.
 
 @par
 Houdini:
