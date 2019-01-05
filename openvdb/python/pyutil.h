@@ -32,6 +32,7 @@
 #define OPENVDB_PYUTIL_HAS_BEEN_INCLUDED
 
 #include "openvdb/openvdb.h"
+#include "openvdb/points/PointDataGrid.h"
 #include <boost/python.hpp>
 #include <tbb/mutex.h>
 #include <map> // for std::pair
@@ -113,6 +114,7 @@ GRID_TRAITS(openvdb::Int32Grid, "Int32Grid");
 GRID_TRAITS(openvdb::Int64Grid, "Int64Grid");
 GRID_TRAITS(openvdb::Vec3IGrid, "Vec3IGrid");
 GRID_TRAITS(openvdb::Vec3DGrid, "Vec3DGrid");
+GRID_TRAITS(openvdb::points::PointDataGrid, "PointDataGrid");
 #endif
 
 #undef GRID_TRAITS
