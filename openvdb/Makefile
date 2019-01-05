@@ -623,6 +623,7 @@ PYTHON_SRC_NAMES := \
     python/pyIntGrid.cc \
     python/pyMetadata.cc \
     python/pyOpenVDBModule.cc \
+    python/pyPointGrid.cc \
     python/pyTransform.cc \
     python/pyVec3Grid.cc \
 #
