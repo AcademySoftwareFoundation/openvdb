@@ -2011,7 +2011,7 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
     if(this->mSize != otherT->mSize ||
        this->mStrideOrTotalSize != otherT->mStrideOrTotalSize ||
        this->mIsUniform != otherT->mIsUniform ||
-       *this->sTypeName != *otherT->sTypeName) return false;
+       this->attributeType() != this->attributeType()) return false;
 
     this->doLoad();
     otherT->doLoad();

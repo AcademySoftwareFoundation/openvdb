@@ -749,6 +749,13 @@ TestAttributeArray::testAttributeArray()
             }
         }
 
+        { // Equality using an unregistered attribute type
+            TypedAttributeArray<half> attr1(50);
+            TypedAttributeArray<half> attr2(50);
+
+            CPPUNIT_ASSERT(attr1 == attr2);
+        }
+
         // attribute array must not be uniform for compression
 
         attr.set(1, 7);
