@@ -9,7 +9,7 @@ Version 6.0.0 - December 18, 2018
       Some changes in this release (see "ABI changes" below) alter
       the grid ABI so that it is incompatible with earlier versions
       of the OpenVDB library, such as the ones built into Houdini
-      up to and including Houdini 16.  To preserve ABI compatibility,
+      up to and including Houdini 17.  To preserve ABI compatibility,
       when compiling OpenVDB or any dependent code define the macro
       OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
       Houdini 15, 15.5 and 16, 4 for Houdini 16.5 and 5 for Houdini 17.0
@@ -21,7 +21,7 @@ Version 6.0.0 - December 18, 2018
       particlesToMask() and particleTrailsToMask() for common particle
       rasterization use cases.
     - Added batch copying of AttributeArray values that significantly
-      out-performs the older method that relied on a virtual function.
+      outperforms the older method that relied on a virtual function.
 
     Improvements:
     - Improved the responsiveness of the mesh to volume converter to interrupt
@@ -29,22 +29,24 @@ Version 6.0.0 - December 18, 2018
     - Attempts to use a partially deserialized AttributeArray now errors.
     - Updated point deletion to use faster batch copying for ABI=6+.
     - Methods relating to in-memory Blosc compression for AttributeArrays now
-      do nothing and have been marked deprecated resulting in memory savings for
-      ABI=6+.
+      do nothing and have been marked deprecated resulting in memory savings
+      for ABI=6+.
 
     Bug fixes:
-    - Fixed various signed/unsigned casting issues when moving points in point
-      data grids to resolve compiler warnings.
+    - Fixed various signed/unsigned casting issues to resolve compiler warnings
+      when moving points in point data grids.
 
     ABI changes:
     - Added new virtual functions to AttributeArray.
     - Changed the order and size of member variables in AttributeArray
-      and TypedAttributeArray classes.
+      and TypedAttributeArray.
 
     API changes:
     - Removed a number of methods that were deprecated in version 5.0.0 or
       earlier.
     - Removed the experimental ValueAccessor::newSetValue method.
+    - Deprecated AttributeArray methods relating to in-memory
+      Blosc compression.
 
     Houdini:
     - Added an option to the Visualize SOP to display leaf nodes as points.
