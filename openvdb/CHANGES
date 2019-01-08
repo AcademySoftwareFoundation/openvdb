@@ -47,6 +47,8 @@ Version 6.0.0 - December 18, 2018
     - Removed the experimental ValueAccessor::newSetValue method.
 
     Houdini:
+    - The Convert and To Polygons SOPs now correctly transfer vertex
+      attributes when the output is a polygon soup.
     - Added an option to the Visualize SOP to display leaf nodes as points.
     - Renamed the Visualize SOP's "leafmode", "internalmode", "tilemode"
       and "voxelmode" parameters to "leafstyle", "internalstyle", etc.

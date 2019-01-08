@@ -63,6 +63,8 @@ API changes:
 
 @par
 Houdini:
+- The Convert and To&nbsp;Polygons SOPs now correctly transfer vertex
+  attributes when the output is a polygon soup.
 - Added an option to the Visualize&nbsp;SOP to display leaf nodes as points.
 - Renamed the Visualize&nbsp;SOP&rsquo;s <TT>leafmode</TT>,
   <TT>internalmode</TT>, <TT>tilemode</TT> and <TT>voxelmode</TT> parameters
