@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -666,7 +666,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
     using RangeT = tbb::blocked_range<size_t>;
     tbb::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
+            LeafT *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
             dstLeaf->getValueMask() |= srcLeaf->getValueMask();
             auto *ptr = dstLeaf->buffer().data();
             for (auto v = srcLeaf->cbeginValueOn(); v; ++v) op(ptr[v.pos()], *v);
@@ -1254,6 +1254,6 @@ inline void compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = compos
 
 #endif // OPENVDB_TOOLS_COMPOSITE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -513,9 +513,9 @@ PagedInputStream::createHandle(std::streamsize n)
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     // TODO: C++14 introduces std::make_unique
-    PageHandle::Ptr pageHandle(new PageHandle(mPage, mByteIndex, n));
+    PageHandle::Ptr pageHandle(new PageHandle(mPage, mByteIndex, int(n)));
 #else
-    PageHandle::Ptr pageHandle = std::make_shared<PageHandle>(mPage, mByteIndex, n);
+    PageHandle::Ptr pageHandle = std::make_shared<PageHandle>(mPage, mByteIndex, int(n));
 #endif
 
     mByteIndex += int(n);
@@ -659,6 +659,6 @@ PagedOutputStream::resize(size_t size)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
