@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -304,9 +304,8 @@ struct MetaMapConverter
             py::object val = pyDict[keys[i]];
             Metadata::Ptr value;
             if (py::extract<std::string>(val).check()) {
-                value.reset(
-                    new StringMetadata(py::extract<std::string>(val)));
-            } else if (PyBool_Check(val.ptr())) {
+                value.reset(new StringMetadata(py::extract<std::string>(val)));
+            } else if (bool(PyBool_Check(val.ptr()))) {
                 value.reset(new BoolMetadata(py::extract<bool>(val)));
             } else if (py::extract<Int64>(val).check()) {
                 const Int64 n = py::extract<Int64>(val);
@@ -806,6 +805,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
 } // BOOST_PYTHON_MODULE
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
