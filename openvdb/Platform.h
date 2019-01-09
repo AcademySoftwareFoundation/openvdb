@@ -186,6 +186,9 @@
         _Pragma("message(\"NOTE: ignoring deprecation warning\")")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("GCC diagnostic pop")
+#else
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    #define OPENVDB_NO_DEPRECATION_WARNING_END
 #endif
 
 
