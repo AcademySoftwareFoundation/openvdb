@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -105,6 +105,10 @@ template<typename T>
 class Quat
 {
 public:
+    using value_type = T;
+    using ValueType = T;
+    static const int size = 4;
+
     /// Trivial constructor, the quaternion is NOT initialized
     Quat() {}
 
@@ -653,6 +657,6 @@ template<> inline math::Quatd zeroVal<math::Quatd >() { return math::Quatd::zero
 
 #endif //OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
