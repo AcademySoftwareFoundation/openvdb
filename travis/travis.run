@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -50,6 +50,7 @@ ABI="$2"
 BLOSC="$3"
 RELEASE="$4"
 HOUDINI_MAJOR="$5"
+COMPILER="$6"
 
 COMMON_ARGS="CXX=$HOME/ccache_compiler DESTDIR=/tmp/OpenVDB"
 
@@ -100,7 +101,13 @@ if [ "$TASK" = "install" ]; then
     # for use in hcustom where changing the compiler is hard
     echo '#!/bin/bash' > $HOME/ccache_compiler
     echo 'export CCACHE_MAXSIZE=20G' >> $HOME/ccache_compiler
-    echo 'ccache clang++ -Qunused-arguments $*' >> $HOME/ccache_compiler
+    if [ "$COMPILER" = "clang" ]; then
+        echo 'ccache clang++ -Qunused-arguments $*' >> $HOME/ccache_compiler
+    else
+        if [ "$COMPILER" = "gcc" ]; then
+            echo 'ccache g++ $*' >> $HOME/ccache_compiler
+        fi
+    fi
     chmod 755 $HOME/ccache_compiler
     # update OS
     sudo apt-get update
