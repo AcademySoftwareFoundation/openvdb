@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 6.0.1 - In development
 
+    Bug fixes:
+    - Fixed a bug in tools::clip() that caused some grid metadata
+      to be discarded.
+
 
 Version 6.0.0 - December 18, 2018
 
