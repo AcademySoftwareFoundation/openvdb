@@ -45,33 +45,37 @@ cache:
 # Setup environment variables for different concurrent builds
 env:
   # Build and run unit tests for ABI={3,4,5,6}
-  - ABI=6 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=5 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=6 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
 
   # Build Houdini plug-ins for H17.0, H16.0, H16.5
-  - ABI=5 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=17.0 COMPILER=clang
-  - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.5 COMPILER=clang
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=16.0 COMPILER=clang
+  - ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=17.0 COMPILER=clang
+  - ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=16.5 COMPILER=clang
+  - ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=16.0 COMPILER=clang
 
   # Build and run unit tests using other compilers
-  - ABI=6 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none COMPILER=gcc
+  - ABI=6 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=gcc
 
-  # Build and run unit tests for ABI={3,4,5} with Blosc disabled
-  - ABI=6 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=5 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none COMPILER=clang
+  # Build and run unit tests for ABI={5,6} with Blosc disabled
+  - ABI=6 BLOSC=no MODE=release HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=5 BLOSC=no MODE=release HOUDINI_MAJOR=none COMPILER=clang
 
-  # Build (but don't run) unit tests in debug mode for ABI={3,4,5} with and without Blosc
-  - ABI=6 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=5 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=6 BLOSC=no RELEASE=no HOUDINI_MAJOR=none COMPILER=clang
-  - ABI=5 BLOSC=no RELEASE=no HOUDINI_MAJOR=none COMPILER=clang
+  # Check for indirect header includes (ABI=6 and H17.0)
+  - ABI=6 BLOSC=yes MODE=header HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=5 BLOSC=yes MODE=header HOUDINI_MAJOR=17.0 COMPILER=clang
+
+  # Build (but don't run) unit tests in debug mode for ABI={5,6} with and without Blosc
+  - ABI=6 BLOSC=yes MODE=debug HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=5 BLOSC=yes MODE=debug HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=6 BLOSC=no MODE=debug HOUDINI_MAJOR=none COMPILER=clang
+  - ABI=5 BLOSC=no MODE=debug HOUDINI_MAJOR=none COMPILER=clang
 
 # Build and install all library dependencies for OpenVDB
 # (build will error if this stage does not succeed)
-install: bash travis/travis.run install $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $COMPILER
+install: bash travis/travis.run install $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
 
 # Build OpenVDB and OpenVDB Houdini and run unit tests
 # (build will fail if this stage does not succeed)
-script: bash travis/travis.run script $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $COMPILER
+script: bash travis/travis.run script $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
