@@ -11,6 +11,11 @@ Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
 
+@par
+Python:
+- Added basic @link points/PointDataGrid.h PointDataGrid@endlink support to
+  the Python module.
+
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par

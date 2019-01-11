@@ -13,6 +13,9 @@ Version 6.0.1 - In development
     - The Points Convert SOP now reports NaN Positions as warnings when
       converting from Houdini Points to VDB Points.
 
+    Python:
+    - Added basic PointDataGrid support to the Python module.
+
 
 Version 6.0.0 - December 18, 2018
 
