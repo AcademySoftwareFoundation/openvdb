@@ -11,6 +11,11 @@ Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
 
+@par
+Houdini:
+- The Transform&nbsp;SOP now supports frustum transforms by applying the
+  transformation to the internal affine map.
+
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par

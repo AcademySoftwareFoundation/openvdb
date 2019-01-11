@@ -7,6 +7,9 @@ Version 6.0.1 - In development
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
 
+    Houdini:
+    - The Transform SOP now supports frustum transforms by applying the
+      transformation to the internal affine map.
 
 Version 6.0.0 - December 18, 2018
 
