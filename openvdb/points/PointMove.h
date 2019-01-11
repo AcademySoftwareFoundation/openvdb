@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -513,7 +513,9 @@ struct GlobalMovePointsOp
         for (const auto& it : indices) {
             const auto& sourceArray = mSourceHandles.getConstArray(std::get<0>(it));
             const Index tgtOffset = indexOffsetFromVoxel(std::get<1>(it), targetLeaf, offsets);
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             targetArray.set(tgtOffset, sourceArray, std::get<2>(it));
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
     }
 
@@ -629,7 +631,9 @@ struct LocalMovePointsOp
 
         for (const auto& it : indices) {
             const Index tgtOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             targetArray.set(tgtOffset, sourceArray, it.second);
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
     }
 
@@ -995,6 +999,6 @@ void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
 
 #endif // OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

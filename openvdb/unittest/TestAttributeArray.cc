@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -736,11 +736,9 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
-#pragma GCC diagnostic pop
+            OPENVDB_NO_DEPRECATION_WARNING_END
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
@@ -765,9 +763,7 @@ TestAttributeArray::testAttributeArray()
         // note that in-memory compression has been deprecated, verify all
         // isCompressed() calls return false
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 
         CPPUNIT_ASSERT(!attr.isCompressed());
 
@@ -820,9 +816,10 @@ TestAttributeArray::testAttributeArray()
                 CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
             }
         }
+
+        OPENVDB_NO_DEPRECATION_WARNING_END
     }
 
-#pragma GCC diagnostic pop
 
     { // Fixed codec (position range)
         AttributeArray::Ptr attr1(new AttributeArrayC(50));
@@ -937,11 +934,9 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
         CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
-#pragma GCC diagnostic pop
+        OPENVDB_NO_DEPRECATION_WARNING_END
         CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -1036,13 +1031,11 @@ TestAttributeArray::testAttributeArrayCopy()
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-// disable deprecated warnings for virtual set() method (from ABI=6 onwards)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
         for (const auto& pair : indexPairs) {
             attr.set(pair.second, sourceAttr, pair.first);
         }
-#pragma GCC diagnostic pop
+        OPENVDB_NO_DEPRECATION_WARNING_END
 
         CPPUNIT_ASSERT(targetAttr == attr);
     }
@@ -1365,9 +1358,7 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 
     {
         AttributeArray* array = attrSet.get(1);
@@ -1413,7 +1404,7 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT(!array->isCompressed());
     }
 
-#pragma GCC diagnostic pop
+    OPENVDB_NO_DEPRECATION_WARNING_END
 
     // check values have been correctly set without using handles
 
@@ -1635,11 +1626,9 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
-#pragma GCC diagnostic pop
+            OPENVDB_NO_DEPRECATION_WARNING_END
 
             AttributeArrayI attrBcopy(attrB);
             AttributeArrayI attrBequal = attrB;
@@ -1690,11 +1679,9 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             CPPUNIT_ASSERT_EQUAL(attrA2.isCompressed(), attrB2.isCompressed());
-#pragma GCC diagnostic pop
+            OPENVDB_NO_DEPRECATION_WARNING_END
 
             AttributeArrayF attrB2copy(attrB2);
             AttributeArrayF attrB2equal = attrB2;
@@ -1850,16 +1837,16 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
             attrB.compress();
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrB.isCompressed());
-#pragma GCC diagnostic pop
+
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -2127,11 +2114,9 @@ TestAttributeArray::testDelayedLoad()
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             attrA.compress();
-#pragma GCC diagnostic pop
+            OPENVDB_NO_DEPRECATION_WARNING_END
             attrA.writeMetadata(fileout, false, /*paged=*/true);
 
             compression::PagedOutputStream outputStreamSize(fileout);
@@ -2166,9 +2151,8 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
@@ -2176,7 +2160,8 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
 
             CPPUNIT_ASSERT(!attrB.isCompressed());
-#pragma GCC diagnostic pop
+
+            OPENVDB_NO_DEPRECATION_WARNING_END
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
@@ -2285,9 +2270,7 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrB.isCompressed());
@@ -2297,7 +2280,7 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
-#pragma GCC diagnostic pop
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -2356,9 +2339,8 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
             AttributeHandle<int> handle(attrB);
@@ -2372,7 +2354,8 @@ TestAttributeArray::testDelayedLoad()
 
             AttributeHandle<int> handle2(attrB, /*preserveCompression=*/false);
             CPPUNIT_ASSERT(!attrB.isCompressed());
-#pragma GCC diagnostic pop
+
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
 #endif
 
@@ -2676,6 +2659,6 @@ TestAttributeArray::testProfile()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
