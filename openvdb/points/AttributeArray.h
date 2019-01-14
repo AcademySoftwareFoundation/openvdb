@@ -598,7 +598,7 @@ public:
     /// Move assignment operator disabled.
     TypedAttributeArray& operator=(TypedAttributeArray&&) = delete;
 
-    virtual ~TypedAttributeArray() { this->deallocate(); }
+    ~TypedAttributeArray() override { this->deallocate(); }
 
     /// Return a copy of this attribute.
     AttributeArray::Ptr copy() const override;
