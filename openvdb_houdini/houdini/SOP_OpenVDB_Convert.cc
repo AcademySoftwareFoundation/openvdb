@@ -283,9 +283,19 @@ Polygon Soup:\n\
             "the adaptivity threshold for all internal surfaces."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes")
-        .setTooltip("When converting to polygons with a second input, transfer "
-            "all attributes (primitive, vertex and point) from the reference surface.\n\n"
-            "This will override computed vertex normals for primitives in the surface group."));
+        .setTooltip(
+            "Transfer all attributes (primitive, vertex and point) from the reference surface.")
+        .setDocumentation(
+            "When a reference surface is provided, this option transfers all attributes\n"
+            "(primitive, vertex and point) from the reference surface to the output geometry.\n"
+            "\n"
+            "NOTE:\n"
+            "    Primitive attribute values can't meaningfully be transferred to a\n"
+            "    polygon soup, because the entire polygon soup is a single primitive.\n"
+            "\n"
+            "NOTE:\n"
+            "    Computed vertex normals for primitives in the surface group\n"
+            "    will be overridden.\n"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sharpenfeatures", "Sharpen Features")
         .setTooltip("Sharpen edges and corners."));

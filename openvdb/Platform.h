@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,26 @@
 #include "PlatformConfig.h"
 
 #define PRAGMA(x) _Pragma(#x)
+
+/// @name Utilities
+/// @{
+/// @cond OPENVDB_VERSION_INTERNAL
+#define OPENVDB_PREPROC_STRINGIFY_(x) #x
+/// @endcond
+/// @brief Return @a x as a string literal.  If @a x is a macro,
+/// return its value as a string literal.
+/// @hideinitializer
+#define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
+
+/// @cond OPENVDB_VERSION_INTERNAL
+#define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
+/// @endcond
+/// @brief Form a new token by concatenating two existing tokens.
+/// If either token is a macro, concatenate its value.
+/// @hideinitializer
+#define OPENVDB_PREPROC_CONCAT(x, y) OPENVDB_PREPROC_CONCAT_(x, y)
+/// @}
+
 
 /// Use OPENVDB_DEPRECATED to mark functions as deprecated.
 /// It should be placed right before the signature of the function,
@@ -131,6 +151,47 @@
 #endif
 
 
+/// @brief Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END,
+/// to inhibit warnings about deprecated code.
+/// @note Use this sparingly.  Remove references to deprecated code if at all possible.
+/// @details Example:
+/// @code
+/// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
+///
+/// {
+///     OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+///     myDeprecatedFunction();
+///     OPENVDB_NO_DEPRECATION_WARNING_END
+/// }
+/// @endcode
+#if defined __INTEL_COMPILER
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
+        _Pragma("warning (push)") \
+        _Pragma("warning (disable:1478)") \
+        PRAGMA(message("NOTE: ignoring deprecation warning at " __FILE__  \
+            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+    #define OPENVDB_NO_DEPRECATION_WARNING_END \
+        _Pragma("warning (pop)")
+#elif defined __clang__
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
+        _Pragma("clang diagnostic push") \
+        _Pragma("clang diagnostic ignored \"-Wdeprecated-declarations\"")
+        // note: no #pragma message, since Clang treats them as warnings
+    #define OPENVDB_NO_DEPRECATION_WARNING_END \
+        _Pragma("clang diagnostic pop")
+#elif defined __GNUC__
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
+        _Pragma("GCC diagnostic push") \
+        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"") \
+        _Pragma("message(\"NOTE: ignoring deprecation warning\")")
+    #define OPENVDB_NO_DEPRECATION_WARNING_END \
+        _Pragma("GCC diagnostic pop")
+#else
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    #define OPENVDB_NO_DEPRECATION_WARNING_END
+#endif
+
+
 #ifdef _MSC_VER
     /// Visual C++ does not have constants like M_PI unless this is defined.
     /// @note This is needed even though the core library is built with this but
@@ -204,6 +265,6 @@ using boost::uint64_t;
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

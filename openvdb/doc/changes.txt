@@ -2,6 +2,102 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v6_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 6.0.1</B> - <I>In development</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
+  some grid metadata to be discarded.
+
+
+@htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 6.0.0</B> - <I>December 18, 2018</I>
+
+@par
+<BLOCKQUOTE>
+Some changes in this release (see @ref v6_0_0_ABI_changes "ABI changes" below)
+alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
+the OpenVDB library, such as the ones built into Houdini up to and including
+Houdini&nbsp;17.
+To preserve ABI compatibility, when compiling OpenVDB or any dependent code
+define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
+for example, <I>N</I> is 3 for Houdini&nbsp;15, 15.5 and&nbsp;16,
+4 for Houdini&nbsp;16.5 and 5 for Houdini&nbsp;17.0.
+</BLOCKQUOTE>
+
+@par
+New features:
+- Added support to the
+  @link ParticlesToLevelSet.h ParticlesToLevelSet@endlink tool
+  for fast rasterization of particles into boolean mask grids.
+- Added convenience functions
+  @vdblink::tools::particlesToSdf() particlesToSdf@endlink,
+  @vdblink::tools::particleTrailsToSdf() particleTrailsToSdf@endlink,
+  @vdblink::tools::particlesToMask() particlesToMask@endlink
+  and @vdblink::tools::particleTrailsToMask() particleTrailsToMask@endlink
+  for common particle rasterization use cases.
+- Added batch copying functions @vdblink::points::AttributeArray::copyValues()
+  AttributeArray::copyValues@endlink and
+  @vdblink::points::AttributeArray::copyValuesUnsafe()
+  AttributeArray::copyValuesUnsafe@endlink that significantly outperform
+  the older @vdblink::points::AttributeArray::set()
+  AttributeArray::set@endlink method.
+
+@par
+Improvements:
+- Improved the responsiveness of the
+  @link MeshToVolume.h mesh to volume@endlink converter to interrupt requests.
+- Attempts to use a partially deserialized
+  @vdblink::points::AttributeArray AttributeArray@endlink now errors.
+- Updated point deletion to use faster batch copying for ABI=6+.
+- Methods relating to in-memory Blosc compression for
+  @vdblink::points::AttributeArray::compress() AttributeArray@endlink
+  now do nothing and have been marked deprecated resulting in memory savings
+  for ABI=6+.
+
+@par
+Bug fixes:
+- Fixed various signed/unsigned casting issues to resolve compiler warnings
+  when moving points in point data grids.
+
+@anchor v6_0_0_ABI_changes
+@par
+ABI changes:
+- Added multiple new virtual functions to
+  @vdblink::points::AttributeArray AttributeArray@endlink.
+- Changed the order and size of member variables in
+  @vdblink::points::AttributeArray AttributeArray@endlink
+  and @vdblink::points::TypedAttributeArray TypedAttributeArray@endlink.
+
+@par
+API changes:
+- Removed a number of methods that were deprecated in version&nbsp;5.0.0 or
+  earlier.
+- Removed the experimental @b ValueAccessor::newSetValue method.
+- Deprecated @vdblink::points::AttributeArray::compress()
+  AttributeArray@endlink methods relating to in-memory Blosc compression.
+
+@par
+Houdini:
+- The Convert and To&nbsp;Polygons SOPs now correctly transfer vertex
+  attributes when the output is a polygon soup.
+- Added an option to the Visualize&nbsp;SOP to display leaf nodes as points.
+- Renamed the Visualize&nbsp;SOP&rsquo;s <TT>leafmode</TT>,
+  <TT>internalmode</TT>, <TT>tilemode</TT> and <TT>voxelmode</TT> parameters
+  to <TT>leafstyle</TT>, <TT>internalstyle</TT>, etc. and converted them
+  from ordinals to strings.
+- Made various improvements to viewport rendering of point data grids.
+- Added a <B>ParmFactory::setInvisible</B> method to allow parameters
+  to be marked as hidden.  This is useful for multi-parms,
+  whose child parameters cannot be made obsolete.
+- Removed the option to use in-memory Blosc compression from the
+  Points&nbsp;Convert&nbsp;SOP as this feature has now been deprecated.
+- Made various small changes for Houdini&nbsp;17 compatibility.
+
+
 @htmlonly <a name="v5_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 5.2.0</B> - <I>August 13, 2018</I>
@@ -73,6 +169,8 @@ Bug fixes:
 
 @par
 Houdini:
+- Added an option to the From&nbsp;Particles&nbsp;SOP to output an
+  interior mask grid.
 - Added options to the Metadata&nbsp;SOP to set the grid name
   and to propagate metadata to primitive attributes and vice-versa.
 - Modified <A HREF=

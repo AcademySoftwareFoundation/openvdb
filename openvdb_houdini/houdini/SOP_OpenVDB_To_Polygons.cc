@@ -206,12 +206,16 @@ newSopOperator(OP_OperatorTable* table)
             " for regions that are inside the surface."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes")
-        .setTooltip("Transfers all attributes (primitive, vertex and point) from the "
-            "reference surface. Will override computed vertex normals for primitives "
-            " in the surface group.")
+        .setTooltip(
+            "Transfer all attributes (primitive, vertex and point) from the reference surface.")
         .setDocumentation(
             "When a reference surface is provided, this option transfers all attributes\n"
-            "(primitive, vertex and point) from the reference surface.\n\n"
+            "(primitive, vertex and point) from the reference surface to the output geometry.\n"
+            "\n"
+            "NOTE:\n"
+            "    Primitive attribute values can't meaningfully be transferred to a\n"
+            "    polygon soup, because the entire polygon soup is a single primitive.\n"
+            "\n"
             "NOTE:\n"
             "    Computed vertex normals for primitives in the surface group\n"
             "    will be overridden.\n"));

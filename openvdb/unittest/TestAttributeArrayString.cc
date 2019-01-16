@@ -219,6 +219,15 @@ TestAttributeArrayString::testStringAttribute()
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
         CPPUNIT_ASSERT_EQUAL(isString(attr), isString(attrB));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        AttributeArray& baseAttr(attr);
+        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<StringIndexType>()), baseAttr.valueType());
+        CPPUNIT_ASSERT_EQUAL(Name("str"), baseAttr.codecType());
+        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.valueTypeSize());
+        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.storageTypeSize());
+        CPPUNIT_ASSERT(!baseAttr.valueTypeIsFloatingPoint());
+#endif
     }
 
     { // IO
@@ -363,9 +372,27 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
         CPPUNIT_ASSERT_THROW(handle.set(1, "testB"), LookupError);
     }
 
+    { // empty string always has index 0
+        CPPUNIT_ASSERT(handle.contains(""));
+    }
+
+    { // cache won't contain metadata until it has been reset
+        CPPUNIT_ASSERT(!handle.contains("testA"));
+        CPPUNIT_ASSERT(!handle.contains("testB"));
+        CPPUNIT_ASSERT(!handle.contains("testC"));
+    }
+
     handle.resetCache();
 
+    { // empty string always has index 0 regardless of cache reset
+        CPPUNIT_ASSERT(handle.contains(""));
+    }
+
     { // cache now reset
+        CPPUNIT_ASSERT(handle.contains("testA"));
+        CPPUNIT_ASSERT(handle.contains("testB"));
+        CPPUNIT_ASSERT(handle.contains("testC"));
+
         CPPUNIT_ASSERT_NO_THROW(handle.set(1, "testB"));
 
         CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));

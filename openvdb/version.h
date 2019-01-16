@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,30 +71,11 @@
 
 #include "Platform.h"
 
-/// @name Utilities
-/// @{
-/// @cond OPENVDB_VERSION_INTERNAL
-#define OPENVDB_PREPROC_STRINGIFY_(x) #x
-/// @endcond
-/// @brief Return @a x as a string literal.  If @a x is a macro,
-/// return its value as a string literal.
-/// @hideinitializer
-#define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
-
-/// @cond OPENVDB_VERSION_INTERNAL
-#define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
-/// @endcond
-/// @brief Form a new token by concatenating two existing tokens.
-/// If either token is a macro, concatenate its value.
-/// @hideinitializer
-#define OPENVDB_PREPROC_CONCAT(x, y) OPENVDB_PREPROC_CONCAT_(x, y)
-/// @}
-
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 5
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.
@@ -252,6 +233,6 @@ struct VersionId {
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

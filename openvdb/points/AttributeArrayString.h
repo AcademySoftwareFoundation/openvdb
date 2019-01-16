@@ -148,6 +148,9 @@ public:
     Name get(Index n, Index m = 0) const;
     void get(Name& name, Index n, Index m = 0) const;
 
+    /// @brief Returns a reference to the array held in the Handle.
+    const AttributeArray& array() const;
+
 protected:
     AttributeHandle<StringIndexType, StringCodec<false>>    mHandle;
     const MetaMap&                                          mMetadata;
@@ -191,6 +194,13 @@ public:
 
     /// Reset the value cache from the metadata
     void resetCache();
+
+    /// @brief Returns a reference to the array held in the Write Handle.
+    AttributeArray& array();
+
+    /// @brief  Returns whether or not the metadata cache contains a given value.
+    /// @param  name Name of the String.
+    bool contains(const Name& name) const;
 
 private:
     /// Retrieve the index of this string value from the cache

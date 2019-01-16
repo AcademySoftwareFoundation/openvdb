@@ -309,7 +309,12 @@ GT_GEOPrimCollectVDB::endCollecting(
     GT_DataArrayHandle vertex_counts = task.myVertexCounts.allocateArray();
 
     GT_AttributeListHandle
+
+#if (UT_VERSION_INT >= 0x11000000) // 17.0 or later
+    vertices = GT_AttributeList::createAttributeList("P", task.myPos);
+#else
 	vertices = GT_AttributeList::createAttributeList("P", task.myPos, NULL);
+#endif
 
     return GT_PrimitiveHandle(
 		new GT_PrimCurveMesh(

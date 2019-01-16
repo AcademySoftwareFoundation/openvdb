@@ -30,7 +30,7 @@
 
 /// @file GR_PrimVDBPoints.cc
 ///
-/// @author Dan Bailey
+/// @author Dan Bailey, Nick Avramoussis
 ///
 /// @brief GR Render Hook and Primitive for VDB PointDataGrid
 
@@ -87,18 +87,20 @@ template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 
 static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
 static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
-static RE_ShaderHandle theVelocityDecorShader("decor/GL32/point_normal.prog");
-
-namespace {
-
-RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
+static RE_ShaderHandle theVelocityDecorShader("decor/GL32/user_point_vector3.prog");
+static RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
+static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-RE_ShaderHandle thePointShader("particle/GL32/point.prog");
+static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 #else
-RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
+static RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
 #endif
 
-RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
+/// @note  An additional scale for velocity trails to accurately match
+///        the visualization of velocity for Houdini points
+#define VELOCITY_DECOR_SCALE -0.041f;
+
+namespace {
 
 /// @note The render hook guard should not be required..
 
@@ -191,20 +193,24 @@ protected:
     void computeCentroid(const openvdb::points::PointDataGrid& grid);
     void computeBbox(const openvdb::points::PointDataGrid& grid);
 
-    void updatePosBuffer(  RE_Render* r,
-                        const openvdb::points::PointDataGrid& grid,
-                        const RE_CacheVersion& version);
+    void updatePosBuffer(RE_Render* r,
+                         const openvdb::points::PointDataGrid& grid,
+                         const RE_CacheVersion& version);
 
-    void updateWireBuffer(    RE_Render* r,
-                        const openvdb::points::PointDataGrid& grid,
-                        const RE_CacheVersion& version);
+    void updateWireBuffer(RE_Render* r,
+                          const openvdb::points::PointDataGrid& grid,
+                          const RE_CacheVersion& version);
 
-    bool updateVec3Buffer(   RE_Render* r,
-                            const openvdb::points::PointDataGrid& grid,
-                            const std::string& name,
-                            const RE_CacheVersion& version);
+    bool updateVec3Buffer(RE_Render* r,
+                          const openvdb::points::PointDataGrid& grid,
+                          const std::string& attributeName,
+                          const std::string& bufferName,
+                          const RE_CacheVersion& version);
 
-    bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
+    bool updateVec3Buffer(RE_Render* r,
+                          const std::string& attributeName,
+                          const std::string& bufferName,
+                          const RE_CacheVersion& version);
 
     void removeBuffer(const std::string& name);
 
@@ -248,7 +254,7 @@ static inline bool
 grIsPointDataGrid(const GT_PrimitiveHandle& gt_prim)
 {
     if (gt_prim->getPrimitiveType() != GT_PRIM_VDB_VOLUME)
-	return false;
+        return false;
 
     const GT_PrimVDB* gt_vdb = static_cast<const GT_PrimVDB*>(gt_prim.get());
     const GEO_PrimVDB* gr_vdb = gt_vdb->getGeoPrimitive();
@@ -270,7 +276,7 @@ GUI_PrimVDBPointsHook::createPrimitive(
     GR_PrimAcceptResult& processed)
 {
     if (grIsPointDataGrid(gt_prim)) {
-	processed = GR_PROCESSED;
+        processed = GR_PROCESSED;
         return new GR_PrimVDBPoints(info, cache_name, geo_prim);
     }
     processed = GR_NOT_PROCESSED;
@@ -285,7 +291,7 @@ namespace {
 
 using StringPair = std::pair<std::string, std::string>;
 
-void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
+bool patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
                  const std::vector<StringPair>& stringReplacements,
                  const std::vector<std::string>& stringInsertions = {})
 {
@@ -294,149 +300,93 @@ void patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
     r->pushShader();
     r->bindShader(shader);
 
-    RE_ShaderStage* patchedShader = shader->getShader("pointOffset", type);
-
+    const RE_ShaderStage* const patchedShader = shader->getShader("pointOffset", type);
     if (patchedShader) {
         r->popShader();
+        return false;
     }
-    else {
 
-        // retrieve the shader source
+    // retrieve the shader source and version
 
-        UT_String source;
-        shader->getShaderSource(r, source, type);
+    UT_String source;
+    shader->getShaderSource(r, source, type);
+    const int version = shader->getCodeVersion();
 
-        const int version = shader->getCodeVersion();
+    // patch the shader to replace the strings
 
-        r->popShader();
-
-        // patch the shader to replace the strings
-
-        for (const auto& stringPair : stringReplacements) {
-            source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
-        }
-
-        // patch the shader to insert the strings
-
-        for (const auto& str: stringInsertions) {
-            source.insert(0, str.c_str());
-        }
-
-        // move the version up to the top of the file
-
-        source.substitute("#version ", "// #version");
-
-        std::stringstream ss;
-        ss << "#version " << version << "\n";
-        source.insert(0, ss.str().c_str());
-
-        // remove the existing shader and add the patched one
-
-        shader->clearShaders(r, type);
-
-        UT_String message;
-
-        const bool success = shader->addShader(r, type, source, "pointOffset", version, &message);
-
-        if (!success) {
-            if (type == RE_SHADER_VERTEX)           std::cerr << "Vertex Shader (";
-            else if (type == RE_SHADER_GEOMETRY)    std::cerr << "Geometry Shader (";
-            else if (type == RE_SHADER_FRAGMENT)    std::cerr << "Fragment Shader (";
-            std::cerr << shader->getName();
-            std::cerr << ") Compile Failure: " << message.toStdString() << std::endl;
-        }
-
-        assert(success);
+    for (const auto& stringPair : stringReplacements) {
+        source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
     }
+
+    // patch the shader to insert the strings
+
+    for (const auto& str: stringInsertions) {
+        source.insert(0, str.c_str());
+    }
+
+    // move the version up to the top of the file
+
+    source.substitute("#version ", "// #version");
+
+    std::stringstream ss;
+    ss << "#version " << version << "\n";
+    source.insert(0, ss.str().c_str());
+
+    // remove the existing shader and add the patched one
+
+    shader->clearShaders(r, type);
+
+    UT_String message;
+    const bool success = shader->addShader(r, type, source, "pointOffset", version, &message);
+
+    r->popShader();
+
+    if (!success) {
+        if (type == RE_SHADER_VERTEX)           std::cerr << "Vertex Shader (";
+        else if (type == RE_SHADER_GEOMETRY)    std::cerr << "Geometry Shader (";
+        else if (type == RE_SHADER_FRAGMENT)    std::cerr << "Fragment Shader (";
+        std::cerr << shader->getName();
+        std::cerr << ") Compile Failure: " << message.toStdString() << std::endl;
+    }
+
+    assert(success);
+
+    return true;
 }
 
 void patchShaderVertexOffset(RE_Render* r, RE_ShaderHandle& shader)
 {
     // patch the shader to add a uniform offset to the position
 
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
-    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
-    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
+    static const std::vector<StringPair> stringReplacements
+    {
+        StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"),
+        StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"),
+        StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)")
+    };
 
     patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
 }
 
-void patchShaderVertexOffsetVelocity(RE_Render* r, RE_ShaderHandle& shader)
+void patchShaderNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
 {
-    // patch the shader to add a uniform offset to the position and swap "N" for "v"
+    static const std::vector<StringPair> stringReplacements
+    {
+        StringPair("\t", " "),
+        StringPair("  ", " "),
+        StringPair("  ", " "),
+        StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"),
+        StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize")
+    };
 
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("void main()", "uniform vec3 offset;\n\nvoid main()"));
-    stringReplacements.push_back(StringPair("vec4(P, 1.0)", "vec4(P + offset, 1.0)"));
-    stringReplacements.push_back(StringPair("vec4(P,1.0)", "vec4(P + offset, 1.0)"));
-    stringReplacements.push_back(StringPair("N)", "v)"));
-    stringReplacements.push_back(StringPair("in vec3 N;", "in vec3 v;"));
-    stringReplacements.push_back(StringPair("normalize(", "-0.04 * normalize("));
-
-    patchShader(r, shader, RE_SHADER_VERTEX, stringReplacements);
-}
-
-void patchShaderGeomDecorationScale(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // patch the shader to rename decoration scale
-
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
-
-    patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements);
-}
-
-void patchShaderGeomDecorationScaleNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // patch the shader to rename decoration scale
-
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("glH_DecorationScale", "decorationScale"));
-    stringReplacements.push_back(StringPair("\t", " "));
-    stringReplacements.push_back(StringPair("  ", " "));
-    stringReplacements.push_back(StringPair("  ", " "));
-    stringReplacements.push_back(StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"));
-    stringReplacements.push_back(StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize"));
-
-    std::vector<std::string> stringInsertions;
-    stringInsertions.push_back("uniform vec2 glH_DepthProject;");
-    stringInsertions.push_back("uniform vec2 glH_ScreenSize;");
+    static const std::vector<std::string> stringInsertions
+    {
+        "uniform vec2 glH_DepthProject;",
+        "uniform vec2 glH_ScreenSize;"
+    };
 
     patchShader(r, shader, RE_SHADER_GEOMETRY, stringReplacements, stringInsertions);
 }
-
-void patchShaderFragmentBlue(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // patch the shader to hard-code the color to blue
-
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("col.rgb", "vec3(0,0,1)"));
-
-    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
-}
-
-void patchShaderFragmentTurqoise(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // patch the shader to hard-code the color to blue
-
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("col.rgb", "vec3(0.2,0.55,0.55)"));
-
-    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
-}
-
-void patchShaderFragmentBlueDiscard(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // patch the shader to discard pixels with alpha < 0.25 and hard-code color to blue
-
-    std::vector<StringPair> stringReplacements;
-    stringReplacements.push_back(StringPair("color = vec4(fsIn.color.rgb * d, d);",
-                                            "if (d < 0.25) discard;\ncolor = vec4(vec3(0,0,1) * d, d);"));
-
-    patchShader(r, shader, RE_SHADER_FRAGMENT, stringReplacements);
-}
-
 
 } // namespace
 
@@ -452,7 +402,6 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
 {
 }
 
-
 GR_PrimAcceptResult
 GR_PrimVDBPoints::acceptPrimitive(GT_PrimitiveType,
                   int geo_type,
@@ -460,223 +409,13 @@ GR_PrimVDBPoints::acceptPrimitive(GT_PrimitiveType,
                   const GEO_Primitive*)
 {
     if (geo_type == GT_PRIM_VDB_VOLUME && grIsPointDataGrid(gt_prim))
-	return GR_PROCESSED;
+        return GR_PROCESSED;
 
     return GR_NOT_PROCESSED;
 }
 
-namespace gr_primitive_internal {
-
-template<   typename PointDataTreeType,
-            typename AttributeType,
-            typename HoudiniBufferType>
-struct FillGPUBuffersPosition {
-
-    using LeafNode = typename PointDataTreeType::LeafNodeType;
-    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
-    using LeafRangeT = typename LeafManagerT::LeafRange;
-
-    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
-
-    FillGPUBuffersPosition( HoudiniBufferType* buffer,
-                            const LeafOffsets& leafOffsets,
-                            const PointDataTreeType& pointDataTree,
-                            const openvdb::math::Transform& transform,
-                            const openvdb::Vec3f& positionOffset,
-                            const unsigned attributeIndex,
-                            const std::string& groupName = "")
-        : mBuffer(buffer)
-        , mPointDataTree(pointDataTree)
-        , mLeafOffsets(leafOffsets)
-        , mTransform(transform)
-        , mPositionOffset(positionOffset)
-        , mAttributeIndex(attributeIndex)
-        , mGroupName(groupName) { }
-
-    inline UT_Vector3H voxelSpaceToUTVector(const openvdb::Vec3f& positionVoxelSpace,
-                                            const openvdb::Vec3f& gridIndexSpace,
-                                            const openvdb::math::Transform& transform) const
-    {
-        const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionVoxelSpace + gridIndexSpace) - mPositionOffset;
-        return UT_Vector3H(positionWorldSpace.x(), positionWorldSpace.y(), positionWorldSpace.z());
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        const bool useGroup = !mGroupName.empty();
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-
-            const LeafNode* leaf = mLeafOffsets[n].first;
-            const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
-
-            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
-                    leaf->template constAttributeArray(mAttributeIndex));
-
-            openvdb::Vec3f positionVoxelSpace;
-
-            const bool uniform = handle->isUniform();
-
-            if (uniform)    positionVoxelSpace = handle->get(openvdb::Index64(0));
-
-            openvdb::Index64 offset = 0;
-
-            if (useGroup && leaf->attributeSet().has_group(mGroupName)) {
-                GroupFilter filter(mGroupName);
-
-                auto iter = leaf->beginIndexOn(filter);
-
-                for (; iter; ++iter)
-                {
-                    if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
-                    mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, iter.getCoord().asVec3d(), mTransform);
-                }
-            }
-            else {
-                auto iter = leaf->beginIndexOn();
-
-                for (; iter; ++iter)
-                {
-                    if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
-                    mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, iter.getCoord().asVec3d(), mTransform);
-                }
-            }
-        }
-    }
-
-    //////////
-
-    HoudiniBufferType*                  mBuffer;
-    const LeafOffsets&                  mLeafOffsets;
-    const PointDataTreeType&            mPointDataTree;
-    const openvdb::math::Transform&     mTransform;
-    const openvdb::Vec3f                mPositionOffset;
-    const unsigned                      mAttributeIndex;
-    const std::string                   mGroupName;
-}; // class FillGPUBuffersPosition
-
-
-template<   typename PointDataTreeType,
-            typename AttributeType,
-            typename HoudiniBufferType>
-struct FillGPUBuffersVec3 {
-
-    using LeafNode = typename PointDataTreeType::LeafNodeType;
-    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
-    using LeafRangeT = typename LeafManagerT::LeafRange;
-
-    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
-
-    FillGPUBuffersVec3( HoudiniBufferType* buffer,
-                            const LeafOffsets& leafOffsets,
-                            const PointDataTreeType& pointDataTree,
-                            const unsigned attributeIndex)
-        : mBuffer(buffer)
-        , mPointDataTree(pointDataTree)
-        , mLeafOffsets(leafOffsets)
-        , mAttributeIndex(attributeIndex) { }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-
-            const LeafNode* leaf = mLeafOffsets[n].first;
-            const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
-
-            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
-                leaf->constAttributeArray(mAttributeIndex));
-
-            openvdb::Vec3f color;
-
-            const bool uniform = handle->isUniform();
-
-            if (uniform) color = handle->get(openvdb::Index64(0));
-
-            openvdb::Index64 offset = 0;
-
-            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                if (!uniform) color = handle->get(*iter);
-                mBuffer[leafOffset + offset] = HoudiniBufferType(color.x(), color.y(), color.z());
-
-                offset++;
-            }
-        }
-    }
-
-    //////////
-
-    HoudiniBufferType*                  mBuffer;
-    const LeafOffsets&                  mLeafOffsets;
-    const PointDataTreeType&            mPointDataTree;
-    const unsigned                      mAttributeIndex;
-}; // class FillGPUBuffersVec3
-
-
-template<   typename PointDataTreeType,
-            typename AttributeType,
-            typename HoudiniBufferType>
-struct FillGPUBuffersId {
-
-    using LeafNode = typename PointDataTreeType::LeafNodeType;
-    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
-    using LeafRangeT = typename LeafManagerT::LeafRange;
-
-    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
-
-    FillGPUBuffersId( HoudiniBufferType* buffer,
-                            const LeafOffsets& leafOffsets,
-                            const PointDataTreeType& pointDataTree,
-                            const unsigned attributeIndex)
-        : mBuffer(buffer)
-        , mLeafOffsets(leafOffsets)
-        , mPointDataTree(pointDataTree)
-        , mAttributeIndex(attributeIndex) { }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        const long maxId = std::numeric_limits<HoudiniBufferType>::max();
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-
-            const LeafNode* leaf = mLeafOffsets[n].first;
-            const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
-
-            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
-                leaf->constAttributeArray(mAttributeIndex));
-
-            HoudiniBufferType scalarValue{0};
-
-            // note id attribute (in the GPU cache) is only 32-bit, so use zero if id overflows
-
-            const bool uniform = handle->isUniform();
-
-            if (uniform) {
-                const long id = handle->get(openvdb::Index64(0));
-                scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
-            }
-
-            openvdb::Index64 offset = 0;
-
-            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                if (!uniform) {
-                    const long id = handle->get(*iter);
-                    scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
-                }
-                mBuffer[leafOffset + offset] = scalarValue;
-
-                offset++;
-            }
-        }
-    }
-
-    //////////
-
-    HoudiniBufferType*                  mBuffer;
-    const LeafOffsets&                  mLeafOffsets;
-    const PointDataTreeType&            mPointDataTree;
-    const unsigned                      mAttributeIndex;
-}; // class FillGPUBuffersId
-
+namespace gr_primitive_internal
+{
 
 struct FillGPUBuffersLeafBoxes
 {
@@ -760,13 +499,12 @@ GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
 
     openvdb::CoordBBox coordBBox;
     if (!grid.tree().evalLeafBoundingBox(coordBBox)) {
-        mCentroid = openvdb::Vec3f(0, 0, 0);
-        return;
+        mCentroid.init(0.0f, 0.0f, 0.0f);
     }
-
-    // get the centroid and convert to world space
-
-    mCentroid = openvdb::Vec3f{grid.transform().indexToWorld(coordBBox.getCenter())};
+    else {
+        // get the centroid and convert to world space
+        mCentroid = openvdb::Vec3f(grid.transform().indexToWorld(coordBBox.getCenter()));
+    }
 }
 
 void
@@ -790,19 +528,23 @@ struct PositionAttribute
             , mPositionOffset(attribute.mPositionOffset)
             , mStride(attribute.mStride) { }
 
-        void set(openvdb::Index offset, openvdb::Index /*stride*/, const ValueType& value) {
-            const size_t vertices = mStride;
+        void set(openvdb::Index offset,
+                 openvdb::Index /*stride*/,
+                 const ValueType& value)
+        {
             const ValueType transformedValue = value - mPositionOffset;
-            mBuffer[offset * vertices] = UT_Vector3H(transformedValue.x(), transformedValue.y(), transformedValue.z());
+            mBuffer[offset * mStride] = UT_Vector3F(transformedValue.x(), transformedValue.y(), transformedValue.z());
         }
 
     private:
-        UT_Vector3H* mBuffer;
-        ValueType& mPositionOffset;
-        Index mStride;
+        UT_Vector3F* mBuffer;
+        const ValueType& mPositionOffset;
+        const Index mStride;
     }; // struct Handle
 
-    PositionAttribute(UT_Vector3H* buffer, const ValueType& positionOffset, Index stride = 1)
+    PositionAttribute(UT_Vector3F* buffer,
+                      const ValueType& positionOffset,
+                      Index stride = 1)
         : mBuffer(buffer)
         , mPositionOffset(positionOffset)
         , mStride(stride) { }
@@ -811,9 +553,9 @@ struct PositionAttribute
     void compact() { }
 
 private:
-    UT_Vector3H* mBuffer;
-    ValueType mPositionOffset;
-    Index mStride;
+    UT_Vector3F* mBuffer;
+    const ValueType mPositionOffset;
+    const Index mStride;
 }; // struct PositionAttribute
 
 template <typename T>
@@ -827,7 +569,10 @@ struct VectorAttribute
             : mBuffer(attribute.mBuffer) { }
 
         template <typename ValueType>
-        void set(openvdb::Index offset, openvdb::Index /*stride*/, const openvdb::math::Vec3<ValueType>& value) {
+        void set(openvdb::Index offset,
+                 openvdb::Index /*stride*/,
+                 const openvdb::math::Vec3<ValueType>& value)
+        {
             mBuffer[offset] = UT_Vector3H(float(value.x()), float(value.y()), float(value.z()));
         }
 
@@ -850,11 +595,10 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
              const openvdb::points::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
-    bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
     // Initialize the geometry with the proper name for the GL cache
-    if (!myGeo)
-        myGeo.reset(new RE_Geometry);
+    if (!myGeo) myGeo.reset(new RE_Geometry);
     myGeo->cacheBuffers(getCacheName());
 
     using GridType = openvdb::points::PointDataGrid;
@@ -862,19 +606,16 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
     using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
-
-    if (tree.leafCount() == 0)  return;
-
     auto iter = tree.cbeginLeaf();
 
+    if (!iter) return;
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
     // check if group viewport is in use
+    const openvdb::StringMetadata::ConstPtr s =
+        grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT);
 
-    std::string groupName = "";
-    if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT)) {
-        groupName = s->value();
-    }
+    const std::string groupName = s ? s->value() : "";
     const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
 
     // count up total points ignoring any leaf nodes that are out of core
@@ -888,63 +629,46 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         numPoints = static_cast<int>(pointCount(tree, filter, /*inCoreOnly=*/true));
     }
 
-    if (numPoints == 0)    return;
-
-    size_t stride = 1;
+    if (numPoints == 0) return;
 
     // Initialize the number of points in the geometry.
 
-    myGeo->setNumPoints(int(numPoints));
+    myGeo->setNumPoints(numPoints);
 
     const size_t positionIndex = descriptor.find("P");
 
     // determine whether position exists
 
-    bool hasPosition = positionIndex != AttributeSet::INVALID_POS;
-
-    if (!hasPosition)   return;
+    if (positionIndex == AttributeSet::INVALID_POS) return;
 
     // fetch point position attribute, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_VertexArray* posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #else
-    RE_VertexArray* posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #endif
 
     if (posGeo->getCacheVersion() != version)
     {
-        using gr_primitive_internal::FillGPUBuffersPosition;
+        std::vector<Name> includeGroups, excludeGroups;
+        if (useGroup) includeGroups.emplace_back(groupName);
 
-        std::vector<Name> includeGroups;
-        std::vector<Name> excludeGroups;
-        if (useGroup)   includeGroups.push_back(groupName);
-
+        // @note  We've tried using UT_Vector3H here but we get serious aliasing in
+        // leaf nodes which are a small distance away from the origin of the VDB
+        // primitive (~5-6 nodes away)
         MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
 
         std::vector<Index64> offsets;
         pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
 
-        UT_UniquePtr<UT_Vector3H[]> pdata(new UT_Vector3H[numPoints]);
+        UT_UniquePtr<UT_Vector3F[]> pdata(new UT_Vector3F[numPoints]);
 
-        PositionAttribute positionAttribute(pdata.get(), mCentroid, static_cast<Index>(stride));
+        PositionAttribute positionAttribute(pdata.get(), mCentroid);
         convertPointDataGridPosition(positionAttribute, grid, offsets,
                                     /*startOffset=*/ 0, filter, /*inCoreOnly=*/true);
 
-        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
-
-        if (numPoints < maxVertexSize) {
-            posGeo->setArray(r, pdata.get(), /*offset = */ 0, /*sublen = */ int(numPoints));
-        }
-        else {
-            for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
-                const int sublength = (offset + maxVertexSize) > numPoints ?
-                    numPoints - offset : maxVertexSize;
-
-                posGeo->setArray(r, pdata.get()+offset, /*offset=*/ offset, /*sublen=*/ sublength);
-            }
-        }
-
+        posGeo->setArray(r, pdata.get());
         posGeo->setCacheVersion(version);
     }
 
@@ -963,8 +687,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         myGeo->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
         myGeo->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
         myGeo->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
-        myGeo->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1,
-                            instance.data());
+        myGeo->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1, instance.data());
     }
 
     RE_PrimType primType = RE_PRIM_POINTS;
@@ -981,11 +704,10 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
              const openvdb::points::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
-    bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
     // Initialize the geometry with the proper name for the GL cache
-    if (!myWire)
-        myWire.reset(new RE_Geometry);
+    if (!myWire) myWire.reset(new RE_Geometry);
     myWire->cacheBuffers(getCacheName());
 
     using GridType = openvdb::points::PointDataGrid;
@@ -993,18 +715,16 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
     using LeafNode = TreeType::LeafNodeType;
 
     const TreeType& tree = grid.tree();
-
     if (tree.leafCount() == 0)  return;
 
     // count up total points ignoring any leaf nodes that are out of core
 
     size_t outOfCoreLeaves = 0;
-    for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
-    {
-        if (iter->buffer().isOutOfCore())   outOfCoreLeaves++;
+    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
+        if (iter->buffer().isOutOfCore()) outOfCoreLeaves++;
     }
 
-    if (outOfCoreLeaves == 0)    return;
+    if (outOfCoreLeaves == 0) return;
 
     // Initialize the number of points for the wireframe box per leaf.
 
@@ -1029,11 +749,11 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
         std::vector<openvdb::Coord> coords;
 
-        for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
             const LeafNode& leaf = *iter;
 
             // skip in-core leaf nodes (for use when delay loading VDBs)
-            if (!leaf.buffer().isOutOfCore())   continue;
+            if (!leaf.buffer().isOutOfCore()) continue;
 
             coords.push_back(leaf.origin());
         }
@@ -1042,14 +762,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
         const tbb::blocked_range<size_t> range(0, coords.size());
         tbb::parallel_for(range, fill);
 
-        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
-        for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
-            const int sublength = (offset + maxVertexSize) > numPoints ?
-                                                numPoints - offset : maxVertexSize;
-
-            posWire->setArray(r, data.get()+offset, offset, sublength);
-        }
-
+        posWire->setArray(r, data.get());
         posWire->setCacheVersion(version);
     }
 
@@ -1088,19 +801,12 @@ GR_PrimVDBPoints::update(RE_Render *r,
     patchShaderVertexOffset(r, thePixelShader);
     patchShaderVertexOffset(r, thePointShader);
 
-    // patch the decor shaders at run-time to add an offset, change color, etc (does nothing if already patched)
+    // patch the decor shaders at run-time to add an offset etc (does nothing if already patched)
 
     patchShaderVertexOffset(r, theNormalDecorShader);
-    patchShaderGeomDecorationScale(r, theNormalDecorShader);
-    patchShaderFragmentBlue(r, theNormalDecorShader);
-
+    patchShaderVertexOffset(r, theVelocityDecorShader);
     patchShaderVertexOffset(r, theMarkerDecorShader);
-    patchShaderGeomDecorationScaleNoRedeclarations(r, theMarkerDecorShader);
-    patchShaderFragmentBlueDiscard(r, theMarkerDecorShader);
-
-    patchShaderVertexOffsetVelocity(r, theVelocityDecorShader);
-    patchShaderGeomDecorationScale(r, theVelocityDecorShader);
-    patchShaderFragmentTurqoise(r, theVelocityDecorShader);
+    patchShaderNoRedeclarations(r, theMarkerDecorShader);
 
     // geometry itself changed. GR_GEO_TOPOLOGY changed indicates a large
     // change, such as changes in the point, primitive or vertex counts
@@ -1113,16 +819,15 @@ GR_PrimVDBPoints::update(RE_Render *r,
         const openvdb::GridBase* grid =
             const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-        using PointDataGrid = openvdb::points::PointDataGrid;
-
-        const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+        const openvdb::points::PointDataGrid& pointDataGrid =
+            static_cast<const openvdb::points::PointDataGrid&>(*grid);
 
         computeCentroid(pointDataGrid);
         computeBbox(pointDataGrid);
         updatePosBuffer(r, pointDataGrid, p.geo_version);
         updateWireBuffer(r, pointDataGrid, p.geo_version);
 
-        mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
+        mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", "Cd", p.geo_version);
     }
 }
 
@@ -1135,82 +840,72 @@ GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj)
 }
 
 bool
-GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
-                                    const openvdb::points::PointDataGrid& grid,
-                                    const std::string& name,
-                                    const RE_CacheVersion& version)
+GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
+                                   const openvdb::points::PointDataGrid& grid,
+                                   const std::string& attributeName,
+                                   const std::string& bufferName,
+                                   const RE_CacheVersion& version)
 {
     // Initialize the geometry with the proper name for the GL cache
-    if (!myGeo)     return false;
+    if (!myGeo) return false;
 
     using GridType = openvdb::points::PointDataGrid;
     using TreeType = GridType::TreeType;
     using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
-
-    if (tree.leafCount() == 0)  return false;
+    auto iter = tree.cbeginLeaf();
+    if (!iter) return false;
 
     const int numPoints = myGeo->getNumPoints();
-
-    if (numPoints == 0)         return false;
-
-    TreeType::LeafCIter iter = tree.cbeginLeaf();
+    if (numPoints == 0) return false;
 
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-
-    const size_t index = descriptor.find(name);
+    const size_t index = descriptor.find(attributeName);
 
     // early exit if attribute does not exist
 
-    if (index == AttributeSet::INVALID_POS)     return false;
-
-    const openvdb::Name type = descriptor.type(index).first;
+    if (index == AttributeSet::INVALID_POS) return false;
 
     // fetch vector attribute, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, bufferName.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, bufferName.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
 
     if (bufferGeo->getCacheVersion() != version)
     {
-        // check if group viewport is in use
-
-        std::string groupName = "";
-        if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT)) {
-            groupName = s->value();
-        }
-        const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
-
         UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
 
-        std::vector<Name> includeGroups;
-        std::vector<Name> excludeGroups;
-        if (useGroup)   includeGroups.push_back(groupName);
-
-        MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
-
-        std::vector<Index64> offsets;
-        pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
+        const openvdb::Name& type = descriptor.type(index).first;
 
         if (type == "vec3s") {
+
+            // check if group viewport is in use
+
+            const openvdb::StringMetadata::ConstPtr s =
+                grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT);
+
+            const std::string groupName = s ? s->value() : "";
+            const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
+
+            std::vector<Name> includeGroups, excludeGroups;
+            if (useGroup) includeGroups.emplace_back(groupName);
+
+            MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
+
+            std::vector<Index64> offsets;
+            pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
+
             VectorAttribute<Vec3f> typedAttribute(data.get());
             convertPointDataGridAttribute(typedAttribute, grid.tree(), offsets,
                 /*startOffset=*/ 0, static_cast<unsigned>(index), /*stride=*/1,
                 filter, /*inCoreOnly=*/true);
         }
 
-        const int maxVertexSize = RE_OGLBuffer::getMaxVertexArraySize(r);
-        for (int offset = 0; offset < numPoints; offset += maxVertexSize) {
-            const int sublength = (offset + maxVertexSize) > numPoints ?
-                                                numPoints - offset : maxVertexSize;
-
-            bufferGeo->setArray(r, data.get()+offset, offset, sublength);
-        }
-
+        bufferGeo->setArray(r, data.get());
         bufferGeo->setCacheVersion(version);
     }
 
@@ -1218,7 +913,10 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
 }
 
 bool
-GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const RE_CacheVersion& version)
+GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
+                                   const std::string& attributeName,
+                                   const std::string& bufferName,
+                                   const RE_CacheVersion& version)
 {
     const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*getCachedGTPrimitive());
 
@@ -1228,7 +926,7 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     using PointDataGrid = openvdb::points::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
-    return updateVec3Buffer(r, pointDataGrid, name, version);
+    return updateVec3Buffer(r, pointDataGrid, attributeName, bufferName, version);
 }
 
 void
@@ -1248,7 +946,7 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
 {
     if (!myGeo && !myWire)  return;
 
-    bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
     if (!gl3)   return;
 
@@ -1264,10 +962,7 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
 
         const bool pointDisplay = commonOpts.particleDisplayType() == GR_PARTICLE_POINTS;
 
-        RE_ShaderHandle* shader;
-
-        if (pointDisplay)       shader = &thePointShader;
-        else                    shader = &thePixelShader;
+        RE_ShaderHandle* const shader = pointDisplay ? &thePointShader : &thePixelShader;
 
         // bind the shader
 
@@ -1329,25 +1024,25 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 {
     // just render native GR_Primitive decorations if position not available
 
-    const bool hasPosition = myGeo->getAttribute("P");
-    if (!hasPosition) {
+    const RE_VertexArray* const position = myGeo->getAttribute("P");
+    if (!position) {
         GR_Primitive::renderDecoration(r, decor, p);
         return;
     }
 
     const GR_CommonDispOption& commonOpts = p.opts->common();
-
-    const RE_CacheVersion version = myGeo->getAttribute("P")->getCacheVersion();
+    const RE_CacheVersion version = position->getCacheVersion();
 
     // update normal buffer
 
     GR_Decoration normalMarkers[2] = {GR_POINT_NORMAL, GR_NO_DECORATION};
     const bool normalMarkerChanged = standardMarkersChanged(*p.opts, normalMarkers, false);
 
-    if (normalMarkerChanged)
-    {
-        if (p.opts->drawPointNmls())        updateVec3Buffer(r, "N", version);
-        else                                removeBuffer("N");
+    if (normalMarkerChanged) {
+        const bool drawNormals = p.opts->drawPointNmls() && updateVec3Buffer(r, "N", "N", version);
+        if (!drawNormals) {
+            removeBuffer("N");
+        }
     }
 
     // update velocity buffer
@@ -1355,35 +1050,37 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
     GR_Decoration velocityMarkers[2] = {GR_POINT_VELOCITY, GR_NO_DECORATION};
     const bool velocityMarkerChanged = standardMarkersChanged(*p.opts, velocityMarkers, false);
 
-    if (velocityMarkerChanged)
-    {
-        if (p.opts->drawPointVelocity())    updateVec3Buffer(r, "v", version);
-        else                                removeBuffer("v");
+    if (velocityMarkerChanged) {
+        const bool drawVelocity = p.opts->drawPointVelocity() && updateVec3Buffer(r, "v", "V", version);
+        if (!drawVelocity) {
+            removeBuffer("V");
+        }
     }
 
     // setup shader and scale
 
     RE_ShaderHandle* shader = nullptr;
     float scale = 1.0f;
+    UT_Color color;
 
     if (decor == GR_POINT_MARKER) {
         shader = &theMarkerDecorShader;
         scale = static_cast<float>(commonOpts.markerSize());
+        color = commonOpts.getColor(GR_POINT_COLOR);
     }
     else if (decor == GR_POINT_NORMAL) {
-        shader = &theNormalDecorShader;
-        scale = commonOpts.normalScale();
+        if (static_cast<bool>(myGeo->getAttribute("N"))) {
+            shader = &theNormalDecorShader;
+            scale = commonOpts.normalScale();
+            color = commonOpts.getColor(GR_POINT_COLOR); // No normal enum, use GR_POINT_COLOR
+        }
     }
     else if (decor == GR_POINT_VELOCITY) {
-        shader = &theVelocityDecorShader;
-        scale = static_cast<float>(commonOpts.vectorScale());
-
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
-        // use the explicit attribute mapping
-
-        (*shader)->useDefaultAttribMap(false);
-        (*shader)->useExplicitAttribMap(true);
-#endif
+        if (static_cast<bool>(myGeo->getAttribute("V"))) {
+            shader = &theVelocityDecorShader;
+            scale = static_cast<float>(commonOpts.vectorScale()) * VELOCITY_DECOR_SCALE;
+            color = commonOpts.getColor(GR_POINT_TRAIL_COLOR);
+        }
     }
     else if (decor == GR_POINT_NUMBER ||
              decor == GR_POINT_POSITION) {
@@ -1397,18 +1094,35 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         r->pushShader();
         r->bindShader(*shader);
 
-        // bind the position offset and decoration scale
+        // enable alpha usage in the fragment shader
 
-        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
+        r->pushBlendState();
+        r->blendAlpha(/*onoff=*/1);
+
+        // bind the position offset
+
+        const UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
         (*shader)->bindVector(r, "offset", positionOffset);
 
-        fpreal32 decorationScale(scale);
-        (*shader)->bindFloat(r, "decorationScale", decorationScale);
+        // Assumes some uniform builtins are already bound. These can be bound with
+        // r->bindBuiltInUniform() and queried with r->printBuiltInUniforms(/*bound_only=*/true)
+        //
+        //  RE_UNIFORM_WIRE_COLOR = glH_WireColor
+        //  RE_UNIFORM_DECORATION_SCALE = glH_DecorationScale
+        //
 
-        // render and pop the shader
+        r->pushUniformColor(RE_UNIFORM_WIRE_COLOR, color);
+        r->pushUniformData(RE_UNIFORM_DECORATION_SCALE, &scale);
+
+        // render
 
         myGeo->draw(r, RE_GEO_WIRE_IDX);
 
+        // pop uniforms, blend state and the shader
+
+        r->popUniform(RE_UNIFORM_WIRE_COLOR);
+        r->popUniform(RE_UNIFORM_DECORATION_SCALE);
+        r->popBlendState();
         r->popShader();
     }
     else {
