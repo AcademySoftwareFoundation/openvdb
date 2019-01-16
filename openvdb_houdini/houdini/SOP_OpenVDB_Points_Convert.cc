@@ -280,7 +280,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation("The name of the VDB primitive to be created"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Original Geometry")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setTooltip("The incoming geometry will not be deleted if this is set.")
         .setDocumentation("The incoming geometry will not be deleted if this is set."));
 
@@ -628,7 +628,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
         const bool keepOriginalGeo = evalInt("keep", 0, time) == 1;
 
         const GA_PrimitiveGroup* group = (conversion != MODE_CONVERT_TO_VDB) ?
-            matchGroup(*gdp, evalStdString("group", time)) : nullptr;
+            matchGroup(*inputGeo(0), evalStdString("group", time)) : nullptr;
 
         // Extract VDB Point groups to filter
 
