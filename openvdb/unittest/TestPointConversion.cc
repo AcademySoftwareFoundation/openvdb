@@ -574,14 +574,14 @@ TestPointConversion::testPointConversionNans()
     outputString.resize(string.size());
     outputGroup.resize(group.size());
 
-    std::vector<Index64> pointOffsets;
-    getPointOffsets(pointOffsets, tree);
+    std::vector<Index64> offsets;
+    pointOffsets(offsets, tree);
 
-    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, 0);
-    convertPointDataGridAttribute(outputId, tree, pointOffsets, 0, idIndex, 1);
-    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, 0, uniformIndex, 1);
-    convertPointDataGridAttribute(outputString, tree, pointOffsets, 0, stringIndex, 1);
-    convertPointDataGridGroup(outputGroup, tree, pointOffsets, 0, groupIndex);
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, offsets, 0);
+    convertPointDataGridAttribute(outputId, tree, offsets, 0, idIndex, 1);
+    convertPointDataGridAttribute(outputUniform, tree, offsets, 0, uniformIndex, 1);
+    convertPointDataGridAttribute(outputString, tree, offsets, 0, stringIndex, 1);
+    convertPointDataGridGroup(outputGroup, tree, offsets, 0, groupIndex);
 
     // pack and sort the new buffers based on id
 
