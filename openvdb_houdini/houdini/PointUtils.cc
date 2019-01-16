@@ -1719,11 +1719,16 @@ collectPointInfo(const PointDataGrid& grid,
         const openvdb::NamePair& type = descriptor.type(it.second);
         const openvdb::Name& codecType = type.second;
 
-        os << it.first << "[" << type.first;
+        if (isString(array)) {
+            os << it.first << "[str]";
+        }
+        else {
+            os << it.first << "[" << type.first;
+            // if no value compression, hide the codec
+            os << (codecType != "null" ? "_" + codecType : "");
+            os << "]";
+        }
 
-        // if no value compression, hide the codec
-        os << (codecType != "null" ? "_" + codecType : "");
-        os << "]";
         if (!array.hasConstantStride()) os << " [dynamic]";
         else if (array.stride() > 1) os << " [" << array.stride() << "]";
     }
