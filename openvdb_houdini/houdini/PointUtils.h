@@ -123,7 +123,7 @@ convertHoudiniToPointDataGrid(
     const GU_Detail& detail,
     const int compression,
     const AttributeInfoMap& attributes,
-    const openvdb::math::Transform& transform);
+    const openvdb::math::Transform& transform,
     const WarnFunc& warnings = [](const std::string&){});
 
 
