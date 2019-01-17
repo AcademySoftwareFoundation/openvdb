@@ -280,7 +280,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation("The name of the VDB primitive to be created"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "keep", "Keep Original Geometry")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setTooltip("The incoming geometry will not be deleted if this is set.")
         .setDocumentation("The incoming geometry will not be deleted if this is set."));
 
@@ -622,13 +622,17 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
 
         hvdb::Interrupter boss{"Converting points"};
 
+        hvdb::WarnFunc warnFunction = [this](const std::string& msg) {
+            this->addWarning(SOP_MESSAGE, msg.c_str());
+        };
+
         const fpreal time = context.getTime();
 
         const int conversion = static_cast<int>(evalInt("conversion", 0, time));
         const bool keepOriginalGeo = evalInt("keep", 0, time) == 1;
 
         const GA_PrimitiveGroup* group = (conversion != MODE_CONVERT_TO_VDB) ?
-            matchGroup(*gdp, evalStdString("group", time)) : nullptr;
+            matchGroup(*inputGeo(0), evalStdString("group", time)) : nullptr;
 
         // Extract VDB Point groups to filter
 
@@ -756,13 +760,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         geo, *grid, emptyNameVector, includeGroups, excludeGroups);
 
                     const MetaMap& metaMap = *grid;
-                    std::vector<std::string> warnings;
-                    hvdb::convertMetadataToHoudini(geo, metaMap, warnings);
-                    if (warnings.size() > 0) {
-                        for (const auto& warning: warnings) {
-                            addWarning(SOP_MESSAGE, warning.c_str());
-                        }
-                    }
+
+                    hvdb::convertMetadataToHoudini(geo, metaMap, warnFunction);
 
                     gdp->merge(geo);
                 }
@@ -955,10 +954,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                         if (storage == GA_STORE_STRING) {
                             // disable value compression for strings and add a SOP warning
                             valueCompression = hvdb::COMPRESSION_NONE;
-                            addWarning(SOP_MESSAGE,
-                                ("Value compression not supported on string attributes."
+                            warnFunction("Value compression not supported on string attributes."
                                 " Disabling compression for attribute \""
-                                + attributeName + "\".").c_str());
+                                + attributeName + "\".");
                         } else {
                             // disable value compression for incompatible types
                             // and add a SOP warning
@@ -967,21 +965,19 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                                 (storage != GA_STORE_REAL32 || isQuaternion || isMatrix))
                             {
                                 valueCompression = hvdb::COMPRESSION_NONE;
-                                addWarning(SOP_MESSAGE,
-                                    ("Truncate value compression only supported for 32-bit"
+                                warnFunction("Truncate value compression only supported for 32-bit"
                                     " floating-point attributes. Disabling compression for"
-                                    " attribute \"" + attributeName + "\".").c_str());
+                                    " attribute \"" + attributeName + "\".");
                             }
 
                             if (valueCompression == hvdb::COMPRESSION_UNIT_VECTOR &&
                                 (storage != GA_STORE_REAL32 || !isVector))
                             {
                                 valueCompression = hvdb::COMPRESSION_NONE;
-                                addWarning(SOP_MESSAGE,
-                                    ("Unit Vector value compression only supported for"
+                                warnFunction("Unit Vector value compression only supported for"
                                     " vector 3 x 32-bit floating-point attributes. "
                                     "Disabling compression for attribute \""
-                                    + attributeName + "\".").c_str());
+                                    + attributeName + "\".");
                             }
 
                             const bool isUnit =
@@ -990,11 +986,10 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                             if (isUnit && (storage != GA_STORE_REAL32 || (width != 1 && !isVector)))
                             {
                                 valueCompression = hvdb::COMPRESSION_NONE;
-                                addWarning(SOP_MESSAGE,
-                                    ("Unit compression only supported for scalar and vector"
+                                warnFunction("Unit compression only supported for scalar and vector"
                                     " 3 x 32-bit floating-point attributes. "
                                     "Disabling compression for attribute \""
-                                    + attributeName + "\".").c_str());
+                                    + attributeName + "\".");
                             }
                         }
                     }
@@ -1073,14 +1068,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
         const int positionCompression = static_cast<int>(evalInt("poscompression", 0, time));
 
         PointDataGrid::Ptr pointDataGrid = hvdb::convertHoudiniToPointDataGrid(
-            *detail, positionCompression, attributes, *transform);
+            *detail, positionCompression, attributes, *transform, warnFunction);
 
-        std::vector<std::string> warnings;
-        hvdb::populateMetadataFromHoudini(*pointDataGrid, warnings, *detail);
-
-        for (const auto& warning : warnings) {
-            addWarning(SOP_MESSAGE, warning.c_str());
-        }
+        hvdb::populateMetadataFromHoudini(*pointDataGrid, *detail, warnFunction);
 
         hvdb::createVdbPrimitive(*gdp, pointDataGrid, evalStdString("name", time).c_str());
 
