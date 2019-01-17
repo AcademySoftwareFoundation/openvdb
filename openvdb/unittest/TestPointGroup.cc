@@ -484,31 +484,31 @@ TestPointGroup::testSet()
     // test add to group
 
     setGroup(tree, "test", true);
-    CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(6));
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(6));
 
     // test nothing is done if the index tree contains no valid indices
 
     tools::PointIndexGrid::Ptr tmpIndexGrid = tools::PointIndexGrid::create();
     setGroup(tree, tmpIndexGrid->tree(), {0,0,0,0,0,0}, "test", /*remove*/true);
-    CPPUNIT_ASSERT_EQUAL(Index64(6), groupPointCount(tree, "test"));
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
 
     // test throw on out of range index
 
     auto indexLeaf = tmpIndexGrid->tree().touchLeaf(tree.cbeginLeaf()->origin());
     indexLeaf->indices().emplace_back(membership.size());
     CPPUNIT_ASSERT_THROW(setGroup(tree, tmpIndexGrid->tree(), membership, "test"), IndexError);
-    CPPUNIT_ASSERT_EQUAL(Index64(6), groupPointCount(tree, "test"));
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
 
     // test remove flag
 
     setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/false);
-    CPPUNIT_ASSERT_EQUAL(Index64(6), groupPointCount(tree, "test"));
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
 
     setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
-    CPPUNIT_ASSERT_EQUAL(Index64(4), groupPointCount(tree, "test"));
+    CPPUNIT_ASSERT_EQUAL(Index64(4), pointCount(tree, filter));
 
     setGroup(tree, pointIndexGrid->tree(), {0,1,0,0,1,0}, "test", /*remove*/false);
-    CPPUNIT_ASSERT_EQUAL(Index64(6), groupPointCount(tree, "test"));
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
 
     setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
 
