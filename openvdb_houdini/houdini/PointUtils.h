@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -117,6 +117,7 @@ computeVoxelSizeFromHoudini(
 /// @param  attributes     a vector of VDB Points attributes to be included
 ///                        (empty vector defaults to all)
 /// @param  transform      transform to use for the new point grid
+/// @param  warnings       list of warnings to be added to the SOP
 OPENVDB_HOUDINI_API
 openvdb::points::PointDataGrid::Ptr
 convertHoudiniToPointDataGrid(
@@ -215,6 +216,6 @@ OPENVDB_HOUDINI_API extern const PRM_ChoiceList VDBPointsGroupMenu;
 
 #endif // OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
