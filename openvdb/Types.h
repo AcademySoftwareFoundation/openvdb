@@ -341,6 +341,7 @@ template<> inline const char* typeNameAsString<ValueMask>()         { return "ma
 template<> inline const char* typeNameAsString<half>()              { return "half"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
+template<> inline const char* typeNameAsString<int8_t>()            { return "int8"; }
 template<> inline const char* typeNameAsString<uint8_t>()           { return "uint8"; }
 template<> inline const char* typeNameAsString<int16_t>()           { return "int16"; }
 template<> inline const char* typeNameAsString<uint16_t>()          { return "uint16"; }

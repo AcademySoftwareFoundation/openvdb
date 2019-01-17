@@ -423,6 +423,19 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
         {
+            TypedAttributeArray<int8_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int8"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
             TypedAttributeArray<int16_t> typedAttr(size);
             AttributeArray& attr(typedAttr);
             CPPUNIT_ASSERT_EQUAL(Name("int16"), attr.valueType());
