@@ -1198,6 +1198,25 @@ copyToArray(GridType& grid, py::object arrayObj, py::object coordObj)
     op();
 }
 
+
+template<>
+inline void
+copyFromArray(points::PointDataGrid& grid, py::object arrayObj, py::object coordObj, py::object toleranceObj)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "copying NumPy arrays for PointDataGrids is not supported");
+    boost::python::throw_error_already_set();
+}
+
+
+template<>
+inline void
+copyToArray(points::PointDataGrid& grid, py::object arrayObj, py::object coordObj)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "copying NumPy arrays for PointDataGrids is not supported");
+    boost::python::throw_error_already_set();
+}
+
+
 #endif // defined(PY_OPENVDB_USE_NUMPY)
 
 
