@@ -1068,7 +1068,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
         const int positionCompression = static_cast<int>(evalInt("poscompression", 0, time));
 
         PointDataGrid::Ptr pointDataGrid = hvdb::convertHoudiniToPointDataGrid(
-            *detail, positionCompression, attributes, *transform);
+            *detail, positionCompression, attributes, *transform, warnFunction);
 
         hvdb::populateMetadataFromHoudini(*pointDataGrid, *detail, warnFunction);
 
