@@ -10,7 +10,14 @@
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
+- Added a check to @vdblink::points::setGroup setGroup@endlink to compare
+  the maximum index of the provided PointIndexTree to the size of the
+  membership vector.
 
+@par
+Houdini:
+- The Points Convert SOP now reports NaN Positions as warnings when
+  converting from Houdini Points to VDB Points.
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par

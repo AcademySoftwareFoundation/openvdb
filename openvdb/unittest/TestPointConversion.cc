@@ -604,7 +604,7 @@ TestPointConversion::testPointConversionNans()
     {
         size_t iOffset = i;
         for (const int& idx : nanIndices) {
-            if (iOffset >= idx) iOffset += 1;
+            if (iOffset >= static_cast<size_t>(idx)) iOffset += 1;
         }
 
         CPPUNIT_ASSERT_EQUAL(id.buffer()[iOffset], pointData[i].id);
