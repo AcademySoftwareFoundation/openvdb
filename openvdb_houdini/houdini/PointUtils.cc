@@ -1142,15 +1142,15 @@ convertPointDataGridToHoudini(
             continue;
         }
 
+        const auto index = static_cast<unsigned>(namePos.second);
+        const AttributeArray& array = leafIter->constAttributeArray(index);
+
         // don't convert group attributes
-        if (descriptor.hasGroup(name))  continue;
+        if (isGroup(array))    continue;
+
+        const unsigned stride = array.stride();
 
         GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
-
-        const auto index = static_cast<unsigned>(namePos.second);
-
-        const AttributeArray& array = leafIter->constAttributeArray(index);
-        const unsigned stride = array.stride();
 
         const NamePair& type = descriptor.type(index);
         const Name valueType(isString(array) ? "string" : type.first);

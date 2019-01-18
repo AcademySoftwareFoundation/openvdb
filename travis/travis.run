@@ -36,7 +36,11 @@
 #        * script (building OpenVDB and executing unit tests)
 # ABI (3/4/5) - the ABI version of OpenVDB
 # BLOSC (yes/no) - to build with Blosc support
-# RELEASE (yes/no) - to build in release or debug mode
+# MODE (release/debug/header):
+#        * release (standalone - builds all core library components and runs all tests)
+#        * release (houdini - builds core library and Houdini plugins)
+#        * debug (builds all core library components in debug mode)
+#        * header (checks for indirect includes)
 # HOUDINI_MAJOR (16.0/16.5) - the major version of Houdini
 #
 # (Note Travis instances allow only 7.5GB of memory per VM, so limit concurrent builds to 4)
@@ -48,7 +52,7 @@ set -ex
 TASK="$1"
 ABI="$2"
 BLOSC="$3"
-RELEASE="$4"
+MODE="$4"
 HOUDINI_MAJOR="$5"
 COMPILER="$6"
 
@@ -180,18 +184,28 @@ elif [ "$TASK" = "script" ]; then
         # release mode - build and run OpenVDB unit tests
         # debug mode - build OpenVDB unit tests
         if [ "$BLOSC" = "yes" ]; then
-            if [ "$RELEASE" = "yes" ]; then
+            if [ "$MODE" = "release" ]; then
+                # build OpenVDB core library, OpenVDB Python module and all binaries
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" -j4
+                # run C++ and Python unit tests
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS pytest abi="$ABI" -j4
+            elif [ "$MODE" = "header" ]; then
                 # check for any indirect includes
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" -j4
             else
+                # build OpenVDB core library, OpenVDB Python module and all binaries
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" debug=yes -j4
             fi
         else
-            if [ "$RELEASE" = "yes" ]; then
+            if [ "$MODE" = "release" ]; then
+                # build OpenVDB core library, OpenVDB Python module and all binaries
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" -j4
+                # run C++ and Python unit tests
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi="$ABI" -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS pytest abi="$ABI" -j4
             else
+                # build OpenVDB core library, OpenVDB Python module and all binaries
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" debug=yes -j4
             fi
         fi
@@ -204,17 +218,20 @@ elif [ "$TASK" = "script" ]; then
         # note that this means the DSO can no longer be loaded in Houdini
         sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
         # build OpenVDB core library and OpenVDB houdini library
-        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
+        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" -j4
         make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" -j4
         # manually install OpenVDB houdini headers and lib
         mkdir houdini_utils
         cp openvdb_houdini/houdini/*.h openvdb_houdini
         cp openvdb_houdini/houdini/*.h houdini_utils
         cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
-        # build OpenVDB Houdini SOPs
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
-        # check for any indirect includes
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" -j4
+        if [ "$MODE" = "header" ]; then
+            # check for any indirect includes
+            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" -j4
+        else
+            # build OpenVDB Houdini SOPs
+            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
+        fi
     fi
 fi
 

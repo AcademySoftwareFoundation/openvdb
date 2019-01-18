@@ -82,9 +82,6 @@ matchingAttributeSets(const AttributeSet& lhs,
 
         if (a->size() != b->size()) return false;
         if (a->isUniform() != b->isUniform()) return false;
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        if (a->isCompressed() != b->isCompressed()) return false;
-        OPENVDB_NO_DEPRECATION_WARNING_END
         if (a->isHidden() != b->isHidden()) return false;
         if (a->type() != b->type()) return false;
     }

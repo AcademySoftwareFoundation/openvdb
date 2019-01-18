@@ -736,9 +736,6 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
-            OPENVDB_NO_DEPRECATION_WARNING_END
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
@@ -759,67 +756,7 @@ TestAttributeArray::testAttributeArray()
         attr.set(1, 7);
         attr.set(2, 8);
         attr.set(6, 100);
-
-        // note that in-memory compression has been deprecated, verify all
-        // isCompressed() calls return false
-
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-        CPPUNIT_ASSERT(!attr.isCompressed());
-
-        { // test compressed copy construction
-            attr.compress();
-
-            CPPUNIT_ASSERT(!attr.isCompressed());
-
-            AttributeArray::Ptr attrCopy = attr.copy();
-            AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
-
-            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
-            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
-
-            for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
-                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
-            }
-        }
-
-        { // test compressed copy construction (uncompress on copy)
-            attr.compress();
-
-            CPPUNIT_ASSERT(!attr.isCompressed());
-
-            AttributeArray::Ptr attrCopy = attr.copyUncompressed();
-            AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
-
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            attr.decompress();
-
-            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
-            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
-
-            for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
-                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
-            }
-        }
-
-        OPENVDB_NO_DEPRECATION_WARNING_END
     }
-
 
     { // Fixed codec (position range)
         AttributeArray::Ptr attr1(new AttributeArrayC(50));
@@ -934,9 +871,6 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
-        OPENVDB_NO_DEPRECATION_WARNING_END
         CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -1027,20 +961,18 @@ TestAttributeArray::testAttributeArrayCopy()
         targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
     }
 
-    { // verify behaviour with slow virtual function
+#if OPENVDB_ABI_VERSION_NUMBER < 6
+    { // verify behaviour with slow virtual function (ABI<6)
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
         for (const auto& pair : indexPairs) {
             attr.set(pair.second, sourceAttr, pair.first);
         }
-        OPENVDB_NO_DEPRECATION_WARNING_END
 
         CPPUNIT_ASSERT(targetAttr == attr);
     }
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
+#else
     using AttributeArrayF = TypedAttributeArray<float>;
 
     { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
@@ -1358,12 +1290,8 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
-    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
     {
         AttributeArray* array = attrSet.get(1);
-
-        array->compress();
 
         AttributeWriteHandle<float> handle(*array);
 
@@ -1371,40 +1299,12 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT_EQUAL(float(11), handle.get(6));
 
-        CPPUNIT_ASSERT(!array->isCompressed());
-
-        array->compress();
-
-        CPPUNIT_ASSERT(!array->isCompressed());
-
         {
             AttributeHandle<float> handleRO(*array);
 
-            CPPUNIT_ASSERT(!array->isCompressed());
-
             CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
-
-            CPPUNIT_ASSERT(!array->isCompressed());
         }
-
-        CPPUNIT_ASSERT(!array->isCompressed());
-
-        {
-            AttributeHandle<float> handleRO(*array, /*preserveCompression=*/false);
-
-            // AttributeHandle uncompresses data on construction
-
-            CPPUNIT_ASSERT(!array->isCompressed());
-
-            CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
-
-            CPPUNIT_ASSERT(!array->isCompressed());
-        }
-
-        CPPUNIT_ASSERT(!array->isCompressed());
     }
-
-    OPENVDB_NO_DEPRECATION_WARNING_END
 
     // check values have been correctly set without using handles
 
@@ -1626,9 +1526,6 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-            CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
-            OPENVDB_NO_DEPRECATION_WARNING_END
 
             AttributeArrayI attrBcopy(attrB);
             AttributeArrayI attrBequal = attrB;
@@ -1679,9 +1576,6 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
             CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
             CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-            CPPUNIT_ASSERT_EQUAL(attrA2.isCompressed(), attrB2.isCompressed());
-            OPENVDB_NO_DEPRECATION_WARNING_END
 
             AttributeArrayF attrB2copy(attrB2);
             AttributeArrayF attrB2equal = attrB2;
@@ -1836,17 +1730,6 @@ TestAttributeArray::testDelayedLoad()
             attrB.readPagedBuffers(inputStream);
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            attrB.compress();
-
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            OPENVDB_NO_DEPRECATION_WARNING_END
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -2114,9 +1997,6 @@ TestAttributeArray::testDelayedLoad()
             io::setStreamMetadataPtr(fileout, streamMetadata);
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-            attrA.compress();
-            OPENVDB_NO_DEPRECATION_WARNING_END
             attrA.writeMetadata(fileout, false, /*paged=*/true);
 
             compression::PagedOutputStream outputStreamSize(fileout);
@@ -2151,17 +2031,9 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
-
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            OPENVDB_NO_DEPRECATION_WARNING_END
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
@@ -2255,34 +2127,6 @@ TestAttributeArray::testDelayedLoad()
         }
 
 #ifdef OPENVDB_USE_BLOSC
-        // read in using delayed load and check no implicit load through compress()
-        {
-            AttributeArrayI attrB;
-
-            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
-            io::setStreamMetadataPtr(filein, streamMetadata);
-            io::setMappedFilePtr(filein, mappedFile);
-
-            attrB.readMetadata(filein);
-            compression::PagedInputStream inputStream(filein);
-            inputStream.setSizeOnly(true);
-            attrB.readPagedBuffers(inputStream);
-            inputStream.setSizeOnly(false);
-            attrB.readPagedBuffers(inputStream);
-
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            attrB.compress();
-
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            OPENVDB_NO_DEPRECATION_WARNING_END
-        }
-
         // read in using delayed load and check copy and assignment constructors
         {
             AttributeArrayI attrB;
@@ -2339,23 +2183,13 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
 
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
             AttributeHandle<int> handle(attrB);
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB.isCompressed());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), handle.get(i));
             }
-
-            AttributeHandle<int> handle2(attrB, /*preserveCompression=*/false);
-            CPPUNIT_ASSERT(!attrB.isCompressed());
-
-            OPENVDB_NO_DEPRECATION_WARNING_END
         }
 #endif
 
