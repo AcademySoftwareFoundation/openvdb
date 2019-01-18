@@ -75,6 +75,7 @@ STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     BOOST_PYTHON_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     BOOST_PYTHON_LIB=-lboost_python\
                     NUMPY_INCL_DIR=/usr/lib/python2.7/dist-packages/numpy/core/include/numpy\
+                    PYTHON_WRAP_ALL_GRID_TYPES=yes\
                     EPYDOC=/usr/bin/epydoc\
                     DOXYGEN=/usr/bin/doxygen"
 HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
