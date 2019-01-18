@@ -311,6 +311,9 @@ class TestOpenVDB(unittest.TestCase):
         coords = set([(-10, -10, -10), (0, 0, 0), (1, 1, 1)])
 
         for factory in openvdb.GridTypes:
+            # skip value accessor tests for PointDataGrids (value setting methods are disabled)
+            if factory.valueTypeName.startswith('ptdataidx'):
+                continue
             grid = factory()
             zero, one = grid.zeroValue, grid.oneValue
             acc = grid.getAccessor()
@@ -543,6 +546,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
@@ -634,6 +640,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
