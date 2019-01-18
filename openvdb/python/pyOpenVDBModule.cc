@@ -215,6 +215,58 @@ struct VecConverter
 ////////////////////////////////////////
 
 
+/// Helper class to convert between a Python integer and a openvdb::PointIndex
+template <typename PointIndexT>
+struct PointIndexConverter
+{
+    using IntType = typename PointIndexT::IntType;
+
+    /// @return a Python integer object equivalent to the given PointIndex.
+    static PyObject* convert(const PointIndexT& index)
+    {
+        py::object obj(static_cast<IntType>(index));
+        Py_INCREF(obj.ptr());
+        return obj.ptr();
+    }
+
+    /// @return nullptr if the given Python object is not convertible to the PointIndex.
+    static void* convertible(PyObject* obj)
+    {
+        if (!PyInt_Check(obj)) return nullptr; // not a Python integer
+        return obj;
+    }
+
+    /// Convert from a Python object to a PointIndex.
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a PointIndex in the provided memory location.
+        using StorageT = py::converter::rvalue_from_python_storage<PointIndexT>;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) PointIndexT; // placement new
+        data->convertible = storage;
+
+        // Extract the PointIndex from the python integer
+        PointIndexT* index = static_cast<PointIndexT*>(storage);
+
+        *index = static_cast<IntType>(PyInt_AsLong(obj));
+    }
+
+    /// Register both the PointIndex-to-integer and the integer-to-PointIndex converters.
+    static void registerConverter()
+    {
+        py::to_python_converter<PointIndexT, PointIndexConverter>();
+        py::converter::registry::push_back(
+            &PointIndexConverter::convertible,
+            &PointIndexConverter::construct,
+            py::type_id<PointIndexT>());
+    }
+}; // struct PointIndexConverter
+
+
+////////////////////////////////////////
+
+
 /// Helper class to convert between a Python dict and an openvdb::MetaMap
 /// @todo Consider implementing a separate, templated converter for
 /// the various Metadata types.
@@ -706,6 +758,8 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     _openvdbmodule::VecConverter<Vec4I>::registerConverter();
     _openvdbmodule::VecConverter<Vec4s>::registerConverter();
     _openvdbmodule::VecConverter<Vec4d>::registerConverter();
+
+    _openvdbmodule::PointIndexConverter<PointDataIndex32>::registerConverter();
 
     _openvdbmodule::MetaMapConverter::registerConverter();
 

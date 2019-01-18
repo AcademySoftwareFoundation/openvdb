@@ -45,7 +45,6 @@ void
 exportPointGrid()
 {
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    py::class_<PointIndex<unsigned int, 1u>>("PointDataIndex", py::init<py::optional<unsigned int>>());
     pyGrid::exportGrid<points::PointDataGrid>();
 #endif
 }
