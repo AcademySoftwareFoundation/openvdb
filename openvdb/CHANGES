@@ -12,6 +12,8 @@ Version 6.0.1 - In development
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
       converting from Houdini Points to VDB Points.
+    - Fixed a bug where the Points Convert SOP was incorrectly ignoring
+      point attributes with the same name as an existing point group.
 
     Python:
     - Added basic PointDataGrid support to the Python module.

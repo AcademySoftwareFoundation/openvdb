@@ -12,6 +12,11 @@ Bug fixes:
   some grid metadata to be discarded.
 
 @par
+Houdini:
+- Fixed a bug where the Points&nbsp;Convert&nbsp;SOP was incorrectly ignoring
+  point attributes with the same name as an existing point group.
+
+@par
 Python:
 - Added basic @link points/PointDataGrid.h PointDataGrid@endlink support to
   the Python module.
