@@ -457,19 +457,6 @@ TestPointAttribute::testBloscCompress()
 
     CPPUNIT_ASSERT(leafIter->attributeArray("compact").isUniform());
     CPPUNIT_ASSERT(leafIter2->attributeArray("compact").isUniform());
-
-    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-    bloscCompressAttribute(tree, "id");
-
-#ifdef OPENVDB_USE_BLOSC
-    CPPUNIT_ASSERT(!leafIter->attributeArray("id").isCompressed());
-    CPPUNIT_ASSERT(!leafIter->attributeArray("id2").isCompressed());
-    CPPUNIT_ASSERT(!leafIter2->attributeArray("id").isCompressed());
-    CPPUNIT_ASSERT(!leafIter2->attributeArray("id2").isCompressed());
-#endif
-
-    OPENVDB_NO_DEPRECATION_WARNING_END
 }
 
 // Copyright (c) 2012-2019 DreamWorks Animation LLC
