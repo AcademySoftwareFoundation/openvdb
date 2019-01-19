@@ -211,7 +211,6 @@ struct AdvectionParms
         : mOutputGeo(outputGeo)
         , mPointGeo(nullptr)
         , mPointGroup(nullptr)
-        , mVDBGroup(nullptr)
         , mOffsetsToSkip()
         , mIncludeGroups()
         , mExcludeGroups()
@@ -230,7 +229,6 @@ struct AdvectionParms
     GU_Detail* mOutputGeo;
     const GU_Detail* mPointGeo;
     const GA_PointGroup* mPointGroup;
-    const GA_PrimitiveGroup* mVDBGroup;
     std::vector<GA_Offset> mOffsetsToSkip;
     std::vector<std::string> mIncludeGroups;
     std::vector<std::string> mExcludeGroups;
@@ -1013,10 +1011,12 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
 #endif
 
         // Evaluate UI parameters
+        const fpreal now = context.getTime();
+
         AdvectionParms parms(gdp);
         if (!evalAdvectionParms(context, parms)) return error();
 
-        const bool advectVdbPoints = (0 != evalInt("advectvdbpoints", 0, context.getTime()));
+        const bool advectVdbPoints = (0 != evalInt("advectvdbpoints", 0, now));
 
         hvdb::Interrupter boss("Processing points");
 
@@ -1030,7 +1030,10 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
             // ensure the offsets to skip are sorted to make lookups faster
             std::sort(parms.mOffsetsToSkip.begin(), parms.mOffsetsToSkip.end());
 
-            for (hvdb::VdbPrimIterator vdbIt(gdp, parms.mVDBGroup); vdbIt; ++vdbIt) {
+            const std::string vdbGroupStr = evalStdString("vdbgroup", now);
+            const GA_PrimitiveGroup* vdbGroup = matchGroup(*parms.mPointGeo, vdbGroupStr);
+
+            for (hvdb::VdbPrimIterator vdbIt(gdp, vdbGroup); vdbIt; ++vdbIt) {
                 GU_PrimVDB* vdbPrim = *vdbIt;
 
                 // only process if grid is a PointDataGrid with leaves
@@ -1099,7 +1102,7 @@ bool
 VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionParms(
     OP_Context& context, AdvectionParms& parms)
 {
-    fpreal now = context.getTime();
+    const fpreal now = context.getTime();
 
     parms.mPointGeo = inputGeo(0);
 
@@ -1112,13 +1115,15 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionP
     evalString(ptGroupStr, "group", 0, now);
 
     parms.mPointGroup = parsePointGroups(ptGroupStr, GroupCreator(gdp));
-    parms.mVDBGroup = matchGroup(*parms.mPointGeo, evalStdString("vdbgroup", now));
 
-    const std::string groups = evalStdString("vdbpointsgroups", now);
+    const bool advectVdbPoints = (0 != evalInt("advectvdbpoints", 0, now));
+    if (advectVdbPoints) {
+        const std::string groups = evalStdString("vdbpointsgroups", now);
 
-    // Get and parse the vdb points groups
-    openvdb::points::AttributeSet::Descriptor::parseNames(
-        parms.mIncludeGroups, parms.mExcludeGroups, evalStdString("vdbpointsgroups", now));
+        // Get and parse the vdb points groups
+        openvdb::points::AttributeSet::Descriptor::parseNames(
+            parms.mIncludeGroups, parms.mExcludeGroups, groups);
+    }
 
     if (!parms.mPointGroup && ptGroupStr.length() > 0) {
         addWarning(SOP_MESSAGE, "Point group not found");
