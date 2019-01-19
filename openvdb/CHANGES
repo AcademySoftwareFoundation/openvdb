@@ -6,8 +6,14 @@ Version 6.0.1 - In development
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
+    - Added a check to points::setGroup to compare the maximum index of the
+      provided PointIndexTree to the size of the membership vector.
 
     Houdini:
+    - The Points Convert SOP now reports NaN Positions as warnings when
+      converting from Houdini Points to VDB Points.
+    - Fixed a bug where the Points Convert SOP was incorrectly ignoring
+      point attributes with the same name as an existing point group.
     - The Transform SOP now supports frustum transforms by applying the
       transformation to the internal affine map.
 
