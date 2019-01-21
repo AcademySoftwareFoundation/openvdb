@@ -15,6 +15,8 @@ Bug fixes:
 Houdini:
 - Fixed a bug where the Points&nbsp;Convert&nbsp;SOP was incorrectly ignoring
   point attributes with the same name as an existing point group.
+- The Transform&nbsp;SOP now supports frustum transforms by applying the
+  transformation to the internal affine map.
 
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
