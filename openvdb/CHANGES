@@ -16,7 +16,8 @@ Version 6.0.1 - In development
       point attributes with the same name as an existing point group.
 
     Python:
-    - Added basic PointDataGrid support to the Python module.
+    - Added limited support for PointDataGrids to the Python module,
+      offering I/O and metadata functionality for now.
 
 
 Version 6.0.0 - December 18, 2018

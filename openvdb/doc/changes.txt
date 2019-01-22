@@ -18,8 +18,8 @@ Houdini:
 
 @par
 Python:
-- Added basic @link points/PointDataGrid.h PointDataGrid@endlink support to
-  the Python module.
+- Added limited support for @link points/PointDataGrid.h PointDataGrids@endlink
+  to the Python module, comprising I/O and metadata functionality for now.
 
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
