@@ -3425,7 +3425,7 @@ SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
             rasterize(settings, outputGrids);
 
             if (vexContextPtr && vexContextPtr->isTimeDependant()) {
-                OP_Node::flags().timeDep = true;
+                OP_Node::flags().setTimeDep(true);
             }
 
             for (size_t n = 0, N = outputGrids.size(); n < N && !boss.wasInterrupted(); ++n) {
