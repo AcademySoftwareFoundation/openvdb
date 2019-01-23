@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1063,6 +1063,12 @@ protected:
         }
     }
 
+#ifdef __clang__
+    // Suppress "enum value not explicitly handled" warnings
+    PRAGMA(clang diagnostic push)
+    PRAGMA(clang diagnostic ignored "-Wswitch-enum")
+#endif
+
     void copyFromArray() const override
     {
         switch (this->mArrayTypeId) {
@@ -1092,6 +1098,11 @@ protected:
         default: throw openvdb::TypeError(); break;
         }
     }
+
+#ifdef __clang__
+    PRAGMA(clang diagnostic pop)
+#endif
+
 }; // class CopyOp
 
 // Specialization for Vec3 grids
@@ -1125,6 +1136,12 @@ protected:
             boost::python::throw_error_already_set();
         }
     }
+
+#ifdef __clang__
+    // Suppress "enum value not explicitly handled" warnings
+    PRAGMA(clang diagnostic push)
+    PRAGMA(clang diagnostic ignored "-Wswitch-enum")
+#endif
 
     void copyFromArray() const override
     {
@@ -1171,6 +1188,11 @@ protected:
         default: throw openvdb::TypeError(); break;
         }
     }
+
+#ifdef __clang__
+    PRAGMA(clang diagnostic pop)
+#endif
+
 }; // class CopyOp
 
 
@@ -2542,6 +2564,6 @@ exportGrid()
 
 #endif // OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
