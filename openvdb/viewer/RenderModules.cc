@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -288,22 +288,22 @@ BufferObject::render() const
 
     glBindBuffer(GL_ARRAY_BUFFER, mVertexBuffer);
     glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(3, GL_FLOAT, 0, 0);
+    glVertexPointer(3, GL_FLOAT, nullptr, nullptr);
 
     if (usesColorBuffer) {
         glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
         glEnableClientState(GL_COLOR_ARRAY);
-        glColorPointer(3, GL_FLOAT, 0, 0);
+        glColorPointer(3, GL_FLOAT, nullptr, nullptr);
     }
 
     if (usesNormalBuffer) {
         glEnableClientState(GL_NORMAL_ARRAY);
         glBindBuffer(GL_ARRAY_BUFFER, mNormalBuffer);
-        glNormalPointer(GL_FLOAT, 0, 0);
+        glNormalPointer(GL_FLOAT, nullptr, nullptr);
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
-    glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, 0);
+    glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, nullptr);
 
     // disable client-side capabilities
     if (usesColorBuffer) glDisableClientState(GL_COLOR_ARRAY);
@@ -1691,6 +1691,6 @@ MeshModule::render()
 
 } // namespace openvdb_viewer
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

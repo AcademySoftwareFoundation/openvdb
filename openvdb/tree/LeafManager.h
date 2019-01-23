@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -222,7 +222,7 @@ public:
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
         , mLeafs(nullptr)
         , mAuxBuffers(nullptr)
-        , mTask(0)
+        , mTask(nullptr)
         , mIsMaster(true)
     {
         this->rebuild(serial);
@@ -239,7 +239,7 @@ public:
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
         , mLeafs(new LeafType*[mLeafCount])
         , mAuxBuffers(nullptr)
-        , mTask(0)
+        , mTask(nullptr)
         , mIsMaster(true)
     {
         size_t n = mLeafCount;
@@ -849,6 +849,6 @@ struct LeafManagerImpl<LeafManager<const TreeT> >
 
 #endif // OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

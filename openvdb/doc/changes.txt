@@ -19,9 +19,6 @@ Bug fixes:
 Houdini:
 - The Points&nbsp;Convert SOP now reports NaN Positions as warnings when
   converting from Houdini Points to VDB Points.
-
-@par
-Houdini:
 - Fixed a bug where the Points&nbsp;Convert&nbsp;SOP was incorrectly ignoring
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the

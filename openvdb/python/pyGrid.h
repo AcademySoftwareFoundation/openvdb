@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1074,7 +1074,7 @@ protected:
         case DtId::INT64: this->template fromArray<typename NumPyToCpp<DtId::INT64>::type>(); break;
         case DtId::UINT32:this->template fromArray<typename NumPyToCpp<DtId::UINT32>::type>();break;
         case DtId::UINT64:this->template fromArray<typename NumPyToCpp<DtId::UINT64>::type>();break;
-        default: throw openvdb::TypeError(); break;
+        case DtId::NONE: throw openvdb::TypeError(); break;
         }
     }
 
@@ -1089,7 +1089,7 @@ protected:
         case DtId::INT64:  this->template toArray<typename NumPyToCpp<DtId::INT64>::type>(); break;
         case DtId::UINT32: this->template toArray<typename NumPyToCpp<DtId::UINT32>::type>(); break;
         case DtId::UINT64: this->template toArray<typename NumPyToCpp<DtId::UINT64>::type>(); break;
-        default: throw openvdb::TypeError(); break;
+        case DtId::NONE: throw openvdb::TypeError(); break;
         }
     }
 }; // class CopyOp
@@ -1145,7 +1145,7 @@ protected:
             this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::UINT32>::type>>(); break;
         case DtId::UINT64:
             this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::UINT64>::type>>(); break;
-        default: throw openvdb::TypeError(); break;
+        case DtId::NONE: throw openvdb::TypeError(); break;
         }
     }
 
@@ -1168,7 +1168,7 @@ protected:
             this->template toArray<math::Vec3<typename NumPyToCpp<DtId::UINT32>::type>>(); break;
         case DtId::UINT64:
             this->template toArray<math::Vec3<typename NumPyToCpp<DtId::UINT64>::type>>(); break;
-        default: throw openvdb::TypeError(); break;
+        case DtId::NONE: throw openvdb::TypeError(); break;
         }
     }
 }; // class CopyOp
@@ -1285,7 +1285,8 @@ copyVecArray(NumPyArrayType& arrayObj, std::vector<VecT>& vec)
     case DtId::INT64:  CopyVecOp<NumPyToCpp<DtId::INT64>::type, ValueT>()(src, dst, M*N); break;
     case DtId::UINT32: CopyVecOp<NumPyToCpp<DtId::UINT32>::type, ValueT>()(src, dst, M*N); break;
     case DtId::UINT64: CopyVecOp<NumPyToCpp<DtId::UINT64>::type, ValueT>()(src, dst, M*N); break;
-    default: break;
+    case DtId::BOOL: break;
+    case DtId::NONE: break;
     }
 }
 
@@ -1318,7 +1319,7 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
                     case DtId::FLOAT: case DtId::DOUBLE: //case DtId::HALF:
                     case DtId::INT16: case DtId::INT32: case DtId::INT64:
                     case DtId::UINT32: case DtId::UINT64: break;
-                    default: wrongArrayType = true; break;
+                    case DtId::BOOL: case DtId::NONE: wrongArrayType = true; break;
                 }
             }
             if (wrongArrayType) {
@@ -2542,6 +2543,6 @@ exportGrid()
 
 #endif // OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
