@@ -288,18 +288,18 @@ BufferObject::render() const
 
     glBindBuffer(GL_ARRAY_BUFFER, mVertexBuffer);
     glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(3, GL_FLOAT, nullptr, nullptr);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
 
     if (usesColorBuffer) {
         glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
         glEnableClientState(GL_COLOR_ARRAY);
-        glColorPointer(3, GL_FLOAT, nullptr, nullptr);
+        glColorPointer(3, GL_FLOAT, 0, nullptr);
     }
 
     if (usesNormalBuffer) {
         glEnableClientState(GL_NORMAL_ARRAY);
         glBindBuffer(GL_ARRAY_BUFFER, mNormalBuffer);
-        glNormalPointer(GL_FLOAT, nullptr, nullptr);
+        glNormalPointer(GL_FLOAT, 0, nullptr);
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
