@@ -18,6 +18,11 @@ Houdini:
 - The Transform&nbsp;SOP now supports frustum transforms by applying the
   transformation to the internal affine map.
 
+@par
+Python:
+- Added limited support for @link points/PointDataGrid.h PointDataGrids@endlink
+  to the Python module, comprising I/O and metadata functionality for now.
+
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly
 @par

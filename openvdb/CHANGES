@@ -17,6 +17,11 @@ Version 6.0.1 - In development
     - The Transform SOP now supports frustum transforms by applying the
       transformation to the internal affine map.
 
+    Python:
+    - Added limited support for PointDataGrids to the Python module,
+      offering I/O and metadata functionality for now.
+
+
 Version 6.0.0 - December 18, 2018
 
       Some changes in this release (see "ABI changes" below) alter

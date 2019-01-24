@@ -75,6 +75,7 @@ STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     BOOST_PYTHON_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     BOOST_PYTHON_LIB=-lboost_python\
                     NUMPY_INCL_DIR=/usr/lib/python2.7/dist-packages/numpy/core/include/numpy\
+                    PYTHON_WRAP_ALL_GRID_TYPES=yes\
                     EPYDOC=/usr/bin/epydoc\
                     DOXYGEN=/usr/bin/doxygen"
 HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
@@ -186,6 +187,12 @@ elif [ "$TASK" = "script" ]; then
         if [ "$BLOSC" = "yes" ]; then
             if [ "$MODE" = "release" ]; then
                 # build OpenVDB core library, OpenVDB Python module and all binaries
+                if [ "$COMPILER" = "gcc" ]; then
+                    # for GCC, pre-build vdb_view and python using fewer threads in order to reduce memory consumption
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" -j4
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_view abi="$ABI" -j2
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS python abi="$ABI" -j2
+                fi
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" -j4
                 # run C++ and Python unit tests
                 make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" -j4

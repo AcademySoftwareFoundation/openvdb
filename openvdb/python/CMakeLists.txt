@@ -45,6 +45,7 @@ SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
   pyIntGrid.cc
   pyMetadata.cc
   pyOpenVDBModule.cc
+  pyPointGrid.cc
   pyTransform.cc
   pyVec3Grid.cc
   )
