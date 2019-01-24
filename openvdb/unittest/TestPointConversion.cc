@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -604,7 +604,7 @@ TestPointConversion::testPointConversionNans()
     {
         size_t iOffset = i;
         for (const int& idx : nanIndices) {
-            if (iOffset >= idx) iOffset += 1;
+            if (int(iOffset) >= idx) iOffset += 1;
         }
 
         CPPUNIT_ASSERT_EQUAL(id.buffer()[iOffset], pointData[i].id);
@@ -1126,6 +1126,6 @@ TestPointConversion::testComputeVoxelSize()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

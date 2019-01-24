@@ -10,9 +10,15 @@
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
+- Added a check to @vdblink::points::setGroup() points::setGroup@endlink
+  to compare the maximum index of the provided
+  @vdblink::tools::PointIndexTree PointIndexTree@endlink
+  to the size of the membership vector.
 
 @par
 Houdini:
+- The Points&nbsp;Convert SOP now reports NaN Positions as warnings when
+  converting from Houdini Points to VDB Points.
 - Fixed a bug where the Points&nbsp;Convert&nbsp;SOP was incorrectly ignoring
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the

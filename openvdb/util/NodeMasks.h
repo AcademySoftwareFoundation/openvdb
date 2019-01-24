@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -729,12 +729,12 @@ public:
     /// Set the <i>n</i>th  bit on
     void setOn(Index32 n) {
         assert( n  < 8 );
-        mByte = mByte | static_cast<Byte>(0x01U << (n & 7));
+        mByte = static_cast<Byte>(mByte | 0x01U << (n & 7));
     }
     /// Set the <i>n</i>th bit off
     void setOff(Index32 n) {
         assert( n  < 8 );
-        mByte = mByte & static_cast<Byte>(~(0x01U << (n & 7)));
+        mByte = static_cast<Byte>(mByte & ~(0x01U << (n & 7)));
     }
     /// Set the <i>n</i>th bit to the specified state
     void set(Index32 n, bool On) { On ? this->setOn(n) : this->setOff(n); }
@@ -747,7 +747,7 @@ public:
     /// Toggle the state of the <i>n</i>th bit
     void toggle(Index32 n) {
         assert( n  < 8 );
-        mByte = mByte ^ static_cast<Byte>(0x01U << (n & 7));
+        mByte = static_cast<Byte>(mByte ^ 0x01U << (n & 7));
     }
     /// Toggle the state of all bits in the mask
     void toggle() { mByte = static_cast<Byte>(~mByte); }
@@ -1435,6 +1435,6 @@ public:
 
 #endif // OPENVDB_UTIL_NODEMASKS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
