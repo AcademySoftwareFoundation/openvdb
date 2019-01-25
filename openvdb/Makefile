@@ -285,8 +285,8 @@ ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
 endif
 
 ifeq (yes,$(strip $(strict)))
-    USING_CLANG=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __clang__)
-    USING_GCC=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __GNUC__)
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
     ifneq (,$(USING_CLANG))
         CXXFLAGS += \
             -Qunused-arguments \
