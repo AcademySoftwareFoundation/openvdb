@@ -85,7 +85,9 @@ IF ( OPENVDB_CXX_WARNINGS )
         MESSAGE ( STATUS "Configuring Clang CXX warnings" )
         ADD_DEFINITIONS (
             -Qunused-arguments
-            -Weverything
+            -Wall \
+            -Wextra \
+            -Wconversion \
             -Wc++0x-compat
             -Wno-c++98-compat-pedantic
             -Wno-covered-switch-default

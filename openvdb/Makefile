@@ -290,7 +290,9 @@ ifeq (yes,$(strip $(warnings)))
     ifneq (,$(USING_CLANG))
         CXXFLAGS += \
             -Qunused-arguments \
-            -Weverything \
+            -Wall \
+            -Wextra \
+            -Wconversion \
             -Wc++0x-compat \
             -Wno-c++98-compat-pedantic \
             -Wno-covered-switch-default \
