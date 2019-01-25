@@ -187,31 +187,31 @@ elif [ "$TASK" = "script" ]; then
                 # build OpenVDB core library, OpenVDB Python module and all binaries
                 if [ "$COMPILER" = "gcc" ]; then
                     # for GCC, pre-build vdb_view and python using fewer threads in order to reduce memory consumption
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" warnings=yes -j4
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_view abi="$ABI" warnings=yes -j2
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS python abi="$ABI" warnings=yes -j2
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" strict=yes -j4
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_view abi="$ABI" strict=yes -j2
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS python abi="$ABI" strict=yes -j2
                 fi
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" warnings=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" strict=yes -j4
                 # run C++ and Python unit tests
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" warnings=yes -j4
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS pytest abi="$ABI" warnings=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" strict=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS pytest abi="$ABI" strict=yes -j4
             elif [ "$MODE" = "header" ]; then
                 # check for any indirect includes
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" warnings=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" strict=yes -j4
             else
                 # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" warnings=yes debug=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" strict=yes debug=yes -j4
             fi
         else
             if [ "$MODE" = "release" ]; then
                 # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" warnings=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" strict=yes -j4
                 # run C++ and Python unit tests
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi="$ABI" warnings=yes -j4
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS pytest abi="$ABI" warnings=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi="$ABI" strict=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS pytest abi="$ABI" strict=yes -j4
             else
                 # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" warnings=yes debug=yes -j4
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" strict=yes debug=yes -j4
             fi
         fi
     else
@@ -223,8 +223,8 @@ elif [ "$TASK" = "script" ]; then
         # note that this means the DSO can no longer be loaded in Houdini
         sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
         # build OpenVDB core library and OpenVDB houdini library
-        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" warnings=yes -j4
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" warnings=yes -j4
+        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" strict=yes -j4
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" strict=yes -j4
         # manually install OpenVDB houdini headers and lib
         mkdir houdini_utils
         cp openvdb_houdini/houdini/*.h openvdb_houdini
@@ -232,10 +232,10 @@ elif [ "$TASK" = "script" ]; then
         cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
         if [ "$MODE" = "header" ]; then
             # check for any indirect includes
-            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" warnings=yes -j4
+            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" strict=yes -j4
         else
             # build OpenVDB Houdini SOPs
-            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" warnings=yes -j4
+            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" strict=yes -j4
         fi
     fi
 fi

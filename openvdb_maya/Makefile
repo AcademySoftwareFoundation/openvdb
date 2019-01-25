@@ -41,7 +41,7 @@
 #   bits=32|64          build for 32-bit or 64-bit environments (default: 64)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands in verbose mode
-#   warnings=yes        Enable a collection of pre defined compiler warnings
+#   strict=yes          Enable a collection of pre defined compiler warnings
 #                       for GCC and clang
 
 
@@ -189,7 +189,7 @@ ifdef MBSD
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
-ifeq (yes,$(strip $(warnings)))
+ifeq (yes,$(strip $(strict)))
     USING_CLANG=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __clang__)
     USING_GCC=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __GNUC__)
     ifneq (,$(USING_CLANG))

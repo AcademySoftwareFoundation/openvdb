@@ -62,7 +62,7 @@
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
-#   warnings=yes        Enable a collection of pre defined compiler warnings
+#   strict=yes          Enable a collection of pre defined compiler warnings
 #                       for GCC and clang
 
 
@@ -284,7 +284,7 @@ ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
-ifeq (yes,$(strip $(warnings)))
+ifeq (yes,$(strip $(strict)))
     USING_CLANG=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __clang__)
     USING_GCC=$(shell ${CXX} -dM -E -x c++ - < /dev/null | grep __GNUC__)
     ifneq (,$(USING_CLANG))
