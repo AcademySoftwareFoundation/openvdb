@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -457,23 +457,8 @@ TestPointAttribute::testBloscCompress()
 
     CPPUNIT_ASSERT(leafIter->attributeArray("compact").isUniform());
     CPPUNIT_ASSERT(leafIter2->attributeArray("compact").isUniform());
-
-// disable deprecated warnings for in-memory compression
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-    bloscCompressAttribute(tree, "id");
-
-#ifdef OPENVDB_USE_BLOSC
-    CPPUNIT_ASSERT(!leafIter->attributeArray("id").isCompressed());
-    CPPUNIT_ASSERT(!leafIter->attributeArray("id2").isCompressed());
-    CPPUNIT_ASSERT(!leafIter2->attributeArray("id").isCompressed());
-    CPPUNIT_ASSERT(!leafIter2->attributeArray("id2").isCompressed());
-#endif
-
-#pragma GCC diagnostic pop
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

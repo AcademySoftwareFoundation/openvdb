@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafManager.h>
 #include "Dense.h"
+#include <algorithm> // for std::min()
+#include <vector>
 
 
 namespace openvdb {
@@ -71,7 +73,7 @@ namespace tools {
 /// @code
 /// struct ExampleOp
 /// {
-///     typedef DesiredTreeType   ResultTreeType;
+///     using ResultTreeType = DesiredTreeType;
 ///
 ///     template<typename IndexOrCoord>
 ///      void OpType::operator() (const DenseValueType a, const IndexOrCoord& ijk,
@@ -82,23 +84,23 @@ namespace tools {
 /// For example, to generate a <ValueType, 5, 4, 3> tree with valuesOn
 /// at locations greater than a given maskvalue
 /// @code
-/// template <typename ValueType>
+/// template<typename ValueType>
 /// class Rule
 /// {
 /// public:
 ///     // Standard tree type (e.g. MaskTree or FloatTree in openvdb.h)
-///     typedef typename openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type  ResultTreeType;
+///     using ResultTreeType = typename openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type;
 ///
-///     typedef typename ResultTreeType::LeafNodeType  ResultLeafNodeType;
-///     typedef typename ResultTreeType::ValueType     ResultValueType;
+///     using ResultLeafNodeType = typename ResultTreeType::LeafNodeType;
+///     using ResultValueType = typename ResultTreeType::ValueType;
 ///
-///     typedef float                         DenseValueType;
+///     using DenseValueType = float;
 ///
-///     typedef vdbmath::Coord::ValueType     Index;
+///     using Index = vdbmath::Coord::ValueType;
 ///
 ///     Rule(const DenseValueType& value): mMaskValue(value){};
 ///
-///     template <typename IndexOrCoord>
+///     template<typename IndexOrCoord>
 ///     void operator()(const DenseValueType& a, const IndexOrCoord& offset,
 ///                 ResultLeafNodeType* leaf) const
 ///     {
@@ -120,10 +122,11 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
 /// This struct that aids template resolution of a new tree type
 /// has the same configuration at TreeType, but the ValueType from
 /// DenseType.
-template <typename DenseType, typename TreeType> struct DSConverter {
-    typedef typename DenseType::ValueType  ValueType;
-
-    typedef typename TreeType::template ValueConverter<ValueType>::Type Type;
+template<typename DenseType, typename TreeType>
+struct DSConverter
+{
+    using ValueType = typename DenseType::ValueType;
+    using Type = typename TreeType::template ValueConverter<ValueType>::Type;
 };
 
 
@@ -196,22 +199,18 @@ void compositeToDense(Dense<typename TreeT::ValueType, LayoutZYX>& dense,
 template<typename OpType, typename DenseType>
 class SparseExtractor
 {
-
 public:
+    using Index = openvdb::math::Coord::ValueType;
 
-    typedef openvdb::math::Coord::ValueType              Index;
+    using DenseValueType = typename DenseType::ValueType;
+    using ResultTreeType = typename OpType::ResultTreeType;
+    using ResultValueType = typename ResultTreeType::ValueType;
+    using ResultLeafNodeType = typename ResultTreeType::LeafNodeType;
+    using MaskTree = typename ResultTreeType::template ValueConverter<ValueMask>::Type;
 
-    typedef typename DenseType::ValueType                 DenseValueType;
-    typedef typename OpType::ResultTreeType               ResultTreeType;
-    typedef typename ResultTreeType::ValueType            ResultValueType;
-    typedef typename ResultTreeType::LeafNodeType         ResultLeafNodeType;
-    typedef typename ResultTreeType::template ValueConverter<ValueMask>::Type MaskTree;
-
-    typedef tbb::blocked_range3d<Index, Index, Index>     Range3d;
-
+    using Range3d = tbb::blocked_range3d<Index, Index, Index>;
 
 private:
-
     const DenseType&                     mDense;
     const OpType&                        mFunctor;
     const ResultValueType                mBackground;
@@ -220,9 +219,7 @@ private:
     typename ResultTreeType::Ptr         mMask;
     openvdb::math::Coord                 mMin;
 
-
 public:
-
     SparseExtractor(const DenseType& dense, const OpType& functor,
                     const ResultValueType background) :
         mDense(dense), mFunctor(functor),
@@ -231,7 +228,6 @@ public:
         mWidth(ResultLeafNodeType::DIM),
         mMask( new ResultTreeType(mBackground))
     {}
-
 
     SparseExtractor(const DenseType& dense,
                     const openvdb::math::CoordBBox& bbox,
@@ -249,7 +245,6 @@ public:
         }
     }
 
-
     SparseExtractor(SparseExtractor& other, tbb::split):
         mDense(other.mDense), mFunctor(other.mFunctor),
         mBackground(other.mBackground), mBBox(other.mBBox),
@@ -258,9 +253,8 @@ public:
         mMin(other.mMin)
     {}
 
-    typename ResultTreeType::Ptr extract(bool threaded = true) {
-
-
+    typename ResultTreeType::Ptr extract(bool threaded = true)
+    {
         // Construct 3D range of leaf nodes that
         // intersect mBBox.
 
@@ -287,11 +281,9 @@ public:
 
         mMin = padded_min;
 
-
         Range3d  leafRange(0, xleafCount, 1,
                            0, yleafCount, 1,
                            0, zleafCount, 1);
-
 
         // Iterate over the leafnodes applying *this as a functor.
         if (threaded) {
@@ -303,10 +295,9 @@ public:
         return mMask;
     }
 
-
-    void operator()(const Range3d& range) {
-
-        ResultLeafNodeType* leaf = NULL;
+    void operator()(const Range3d& range)
+    {
+        ResultLeafNodeType* leaf = nullptr;
 
         // Unpack the range3d item.
         const Index imin = range.pages().begin();
@@ -332,7 +323,7 @@ public:
                                                     mWidth * j,
                                                     mWidth * k );
 
-                    if (leaf == NULL) {
+                    if (leaf == nullptr) {
                         leaf = new ResultLeafNodeType(origin, mBackground);
                     } else {
                         leaf->setOrigin(origin);
@@ -398,7 +389,7 @@ public:
 
                     if (!leaf->isEmpty()) {
                         mMask->addLeaf(leaf);
-                        leaf = NULL;
+                        leaf = nullptr;
                     }
 
                 }
@@ -407,7 +398,7 @@ public:
 
         // Clean up an unused leaf.
 
-        if (leaf != NULL) delete leaf;
+        if (leaf != nullptr) delete leaf;
     }
 
     void join(SparseExtractor& rhs) {
@@ -422,7 +413,6 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
                   const typename OpType::ResultValueType& background,
                   bool threaded)
 {
-
     // Construct the mask using a parallel reduce pattern.
     // Each thread computes disjoint mask-trees.  The join merges
     // into a single tree.
@@ -436,20 +426,19 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
 /// @brief Functor-based class used to extract data from a dense grid, at
 /// the index-space intersection with a supplied mask in the form of a sparse tree.
 /// The @c extractSparseTreeWithMask function wraps this class.
-template <typename DenseType, typename MaskTreeType>
+template<typename DenseType, typename MaskTreeType>
 class SparseMaskedExtractor
 {
 public:
+    using _ResultTreeType = typename DSConverter<DenseType, MaskTreeType>::Type;
+    using ResultTreeType = _ResultTreeType;
+    using ResultLeafNodeType = typename ResultTreeType::LeafNodeType;
+    using ResultValueType = typename ResultTreeType::ValueType;
+    using DenseValueType = ResultValueType;
 
-    typedef typename DSConverter<DenseType, MaskTreeType>::Type  _ResultTreeType;
-    typedef _ResultTreeType                                      ResultTreeType;
-    typedef typename ResultTreeType::LeafNodeType                ResultLeafNodeType;
-    typedef typename ResultTreeType::ValueType                   ResultValueType;
-    typedef ResultValueType                                      DenseValueType;
-
-    typedef typename ResultTreeType::template ValueConverter<ValueMask>::Type  MaskTree;
-    typedef typename MaskTree::LeafCIter                         MaskLeafCIter;
-    typedef std::vector<const typename MaskTree::LeafNodeType*>  MaskLeafVec;
+    using MaskTree = typename ResultTreeType::template ValueConverter<ValueMask>::Type;
+    using MaskLeafCIter = typename MaskTree::LeafCIter;
+    using MaskLeafVec = std::vector<const typename MaskTree::LeafNodeType*>;
 
 
     SparseMaskedExtractor(const DenseType& dense,
@@ -461,15 +450,13 @@ public:
         mResult(new ResultTreeType(mBackground))
     {}
 
-
-
     SparseMaskedExtractor(const SparseMaskedExtractor& other, tbb::split):
         mDense(other.mDense), mBackground(other.mBackground), mBBox(other.mBBox),
         mLeafVec(other.mLeafVec), mResult( new ResultTreeType(mBackground))
     {}
 
-    typename ResultTreeType::Ptr extract(bool threaded = true) {
-
+    typename ResultTreeType::Ptr extract(bool threaded = true)
+    {
         tbb::blocked_range<size_t> range(0, mLeafVec.size());
 
         if (threaded) {
@@ -481,13 +468,11 @@ public:
         return mResult;
     }
 
-
     // Used in looping over leaf nodes in the masked grid
     // and using the active mask to select data to
-    void operator()(const tbb::blocked_range<size_t>& range) {
-
-        ResultLeafNodeType* leaf = NULL;
-
+    void operator()(const tbb::blocked_range<size_t>& range)
+    {
+        ResultLeafNodeType* leaf = nullptr;
 
         // loop over all the candidate leafs. Adding only those with 'true' values
         // to the tree
@@ -510,7 +495,7 @@ public:
 
             // Reset or allocate the target leaf
 
-            if (leaf == NULL) {
+            if (leaf == nullptr) {
                 leaf = new ResultLeafNodeType(maskLeaf->origin(), mBackground);
             } else {
                 leaf->setOrigin(maskLeaf->origin());
@@ -518,13 +503,11 @@ public:
                 leaf->setValuesOff();
             }
 
-
             // Iterate over the intersecting bounding box
             // copying active values to the result tree
 
             const openvdb::math::Coord start = localBBox.getStart();
             const openvdb::math::Coord end   = localBBox.getEnd();
-
 
             openvdb::math::Coord ijk;
 
@@ -568,13 +551,13 @@ public:
 
             if (!leaf->isEmpty()) {
                 mResult->addLeaf(leaf);
-                leaf = NULL;
+                leaf = nullptr;
             }
         }
 
         // Clean up an unused leaf.
 
-        if (leaf != NULL) delete leaf;
+        if (leaf != nullptr) delete leaf;
     }
 
     void join(SparseMaskedExtractor& rhs) {
@@ -597,8 +580,8 @@ private:
 template<typename _ResultTreeType, typename DenseValueType>
 struct ExtractAll
 {
-    typedef  _ResultTreeType                       ResultTreeType;
-    typedef typename ResultTreeType::LeafNodeType  ResultLeafNodeType;
+    using ResultTreeType = _ResultTreeType;
+    using ResultLeafNodeType = typename ResultTreeType::LeafNodeType;
 
     template<typename CoordOrIndex> inline void
     operator()(const DenseValueType& a, const CoordOrIndex& offset, ResultLeafNodeType* leaf) const
@@ -608,20 +591,20 @@ struct ExtractAll
 };
 
 
-template <typename DenseType, typename MaskTreeType>
+template<typename DenseType, typename MaskTreeType>
 typename DSConverter<DenseType, MaskTreeType>::Type::Ptr
 extractSparseTreeWithMask(const DenseType& dense,
                           const MaskTreeType& maskProxy,
                           const typename DenseType::ValueType& background,
                           bool threaded)
 {
-    typedef SparseMaskedExtractor<DenseType, MaskTreeType>       LeafExtractor;
-    typedef typename LeafExtractor::DenseValueType               DenseValueType;
-    typedef typename LeafExtractor::ResultTreeType               ResultTreeType;
-    typedef typename LeafExtractor::MaskLeafVec                  MaskLeafVec;
-    typedef typename LeafExtractor::MaskTree                     MaskTree;
-    typedef typename LeafExtractor::MaskLeafCIter                MaskLeafCIter;
-    typedef ExtractAll<ResultTreeType, DenseValueType>           ExtractionRule;
+    using LeafExtractor = SparseMaskedExtractor<DenseType, MaskTreeType>;
+    using DenseValueType = typename LeafExtractor::DenseValueType;
+    using ResultTreeType = typename LeafExtractor::ResultTreeType;
+    using MaskLeafVec = typename LeafExtractor::MaskLeafVec;
+    using MaskTree = typename LeafExtractor::MaskTree;
+    using MaskLeafCIter = typename LeafExtractor::MaskLeafCIter;
+    using ExtractionRule = ExtractAll<ResultTreeType, DenseValueType>;
 
     // Use Mask tree to hold the topology
 
@@ -684,27 +667,22 @@ extractSparseTreeWithMask(const DenseType& dense,
 /// @brief Class that applies a functor to the index space intersection
 /// of a prescribed bounding box and the dense grid.
 /// NB: This class only supports DenseGrids with ZYX memory layout.
-template <typename _ValueT, typename OpType>
+template<typename _ValueT, typename OpType>
 class DenseTransformer
 {
 public:
-
-    typedef _ValueT                                 ValueT;
-    typedef Dense<ValueT, openvdb::tools::LayoutZYX>       DenseT;
-    typedef openvdb::math::Coord::ValueType         IntType;
-    typedef tbb::blocked_range2d<IntType, IntType>  RangeType;
-
+    using ValueT = _ValueT;
+    using DenseT = Dense<ValueT, openvdb::tools::LayoutZYX>;
+    using IntType = openvdb::math::Coord::ValueType;
+    using RangeType = tbb::blocked_range2d<IntType, IntType>;
 
 private:
-
     DenseT&                  mDense;
     const OpType&            mOp;
     openvdb::math::CoordBBox mBBox;
 
 public:
-    DenseTransformer(DenseT& dense,
-                     const openvdb::math::CoordBBox& bbox,
-                     const OpType& functor):
+    DenseTransformer(DenseT& dense, const openvdb::math::CoordBBox& bbox, const OpType& functor):
         mDense(dense), mOp(functor), mBBox(dense.bbox())
     {
         // The iteration space is the intersection of the
@@ -763,12 +741,12 @@ public:
 /// @brief a wrapper struct used to avoid unnecessary computation of
 /// memory access from @c Coord when all offsets are guaranteed to be
 /// within the dense grid.
-template <typename ValueT, typename PointWiseOp>
+template<typename ValueT, typename PointWiseOp>
 struct ContiguousOp
 {
     ContiguousOp(const PointWiseOp& op) : mOp(op){}
 
-    typedef Dense<ValueT, openvdb::tools::LayoutZYX>  DenseT;
+    using DenseT = Dense<ValueT, openvdb::tools::LayoutZYX>;
     inline void transform(DenseT& dense, openvdb::math::Coord& ijk, size_t size) const
     {
         ValueT* dp = const_cast<ValueT*>(&dense.getValue(ijk));
@@ -783,13 +761,13 @@ struct ContiguousOp
 
 
 /// Apply a point-wise functor to the intersection of a dense grid and a given bounding box
-template <typename ValueT, typename PointwiseOpT>
+template<typename ValueT, typename PointwiseOpT>
 void
 transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense,
                const openvdb::CoordBBox& bbox,
                const PointwiseOpT& functor, bool parallel)
 {
-    typedef ContiguousOp<ValueT, PointwiseOpT>  OpT;
+    using OpT = ContiguousOp<ValueT, PointwiseOpT>;
 
     // Convert the Op so it operates on a contiguous line in memory
 
@@ -801,19 +779,18 @@ transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense,
 }
 
 
-template <typename CompositeMethod, typename _TreeT>
+template<typename CompositeMethod, typename _TreeT>
 class SparseToDenseCompositor
 {
-
 public:
-    typedef _TreeT                                               TreeT;
-    typedef typename TreeT::ValueType                            ValueT;
-    typedef typename TreeT::LeafNodeType                         LeafT;
-    typedef typename TreeT::template ValueConverter<ValueMask>::Type  MaskTreeT;
-    typedef typename MaskTreeT::LeafNodeType                     MaskLeafT;
-    typedef Dense<ValueT, openvdb::tools::LayoutZYX>             DenseT;
-    typedef openvdb::math::Coord::ValueType                      Index;
-    typedef tbb::blocked_range3d<Index, Index, Index>            Range3d;
+    using TreeT = _TreeT;
+    using ValueT = typename TreeT::ValueType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using MaskTreeT = typename TreeT::template ValueConverter<ValueMask>::Type;
+    using MaskLeafT = typename MaskTreeT::LeafNodeType;
+    using DenseT = Dense<ValueT, openvdb::tools::LayoutZYX>;
+    using Index = openvdb::math::Coord::ValueType;
+    using Range3d = tbb::blocked_range3d<Index, Index, Index>;
 
     SparseToDenseCompositor(DenseT& dense, const TreeT& source, const TreeT& alpha,
                             const ValueT beta, const ValueT strength) :
@@ -825,11 +802,10 @@ public:
         mBeta(other.mBeta), mStrength(other.mStrength) {}
 
 
-
-    void sparseComposite(bool threaded) {
-
+    void sparseComposite(bool threaded)
+    {
         const ValueT beta = mBeta;
-        const ValueT strenght = mStrength;
+        const ValueT strength = mStrength;
 
         // construct a tree that defines the iteration space
 
@@ -863,7 +839,7 @@ public:
             const ValueT sourceValue = sourceAccessor.getValue(org);
 
             if (openvdb::math::isZero(alphaValue) &&
-                openvdb::math::isZero(sourceValue) ) continue;
+                openvdb::math::isZero(sourceValue)) continue;
 
             // Compute overlap of tile with the dense grid
 
@@ -876,7 +852,7 @@ public:
 
             // Composite the tile-uniform values into the dense grid.
             compositeFromTile(mDense, localBBox, sourceValue,
-                              alphaValue, beta, strenght, threaded);
+                              alphaValue, beta, strength, threaded);
         }
     }
 
@@ -884,8 +860,7 @@ public:
     // Used in sparseComposite
     void inline operator()(const MaskLeafT& maskLeaf, size_t /*i*/) const
     {
-
-        typedef UniformLeaf   ULeaf;
+        using ULeaf = UniformLeaf;
         openvdb::math::CoordBBox localBBox = maskLeaf.getNodeBoundingBox();
         localBBox.intersect(mDense.bbox());
 
@@ -931,12 +906,12 @@ public:
     }
     // i.e.  it assumes that all valueOff Alpha voxels have value 0.
 
-    template <typename LeafT1, typename LeafT2>
+    template<typename LeafT1, typename LeafT2>
     inline static void compositeFromLeaf(DenseT& dense, const openvdb::math::CoordBBox& bbox,
                                          const LeafT1& source, const LeafT2& alpha,
                                          const ValueT beta, const ValueT strength)
     {
-        typedef openvdb::math::Coord::ValueType  IntType;
+        using IntType = openvdb::math::Coord::ValueType;
 
         const ValueT sbeta = strength * beta;
         openvdb::math::Coord ijk = bbox.min();
@@ -969,12 +944,8 @@ public:
                     for (ijk[2] = bbox.min().z(); ijk[2] < bbox.max().z() + 1; ++ijk[2]) {
 
                         if (alpha.isValueOn(ijk)) {
-
-                            dense.setValue(ijk,
-                             CompositeMethod::apply(dense.getValue(ijk),
-                                                    alpha.getValue(ijk), source.getValue(ijk),
-                                                    strength, beta, sbeta)
-                                           );
+                            dense.setValue(ijk, CompositeMethod::apply(dense.getValue(ijk),
+                                alpha.getValue(ijk), source.getValue(ijk), strength, beta, sbeta));
                         }
                     }
                 }
@@ -983,20 +954,17 @@ public:
     }
 
     inline static void compositeFromTile(DenseT& dense, openvdb::math::CoordBBox& bbox,
-                                         const ValueT& sourceValue, const ValueT& alphaValue,
-                                         const ValueT& beta, const ValueT& strength,
-                                         bool threaded)
+        const ValueT& sourceValue, const ValueT& alphaValue,
+        const ValueT& beta, const ValueT& strength,
+        bool threaded)
     {
-
-        typedef UniformTransformer TileTransformer;
+        using TileTransformer = UniformTransformer;
         TileTransformer functor(sourceValue, alphaValue, beta, strength);
 
         // Transform the data inside the bbox according to the TileTranformer.
 
         transformDense(dense, bbox, functor, threaded);
-
     }
-
 
     void denseComposite(bool threaded)
     {
@@ -1016,12 +984,11 @@ public:
         } else {
             (*this)(range);
         }
-
     }
 
     // Composites a dense region using value accessors
     // into a dense grid
-    void inline operator()(const Range3d& range) const
+    void operator()(const Range3d& range) const
     {
         // Use value accessors to alpha and source
 
@@ -1050,17 +1017,14 @@ public:
                     const ValueT& alpha = alphaAccessor.getValue(ijk);
                     const ValueT& src   = sourceAccessor.getValue(ijk);
 
-                    mDense.setValue(ijk, CompositeMethod::apply(d_old, alpha, src,
-                                                                strength, beta, sbeta));
+                    mDense.setValue(ijk,
+                        CompositeMethod::apply(d_old, alpha, src, strength, beta, sbeta));
                 }
             }
         }
-
     }
 
-
 private:
-
     // Internal class that wraps the templated composite method
     // for use when both alpha and source are uniform over
     // a prescribed bbox (e.g. a tile).
@@ -1075,13 +1039,15 @@ private:
 
         ValueT operator()(const ValueT& input) const
         {
-            return CompositeMethod::apply(input, mAlpha, mSource,
-                                          mStrength, mBeta, mSBeta);
+            return CompositeMethod::apply(input, mAlpha, mSource, mStrength, mBeta, mSBeta);
         }
 
     private:
-        const ValueT mSource;   const ValueT mAlpha; const ValueT mBeta;
-        const ValueT mStrength; const ValueT mSBeta;
+        const ValueT mSource;
+        const ValueT mAlpha;
+        const ValueT mBeta;
+        const ValueT mStrength;
+        const ValueT mSBeta;
     };
 
 
@@ -1092,9 +1058,9 @@ private:
     class UniformLeaf : private Line
     {
     public:
-        typedef typename LeafT::ValueType ValueT;
+        using ValueT = typename LeafT::ValueType;
 
-        typedef Line   BaseT;
+        using BaseT = Line;
         UniformLeaf(const ValueT& value) : BaseT(init(value)) {}
 
         static const BaseT init(const ValueT& value) {
@@ -1108,8 +1074,7 @@ private:
         bool isDense() const { return true; }
         bool isValueOn(openvdb::math::Coord&) const { return true; }
 
-        inline const ValueT& getValue(const openvdb::math::Coord& ) const
-        {return  BaseT::mValues[0];}
+        const ValueT& getValue(const openvdb::math::Coord&) const { return  BaseT::mValues[0]; }
     };
 
 private:
@@ -1125,7 +1090,7 @@ namespace ds
 {
     //@{
     /// @brief Point wise methods used to apply various compositing operations.
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpOver
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1136,8 +1101,7 @@ namespace ds
         { return (u + strength * alpha * (beta * v - u)); }
     };
 
-
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpAdd
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1148,7 +1112,7 @@ namespace ds
         { return (u + sbeta * alpha * v); }
     };
 
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpSub
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1159,7 +1123,7 @@ namespace ds
         { return (u - sbeta * alpha * v); }
     };
 
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpMin
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1170,8 +1134,7 @@ namespace ds
         { return ( ( 1 - s * alpha) * u + s * alpha * std::min(u, beta * v) ); }
     };
 
-
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpMax
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1182,7 +1145,7 @@ namespace ds
         { return ( ( 1 - s * alpha ) * u + s * alpha * std::min(u, beta * v) ); }
     };
 
-    template <typename ValueT>
+    template<typename ValueT>
     struct OpMult
     {
         static inline ValueT apply(const ValueT u, const ValueT alpha,
@@ -1196,42 +1159,43 @@ namespace ds
 
     //@{
     /// Translator that converts an enum to compositing functor types
-    template <DSCompositeOp OP, typename ValueT>
+    template<DSCompositeOp OP, typename ValueT>
     struct CompositeFunctorTranslator{};
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_OVER, ValueT>{ typedef OpOver<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_OVER, ValueT>{ using OpT = OpOver<ValueT>; };
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_ADD, ValueT>{ typedef OpAdd<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_ADD, ValueT>{ using OpT = OpAdd<ValueT>; };
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_SUB, ValueT>{ typedef OpSub<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_SUB, ValueT>{ using OpT = OpSub<ValueT>; };
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_MIN, ValueT>{ typedef OpMin<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_MIN, ValueT>{ using OpT = OpMin<ValueT>; };
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_MAX, ValueT>{ typedef OpMax<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_MAX, ValueT>{ using OpT = OpMax<ValueT>; };
 
-    template <typename ValueT>
-    struct CompositeFunctorTranslator<DS_MULT, ValueT>{ typedef OpMult<ValueT>   OpT; };
+    template<typename ValueT>
+    struct CompositeFunctorTranslator<DS_MULT, ValueT>{ using OpT = OpMult<ValueT>; };
     //@}
 
 } // namespace ds
 
 
-template <DSCompositeOp OpT, typename TreeT>
-void compositeToDense(
+template<DSCompositeOp OpT, typename TreeT>
+inline void
+compositeToDense(
     Dense<typename TreeT::ValueType, LayoutZYX>& dense,
     const TreeT& source, const TreeT& alpha,
     const typename TreeT::ValueType beta,
     const typename TreeT::ValueType strength,
     bool threaded)
 {
-    typedef typename TreeT::ValueType  ValueT;
-    typedef ds::CompositeFunctorTranslator<OpT, ValueT> Translator;
-    typedef typename Translator::OpT  Method;
+    using ValueT = typename TreeT::ValueType;
+    using Translator = ds::CompositeFunctorTranslator<OpT, ValueT>;
+    using Method = typename Translator::OpT;
 
     if (openvdb::math::isZero(strength)) return;
 
@@ -1254,6 +1218,6 @@ void compositeToDense(
 
 #endif //OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

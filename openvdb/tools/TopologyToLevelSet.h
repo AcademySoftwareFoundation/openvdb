@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -47,8 +47,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for math::BiasedGradientScheme
 #include <openvdb/util/NullInterrupter.h>
-
 #include <tbb/task_group.h>
+#include <algorithm> // for std::min(), std::max()
+#include <vector>
 
 
 namespace openvdb {
@@ -91,7 +92,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 template<typename GridT, typename InterrupterT>
 inline typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
-    int smoothingSteps = 0, InterrupterT* interrupt = NULL);
+    int smoothingSteps = 0, InterrupterT* interrupt = nullptr);
 
 
 ////////////////////////////////////////
@@ -125,17 +126,18 @@ struct ErodeOp
 template<typename TreeType>
 struct OffsetAndMinComp
 {
-    typedef typename TreeType::LeafNodeType     LeafNodeType;
-    typedef typename TreeType::ValueType        ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
-    OffsetAndMinComp(std::vector<LeafNodeType*>& lhsNodes, const TreeType& rhsTree, ValueType offset)
-        : mLhsNodes(lhsNodes.empty() ? NULL : &lhsNodes[0]), mRhsTree(&rhsTree), mOffset(offset)
+    OffsetAndMinComp(std::vector<LeafNodeType*>& lhsNodes,
+        const TreeType& rhsTree, ValueType offset)
+        : mLhsNodes(lhsNodes.empty() ? nullptr : &lhsNodes[0]), mRhsTree(&rhsTree), mOffset(offset)
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        typedef typename LeafNodeType::ValueOnIter Iterator;
+        using Iterator = typename LeafNodeType::ValueOnIter;
 
         tree::ValueAccessor<const TreeType> rhsAcc(*mRhsTree);
         const ValueType offset = mOffset;
@@ -162,7 +164,7 @@ private:
 
 template<typename GridType, typename InterrupterType>
 inline void
-normalizeLevelSet(GridType& grid, const int halfWidthInVoxels, InterrupterType* interrupt = NULL)
+normalizeLevelSet(GridType& grid, const int halfWidthInVoxels, InterrupterType* interrupt = nullptr)
 {
     LevelSetFilter<GridType, GridType, InterrupterType> filter(grid, interrupt);
     filter.setSpatialScheme(math::FIRST_BIAS);
@@ -174,11 +176,12 @@ normalizeLevelSet(GridType& grid, const int halfWidthInVoxels, InterrupterType* 
 
 template<typename GridType, typename InterrupterType>
 inline void
-smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, InterrupterType* interrupt = NULL)
+smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
+    InterrupterType* interrupt = nullptr)
 {
-    typedef typename GridType::ValueType        ValueType;
-    typedef typename GridType::TreeType         TreeType;
-    typedef typename TreeType::LeafNodeType     LeafNodeType;
+    using ValueType = typename GridType::ValueType;
+    using TreeType = typename GridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     GridType filterGrid(grid);
 
@@ -212,9 +215,9 @@ inline typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilation,
     int smoothingSteps, InterrupterT* interrupt)
 {
-    typedef typename GridT::TreeType::template ValueConverter<ValueMask>::Type MaskTreeT;
-    typedef typename GridT::TreeType::template ValueConverter<float>::Type     FloatTreeT;
-    typedef Grid<FloatTreeT>                                                   FloatGridT;
+    using MaskTreeT = typename GridT::TreeType::template ValueConverter<ValueMask>::Type;
+    using FloatTreeT = typename GridT::TreeType::template ValueConverter<float>::Type;
+    using FloatGridT = Grid<FloatTreeT>;
 
     // Check inputs
 
@@ -222,7 +225,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
     closingSteps = std::max(closingSteps, 0);
     dilation = std::max(dilation, 0);
 
-    if ( !grid.hasUniformVoxels() ) {
+    if (!grid.hasUniformVoxels()) {
         OPENVDB_THROW(ValueError, "Non-uniform voxels are not supported!");
     }
 
@@ -281,6 +284,6 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 #endif // OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
 
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

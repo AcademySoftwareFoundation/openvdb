@@ -42,6 +42,7 @@ internal::initialize()
 {
     // Register attribute arrays with no compression
     TypedAttributeArray<bool>::registerType();
+    TypedAttributeArray<int8_t>::registerType();
     TypedAttributeArray<int16_t>::registerType();
     TypedAttributeArray<int32_t>::registerType();
     TypedAttributeArray<int64_t>::registerType();

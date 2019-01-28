@@ -789,8 +789,15 @@ private:
                 const Real x2y2 = x2 + math::Pow2(c.y() - P[1]);
                 for (c.z() = lo.z(); c.z() <= hi.z(); ++c.z()) {
                     const Real x2y2z2 = x2y2 + math::Pow2(c.z()-P[2]); // squared dist from c to P
+#if defined __INTEL_COMPILER
+    _Pragma("warning (push)")
+    _Pragma("warning (disable:186)") // "pointless comparison of unsigned integer with zero"
+#endif
                     if (x2y2z2 >= max2 || (!acc.probeValue(c, v) && (v < ValueT(0))))
                         continue;//outside narrow band of the particle or inside existing level set
+#if defined __INTEL_COMPILER
+    _Pragma("warning (pop)")
+#endif
                     if (x2y2z2 <= min2) {//inside narrow band of the particle.
                         acc.setValueOff(c, inside);
                         continue;

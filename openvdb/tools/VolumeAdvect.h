@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -396,7 +396,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     using VoxelIterT = typename TreeT::LeafNodeType::ValueOnIter;
 
     Advect(const VolumeGridT& inGrid, const VolumeAdvection& parent)
-        : mTask(0)
+        : mTask(nullptr)
         , mInGrid(&inGrid)
         , mVelocityInt(parent.mVelGrid)
         , mParent(&parent)
@@ -567,6 +567,6 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
 
 #endif // OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
