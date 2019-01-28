@@ -212,22 +212,22 @@ using PointDataIndex64 = PointIndex<Index64, 1>;
 ////////////////////////////////////////
 
 
-namespace internal {
-
-/// Helper metafunction used to determine if the first template parameter is a
-/// specialization of the class template given in the second template parameter
-
+/// @brief Helper metafunction used to determine if the first template
+/// parameter is a specialization of the class template given in the second
+/// template parameter
 template <typename T, template <typename...> class Template>
-struct SpecializationOf : std::false_type {};
+struct IsSpecializationOf : std::false_type {};
 
 template <typename... Args, template <typename...> class Template>
-struct SpecializationOf<Template<Args...>, Template> : std::true_type {};
+struct IsSpecializationOf<Template<Args...>, Template> : std::true_type {};
 
-} // namespace internal
 
-template<typename T, bool = internal::SpecializationOf<T, math::Vec2>::value ||
-                            internal::SpecializationOf<T, math::Vec3>::value ||
-                            internal::SpecializationOf<T, math::Vec4>::value>
+////////////////////////////////////////
+
+
+template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
+                            IsSpecializationOf<T, math::Vec3>::value ||
+                            IsSpecializationOf<T, math::Vec4>::value>
 struct VecTraits
 {
     static const bool IsVec = true;
@@ -243,7 +243,7 @@ struct VecTraits<T, false>
     using ElementType = T;
 };
 
-template<typename T, bool = internal::SpecializationOf<T, math::Quat>::value>
+template<typename T, bool = IsSpecializationOf<T, math::Quat>::value>
 struct QuatTraits
 {
     static const bool IsQuat = true;
@@ -259,8 +259,8 @@ struct QuatTraits<T, false>
     using ElementType = T;
 };
 
-template<typename T, bool = internal::SpecializationOf<T, math::Mat3>::value ||
-                            internal::SpecializationOf<T, math::Mat4>::value>
+template<typename T, bool = IsSpecializationOf<T, math::Mat3>::value ||
+                            IsSpecializationOf<T, math::Mat4>::value>
 struct MatTraits
 {
     static const bool IsMat = true;
