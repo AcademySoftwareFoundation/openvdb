@@ -47,7 +47,7 @@ OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
-OPTION ( OPENVDB_CXX_WARNINGS "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
+OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
 
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "build for compatibility
 with version N of the OpenVDB Grid ABI, where N is 2, 3, 4, etc.
@@ -79,7 +79,7 @@ ELSEIF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
   ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
 ENDIF ()
 
-IF ( OPENVDB_CXX_WARNINGS )
+IF ( OPENVDB_CXX_STRICT )
     # Add definitions for a number of compiler warnings for GCC and Clang for all sub projects
     IF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
         MESSAGE ( STATUS "Configuring Clang CXX warnings" )
