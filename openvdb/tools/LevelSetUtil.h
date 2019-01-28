@@ -2380,6 +2380,9 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 
     BoolTreeType topologyMask(tree, false, TopologyCopy());
 
+    // prune out any inactive leaf nodes or inactive tiles
+    tools::pruneInactive(topologyMask);
+
     if (topologyMask.hasActiveTiles()) {
         topologyMask.voxelizeActiveTiles();
     }
@@ -2460,6 +2463,8 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     if (nodeSegmentGroups.size() == 1) {
 
         BoolTreePtrType mask(new BoolTreeType(tree, false, TopologyCopy()));
+
+        tools::pruneInactive(*mask);
 
         if (mask->hasActiveTiles()) {
             mask->voxelizeActiveTiles();

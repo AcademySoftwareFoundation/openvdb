@@ -193,6 +193,37 @@ TestLevelSetUtil::testSegmentationTools()
         openvdb::tools::segmentActiveVoxels(*grid, segments);
         CPPUNIT_ASSERT(segments.size() == 2);
     }
+
+    { // Test an empty fog volume
+
+        openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0);
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), grid->tree().leafCount());
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentActiveVoxels(*grid, segments);
+
+        // note that an empty volume should segment into an empty volume
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
+    }
+
+    { // Test fog volume with two inactive leaf nodes
+
+        openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0);
+
+        auto* leaf1 = grid->tree().touchLeaf(openvdb::Coord(0,0,0));
+        auto* leaf2 = grid->tree().touchLeaf(openvdb::Coord(100,100,100));
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), grid->tree().leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), grid->tree().activeVoxelCount());
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentActiveVoxels(*grid, segments);
+
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
+    }
 }
 
 
