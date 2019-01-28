@@ -49,6 +49,7 @@
 #include <tbb/tick_count.h>
 #include <tbb/atomic.h>
 
+#include <cstdio> // for std::remove()
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -122,6 +123,14 @@ public:
 private:
     tbb::tick_count mT0;
 };// ProfileTimer
+
+
+struct ScopedFile
+{
+    explicit ScopedFile(const std::string& s): pathname(s) {}
+    ~ScopedFile() { if (!pathname.empty()) std::remove(pathname.c_str()); }
+    const std::string pathname;
+};
 
 
 using namespace openvdb;
@@ -2037,6 +2046,7 @@ TestAttributeArray::testDelayedLoad()
 
             { // attempting to write a partially-read AttributeArray throws
                 std::string filename = tempDir + "/openvdb_partial1";
+                ScopedFile f(filename);
                 std::ofstream fileout(filename.c_str(), std::ios_base::binary);
                 io::setStreamMetadataPtr(fileout, streamMetadata);
                 io::setDataCompression(fileout, io::COMPRESS_BLOSC);
