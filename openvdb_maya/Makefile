@@ -194,23 +194,10 @@ ifeq (yes,$(strip $(strict)))
     USING_GCC=$(shell ${CXX} --version | grep GCC)
     ifneq (,$(USING_CLANG))
         CXXFLAGS += \
-            -Qunused-arguments \
             -Wall \
             -Wextra \
             -Wconversion \
-            -Wc++0x-compat \
-            -Wno-c++98-compat-pedantic \
-            -Wno-covered-switch-default \
-            -Wno-documentation \
-            -Wno-documentation-deprecated-sync \
-            -Wno-documentation-unknown-command \
-            -Wno-double-promotion \
-            -Wno-exit-time-destructors \
-            -Wno-global-constructors \
-            -Wno-mismatched-tags \
-            -Wno-padded \
             -Wno-sign-conversion \
-            -Wno-weak-vtables \
         #
     else ifneq (,$(USING_GCC))
         CXXFLAGS += \

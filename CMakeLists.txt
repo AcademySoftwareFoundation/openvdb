@@ -84,23 +84,10 @@ IF ( OPENVDB_CXX_WARNINGS )
     IF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
         MESSAGE ( STATUS "Configuring Clang CXX warnings" )
         ADD_DEFINITIONS (
-            -Qunused-arguments
-            -Wall \
-            -Wextra \
-            -Wconversion \
-            -Wc++0x-compat
-            -Wno-c++98-compat-pedantic
-            -Wno-covered-switch-default
-            -Wno-documentation
-            -Wno-documentation-deprecated-sync
-            -Wno-documentation-unknown-command
-            -Wno-double-promotion
-            -Wno-exit-time-destructors
-            -Wno-global-constructors
-            -Wno-mismatched-tags
-            -Wno-padded
+            -Wall
+            -Wextra
+            -Wconversion
             -Wno-sign-conversion
-            -Wno-weak-vtables
         )
     ELSEIF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
         MESSAGE ( STATUS "Configuring GCC CXX warnings" )
