@@ -140,6 +140,66 @@ TestTypes::testTraits()
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Byte>::ElementType, Byte>::value));
     }
 
+    { // QuatTraits - IsQuat
+
+        // standard types (Quats, etc)
+        CPPUNIT_ASSERT(QuatTraits<Quats>::IsQuat);
+        CPPUNIT_ASSERT(QuatTraits<Quatd>::IsQuat);
+
+        // some non-quaternion types
+        CPPUNIT_ASSERT(!QuatTraits<Vec3s>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Vec4d>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Vec2i>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Vec3U16>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<int>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<double>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<bool>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Mat4s>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<ValueMask>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Dummy>::IsQuat);
+        CPPUNIT_ASSERT(!QuatTraits<Byte>::IsQuat);
+    }
+
+    { // QuatTraits - Size
+
+        // standard types (Quats, etc)
+        CPPUNIT_ASSERT(QuatTraits<Quats>::Size == 4);
+        CPPUNIT_ASSERT(QuatTraits<Quatd>::Size == 4);
+
+        // some non-quaternion types
+        CPPUNIT_ASSERT(QuatTraits<Vec3s>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Vec4d>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Vec2i>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Vec3U16>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<int>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<double>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<bool>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Mat4s>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<ValueMask>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Dummy>::Size == 1);
+        CPPUNIT_ASSERT(QuatTraits<Byte>::Size == 1);
+    }
+
+    { // QuatTraits - ElementType
+
+        // standard types (Quats, etc)
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Quats>::ElementType, float>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Quatd>::ElementType, double>::value));
+
+        // some non-matrix types
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Vec3s>::ElementType, Vec3s>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Vec4d>::ElementType, Vec4d>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Vec2i>::ElementType, Vec2i>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Vec3U16>::ElementType, Vec3U16>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<int>::ElementType, int>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<double>::ElementType, double>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<bool>::ElementType, bool>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Mat4s>::ElementType, Mat4s>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<ValueMask>::ElementType, ValueMask>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Dummy>::ElementType, Dummy>::value));
+        CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Byte>::ElementType, Byte>::value));
+    }
+
     { // MatTraits - IsMat
 
         // standard types (Mat4d, etc)
