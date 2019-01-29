@@ -367,7 +367,7 @@ TestTreeGetSetValues::testFill()
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree.leafCount());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree.nonLeafCount()); // root node
     CPPUNIT_ASSERT(tree.empty());
-    
+
     // Partially fill a region with inactive background values.
     tree.fill(CoordBBox(Coord(27), Coord(254)), background, /*active=*/false);
     // Confirm that after pruning, the tree is empty.

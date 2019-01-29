@@ -192,22 +192,22 @@ TestDiagnostics::testDiagnose()
 
     FloatGrid::Ptr gridSphere =
         tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
-        
+
     //gridSphere->print(std::cerr, 2);
-    
+
     {// Check min/max of active values
         math::Extrema ex = tools::extrema(gridSphere->cbeginValueOn());
         //std::cerr << "Min = " << ex.min() << " max = " << ex.max() << std::endl;
         CPPUNIT_ASSERT(ex.min() > -voxelSize*width);
         CPPUNIT_ASSERT(ex.max() <  voxelSize*width);
-        
+
     }
     {// Check min/max of all values
         math::Extrema ex = tools::extrema(gridSphere->cbeginValueAll());
         //std::cerr << "Min = " << ex.min() << " max = " << ex.max() << std::endl;
         CPPUNIT_ASSERT(ex.min() >= -voxelSize*width);
         CPPUNIT_ASSERT(ex.max() <=  voxelSize*width);
-        
+
     }
     {// check range of all values in a sphere w/o mask
         tools::CheckRange<FloatGrid, true, true, FloatGrid::ValueAllCIter> c(-gamma, gamma);
@@ -316,13 +316,13 @@ TestDiagnostics::testCheckLevelSet()
 
     FloatGrid::Ptr grid =
         tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
-    
+
     //tools::CheckLevelSet<FloatGrid> c(*grid);
     //std::string str = c.check();
     std::string str = tools::checkLevelSet(*grid);
     CPPUNIT_ASSERT(str.empty());
     //std::cerr << "\n" << str << std::endl;
-    
+
     grid->tree().setValue(Coord(0,0,0), voxelSize*(width+0.5f));
     //str = c.check();
     str = tools::checkLevelSet(*grid);
@@ -332,7 +332,7 @@ TestDiagnostics::testCheckLevelSet()
     //str = c.check(6);
     str = tools::checkLevelSet(*grid, 6);
     CPPUNIT_ASSERT(str.empty());
-    
+
 }// testCheckLevelSet
 
 void
@@ -346,7 +346,7 @@ TestDiagnostics::testCheckFogVolume()
     FloatGrid::Ptr grid =
         tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
     tools::sdfToFogVolume(*grid);
-    
+
     //tools::CheckFogVolume<FloatGrid> c(*grid);
     //std::string str = c.check();
     std::string str = tools::checkFogVolume(*grid);
@@ -362,7 +362,7 @@ TestDiagnostics::testCheckFogVolume()
     str = tools::checkFogVolume(*grid, 5);
     //str = c.check(5);
     CPPUNIT_ASSERT(str.empty());
-    
+
 }// testCheckFogVolume
 
 void

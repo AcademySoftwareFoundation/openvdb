@@ -160,7 +160,7 @@ TestLevelSetUtil::testSegmentationTools()
 
         std::vector<FloatGrid::Ptr> segments;
 
-        // This tool will not identify two separate segments when the narrow-bands overlap. 
+        // This tool will not identify two separate segments when the narrow-bands overlap.
         openvdb::tools::segmentActiveVoxels(*sdfGrid, segments);
         CPPUNIT_ASSERT(segments.size() == 1);
 

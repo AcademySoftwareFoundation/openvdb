@@ -385,7 +385,7 @@ public:
 		CoordBBox   bbox(org, org + dim.offsetBy(-1));
 		float	    value = tile(0, 0, 0);
 
-		if (!SYSisEqual(value, background) && 
+		if (!SYSisEqual(value, background) &&
 		    (myActivateInsideSDF || !SYSisEqual(value, -background))) {
 		    grid.fill(bbox, value);
 		}
@@ -395,7 +395,7 @@ public:
 		    for (ijk[1] = 0; ijk[1] < dim[1]; ++ijk[1]) {
 			for (ijk[0] = 0; ijk[0] < dim[0]; ++ijk[0]) {
 			    float value = tile(ijk[0], ijk[1], ijk[2]);
-			    if (!SYSisEqual(value, background) && 
+			    if (!SYSisEqual(value, background) &&
 				(myActivateInsideSDF || !SYSisEqual(value, -background))) {
 				Coord pos = ijk.offsetBy(org[0], org[1], org[2]);
 				acc.setValue(pos, value);

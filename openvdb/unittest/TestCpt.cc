@@ -496,7 +496,7 @@ TestCpt::testCptMaskedTool()
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
     maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
-    
+
     // run the tool
     //typedef openvdb::tools::Cpt<FloatGrid> FloatCpt;//fails because MaskT defaults to MaskGrid
     typedef openvdb::tools::Cpt<FloatGrid, BoolGrid> FloatCpt;

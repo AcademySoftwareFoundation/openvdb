@@ -526,7 +526,7 @@ GEO_PrimVDB::conditionMatrix(UT_Matrix4D &mat4)
 	// some operations (e.g. LevelSetMorph) don't work with non-Uniform
 	// scales.  So we unify the diagonal if the diagonals are SYSisEqual,
 	// but not exactly equal.
-	if (SYSisEqual(mat4(0, 0), mat4(1, 1)) && 
+	if (SYSisEqual(mat4(0, 0), mat4(1, 1)) &&
 	    SYSisEqual(mat4(0, 0), mat4(2, 2)) &&
 	    !(mat4(0, 0) == mat4(1,1) && mat4(0, 0) == mat4(2,2)))
 	{
@@ -534,7 +534,7 @@ GEO_PrimVDB::conditionMatrix(UT_Matrix4D &mat4)
 	    mat4(1, 1) = mat4(2, 2) = mat4(0, 0);
 	    return true;
 	}
-	if (SYSalmostEqual((float)mat4(0, 0), (float)mat4(1, 1)) && 
+	if (SYSalmostEqual((float)mat4(0, 0), (float)mat4(1, 1)) &&
 	    SYSalmostEqual((float)mat4(0, 0), (float)mat4(2, 2)) &&
 	    !(mat4(0, 0) == mat4(1,1) && mat4(0, 0) == mat4(2,2)))
 	{
@@ -1240,7 +1240,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, float *f, int stride, const UT_Vector
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
 	    geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
 	    geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
@@ -1254,7 +1254,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, int *f, int stride, const UT_Vector3 
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
 	    geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
 	    geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {

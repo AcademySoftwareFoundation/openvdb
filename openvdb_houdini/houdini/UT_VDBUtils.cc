@@ -43,7 +43,7 @@
  *
  * NAME:        UT_VDBUtils.h (UT Library, C++)
  *
- * COMMENTS:    
+ * COMMENTS:
  */
 
 #include "UT_VDBUtils.h"
