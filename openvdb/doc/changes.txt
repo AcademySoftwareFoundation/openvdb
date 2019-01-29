@@ -14,6 +14,12 @@ Bug fixes:
   to compare the maximum index of the provided
   @vdblink::tools::PointIndexTree PointIndexTree@endlink
   to the size of the membership vector.
+- Fixed a crash in
+  @vdblink::tools::extractActiveVoxelSegmentMasks() extractActiveVoxelSegmentMasks@endlink
+  when the first leaf node has no active voxels. [Reported by Rick Hankins]
+- Fixed a bug in @vdblink::tools::segmentActiveVoxels() segmentActiveVoxels@endlink
+  and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
+  nodes are only pruned when there is more than one segment.
 
 @par
 Houdini:
