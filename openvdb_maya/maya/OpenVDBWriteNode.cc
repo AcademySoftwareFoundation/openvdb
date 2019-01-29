@@ -115,12 +115,12 @@ MStatus OpenVDBWriteNode::initialize()
     stat = addAttribute(aVdbFilePath);
     if (stat != MS::kSuccess) return stat;
 
-	aFrameNumbering = eAttr.create("FrameNumbering", "numbering", 0, &stat);
+    aFrameNumbering = eAttr.create("FrameNumbering", "numbering", 0, &stat);
     if (stat != MS::kSuccess) return stat;
 
-	eAttr.addField("Frame.SubTick", 0);
-	eAttr.addField("Fractional frame values", 1);
-	eAttr.addField("Global ticks", 2);
+    eAttr.addField("Frame.SubTick", 0);
+    eAttr.addField("Fractional frame values", 1);
+    eAttr.addField("Global ticks", 2);
 
     eAttr.setConnectable(false);
     stat = addAttribute(aFrameNumbering);

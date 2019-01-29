@@ -30,7 +30,7 @@
 
 /*
  * Copyright (c) 2012
- *	Side Effects Software Inc.  All rights reserved.
+ *      Side Effects Software Inc.  All rights reserved.
  *
  * Redistribution and use of Houdini Development Kit samples in source and
  * binary forms, with or without modification, are permitted provided that the
@@ -96,22 +96,22 @@ namespace {
 class GEO_VDBTranslator : public GEO_IOTranslator
 {
 public:
-	     GEO_VDBTranslator() {}
+             GEO_VDBTranslator() {}
     virtual ~GEO_VDBTranslator() {}
 
     virtual GEO_IOTranslator *duplicate() const;
 
     virtual const char *formatName() const;
 
-    virtual int		checkExtension(const char *name);
-    virtual void	getFileExtensions(UT_StringArray &extensions) const;
+    virtual int         checkExtension(const char *name);
+    virtual void        getFileExtensions(UT_StringArray &extensions) const;
 
-    virtual int		checkMagicNumber(unsigned magic);
+    virtual int         checkMagicNumber(unsigned magic);
 
 #if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
-    virtual bool	fileStat(const char *filename,
-				GA_Stat &stat,
-				uint level);
+    virtual bool        fileStat(const char *filename,
+                                GA_Stat &stat,
+                                uint level);
 #endif
 
     virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
@@ -120,7 +120,7 @@ public:
     virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, const char *fname);
 #else
     virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, std::ostream &os,
-					       const char *fname);
+                                               const char *fname);
 #endif
 };
 
@@ -162,79 +162,79 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
     stat.clear();
 
     try {
-	openvdb::io::File file(filename);
+        openvdb::io::File file(filename);
 
-	file.open(/*delayLoad*/false);
+        file.open(/*delayLoad*/false);
 
-	int		nprim = 0;
-	UT_BoundingBox	bbox;
-	bbox.makeInvalid();
+        int             nprim = 0;
+        UT_BoundingBox  bbox;
+        bbox.makeInvalid();
 
-	// Loop over all grids in the file.
-	for (openvdb::io::File::NameIterator nameIter = file.beginName();
-	    nameIter != file.endName(); ++nameIter)
-	{
-	    const std::string& gridName = nameIter.gridName();
+        // Loop over all grids in the file.
+        for (openvdb::io::File::NameIterator nameIter = file.beginName();
+            nameIter != file.endName(); ++nameIter)
+        {
+            const std::string& gridName = nameIter.gridName();
 
-	    // Read the grid metadata.
-	    auto grid = file.readGridMetadata(gridName);
+            // Read the grid metadata.
+            auto grid = file.readGridMetadata(gridName);
 
-	    auto stats = grid->getStatsMetadata();
+            auto stats = grid->getStatsMetadata();
 
-	    openvdb::Vec3IMetadata::Ptr		meta_minbbox, meta_maxbbox;
-	    UT_BoundingBox			voxelbox;
+            openvdb::Vec3IMetadata::Ptr         meta_minbbox, meta_maxbbox;
+            UT_BoundingBox                      voxelbox;
 
-	    voxelbox.initBounds();
+            voxelbox.initBounds();
 
-	    meta_minbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_min");
-	    meta_maxbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_max");
-	    if (meta_minbbox && meta_maxbbox)
-	    {
-		UT_Vector3		minv, maxv;
-		minv = UTvdbConvert(meta_minbbox->value());
-		maxv = UTvdbConvert(meta_maxbbox->value());
-		voxelbox.enlargeBounds(minv);
-		voxelbox.enlargeBounds(maxv);
-		// We need to convert from corner-sampled (as in VDB)
-		// to center-sampled (as our BBOX elsewhere reports)
-		voxelbox.expandBounds(0.5, 0.5, 0.5);
+            meta_minbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_min");
+            meta_maxbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_max");
+            if (meta_minbbox && meta_maxbbox)
+            {
+                UT_Vector3              minv, maxv;
+                minv = UTvdbConvert(meta_minbbox->value());
+                maxv = UTvdbConvert(meta_maxbbox->value());
+                voxelbox.enlargeBounds(minv);
+                voxelbox.enlargeBounds(maxv);
+                // We need to convert from corner-sampled (as in VDB)
+                // to center-sampled (as our BBOX elsewhere reports)
+                voxelbox.expandBounds(0.5, 0.5, 0.5);
 
-		// Transform
-		UT_Vector3		voxelpts[8];
-		UT_BoundingBox		worldbox;
+                // Transform
+                UT_Vector3              voxelpts[8];
+                UT_BoundingBox          worldbox;
 
-		worldbox.initBounds();
-		voxelbox.getBBoxPoints(voxelpts);
-		for (int i = 0; i < 8; i++)
-		{
-		    worldbox.enlargeBounds(
-			    UTvdbConvert( grid->indexToWorld(UTvdbConvert(voxelpts[i])) ) );
-		}
+                worldbox.initBounds();
+                voxelbox.getBBoxPoints(voxelpts);
+                for (int i = 0; i < 8; i++)
+                {
+                    worldbox.enlargeBounds(
+                            UTvdbConvert( grid->indexToWorld(UTvdbConvert(voxelpts[i])) ) );
+                }
 
-		bbox.enlargeBounds(worldbox);
-	    }
+                bbox.enlargeBounds(worldbox);
+            }
 
-	    if (voxelbox.isValid()) {
-		stat.appendVolume(nprim, gridName.c_str(),
-		    static_cast<int>(voxelbox.size().x()),
-		    static_cast<int>(voxelbox.size().y()),
-		    static_cast<int>(voxelbox.size().z()));
-	    } else {
-		stat.appendVolume(nprim, gridName.c_str(), 0, 0, 0);
-	    }
-	    nprim++;
-	}
+            if (voxelbox.isValid()) {
+                stat.appendVolume(nprim, gridName.c_str(),
+                    static_cast<int>(voxelbox.size().x()),
+                    static_cast<int>(voxelbox.size().y()),
+                    static_cast<int>(voxelbox.size().z()));
+            } else {
+                stat.appendVolume(nprim, gridName.c_str(), 0, 0, 0);
+            }
+            nprim++;
+        }
 
-	// Straightforward correspondence:
-	stat.setPointCount(nprim);
-	stat.setVertexCount(nprim);
-	stat.setPrimitiveCount(nprim);
-	stat.setBounds(bbox);
+        // Straightforward correspondence:
+        stat.setPointCount(nprim);
+        stat.setVertexCount(nprim);
+        stat.setPrimitiveCount(nprim);
+        stat.setBounds(bbox);
 
-	file.close();
+        file.close();
     } catch (std::exception &e) {
-	cerr << "Stat failure: " << e.what() << "\n";
-	return false;
+        cerr << "Stat failure: " << e.what() << "\n";
+        return false;
     }
 
     return true;
@@ -249,10 +249,10 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
 {
     UT_WorkBuffer   buf;
     GU_Detail       *gdp = static_cast<GU_Detail*>(geogdp);
-    bool	    ok = true;
+    bool            ok = true;
 
     // Create a std::stream proxy.
-    FS_IStreamDevice	reader(&is);
+    FS_IStreamDevice    reader(&is);
     auto streambuf = new FS_IStreamDeviceBuffer(reader);
     auto stdstream = new std::istream(streambuf);
 
@@ -268,16 +268,16 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
         }
 
         // Loop over all grids in the file.
-	auto && allgrids = file.getGrids();
-	for (auto && grid : *allgrids)
-	{
-	    // Add a new VDB primitive for this grid.
-	    // Note: this clears the grid's metadata.
-	    createVdbPrimitive(*gdp, grid);
+        auto && allgrids = file.getGrids();
+        for (auto && grid : *allgrids)
+        {
+            // Add a new VDB primitive for this grid.
+            // Note: this clears the grid's metadata.
+            createVdbPrimitive(*gdp, grid);
         }
     } catch (std::exception &e) {
-	// Add a warning here instead of an error or else the File SOP's
-	// Missing Frame parameter won't be able to suppress cook errors.
+        // Add a warning here instead of an error or else the File SOP's
+        // Missing Frame parameter won't be able to suppress cook errors.
         UTaddCommonWarning(UT_ERROR_JUST_STRING, e.what());
         ok = false;
     }
