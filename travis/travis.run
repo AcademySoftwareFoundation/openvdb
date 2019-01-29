@@ -56,7 +56,7 @@ MODE="$4"
 HOUDINI_MAJOR="$5"
 COMPILER="$6"
 
-COMMON_ARGS="CXX=$HOME/ccache_compiler DESTDIR=/tmp/OpenVDB"
+COMMON_ARGS="CXX=$HOME/ccache_compiler DESTDIR=/tmp/OpenVDB strict=yes"
 
 # Location of third-party dependencies for standalone and houdini builds
 STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
@@ -98,31 +98,6 @@ NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
 
 HOUDINI_HAS_BOOST=$(echo "$HOUDINI_MAJOR < 16.5" | bc -l)
 
-CLANG_WARNINGS="    -Qunused-arguments\
-                    -Weverything\
-                    -Wc++0x-compat\
-                    -Wno-c++98-compat-pedantic\
-                    -Wno-covered-switch-default\
-                    -Wno-documentation\
-                    -Wno-documentation-deprecated-sync\
-                    -Wno-documentation-unknown-command\
-                    -Wno-double-promotion\
-                    -Wno-exit-time-destructors\
-                    -Wno-global-constructors\
-                    -Wno-mismatched-tags\
-                    -Wno-padded\
-                    -Wno-sign-conversion\
-                    -Wno-weak-vtables"
-
-GCC_WARNINGS="      -Wall
-                    -Wextra\
-                    -pedantic
-                    -Wcast-align\
-                    -Wcast-qual\
-                    -Wconversion\
-                    -Wdisabled-optimization\
-                    -Woverloaded-virtual"
-
 # zero ccache stats
 ccache -z
 
@@ -132,9 +107,9 @@ if [ "$TASK" = "install" ]; then
     echo '#!/bin/bash' > $HOME/ccache_compiler
     echo 'export CCACHE_MAXSIZE=20G' >> $HOME/ccache_compiler
     if [ "$COMPILER" = "clang" ]; then
-        echo 'ccache clang++' "$CLANG_WARNINGS" '$*' | xargs echo -n >> $HOME/ccache_compiler
+        echo 'ccache clang++ $*' >> $HOME/ccache_compiler
     elif [ "$COMPILER" = "gcc" ]; then
-        echo 'ccache g++' "$GCC_WARNINGS" '$*' | xargs echo -n >> $HOME/ccache_compiler
+        echo 'ccache g++ $*' >> $HOME/ccache_compiler
     fi
     chmod 755 $HOME/ccache_compiler
     # update OS

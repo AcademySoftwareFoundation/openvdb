@@ -62,6 +62,8 @@
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -280,6 +282,30 @@ ifneq (,$(abi))
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
+endif
+
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
 endif
 
 LIBS := \
