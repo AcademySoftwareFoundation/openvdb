@@ -11,9 +11,9 @@ New features:
 - Added new @vdblink::QuatTraits QuatTraits@endlink,
   @vdblink::MatTraits MatTraits@endlink and
   @vdblink::ValueTraits ValueTraits@endlink type traits to complement
-  @vdblink::VecTraits VecTraits@endlink.
-- Added an @vdblink::IsSpecializationOf @endlink helper metafunction for
-  deducing inheritence at compile-time.
+  @vdblink::VecTraits VecTraits@endlink and added an
+  @vdblink::IsSpecializationOf IsSpecializationOf@endlink
+  helper metafunction.
 
 @par
 Bug fixes:
