@@ -7,6 +7,15 @@
 <B>Version 6.0.1</B> - <I>In development</I>
 
 @par
+New features:
+- Added new @vdblink::QuatTraits QuatTraits@endlink,
+  @vdblink::MatTraits MatTraits@endlink and
+  @vdblink::ValueTraits ValueTraits@endlink type traits to complement
+  @vdblink::VecTraits VecTraits@endlink and added an
+  @vdblink::IsSpecializationOf IsSpecializationOf@endlink
+  helper metafunction.
+
+@par
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.

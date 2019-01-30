@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 6.0.1 - In development
 
+    New features:
+    - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
+      VecTraits and added an IsSpecializationOf helper metafunction.
+
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
