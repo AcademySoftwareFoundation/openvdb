@@ -2,9 +2,9 @@
                                OpenVDB
 ========================================================================
 
-The OpenVDB library comprises a hierarchical data structure and a suite 
-of tools for the efficient manipulation of sparse, possibly time-varying, 
-volumetric data discretized on a three-dimensional grid. 
+The OpenVDB library comprises a hierarchical data structure and a suite
+of tools for the efficient manipulation of sparse, possibly time-varying,
+volumetric data discretized on a three-dimensional grid.
 
 For instructions on library installation and dependencies see INSTALL
 

@@ -83,9 +83,9 @@ using ::GEO_PrimVDB;
 #include <openvdb/openvdb.h>
 
 
-class	GEO_Detail;
-class	GEO_PrimVolume;
-class	GEO_PrimVolumeXform;
+class   GEO_Detail;
+class   GEO_PrimVolume;
+class   GEO_PrimVolumeXform;
 class   UT_MemoryCounter;
 
 #if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
@@ -95,27 +95,27 @@ struct OPENVDB_HOUDINI_API GEO_VolumeOptions
     {
     }
     GEO_VolumeOptions(GEO_VolumeVis mode, fpreal iso, fpreal density)
-	: myMode(mode)
-	, myIso(iso)
-	, myDensity(density)
+        : myMode(mode)
+        , myIso(iso)
+        , myDensity(density)
     {
     }
     bool operator==(const GEO_VolumeOptions &v) const
     {
-	OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
-	return (myMode == v.myMode
-		&& myIso == v.myIso
-		&& myDensity == v.myDensity);
-	OPENVDB_NO_FP_EQUALITY_WARNING_END
+        OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
+        return (myMode == v.myMode
+                && myIso == v.myIso
+                && myDensity == v.myDensity);
+        OPENVDB_NO_FP_EQUALITY_WARNING_END
     }
     bool operator!=(const GEO_VolumeOptions &v) const
     {
-	return !(*this == v);
+        return !(*this == v);
     }
 
-    GEO_VolumeVis	    myMode;
-    fpreal		    myIso;
-    fpreal		    myDensity;
+    GEO_VolumeVis           myMode;
+    fpreal                  myIso;
+    fpreal                  myDensity;
 };
 #endif
 
@@ -123,7 +123,7 @@ struct OPENVDB_HOUDINI_API GEO_VolumeOptions
 class OPENVDB_HOUDINI_API GEO_PrimVDB : public GEO_Primitive
 {
 public:
-    typedef uint64	UniqueId;
+    typedef uint64      UniqueId;
 
 protected:
     /// NOTE: The constructor should only be called from subclass
@@ -144,8 +144,8 @@ protected:
 #endif
 
 public:
-    static GA_PrimitiveFamilyMask 	buildFamilyMask()
-					    { return GA_FAMILY_NONE; }
+    static GA_PrimitiveFamilyMask       buildFamilyMask()
+                                            { return GA_FAMILY_NONE; }
 
     /// @{
     /// Required interface methods
@@ -195,72 +195,72 @@ public:
 
     /// Convert an index in the voxel array into the corresponding worldspace
     /// location
-    void		indexToPos(int x, int y, int z, UT_Vector3 &pos) const;
-    void		findexToPos(UT_Vector3 index, UT_Vector3 &pos) const;
+    void                indexToPos(int x, int y, int z, UT_Vector3 &pos) const;
+    void                findexToPos(UT_Vector3 index, UT_Vector3 &pos) const;
 
     /// Convert a 3d position into the closest index value.
-    void		posToIndex(UT_Vector3 pos, int &x, int &y, int &z) const;
-    void		posToIndex(UT_Vector3 pos, UT_Vector3 &index) const;
+    void                posToIndex(UT_Vector3 pos, int &x, int &y, int &z) const;
+    void                posToIndex(UT_Vector3 pos, UT_Vector3 &index) const;
 
     /// Evaluate the voxel value at the given world space position.
     /// Note that depending on the underlying VDB type, this may not
     /// be sensible, in which case a zero will silently be returned
-    fpreal		getValueF(const UT_Vector3 &pos) const;
-    fpreal		getValueAtIndexF(int ix, int iy, int iz) const;
-    UT_Vector3D		getValueV3(const UT_Vector3 &pos) const;
-    UT_Vector3D		getValueAtIndexV3(int ix, int iy, int iz) const;
-    void		getValues(float *f, int stride, const UT_Vector3 *pos, int num) const;
-    void		getValues(int *f, int stride, const UT_Vector3 *pos, int num) const;
-    void		getValuesAtIndices(float *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
-    void		getValuesAtIndices(int *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
+    fpreal              getValueF(const UT_Vector3 &pos) const;
+    fpreal              getValueAtIndexF(int ix, int iy, int iz) const;
+    UT_Vector3D         getValueV3(const UT_Vector3 &pos) const;
+    UT_Vector3D         getValueAtIndexV3(int ix, int iy, int iz) const;
+    void                getValues(float *f, int stride, const UT_Vector3 *pos, int num) const;
+    void                getValues(int *f, int stride, const UT_Vector3 *pos, int num) const;
+    void                getValuesAtIndices(float *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
+    void                getValuesAtIndices(int *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
 
     /// Vector grid variants.
-    void		getValues(UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num) const;
-    void		getValuesAtIndices(UT_Vector3 *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
+    void                getValues(UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num) const;
+    void                getValuesAtIndices(UT_Vector3 *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
 
     // Worldspace gradient at the given position
-    UT_Vector3		 getGradient(const UT_Vector3 &pos) const;
+    UT_Vector3           getGradient(const UT_Vector3 &pos) const;
 
     /// Evaluate this grid's gradients at the given world space positions.
     /// Does nothing and returns false if grid is non-scalar.
     /// If normalize is true, then the gradients will be normalized to be unit
     /// length.
-    bool		evalGradients(
-			    UT_Vector3 *gradients,
-			    int gradients_stride,
-			    const UT_Vector3 *positions,
-			    int num_positions,
-			    bool normalize = false) const;
+    bool                evalGradients(
+                            UT_Vector3 *gradients,
+                            int gradients_stride,
+                            const UT_Vector3 *positions,
+                            int num_positions,
+                            bool normalize = false) const;
 
     /// Get the storage type of the grid
-    UT_VDBType		getStorageType() const
-    				{ return myGridAccessor.getStorageType(); }
+    UT_VDBType          getStorageType() const
+                                { return myGridAccessor.getStorageType(); }
     /// Get the tuple size, usually 1 or 3
-    int			getTupleSize() const
-			    { return UTvdbGetGridTupleSize(getStorageType()); }
+    int                 getTupleSize() const
+                            { return UTvdbGetGridTupleSize(getStorageType()); }
 
-    bool		 isSDF() const;
+    bool                 isSDF() const;
 
     /// True if the two volumes map the same indices to the same positions.
-    bool		 isAligned(const GEO_PrimVDB *vdb) const;
+    bool                 isAligned(const GEO_PrimVDB *vdb) const;
     /// True if the two volumes have the same active regions
-    bool		 isActiveRegionMatched(const GEO_PrimVDB *vdb) const;
+    bool                 isActiveRegionMatched(const GEO_PrimVDB *vdb) const;
 
     /// True if we are aligned with the world axes.  Ie, all our
     /// off diagonals are zero and our diagonal is positive.
-    bool		 isWorldAxisAligned() const;
+    bool                 isWorldAxisAligned() const;
 
     // Transform the matrix associated with this primitive. Translate is
     // ignored.
-    virtual void 	transform(const UT_Matrix4 &mat);
+    virtual void        transform(const UT_Matrix4 &mat);
 
     /// Accessors for the 4x4 matrix representing the affine transform that
     /// converts from index space voxel coordinates to world space. For frustum
     /// maps, this will be transform as if the taper value is set to 1.
     /// @{
-    void 		setTransform4(const UT_DMatrix4 &xform4);
-    void 		setTransform4(const UT_Matrix4 &xform4);
-    UT_Matrix4D 	getTransform4() const;
+    void                setTransform4(const UT_DMatrix4 &xform4);
+    void                setTransform4(const UT_Matrix4 &xform4);
+    UT_Matrix4D         getTransform4() const;
     /// @}
 
     // Take the whole set of points into consideration when applying the
@@ -281,7 +281,7 @@ public:
 
     /// This method assigns a preallocated vertex to the quadric, optionally
     /// creating the topological link between the primitive and new vertex.
-    void		 assignVertex(GA_Offset new_vtx, bool update_topology);
+    void                 assignVertex(GA_Offset new_vtx, bool update_topology);
 
 #if (UT_VERSION_INT < 0x10000162)
     /// Defragmentation
@@ -329,24 +329,24 @@ public:
     /// the index space [(0,0,0), resolution] bbox. If force_taper is true,
     /// then the resulting transform will always be a NonlinearFrustumMap even
     /// if there is no tapering.
-    void		setSpaceTransform(const GEO_PrimVolumeXform &space,
-					  const UT_Vector3R &resolution,
-					  bool force_taper = false);
+    void                setSpaceTransform(const GEO_PrimVolumeXform &space,
+                                          const UT_Vector3R &resolution,
+                                          bool force_taper = false);
 
     /// @}
 
-    fpreal		getTaper() const;
+    fpreal              getTaper() const;
 
     /// Returns the resolution of the active voxel array.
     /// Does *not* mean the indices go from 0..rx, however!
-    void		getRes(int &rx, int &ry, int &rz) const;
+    void                getRes(int &rx, int &ry, int &rz) const;
 
     /// Computes the voxel diameter by taking a step in x, y, and z
     /// converting to world space and taking the length of that vector.
-    fpreal		 getVoxelDiameter() const;
+    fpreal               getVoxelDiameter() const;
 
     /// Returns the length of the voxel when you take an x, y, and z step
-    UT_Vector3		 getVoxelSize() const;
+    UT_Vector3           getVoxelSize() const;
 
     /// VDBs may either be unbounded, or created with a specific frustum
     /// range.  The latter is important for tapered VDBs that otherwise
@@ -354,14 +354,14 @@ public:
     /// presence of an idxbox as a clipping box in index space.
     /// This does *NOT* relate to getRes - it may be much larger or
     /// even in some cases smaller.
-    bool		getFrustumBounds(UT_BoundingBox &idxbox) const;
+    bool                getFrustumBounds(UT_BoundingBox &idxbox) const;
 
     enum ActivateOperation
     {
-	ACTIVATE_UNION,		// Activate anything in source
-	ACTIVATE_INTERSECT,	// Deactivate anything not in source
-	ACTIVATE_SUBTRACT,	// Deactivate anything in source
-	ACTIVATE_COPY		// Set our activation to match source
+        ACTIVATE_UNION,         // Activate anything in source
+        ACTIVATE_INTERSECT,     // Deactivate anything not in source
+        ACTIVATE_SUBTRACT,      // Deactivate anything in source
+        ACTIVATE_COPY           // Set our activation to match source
     };
 
     /// Activates voxels given an *index* space bounding box.  This
@@ -369,22 +369,22 @@ public:
     /// If this is Frustum VDB, the activation will be clipped by that.
     /// Setting the value only takes effect if the voxels are activated,
     /// deactivated voxels are set to the background.
-    void		activateIndexBBox(
-			    const openvdb::CoordBBox& bbox,
-			    ActivateOperation operation,
-			    bool setvalue, fpreal value)
-			{
-			    activateIndexBBoxAdapter(
-				&bbox, operation, setvalue, value);
-			}
+    void                activateIndexBBox(
+                            const openvdb::CoordBBox& bbox,
+                            ActivateOperation operation,
+                            bool setvalue, fpreal value)
+                        {
+                            activateIndexBBoxAdapter(
+                                &bbox, operation, setvalue, value);
+                        }
 
     /// Activates all of the voxels in this VDB that are touched
     /// by active voxels in the source.
     /// If ignore_transform is true, voxels will be activated
     /// by grid index instead of world space position.
-    void		activateByVDB(const GEO_PrimVDB *vdb,
-				    ActivateOperation operation,
-				    bool setvalue, fpreal value,
+    void                activateByVDB(const GEO_PrimVDB *vdb,
+                                    ActivateOperation operation,
+                                    bool setvalue, fpreal value,
                                     bool ignore_transform=false);
 
     /// @{
@@ -426,48 +426,48 @@ public:
     /// return value of false indicates an error in the operation, most
     /// likely an invalid P.  For any attribute other than the position
     /// these methods simply enlarge the bounding box based on the vertex.
-    virtual bool	 enlargeBoundingBox(UT_BoundingRect &b,
-					const GA_Attribute *P) const;
-    virtual bool	 enlargeBoundingBox(UT_BoundingBox &b,
-					const GA_Attribute *P) const;
-    virtual void	 enlargePointBounds(UT_BoundingBox &e) const;
+    virtual bool         enlargeBoundingBox(UT_BoundingRect &b,
+                                        const GA_Attribute *P) const;
+    virtual bool         enlargeBoundingBox(UT_BoundingBox &b,
+                                        const GA_Attribute *P) const;
+    virtual void         enlargePointBounds(UT_BoundingBox &e) const;
     /// @}
     /// Enlarge a bounding sphere to encompass the primitive.  A return value
     /// of false indicates an error in the operation, most likely an invalid
     /// P.  For any attribute other than the position this method simply
     /// enlarges the sphere based on the vertex.
-    virtual bool	 enlargeBoundingSphere(UT_BoundingSphere &b,
-					const GA_Attribute *P) const;
+    virtual bool         enlargeBoundingSphere(UT_BoundingSphere &b,
+                                        const GA_Attribute *P) const;
 
     /// Accessor for the local 3x3 affine transform matrix for the primitive.
     /// For frustum maps, this will be transform as if the taper value is set
     /// to 1.
     /// @{
-    virtual void	getLocalTransform(UT_Matrix3D &result) const;
-    virtual void	setLocalTransform(const UT_Matrix3D &new_mat3);
+    virtual void        getLocalTransform(UT_Matrix3D &result) const;
+    virtual void        setLocalTransform(const UT_Matrix3D &new_mat3);
     /// @}
 
     /// @internal Hack to condition 4x4 matrices that we avoid creating what
     /// OpenVDB erroneously thinks are singular matrices. Returns true if mat4
     /// was modified.
-    static bool		conditionMatrix(UT_Matrix4D &mat4);
+    static bool         conditionMatrix(UT_Matrix4D &mat4);
 
     /// Visualization accessors
     /// @{
     const GEO_VolumeOptions &getVisOptions() const  { return myVis; }
 
-    void		setVisualization(
-			    GEO_VolumeVis vismode,
-			    fpreal iso,
-			    fpreal density)
-			{
-			    myVis.myMode = vismode;
-			    myVis.myIso = iso;
-			    myVis.myDensity = density;
-			}
-    GEO_VolumeVis	getVisualization() const    { return myVis.myMode; }
-    fpreal		getVisIso() const	    { return myVis.myIso; }
-    fpreal		getVisDensity() const	    { return myVis.myDensity; }
+    void                setVisualization(
+                            GEO_VolumeVis vismode,
+                            fpreal iso,
+                            fpreal density)
+                        {
+                            myVis.myMode = vismode;
+                            myVis.myIso = iso;
+                            myVis.myDensity = density;
+                        }
+    GEO_VolumeVis       getVisualization() const    { return myVis.myMode; }
+    fpreal              getVisIso() const           { return myVis.myIso; }
+    fpreal              getVisDensity() const       { return myVis.myDensity; }
     /// @}
 
     /// Load the order from a JSON value
@@ -479,12 +479,12 @@ public:
     bool                loadVDB(UT_JSONParser &p);
     /// @}
 
-    bool		saveVisualization(
-			    UT_JSONWriter &w,
-			    const GA_SaveMap &map) const;
-    bool		loadVisualization(
-			    UT_JSONParser &p,
-			    const GA_LoadMap &map);
+    bool                saveVisualization(
+                            UT_JSONWriter &w,
+                            const GA_SaveMap &map) const;
+    bool                loadVisualization(
+                            UT_JSONParser &p,
+                            const GA_LoadMap &map);
 
     /// Method to perform quick lookup of vertex without the virtual call
     GA_Offset           fastVertexOffset(GA_Size UT_IF_ASSERT_P(index)) const
@@ -509,76 +509,76 @@ public:
 
     /// @brief Computes the total density of the volume, scaled by
     /// the volume's size. Negative values will be ignored.
-    fpreal 	calcPositiveDensity() const;
+    fpreal      calcPositiveDensity() const;
 
-    bool	hasGrid() const { return myGridAccessor.hasGrid(); }
+    bool        hasGrid() const { return myGridAccessor.hasGrid(); }
 
     /// @brief If this primitive's grid's voxel data (i.e., its tree)
     /// is shared, replace the tree with a deep copy of itself that is
     /// not shared with anyone else.
-    void			makeGridUnique()
-				    { myGridAccessor.makeGridUnique(); }
+    void                        makeGridUnique()
+                                    { myGridAccessor.makeGridUnique(); }
 
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
-    const openvdb::GridBase &	getConstGrid() const
-				    { return myGridAccessor.getConstGrid(*this); }
+    const openvdb::GridBase &   getConstGrid() const
+                                    { return myGridAccessor.getConstGrid(*this); }
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
-    const openvdb::GridBase &	getGrid() const
-				    { return getConstGrid(); }
+    const openvdb::GridBase &   getGrid() const
+                                    { return getConstGrid(); }
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
     /// @warning Call makeGridUnique() before modifying the grid's voxel data.
-    openvdb::GridBase &		getGrid()
-				{
-				    incrGridUniqueIds();
-				    return myGridAccessor.getGrid(*this);
-				}
+    openvdb::GridBase &         getGrid()
+                                {
+                                    incrGridUniqueIds();
+                                    return myGridAccessor.getGrid(*this);
+                                }
 
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
-    openvdb::GridBase::ConstPtr	getConstGridPtr() const
-				    { return myGridAccessor.getConstGridPtr(*this); }
+    openvdb::GridBase::ConstPtr getConstGridPtr() const
+                                    { return myGridAccessor.getConstGridPtr(*this); }
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
-    openvdb::GridBase::ConstPtr	getGridPtr() const
-				    { return getConstGridPtr(); }
+    openvdb::GridBase::ConstPtr getGridPtr() const
+                                    { return getConstGridPtr(); }
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
     /// @warning Call makeGridUnique() before modifying the grid's voxel data.
-    openvdb::GridBase::Ptr	getGridPtr()
-				{
-				    incrGridUniqueIds();
-				    return myGridAccessor.getGridPtr(*this);
-				}
+    openvdb::GridBase::Ptr      getGridPtr()
+                                {
+                                    incrGridUniqueIds();
+                                    return myGridAccessor.getGridPtr(*this);
+                                }
 
     /// @brief Set this primitive's grid to a shallow copy of the given grid.
     /// @note Invalidates all previous getGrid() and getConstGrid() references
-    void			setGrid(const openvdb::GridBase &grid)
-				{
-				    incrGridUniqueIds();
-				    myGridAccessor.setGrid(grid, *this);
-				}
+    void                        setGrid(const openvdb::GridBase &grid)
+                                {
+                                    incrGridUniqueIds();
+                                    myGridAccessor.setGrid(grid, *this);
+                                }
 
     /// @brief Return a reference to this primitive's grid metadata.
     /// @note Calling setGrid() invalidates all references previously returned.
-    const openvdb::MetaMap&	getConstMetadata() const
-				    { return getConstGrid(); }
+    const openvdb::MetaMap&     getConstMetadata() const
+                                    { return getConstGrid(); }
     /// @brief Return a reference to this primitive's grid metadata.
     /// @note Calling setGrid() invalidates all references previously returned.
-    const openvdb::MetaMap&	getMetadata() const
-				    { return getConstGrid(); }
+    const openvdb::MetaMap&     getMetadata() const
+                                    { return getConstGrid(); }
     /// @brief Return a reference to this primitive's grid metadata.
     /// @note Calling setGrid() invalidates all references previously returned.
-    openvdb::MetaMap&		getMetadata()
-				{
-				    incrMetadataUniqueId();
-				    return myGridAccessor.getGrid(*this);
-				}
+    openvdb::MetaMap&           getMetadata()
+                                {
+                                    incrMetadataUniqueId();
+                                    return myGridAccessor.getGrid(*this);
+                                }
 
     /// @brief Return the value of this primitive's "name" attribute
     /// in the given detail.
@@ -588,30 +588,30 @@ public:
     /// @details A primitive's serial number never changes.
     /// @todo Because serial numbers are currently 32-bit, it is possible,
     /// though unlikely, for two primitives to have the same serial number.
-    UniqueId	    getUniqueId() const
-			{ return static_cast<UniqueId>(myUniqueId); }
+    UniqueId        getUniqueId() const
+                        { return static_cast<UniqueId>(myUniqueId); }
 
     /// @brief Return the serial number of this primitive's voxel data.
     /// @details The serial number is incremented whenever a non-const
     /// reference or pointer to this primitive's grid is requested
     /// (whether or not the voxel data is ultimately modified).
-    UniqueId	    getTreeUniqueId() const
-			{ return static_cast<UniqueId>(myTreeUniqueId); }
+    UniqueId        getTreeUniqueId() const
+                        { return static_cast<UniqueId>(myTreeUniqueId); }
     /// @brief Return the serial number of this primitive's grid metadata.
     /// @details The serial number is incremented whenever a non-const
     /// reference to the metadata or non-const access to the grid is requested
     /// (whether or not the metadata is ultimately modified).
-    UniqueId	    getMetadataUniqueId() const
-			{ return static_cast<UniqueId>(myMetadataUniqueId); }
+    UniqueId        getMetadataUniqueId() const
+                        { return static_cast<UniqueId>(myMetadataUniqueId); }
     /// @brief Return the serial number of this primitive's transform.
     /// @details The serial number is incremented whenever the transform
     /// is modified or non-const access to this primitive's grid is requested
     /// (whether or not the transform is ultimately modified).
-    UniqueId	    getTransformUniqueId() const
-			{ return static_cast<UniqueId>(myTransformUniqueId); }
+    UniqueId        getTransformUniqueId() const
+                        { return static_cast<UniqueId>(myTransformUniqueId); }
 
 protected:
-    typedef SYS_AtomicCounter	AtomicUniqueId; // 32-bit on non-AMD systems
+    typedef SYS_AtomicCounter   AtomicUniqueId; // 32-bit on non-AMD systems
 
     /// Register intrinsic attributes
 #if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
@@ -622,7 +622,7 @@ protected:
 #endif
 
     /// Return true if the given metadata token is an intrinsic
-    static bool		isIntrinsicMetadata(const char *name);
+    static bool         isIntrinsicMetadata(const char *name);
 
     /// @warning vertexPoint() doesn't check the bounds.  Use with caution.
     GA_Offset           vertexPoint(GA_Size) const
@@ -634,7 +634,7 @@ protected:
 
     /// Report approximate memory usage, excluding sizeof(*this),
     /// because the subclass doesn't have access to myGridAccessor.
-    int64		getBaseMemoryUsage() const;
+    int64               getBaseMemoryUsage() const;
 
     // This is called by the subclasses to count the
     // memory used by this, excluding sizeof(*this).
@@ -642,24 +642,24 @@ protected:
 
     /// @brief Return an ID number that is guaranteed to be unique across
     /// all VDB primitives.
-    static UniqueId	nextUniqueId();
+    static UniqueId     nextUniqueId();
 
-    void		incrTreeUniqueId()
-			    { myTreeUniqueId.maximum(nextUniqueId()); }
-    void		incrMetadataUniqueId()
-			    { myMetadataUniqueId.maximum(nextUniqueId()); }
-    void		incrTransformUniqueId()
-			    { myTransformUniqueId.maximum(nextUniqueId()); }
-    void		incrGridUniqueIds()
-			{
-			    incrTreeUniqueId();
-			    incrMetadataUniqueId();
-			    incrTransformUniqueId();
-			}
+    void                incrTreeUniqueId()
+                            { myTreeUniqueId.maximum(nextUniqueId()); }
+    void                incrMetadataUniqueId()
+                            { myMetadataUniqueId.maximum(nextUniqueId()); }
+    void                incrTransformUniqueId()
+                            { myTransformUniqueId.maximum(nextUniqueId()); }
+    void                incrGridUniqueIds()
+                        {
+                            incrTreeUniqueId();
+                            incrMetadataUniqueId();
+                            incrTransformUniqueId();
+                        }
 
     /// @brief Replace this primitive's grid with a shallow copy
     /// of another primitive's grid.
-    void		copyGridFrom(const GEO_PrimVDB&);
+    void                copyGridFrom(const GEO_PrimVDB&);
 
 #if (UT_VERSION_INT < 0x10000162) // earlier than 16.0.354
     GA_Offset myVertex;
@@ -681,8 +681,8 @@ protected:
     class GridAccessor
     {
     public:
-	GridAccessor() : myStorageType(UT_VDB_INVALID)
-	    { }
+        GridAccessor() : myStorageType(UT_VDB_INVALID)
+            { }
 
         void clear()
         {
@@ -690,71 +690,71 @@ protected:
             myStorageType = UT_VDB_INVALID;
         }
 
-	openvdb::GridBase &
-	getGrid(const GEO_PrimVDB &prim)
-	    { updateGridTranslates(prim); return *myGrid; }
+        openvdb::GridBase &
+        getGrid(const GEO_PrimVDB &prim)
+            { updateGridTranslates(prim); return *myGrid; }
 
-	const openvdb::GridBase &
-	getConstGrid(const GEO_PrimVDB &prim) const
-	    { updateGridTranslates(prim); return *myGrid; }
+        const openvdb::GridBase &
+        getConstGrid(const GEO_PrimVDB &prim) const
+            { updateGridTranslates(prim); return *myGrid; }
 
-	openvdb::GridBase::Ptr
-	getGridPtr(const GEO_PrimVDB &prim)
-	    { updateGridTranslates(prim); return myGrid; }
+        openvdb::GridBase::Ptr
+        getGridPtr(const GEO_PrimVDB &prim)
+            { updateGridTranslates(prim); return myGrid; }
 
-	openvdb::GridBase::ConstPtr
-	getConstGridPtr(const GEO_PrimVDB &prim) const
-	    { updateGridTranslates(prim); return myGrid; }
+        openvdb::GridBase::ConstPtr
+        getConstGridPtr(const GEO_PrimVDB &prim) const
+            { updateGridTranslates(prim); return myGrid; }
 
-	// These accessors will ensure the transform's translate is set into
-	// the vertex position.
-	void	    setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim)
-			{ setGridAdapter(&grid, prim); }
-	void	    setTransform(
-			const openvdb::math::Transform &xform,
-			GEO_PrimVDB &prim)
-			{ setTransformAdapter(&xform, prim); }
+        // These accessors will ensure the transform's translate is set into
+        // the vertex position.
+        void        setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim)
+                        { setGridAdapter(&grid, prim); }
+        void        setTransform(
+                        const openvdb::math::Transform &xform,
+                        GEO_PrimVDB &prim)
+                        { setTransformAdapter(&xform, prim); }
 
-	void 		makeGridUnique();
+        void            makeGridUnique();
 
-	UT_VDBType	getStorageType() const { return myStorageType; }
-	bool 		hasGrid() const { return myGrid != 0; }
-
-    private:
-	void	    updateGridTranslates(const GEO_PrimVDB &prim) const;
-	void	    setVertexPosition(
-			const openvdb::math::Transform &xform,
-			GEO_PrimVDB &prim)
-			{ setVertexPositionAdapter(&xform, prim); }
-
-	void	    setGridAdapter(const void* grid, GEO_PrimVDB&);
-	void	    setTransformAdapter(const void* xform, GEO_PrimVDB&);
-	void	    setVertexPositionAdapter(const void* xform, GEO_PrimVDB&);
+        UT_VDBType      getStorageType() const { return myStorageType; }
+        bool            hasGrid() const { return myGrid != 0; }
 
     private:
-	openvdb::GridBase::Ptr 	myGrid;
-	UT_VDBType		myStorageType;
+        void        updateGridTranslates(const GEO_PrimVDB &prim) const;
+        void        setVertexPosition(
+                        const openvdb::math::Transform &xform,
+                        GEO_PrimVDB &prim)
+                        { setVertexPositionAdapter(&xform, prim); }
+
+        void        setGridAdapter(const void* grid, GEO_PrimVDB&);
+        void        setTransformAdapter(const void* xform, GEO_PrimVDB&);
+        void        setVertexPositionAdapter(const void* xform, GEO_PrimVDB&);
+
+    private:
+        openvdb::GridBase::Ptr  myGrid;
+        UT_VDBType              myStorageType;
     };
 
 private:
-    void		activateIndexBBoxAdapter(
-			    const void* bbox,
-			    ActivateOperation,
-			    bool setvalue, fpreal value);
+    void                activateIndexBBoxAdapter(
+                            const void* bbox,
+                            ActivateOperation,
+                            bool setvalue, fpreal value);
 
 
-    GridAccessor	    myGridAccessor;
+    GridAccessor            myGridAccessor;
 
-    GEO_VolumeOptions	    myVis;
+    GEO_VolumeOptions       myVis;
 
 #if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    bool		    myStashedState;
+    bool                    myStashedState;
 #endif
 
-    AtomicUniqueId	    myUniqueId;
-    AtomicUniqueId	    myTreeUniqueId;
-    AtomicUniqueId	    myMetadataUniqueId;
-    AtomicUniqueId	    myTransformUniqueId;
+    AtomicUniqueId          myUniqueId;
+    AtomicUniqueId          myTreeUniqueId;
+    AtomicUniqueId          myMetadataUniqueId;
+    AtomicUniqueId          myTransformUniqueId;
 
 }; // class GEO_PrimVDB
 

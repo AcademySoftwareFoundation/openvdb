@@ -114,13 +114,13 @@ MStatus OpenVDBFilterNode::initialize()
 
 
     MFnEnumAttribute eAttr;
-	aFilter = eAttr.create("Filter", "filter", 0, &stat);
+    aFilter = eAttr.create("Filter", "filter", 0, &stat);
     if (stat != MS::kSuccess) return stat;
 
-	eAttr.addField("Mean", 0);
-	eAttr.addField("Gauss", 1);
-	eAttr.addField("Median", 2);
-	eAttr.addField("Offset", 3);
+    eAttr.addField("Mean", 0);
+    eAttr.addField("Gauss", 1);
+    eAttr.addField("Median", 2);
+    eAttr.addField("Offset", 3);
 
     eAttr.setConnectable(false);
     stat = addAttribute(aFilter);
