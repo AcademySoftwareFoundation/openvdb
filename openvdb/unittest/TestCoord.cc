@@ -85,7 +85,8 @@ TestCoord::testCoord()
     CPPUNIT_ASSERT(xyz2 < xyz);
     CPPUNIT_ASSERT(xyz2 <= xyz);
 
-    xyz2 -= xyz2;
+    Coord xyz3(xyz2);
+    xyz2 -= xyz3;
     CPPUNIT_ASSERT_EQUAL(Coord(), xyz2);
 
     xyz2.reset(0, 4, 4);

@@ -280,8 +280,6 @@ namespace {
 
 // Convert a Vec3 value to a vector of another value type or to a scalar value
 
-inline const openvdb::Vec3R& convertValue(const openvdb::Vec3R& val) { return val; }
-
 // Overload for scalar types (discards all but the first vector component)
 template<typename ValueType>
 inline typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
