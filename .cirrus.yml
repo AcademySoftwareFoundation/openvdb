@@ -19,3 +19,15 @@ spaces_not_tabs_task:
     - set +e
     - git grep -n "	" -- '*.cc' '*.h'
     - test $? -eq 1
+
+# Install Doxygen and build core library documentation, erroring on warning
+# (note - this excludes util/Formats.h due to a bug in Doxygen)
+doxygen_task:
+  test_script:
+    - set +e
+    - apt-get update
+    - apt-get install doxygen -y
+    - cd openvdb
+    - make doc 2>&1 | tee ./doxygen.log
+    - grep "warning:" ./doxygen.log | grep -v "util/Formats.h"
+    - test $? -eq 1
