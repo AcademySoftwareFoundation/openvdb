@@ -772,7 +772,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
 
                 const auto outputName = getOutputNameMode(evalStdString("outputname", time));
 
-                int i = 0;
+                size_t i = 0;
 
                 for (PointDataGrid::ConstPtr grid : pointGrids) {
 
