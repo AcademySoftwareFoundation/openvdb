@@ -39,6 +39,7 @@
 
 #include "AttributeArray.h"
 #include <memory>
+#include <unordered_set>
 
 
 namespace openvdb {
@@ -93,8 +94,8 @@ public:
 
 private:
     MetaMap& mMetadata;
-    std::vector<Index> mIndices;
-    std::vector<Name> mValues;
+    std::vector<std::pair<Index, Index>> mIdBlocks;
+    std::unordered_set<Name> mValues;
 }; // StringMetaInserter
 
 
@@ -206,7 +207,7 @@ public:
 private:
     /// Retrieve the index of this string value from the cache
     /// @note throws if name does not exist in cache
-    Index getIndex(const Name& name);
+    Index getIndex(const Name& name) const;
 
     using ValueMap = std::map<std::string, Index>;
 
