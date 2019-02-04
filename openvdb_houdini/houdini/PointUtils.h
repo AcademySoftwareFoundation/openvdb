@@ -153,8 +153,8 @@ convertPointDataGridToHoudini(
 /// @brief Populate VDB Points grid metadata from Houdini detail attributes
 ///
 /// @param  grid           grid to be populated with metadata
-/// @param  warnings       list of warnings to be added to the SOP
 /// @param  detail         GU_Detail to extract the detail attributes from
+/// @param  warnings       list of warnings to be added to the SOP
 OPENVDB_HOUDINI_API
 void
 populateMetadataFromHoudini(
