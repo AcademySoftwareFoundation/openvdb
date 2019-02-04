@@ -40,6 +40,7 @@
 #include "AttributeArray.h"
 #include <memory>
 #include <unordered_set>
+#include <unordered_map>
 
 
 namespace openvdb {
@@ -209,7 +210,7 @@ private:
     /// @note throws if name does not exist in cache
     Index getIndex(const Name& name) const;
 
-    using ValueMap = std::map<std::string, Index>;
+    using ValueMap = std::unordered_map<std::string, Index>;
 
     ValueMap                                                    mCache;
     AttributeWriteHandle<StringIndexType, StringCodec<false>>   mWriteHandle;
