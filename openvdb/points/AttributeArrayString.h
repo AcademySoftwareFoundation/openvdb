@@ -142,6 +142,7 @@ public:
                             const MetaMap& metadata,
                             const bool preserveCompression = true);
 
+    Index stride() const { return 1; }
     Index size() const { return mHandle.size(); }
     bool isUniform() const { return mHandle.isUniform(); }
 
