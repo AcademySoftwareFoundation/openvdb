@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -370,6 +370,7 @@ SET ( UNITTEST_SOURCE_FILES
   unittest/TestTreeGetSetValues.cc
   unittest/TestTreeIterators.cc
   unittest/TestTreeVisitor.cc
+  unittest/TestTypes.cc
   unittest/TestUtil.cc
   unittest/TestValueAccessor.cc
   unittest/TestVec2Metadata.cc

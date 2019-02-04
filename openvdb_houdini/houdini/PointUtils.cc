@@ -79,6 +79,7 @@ gaStorageFromAttrString(const openvdb::Name& type)
 {
     if (type == "string")           return GA_STORE_STRING;
     else if (type == "bool")        return GA_STORE_BOOL;
+    else if (type == "int8")        return GA_STORE_INT8;
     else if (type == "int16")       return GA_STORE_INT16;
     else if (type == "int32")       return GA_STORE_INT32;
     else if (type == "int64")       return GA_STORE_INT64;
@@ -102,6 +103,7 @@ gaStorageFromAttrString(const openvdb::Name& type)
 
 template<typename T> struct GAHandleTraits    { using RW = GA_RWHandleF; using RO = GA_ROHandleF; };
 template<> struct GAHandleTraits<bool>        { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
+template<> struct GAHandleTraits<int8_t>      { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int16_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int32_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int64_t>     { using RW = GA_RWHandleID; using RO = GA_ROHandleID; };
@@ -670,6 +672,8 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     else {
         if (storage == GA_STORE_BOOL) {
             convertAttributeFromHoudini<bool>(tree, indexTree, name, attribute, defaults, width);
+        } else if (storage == GA_STORE_INT8) {
+            convertAttributeFromHoudini<int8_t>(tree, indexTree, name, attribute, defaults, width);
         } else if (storage == GA_STORE_INT16) {
             convertAttributeFromHoudini<int16_t>(tree, indexTree, name, attribute, defaults, width);
         } else if (storage == GA_STORE_INT32) {
@@ -862,6 +866,8 @@ gaDefaultsFromDescriptor(const openvdb::points::AttributeSet::Descriptor& descri
 
     if (type == "bool") {
         return gaDefaultsFromDescriptorTyped<bool, int32>(descriptor, name);
+    } else if (type == "int8") {
+         return gaDefaultsFromDescriptorTyped<int8_t, int32>(descriptor, name);
     } else if (type == "int16") {
          return gaDefaultsFromDescriptorTyped<int16_t, int32>(descriptor, name);
     } else if (type == "int32") {
@@ -1215,6 +1221,11 @@ convertPointDataGridToHoudini(
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
                 filter, inCoreOnly);
         }
+        else if (valueType == "int8") {
+            HoudiniWriteAttribute<int8_t> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
+                filter, inCoreOnly);
+        }
         else if (valueType == "int16") {
             HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
@@ -1400,6 +1411,8 @@ populateMetadataFromHoudini(openvdb::points::PointDataGrid& grid,
             for (int i = 0; i < width; i++) {
                 if (storage == GA_STORE_BOOL) {
                     metadata = createTypedMetadataFromAttribute<bool>(attribute, i);
+                } else if (storage == GA_STORE_INT8) {
+                    metadata = createTypedMetadataFromAttribute<int8_t>(attribute, i);
                 } else if (storage == GA_STORE_INT16) {
                     metadata = createTypedMetadataFromAttribute<int16_t>(attribute, i);
                 } else if (storage == GA_STORE_INT32) {
@@ -1548,6 +1561,7 @@ convertMetadataToHoudini(GU_Detail& detail,
         UT_ASSERT(!attrib.isInvalid());
 
         if (type == openvdb::typeNameAsString<bool>())                 populateHoudiniDetailAttribute<bool>(attrib, metaMap, key, index);
+        else if (type == openvdb::typeNameAsString<int8_t>())          populateHoudiniDetailAttribute<int8_t>(attrib, metaMap, key, index);
         else if (type == openvdb::typeNameAsString<int16_t>())         populateHoudiniDetailAttribute<int16_t>(attrib, metaMap, key, index);
         else if (type == openvdb::typeNameAsString<int32_t>())         populateHoudiniDetailAttribute<int32_t>(attrib, metaMap, key, index);
         else if (type == openvdb::typeNameAsString<int64_t>())         populateHoudiniDetailAttribute<int64_t>(attrib, metaMap, key, index);

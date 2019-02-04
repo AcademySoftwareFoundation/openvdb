@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,8 +45,10 @@
 #include "GridTransformer.h" // for resampleToMatch()
 #include "LevelSetUtil.h" // for sdfSegmentation()
 
+#include <algorithm> // for std::max(), std::min()
 #include <limits>
 #include <list>
+#include <vector>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
@@ -62,16 +64,16 @@ template<class GridType, class InterruptType = util::NullInterrupter>
 class LevelSetFracture
 {
 public:
-    typedef std::vector<Vec3s> Vec3sList;
-    typedef std::vector<math::Quats> QuatsList;
-    typedef std::list<typename GridType::Ptr> GridPtrList;
-    typedef typename GridPtrList::iterator GridPtrListIter;
+    using Vec3sList = std::vector<Vec3s>;
+    using QuatsList = std::vector<math::Quats>;
+    using GridPtrList = std::list<typename GridType::Ptr>;
+    using GridPtrListIter = typename GridPtrList::iterator;
 
 
     /// @brief Default constructor
     ///
     /// @param interrupter  optional interrupter object
-    explicit LevelSetFracture(InterruptType* interrupter = NULL);
+    explicit LevelSetFracture(InterruptType* interrupter = nullptr);
 
     /// @brief Divide volumes represented by level set grids into multiple,
     /// disjoint pieces by intersecting them with one or more "cutter" volumes,
@@ -92,7 +94,7 @@ public:
     /// @param cutterOverlap  toggle to allow consecutive cutter instances to fracture
     ///                       previously generated fragments
     void fracture(GridPtrList& grids, const GridType& cutter, bool segment = false,
-        const Vec3sList* points = NULL, const QuatsList* rotations = NULL,
+        const Vec3sList* points = nullptr, const QuatsList* rotations = nullptr,
         bool cutterOverlap = true);
 
     /// Return a list of new fragments, not including the residuals from the input grids.
@@ -129,12 +131,12 @@ namespace level_set_fracture_internal {
 template<typename LeafNodeType>
 struct FindMinMaxVoxelValue {
 
-    typedef typename LeafNodeType::ValueType    ValueType;
+    using ValueType = typename LeafNodeType::ValueType;
 
     FindMinMaxVoxelValue(const std::vector<const LeafNodeType*>& nodes)
         : minValue(std::numeric_limits<ValueType>::max())
         , maxValue(-minValue)
-        , mNodes(nodes.empty() ? NULL : &nodes.front())
+        , mNodes(nodes.empty() ? nullptr : &nodes.front())
     {
     }
 
@@ -220,7 +222,7 @@ LevelSetFracture<GridType, InterruptType>::fracture(GridPtrList& grids, const Gr
 
             // Since there is no scaling, use the generic resampler instead of
             // the more expensive level set rebuild tool.
-            if (mInterrupter != NULL) {
+            if (mInterrupter != nullptr) {
 
                 if (hasInstanceRotations) {
                     doResampleToMatch<BoxSampler>(cutterGrid, instCutterGrid, *mInterrupter);
@@ -259,7 +261,7 @@ template<class GridType, class InterruptType>
 bool
 LevelSetFracture<GridType, InterruptType>::isValidFragment(GridType& grid) const
 {
-    typedef typename GridType::TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename GridType::TreeType::LeafNodeType;
 
     if (grid.tree().leafCount() < 9) {
 
@@ -309,7 +311,7 @@ void
 LevelSetFracture<GridType, InterruptType>::process(
     GridPtrList& grids, const GridType& cutter)
 {
-    typedef typename GridType::Ptr GridPtr;
+    using GridPtr = typename GridType::Ptr;
     GridPtrList newFragments;
 
     for (GridPtrListIter it = grids.begin(); it != grids.end(); ++it) {
@@ -341,6 +343,6 @@ LevelSetFracture<GridType, InterruptType>::process(
 
 #endif // OPENVDB_TOOLS_LEVELSETFRACTURE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

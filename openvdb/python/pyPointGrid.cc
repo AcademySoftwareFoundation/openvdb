@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,31 +27,28 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
+//
+/// @file pyPointGrid.cc
+/// @brief Boost.Python wrappers for point openvdb::Grid types
 
-/*
- * PROPRIETARY INFORMATION.  This software is proprietary to
- * Side Effects Software Inc., and is not to be reproduced,
- * transmitted, or disclosed in any way without written permission.
- *
- * Produced by:
- *      Adrian Saldanha
- *      Side Effects Software Inc
- *      477 Richmond Street West
- *      Toronto, Ontario
- *      Canada   M5V 3E7
- *      416-504-9876
- *
- * NAME:        UT_VDBUtils.h (UT Library, C++)
- *
- * COMMENTS:
- */
+#include <boost/python.hpp>
 
-#include "UT_VDBUtils.h"
+#include "pyGrid.h"
 
-namespace openvdb_houdini {
-// empty
+namespace py = boost::python;
+
+
+void exportPointGrid();
+
+
+void
+exportPointGrid()
+{
+#ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
+    pyGrid::exportGrid<points::PointDataGrid>();
+#endif
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

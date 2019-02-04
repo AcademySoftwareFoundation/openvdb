@@ -7,19 +7,36 @@
 <B>Version 6.0.1</B> - <I>In development</I>
 
 @par
+New features:
+- Added new @vdblink::QuatTraits QuatTraits@endlink,
+  @vdblink::MatTraits MatTraits@endlink and
+  @vdblink::ValueTraits ValueTraits@endlink type traits to complement
+  @vdblink::VecTraits VecTraits@endlink and added an
+  @vdblink::IsSpecializationOf IsSpecializationOf@endlink
+  helper metafunction.
+
+@par
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
-- Added a check to @vdblink::points::setGroup setGroup@endlink to compare
-  the maximum index of the provided PointIndexTree to the size of the
-  membership vector.
+- Added a check to @vdblink::points::setGroup() points::setGroup@endlink
+  to compare the maximum index of the provided
+  @vdblink::tools::PointIndexTree PointIndexTree@endlink
+  to the size of the membership vector.
 
 @par
 Houdini:
-- The Points Convert SOP now reports NaN Positions as warnings when
+- The Points&nbsp;Convert SOP now reports NaN Positions as warnings when
   converting from Houdini Points to VDB Points.
 - Fixed a bug where the Points&nbsp;Convert&nbsp;SOP was incorrectly ignoring
   point attributes with the same name as an existing point group.
+- The Transform&nbsp;SOP now supports frustum transforms by applying the
+  transformation to the internal affine map.
+
+@par
+Python:
+- Added limited support for @link points/PointDataGrid.h PointDataGrids@endlink
+  to the Python module, comprising I/O and metadata functionality for now.
 
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 #define OPENVDB_PYUTIL_HAS_BEEN_INCLUDED
 
 #include "openvdb/openvdb.h"
+#include "openvdb/points/PointDataGrid.h"
 #include <boost/python.hpp>
 #include <tbb/mutex.h>
 #include <map> // for std::pair
@@ -113,6 +114,7 @@ GRID_TRAITS(openvdb::Int32Grid, "Int32Grid");
 GRID_TRAITS(openvdb::Int64Grid, "Int64Grid");
 GRID_TRAITS(openvdb::Vec3IGrid, "Vec3IGrid");
 GRID_TRAITS(openvdb::Vec3DGrid, "Vec3DGrid");
+GRID_TRAITS(openvdb::points::PointDataGrid, "PointDataGrid");
 #endif
 
 #undef GRID_TRAITS
@@ -226,9 +228,9 @@ inline T
 extractArg(
     boost::python::object obj,
     const char* functionName,
-    const char* className = NULL,
+    const char* className = nullptr,
     int argIdx = 0, // args are numbered starting from 1
-    const char* expectedType = NULL)
+    const char* expectedType = nullptr)
 {
     boost::python::extract<T> val(obj);
     if (!val.check()) {
@@ -279,6 +281,6 @@ className(boost::python::object obj)
 
 #endif // OPENVDB_PYUTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

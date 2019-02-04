@@ -36,22 +36,22 @@ memory and on disk), fast data access (both random and sequential), and
 a collection of algorithms specifically optimized for the data structure
 for common tasks such as filtering, constructive solid geometry (CSG),
 discretization of partial differential equations, voxelization of polygons,
-skinning of particles, volumetric compositing and sampling. The technical 
+skinning of particles, volumetric compositing and sampling. The technical
 details of VDB are described in the paper
 <a href="http://www.museth.org/Ken/Publications.html" target="_blank">"VDB: High-Resolution Sparse Volumes with Dynamic Topology"</a>.
 
 @section sWhatLicense What license is OpenVDB distributed under?
-OpenVDB is released under the Mozilla Public License Version 2.0, which is a 
-free, open source, and detailed software license developed and maintained by 
-the Mozilla Foundation. It is characterized as a hybridization of the modified 
-BSD license and GNU General Public License (GPL) that seeks to balance the 
+OpenVDB is released under the Mozilla Public License Version 2.0, which is a
+free, open source, and detailed software license developed and maintained by
+the Mozilla Foundation. It is characterized as a hybridization of the modified
+BSD license and GNU General Public License (GPL) that seeks to balance the
 concerns of proprietary and open source developers. For more information
-about this license, see the 
-<a href="http://www.mozilla.org/MPL" target="_blank">Mozilla FAQ</a>. 
+about this license, see the
+<a href="http://www.mozilla.org/MPL" target="_blank">Mozilla FAQ</a>.
 
 @section sWhatCLA Is there a Contributor License Agreement for OpenVDB?
-Yes, developers who wish to contribute code to be considered for inclusion 
-in the OpenVDB distribution must first complete this 
+Yes, developers who wish to contribute code to be considered for inclusion
+in the OpenVDB distribution must first complete this
 <a href="http://www.openvdb.org//download/OpenVDBContributorLicenseAgreement.pdf" target="_blank">Contributor License Agreement</a>
 and submit it to DreamWorks (directions are in the CLA).
 
@@ -103,7 +103,7 @@ paper in <i>ACM&nbsp;Transactions on Graphics</i>.
 
 @section sLevelSet Is OpenVDB primarily for level set applications?
 No! Don't let the fact that OpenVDB can represent and operate so well on
-level sets mislead you into thinking that it is limited to or even focusing 
+level sets mislead you into thinking that it is limited to or even focusing
 on this special type of sparse volumetric application. OpenVDB was developed
 for general-purpose volumetric processing and numerical simulation, and we
 have even had success using it for volumetric applications that traditionally
@@ -132,7 +132,7 @@ distinction from similarly named, but different, existing sparse data
 structures like DT-Grid or DB-Grid. The simple truth is that "VDB" is just a
 name. :-)
 
-@section sAccessor Why are there no coordinate-based access methods on the grid? 
+@section sAccessor Why are there no coordinate-based access methods on the grid?
 It might surprise you that the @c Grid class doesn't directly provide access
 to voxels via their @ijk coordinates.  Instead, the recommended procedure
 is to ask the grid for a "value accessor", which is an accelerator object
@@ -172,13 +172,13 @@ These are the smallest addressable units of index space.
 @section sTile What are tiles?
 Values stored in nodes of type @c RootNode or @c InternalNode correspond to
 regions of index space with a constant value and active state and with
-power of two dimensions. We refer to such regions as "tiles".  By 
+power of two dimensions. We refer to such regions as "tiles".  By
 construction, tiles have no child nodes.
 
 @section sBackground What is the background value?
 A tree's background value is the value that is returned whenever
-one accesses a region of index space that is not explicitly represented by 
-voxels or tiles in the tree. Thus, you can think of the background value 
+one accesses a region of index space that is not explicitly represented by
+voxels or tiles in the tree. Thus, you can think of the background value
 as the default value associated with an empty tree.
 Note that the background value is always inactive!
 
@@ -211,17 +211,17 @@ effectively unbounded (unlike Field3D), and offers fast random and sequential
 voxel access.
 
 @section sReplaceDense Does OpenVDB replace dense grids?
-This depends a lot on your application of dense grids and your configuration 
-of OpenVDB. Clearly, if you are storing or processing sparse data, OpenVDB 
-will offer a smaller memory footprint and faster (sparse) data processing. 
-However, even in some cases where both data and computation are dense, OpenVDB 
-can offer benefits like improved CPU cache performance due to its underlying 
-blocking and hierarchical tree structure. Exceptions are of course algorithms 
-that expect dense data to be laid out linearly in memory, or applications that 
-use very small grids. The simple truth is only a benchmark comparison can tell 
-you the preferred data structure, but for what it's worth it is our experience 
-that for the volumetric applications we encounter in production, OpenVDB is 
-almost always superior. 
+This depends a lot on your application of dense grids and your configuration
+of OpenVDB. Clearly, if you are storing or processing sparse data, OpenVDB
+will offer a smaller memory footprint and faster (sparse) data processing.
+However, even in some cases where both data and computation are dense, OpenVDB
+can offer benefits like improved CPU cache performance due to its underlying
+blocking and hierarchical tree structure. Exceptions are of course algorithms
+that expect dense data to be laid out linearly in memory, or applications that
+use very small grids. The simple truth is only a benchmark comparison can tell
+you the preferred data structure, but for what it's worth it is our experience
+that for the volumetric applications we encounter in production, OpenVDB is
+almost always superior.
 
 @section sFuture What future improvements to OpenVDB are planned?
 We are continuing to expand the OpenVDB toolset and improve its performance.

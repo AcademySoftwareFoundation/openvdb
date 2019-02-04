@@ -228,43 +228,43 @@ TestLeafBool::testEquivalence()
     {
         LeafType leaf(Coord(0, 0, 0), false); // false and inactive
         LeafType leaf2(Coord(0, 0, 0), true); // true and inactive
-        
+
         CPPUNIT_ASSERT(leaf != leaf2);
-        
+
         leaf.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), true, /*active=*/false);
         CPPUNIT_ASSERT(leaf == leaf2); // true and inactive
-        
+
         leaf.setValuesOn(); // true and active
-        
+
         leaf2.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), false); // false and active
         CPPUNIT_ASSERT(leaf != leaf2);
-        
+
         leaf.negate(); // false and active
         CPPUNIT_ASSERT(leaf == leaf2);
-        
+
         // Set some values.
         leaf.setValueOn(Coord(0, 0, 0), true);
         leaf.setValueOn(Coord(0, 1, 0), true);
         leaf.setValueOn(Coord(1, 1, 0), true);
         leaf.setValueOn(Coord(1, 1, 2), true);
-        
+
         leaf2.setValueOn(Coord(0, 0, 0), true);
         leaf2.setValueOn(Coord(0, 1, 0), true);
         leaf2.setValueOn(Coord(1, 1, 0), true);
         leaf2.setValueOn(Coord(1, 1, 2), true);
-        
+
         CPPUNIT_ASSERT(leaf == leaf2);
-        
+
         leaf2.setValueOn(Coord(0, 0, 1), true);
-        
+
         CPPUNIT_ASSERT(leaf != leaf2);
-        
+
         leaf2.setValueOff(Coord(0, 0, 1), false);
-        
+
         CPPUNIT_ASSERT(leaf != leaf2);
-        
+
         leaf2.setValueOn(Coord(0, 0, 1));
-        
+
         CPPUNIT_ASSERT(leaf == leaf2);
     }
     {// test LeafNode<bool>::operator==()
@@ -279,7 +279,7 @@ TestLeafBool::testEquivalence()
         CPPUNIT_ASSERT(leaf2 != leaf4);
         CPPUNIT_ASSERT(leaf3 != leaf4);
     }
-        
+
 }
 
 
@@ -542,7 +542,7 @@ TestLeafBool::testMedian()
     using namespace openvdb;
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
     bool state = false;
-    
+
     CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(state));
     CPPUNIT_ASSERT(state == false);
     CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(state));
@@ -562,7 +562,7 @@ TestLeafBool::testMedian()
     CPPUNIT_ASSERT_EQUAL(leaf.numValues()-2, leaf.medianOff(state));
     CPPUNIT_ASSERT(state == false);
     CPPUNIT_ASSERT(!leaf.medianAll());
-    
+
     leaf.setValue(Coord(5,0,1), true);
     CPPUNIT_ASSERT_EQUAL(Index(3), leaf.medianOn(state));
     CPPUNIT_ASSERT(state == false);

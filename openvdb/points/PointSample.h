@@ -482,6 +482,8 @@ inline void sampleGrid( size_t order,
                 pointDataSampler.template sample<SourceGridT, Vec3d>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<Vec3i>()) {
                 pointDataSampler.template sample<SourceGridT, Vec3i>(sourceGrid, targetIdx);
+            } else if (targetType == typeNameAsString<int8_t>()) {
+                pointDataSampler.template sample<SourceGridT, int8_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int16_t>()) {
                 pointDataSampler.template sample<SourceGridT, int16_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int32_t>()) {

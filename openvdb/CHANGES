@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 6.0.1 - In development
 
+    New features:
+    - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
+      VecTraits and added an IsSpecializationOf helper metafunction.
+
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
@@ -14,6 +18,12 @@ Version 6.0.1 - In development
       converting from Houdini Points to VDB Points.
     - Fixed a bug where the Points Convert SOP was incorrectly ignoring
       point attributes with the same name as an existing point group.
+    - The Transform SOP now supports frustum transforms by applying the
+      transformation to the internal affine map.
+
+    Python:
+    - Added limited support for PointDataGrids to the Python module,
+      offering I/O and metadata functionality for now.
 
 
 Version 6.0.0 - December 18, 2018

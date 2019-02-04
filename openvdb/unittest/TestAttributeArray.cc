@@ -49,6 +49,7 @@
 #include <tbb/tick_count.h>
 #include <tbb/atomic.h>
 
+#include <cstdio> // for std::remove()
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -64,52 +65,16 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <sys/stat.h> // for stat()
 #endif
 
-/// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
-class ProxyMappedFile
+
+/// @brief io::MappedFile has a private constructor, so declare a class that acts as the friend
+class TestMappedFile
 {
 public:
-    explicit ProxyMappedFile(const std::string& filename)
-        : mImpl(new Impl(filename)) { }
-
-private:
-    class Impl
+    static openvdb::io::MappedFile::Ptr create(const std::string& filename)
     {
-    public:
-        Impl(const std::string& filename)
-            : mMap(filename.c_str(), boost::interprocess::read_only)
-            , mRegion(mMap, boost::interprocess::read_only)
-        {
-            mLastWriteTime = 0;
-            const char* regionFilename = mMap.get_name();
-#ifdef _MSC_VER
-            using namespace boost::interprocess::detail;
-            using namespace boost::interprocess::ipcdetail;
-            using openvdb::Index64;
-
-            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
-                FILETIME mtime;
-                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
-                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
-                }
-                close_file(fh);
-            }
-#else
-            struct stat info;
-            if (0 == ::stat(regionFilename, &info)) {
-                mLastWriteTime = openvdb::Index64(info.st_mtime);
-            }
-#endif
-        }
-
-        using Notifier = std::function<void(std::string /*filename*/)>;
-        boost::interprocess::file_mapping mMap;
-        boost::interprocess::mapped_region mRegion;
-        bool mAutoDelete = false;
-        Notifier mNotifier;
-        mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
-    }; // class Impl
-    std::unique_ptr<Impl> mImpl;
-}; // class ProxyMappedFile
+        return openvdb::SharedPtr<openvdb::io::MappedFile>(new openvdb::io::MappedFile(filename));
+    }
+};
 
 
 /// @brief Functionality similar to openvdb::util::CpuTimer except with prefix padding and no decimals.
@@ -159,6 +124,14 @@ public:
 private:
     tbb::tick_count mT0;
 };// ProfileTimer
+
+
+struct ScopedFile
+{
+    explicit ScopedFile(const std::string& s): pathname(s) {}
+    ~ScopedFile() { if (!pathname.empty()) std::remove(pathname.c_str()); }
+    const std::string pathname;
+};
 
 
 using namespace openvdb;
@@ -413,6 +386,19 @@ TestAttributeArray::testAttributeArray()
             TypedAttributeArray<bool> typedAttr(size);
             AttributeArray& attr(typedAttr);
             CPPUNIT_ASSERT_EQUAL(Name("bool"), attr.valueType());
+            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
+            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
+            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
+            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
+            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
+            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
+            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<int8_t> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            CPPUNIT_ASSERT_EQUAL(Name("int8"), attr.valueType());
             CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
             CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
             CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
@@ -1003,7 +989,8 @@ TestAttributeArray::testAttributeArrayCopy()
         TypedAttributeArray<half> targetTypedAttr1(size);
         AttributeArray& targetAttr1(targetTypedAttr1);
         for (Index i = 0; i < size; i++) {
-            targetTypedAttr1.set(i, sourceTypedAttr.get(i));
+            targetTypedAttr1.set(i,
+                io::RealToHalf<double>::convert(sourceTypedAttr.get(i)));
         }
 
         // truncated float array
@@ -1443,6 +1430,8 @@ TestAttributeArray::testDelayedLoad()
     AttributeArrayI::registerType();
     AttributeArrayF::registerType();
 
+    SharedPtr<io::MappedFile> mappedFile;
+
     io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
     std::string tempDir;
@@ -1500,10 +1489,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        ProxyMappedFile* proxy = new ProxyMappedFile(filename);
-        SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check manual loading of data
         {
@@ -1903,10 +1889,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check fill()
         {
@@ -1963,10 +1946,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check fill()
         {
@@ -2011,10 +1991,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check manual loading of data
         {
@@ -2071,6 +2048,7 @@ TestAttributeArray::testDelayedLoad()
 
             { // attempting to write a partially-read AttributeArray throws
                 std::string filename = tempDir + "/openvdb_partial1";
+                ScopedFile f(filename);
                 std::ofstream fileout(filename.c_str(), std::ios_base::binary);
                 io::setStreamMetadataPtr(fileout, streamMetadata);
                 io::setDataCompression(fileout, io::COMPRESS_BLOSC);
@@ -2219,10 +2197,7 @@ TestAttributeArray::testDelayedLoad()
             fileout.close();
         }
 
-        // abuse File being a friend of MappedFile to get around the private constructor
-
-        proxy = new ProxyMappedFile(filename);
-        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+        mappedFile = TestMappedFile::create(filename);
 
         // read in using delayed load and check metadata fail due to serialization flags
         {
@@ -2353,13 +2328,14 @@ template <typename AttrT>
 void sum(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sum");
-    typename AttrT::ValueType sum = 0;
+    using ValueType = typename AttrT::ValueType;
+    ValueType sum = 0;
     const Index size = attr.size();
     for (Index i = 0; i < size; i++) {
         sum += attr.getUnsafe(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum);
+    CPPUNIT_ASSERT(sum!=ValueType());
 }
 
 template <typename CodecT, typename AttrT>
@@ -2373,7 +2349,7 @@ void sumH(const Name& prefix, const AttrT& attr)
         sum += handle.get(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum);
+    CPPUNIT_ASSERT(sum!=ValueType());
 }
 
 } // namespace profile
@@ -2419,7 +2395,7 @@ TestAttributeArray::testProfile()
                 sum += float(values[i]);
             }
             // to prevent optimisation clean up
-            CPPUNIT_ASSERT(sum);
+            CPPUNIT_ASSERT(sum!=0.0f);
         }
     }
 

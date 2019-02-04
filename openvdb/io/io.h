@@ -41,6 +41,7 @@
 #include <memory>
 #include <string>
 
+class TestMappedFile;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -178,6 +179,7 @@ public:
 
 private:
     friend class File;
+    friend class ::TestMappedFile;
 
     explicit MappedFile(const std::string& filename, bool autoDelete = false);
 

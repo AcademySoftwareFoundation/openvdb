@@ -73,7 +73,7 @@ TestInit::test()
     CPPUNIT_ASSERT(math::TranslationMap::isRegistered());
     CPPUNIT_ASSERT(math::ScaleTranslateMap::isRegistered());
     CPPUNIT_ASSERT(math::NonlinearFrustumMap::isRegistered());
-    
+
     // grid types
     CPPUNIT_ASSERT(BoolGrid::isRegistered());
     CPPUNIT_ASSERT(FloatGrid::isRegistered());

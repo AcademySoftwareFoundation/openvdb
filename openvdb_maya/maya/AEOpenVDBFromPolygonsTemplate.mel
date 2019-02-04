@@ -15,7 +15,7 @@ AEOpenVDBFromPolygonsTemplate( string $nodeAttr )
 
             editorTemplate -addControl "EstimatedGridResolution";
 
-            editorTemplate 
+            editorTemplate
                 -annotation "Uniform voxel size in world units."
                 -addControl "VoxelSize";
 
@@ -45,18 +45,18 @@ AEOpenVDBFromPolygonsTemplate( string $nodeAttr )
         }
         editorTemplate -endNoOptimize;
         editorTemplate -endLayout;
-        
+
         editorTemplate -beginLayout "Information" -collapse 0;
         editorTemplate -beginNoOptimize;
         {
              editorTemplate -callCustom "AEAT_FromPolygonsInfoNew"
                 "AEAT_FromPolygonsInfoReplace" "NodeInfo";
-                
+
 
         }
         editorTemplate -endNoOptimize;
         editorTemplate -endLayout;
-        
+
 	    editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
@@ -68,13 +68,13 @@ AEAT_FromPolygonsUpdateEnabled( string $node )
 {
     int $fill = `getAttr ($node+".FillInterior")`;
     int $unsigned = `getAttr ($node+".UnsignedDistanceField")`;
-          
+
     if ($fill == 1 || $unsigned == 1) {
         editorTemplate -dimControl $node "InteriorBandWidth" 1;
     } else {
         editorTemplate -dimControl $node "InteriorBandWidth" 0;
     }
-    
+
     if ($unsigned == 1) {
         editorTemplate -dimControl $node "FillInterior" 1;
     } else {
@@ -95,8 +95,8 @@ global proc
 AEAT_FromPolygonsOutputsNew( string $attr )
 {
     string $parent = `setParent -q` + "|fromPolygonsOutputsLayout|";
-    string $node = plugNode($attr); 
-    
+    string $node = plugNode($attr);
+
     global int $gAttributeEditorTemplateLabelWidth;
     rowColumnLayout
         -numberOfColumns 2
@@ -141,7 +141,7 @@ AEAT_FromPolygonsOutputsReplace( string $attr )
     string $parent = `setParent -q`;
     string $parentLayout = $parent + "|fromPolygonsOutputsLayout|";
     string $nodeName = plugNode($attr);
-    
+
     if( `text -exists ($parent+"|fromPolygonsScriptJobParent")` == 1 ) {
         deleteUI fromPolygonsScriptJobParent;
     }
@@ -183,7 +183,7 @@ AEAT_FromPolygonsInfoUpdate( string $nodeName )
 
 global proc
 AEAT_FromPolygonsInfoNew( string $attr )
-{    
+{
     scrollField
         -editable 0
         fromPolygonsInfoField;
@@ -195,13 +195,13 @@ AEAT_FromPolygonsInfoReplace( string $attr )
 {
     string $parent = `setParent -q`;
     string $nodeName = plugNode($attr);
-    
+
     if( `text -exists ($parent+"|fromPolygonsInfoScriptJobParent")` == 1 ) {
         deleteUI fromPolygonsInfoScriptJobParent;
     }
 
     string $scriptParent = `text -manage 0 fromPolygonsInfoScriptJobParent`;
-    
+
     scriptJob -parent $scriptParent
         -attributeChange ($nodeName+".NodeInfo")
         ("AEAT_FromPolygonsInfoUpdate(\""+$nodeName+"\")");
