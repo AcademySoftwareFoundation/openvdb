@@ -926,7 +926,6 @@ public:
     bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; }
     bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; }
     BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); }
-    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); }
     BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); }
     BlindData operator-() const { return BlindData(-mVisible, mBlind); }
 
@@ -950,6 +949,15 @@ template<typename VisibleT, typename BlindT>
 inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 {
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
+}
+
+/// @private
+// Required to support the (zeroVal<BlindData>() + val) idiom.
+template<typename VisibleT, typename BlindT, typename T>
+inline BlindData<VisibleT, BlindT>
+operator+(const BlindData<VisibleT, BlindT>& x, const T& rhs)
+{
+    return BlindData<VisibleT, BlindT>(x.visible() + static_cast<VisibleT>(rhs), x.blind());
 }
 
 } // namespace p2ls_internal
