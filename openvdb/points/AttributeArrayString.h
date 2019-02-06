@@ -144,9 +144,11 @@ public:
                             const MetaMap& metadata,
                             const bool preserveCompression = true);
 
-    Index stride() const { return 1; }
+    Index stride() const { return mHandle.stride(); }
     Index size() const { return mHandle.size(); }
+
     bool isUniform() const { return mHandle.isUniform(); }
+    bool hasConstantStride() const { return mHandle.hasConstantStride(); }
 
     Name get(Index n, Index m = 0) const;
     void get(Name& name, Index n, Index m = 0) const;
