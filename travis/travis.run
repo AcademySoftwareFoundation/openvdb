@@ -39,6 +39,7 @@
 # MODE (release/debug/header):
 #        * release (standalone - builds all core library components and runs all tests)
 #        * release (houdini - builds core library and Houdini plugins)
+#        * extras (standalone - builds the Python module, tests and binaries)
 #        * debug (builds all core library components in debug mode)
 #        * header (checks for indirect includes)
 # HOUDINI_MAJOR (16.0/16.5) - the major version of Houdini
@@ -64,8 +65,8 @@ STANDALONE_ARGS="   BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     EXR_LIB_DIR=/usr/local/lib\
                     TBB_LIB_DIR=/usr/lib\
                     CONCURRENT_MALLOC_LIB=\
-                    CPPUNIT_INCL_DIR=/test/cppunit/include\
-                    CPPUNIT_LIB_DIR=/test/cppunit/lib\
+                    CPPUNIT_INCL_DIR=$HOME/cppunit/include\
+                    CPPUNIT_LIB_DIR=$HOME/cppunit/lib\
                     LOG4CPLUS_INCL_DIR=/usr/include\
                     LOG4CPLUS_LIB_DIR=/usr/lib/x86_64-linux-gnu\
                     GLFW_INCL_DIR=/usr/include/GL\
@@ -89,8 +90,8 @@ HOUDINI_ARGS="      BOOST_INCL_DIR=/test/hou/toolkit/include\
                     DOXYGEN="
 
 # Blosc
-STANDALONE_BLOSC_ARGS=" BLOSC_INCL_DIR=/test/blosc/include\
-                        BLOSC_LIB_DIR=/test/blosc/lib"
+STANDALONE_BLOSC_ARGS=" BLOSC_INCL_DIR=$HOME/blosc/include\
+                        BLOSC_LIB_DIR=$HOME/blosc/lib"
 HOUDINI_BLOSC_ARGS="    BLOSC_INCL_DIR=/test/hou/toolkit/include\
                         BLOSC_LIB_DIR=/test/hou/dsolib"
 NO_BLOSC_ARGS="         BLOSC_INCL_DIR=\
@@ -100,6 +101,8 @@ HOUDINI_HAS_BOOST=$(echo "$HOUDINI_MAJOR < 16.5" | bc -l)
 
 # zero ccache stats
 ccache -z
+
+mkdir -p $HOME/builds/$TRAVIS_BUILD_ID
 
 if [ "$TASK" = "install" ]; then
     # introduce wrapper to compiler that uses ccache, this is mainly
@@ -123,26 +126,30 @@ if [ "$TASK" = "install" ]; then
         sudo apt-get install -y libboost-system-dev
         sudo apt-get install -y libboost-thread-dev
         sudo apt-get install -y libtbb-dev
-        # download and build Blosc 1.5.0  if required
+        # download and build Blosc 1.5.0 if required
         if [ "$BLOSC" = "yes" ]; then
-            wget https://github.com/Blosc/c-blosc/archive/v1.5.0.zip
-            unzip v1.5.0.zip
-            cd c-blosc-1.5.0
-            mkdir -p /test/blosc
-            cmake -DCMAKE_INSTALL_PREFIX=/test/blosc
+            if [ ! -d $HOME/blosc/lib ]; then
+                wget https://github.com/Blosc/c-blosc/archive/v1.5.0.zip
+                unzip v1.5.0.zip
+                cd c-blosc-1.5.0
+                mkdir -p $HOME/blosc
+                cmake -DCMAKE_INSTALL_PREFIX=$HOME/blosc
+                make
+                make install
+                cd -
+            fi
+        fi
+        # compile and install cppunit if required
+        if [ ! -d $HOME/cppunit/lib ]; then
+            wget http://dev-www.libreoffice.org/src/cppunit-1.13.2.tar.gz
+            tar -xvzf cppunit-1.13.2.tar.gz
+            cd cppunit-1.13.2
+            mkdir -p $HOME/cppunit
+            ./configure --prefix=$HOME/cppunit
             make
             make install
             cd -
         fi
-        # compile and install cppunit
-        wget http://dev-www.libreoffice.org/src/cppunit-1.13.2.tar.gz
-        tar -xvzf cppunit-1.13.2.tar.gz
-        cd cppunit-1.13.2
-        mkdir -p /test/cppunit
-        ./configure --prefix=/test/cppunit
-        make
-        make install
-        cd -
         sudo apt-get install -y liblog4cplus-dev
         sudo apt-get install -y libglfw3-dev
         sudo apt-get install -y python-dev
@@ -178,66 +185,96 @@ if [ "$TASK" = "install" ]; then
             cp /usr/lib/x86_64-linux-gnu/libboost_system.so* /test/hou/dsolib
         fi
     fi
-elif [ "$TASK" = "script" ]; then
-    if [ "$HOUDINI_MAJOR" = "none" ]; then
-        # release mode - build and run OpenVDB unit tests
-        # debug mode - build OpenVDB unit tests
-        if [ "$BLOSC" = "yes" ]; then
-            if [ "$MODE" = "release" ]; then
-                # build OpenVDB core library, OpenVDB Python module and all binaries
-                if [ "$COMPILER" = "gcc" ]; then
-                    # for GCC, pre-build vdb_view and python using fewer threads in order to reduce memory consumption
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" -j4
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_view abi="$ABI" -j2
-                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS python abi="$ABI" -j2
-                fi
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" -j4
-                # run C++ and Python unit tests
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi="$ABI" -j4
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS pytest abi="$ABI" -j4
-            elif [ "$MODE" = "header" ]; then
-                # check for any indirect includes
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" -j4
+elif [ "$TASK" = "extras" ]; then
+    # build OpenVDB core library, OpenVDB Python module and all binaries
+    if [ "$COMPILER" = "gcc" ]; then
+        # for GCC, pre-build vdb_view and python using fewer threads in order to reduce memory consumption
+        make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" -j4
+        make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_view abi="$ABI" -j2
+        make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS python abi="$ABI" -j2
+    fi
+    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" -j4
+    cp openvdb/libopenvdb.so* $HOME/builds/$TRAVIS_BUILD_ID
+elif [ "$TASK" = "core" ]; then
+    if [ "$BLOSC" = "yes" ]; then
+        if [ "$MODE" = "release" ]; then
+            if [ "$HOUDINI_MAJOR" = "none" ]; then
+                # build OpenVDB core library and run C++ unit tests
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" -j4
+                cp openvdb/libopenvdb.so* $HOME/builds/$TRAVIS_BUILD_ID
             else
-                # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi="$ABI" debug=yes -j4
+                # source houdini_setup
+                cd hou
+                source houdini_setup
+                cd -
+                # build OpenVDB core library and OpenVDB houdini library
+                make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" -j4
+                cp openvdb/libopenvdb.so* $HOME/builds/$TRAVIS_BUILD_ID
             fi
+        elif [ "$MODE" = "header" ]; then
+            # check for any indirect includes
+            make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS header_test abi="$ABI" -j4
         else
-            if [ "$MODE" = "release" ]; then
-                # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" -j4
-                # run C++ and Python unit tests
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi="$ABI" -j4
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS pytest abi="$ABI" -j4
-            else
-                # build OpenVDB core library, OpenVDB Python module and all binaries
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi="$ABI" debug=yes -j4
-            fi
+            # build OpenVDB core library and run C++ unit tests
+            make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install_lib abi="$ABI" debug=yes -j4
+            cp openvdb/libopenvdb.so* $HOME/builds/$TRAVIS_BUILD_ID
         fi
     else
-        # source houdini_setup
-        cd hou
-        source houdini_setup
-        cd -
-        # disable hcustom tagging to remove timestamps in Houdini DSOs for ccache
-        # note that this means the DSO can no longer be loaded in Houdini
-        sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
-        # build OpenVDB core library and OpenVDB houdini library
-        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" -j4
-        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" -j4
-        # manually install OpenVDB houdini headers and lib
-        mkdir houdini_utils
-        cp openvdb_houdini/houdini/*.h openvdb_houdini
-        cp openvdb_houdini/houdini/*.h houdini_utils
-        cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
-        if [ "$MODE" = "header" ]; then
-            # check for any indirect includes
-            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" -j4
-        else
-            # build OpenVDB Houdini SOPs
-            make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
-        fi
+        # build OpenVDB core library and run C++ unit tests
+        make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install_lib abi="$ABI" -j4
+        cp openvdb/libopenvdb.so* $HOME/builds/$TRAVIS_BUILD_ID
     fi
+elif [ "$TASK" = "test" ]; then
+    sed -E -i.bak "s/vdb_test: \\$\(LIBOPENVDB\) /vdb_test: /g" openvdb/Makefile
+    if [ "$MODE" = "release" ]; then
+        # build OpenVDB core library and run C++ unit tests
+        cp $HOME/builds/$TRAVIS_BUILD_ID/libopenvdb.so* openvdb
+        if [ "$BLOSC" = "yes" ]; then
+            make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_test abi="$ABI" -j4
+        else
+            make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS vdb_test abi="$ABI" -j4
+        fi
+        cp openvdb/vdb_test $HOME/builds/$TRAVIS_BUILD_ID
+    else
+        # build OpenVDB core library and run C++ unit tests
+        cp $HOME/builds/$TRAVIS_BUILD_ID/libopenvdb.so* openvdb
+        make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS vdb_test abi="$ABI" debug=yes -j4
+        # cleanup
+        rm -r $HOME/builds/$TRAVIS_BUILD_ID
+    fi
+elif [ "$TASK" = "houdini" ]; then
+    # source houdini_setup
+    cd hou
+    source houdini_setup
+    cd -
+    if [ ! "$MODE" = "header" ]; then
+        # install only
+        cp $HOME/builds/$TRAVIS_BUILD_ID/libopenvdb.so* openvdb
+        sed -i.bak 's/install_lib: lib/install_lib: /g' openvdb/Makefile
+    fi
+    make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install_lib abi="$ABI" -j4
+    # disable hcustom tagging to remove timestamps in Houdini DSOs for ccache
+    # note that this means the DSO can no longer be loaded in Houdini
+    sed -i.bak 's/\/hcustom/\/hcustom -t/g' openvdb_houdini/Makefile
+    make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib abi="$ABI" -j4
+    # manually install OpenVDB houdini headers and lib
+    mkdir houdini_utils
+    cp openvdb_houdini/houdini/*.h openvdb_houdini
+    cp openvdb_houdini/houdini/*.h houdini_utils
+    cp openvdb_houdini/libopenvdb_houdini* /tmp/OpenVDB/lib
+    if [ "$MODE" = "header" ]; then
+        # check for any indirect includes
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS header_test abi="$ABI" -j4
+    else
+        # build OpenVDB Houdini SOPs
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install abi="$ABI" -j4
+    fi
+    # cleanup
+    rm -r $HOME/builds/$TRAVIS_BUILD_ID
+elif [ "$TASK" = "run" ]; then
+    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$HOME/builds/$TRAVIS_BUILD_ID; $HOME/builds/$TRAVIS_BUILD_ID/vdb_test -v
+    # cleanup
+    rm -r $HOME/builds/$TRAVIS_BUILD_ID
 fi
 
 # output ccache stats
