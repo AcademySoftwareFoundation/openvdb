@@ -1413,10 +1413,10 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
         CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
 
-        // handle is bound as if a linear array with stride 1
+        // handle is bound as if a linear array with stride 0
         StridedHandle handle(*array);
         CPPUNIT_ASSERT(!handle.hasConstantStride());
-        CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
+        CPPUNIT_ASSERT_EQUAL(Index(0), handle.stride());
         CPPUNIT_ASSERT_EQUAL(array->dataSize(), handle.size());
     }
 }

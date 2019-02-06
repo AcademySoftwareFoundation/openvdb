@@ -2101,7 +2101,7 @@ AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const
 template <typename ValueType, typename CodecType>
 AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool collapseOnDestruction)
     : mArray(&array)
-    , mStrideOrTotalSize(array.hasConstantStride() ? array.stride() : 1)
+    , mStrideOrTotalSize(array.stride())
     , mSize(array.hasConstantStride() ? array.size() : array.dataSize())
     , mCollapseOnDestruction(collapseOnDestruction && array.isStreaming())
 {
