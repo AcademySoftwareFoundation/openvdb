@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,9 +36,6 @@ import os, os.path
 import sys
 import unittest
 try:
-    import studioenv
-    from studio.ani import Ani
-    from studio import logging
     from studio import openvdb
 except ImportError:
     import pyopenvdb as openvdb
@@ -789,11 +786,7 @@ if __name__ == '__main__':
     print('Testing %s' % os.path.dirname(openvdb.__file__))
     sys.stdout.flush()
 
-    try:
-        logging.configure(sys.argv)
-        args = Ani(sys.argv).userArgs() # strip out ANI-related arguments
-    except NameError:
-        args = sys.argv
+    args = sys.argv
 
     # Unlike CppUnit, PyUnit doesn't use the "-t" flag to identify
     # test names, so for consistency, strip out any "-t" arguments,
@@ -804,6 +797,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
