@@ -431,15 +431,16 @@ struct GlobalMovePointsOp
         Index sourceLeafIndex = copyIterator.leafIndex(0);
         Index startIndex = 0;
 
-        for (int i = 1; i <= sortedIndices.size(); i++) {
-            Index newSourceLeafIndex = copyIterator.leafIndex(i);
+        for (size_t i = 1; i <= sortedIndices.size(); i++) {
+            Index endIndex = static_cast<Index>(i);
+            Index newSourceLeafIndex = copyIterator.leafIndex(endIndex);
 
             // when it changes, do a batch-copy of all the indices that lie within this range
             // TODO: this step could use nested parallelization for cases where there are a
             // large number of points being moved per attribute
 
             if (newSourceLeafIndex > sourceLeafIndex) {
-                copyIterator.reset(startIndex, i);
+                copyIterator.reset(startIndex, endIndex);
 
                 LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafIndex);
                 const auto& sourceArray = sourceLeaf.attributeArray(mAttributeIndex);
@@ -448,7 +449,7 @@ struct GlobalMovePointsOp
                 targetArray.copyValuesUnsafe(sourceArray, copyIterator);
 
                 sourceLeafIndex = newSourceLeafIndex;
-                startIndex = i;
+                startIndex = endIndex;
             }
         }
     }
@@ -490,7 +491,7 @@ struct LocalMovePointsOp
             , mIndices(indices)
             , mOffsets(offsets) { }
 
-        operator bool() const { return mIndex < mIndices.size(); }
+        operator bool() const { return mIndex < static_cast<int>(mIndices.size()); }
 
         CopyIterator& operator++() { ++mIndex; return *this; }
 
