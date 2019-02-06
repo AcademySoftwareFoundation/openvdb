@@ -38,10 +38,16 @@ class TestTypes: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestTypes);
-    CPPUNIT_TEST(testTraits);
+    CPPUNIT_TEST(testVecTraits);
+    CPPUNIT_TEST(testQuatTraits);
+    CPPUNIT_TEST(testMatTraits);
+    CPPUNIT_TEST(testValueTraits);
     CPPUNIT_TEST_SUITE_END();
 
-    void testTraits();
+    void testVecTraits();
+    void testQuatTraits();
+    void testMatTraits();
+    void testValueTraits();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTypes);
@@ -51,7 +57,7 @@ namespace { struct Dummy {}; }
 
 
 void
-TestTypes::testTraits()
+TestTypes::testVecTraits()
 {
     { // VecTraits - IsVec
 
@@ -139,7 +145,12 @@ TestTypes::testTraits()
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Dummy>::ElementType, Dummy>::value));
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Byte>::ElementType, Byte>::value));
     }
+}
 
+
+void
+TestTypes::testQuatTraits()
+{
     { // QuatTraits - IsQuat
 
         // standard types (Quats, etc)
@@ -199,7 +210,12 @@ TestTypes::testTraits()
         CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Dummy>::ElementType, Dummy>::value));
         CPPUNIT_ASSERT(bool(std::is_same<QuatTraits<Byte>::ElementType, Byte>::value));
     }
+}
 
+
+void
+TestTypes::testMatTraits()
+{
     { // MatTraits - IsMat
 
         // standard types (Mat4d, etc)
@@ -265,7 +281,12 @@ TestTypes::testTraits()
         CPPUNIT_ASSERT(bool(std::is_same<MatTraits<Dummy>::ElementType, Dummy>::value));
         CPPUNIT_ASSERT(bool(std::is_same<MatTraits<Byte>::ElementType, Byte>::value));
     }
+}
 
+
+void
+TestTypes::testValueTraits()
+{
     { // ValueTraits - IsVec, IsQuat, IsMat, IsScalar
 
         // vector types
