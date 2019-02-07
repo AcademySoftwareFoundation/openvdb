@@ -169,8 +169,6 @@ mip(const GridType& inGrid, const Options& opts)
         }
     }
 
-    const double msec = timer.delta(); // elapsed time
-
     if (outGrids.size() == 1 && opts.preserve) {
         // If -preserve is in effect and there is only one output grid,
         // give it the same name as the input grid.
@@ -178,7 +176,7 @@ mip(const GridType& inGrid, const Options& opts)
     }
 
     OPENVDB_LOG_INFO("processed grid \"" << inGrid.getName() << "\" in "
-        << std::setprecision(3) << (msec / 1000.0) << " sec");
+        << std::setprecision(3) << (timer.delta() / 1000.0) << " sec");
 
     return outGrids;
 }
