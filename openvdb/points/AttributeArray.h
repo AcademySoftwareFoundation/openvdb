@@ -188,9 +188,11 @@ public:
     AttributeArray& operator=(AttributeArray&&) = default;
 
     /// Return a copy of this attribute.
+    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copy() const = 0;
 
     /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
+    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
     /// Return the number of elements in this array.
@@ -285,9 +287,13 @@ public:
     /// and both value types are floating-point or both integer.
     /// @note It is possible to use this method to write to a uniform target array
     /// if the iterator does not have non-zero target indices.
+    /// @note This method is not thread-safe, it must be guaranteed that this array is not
+    /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter);
     /// @brief Like copyValuesUnsafe(), but if @a compact is true, attempt to collapse this array.
+    /// @note This method is not thread-safe, it must be guaranteed that this array is not
+    /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
 #endif
@@ -589,9 +595,11 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor (optionally decompress during copy).
+    /// Deep copy constructor.
+    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
     /// Deep copy assignment operator.
+    /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
     /// Move constructor disabled.
     TypedAttributeArray(TypedAttributeArray&&) = delete;
@@ -601,9 +609,11 @@ public:
     ~TypedAttributeArray() override { this->deallocate(); }
 
     /// Return a copy of this attribute.
+    /// @note This method is thread-safe.
     AttributeArray::Ptr copy() const override;
 
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
+    /// @note This method is thread-safe.
     AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
@@ -1104,6 +1114,12 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 
     // if the target array is uniform, expand it first
     this->expand();
+
+    // TODO: Acquire mutex locks for source and target arrays to ensure that
+    // value copying is always thread-safe. Note that the unsafe method will be
+    // faster, but can only be used if neither the source or target arrays are
+    // modified during copying. Note that this will require a new private
+    // virtual method with ABI=7 to access the mutex from the derived class.
 
     this->doCopyValues(sourceArray, iter, true);
 
