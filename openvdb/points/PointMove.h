@@ -442,8 +442,8 @@ struct GlobalMovePointsOp
             if (newSourceLeafIndex > sourceLeafIndex) {
                 copyIterator.reset(startIndex, endIndex);
 
-                LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafIndex);
-                const auto& sourceArray = sourceLeaf.attributeArray(mAttributeIndex);
+                const LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafIndex);
+                const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
                 sourceArray.loadData();
 
                 targetArray.copyValuesUnsafe(sourceArray, copyIterator);
@@ -668,7 +668,7 @@ struct AttributeHandles
         CacheHandleOp op(mHandles);
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
-            auto& array = leaf->attributeArray(attributeIndex);
+            auto& array = leaf->constAttributeArray(attributeIndex);
             processTypedArray(array, op);
         }
     }
