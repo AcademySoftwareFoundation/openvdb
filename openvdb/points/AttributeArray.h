@@ -1172,7 +1172,9 @@ TypedAttributeArray<ValueType_, Codec_>&
 TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rhs)
 {
     if (&rhs != this) {
+        // lock both the source and target arrays to ensure thread-safety
         tbb::spin_mutex::scoped_lock lock(mMutex);
+        tbb::spin_mutex::scoped_lock rhsLock(const_cast<tbb::spin_mutex&>(rhs.mMutex));
 
         this->deallocate();
 
@@ -1257,6 +1259,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
+    tbb::spin_mutex::scoped_lock lock(const_cast<tbb::spin_mutex&>(mMutex));
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
@@ -1265,6 +1268,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 {
+    tbb::spin_mutex::scoped_lock lock(const_cast<tbb::spin_mutex&>(mMutex));
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this, /*decompress = */true));
 }
 
