@@ -11,7 +11,7 @@ Version 6.0.1 - In development
     - Significantly improved the performance of point data grid string
       attribute generation.
     - AttributeArray::copy() and the copy assignment operator for
-      AttributeArrays is now thread-safe.
+      AttributeArrays are now thread-safe.
 
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
@@ -30,6 +30,7 @@ Version 6.0.1 - In development
     Python:
     - Added limited support for PointDataGrids to the Python module,
       offering I/O and metadata functionality for now.
+
 
 Version 6.0.0 - December 18, 2018
 
