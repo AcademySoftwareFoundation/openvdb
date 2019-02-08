@@ -7,6 +7,10 @@ Version 6.0.1 - In development
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.
 
+    Improvements:
+    - AttributeArray::copy() and the copy assignment operator for
+      AttributeArrays is now thread-safe.
+
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
@@ -24,7 +28,6 @@ Version 6.0.1 - In development
     Python:
     - Added limited support for PointDataGrids to the Python module,
       offering I/O and metadata functionality for now.
-
 
 Version 6.0.0 - December 18, 2018
 

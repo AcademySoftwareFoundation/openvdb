@@ -16,6 +16,11 @@ New features:
   helper metafunction.
 
 @par
+Improvements:
+- @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
+  and the copy assignment operator for AttributeArrays is now thread-safe.
+
+@par
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
