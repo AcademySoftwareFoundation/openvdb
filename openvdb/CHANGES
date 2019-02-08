@@ -8,6 +8,8 @@ Version 6.0.1 - In development
       VecTraits and added an IsSpecializationOf helper metafunction.
 
     Improvements:
+    - Significantly improved the performance of point data grid string
+      attribute generation.
     - AttributeArray::copy() and the copy assignment operator for
       AttributeArrays is now thread-safe.
 

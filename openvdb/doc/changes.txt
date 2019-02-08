@@ -17,6 +17,8 @@ New features:
 
 @par
 Improvements:
+- Significantly improved the performance of point data grid string attribute
+  generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
   and the copy assignment operator for AttributeArrays is now thread-safe.
 
