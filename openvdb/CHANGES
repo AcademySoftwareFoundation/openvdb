@@ -12,6 +12,8 @@ Version 6.0.1 - In development
       to be discarded.
     - Added a check to points::setGroup to compare the maximum index of the
       provided PointIndexTree to the size of the membership vector.
+    - Fixed a race condition when moving points in point data grids for ABI=6+
+      due to non-const access of AttributeArrays resulting in a copy-on-write.
 
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
