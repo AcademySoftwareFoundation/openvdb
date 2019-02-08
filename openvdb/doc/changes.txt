@@ -16,6 +16,11 @@ New features:
   helper metafunction.
 
 @par
+Improvements:
+- Significantly improved the performance of point data grid string attribute
+  generation.
+
+@par
 Bug fixes:
 - Fixed a bug in the @link tools/Clip.h clip@endlink tool that caused
   some grid metadata to be discarded.
