@@ -668,7 +668,7 @@ struct AttributeHandles
         CacheHandleOp op(mHandles);
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
-            auto& array = leaf->constAttributeArray(attributeIndex);
+            const auto& array = leaf->constAttributeArray(attributeIndex);
             processTypedArray(array, op);
         }
     }
