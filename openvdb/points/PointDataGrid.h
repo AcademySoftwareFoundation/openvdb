@@ -407,12 +407,18 @@ public:
     void validateOffsets() const;
 
     /// @brief Read-write attribute array reference from index
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const size_t pos);
     const AttributeArray& attributeArray(const size_t pos) const;
     const AttributeArray& constAttributeArray(const size_t pos) const;
     /// }
     /// @brief Read-write attribute array reference from name
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const Name& attributeName);
     const AttributeArray& attributeArray(const Name& attributeName) const;
