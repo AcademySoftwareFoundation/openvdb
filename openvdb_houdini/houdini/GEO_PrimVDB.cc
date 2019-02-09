@@ -1934,6 +1934,30 @@ geoIntersect(GridTypeA& grid_a, const GridTypeB &grid_b)
     }
 }
 
+/// This class is used as a functor to set inactive voxels to the background
+/// value.
+template<typename GridType>
+class geoInactiveToBackground
+{
+public:
+    typedef typename GridType::ValueOffIter             Iterator;
+    typedef typename GridType::ValueType                ValueType;
+
+    geoInactiveToBackground(const GridType& grid)
+    {
+        background = grid.background();
+    }
+
+    inline void operator()(const Iterator& iter) const
+    {
+        iter.setValue(background);
+        iter.setValueOff();
+    }
+
+private:
+    ValueType background;
+};
+
 template <typename GridType>
 static void
 geoActivateBBox(GridType& grid,
@@ -1949,72 +1973,38 @@ geoActivateBBox(GridType& grid,
     switch (operation)
     {
 	case GEO_PrimVDB::ACTIVATE_UNION: // Union
-	    if (doclip)
-	    {
-		openvdb::CoordBBox	clipped = bbox;
-		clipped = bbox;
-		clipped.min().maxComponent(clipbox.min());
-		clipped.max().minComponent(clipbox.max());
+        if (doclip)
+        {
+            openvdb::CoordBBox	clipped = bbox;
+            clipped = bbox;
+            clipped.min().maxComponent(clipbox.min());
+            clipped.max().minComponent(clipbox.max());
 
-		geoActivateBBox(grid, clipped, setvalue, value,
-				operation,
-				false,
-				clipped);
-		break;
-	    }
-	    if (setvalue)
-	    {
-		grid.fill(bbox, geo_doubleToGridValue<GridType>(value), /*active*/true);
-	    }
-	    else
-	    {
-		// Just activate
-		for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-		{
-		    for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-		    {
-			for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-			{
-			    openvdb::Coord coord(i, j, k);
-			    access.setValueOn(coord);
-			}
-		    }
-		}
-	    }
-	    break;
+            geoActivateBBox(grid, clipped, setvalue, value,
+                    operation,
+                    false,
+                    clipped);
+            break;
+        }
+        if (setvalue)
+        {
+            grid.fill(bbox, geo_doubleToGridValue<GridType>(value), /*active*/true);
+        }
+        else
+        {
+            openvdb::MaskGrid mask(false);
+            mask.denseFill(bbox, true, true);
+            grid.topologyUnion(mask);
+        }
+        break;
 	case GEO_PrimVDB::ACTIVATE_INTERSECT: // Intersect
-	    for (typename GridType::ValueOnCIter
-		 iter = grid.cbeginValueOn(); iter; ++iter)
 	    {
-		openvdb::CoordBBox nodebbox = iter.getBoundingBox();
-
-		// If there is no overlap, we set to off.
-		if (!bbox.hasOverlap(nodebbox))
-		{
-		    grid.fill(nodebbox, grid.background(), /*active*/false);
-		}
-		else
-		{
-		    // Check each voxel.
-		    for (int k=nodebbox.min().z(); k<=nodebbox.max().z(); k++)
-		    {
-			for (int j=nodebbox.min().y(); j<=nodebbox.max().y(); j++)
-			{
-			    for (int i=nodebbox.min().x(); i<=nodebbox.max().x(); i++)
-			    {
-				openvdb::Coord coord(i,j,k);
-
-				if (!bbox.isInside(coord))
-				{
-				    // Always set background.
-				    access.setValue(coord, grid.background());
-				    access.setValueOff(coord);
-				}
-			    }
-			}
-		    }
-		}
-	    }
+            openvdb::MaskGrid mask(false);
+            mask.fill(bbox, true, true);
+            grid.topologyIntersection(mask);
+            geoInactiveToBackground<GridType> bgop(grid);
+            openvdb::tools::foreach(grid.beginValueOff(), bgop);
+        }
 	    break;
 	case GEO_PrimVDB::ACTIVATE_SUBTRACT: // Difference
 	    // No matter what, we clear the background colour
@@ -2049,7 +2039,7 @@ GEO_PrimVDB::activateIndexBBoxAdapter(const void* bboxPtr,
     doclip = geoGetFrustumBoundsFromVDB(this, clipbox);
 
     // Activate based on the parameters and inputs
-    UTvdbCallAllType(this->getStorageType(), geoActivateBBox,
+    UTvdbCallAllTopology(this->getStorageType(), geoActivateBBox,
 		     this->getGrid(),
 		     bbox,
 		     setvalue,
@@ -2100,6 +2090,89 @@ geoMapCoord(const openvdb::Coord& coord_b,
     return geoMapCoord(bbox_b, xform_a, xform_b);
 }
 
+/// This class is used as a functor to create a mask for a grid's active
+/// region.
+template<typename GridType>
+class geoMaskTopology
+{
+public:
+    typedef typename GridType::ValueOnCIter             Iterator;
+    typedef typename openvdb::MaskGrid::Accessor        Accessor;
+
+    geoMaskTopology(const GEO_PrimVolumeXform& a, const GEO_PrimVolumeXform& b)
+        : xform_a(a), xform_b(b)
+    {
+    }
+
+    inline void operator()(const Iterator& iter, Accessor& accessor) const
+    {
+        openvdb::CoordBBox bbox = geoMapCoord(iter.getBoundingBox(), xform_a,
+                                              xform_b);
+        accessor.getTree()->fill(bbox, true, true);
+    }
+
+private:
+    const GEO_PrimVolumeXform& xform_a;
+    const GEO_PrimVolumeXform& xform_b;
+};
+
+/// This class is used as a functor to create a mask for the intersection
+/// of two grids.
+template<typename GridTypeA, typename GridTypeB>
+class geoMaskIntersect
+{
+public:
+    typedef typename GridTypeA::ValueOnCIter            IteratorA;
+    typedef typename GridTypeB::ConstAccessor           AccessorB;
+    typedef typename openvdb::MaskGrid::Accessor        Accessor;
+
+    geoMaskIntersect(const GridTypeB& source,
+                     const GEO_PrimVolumeXform& a,
+                     const GEO_PrimVolumeXform& b)
+        : myAccessor(source.getAccessor()),
+          myXformA(a),
+          myXformB(b)
+    {
+    }
+
+    inline void operator()(const IteratorA& iter, Accessor& accessor) const
+    {
+        openvdb::CoordBBox bbox = iter.getBoundingBox();
+        for(int k = bbox.min().z(); k <= bbox.max().z(); k++) {
+            for (int j = bbox.min().y(); j <= bbox.max().y(); j++) {
+                for (int i = bbox.min().x(); i <= bbox.max().x(); i++) {
+                    openvdb::Coord coord(i, j, k);
+                    accessor.setActiveState(coord,
+                        containsActiveVoxels(geoMapCoord(coord, myXformB, myXformA)));
+                }
+            }
+        }
+    }
+
+private:
+    AccessorB myAccessor;
+    const GEO_PrimVolumeXform& myXformA;
+    const GEO_PrimVolumeXform& myXformB;
+
+    // Returns true if there is at least one voxel in the source grid that is active
+    // within the specified bounding box.
+    inline bool containsActiveVoxels(const openvdb::CoordBBox& bbox) const
+    {
+        for(int k = bbox.min().z(); k <= bbox.max().z(); k++)
+        {
+            for(int j = bbox.min().y(); j <= bbox.max().y(); j++)
+            {
+                for(int i = bbox.min().x(); i <= bbox.max().x(); i++)
+                {
+                    if(myAccessor.isValueOn(openvdb::Coord(i, j, k)))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+};
+
 template <typename GridTypeA, typename GridTypeB>
 void
 geoUnalignedUnion(GridTypeA &grid_a,
@@ -2109,19 +2182,20 @@ geoUnalignedUnion(GridTypeA &grid_a,
 		  bool setvalue, double value,
 		  bool doclip, const openvdb::CoordBBox &clipbox)
 {
-    typename GridTypeA::Accessor 	access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor 	access_b = grid_b.getAccessor();
+    openvdb::MaskGrid mask(false);
+    geoMaskTopology<GridTypeB> maskop(xform_a, xform_b);
+    openvdb::tools::transformValues(grid_b.cbeginValueOn(), mask, maskop);
+    if(doclip)
+        mask.clip(clipbox);
 
-    for (typename GridTypeB::ValueOnCIter
-	 iter = grid_b.cbeginValueOn(); iter; ++iter)
+    if(setvalue)
     {
-	openvdb::CoordBBox bbox_b = iter.getBoundingBox();
-	openvdb::CoordBBox bbox_a = geoMapCoord(bbox_b, xform_a, xform_b);
-
-	// Set the whole bbox to on
-	geoActivateBBox(grid_a, bbox_a, setvalue, value, GEO_PrimVDB::ACTIVATE_UNION,
-			    doclip, clipbox);
+        typename GridTypeA::TreeType newTree(mask.tree(),
+            geo_doubleToGridValue<GridTypeA>(value), openvdb::TopologyCopy());
+        openvdb::tools::compReplace(grid_a.tree(), newTree);
     }
+    else
+        grid_a.tree().topologyUnion(mask.tree());
 }
 
 template <typename GridTypeA, typename GridTypeB>
@@ -2131,42 +2205,16 @@ geoUnalignedDifference(GridTypeA &grid_a,
 		       GEO_PrimVolumeXform xform_a,
 		       GEO_PrimVolumeXform xform_b)
 {
-    typename GridTypeA::Accessor 	access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor 	access_b = grid_b.getAccessor();
+    openvdb::MaskGrid mask(false);
+    geoMaskIntersect<GridTypeA, GridTypeB> maskop(grid_b, xform_a, xform_b);
+    openvdb::tools::transformValues(grid_a.cbeginValueOn(), mask, maskop, true,
+        // DO NOT SHARE THE OPERATOR, since grid_b's accessor does caching...
+        false);
 
-    for (typename GridTypeB::ValueOnCIter
-	 iter = grid_b.cbeginValueOn(); iter; ++iter)
-    {
-	// TODO: is the whole bounding box on here, or not?
-	//       do some testing.
-	openvdb::CoordBBox bbox_b = iter.getBoundingBox();
-	openvdb::CoordBBox bbox_a = geoMapCoord(bbox_b, xform_a, xform_b);
+    grid_a.tree().topologyDifference(mask.tree());
 
-	// Set the whole bbox to off
-	grid_a.fill(bbox_a, grid_a.background(), false);
-    }
-}
-
-template <typename GridType>
-static bool
-geoContainsActiveVoxels(const openvdb::CoordBBox& bbox,
-			GridType&,
-			typename GridType::ConstAccessor& access)
-{
-    for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-    {
-	for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-	{
-	    for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-	    {
-		if (access.isValueOn(openvdb::Coord(i,j,k)))
-		{
-		    return true;
-		}
-	    }
-	}
-    }
-    return false;
+    geoInactiveToBackground<GridTypeA> bgop(grid_a);
+    openvdb::tools::foreach(grid_a.beginValueOff(), bgop);
 }
 
 template <typename GridTypeA, typename GridTypeB>
@@ -2176,32 +2224,16 @@ geoUnalignedIntersect(GridTypeA &grid_a,
 		      GEO_PrimVolumeXform xform_a,
 		      GEO_PrimVolumeXform xform_b)
 {
-    typename GridTypeA::Accessor 	access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor 	access_b = grid_b.getAccessor();
+    openvdb::MaskGrid mask(false);
+    geoMaskIntersect<GridTypeA, GridTypeB> maskop(grid_b, xform_a, xform_b);
+    openvdb::tools::transformValues(grid_a.cbeginValueOn(), mask, maskop, true,
+        // DO NOT SHARE THE OPERATOR, since grid_b's accessor does caching...
+        false);
 
-    for (typename GridTypeA::ValueOnCIter
-	 iter = grid_a.cbeginValueOn(); iter; ++iter)
-    {
-	openvdb::CoordBBox bbox = iter.getBoundingBox();
-	for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-	{
-	    for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-	    {
-		for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-		{
-		    openvdb::Coord coord(i,j,k);
-		    openvdb::CoordBBox bbox_b =
-			geoMapCoord(coord, xform_b, xform_a);
-		    if (!geoContainsActiveVoxels(bbox_b, grid_b, access_b))
-		    {
-			access_a.setValue(coord, grid_a.background());
-			access_a.setValueOff(coord);
-		    }
-		}
-	    }
-	}
+    grid_a.tree().topologyIntersection(mask.tree());
 
-    }
+    geoInactiveToBackground<GridTypeA> bgop(grid_a);
+    openvdb::tools::foreach(grid_a.beginValueOff(), bgop);
 }
 
 // The result of the union of active regions goes into grid_a
@@ -2285,13 +2317,13 @@ geoDoUnion(const GridTypeB &grid_b,
     // If the transforms are equal, we can do an aligned union
     if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
     {
-	UTvdbCallAllType(vdb_a.getStorageType(), geoUnion,
+	UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnion,
 			 vdb_a.getGrid(), grid_b, setvalue, value,
 			 doclip, clipbox);
     }
     else
     {
-	UTvdbCallAllType(vdb_a.getStorageType(), geoUnalignedUnion,
+	UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnalignedUnion,
 			 vdb_a.getGrid(), grid_b,
 			 vdb_a.getIndexSpaceTransform(),
 			 xform_b, setvalue, value,
@@ -2309,12 +2341,12 @@ geoDoIntersect(
 {
     if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
     {
-	UTvdbCallAllType(vdb_a.getStorageType(),
+	UTvdbCallAllTopology(vdb_a.getStorageType(),
 			 geoIntersect, vdb_a.getGrid(), grid_b);
     }
     else
     {
-	UTvdbCallAllType(vdb_a.getStorageType(),
+	UTvdbCallAllTopology(vdb_a.getStorageType(),
 			 geoUnalignedIntersect, vdb_a.getGrid(),
 			 grid_b, vdb_a.getIndexSpaceTransform(),
 			 xform_b);
@@ -2331,12 +2363,12 @@ geoDoDifference(
 {
     if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
     {
-	UTvdbCallAllType(vdb_a.getStorageType(), geoDifference,
+	UTvdbCallAllTopology(vdb_a.getStorageType(), geoDifference,
 			 vdb_a.getGrid(), grid_b);
     }
     else
     {
-	UTvdbCallAllType(vdb_a.getStorageType(), geoUnalignedDifference,
+	UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnalignedDifference,
 			 vdb_a.getGrid(), grid_b,
 			 vdb_a.getIndexSpaceTransform(),
 			 xform_b);
