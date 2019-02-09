@@ -28,6 +28,8 @@ Bug fixes:
   to compare the maximum index of the provided
   @vdblink::tools::PointIndexTree PointIndexTree@endlink
   to the size of the membership vector.
+- Fixed a race condition when moving points in point data grids for ABI=6+
+  due to non-const access of AttributeArrays resulting in a copy-on-write.
 
 @par
 Houdini:
