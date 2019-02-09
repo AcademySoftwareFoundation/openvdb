@@ -188,9 +188,11 @@ public:
     AttributeArray& operator=(AttributeArray&&) = default;
 
     /// Return a copy of this attribute.
+    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copy() const = 0;
 
     /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
+    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
     /// Return the number of elements in this array.
@@ -285,9 +287,13 @@ public:
     /// and both value types are floating-point or both integer.
     /// @note It is possible to use this method to write to a uniform target array
     /// if the iterator does not have non-zero target indices.
+    /// @note This method is not thread-safe, it must be guaranteed that this array is not
+    /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter);
     /// @brief Like copyValuesUnsafe(), but if @a compact is true, attempt to collapse this array.
+    /// @note This method is not thread-safe, it must be guaranteed that this array is not
+    /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
 #endif
@@ -423,7 +429,7 @@ protected:
 #else // #if OPENVDB_ABI_VERSION_NUMBER < 6
 
     bool mIsUniform = true;
-    tbb::spin_mutex mMutex;
+    mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mSerializationFlags = 0;
     tbb::atomic<Index32> mOutOfCore = 0; // interpreted as bool
@@ -589,9 +595,11 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor (optionally decompress during copy).
+    /// Deep copy constructor.
+    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
     /// Deep copy assignment operator.
+    /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
     /// Move constructor disabled.
     TypedAttributeArray(TypedAttributeArray&&) = delete;
@@ -601,9 +609,11 @@ public:
     ~TypedAttributeArray() override { this->deallocate(); }
 
     /// Return a copy of this attribute.
+    /// @note This method is thread-safe.
     AttributeArray::Ptr copy() const override;
 
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
+    /// @note This method is thread-safe.
     AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
@@ -818,7 +828,7 @@ private:
     Index                               mStrideOrTotalSize;
 #if OPENVDB_ABI_VERSION_NUMBER < 6 // as of ABI=6, this data lives in the base class to reduce memory
     bool                                mIsUniform = true;
-    tbb::spin_mutex                     mMutex;
+    mutable tbb::spin_mutex             mMutex;
 #endif
 }; // class TypedAttributeArray
 
@@ -1105,6 +1115,12 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
     // if the target array is uniform, expand it first
     this->expand();
 
+    // TODO: Acquire mutex locks for source and target arrays to ensure that
+    // value copying is always thread-safe. Note that the unsafe method will be
+    // faster, but can only be used if neither the source or target arrays are
+    // modified during copying. Note that this will require a new private
+    // virtual method with ABI=7 to access the mutex from the derived class.
+
     this->doCopyValues(sourceArray, iter, true);
 
     // attempt to compact target array
@@ -1172,7 +1188,9 @@ TypedAttributeArray<ValueType_, Codec_>&
 TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rhs)
 {
     if (&rhs != this) {
+        // lock both the source and target arrays to ensure thread-safety
         tbb::spin_mutex::scoped_lock lock(mMutex);
+        tbb::spin_mutex::scoped_lock rhsLock(rhs.mMutex);
 
         this->deallocate();
 
@@ -1257,6 +1275,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
+    tbb::spin_mutex::scoped_lock lock(mMutex);
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
@@ -1265,6 +1284,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 {
+    tbb::spin_mutex::scoped_lock lock(mMutex);
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this, /*decompress = */true));
 }
 
