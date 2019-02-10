@@ -143,7 +143,7 @@ IF (HDK_FOUND)
 	  )
   ENDIF()
   # MESSAGE ( "HDK_VERSION_STRING = ${HDK_VERSION_STRING}")
-  SET ( HCUSTOM_COMMAND $ENV{HFS}/bin/hcustom ) 
+  SET ( HCUSTOM_COMMAND $ENV{HFS}/bin/hcustom )
   SET ( HOTL_COMMAND $ENV{HFS}/bin/hotl )
 
   SET ( HDK_INCLUDE_DIR "${HDK_LOCATION}/toolkit/include;${HDK_LOCATION}/toolkit/include/htools" CACHE STRING "HDK include directory" )
@@ -242,9 +242,9 @@ IF (HDK_FOUND)
 	#ELSEIF (APPLE)
     # FILE ( GLOB DSOLIB_DYLIB $ENV{HFS}/../Libraries/*.dylib )
   ELSE (WIN32)
-    # Linux/OSX 
-    LINK_DIRECTORIES ( $ENV{HDSO} ) 
-    # LINK_DIRECTORIES ( $ENV{HFS}/dsolib ) 
+    # Linux/OSX
+    LINK_DIRECTORIES ( $ENV{HDSO} )
+    # LINK_DIRECTORIES ( $ENV{HFS}/dsolib )
   ENDIF (WIN32)
 
   IF (APPLE)
@@ -264,7 +264,7 @@ IF (HDK_FOUND)
     ENDIF ()
     FIND_PROGRAM ( PYTHON_EXECUTABLE NAMES python )
     EXECUTE_PROCESS ( COMMAND "${PYTHON_EXECUTABLE}" ${PYTHON_SCRIPT} ${_src_name} )
-    
+
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_EXECUTABLE _exe_NAME )
@@ -309,11 +309,11 @@ IF (HDK_FOUND)
 		tbb
         )
     ENDIF (APPLE)
-    
+
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_LIBRARY _lib_NAME )
-    
+
     ADD_DEFINITIONS ( -DMAKING_DSO )
 
     SET ( HDK_LIBRARY_DIRS $ENV{HFS}/../Libraries )
@@ -348,7 +348,7 @@ IF (HDK_FOUND)
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_STANDALONE_LIBRARY _lib_NAME )
-    
+
     ADD_DEFINITIONS ( -DMAKING_DSO )
 
     SET ( HDK_LIBRARY_DIRS $ENV{HFS}/../Libraries )

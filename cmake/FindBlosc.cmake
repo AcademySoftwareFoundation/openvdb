@@ -53,7 +53,7 @@ IF ( BLOSC_FOUND )
     CACHE STRING "Blosc library directories")
 
   SET ( _blosc_library_name "blosc" )
-  
+
   # Static library setup
   IF (Blosc_USE_STATIC_LIBS)
     SET(CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -69,7 +69,7 @@ IF ( BLOSC_FOUND )
     NO_DEFAULT_PATH
     NO_SYSTEM_ENVIRONMENT_PATH
     )
-  
+
   # Static library tear down
   IF (Blosc_USE_STATIC_LIBS)
     SET( CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP} )
