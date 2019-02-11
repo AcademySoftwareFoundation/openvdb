@@ -8,14 +8,18 @@ Version 6.0.1 - In development
       VecTraits and added an IsSpecializationOf helper metafunction.
 
     Improvements:
-    - Significantly improved the performance of point data grid string attribute
-      generation.
+    - Significantly improved the performance of point data grid string
+      attribute generation.
+    - AttributeArray::copy() and the copy assignment operator for
+      AttributeArrays are now thread-safe.
 
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
     - Added a check to points::setGroup to compare the maximum index of the
       provided PointIndexTree to the size of the membership vector.
+    - Fixed a race condition when moving points in point data grids for ABI=6+
+      due to non-const access of AttributeArrays resulting in a copy-on-write.
     - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
     Houdini:
@@ -742,14 +746,14 @@ Version 3.2.0 - August 10, 2016
     - Fixed bugs in tree::NodeUnion that could cause crashes.
     - Fixed memory leak in
       tools::mesh_to_volume_internal::ExpandNarrowband
-      [Reported by Kévin Dietrich]
+      [Reported by KÃ©vin Dietrich]
     - Fixed parameter type inconsistencies in math/Stencils.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich and Nick Avramoussis]
+      [Contributed by KÃ©vin Dietrich and Nick Avramoussis]
     - Fixed a bug in the VolumeToMesh tool that produced artifacts for
       adaptive surface extraction on clipped level sets.
       [Reported by Jeff Lait]
-    - Corrected empty grid background value in tools::meshToVolume().
+    - Corrected empty grid background value inÂ tools::meshToVolume().
       [Contributed by Jeff Lait]
     - Fixed a bug in tools::volumeToMesh that could produce NaNs.
       [Reported by Rick Hankins]
@@ -892,7 +896,7 @@ Version 3.1.0 - October 1, 2015
       rather than the square of the magnitude.
     - Fixed parameter type inconsistencies in math/Ray.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich]
+      [Contributed by KÃ©vin Dietrich]
     - Fixed incorrect handling of signed values in tools::clip()
       (and the Clip SOP).
 

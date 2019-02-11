@@ -19,6 +19,8 @@ New features:
 Improvements:
 - Significantly improved the performance of point data grid string attribute
   generation.
+- @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
+  and the copy assignment operator for AttributeArrays are now thread-safe.
 
 @par
 Bug fixes:
@@ -28,6 +30,8 @@ Bug fixes:
   to compare the maximum index of the provided
   @vdblink::tools::PointIndexTree PointIndexTree@endlink
   to the size of the membership vector.
+- Fixed a race condition when moving points in point data grids for ABI=6+
+  due to non-const access of AttributeArrays resulting in a copy-on-write.
 - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
 @par
