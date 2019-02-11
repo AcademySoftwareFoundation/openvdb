@@ -21,6 +21,9 @@ Improvements:
   generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
   and the copy assignment operator for AttributeArrays are now thread-safe.
+- The command-line tools (<TT>vdb_print</TT>, etc.) now include
+  the library ABI version (when it differs from the library major version)
+  in their <TT>-version</TT> output.
 
 @par
 Bug fixes:

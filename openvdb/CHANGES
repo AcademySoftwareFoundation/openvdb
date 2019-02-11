@@ -12,6 +12,9 @@ Version 6.0.1 - In development
       attribute generation.
     - AttributeArray::copy() and the copy assignment operator for
       AttributeArrays are now thread-safe.
+    - The command-line tools (vdb_print, etc.) now include the library
+      ABI version (when it differs from the library major version)
+      in their -version output.
 
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
