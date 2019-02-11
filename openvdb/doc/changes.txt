@@ -28,6 +28,7 @@ Bug fixes:
   to compare the maximum index of the provided
   @vdblink::tools::PointIndexTree PointIndexTree@endlink
   to the size of the membership vector.
+- Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
 @par
 Houdini:

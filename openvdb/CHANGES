@@ -16,6 +16,7 @@ Version 6.0.1 - In development
       to be discarded.
     - Added a check to points::setGroup to compare the maximum index of the
       provided PointIndexTree to the size of the membership vector.
+    - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
