@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -119,7 +119,7 @@ main(int argc, char *argv[])
 
         if (printVersionInfo) {
             std::cout << "OpenVDB library version: "
-                << openvdb::getLibraryVersionString() << "\n";
+                << openvdb::getLibraryAbiVersionString() << "\n";
             std::cout << "OpenVDB file format version: "
                 << openvdb::OPENVDB_FILE_VERSION << std::endl;
             // If there are no files to view, don't print the OpenGL version,
@@ -195,6 +195,6 @@ main(int argc, char *argv[])
     return status;
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
