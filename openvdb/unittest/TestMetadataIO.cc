@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,6 +71,31 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<double>);
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<std::string>);
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec3R>);
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec2i>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec4d>);
+
+
+namespace {
+
+template<typename T> struct Value { static T create(int i) { return T(i); } };
+
+template<> struct Value<std::string> {
+    static std::string create(int i) { return "test" + std::to_string(i); }
+};
+
+template<typename T> struct Value<openvdb::math::Vec2<T>> {
+    using ValueType = openvdb::math::Vec2<T>;
+    static ValueType create(int i) { return ValueType(i, i+1); }
+};
+template<typename T> struct Value<openvdb::math::Vec3<T>> {
+    using ValueType = openvdb::math::Vec3<T>;
+    static ValueType create(int i) { return ValueType(i, i+1, i+2); }
+};
+template<typename T> struct Value<openvdb::math::Vec4<T>> {
+    using ValueType = openvdb::math::Vec4<T>;
+    static ValueType create(int i) { return ValueType(i, i+1, i+2, i+3); }
+};
+
+}
 
 
 template<typename T>
@@ -79,7 +104,8 @@ TestMetadataIO<T>::test()
 {
     using namespace openvdb;
 
-    TypedMetadata<T> m(1);
+    const T val = Value<T>::create(1);
+    TypedMetadata<T> m(val);
 
     std::ostringstream ostr(std::ios_base::binary);
 
@@ -90,8 +116,11 @@ TestMetadataIO<T>::test()
     TypedMetadata<T> tm;
     tm.read(istr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(T(1),tm.value(),0);
-    //CPPUNIT_ASSERT(tm.value() == T(1));
+    OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
+
+    CPPUNIT_ASSERT_EQUAL(val, tm.value());
+
+    OPENVDB_NO_FP_EQUALITY_WARNING_END
 }
 
 
@@ -101,164 +130,29 @@ TestMetadataIO<T>::testMultiple()
 {
     using namespace openvdb;
 
-    TypedMetadata<T> m(1);
-    TypedMetadata<T> m2(2);
+    const T val1 = Value<T>::create(1), val2 = Value<T>::create(2);
+    TypedMetadata<T> m1(val1);
+    TypedMetadata<T> m2(val2);
 
     std::ostringstream ostr(std::ios_base::binary);
 
-    m.write(ostr);
+    m1.write(ostr);
     m2.write(ostr);
 
     std::istringstream istr(ostr.str(), std::ios_base::binary);
 
-    TypedMetadata<T> tm, tm2;
-    tm.read(istr);
+    TypedMetadata<T> tm1, tm2;
+    tm1.read(istr);
     tm2.read(istr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(T(1),tm.value(),0);
-    //CPPUNIT_ASSERT(tm.value() == T(1));
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(T(2),tm2.value(),0);
-    //CPPUNIT_ASSERT(tm2.value() == T(2));
+    OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
+
+    CPPUNIT_ASSERT_EQUAL(val1, tm1.value());
+    CPPUNIT_ASSERT_EQUAL(val2, tm2.value());
+
+    OPENVDB_NO_FP_EQUALITY_WARNING_END
 }
 
-
-template<>
-void
-TestMetadataIO<std::string>::test()
-{
-    using namespace openvdb;
-
-    TypedMetadata<std::string> m("test");
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<std::string> tm;
-    tm.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == "test");
-}
-
-
-template<>
-void
-TestMetadataIO<std::string>::testMultiple()
-{
-    using namespace openvdb;
-
-    TypedMetadata<std::string> m("test");
-    TypedMetadata<std::string> m2("test2");
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-    m2.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<std::string> tm, tm2;
-    tm.read(istr);
-    tm2.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == "test");
-    CPPUNIT_ASSERT(tm2.value() == "test2");
-}
-
-
-template<>
-void
-TestMetadataIO<openvdb::Vec3R>::test()
-{
-    using namespace openvdb;
-
-    TypedMetadata<Vec3R> m(Vec3R(1, 2, 3));
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<Vec3R> tm;
-    tm.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == Vec3R(1, 2, 3));
-}
-
-
-template<>
-void
-TestMetadataIO<openvdb::Vec3R>::testMultiple()
-{
-    using namespace openvdb;
-
-    TypedMetadata<Vec3R> m(Vec3R(1, 2, 3));
-    TypedMetadata<Vec3R> m2(Vec3R(4, 5, 6));
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-    m2.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<Vec3R> tm, tm2;
-    tm.read(istr);
-    tm2.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == Vec3R(1, 2, 3));
-    CPPUNIT_ASSERT(tm2.value() == Vec3R(4, 5, 6));
-}
-
-
-template<>
-void
-TestMetadataIO<openvdb::Vec2i>::test()
-{
-    using namespace openvdb;
-
-    TypedMetadata<Vec2i> m(Vec2i(1, 2));
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<Vec2i> tm;
-    tm.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == Vec2i(1, 2));
-}
-
-
-template<>
-void
-TestMetadataIO<openvdb::Vec2i>::testMultiple()
-{
-    using namespace openvdb;
-
-    TypedMetadata<Vec2i> m(Vec2i(1, 2));
-    TypedMetadata<Vec2i> m2(Vec2i(3, 4));
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    m.write(ostr);
-    m2.write(ostr);
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    TypedMetadata<Vec2i> tm, tm2;
-    tm.read(istr);
-    tm2.read(istr);
-
-    CPPUNIT_ASSERT(tm.value() == Vec2i(1, 2));
-    CPPUNIT_ASSERT(tm2.value() == Vec2i(3, 4));
-}
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

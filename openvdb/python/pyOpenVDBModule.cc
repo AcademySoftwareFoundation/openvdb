@@ -311,6 +311,15 @@ struct MetaMapConverter
                 } else if (typeName == Vec3SMetadata::staticTypeName()) {
                     const Vec3s v = static_cast<Vec3SMetadata&>(*meta).value();
                     obj = py::make_tuple(v[0], v[1], v[2]);
+                } else if (typeName == Vec4DMetadata::staticTypeName()) {
+                    const Vec4d v = static_cast<Vec4DMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Vec4IMetadata::staticTypeName()) {
+                    const Vec4i v = static_cast<Vec4IMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Vec4SMetadata::staticTypeName()) {
+                    const Vec4s v = static_cast<Vec4SMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
                 }
                 ret[it->first] = obj;
             }
@@ -385,6 +394,12 @@ struct MetaMapConverter
                 value.reset(new Vec3DMetadata(py::extract<Vec3d>(val)));
             } else if (py::extract<Vec3s>(val).check()) {
                 value.reset(new Vec3SMetadata(py::extract<Vec3s>(val)));
+            } else if (py::extract<Vec4i>(val).check()) {
+                value.reset(new Vec4IMetadata(py::extract<Vec4i>(val)));
+            } else if (py::extract<Vec4d>(val).check()) {
+                value.reset(new Vec4DMetadata(py::extract<Vec4d>(val)));
+            } else if (py::extract<Vec4s>(val).check()) {
+                value.reset(new Vec4SMetadata(py::extract<Vec4s>(val)));
             } else if (py::extract<Metadata::Ptr>(val).check()) {
                 value = py::extract<Metadata::Ptr>(val);
             } else {

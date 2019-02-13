@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,6 +31,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Metadata.h>
+#include <sstream>
 
 
 class TestMetadata: public CppUnit::TestCase
@@ -121,6 +122,12 @@ TestMetadata::testMetadataAsBool()
         meta.setValue(Vec3s(-1.0, 0.0, 1.0));
         CPPUNIT_ASSERT(meta.asBool());
     }
+    {
+        Vec4DMetadata meta(Vec4d(0.0));
+        CPPUNIT_ASSERT(!meta.asBool());
+        meta.setValue(Vec4d(1.0));
+        CPPUNIT_ASSERT(meta.asBool());
+    }
 }
 
 
@@ -182,6 +189,6 @@ TestMetadata::testCustomMetadata()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

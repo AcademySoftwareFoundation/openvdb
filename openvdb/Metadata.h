@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -417,6 +417,9 @@ using Vec2SMetadata  = TypedMetadata<Vec2s>;
 using Vec3DMetadata  = TypedMetadata<Vec3d>;
 using Vec3IMetadata  = TypedMetadata<Vec3i>;
 using Vec3SMetadata  = TypedMetadata<Vec3s>;
+using Vec4DMetadata  = TypedMetadata<Vec4d>;
+using Vec4IMetadata  = TypedMetadata<Vec4i>;
+using Vec4SMetadata  = TypedMetadata<Vec4s>;
 using Mat4SMetadata  = TypedMetadata<Mat4s>;
 using Mat4DMetadata  = TypedMetadata<Mat4d>;
 
@@ -460,6 +463,6 @@ StringMetadata::writeValue(std::ostream& os) const
 
 #endif // OPENVDB_METADATA_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
