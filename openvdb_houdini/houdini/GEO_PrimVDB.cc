@@ -1945,7 +1945,6 @@ public:
     inline void operator()(const Iterator& iter) const
     {
         iter.setValue(background);
-        iter.setValueOff();
     }
 
 private:
