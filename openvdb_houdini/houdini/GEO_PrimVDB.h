@@ -586,32 +586,30 @@ public:
 
     /// @brief Return this primitive's serial number.
     /// @details A primitive's serial number never changes.
-    /// @todo Because serial numbers are currently 32-bit, it is possible,
-    /// though unlikely, for two primitives to have the same serial number.
     UniqueId        getUniqueId() const
-                        { return static_cast<UniqueId>(myUniqueId); }
+                        { return static_cast<UniqueId>(myUniqueId.relaxedLoad()); }
 
     /// @brief Return the serial number of this primitive's voxel data.
     /// @details The serial number is incremented whenever a non-const
     /// reference or pointer to this primitive's grid is requested
     /// (whether or not the voxel data is ultimately modified).
     UniqueId        getTreeUniqueId() const
-                        { return static_cast<UniqueId>(myTreeUniqueId); }
+                        { return static_cast<UniqueId>(myTreeUniqueId.relaxedLoad()); }
     /// @brief Return the serial number of this primitive's grid metadata.
     /// @details The serial number is incremented whenever a non-const
     /// reference to the metadata or non-const access to the grid is requested
     /// (whether or not the metadata is ultimately modified).
     UniqueId        getMetadataUniqueId() const
-                        { return static_cast<UniqueId>(myMetadataUniqueId); }
+                        { return static_cast<UniqueId>(myMetadataUniqueId.relaxedLoad()); }
     /// @brief Return the serial number of this primitive's transform.
     /// @details The serial number is incremented whenever the transform
     /// is modified or non-const access to this primitive's grid is requested
     /// (whether or not the transform is ultimately modified).
     UniqueId        getTransformUniqueId() const
-                        { return static_cast<UniqueId>(myTransformUniqueId); }
+                        { return static_cast<UniqueId>(myTransformUniqueId.relaxedLoad()); }
 
 protected:
-    typedef SYS_AtomicCounter   AtomicUniqueId; // 32-bit on non-AMD systems
+    typedef SYS_AtomicCounter AtomicUniqueId; // 64-bit
 
     /// Register intrinsic attributes
 #if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
