@@ -422,6 +422,9 @@ template<> inline const char* typeNameAsString<Vec3U16>()           { return "ve
 template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
+template<> inline const char* typeNameAsString<Vec4i>()             { return "vec4i"; }
+template<> inline const char* typeNameAsString<Vec4f>()             { return "vec4s"; }
+template<> inline const char* typeNameAsString<Vec4d>()             { return "vec4d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat3s>()             { return "mat3s"; }
 template<> inline const char* typeNameAsString<Mat3d>()             { return "mat3d"; }

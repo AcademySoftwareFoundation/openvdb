@@ -6,6 +6,7 @@ Version 6.0.1 - In development
     New features:
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.
+    - Added support for Vec4s, Vec4d and Vec4i metadata.
 
     Improvements:
     - Significantly improved the performance of point data grid string
