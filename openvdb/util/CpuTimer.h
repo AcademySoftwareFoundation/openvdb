@@ -125,14 +125,23 @@ public:
         return 1000.0*dt.seconds();
     }
 
-    /// @brief This method is identical to milliseconds() - will soon be deprecated
-    inline double delta() const { return this->milliseconds(); }
+    /// @brief Return Time difference in seconds since construction or start was called.
+    ///
+    /// @note Combine this method with start() to get timing without any outputs.
+    inline double seconds() const
+    {
+        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
+        return dt.seconds();
+    }
+
+    /// @brief This method is identical to milliseconds() - deprecated
+    OPENVDB_DEPRECATED inline double delta() const { return this->milliseconds(); }
 
     inline std::string time() const
     {
         const double msec = this->milliseconds();
         std::ostringstream os;
-        printTime(os, msec, "", "", true, 4, 1);
+        printTime(os, msec, "", "", 4, 1, 1);
         return os.str();
     }
 
@@ -142,18 +151,18 @@ public:
     inline double stop() const
     {
         const double msec = this->milliseconds();
-        printTime(mOutStream, msec, " completed in ", "\n", true, 4, 1);
+        printTime(mOutStream, msec, " completed in ", "\n", 4, 3, 1);
         return msec;
     }
 
     /// @brief Returns and prints time in milliseconds since construction or start was called.
     ///
-    /// @note Combine this method with start() to delay output to will completion of task being timed.
+    /// @note Combine this method with start() to delay output of task being timed.
     inline double stop(const std::string& msg) const
     {
         const double msec = this->milliseconds();
         mOutStream << msg << " ...";
-        printTime(mOutStream, msec, " completed in ", "\n", true, 4, 3);
+        printTime(mOutStream, msec, " completed in ", "\n", 4, 3, 1);
         return msec;
     }
 
@@ -163,9 +172,9 @@ public:
     /// @note Should normally be followed by a call to stop() or restart()
     inline double restart()
     {
-        const double delta = this->delta();
+        const double msec = this->milliseconds();
         this->start();
-        return delta;
+        return msec;
     }
 
     /// @brief Stop previous timer, print message and re-start timer.

@@ -85,15 +85,15 @@ printNumber(std::ostream& os, uint64_t number,
 /// @param milliseconds   the time to be output
 /// @param head           a string to be output before the time
 /// @param tail           a string to be output after the time
-/// @param exact          if true, also output the unmodified count, e.g., "4 seconds and 0.0 milliseconds (4000)"
 /// @param width          a fixed width for the numeric text
 /// @param precision      the number of digits after the decimal point
-/// @return 0, 1, 2, 3 or 4, denoting the order of magnitude of the time.
+/// @param verbose        verbose level, 0 is compact format and 1 is long format
+/// @return 0, 1, 2, 3, or 4 denoting the order of magnitude of the time.
 OPENVDB_API int
 printTime(std::ostream& os, double milliseconds,
     const std::string& head = "",
     const std::string& tail = "\n",
-    bool exact = true, int width = 4, int precision = 1);
+    int width = 4, int precision = 1, int verbose = 0);
 
 
 ////////////////////////////////////////

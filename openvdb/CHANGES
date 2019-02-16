@@ -7,11 +7,11 @@ Version 6.0.1 - In development
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.
     - Added support for Vec4s, Vec4d and Vec4i metadata.
-    - Added util::printTime that outputs nicely-formatted time information. 
+    - Added util::printTime that outputs nicely-formatted time information.
 
     Improvements:
     - The API of util::CpuTimer has been improved and is now making use
-      a new util::printTime function for nicer output of time information. 
+      a new util::printTime function for nicer output of time information.
     - Significantly improved the performance of point data grid string
       attribute generation.
     - AttributeArray::copy() and the copy assignment operator for
