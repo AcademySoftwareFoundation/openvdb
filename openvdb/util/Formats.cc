@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -112,10 +112,53 @@ printNumber(std::ostream& os, uint64_t number,
     return group;
 }
 
+int
+printTime(std::ostream& os, double milliseconds,
+  const std::string& head, const std::string& tail,
+  bool exact, int width, int precision)
+  {
+    int group = 0;
+
+    // Write to a string stream so that I/O manipulators like
+    // std::setprecision() don't alter the output stream.
+    std::ostringstream ostr;
+    ostr << head;
+    ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+
+    double msec = milliseconds;
+    if (msec >= 1000.0) {// avoid unnecessary coverheads
+      const uint32_t seconds = static_cast<uint32_t>(msec / 1000.0) % 60 ;
+      const uint32_t minutes = static_cast<uint32_t>(msec / (1000.0*60)) % 60;
+      const uint32_t hours   = static_cast<uint32_t>(msec / (1000.0*60*60)) % 24;
+      const uint32_t days    = static_cast<uint32_t>(msec / (1000.0*60*60*24));
+      msec -= (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
+      if (days) {
+        ostr << days << " days, " << hours << " hours, " << minutes << " minutes, " << seconds << " seconds, and ";
+        group = 4;
+      } else if (hours) {
+        ostr << hours << " hours, " << minutes << " minutes, " << seconds << " seconds, and ";
+        group = 3;
+      } else if (minutes) {
+        ostr << minutes << " minutes, " << seconds << " seconds, and ";
+        group = 2;
+      } else if (seconds) {
+        ostr << seconds << " seconds and ";
+        group = 1;
+      }
+    }
+    ostr << std::setw(width) << msec << " milliseconds";
+    if (exact && group) ostr << " (" << milliseconds << ")";
+    ostr << tail;
+
+    os << ostr.str();
+
+    return group;
+  }
+
 } // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
