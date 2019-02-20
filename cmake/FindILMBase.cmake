@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -84,7 +84,7 @@ IF ( ILMBASE_FOUND )
   SET ( ILMBASE_LIBRARYDIR ${ILMBASE_LOCATION}/lib
     CACHE STRING "ILMBase library directories")
   SET ( ILMBASE_FOUND TRUE )
-  
+
   SET ( ORIGINAL_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
   IF (Ilmbase_USE_STATIC_LIBS)
     IF (APPLE)

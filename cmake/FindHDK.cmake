@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,7 +49,7 @@ OPTION ( HDK_AUTO_GENERATE_SESITAG "Automatically generate <Target>_sesitag.C an
 # Houdini 15 and above defines version in SYS/SYS_Version.h
 SET ( HDK_VERSION_FILE_PATH "toolkit/include/SYS/SYS_Version.h" )
 
-if(NOT ENV{HFS})
+if(NOT DEFINED ENV{HFS})
   message (STATUS "$HFS not set, using provided HDK_LOCATION: " ${HDK_LOCATION} )
   SET(ENV{HFS} ${HDK_LOCATION})
 endif()
@@ -143,7 +143,7 @@ IF (HDK_FOUND)
 	  )
   ENDIF()
   # MESSAGE ( "HDK_VERSION_STRING = ${HDK_VERSION_STRING}")
-  SET ( HCUSTOM_COMMAND $ENV{HFS}/bin/hcustom ) 
+  SET ( HCUSTOM_COMMAND $ENV{HFS}/bin/hcustom )
   SET ( HOTL_COMMAND $ENV{HFS}/bin/hotl )
 
   SET ( HDK_INCLUDE_DIR "${HDK_LOCATION}/toolkit/include;${HDK_LOCATION}/toolkit/include/htools" CACHE STRING "HDK include directory" )
@@ -242,9 +242,9 @@ IF (HDK_FOUND)
 	#ELSEIF (APPLE)
     # FILE ( GLOB DSOLIB_DYLIB $ENV{HFS}/../Libraries/*.dylib )
   ELSE (WIN32)
-    # Linux/OSX 
-    LINK_DIRECTORIES ( $ENV{HDSO} ) 
-    # LINK_DIRECTORIES ( $ENV{HFS}/dsolib ) 
+    # Linux/OSX
+    LINK_DIRECTORIES ( $ENV{HDSO} )
+    # LINK_DIRECTORIES ( $ENV{HFS}/dsolib )
   ENDIF (WIN32)
 
   IF (APPLE)
@@ -264,7 +264,7 @@ IF (HDK_FOUND)
     ENDIF ()
     FIND_PROGRAM ( PYTHON_EXECUTABLE NAMES python )
     EXECUTE_PROCESS ( COMMAND "${PYTHON_EXECUTABLE}" ${PYTHON_SCRIPT} ${_src_name} )
-    
+
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_EXECUTABLE _exe_NAME )
@@ -309,12 +309,10 @@ IF (HDK_FOUND)
 		tbb
         )
     ENDIF (APPLE)
-    
+
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_LIBRARY _lib_NAME )
-    
-    ADD_DEFINITIONS ( -DMAKING_DSO )
 
     SET ( HDK_LIBRARY_DIRS $ENV{HFS}/../Libraries )
     SET ( HDK_HOUDINI_LOCATION $ENV{HFS}/../Houdini )
@@ -326,6 +324,11 @@ IF (HDK_FOUND)
       HDK_CREATE_SESITAG ( ${HDK_SESITAG_FILE} )
 	ENDIF ()
     ADD_LIBRARY ( ${_lib_NAME} ${HDK_LIBRARY_TYPE} ${ARGN} ${HDK_SESITAG_FILE} )
+
+    SET_TARGET_PROPERTIES ( ${_lib_NAME} PROPERTIES
+      DEFINE_SYMBOL MAKING_DSO
+    )
+
     IF (APPLE)
       SET_TARGET_PROPERTIES ( ${_lib_NAME} PROPERTIES
 		LINK_FLAGS "${HDK_LINK_FLAGS} -L${HDK_LIBRARY_DIRS} ${HDK_HOUDINI_LOCATION}"
@@ -348,8 +351,6 @@ IF (HDK_FOUND)
   ENDFUNCTION ()
 
   FUNCTION ( HDK_ADD_STANDALONE_LIBRARY _lib_NAME )
-    
-    ADD_DEFINITIONS ( -DMAKING_DSO )
 
     SET ( HDK_LIBRARY_DIRS $ENV{HFS}/../Libraries )
     SET ( HDK_HOUDINI_LOCATION $ENV{HFS}/../Houdini )
@@ -361,6 +362,11 @@ IF (HDK_FOUND)
     HDK_CREATE_SESITAG ( ${HDK_SESITAG_FILE} )
 
     ADD_LIBRARY ( ${_lib_NAME} ${HDK_LIBRARY_TYPE} ${ARGN} ${HDK_SESITAG_FILE} )
+
+    SET_TARGET_PROPERTIES ( ${_lib_NAME} PROPERTIES
+      DEFINE_SYMBOL MAKING_DSO
+    )
+
     IF (APPLE)
       SET_TARGET_PROPERTIES ( ${_lib_NAME} PROPERTIES
 		LINK_FLAGS "${HDK_LINK_FLAGS} -L${HDK_LIBRARY_DIRS} ${HDK_HOUDINI_LOCATION}"

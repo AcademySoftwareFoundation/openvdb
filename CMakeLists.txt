@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -26,58 +26,99 @@
 #
 
 # yue.nicholas@gmail.com
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
+
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.1 )
+
+SET ( CMAKE_CXX_STANDARD 11 )
+SET ( CMAKE_DISABLE_SOURCE_CHANGES ON )
+SET ( CMAKE_DISABLE_IN_SOURCE_BUILD ON )
 
 PROJECT ( OpenVDB )
 
-ENABLE_TESTING()
+ENABLE_TESTING ()
 
-find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-endif(CCACHE_FOUND)
+FIND_PROGRAM ( CCACHE_FOUND ccache )
+IF ( CCACHE_FOUND )
+    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
+    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
+ENDIF ( CCACHE_FOUND )
 
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
-OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
+OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF )
 OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini SOPs" OFF )
 OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
 OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
+OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see
+  OPENVDB_ABI_VERSION_NUMBER)" OFF )
 
-SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "build for compatibility
-with version N of the OpenVDB Grid ABI, where N is 2, 3, 4, etc.
-(some newer features will be disabled)")
+SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
+    OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)")
 
-IF (OPENVDB_BUILD_HOUDINI_SOPS)
+IF ( OPENVDB_BUILD_HOUDINI_SOPS )
+  # @todo why?
   SET ( OPENVDB_BUILD_PYTHON_MODULE OFF )
 ENDIF ()
 
+# Some platform checks
+
 IF ( APPLE )
   IF ( OPENVDB_BUILD_HOUDINI_SOPS AND OPENVDB_BUILD_MAYA_PLUGIN )
-	MESSAGE ( FATAL_ERROR "On OSX, Houdini linked with libc++ whereas Maya is linked with libstdc++, the different runtimes are not mutually compatible, build them Houdini SOPs and Maya plugins separately with the requisite DCC's compiler" )
+  MESSAGE ( FATAL_ERROR "On OSX, Houdini linked with libc++ whereas Maya is linked with libstdc++, "
+        "the different runtimes are not mutually compatible, build them Houdini SOPs and Maya plugins "
+        "separately with the requisite DCC's compiler" )
   ENDIF ()
 ENDIF ()
 
-LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+# Determine OpenVDB version
 
-SET ( OPENVDB_TOP_LEVEL_DIR ${PROJECT_SOURCE_DIR} CACHE PATH "OpenVDB Top Level Directory to share among sub projects" )
+SET ( OPENVDB_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/version.h )
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_major_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*")
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_minor_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*")
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_patch_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
 
-INCLUDE_DIRECTORIES ( ${OPENVDB_TOP_LEVEL_DIR} ) # To make sure we pick up headers from this version of OpenVDB we are building
-IF ( ${OPENVDB_ABI_VERSION_NUMBER} )
-  MESSAGE( STATUS "Using openvdb abi version ${OPENVDB_ABI_VERSION_NUMBER}")
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_major_version_number "${openvdb_major_version_str}")
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_minor_version_number "${openvdb_minor_version_str}")
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_patch_version_number "${openvdb_patch_version_str}")
 
-  ADD_DEFINITIONS (-DOPENVDB_ABI_VERSION_NUMBER=${OPENVDB_ABI_VERSION_NUMBER} )
-ELSEIF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
+SET ( OPENVDB_MAJOR_VERSION_NUMBER ${_openvdb_major_version_number} CACHE STRING "OpenVDB Major Version Number" )
+SET ( OPENVDB_MINOR_VERSION_NUMBER ${_openvdb_minor_version_number} CACHE STRING "OpenVDB Minor Version Number" )
+SET ( OPENVDB_PATCH_VERSION_NUMBER ${_openvdb_patch_version_number} CACHE STRING "OpenVDB Build Version Number" )
 
-  MESSAGE( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated. Instead use OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version.")
+# Determine the OpenVDB ABI Version. If OPENVDB_ABI_VERSION_NUMBER is defined, use that value,
+# otherwise check the legacy OPENVDB_ENABLE_3_ABI_COMPATIBLE option, falling back to the major
+# library version number
+MESSAGE ( STATUS "Using OpenVDB ABI Version ${OPENVDB_ABI_VERSION_NUMBER}" )
 
-  ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
+IF ( OPENVDB_ABI_VERSION_NUMBER STREQUAL "" )
+  IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
+    SET ( OPENVDB_ABI_VERSION_NUMBER 3 )
+    ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
+    MESSAGE ( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated. Instead use
+      -D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version." )
+  ELSE ()
+    SET ( OPENVDB_ABI_VERSION_NUMBER ${OPENVDB_MAJOR_VERSION_NUMBER} )
+  ENDIF ()
 ENDIF ()
+
+MESSAGE ( STATUS "Using OpenVDB ABI Version ${OPENVDB_ABI_VERSION_NUMBER}" )
+ADD_DEFINITIONS ( -DOPENVDB_ABI_VERSION_NUMBER=${OPENVDB_ABI_VERSION_NUMBER} )
+
+# Configure the top level dir to make sure we pick up headers from this version of OpenVDB we
+# are building
+
+LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" )
+SET ( OPENVDB_TOP_LEVEL_DIR ${PROJECT_SOURCE_DIR} CACHE PATH
+    "OpenVDB Top Level Directory to share among sub projects" )
+INCLUDE_DIRECTORIES ( ${OPENVDB_TOP_LEVEL_DIR} )
+
+# Compiler options
 
 IF ( OPENVDB_CXX_STRICT )
     # Add definitions for a number of compiler warnings for GCC and Clang for all sub projects
@@ -102,7 +143,7 @@ IF ( OPENVDB_CXX_STRICT )
             -Woverloaded-virtual
         )
     ELSE ()
-        MESSAGE ( WARNING "No available CXX warnings for compiler "${CMAKE_CXX_COMPILER_ID} )
+        MESSAGE ( WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}" )
     ENDIF ()
 ENDIF ()
 

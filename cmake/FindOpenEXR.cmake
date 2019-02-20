@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,7 +39,7 @@
 FIND_PACKAGE ( PackageHandleStandardArgs )
 
 FIND_PATH ( OPENEXR_LOCATION include/OpenEXR/OpenEXRConfig.h
-  ENV OPENEXR_ROOT
+  "$ENV{OPENEXR_ROOT}"
   NO_DEFAULT_PATH
   NO_SYSTEM_ENVIRONMENT_PATH
   )
@@ -59,7 +59,7 @@ IF ( OPENEXR_FOUND )
   FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
   STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" "" _openexr_version_minor_unstrip "${_openexr_version_minor_string}")
   STRING ( STRIP "${_openexr_version_minor_unstrip}" OPENEXR_VERSION_MINOR )
-  
+
   MESSAGE ( STATUS "Found OpenEXR v${OPENEXR_VERSION_MAJOR}.${OPENEXR_VERSION_MINOR} at ${OPENEXR_LOCATION}" )
 
   IF ( OPENEXR_NAMESPACE_VERSIONING )
@@ -67,7 +67,7 @@ IF ( OPENEXR_FOUND )
   ELSE ( OPENEXR_NAMESPACE_VERSIONING )
 	SET ( ILMIMF_LIBRARY_NAME IlmImf )
   ENDIF ( OPENEXR_NAMESPACE_VERSIONING )
-	
+
   SET ( OPENEXR_INCLUDE_DIRS
     ${OPENEXR_LOCATION}/include
     ${OPENEXR_LOCATION}/include/OpenEXR
@@ -120,6 +120,6 @@ IF ( OPENEXR_FOUND )
   ENDIF ()
 
   # SET( Openexr_ILMIMF_LIBRARY ${OPENEXR_ILMIMF_LIBRARY_PATH} CACHE STRING "Openexr's IlmImf library")
-  
+
 ENDIF ( OPENEXR_FOUND )
 

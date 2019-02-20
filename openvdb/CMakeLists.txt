@@ -24,10 +24,13 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
-cmake_minimum_required(VERSION 3.1)
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.1 )
 PROJECT ( OpenVDBCore )
 
-set(CMAKE_CXX_STANDARD 11)
+SET ( CMAKE_CXX_STANDARD 11 )
+
+# @todo GLFW, GLEW, glu, gl should only be dependent on vdb_view. Add
+# CMake options to ignore these should vdb_view not be desired.
 
 IF ( USE_GLFW3 )
   FIND_PACKAGE ( GLFW3 REQUIRED )
@@ -46,42 +49,18 @@ ELSE ()
   SET ( GLFW_INCLUDE_DIRECTORY  ${GLFW_INCLUDE_DIR} CACHE STRING "GLFW include directory")
 ENDIF ()
 
-IF (WIN32)
+IF ( WIN32 )
   FIND_PACKAGE ( GLEW REQUIRED )
 ELSE ()
   FIND_PACKAGE ( Threads REQUIRED )
 ENDIF()
 
-# Determine OpenVDB version
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 4
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
-SET ( OPENVDB_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.h )
-
-FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_major_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*")
-FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_minor_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*")
-FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_patch_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
-
-STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-  _openvdb_major_version_number "${openvdb_major_version_str}")
-STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-  _openvdb_minor_version_number "${openvdb_minor_version_str}")
-STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-  _openvdb_patch_version_number "${openvdb_patch_version_str}")
-
-SET ( OPENVDB_MAJOR_VERSION_NUMBER ${_openvdb_major_version_number} CACHE STRING "OpenVDB major version number" )
-SET ( OPENVDB_MINOR_VERSION_NUMBER ${_openvdb_minor_version_number} CACHE STRING "OpenVDB minor version number" )
-SET ( OPENVDB_PATCH_VERSION_NUMBER ${_openvdb_patch_version_number} CACHE STRING "OpenVDB build version number" )
-
-# MESSAGE ( "OPENVDB_VERSION_FILE = ${OPENVDB_VERSION_FILE}")
-# MESSAGE ( "OPENVDB_MAJOR_VERSION_NUMBER = ${OPENVDB_MAJOR_VERSION_NUMBER}" )
-# MESSAGE ( "OPENVDB_MINOR_VERSION_NUMBER = ${OPENVDB_MINOR_VERSION_NUMBER}" )
-# MESSAGE ( "OPENVDB_PATCH_VERSION_NUMBER = ${OPENVDB_PATCH_VERSION_NUMBER}" )
-
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system thread ${OPENVDB_BOOST_PYTHON_LIBRARY_COMPONENT_NAME} )
-IF (WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system thread )
+IF ( WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING )
   ADD_DEFINITIONS ( -DBOOST_ALL_NO_LIB )
 ENDIF ()
+
+# @todo Blosc should be optional
 
 FIND_PACKAGE ( Blosc REQUIRED )
 FIND_PACKAGE ( TBB REQUIRED )
@@ -89,25 +68,27 @@ FIND_PACKAGE ( ZLIB REQUIRED )
 FIND_PACKAGE ( ILMBase REQUIRED )
 FIND_PACKAGE ( OpenEXR REQUIRED )
 FIND_PACKAGE ( OpenGL REQUIRED )
-IF (OPENVDB_BUILD_DOCS)
+
+IF ( OPENVDB_BUILD_DOCS )
   FIND_PACKAGE ( Doxygen REQUIRED )
 ENDIF ()
-IF (OPENVDB_BUILD_UNITTESTS)
+IF ( OPENVDB_BUILD_UNITTESTS )
   FIND_PACKAGE ( CPPUnit REQUIRED )
 ENDIF ()
 
-IF (APPLE)
+IF ( APPLE )
   FIND_LIBRARY ( COCOA_LIBRARY Cocoa )
   FIND_LIBRARY ( IOKIT_LIBRARY IOKit )
   FIND_LIBRARY ( COREVIDEO_LIBRARY CoreVideo )
 ENDIF ()
+
+# Configure include paths
 
 IF ( NOT OPENVDB_BUILD_HOUDINI_SOPS )
   # If we are building OpenVDB Houdini SOP, we need to use the headers
   # shipped with Houdini to ensure version compatibility
   INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
   INCLUDE_DIRECTORIES ( SYSTEM ${TBB_INCLUDE_DIR} )
-  # INCLUDE_DIRECTORIES ( ${OPENGL_INCLUDE_DIR} )
   INCLUDE_DIRECTORIES ( SYSTEM ${ZLIB_INCLUDE_DIR} )
 ENDIF ()
 
@@ -115,13 +96,14 @@ INCLUDE_DIRECTORIES ( SYSTEM ${ILMBASE_INCLUDE_DIRS} )
 INCLUDE_DIRECTORIES ( SYSTEM ${OPENEXR_INCLUDE_DIRS} )
 INCLUDE_DIRECTORIES ( SYSTEM ${GLFW_INCLUDE_DIRECTORY} )
 
-IF (WIN32)
+IF ( WIN32 )
   INCLUDE_DIRECTORIES ( SYSTEM ${GLEW_INCLUDE_DIR} )
 ENDIF ()
 
-INCLUDE_DIRECTORIES ( . ) # So they can simulate referencing installed headers
+# So they can simulate referencing installed headers
+INCLUDE_DIRECTORIES ( . )
 
-IF (WIN32)
+IF ( WIN32 )
   # Because of implicit linking!
   LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
 ENDIF ()
@@ -129,7 +111,7 @@ ENDIF ()
 INCLUDE_DIRECTORIES ( SYSTEM ${BLOSC_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( SYSTEM ${CPPUNIT_INCLUDE_DIR} )
 
-IF (WIN32)
+IF ( WIN32 )
   ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DHALF_EXPORTS -DOPENVDB_DLL )
 ELSE ()
   ADD_DEFINITIONS ( -pthread -fPIC )
@@ -140,6 +122,8 @@ FILE ( GLOB VIEWER_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} viewer/* )
 FILE ( MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
 FILE ( COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
 INCLUDE_DIRECTORIES ( ${CMAKE_BINARY_DIR}/dwa )
+
+# Core library configuration
 
 SET ( OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
@@ -168,9 +152,155 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   util/Util.cc
   )
 
+SET ( OPENVDB_LIBRARY_INCLUDE_FILES
+  Exceptions.h
+  Grid.h
+  Types.h
+  version.h
+  Metadata.h
+  MetaMap.h
+  openvdb.h
+  Platform.h
+  PlatformConfig.h
+)
+
+SET ( OPENVDB_LIBRARY_IO_INCLUDE_FILES
+  io/Archive.h
+  io/Compression.h
+  io/File.h
+  io/GridDescriptor.h
+  io/io.h
+  io/Queue.h
+  io/Stream.h
+  io/TempFile.h
+)
+
+SET ( OPENVDB_LIBRARY_MATH_INCLUDE_FILES
+  math/BBox.h
+  math/ConjGradient.h
+  math/Coord.h
+  math/DDA.h
+  math/FiniteDifference.h
+  math/LegacyFrustum.h
+  math/Maps.h
+  math/Mat.h
+  math/Mat3.h
+  math/Mat4.h
+  math/Math.h
+  math/Operators.h
+  math/Proximity.h
+  math/QuantizedUnitVec.h
+  math/Quat.h
+  math/Ray.h
+  math/Stats.h
+  math/Stencils.h
+  math/Transform.h
+  math/Tuple.h
+  math/Vec2.h
+  math/Vec3.h
+  math/Vec4.h
+)
+
+SET ( OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
+  points/AttributeArray.h
+  points/AttributeArrayString.h
+  points/AttributeGroup.h
+  points/AttributeSet.h
+  points/IndexFilter.h
+  points/IndexIterator.h
+  points/PointAdvect.h
+  points/PointAttribute.h
+  points/PointConversion.h
+  points/PointCount.h
+  points/PointDataGrid.h
+  points/PointDelete.h
+  points/PointGroup.h
+  points/PointMask.h
+  points/PointMove.h
+  points/PointSample.h
+  points/PointScatter.h
+  points/StreamCompression.h
+)
+
+SET ( OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
+  tools/ChangeBackground.h
+  tools/Clip.h
+  tools/Composite.h
+  tools/Dense.h
+  tools/DenseSparseTools.h
+  tools/Diagnostics.h
+  tools/Filter.h
+  tools/GridOperators.h
+  tools/GridTransformer.h
+  tools/Interpolation.h
+  tools/LevelSetAdvect.h
+  tools/LevelSetFilter.h
+  tools/LevelSetFracture.h
+  tools/LevelSetMeasure.h
+  tools/LevelSetMorph.h
+  tools/LevelSetPlatonic.h
+  tools/LevelSetRebuild.h
+  tools/LevelSetSphere.h
+  tools/LevelSetTracker.h
+  tools/LevelSetUtil.h
+  tools/Mask.h
+  tools/MeshToVolume.h
+  tools/Morphology.h
+  tools/MultiResGrid.h
+  tools/ParticleAtlas.h
+  tools/ParticlesToLevelSet.h
+  tools/PointAdvect.h
+  tools/PointIndexGrid.h
+  tools/PointPartitioner.h
+  tools/PointScatter.h
+  tools/PointsToMask.h
+  tools/PoissonSolver.h
+  tools/PotentialFlow.h
+  tools/Prune.h
+  tools/RayIntersector.h
+  tools/RayTracer.h
+  tools/SignedFloodFill.h
+  tools/Statistics.h
+  tools/TopologyToLevelSet.h
+  tools/ValueTransformer.h
+  tools/VectorTransformer.h
+  tools/VelocityFields.h
+  tools/VolumeAdvect.h
+  tools/VolumeToMesh.h
+  tools/VolumeToSpheres.h
+)
+
+SET ( OPENVDB_LIBRARY_TREE_INCLUDE_FILES
+  tree/InternalNode.h
+  tree/Iterator.h
+  tree/LeafBuffer.h
+  tree/LeafManager.h
+  tree/LeafNode.h
+  tree/LeafNodeBool.h
+  tree/LeafNodeMask.h
+  tree/NodeManager.h
+  tree/NodeUnion.h
+  tree/RootNode.h
+  tree/Tree.h
+  tree/TreeIterator.h
+  tree/ValueAccessor.h
+)
+
+SET ( OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
+  util/CpuTimer.h
+  util/Formats.h
+  util/logging.h
+  util/MapsUtil.h
+  util/Name.h
+  util/NodeMasks.h
+  util/NullInterrupter.h
+  util/PagedArray.h
+  util/Util.h
+)
+
 SET_SOURCE_FILES_PROPERTIES ( ${OPENVDB_LIBRARY_SOURCE_FILES}
   PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
+  COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC"
   )
 
 ADD_LIBRARY ( openvdb_static STATIC
@@ -188,6 +318,7 @@ TARGET_LINK_LIBRARIES ( openvdb_static
   ${ZLIB_LIBRARY}
   ${BLOSC_blosc_LIBRARY}
   )
+
 TARGET_LINK_LIBRARIES ( openvdb_shared
   ${Boost_IOSTREAMS_LIBRARY}
   ${Boost_SYSTEM_LIBRARY}
@@ -197,17 +328,17 @@ TARGET_LINK_LIBRARIES ( openvdb_shared
   ${BLOSC_blosc_LIBRARY}
   )
 
-IF (WIN32)
+IF ( WIN32 )
   SET_TARGET_PROPERTIES ( openvdb_static
 	PROPERTIES OUTPUT_NAME libopenvdb
 	)
-ELSE()
+ELSE ()
   SET_TARGET_PROPERTIES ( openvdb_static
 	PROPERTIES OUTPUT_NAME openvdb
 	)
-ENDIF()
+ENDIF ()
 
-SET_TARGET_PROPERTIES(
+SET_TARGET_PROPERTIES (
   openvdb_shared
   PROPERTIES
   OUTPUT_NAME openvdb
@@ -215,15 +346,12 @@ SET_TARGET_PROPERTIES(
   VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
   )
 
-SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print/main.cc )
-SET_SOURCE_FILES_PROPERTIES ( ${VDB_PRINT_SOURCE_FILES}
-  PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-  )
+# VDB binaries
 
-ADD_EXECUTABLE ( vdb_print
-  ${VDB_PRINT_SOURCE_FILES}
-  )
+# vdb_print
+
+SET ( VDB_PRINT_SOURCE_FILES cmd/openvdb_print/main.cc )
+ADD_EXECUTABLE ( vdb_print ${VDB_PRINT_SOURCE_FILES} )
 
 TARGET_LINK_LIBRARIES ( vdb_print
   openvdb_shared
@@ -233,14 +361,10 @@ TARGET_LINK_LIBRARIES ( vdb_print
   stdc++
   )
 
+# vdb_render
+
 SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render/main.cc )
-SET_SOURCE_FILES_PROPERTIES ( ${VDB_RENDER_SOURCE_FILES}
-  PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
-  )
-ADD_EXECUTABLE ( vdb_render
-  ${VDB_RENDER_SOURCE_FILES}
-  )
+ADD_EXECUTABLE ( vdb_render ${VDB_RENDER_SOURCE_FILES} )
 
 TARGET_LINK_LIBRARIES ( vdb_render
   openvdb_shared
@@ -253,6 +377,8 @@ TARGET_LINK_LIBRARIES ( vdb_render
   stdc++
   )
 
+ # vdb_view
+
 SET ( VDB_VIEW_SOURCE_FILES
   cmd/openvdb_view/main.cc
   viewer/Camera.cc
@@ -263,14 +389,13 @@ SET ( VDB_VIEW_SOURCE_FILES
   )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_VIEW_SOURCE_FILES}
   PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG} -DGL_GLEXT_PROTOTYPES=1"
+  COMPILE_FLAGS "${OPENVDB_USE_GLFW_FLAG} -DGL_GLEXT_PROTOTYPES=1"
   )
-IF (NOT WIN32)
-  ADD_EXECUTABLE ( vdb_view
-    ${VDB_VIEW_SOURCE_FILES}
-    )
-  
-  target_include_directories ( vdb_view SYSTEM PRIVATE ${Boost_INCLUDE_DIR} )
+
+IF ( NOT WIN32 )
+  ADD_EXECUTABLE ( vdb_view ${VDB_VIEW_SOURCE_FILES} )
+
+  TARGET_INCLUDE_DIRECTORIES ( vdb_view SYSTEM PRIVATE ${Boost_INCLUDE_DIR} )
 
   TARGET_LINK_LIBRARIES ( vdb_view
     openvdb_shared
@@ -283,10 +408,16 @@ IF (NOT WIN32)
     ${GLFW_LINK_LIBRARY}
     ${GLFW_DEPENDENT_LIBRARIES}
     ${GLEW_GLEW_LIBRARY}
+    ${CMAKE_THREAD_LIBS_INIT}
+    dl
     m
     stdc++
     )
+ELSE ()
+  # @todo vdb_view on windows
 ENDIF ()
+
+# VDB unit tests
 
 SET ( UNITTEST_SOURCE_FILES
   unittest/main.cc
@@ -386,9 +517,7 @@ SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_SOURCE_FILES}
 
 IF ( OPENVDB_BUILD_UNITTESTS )
 
-  ADD_EXECUTABLE ( vdb_test
-    ${UNITTEST_SOURCE_FILES}
-    )
+  ADD_EXECUTABLE ( vdb_test ${UNITTEST_SOURCE_FILES} )
 
   TARGET_LINK_LIBRARIES ( vdb_test
     ${CPPUnit_cppunit_LIBRARY}
@@ -399,10 +528,10 @@ IF ( OPENVDB_BUILD_UNITTESTS )
 
   ADD_TEST ( vdb_unit_test vdb_test )
 
-ENDIF (OPENVDB_BUILD_UNITTESTS)
+ENDIF ( OPENVDB_BUILD_UNITTESTS )
 
 # Doxygen docmentation
-IF (OPENVDB_BUILD_DOCS)
+IF ( OPENVDB_BUILD_DOCS )
 
   FILE ( READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config DOXYGEN_CONFIG_CONTENT )
   FILE ( WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT} )
@@ -420,6 +549,7 @@ IF (OPENVDB_BUILD_DOCS)
 ENDIF ()
 
 # Installation
+
 IF ( NOT WIN32 )
   INSTALL ( TARGETS
     vdb_view
@@ -427,6 +557,7 @@ IF ( NOT WIN32 )
     bin
     )
 ENDIF ()
+
 INSTALL ( TARGETS
   vdb_print
   vdb_render
@@ -440,13 +571,13 @@ INSTALL ( TARGETS
   lib
   )
 
-IF (WIN32)
+IF ( WIN32 )
   INSTALL ( TARGETS
 	openvdb_shared
 	RUNTIME DESTINATION bin COMPONENT Runtime
 	ARCHIVE DESTINATION lib COMPONENT Runtime
 	)
-ELSE()
+ELSE ()
   INSTALL ( TARGETS
 	openvdb_shared
 	DESTINATION
@@ -454,9 +585,12 @@ ELSE()
 	)
 ENDIF ()
 
-INSTALL ( DIRECTORY ${PROJECT_SOURCE_DIR} DESTINATION include
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN "python" EXCLUDE
-  PATTERN "cmd" EXCLUDE
-  PATTERN "doc" EXCLUDE
-  )
+INSTALL ( FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION include )
+
+INSTALL (FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION include/openvdb/)
+INSTALL (FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION include/openvdb/io)
+INSTALL (FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION include/openvdb/math)
+INSTALL (FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION include/openvdb/points)
+INSTALL (FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION include/openvdb/tools)
+INSTALL (FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION include/openvdb/tree)
+INSTALL (FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION include/openvdb/util)
