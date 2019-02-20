@@ -52,14 +52,15 @@ OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see "
-  "OPENVDB_ABI_VERSION_NUMBER)" OFF )
+OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
 
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
     OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)")
 
 IF ( OPENVDB_BUILD_HOUDINI_SOPS )
-  # @todo why?
+  # Prior to the introduction of HBoost (Houdini's namespaced and shipped Boost version from 16.5),
+  # we built against Houdini's version of Boost which didn't include Boost.Python
+  # @todo Enable this for Houdini Versions >= 16.5 (and add additional Boost branching options)
   SET ( OPENVDB_BUILD_PYTHON_MODULE OFF )
 ENDIF ()
 
@@ -67,9 +68,9 @@ ENDIF ()
 
 IF ( APPLE )
   IF ( OPENVDB_BUILD_HOUDINI_SOPS AND OPENVDB_BUILD_MAYA_PLUGIN )
-  MESSAGE ( FATAL_ERROR "On OSX, Houdini linked with libc++ whereas Maya is linked with libstdc++, "
-        "the different runtimes are not mutually compatible, build them Houdini SOPs and Maya plugins "
-        "separately with the requisite DCC's compiler" )
+    MESSAGE ( FATAL_ERROR "On macOS, Houdini is linked with libc++ whereas Maya is linked with libstdc++. "
+      "The different runtimes are not mutually compatible, so build the Houdini and Maya plugins separately "
+      "with the requisite DCC's compiler." )
   ENDIF ()
 ENDIF ()
 
@@ -94,17 +95,19 @@ SET ( OPENVDB_PATCH_VERSION_NUMBER ${_openvdb_patch_version_number} CACHE STRING
 # Determine the OpenVDB ABI Version. If OPENVDB_ABI_VERSION_NUMBER is defined, use that value,
 # otherwise check the legacy OPENVDB_ENABLE_3_ABI_COMPATIBLE option, falling back to the major
 # library version number
-MESSAGE ( STATUS "Using OpenVDB ABI Version ${OPENVDB_ABI_VERSION_NUMBER}" )
 
 IF ( OPENVDB_ABI_VERSION_NUMBER STREQUAL "" )
   IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
     SET ( OPENVDB_ABI_VERSION_NUMBER 3 )
-    ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
     MESSAGE ( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated. Instead use
       -D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version." )
   ELSE ()
     SET ( OPENVDB_ABI_VERSION_NUMBER ${OPENVDB_MAJOR_VERSION_NUMBER} )
   ENDIF ()
+ENDIF ()
+
+IF ( OPENVDB_ABI_VERSION_NUMBER EQUAL 3 )
+  ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
 ENDIF ()
 
 MESSAGE ( STATUS "Using OpenVDB ABI Version ${OPENVDB_ABI_VERSION_NUMBER}" )
