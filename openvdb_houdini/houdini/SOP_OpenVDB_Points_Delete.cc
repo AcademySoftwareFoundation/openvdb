@@ -209,34 +209,40 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_
             }
             GU_PrimVDB* vdbPrim = *vdbIt;
 
-            PointDataGrid::ConstPtr inputGrid =
-                    openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
-
-            // early exit if the grid is of the wrong type
-            if (!inputGrid) continue;
-
-            // early exit if the tree is empty
-            auto leafIter = inputGrid->tree().cbeginLeaf();
-            if (!leafIter) continue;
-
-            // extract names of all selected VDB groups
-
+            // Limit the lifetime of our const shared copies so
+            // we don't have false-sharing when we go to make the
+            // grid unique.
             std::vector<std::string> pointGroups;
 
-            // the "exclude groups" parameter to parseNames is not used in this context,
-            // so we disregard it by storing it in a temporary variable
+            {
+                PointDataGrid::ConstPtr inputGrid =
+                        openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
 
-            std::vector<std::string> tmp;
+                // early exit if the grid is of the wrong type
+                if (!inputGrid) continue;
 
-            AttributeSet::Descriptor::parseNames(pointGroups, tmp, groups);
+                // early exit if the tree is empty
+                auto leafIter = inputGrid->tree().cbeginLeaf();
+                if (!leafIter) continue;
 
-            // determine in any of the requested groups are actually present in the tree
+                // extract names of all selected VDB groups
 
-            const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
-            const bool hasPointsToDrop = std::any_of(pointGroups.begin(), pointGroups.end(),
-                [&descriptor](const std::string& group) { return descriptor.hasGroup(group); });
 
-            if (!hasPointsToDrop) continue;
+                // the "exclude groups" parameter to parseNames is not used in this context,
+                // so we disregard it by storing it in a temporary variable
+
+                std::vector<std::string> tmp;
+
+                AttributeSet::Descriptor::parseNames(pointGroups, tmp, groups);
+
+                // determine in any of the requested groups are actually present in the tree
+
+                const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+                const bool hasPointsToDrop = std::any_of(pointGroups.begin(), pointGroups.end(),
+                    [&descriptor](const std::string& group) { return descriptor.hasGroup(group); });
+
+                if (!hasPointsToDrop) continue;
+            }
 
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();
