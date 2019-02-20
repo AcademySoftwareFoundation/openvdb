@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -294,7 +294,8 @@ private:
 
 namespace local_util {
 
-/// @brief Decompose an affine transform into scale, rotation and translation components.
+/// @brief Decompose an affine transform into scale, rotation (XYZ order),
+/// and translation components.
 /// @return @c false if the given matrix is not affine or cannot otherwise be decomposed.
 template<typename T>
 inline bool
@@ -337,9 +338,9 @@ decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
         const math::Vec3<T> tmpAngle = math::eulerAngles(mat, math::XYZ_ROTATION);
 
         const math::Mat3<T> rebuild =
-            math::rotation<math::Mat3<T> >(math::Vec3<T>(1, 0, 0), tmpAngle.x()) *
-            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 1, 0), tmpAngle.y()) *
             math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 0, 1), tmpAngle.z()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 1, 0), tmpAngle.y()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(1, 0, 0), tmpAngle.x()) *
             math::scale<math::Mat3<T> >(signedScale);
 
         if (xform.eq(rebuild)) {
@@ -1038,6 +1039,6 @@ GridResampler::transformBBox(
 
 #endif // OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -37,7 +37,10 @@ Bug fixes:
   to the size of the membership vector.
 - Fixed a race condition when moving points in point data grids for ABI=6+
   due to non-const access of AttributeArrays resulting in a copy-on-write.
-- Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
+- Fixed a bug that caused the @link MeshToVolume.h mesh to volume@endlink
+  converter to consume infinite memory when given NaNs.
+- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
+  decompose@endlink utility that caused it to fail to decompose some matrices.
 
 @par
 Houdini:
