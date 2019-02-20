@@ -52,8 +52,8 @@ OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see
-  OPENVDB_ABI_VERSION_NUMBER)" OFF )
+OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see "
+  "OPENVDB_ABI_VERSION_NUMBER)" OFF )
 
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
     OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)")
