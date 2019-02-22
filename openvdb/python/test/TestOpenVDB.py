@@ -162,8 +162,15 @@ class TestOpenVDB(unittest.TestCase):
 
         self.assertEqual(grid.metadata, {})
 
-        meta = dict(name='test', saveFloatAsHalf=True,
-            xyz=(-1, 0, 1), xyzw=(1.0, 2.25, 3.5, 4.0), intval=42, floatval=1.25)
+        meta = {
+            'name':     'test',
+            'xyz':      (-1, 0, 1),
+            'xyzw':     (1.0, 2.25, 3.5, 4.0),
+            'intval':   42,
+            'floatval': 1.25,
+            'mat4val':  [[1]*4]*4,
+            'saveFloatAsHalf': True,
+        }
         grid.metadata = meta
         self.assertEqual(grid.metadata, meta)
 
