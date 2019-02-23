@@ -1,0 +1,217 @@
+version: 2
+jobs:
+  # ABI=6 (VFX Reference Platform 2019) built with Clang 3.8
+  # core library, Python module, binaries, unit tests and header checks
+  testabi6:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 6 yes release none clang++
+      - run:
+          name: Extras
+          command: bash ci/run.sh extras 6 yes release none clang++
+      - run:
+          name: Header
+          command: bash ci/run.sh core 6 yes header none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 6 yes release none clang++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 6 yes release none clang++
+
+  # ABI=6 with Blosc disabled
+  testabi6noblosc:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 6 no release none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 6 no release none clang++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 6 no release none clang++
+
+  # ABI=6 in debug mode (unit tests built but not run)
+  testabi6debug:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 6 yes debug none clang++
+      - run:
+          name: Extras
+          command: bash ci/run.sh extras 6 yes debug none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 6 yes debug none clang++
+
+  # ABI=6 build with GCC 6.3.1
+  testabi6gcc:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none g++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 6 yes release none g++
+      - run:
+          name: Extras
+          command: bash ci/run.sh extras 6 yes release none g++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 6 yes release none g++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 6 yes release none g++
+
+  # ABI=5 (VFX Reference Platform 2018)
+  # core library and unit tests
+  testabi5:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 5 yes release none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 5 yes release none clang++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 5 yes release none clang++
+
+  # ABI=5 with Blosc disabled
+  testabi5noblosc:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 5 no release none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 5 no release none clang++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 5 no release none clang++
+
+  # ABI=5 in debug mode (unit tests built but not run)
+  testabi5debug:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 5 yes debug none clang++
+      - run:
+          name: Extras
+          command: bash ci/run.sh extras 5 yes debug none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 5 yes debug none clang++
+
+  # ABI=4 (VFX Reference Platform 2017)
+  # core library and unit tests
+  testabi4:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh none clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 4 yes release none clang++
+      - run:
+          name: Unit
+          command: bash ci/run.sh test 4 yes release none clang++
+      - run:
+          name: Test
+          command: bash ci/run.sh run 4 yes release none clang++
+
+  # Houdini 17.0 latest production release (ABI=5)
+  # core library, Houdini library and plugins and header checks
+  houdini17.0:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh 17.0 clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 5 yes release 17.0 clang++
+      - run:
+          name: Houdini
+          command: bash ci/run.sh houdini 5 yes release 17.0 clang++
+      - run:
+          name: Header
+          command: bash ci/run.sh houdini 5 yes header 17.0 clang++
+
+  # Houdini 16.5 latest production release (ABI=4)
+  # core library, Houdini library and plugins
+  houdini16.5:
+    docker:
+      - image: debian:stretch
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: bash ci/install.sh 16.5 clang++
+      - run:
+          name: Core
+          command: bash ci/run.sh core 4 yes release 16.5 clang++
+      - run:
+          name: Houdini
+          command: bash ci/run.sh houdini 4 yes release 16.5 clang++
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - testabi6
+      - testabi5
+      - testabi4
+      - houdini17.0
+      - houdini16.5
+      - testabi6noblosc
+      - testabi6debug
+      - testabi6gcc
+      - testabi5noblosc
+      - testabi5debug
