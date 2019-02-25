@@ -53,11 +53,12 @@ OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
+OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
 
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
     OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)")
 
-IF ( OPENVDB_BUILD_HOUDINI_SOPS )
+IF (OPENVDB_BUILD_HOUDINI_SOPS)
   # Prior to the introduction of HBoost (Houdini's namespaced and shipped Boost version from 16.5),
   # we built against Houdini's version of Boost which didn't include Boost.Python
   # @todo Enable this for Houdini Versions >= 16.5 (and add additional Boost branching options)
@@ -65,6 +66,19 @@ IF ( OPENVDB_BUILD_HOUDINI_SOPS )
 ENDIF ()
 
 # Some platform checks
+
+IF ( USE_SYSTEM_LIBRARY_PATHS )
+  SET ( SYSTEM_LIBRARY_PATHS
+    ~/Library/Frameworks
+    /Library/Frameworks
+    /usr/local
+    /usr
+    /sw  # Fink
+    /opt/local  # DarwinPorts
+    /opt/csw  # Blastwave
+    /opt
+    )
+ENDIF ()
 
 IF ( APPLE )
   IF ( OPENVDB_BUILD_HOUDINI_SOPS AND OPENVDB_BUILD_MAYA_PLUGIN )
