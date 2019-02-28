@@ -337,6 +337,27 @@ struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::val
 ////////////////////////////////////////
 
 
+/// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
+/// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
+/// @details For example,
+/// - CopyConstness<int, int>::Type is @c int
+/// - CopyConstness<int, const int>::Type is @c int
+/// - CopyConstness<const int, int>::Type is <tt>const int</tt>
+/// - CopyConstness<const int, const int>::Type is <tt>const int</tt>
+template<typename FromType, typename ToType> struct CopyConstness {
+    using Type = typename std::remove_const<ToType>::type;
+};
+
+/// @cond OPENVDB_TYPES_INTERNAL
+template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
+    using Type = const ToType;
+};
+/// @endcond
+
+
+////////////////////////////////////////
+
+
 /// @cond OPENVDB_TYPES_INTERNAL
 
 template<typename... Ts> struct TypeList; // forward declaration
