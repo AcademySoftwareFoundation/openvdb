@@ -7,6 +7,9 @@ Version 6.0.1 - In development
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.
     - Added support for Vec4s, Vec4d and Vec4i metadata.
+    - Added a generic TypeList class.
+    - Added GridBase::apply(), which invokes a functor on a grid
+      if the resolved grid type is a member of a given type list.
 
     Improvements:
     - Significantly improved the performance of point data grid string
@@ -25,6 +28,9 @@ Version 6.0.1 - In development
       due to non-const access of AttributeArrays resulting in a copy-on-write.
     - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
+    API changes:
+    - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
+
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
       converting from Houdini Points to VDB Points.
@@ -32,6 +38,8 @@ Version 6.0.1 - In development
       point attributes with the same name as an existing point group.
     - The Transform SOP now supports frustum transforms by applying the
       transformation to the internal affine map.
+    - Added type lists for sets of commonly-used grid types, including
+      ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
