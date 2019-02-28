@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -222,6 +222,34 @@ public:
     /// no longer a valid level set.
     virtual void clip(const CoordBBox&) = 0;
 #endif
+
+    /// @{
+    /// @brief If this grid resolves to one of the listed grid types,
+    /// invoke the given functor on the resolved grid.
+    /// @return @c false if this grid's type is not one of the listed types
+    ///
+    /// @par Example:
+    /// @code
+    /// using AllowedGridTypes = openvdb::TypeList<
+    ///     openvdb::Int32Grid, openvdb::Int64Grid,
+    ///     openvdb::FloatGrid, openvdb::DoubleGrid>;
+    ///
+    /// const openvdb::CoordBBox bbox{
+    ///     openvdb::Coord{0,0,0}, openvdb::Coord{10,10,10}};
+    ///
+    /// // Fill the grid if it is one of the allowed types.
+    /// myGridBasePtr->apply<AllowedGridTypes>(
+    ///     [&bbox](auto& grid) { // C++14
+    ///         using GridType = typename std::decay<decltype(grid)>::type;
+    ///         grid.fill(bbox, typename GridType::ValueType(1));
+    ///     }
+    /// );
+    /// @endcode
+    ///
+    /// @see @vdblink::TypeList TypeList@endlink
+    template<typename GridTypeListT, typename OpT> inline bool apply(OpT&) const;
+    template<typename GridTypeListT, typename OpT> inline bool apply(OpT&);
+    /// @}
 
 
     //
@@ -1619,11 +1647,53 @@ createLevelSet(Real voxelSize, Real halfWidth)
     return grid;
 }
 
+
+////////////////////////////////////////
+
+
+namespace internal {
+
+/// @private
+template<typename OpT, typename GridBaseT, typename T, typename ...Ts>
+struct GridApplyImpl { bool operator()(GridBaseT&, OpT&) const { return false; } };
+
+// Partial specialization for (nonempty) TypeSets
+/// @private
+template<typename OpT, typename GridBaseT, typename GridT, typename ...GridTs>
+struct GridApplyImpl<OpT, GridBaseT, TypeList<GridT, GridTs...>>
+{
+    bool operator()(GridBaseT& grid, OpT& op) const
+    {
+        if (grid.template isType<GridT>()) {
+            op(static_cast<typename CopyConstness<GridBaseT, GridT>::Type&>(grid));
+            return true;
+        }
+        return GridApplyImpl<OpT, GridBaseT, TypeList<GridTs...>>{}(grid, op);
+    }
+};
+
+} // namespace internal
+
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(OpT& op) const
+{
+    return internal::GridApplyImpl<OpT, const GridBase, GridTypeListT>{}(*this, op);
+}
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(OpT& op)
+{
+    return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>{}(*this, op);
+}
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
