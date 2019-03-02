@@ -50,8 +50,11 @@ Houdini:
 
 @par
 Python:
-- Added limited support for @link points/PointDataGrid.h PointDataGrids@endlink
-  to the Python module, comprising I/O and metadata functionality for now.
+- Added limited support for @ref secPtContents "point data grids",
+  comprising I/O and metadata functionality for now.
+- Added support for @vdblink::Mat4SMetadata Mat4s@endlink
+  and @vdblink::Mat4DMetadata Mat4d@endlink metadata, in the form of nested
+  Python lists (e.g., <TT>[[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1]]</TT>).
 
 
 @htmlonly <a name="v6_0_0_changes"></a>@endhtmlonly

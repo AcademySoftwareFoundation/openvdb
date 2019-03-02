@@ -37,8 +37,10 @@ Version 6.0.1 - In development
       transformation to the internal affine map.
 
     Python:
-    - Added limited support for PointDataGrids to the Python module,
-      offering I/O and metadata functionality for now.
+    - Added limited support for point data grids, comprising I/O and
+      metadata functionality for now.
+    - Added support for Mat4s and Mat4d metadata, in the form of nested
+      Python lists (e.g., [[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1]]).
 
 
 Version 6.0.0 - December 18, 2018
