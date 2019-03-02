@@ -197,7 +197,7 @@ newShopOperator(OP_OperatorTable *table)
     //////////
     // Register this operator.
 
-    SHOP_Operator* shop = new SHOP_Operator(SHOP_OpenVDB_Points::nodeName(), "OpenVDB Points",
+    SHOP_Operator* shop = new SHOP_Operator(SHOP_OpenVDB_Points::nodeName(), "VDB Points (ASWF)",
         SHOP_OpenVDB_Points::factory,
         parms.get(),
 #if (UT_MAJOR_VERSION_INT >= 16)

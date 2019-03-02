@@ -120,7 +120,7 @@ newSopOperator(OP_OperatorTable* table)
             "Voxel values are considered equal if they differ\n"
             "by less than the specified threshold."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
         .addInput("Grids to process")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Prune::Cache; })

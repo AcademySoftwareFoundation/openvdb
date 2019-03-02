@@ -223,9 +223,9 @@ newSopOperator(OP_OperatorTable* table)
 
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Topology To Level Set",
+    hvdb::OpenVDBOpFactory("VDB Topology To Level Set",
         SOP_OpenVDB_Topology_To_Level_Set::factory, parms, *table)
-        .addAlias("OpenVDB From Mask")
+        .addAlias("VDB From Mask")
         .addInput("VDB Grids")
         .setObsoleteParms(obsoleteParms)
 #if VDB_COMPILABLE_SOP

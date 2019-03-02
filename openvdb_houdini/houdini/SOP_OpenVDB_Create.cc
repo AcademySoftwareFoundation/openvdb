@@ -544,7 +544,7 @@ Other:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "matchVoxelSize", "Match Voxel Size"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Create", SOP_OpenVDB_Create::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Create", SOP_OpenVDB_Create::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addOptionalInput("Optional Input to Merge With")
         .addOptionalInput("Optional Reference VDB")

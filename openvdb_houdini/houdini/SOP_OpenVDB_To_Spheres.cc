@@ -239,7 +239,7 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
-    hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
         .addInput("VDBs to convert")
         .setObsoleteParms(obsoleteParms)
 #if VDB_COMPILABLE_SOP

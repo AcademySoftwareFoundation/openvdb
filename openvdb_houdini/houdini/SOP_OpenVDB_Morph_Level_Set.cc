@@ -350,7 +350,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Morph Level Set",
+    hvdb::OpenVDBOpFactory("VDB Morph Level Set",
         SOP_OpenVDB_Morph_Level_Set::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Source SDF VDBs to Morph")

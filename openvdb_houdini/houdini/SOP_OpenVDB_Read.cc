@@ -264,11 +264,11 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Read", SOP_OpenVDB_Read::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Read", SOP_OpenVDB_Read::factory, parms, *table)
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
         .addOptionalInput("Optional Bounding Geometry")
 #endif
-        .addAlias("OpenVDB Reader")
+        .addAlias("VDB Reader")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\

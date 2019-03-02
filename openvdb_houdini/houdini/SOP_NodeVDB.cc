@@ -609,12 +609,12 @@ public:
     std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
     {
         std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
-        return "DW_" + name;
+        return "DW_Open" + name;
     }
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
-        return factory.english();
+        return factory.english() + " (ASWF)";
     }
 };
 

@@ -237,7 +237,7 @@ Position:\n\
         .setDefault("@name=*.z"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
+    hvdb::OpenVDBOpFactory("VDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
         .addInput("Scalar VDBs to merge into vector")
         .setObsoleteParms(obsoleteParms)

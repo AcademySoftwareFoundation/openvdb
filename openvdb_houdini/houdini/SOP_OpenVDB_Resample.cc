@@ -290,7 +290,7 @@ Using Voxel Scale Only:\n\
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Source VDB grids to resample")
         .addOptionalInput("Optional transform reference VDB grid")

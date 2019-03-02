@@ -299,7 +299,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
-    hvdb::OpenVDBOpFactory("OpenVDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("OpenVDB grids to surface")
         .addOptionalInput("Optional reference surface. Can be used "

@@ -295,11 +295,11 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(temporalIntegrationSchemeToString(TemporalIntegrationScheme(0))));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Advect",
+    hvdb::OpenVDBOpFactory("VDB Advect",
         SOP_OpenVDB_Advect::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addAlias("OpenVDB Advect Level Set")
-        .addAlias("OpenVDB Advect Density")
+        .addAlias("VDB Advect Level Set")
+        .addAlias("VDB Advect Density")
         .addInput("VDBs to Advect")
         .addInput("Velocity VDB")
 #if VDB_COMPILABLE_SOP

@@ -417,7 +417,7 @@ newSopOperator(OP_OperatorTable* table)
     /// @todo obsoleteAttrParms
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB From Particles",
+    hvdb::OpenVDBOpFactory("VDB From Particles",
         SOP_OpenVDB_From_Particles::factory, parms, *table)
         .addInput("Points to convert")
         .addOptionalInput("Optional reference VDB")
