@@ -404,7 +404,7 @@ TestCoord::testCoordHash()
       using KeyT = openvdb::Coord;
       using ValueT = size_t;
       using HashT = std::hash<openvdb::Coord>;
-      
+
       std::unordered_map<KeyT, ValueT, HashT> h;
       const openvdb::Coord min(-10,-20,30), max(20,30,50);
       const openvdb::CoordBBox bbox(min, max);

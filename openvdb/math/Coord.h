@@ -251,7 +251,7 @@ public:
     }
 
     /// @brief Return a hash value for this coordinate
-    /// @note Log2N is the binary logarithm of the hash table size. 
+    /// @note Log2N is the binary logarithm of the hash table size.
     /// @details The hash function is taken from the SIGGRAPh paper: "VDB: High-resolution sparse volumes with dynamic topology"
     template <int Log2N = 20>
     inline size_t hash() const { return ( (1<<Log2N)-1 ) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791); }
@@ -597,7 +597,7 @@ operator<<(std::ostream& os, const CoordBBox& b)
 // allows for Coord to be used as the key in std::unordered_map
 namespace std {// injected in namespace std
 
-template<> 
+template<>
 struct hash<openvdb::math::Coord>
 {
     using argument_type = openvdb::math::Coord;
