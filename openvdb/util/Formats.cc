@@ -29,7 +29,6 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "Formats.h"
-
 #include <openvdb/Platform.h>
 #include <iostream>
 #include <iomanip>
@@ -115,7 +114,7 @@ printNumber(std::ostream& os, uint64_t number,
 int
 printTime(std::ostream& os, double milliseconds,
   const std::string& head, const std::string& tail,
-  bool exact, int width, int precision)
+  int width, int precision, int verbose)
   {
     int group = 0;
 
@@ -126,28 +125,31 @@ printTime(std::ostream& os, double milliseconds,
     ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
 
     double msec = milliseconds;
-    if (msec >= 1000.0) {// avoid unnecessary coverheads
+    if (msec >= 1000.0) {// avoid unnecessary overhead
       const uint32_t seconds = static_cast<uint32_t>(msec / 1000.0) % 60 ;
       const uint32_t minutes = static_cast<uint32_t>(msec / (1000.0*60)) % 60;
       const uint32_t hours   = static_cast<uint32_t>(msec / (1000.0*60*60)) % 24;
       const uint32_t days    = static_cast<uint32_t>(msec / (1000.0*60*60*24));
       msec -= (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
-      if (days) {
-        ostr << days << " days, " << hours << " hours, " << minutes << " minutes, " << seconds << " seconds, and ";
-        group = 4;
-      } else if (hours) {
-        ostr << hours << " hours, " << minutes << " minutes, " << seconds << " seconds, and ";
-        group = 3;
-      } else if (minutes) {
-        ostr << minutes << " minutes, " << seconds << " seconds, and ";
-        group = 2;
-      } else if (seconds) {
-        ostr << seconds << " seconds and ";
-        group = 1;
+      if (days>0) {
+        ostr << days << (verbose==0 ? "d " : days>1 ? " days, " : " day, ");
+        group = 4;  
+      }
+      if (hours>0) {
+        ostr << hours << (verbose==0 ? "h " : hours>1 ? " hours, " : " hour, ");
+        if (!group) group = 3;
+      } 
+      if (minutes>0) {
+        ostr << minutes << (verbose==0 ? "m " : minutes>1 ? " minutes, " : " minute, ");
+        if (!group) group = 2;
+      }
+      if (seconds>0) {
+        ostr << seconds << (verbose==0 ? "s " : seconds>1 ? " seconds and " : " second and ");
+        if (!group) group = 1;
       }
     }
-    ostr << std::setw(width) << msec << " milliseconds";
-    if (exact && group) ostr << " (" << milliseconds << ")";
+    ostr << std::setw(width) << msec << (verbose ? " milliseconds" : "ms");
+    if (verbose && group) ostr << " (" << milliseconds << "ms)";
     ostr << tail;
 
     os << ostr.str();
