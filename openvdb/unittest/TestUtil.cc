@@ -124,19 +124,35 @@ TestUtil::testFormats()
   }
   {// TODO: add a unit tests for printNumber
   }
-  {// test printTime
-      const int width = 4, precision = 1;
-      const int days = 5;
+  {// test long format printTime
+      const int width = 4, precision = 1, verbose = 1;
+      const int days = 1;
       const int hours = 3;
       const int minutes = 59;
       const int seconds = 12;
       const double milliseconds = 347.6;
       const double mseconds = milliseconds + (seconds + (minutes + (hours + days*24)*60)*60)*1000.0;
       std::ostringstream ostr1, ostr2;
-      CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", true, width, precision ));
+      CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", width, precision, verbose ));
       ostr1 << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
-      ostr1 << "Completed in " << days << " days, " << hours << " hours, " << minutes << " minutes, "
-            << seconds << " seconds, and " << std::setw(width) << milliseconds << " milliseconds (" << mseconds << ")";
+      ostr1 << "Completed in " << days << " day, " << hours << " hours, " << minutes << " minutes, "
+            << seconds << " seconds and " << std::setw(width) << milliseconds << " milliseconds (" << mseconds << "ms)";
+      //std::cerr << ostr2.str() << std::endl;
+      CPPUNIT_ASSERT_EQUAL(ostr1.str(), ostr2.str());
+    }
+    {// test compact format printTime
+      const int width = 4, precision = 1, verbose = 0;
+      const int days = 1;
+      const int hours = 3;
+      const int minutes = 59;
+      const int seconds = 12;
+      const double milliseconds = 347.6;
+      const double mseconds = milliseconds + (seconds + (minutes + (hours + days*24)*60)*60)*1000.0;
+      std::ostringstream ostr1, ostr2;
+      CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", width, precision, verbose ));
+      ostr1 << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+      ostr1 << "Completed in " << days << "d " << hours << "h " << minutes << "m "
+            << seconds << "s " << std::setw(width) << milliseconds << "ms";
       //std::cerr << ostr2.str() << std::endl;
       CPPUNIT_ASSERT_EQUAL(ostr1.str(), ostr2.str());
     }
@@ -145,15 +161,15 @@ TestUtil::testFormats()
 void
 TestUtil::testCpuTimer()
 {
-    const int expected = 259, tolerance = 20;//milliseconds
+    const int expected = 159, tolerance = 20;//milliseconds
     const tbb::tick_count::interval_t sec(expected/1000.0);
     {
       openvdb::util::CpuTimer timer;
       tbb::this_tbb_thread::sleep(sec);
-      const int actual1 = static_cast<int>(timer.delta());
+      const int actual1 = static_cast<int>(timer.milliseconds());
       CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, actual1, tolerance);
       tbb::this_tbb_thread::sleep(sec);
-      const int actual2 = static_cast<int>(timer.delta());
+      const int actual2 = static_cast<int>(timer.milliseconds());
       CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
     }
     {
