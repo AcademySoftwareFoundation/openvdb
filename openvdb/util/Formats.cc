@@ -133,12 +133,12 @@ printTime(std::ostream& os, double milliseconds,
       msec -= (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
       if (days>0) {
         ostr << days << (verbose==0 ? "d " : days>1 ? " days, " : " day, ");
-        group = 4;  
+        group = 4;
       }
       if (hours>0) {
         ostr << hours << (verbose==0 ? "h " : hours>1 ? " hours, " : " hour, ");
         if (!group) group = 3;
-      } 
+      }
       if (minutes>0) {
         ostr << minutes << (verbose==0 ? "m " : minutes>1 ? " minutes, " : " minute, ");
         if (!group) group = 2;
