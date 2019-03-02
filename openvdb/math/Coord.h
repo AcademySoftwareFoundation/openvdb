@@ -251,7 +251,7 @@ public:
     }
 
     /// @brief Return a hash value for this coordinate
-    /// @param Log2N binary logarithm of the hash table size. 
+    /// @note Log2N is the binary logarithm of the hash table size. 
     /// @details The hash function is taken from the SIGGRAPh paper: "VDB: High-resolution sparse volumes with dynamic topology"
     template <int Log2N = 20>
     inline size_t hash() const { return ( (1<<Log2N)-1 ) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791); }
