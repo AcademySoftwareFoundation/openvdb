@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,6 +39,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/PagedArray.h>
+#include <openvdb/util/Formats.h>
 
 #include <iostream>
 
@@ -55,11 +56,13 @@ class TestUtil: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestUtil);
+    CPPUNIT_TEST(testFormats);
     CPPUNIT_TEST(testCpuTimer);
     CPPUNIT_TEST(testPagedArray);
     CPPUNIT_TEST_SUITE_END();
 
     void testCpuTimer();
+    void testFormats();
     void testPagedArray();
 
     using RangeT = tbb::blocked_range<size_t>;
@@ -114,20 +117,70 @@ public:
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestUtil);
 
+void
+TestUtil::testFormats()
+{
+  {// TODO: add  unit tests for printBytes
+  }
+  {// TODO: add a unit tests for printNumber
+  }
+  {// test long format printTime
+      const int width = 4, precision = 1, verbose = 1;
+      const int days = 1;
+      const int hours = 3;
+      const int minutes = 59;
+      const int seconds = 12;
+      const double milliseconds = 347.6;
+      const double mseconds = milliseconds + (seconds + (minutes + (hours + days*24)*60)*60)*1000.0;
+      std::ostringstream ostr1, ostr2;
+      CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", width, precision, verbose ));
+      ostr1 << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+      ostr1 << "Completed in " << days << " day, " << hours << " hours, " << minutes << " minutes, "
+            << seconds << " seconds and " << std::setw(width) << milliseconds << " milliseconds (" << mseconds << "ms)";
+      //std::cerr << ostr2.str() << std::endl;
+      CPPUNIT_ASSERT_EQUAL(ostr1.str(), ostr2.str());
+    }
+    {// test compact format printTime
+      const int width = 4, precision = 1, verbose = 0;
+      const int days = 1;
+      const int hours = 3;
+      const int minutes = 59;
+      const int seconds = 12;
+      const double milliseconds = 347.6;
+      const double mseconds = milliseconds + (seconds + (minutes + (hours + days*24)*60)*60)*1000.0;
+      std::ostringstream ostr1, ostr2;
+      CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", width, precision, verbose ));
+      ostr1 << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+      ostr1 << "Completed in " << days << "d " << hours << "h " << minutes << "m "
+            << std::setw(width) << (seconds + milliseconds/1000.0) << "s";
+      //std::cerr << ostr2.str() << std::endl;
+      CPPUNIT_ASSERT_EQUAL(ostr1.str(), ostr2.str());
+    }
+}
 
 void
 TestUtil::testCpuTimer()
 {
-    const int expected = 259, tolerance = 20;//milliseconds
+    const int expected = 159, tolerance = 20;//milliseconds
     const tbb::tick_count::interval_t sec(expected/1000.0);
-
-    openvdb::util::CpuTimer timer;
-    tbb::this_tbb_thread::sleep(sec);
-    const int actual1 = static_cast<int>(timer.delta());
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, actual1, tolerance);
-    tbb::this_tbb_thread::sleep(sec);
-    const int actual2 = static_cast<int>(timer.delta());
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
+    {
+      openvdb::util::CpuTimer timer;
+      tbb::this_tbb_thread::sleep(sec);
+      const int actual1 = static_cast<int>(timer.milliseconds());
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, actual1, tolerance);
+      tbb::this_tbb_thread::sleep(sec);
+      const int actual2 = static_cast<int>(timer.milliseconds());
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
+    }
+    {
+      openvdb::util::CpuTimer timer;
+      tbb::this_tbb_thread::sleep(sec);
+      auto t1 = timer.restart();
+      tbb::this_tbb_thread::sleep(sec);
+      tbb::this_tbb_thread::sleep(sec);
+      auto t2 = timer.restart();
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(2*t1, t2, tolerance);
+    }
 }
 
 
@@ -595,6 +648,6 @@ TestUtil::testPagedArray()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
