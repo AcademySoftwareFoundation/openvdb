@@ -333,12 +333,11 @@ using Vec3GridTypes = openvdb::TypeList<
     openvdb::Vec3IGrid>;
 
 using PointGridTypes = openvdb::TypeList<
-    openvdb::tools::PointIndexGrid,
     openvdb::points::PointDataGrid>;
 
-using NonPointGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
+using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
 
-using AllGridTypes = NonPointGridTypes::Append<PointGridTypes>;
+using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
 
 } // namespace openvdb_houdini
 
