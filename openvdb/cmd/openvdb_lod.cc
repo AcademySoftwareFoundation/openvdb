@@ -362,7 +362,7 @@ main(int argc, char *argv[])
             outFile.write(outGrids);
         }
 
-        const double msec = timer.delta(); // elapsed time
+        const double msec = timer.milliseconds(); // elapsed time
 
         if (outGrids.empty()) {
             OPENVDB_LOG_WARN("wrote empty file " << outFilename << " in "
