@@ -438,7 +438,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fill)::cookVDBSop(OP_Context& 
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
-            it->getGrid().apply<hvdb::NonPointGridTypes>(*fillOp);
+            it->getGrid().apply<hvdb::VolumeGridTypes>(*fillOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());
