@@ -600,9 +600,10 @@ namespace std {// injected in namespace std
 template<>
 struct hash<openvdb::math::Coord>
 {
-    using argument_type = openvdb::math::Coord;
+    using Coord = openvdb::math::Coord;
+    using argument_type = Coord;
     using result_type = std::size_t;
-    result_type operator()(const argument_type& ijk) const noexcept { return ijk.hash<>(); }
+    std::size_t operator()(const Coord& ijk) const noexcept { return ijk.Coord::hash<>(); }
 };// std::hash<openvdb::math::Coord>
 
 }// namespace std

@@ -12,7 +12,7 @@ Version 6.0.1 - In development
     - Added CoordBBox::moveMin and CoordBBox::moveMax to move a CoordBBox.
 
     Improvements:
-    - The API of util::CpuTimer has been improved and is now making use
+    - The API of util::CpuTimer has been improved and is now making use of
       a new util::printTime function for nicer output of time information.
     - Significantly improved the performance of point data grid string
       attribute generation.

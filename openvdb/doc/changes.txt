@@ -17,9 +17,18 @@ New features:
 - Added support for @vdblink::Vec4SMetadata Vec4s@endlink,
   @vdblink::Vec4DMetadata Vec4d@endlink
   and @vdblink::Vec4IMetadata Vec4i@endlink metadata.
+- Added @vdblink::util::printTime util::printTime@endlink that 
+  outputs nicely-formatted time information.
+- Added a template specialization of std::hash with @vdblink::math::Coord Coord@endlink.
+- Added @vdblink::math::CoordBBox::moveMin CoordBBox::moveMin@endlink and 
+  @vdblink::math::CoordBBox::moveMax CoordBBox::moveMax@endlink to move a 
+  @vdblink::math::CoordBBox CoordBBox@endlink.  
 
 @par
 Improvements:
+- The API of @vdblink::util::CpuTimer util::CpuTimer@endlink has been improved 
+  and is now making use of a new @vdblink::util::printTime util::printTime@endlink 
+  function for nicer output of time information.
 - Significantly improved the performance of point data grid string attribute
   generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
