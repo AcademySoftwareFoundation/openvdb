@@ -1298,19 +1298,19 @@ OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& alloca
 
 //virtual
 std::string
-OpPolicy::getLabelName(const OpFactory& factory)
-{
-    return factory.english();
-}
-
-
-//virtual
-std::string
 OpPolicy::getName(const OpFactory&, const std::string& english)
 {
     UT_String s(english);
     s.forceValidVariableName();
     return s.toStdString();
+}
+
+
+//virtual
+std::string
+OpPolicy::getLabelName(const OpFactory& factory)
+{
+    return factory.english();
 }
 
 

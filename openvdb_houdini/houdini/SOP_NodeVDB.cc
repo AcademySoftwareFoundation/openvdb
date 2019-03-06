@@ -587,7 +587,7 @@ public:
 };
 
 
-/// @brief Default OpPolicy for OpenVDB operator types
+/// @brief SideFX OpPolicy for OpenVDB operator types
 class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:

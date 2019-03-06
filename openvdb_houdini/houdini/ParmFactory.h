@@ -532,17 +532,17 @@ public:
     /// factory.@link OpFactory::english() english()@endlink.
     virtual std::string getName(const OpFactory& factory, const std::string& english);
 
-    /// @brief Return a label name for the operator defined by the given factory.
-    /// @details In this base class implementation, this method simply returns
-    /// factory.@link OpFactory::english() english()@endlink.
-    virtual std::string getLabelName(const OpFactory&);
-
     /// @brief Return an icon name for the operator defined by the given factory.
     /// @details Return an empty string to use Houdini's default icon naming scheme.
     virtual std::string getIconName(const OpFactory&) { return ""; }
 
     /// @brief Return a help URL for the operator defined by the given factory.
     virtual std::string getHelpURL(const OpFactory&) { return ""; }
+
+    /// @brief Return a label name for the operator defined by the given factory.
+    /// @details In this base class implementation, this method simply returns
+    /// factory.@link OpFactory::english() english()@endlink.
+    virtual std::string getLabelName(const OpFactory&);
 };
 
 
