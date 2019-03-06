@@ -268,7 +268,6 @@ newSopOperator(OP_OperatorTable* table)
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
         .addOptionalInput("Optional Bounding Geometry")
 #endif
-        .addAlias("VDB Reader")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\

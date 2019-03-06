@@ -298,8 +298,6 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Advect",
         SOP_OpenVDB_Advect::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addAlias("VDB Advect Level Set")
-        .addAlias("VDB Advect Density")
         .addInput("VDBs to Advect")
         .addInput("Velocity VDB")
 #if VDB_COMPILABLE_SOP
