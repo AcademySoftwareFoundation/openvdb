@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -787,7 +787,7 @@ TestTreeCombine::testCsg()
     CPPUNIT_ASSERT(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
-    std::cerr << "file read: " << timer.delta() << " sec\n";
+    std::cerr << "file read: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if TEST_CSG_VERBOSE
@@ -836,7 +836,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     TreePtr aTree(new TreeT(aInputTree));
     TreeT bTree(bInputTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "deep copy: " << timer.delta() << " ms\n";
+    std::cerr << "deep copy: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if (TEST_CSG_VERBOSE > 1)
@@ -855,7 +855,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
     visitor(*aTree, bTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "combine: " << timer.delta() << " ms\n";
+    std::cerr << "combine: " << timer.milliseconds() << " msec\n";
 #endif
 #if (TEST_CSG_VERBOSE > 1)
     std::cerr << "\nActual:\n";
@@ -1070,6 +1070,6 @@ TestTreeCombine::testCompActiveLeafVoxels()
 ////////////////////////////////////////
 
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

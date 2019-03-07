@@ -176,7 +176,7 @@ mip(const GridType& inGrid, const Options& opts)
     }
 
     OPENVDB_LOG_INFO("processed grid \"" << inGrid.getName() << "\" in "
-        << std::setprecision(3) << (timer.delta() / 1000.0) << " sec");
+        << std::setprecision(3) << timer.seconds() << " sec");
 
     return outGrids;
 }
