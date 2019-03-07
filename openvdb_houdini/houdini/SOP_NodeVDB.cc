@@ -614,7 +614,7 @@ public:
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
-        return factory.english() + " (ASWF)";
+        return "Open" + factory.english();
     }
 };
 
