@@ -377,7 +377,11 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("VDB Visualize", SOP_OpenVDB_Visualize::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Visualize Tree",
+        SOP_OpenVDB_Visualize::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBVisualize")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs to visualize")
 #if VDB_COMPILABLE_SOP

@@ -532,8 +532,11 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("VDB From Polygons",
+    hvdb::OpenVDBOpFactory("VDB from Polygons",
         SOP_OpenVDB_From_Polygons::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBFromPolygons")
+#endif
         .addInput("Polygons to Convert")
         .addOptionalInput("Optional Reference VDB (for transform matching)")
         .setObsoleteParms(obsoleteParms)

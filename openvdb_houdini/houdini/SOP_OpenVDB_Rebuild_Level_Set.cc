@@ -172,8 +172,11 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("VDB Rebuild Level Set",
+    hvdb::OpenVDBOpFactory("VDB Rebuild SDF",
         SOP_OpenVDB_Rebuild_Level_Set::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBRebuildLevelSet")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("VDB grids to process")
 #if VDB_COMPILABLE_SOP
