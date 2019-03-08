@@ -448,7 +448,7 @@ public:
             // Translate Houdini points toward the isosurface.
             UTparallelForLightItems(GA_SplittableRange(mRange), [&](const GA_SplittableRange& r) {
                 const auto cptAcc = cpt->getConstAccessor();
-                GA_Offset start = 0, end = 0;
+                auto start = GA_Offset(GA_INVALID_OFFSET), end = GA_Offset(GA_INVALID_OFFSET);
                 for (GA_Iterator it(r); it.blockAdvance(start, end); ) {
                     if (mBoss && mBoss->wasInterrupted()) break;
                     for (auto offset = start; offset < end; ++offset) {

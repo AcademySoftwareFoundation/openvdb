@@ -34,14 +34,14 @@
  * transmitted, or disclosed in any way without written permission.
  *
  * Produced by:
- *	Jeff Lait
- *	Side Effects Software Inc
- *	477 Richmond Street West
- *	Toronto, Ontario
- *	Canada   M5V 3E7
- *	416-504-9876
+ *      Jeff Lait
+ *      Side Effects Software Inc
+ *      477 Richmond Street West
+ *      Toronto, Ontario
+ *      Canada   M5V 3E7
+ *      416-504-9876
  *
- * NAME:	GU_PrimVDB.h ( GU Library, C++)
+ * NAME:        GU_PrimVDB.h ( GU Library, C++)
  *
  * COMMENTS: Custom VDB primitive.
  */
@@ -116,11 +116,11 @@ public:
 
 #ifndef SESI_OPENVDB
     /// Allows you to find out what this primitive type was named.
-    static GA_PrimitiveTypeId	 theTypeId() { return theDefinition->getId(); }
+    static GA_PrimitiveTypeId    theTypeId() { return theDefinition->getId(); }
 
     /// Must be invoked during the factory callback to add us to the
     /// list of primitives
-    static void		registerMyself(GA_PrimitiveFactory *factory);
+    static void         registerMyself(GA_PrimitiveFactory *factory);
 #endif
 
     virtual const GA_PrimitiveDefinition &getTypeDef() const
@@ -131,45 +131,45 @@ public:
 
     // Conversion Methods
 
-    virtual GEO_Primitive	*convert(GU_ConvertParms &parms,
-					 GA_PointGroup *usedpts = 0);
-    virtual GEO_Primitive	*convertNew(GU_ConvertParms &parms);
+    virtual GEO_Primitive       *convert(GU_ConvertParms &parms,
+                                         GA_PointGroup *usedpts = 0);
+    virtual GEO_Primitive       *convertNew(GU_ConvertParms &parms);
 
     /// Convert all GEO_PrimVolume primitives in geometry to
     /// GEO_PrimVDB, preserving prim/vertex/point attributes (and prim/point
     /// groups if requested).
-    static void			convertVolumesToVDBs(
-					GU_Detail &dst_geo,
-					const GU_Detail &src_geo,
-					GU_ConvertParms &parms,
-					bool flood_sdf,
-					bool prune,
-					fpreal tolerance,
-					bool keep_original,
-					bool activate_inside = true);
+    static void                 convertVolumesToVDBs(
+                                        GU_Detail &dst_geo,
+                                        const GU_Detail &src_geo,
+                                        GU_ConvertParms &parms,
+                                        bool flood_sdf,
+                                        bool prune,
+                                        fpreal tolerance,
+                                        bool keep_original,
+                                        bool activate_inside = true);
 
     /// Convert all GEO_PrimVDB primitives in geometry to parms.toType,
     /// preserving prim/vertex/point attributes (and prim/point groups if
     /// requested).
     /// @{
-    static void			convertVDBs(
-					GU_Detail &dst_geo,
-					const GU_Detail &src_geo,
-					GU_ConvertParms &parms,
-					fpreal adaptivity,
-					bool keep_original);
-    static void			convertVDBs(
-					GU_Detail &dst_geo,
-					const GU_Detail &src_geo,
-					GU_ConvertParms &parms,
-					fpreal adaptivity,
-					bool keep_original,
-					bool split_disjoint_volumes);
+    static void                 convertVDBs(
+                                        GU_Detail &dst_geo,
+                                        const GU_Detail &src_geo,
+                                        GU_ConvertParms &parms,
+                                        fpreal adaptivity,
+                                        bool keep_original);
+    static void                 convertVDBs(
+                                        GU_Detail &dst_geo,
+                                        const GU_Detail &src_geo,
+                                        GU_ConvertParms &parms,
+                                        fpreal adaptivity,
+                                        bool keep_original,
+                                        bool split_disjoint_volumes);
     /// @}
 
 #if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-    virtual void		*castTo (void) const;
-    virtual const GEO_Primitive	*castToGeo(void) const;
+    virtual void                *castTo (void) const;
+    virtual const GEO_Primitive *castToGeo(void) const;
 #endif
 
     // NOTE:  For static member functions please call in the following
@@ -178,7 +178,7 @@ public:
 
     // Optional Build Method
 
-    static GU_PrimVDB *	build(GU_Detail *gdp, bool append_points = true);
+    static GU_PrimVDB * build(GU_Detail *gdp, bool append_points = true);
 
     /// Store a VDB grid in a new VDB primitive and add the primitive
     /// to a geometry detail.
@@ -188,37 +188,37 @@ public:
     /// @param name  if non-null, set the new primitive's @c name attribute to
     ///     this string; otherwise, if @a src is non-null, use its name
     static GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
-	const GEO_PrimVDB* src = NULL, const char* name = NULL)
+        const GEO_PrimVDB* src = NULL, const char* name = NULL)
     {
-	return GU_PrimVDB::buildFromGridAdapter(gdp, &grid, src, name);
+        return GU_PrimVDB::buildFromGridAdapter(gdp, &grid, src, name);
     }
 
     /// Create new VDB primitive from the given native volume primitive
-    static GU_PrimVDB *	buildFromPrimVolume(
-			    GU_Detail &geo,
-			    const GEO_PrimVolume &vol,
-			    const char *name,
-			    const bool flood_sdf = false,
-			    const bool prune = false,
-			    const float tolerance = 0.0,
-			    const bool activate_inside_sdf = true);
+    static GU_PrimVDB * buildFromPrimVolume(
+                            GU_Detail &geo,
+                            const GEO_PrimVolume &vol,
+                            const char *name,
+                            const bool flood_sdf = false,
+                            const bool prune = false,
+                            const float tolerance = 0.0,
+                            const bool activate_inside_sdf = true);
 
     /// A fast method for converting a primitive volume to a polysoup via VDB
     /// into the given gdp. It will _not_ copy attributes because this is a
     /// special case used for display purposes only.
-    static void		convertPrimVolumeToPolySoup(
-			    GU_Detail &dst_geo,
-			    const GEO_PrimVolume &src_vol);
+    static void         convertPrimVolumeToPolySoup(
+                            GU_Detail &dst_geo,
+                            const GEO_PrimVolume &src_vol);
 
-    virtual void	normal(NormalComp &output) const;
+    virtual void        normal(NormalComp &output) const;
 
 #if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-    virtual int		intersectRay(const UT_Vector3 &o, const UT_Vector3 &d,
-				float tmax = 1E17F, float tol = 1E-12F,
-				float *distance = 0, UT_Vector3 *pos = 0,
-				UT_Vector3 *nml = 0, int accurate = 0,
-				float *u = 0, float *v = 0,
-				int ignoretrim = 1) const;
+    virtual int         intersectRay(const UT_Vector3 &o, const UT_Vector3 &d,
+                                float tmax = 1E17F, float tol = 1E-12F,
+                                float *distance = 0, UT_Vector3 *pos = 0,
+                                UT_Vector3 *nml = 0, int accurate = 0,
+                                float *u = 0, float *v = 0,
+                                int ignoretrim = 1) const;
 #endif
 
     // callermustdelete is true if the returned cache is to be deleted by
@@ -228,7 +228,7 @@ public:
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     SYS_DEPRECATED_HDK(13.0)
 #endif
-    virtual GU_RayIntersect	*createRayCache(int &callermustdelete);
+    virtual GU_RayIntersect     *createRayCache(int &callermustdelete);
 #endif
 
     /// @brief Transfer any metadata associated with this primitive's
@@ -296,40 +296,40 @@ private: // METHODS
     /// the same index space, so this can really only be safely called after
     /// buildFromPrimVolume(). This is used to ensure that non-constant borders
     /// can be converted at the expense of some extra memory.
-    void		expandBorderFromPrimVolume(
-			    const GEO_PrimVolume &vol,
-			    int border_radius);
+    void                expandBorderFromPrimVolume(
+                            const GEO_PrimVolume &vol,
+                            int border_radius);
 
-    GEO_Primitive *	convertToNewPrim(
-			    GEO_Detail &dst_geo,
-			    GU_ConvertParms &parms,
-			    fpreal adaptivity,
-			    bool split_disjoint_volumes,
-			    bool &success) const;
-    GEO_Primitive *	convertToPrimVolume(
-			    GEO_Detail &dst_geo,
-			    GU_ConvertParms &parms,
-			    bool split_disjoint_volumes) const;
-    GEO_Primitive *	convertToPoly(
-			    GEO_Detail &dst_geo,
-			    GU_ConvertParms &parms,
-			    fpreal adaptivity,
-			    bool buildpolysoup,
-			    bool &success) const;
+    GEO_Primitive *     convertToNewPrim(
+                            GEO_Detail &dst_geo,
+                            GU_ConvertParms &parms,
+                            fpreal adaptivity,
+                            bool split_disjoint_volumes,
+                            bool &success) const;
+    GEO_Primitive *     convertToPrimVolume(
+                            GEO_Detail &dst_geo,
+                            GU_ConvertParms &parms,
+                            bool split_disjoint_volumes) const;
+    GEO_Primitive *     convertToPoly(
+                            GEO_Detail &dst_geo,
+                            GU_ConvertParms &parms,
+                            fpreal adaptivity,
+                            bool buildpolysoup,
+                            bool &success) const;
 
-    static GU_PrimVDB*	buildFromGridAdapter(
-			    GU_Detail& gdp,
-			    void* grid,
-			    const GEO_PrimVDB*,
-			    const char* name);
-    static void		createGridAttrsFromMetadataAdapter(
-			    const GEO_PrimVDB& prim,
-			    const void* grid,
-			    GEO_Detail& gdp);
-    static void		createMetadataFromGridAttrsAdapter(
-			    void* grid,
-			    const GEO_PrimVDB&,
-			    const GEO_Detail&);
+    static GU_PrimVDB*  buildFromGridAdapter(
+                            GU_Detail& gdp,
+                            void* grid,
+                            const GEO_PrimVDB*,
+                            const char* name);
+    static void         createGridAttrsFromMetadataAdapter(
+                            const GEO_PrimVDB& prim,
+                            const void* grid,
+                            GEO_Detail& gdp);
+    static void         createMetadataFromGridAttrsAdapter(
+                            void* grid,
+                            const GEO_PrimVDB&,
+                            const GEO_Detail&);
 
     static void createAttrsFromMetadataAdapter(
         GA_AttributeOwner owner,
@@ -345,8 +345,8 @@ private: // METHODS
 
 private: // DATA
 
-    static GA_PrimitiveDefinition	*theDefinition;
-    friend class			 GU_PrimitiveFactory;
+    static GA_PrimitiveDefinition       *theDefinition;
+    friend class                         GU_PrimitiveFactory;
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     SYS_DEPRECATED_PUSH_DISABLE()
 #endif

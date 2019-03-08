@@ -39,6 +39,8 @@
 
 #include "AttributeArray.h"
 #include <memory>
+#include <unordered_set>
+#include <unordered_map>
 
 
 namespace openvdb {
@@ -93,8 +95,8 @@ public:
 
 private:
     MetaMap& mMetadata;
-    std::vector<Index> mIndices;
-    std::vector<Name> mValues;
+    std::vector<std::pair<Index, Index>> mIdBlocks;
+    std::unordered_set<Name> mValues;
 }; // StringMetaInserter
 
 
@@ -142,11 +144,17 @@ public:
                             const MetaMap& metadata,
                             const bool preserveCompression = true);
 
+    Index stride() const { return mHandle.stride(); }
     Index size() const { return mHandle.size(); }
+
     bool isUniform() const { return mHandle.isUniform(); }
+    bool hasConstantStride() const { return mHandle.hasConstantStride(); }
 
     Name get(Index n, Index m = 0) const;
     void get(Name& name, Index n, Index m = 0) const;
+
+    /// @brief Returns a reference to the array held in the Handle.
+    const AttributeArray& array() const;
 
 protected:
     AttributeHandle<StringIndexType, StringCodec<false>>    mHandle;
@@ -192,12 +200,19 @@ public:
     /// Reset the value cache from the metadata
     void resetCache();
 
+    /// @brief Returns a reference to the array held in the Write Handle.
+    AttributeArray& array();
+
+    /// @brief  Returns whether or not the metadata cache contains a given value.
+    /// @param  name Name of the String.
+    bool contains(const Name& name) const;
+
 private:
     /// Retrieve the index of this string value from the cache
     /// @note throws if name does not exist in cache
-    Index getIndex(const Name& name);
+    Index getIndex(const Name& name) const;
 
-    using ValueMap = std::map<std::string, Index>;
+    using ValueMap = std::unordered_map<std::string, Index>;
 
     ValueMap                                                    mCache;
     AttributeWriteHandle<StringIndexType, StringCodec<false>>   mWriteHandle;

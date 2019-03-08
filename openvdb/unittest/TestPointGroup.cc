@@ -475,13 +475,42 @@ TestPointGroup::testSet()
     GroupFilter filter("test", tree.cbeginLeaf()->attributeSet());
     CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
-    std::vector<short> membership{1, 0, 1, 1, 0, 1};
-
     // copy tree for descriptor sharing test
 
     PointDataTree tree2(tree);
 
-    setGroup(tree, pointIndexGrid->tree(), membership, "test");
+    std::vector<short> membership{1, 0, 1, 1, 0, 1};
+
+    // test add to group
+
+    setGroup(tree, "test", true);
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(6));
+
+    // test nothing is done if the index tree contains no valid indices
+
+    tools::PointIndexGrid::Ptr tmpIndexGrid = tools::PointIndexGrid::create();
+    setGroup(tree, tmpIndexGrid->tree(), {0,0,0,0,0,0}, "test", /*remove*/true);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    // test throw on out of range index
+
+    auto indexLeaf = tmpIndexGrid->tree().touchLeaf(tree.cbeginLeaf()->origin());
+    indexLeaf->indices().emplace_back(membership.size());
+    CPPUNIT_ASSERT_THROW(setGroup(tree, tmpIndexGrid->tree(), membership, "test"), IndexError);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    // test remove flag
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/false);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
+    CPPUNIT_ASSERT_EQUAL(Index64(4), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), {0,1,0,0,1,0}, "test", /*remove*/false);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
 
     // check that descriptor remains shared
 

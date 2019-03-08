@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -212,27 +212,93 @@ using PointDataIndex64 = PointIndex<Index64, 1>;
 ////////////////////////////////////////
 
 
-template<typename T> struct VecTraits {
+/// @brief Helper metafunction used to determine if the first template
+/// parameter is a specialization of the class template given in the second
+/// template parameter
+template <typename T, template <typename...> class Template>
+struct IsSpecializationOf : std::false_type {};
+
+template <typename... Args, template <typename...> class Template>
+struct IsSpecializationOf<Template<Args...>, Template> : std::true_type {};
+
+
+////////////////////////////////////////
+
+
+template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
+                            IsSpecializationOf<T, math::Vec3>::value ||
+                            IsSpecializationOf<T, math::Vec4>::value>
+struct VecTraits
+{
+    static const bool IsVec = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct VecTraits<T, false>
+{
     static const bool IsVec = false;
     static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec2<T> > {
-    static const bool IsVec = true;
-    static const int Size = 2;
+template<typename T, bool = IsSpecializationOf<T, math::Quat>::value>
+struct QuatTraits
+{
+    static const bool IsQuat = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct QuatTraits<T, false>
+{
+    static const bool IsQuat = false;
+    static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec3<T> > {
-    static const bool IsVec = true;
-    static const int Size = 3;
+template<typename T, bool = IsSpecializationOf<T, math::Mat3>::value ||
+                            IsSpecializationOf<T, math::Mat4>::value>
+struct MatTraits
+{
+    static const bool IsMat = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct MatTraits<T, false>
+{
+    static const bool IsMat = false;
+    static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec4<T> > {
-    static const bool IsVec = true;
-    static const int Size = 4;
+template<typename T, bool = VecTraits<T>::IsVec ||
+                            QuatTraits<T>::IsQuat ||
+                            MatTraits<T>::IsMat>
+struct ValueTraits
+{
+    static const bool IsVec = VecTraits<T>::IsVec;
+    static const bool IsQuat = QuatTraits<T>::IsQuat;
+    static const bool IsMat = MatTraits<T>::IsMat;
+    static const bool IsScalar = false;
+    static const int Size = T::size;
+    static const int Elements = IsMat ? Size*Size : Size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct ValueTraits<T, false>
+{
+    static const bool IsVec = false;
+    static const bool IsQuat = false;
+    static const bool IsMat = false;
+    static const bool IsScalar = true;
+    static const int Size = 1;
+    static const int Elements = 1;
     using ElementType = T;
 };
 
@@ -341,6 +407,7 @@ template<> inline const char* typeNameAsString<ValueMask>()         { return "ma
 template<> inline const char* typeNameAsString<half>()              { return "half"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
+template<> inline const char* typeNameAsString<int8_t>()            { return "int8"; }
 template<> inline const char* typeNameAsString<uint8_t>()           { return "uint8"; }
 template<> inline const char* typeNameAsString<int16_t>()           { return "int16"; }
 template<> inline const char* typeNameAsString<uint16_t>()          { return "uint16"; }
@@ -355,6 +422,9 @@ template<> inline const char* typeNameAsString<Vec3U16>()           { return "ve
 template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
+template<> inline const char* typeNameAsString<Vec4i>()             { return "vec4i"; }
+template<> inline const char* typeNameAsString<Vec4f>()             { return "vec4s"; }
+template<> inline const char* typeNameAsString<Vec4d>()             { return "vec4d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat3s>()             { return "mat3s"; }
 template<> inline const char* typeNameAsString<Mat3d>()             { return "mat3d"; }
@@ -575,6 +645,6 @@ class PartialCreate {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,9 +36,6 @@ import os, os.path
 import sys
 import unittest
 try:
-    import studioenv
-    from studio.ani import Ani
-    from studio import logging
     from studio import openvdb
 except ImportError:
     import pyopenvdb as openvdb
@@ -165,7 +162,15 @@ class TestOpenVDB(unittest.TestCase):
 
         self.assertEqual(grid.metadata, {})
 
-        meta = dict(name='test', saveFloatAsHalf=True, xyz=(-1, 0, 1), intval=42, floatval=1.25)
+        meta = {
+            'name':     'test',
+            'xyz':      (-1, 0, 1),
+            'xyzw':     (1.0, 2.25, 3.5, 4.0),
+            'intval':   42,
+            'floatval': 1.25,
+            'mat4val':  [[1]*4]*4,
+            'saveFloatAsHalf': True,
+        }
         grid.metadata = meta
         self.assertEqual(grid.metadata, meta)
 
@@ -311,6 +316,9 @@ class TestOpenVDB(unittest.TestCase):
         coords = set([(-10, -10, -10), (0, 0, 0), (1, 1, 1)])
 
         for factory in openvdb.GridTypes:
+            # skip value accessor tests for PointDataGrids (value setting methods are disabled)
+            if factory.valueTypeName.startswith('ptdataidx'):
+                continue
             grid = factory()
             zero, one = grid.zeroValue, grid.oneValue
             acc = grid.getAccessor()
@@ -543,6 +551,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
@@ -634,6 +645,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
@@ -780,11 +794,7 @@ if __name__ == '__main__':
     print('Testing %s' % os.path.dirname(openvdb.__file__))
     sys.stdout.flush()
 
-    try:
-        logging.configure(sys.argv)
-        args = Ani(sys.argv).userArgs() # strip out ANI-related arguments
-    except NameError:
-        args = sys.argv
+    args = sys.argv
 
     # Unlike CppUnit, PyUnit doesn't use the "-t" flag to identify
     # test names, so for consistency, strip out any "-t" arguments,
@@ -795,6 +805,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

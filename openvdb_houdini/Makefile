@@ -53,6 +53,8 @@
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (in particular, hcustom and doxygen)
 #                       in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -202,6 +204,32 @@ ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
     # change to runtime resolution, like Linux.
     CXXFLAGS += -undefined dynamic_lookup
+endif
+
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        WARNING_FLAGS += \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        WARNING_FLAGS += \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
+    CXXFLAGS += $(WARNING_FLAGS)
+    HCUSTOM_EXTRA_CFLAGS += $(WARNING_FLAGS)
 endif
 
 ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))

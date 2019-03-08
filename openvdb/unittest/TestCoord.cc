@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include <unordered_map>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Types.h>
 #include <sstream>
@@ -42,12 +43,14 @@ public:
     CPPUNIT_TEST(testConversion);
     CPPUNIT_TEST(testIO);
     CPPUNIT_TEST(testCoordBBox);
+    CPPUNIT_TEST(testCoordHash);
     CPPUNIT_TEST_SUITE_END();
 
     void testCoord();
     void testConversion();
     void testIO();
     void testCoordBBox();
+    void testCoordHash();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestCoord);
@@ -85,7 +88,8 @@ TestCoord::testCoord()
     CPPUNIT_ASSERT(xyz2 < xyz);
     CPPUNIT_ASSERT(xyz2 <= xyz);
 
-    xyz2 -= xyz2;
+    Coord xyz3(xyz2);
+    xyz2 -= xyz3;
     CPPUNIT_ASSERT_EQUAL(Coord(), xyz2);
 
     xyz2.reset(0, 4, 4);
@@ -200,6 +204,24 @@ TestCoord::testCoordBBox()
         const openvdb::Coord min(1,2,3), max(6,10,15);
         const openvdb::CoordBBox b(min, max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Vec3d(3.5, 6.0, 9.0), b.getCenter());
+    }
+    {// moveMin
+        const openvdb::Coord min(1,2,3), max(6,10,15);
+        openvdb::CoordBBox b(min, max);
+        const openvdb::Coord dim = b.dim();
+        b.moveMin(openvdb::Coord(0));
+        CPPUNIT_ASSERT_EQUAL(dim, b.dim());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), b.min());
+        CPPUNIT_ASSERT_EQUAL(max-min, b.max());
+    }
+    {// moveMax
+        const openvdb::Coord min(1,2,3), max(6,10,15);
+        openvdb::CoordBBox b(min, max);
+        const openvdb::Coord dim = b.dim();
+        b.moveMax(openvdb::Coord(0));
+        CPPUNIT_ASSERT_EQUAL(dim, b.dim());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), b.max());
+        CPPUNIT_ASSERT_EQUAL(min-max, b.min());
     }
     {// a volume that overflows Int32.
         using Int32 = openvdb::Int32;
@@ -362,6 +384,39 @@ TestCoord::testCoordBBox()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+void
+TestCoord::testCoordHash()
+{
+    {//test Coord::hash function
+      openvdb::Coord a(-1, 34, 67), b(-2, 34, 67);
+      CPPUNIT_ASSERT(a.hash<>() != b.hash<>());
+      CPPUNIT_ASSERT(a.hash<10>() != b.hash<10>());
+      CPPUNIT_ASSERT(a.hash<5>() != b.hash<5>());
+    }
+
+    {//test std::hash function
+      std::hash<openvdb::Coord> h;
+      openvdb::Coord a(-1, 34, 67), b(-2, 34, 67);
+      CPPUNIT_ASSERT(h(a) != h(b));
+    }
+
+    {//test hash map (= unordered_map)
+      using KeyT = openvdb::Coord;
+      using ValueT = size_t;
+      using HashT = std::hash<openvdb::Coord>;
+
+      std::unordered_map<KeyT, ValueT, HashT> h;
+      const openvdb::Coord min(-10,-20,30), max(20,30,50);
+      const openvdb::CoordBBox bbox(min, max);
+      size_t n = 0;
+      for (const auto& ijk: bbox) h[ijk] = n++;
+      CPPUNIT_ASSERT_EQUAL(h.size(), n);
+      n = 0;
+      for (const auto& ijk: bbox) CPPUNIT_ASSERT_EQUAL(h[ijk], n++);
+      CPPUNIT_ASSERT(h.load_factor() <= 1.0f);// no hask key collisions!
+    }
+}
+
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

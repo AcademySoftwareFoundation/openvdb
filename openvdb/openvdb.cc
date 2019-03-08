@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -74,6 +74,9 @@ initialize()
     Vec3IMetadata::registerType();
     Vec3SMetadata::registerType();
     Vec3DMetadata::registerType();
+    Vec4IMetadata::registerType();
+    Vec4SMetadata::registerType();
+    Vec4DMetadata::registerType();
     Mat4SMetadata::registerType();
     Mat4DMetadata::registerType();
 
@@ -168,6 +171,6 @@ __pragma(warning(default:1711))
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

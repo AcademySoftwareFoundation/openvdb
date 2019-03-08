@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -61,6 +61,7 @@ void exportMetadata();
 void exportFloatGrid();
 void exportIntGrid();
 void exportVec3Grid();
+void exportPointGrid();
 
 
 namespace _openvdbmodule {
@@ -214,6 +215,145 @@ struct VecConverter
 ////////////////////////////////////////
 
 
+/// Helper class to convert between a 2D Python numeric sequence
+/// (tuple, list, etc.) and an openvdb::Mat
+template<typename MatT>
+struct MatConverter
+{
+    /// Return the given matrix as a Python list of lists.
+    static py::object toList(const MatT& m)
+    {
+        py::list obj;
+        for (int i = 0; i < MatT::size; ++i) {
+            py::list rowObj;
+            for (int j = 0; j < MatT::size; ++j) { rowObj.append(m(i, j)); }
+            obj.append(rowObj);
+        }
+        return std::move(obj);
+    }
+
+    /// Extract a matrix from a Python sequence of numeric sequences.
+    static MatT fromSeq(py::object obj)
+    {
+        MatT m = MatT::zero();
+        if (py::len(obj) == MatT::size) {
+            for (int i = 0; i < MatT::size; ++i) {
+                py::object rowObj = obj[i];
+                if (py::len(rowObj) != MatT::size) return MatT::zero();
+                for (int j = 0; j < MatT::size; ++j) {
+                    m(i, j) = py::extract<typename MatT::value_type>(rowObj[j]);
+                }
+            }
+        }
+        return m;
+    }
+
+    static PyObject* convert(const MatT& m)
+    {
+        py::object obj = toList(m);
+        Py_INCREF(obj.ptr());
+        return obj.ptr();
+    }
+
+    static void* convertible(PyObject* obj)
+    {
+        if (!PySequence_Check(obj)) return nullptr; // not a Python sequence
+
+        Py_ssize_t len = PySequence_Length(obj);
+        if (len != MatT::size) return nullptr;
+
+        py::object seq = pyutil::pyBorrow(obj);
+        for (int i = 0; i < MatT::size; ++i) {
+            py::object rowObj = seq[i];
+            if (py::len(rowObj) != MatT::size) return nullptr;
+            // Check that all elements of the Python sequence are convertible
+            // to the Mat's value type.
+            for (int j = 0; j < MatT::size; ++j) {
+                if (!py::extract<typename MatT::value_type>(rowObj[j]).check()) {
+                    return nullptr;
+                }
+            }
+        }
+        return obj;
+    }
+
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a Mat in the provided memory location.
+        using StorageT = py::converter::rvalue_from_python_storage<MatT>;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) MatT; // placement new
+        data->convertible = storage;
+        *(static_cast<MatT*>(storage)) = fromSeq(pyutil::pyBorrow(obj));
+    }
+
+    static void registerConverter()
+    {
+        py::to_python_converter<MatT, MatConverter<MatT> >();
+        py::converter::registry::push_back(
+            &MatConverter<MatT>::convertible,
+            &MatConverter<MatT>::construct,
+            py::type_id<MatT>());
+    }
+}; // struct MatConverter
+
+
+////////////////////////////////////////
+
+
+/// Helper class to convert between a Python integer and a openvdb::PointIndex
+template <typename PointIndexT>
+struct PointIndexConverter
+{
+    using IntType = typename PointIndexT::IntType;
+
+    /// @return a Python integer object equivalent to the given PointIndex.
+    static PyObject* convert(const PointIndexT& index)
+    {
+        py::object obj(static_cast<IntType>(index));
+        Py_INCREF(obj.ptr());
+        return obj.ptr();
+    }
+
+    /// @return nullptr if the given Python object is not convertible to the PointIndex.
+    static void* convertible(PyObject* obj)
+    {
+        if (!PyInt_Check(obj)) return nullptr; // not a Python integer
+        return obj;
+    }
+
+    /// Convert from a Python object to a PointIndex.
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a PointIndex in the provided memory location.
+        using StorageT = py::converter::rvalue_from_python_storage<PointIndexT>;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) PointIndexT; // placement new
+        data->convertible = storage;
+
+        // Extract the PointIndex from the python integer
+        PointIndexT* index = static_cast<PointIndexT*>(storage);
+
+        *index = static_cast<IntType>(PyInt_AsLong(obj));
+    }
+
+    /// Register both the PointIndex-to-integer and the integer-to-PointIndex converters.
+    static void registerConverter()
+    {
+        py::to_python_converter<PointIndexT, PointIndexConverter>();
+        py::converter::registry::push_back(
+            &PointIndexConverter::convertible,
+            &PointIndexConverter::construct,
+            py::type_id<PointIndexT>());
+    }
+}; // struct PointIndexConverter
+
+
+////////////////////////////////////////
+
+
 /// Helper class to convert between a Python dict and an openvdb::MetaMap
 /// @todo Consider implementing a separate, templated converter for
 /// the various Metadata types.
@@ -258,6 +398,21 @@ struct MetaMapConverter
                 } else if (typeName == Vec3SMetadata::staticTypeName()) {
                     const Vec3s v = static_cast<Vec3SMetadata&>(*meta).value();
                     obj = py::make_tuple(v[0], v[1], v[2]);
+                } else if (typeName == Vec4DMetadata::staticTypeName()) {
+                    const Vec4d v = static_cast<Vec4DMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Vec4IMetadata::staticTypeName()) {
+                    const Vec4i v = static_cast<Vec4IMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Vec4SMetadata::staticTypeName()) {
+                    const Vec4s v = static_cast<Vec4SMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Mat4SMetadata::staticTypeName()) {
+                    const Mat4s m = static_cast<Mat4SMetadata&>(*meta).value();
+                    obj = MatConverter<Mat4s>::toList(m);
+                } else if (typeName == Mat4DMetadata::staticTypeName()) {
+                    const Mat4d m = static_cast<Mat4DMetadata&>(*meta).value();
+                    obj = MatConverter<Mat4d>::toList(m);
                 }
                 ret[it->first] = obj;
             }
@@ -304,9 +459,8 @@ struct MetaMapConverter
             py::object val = pyDict[keys[i]];
             Metadata::Ptr value;
             if (py::extract<std::string>(val).check()) {
-                value.reset(
-                    new StringMetadata(py::extract<std::string>(val)));
-            } else if (PyBool_Check(val.ptr())) {
+                value.reset(new StringMetadata(py::extract<std::string>(val)));
+            } else if (bool(PyBool_Check(val.ptr()))) {
                 value.reset(new BoolMetadata(py::extract<bool>(val)));
             } else if (py::extract<Int64>(val).check()) {
                 const Int64 n = py::extract<Int64>(val);
@@ -333,6 +487,16 @@ struct MetaMapConverter
                 value.reset(new Vec3DMetadata(py::extract<Vec3d>(val)));
             } else if (py::extract<Vec3s>(val).check()) {
                 value.reset(new Vec3SMetadata(py::extract<Vec3s>(val)));
+            } else if (py::extract<Vec4i>(val).check()) {
+                value.reset(new Vec4IMetadata(py::extract<Vec4i>(val)));
+            } else if (py::extract<Vec4d>(val).check()) {
+                value.reset(new Vec4DMetadata(py::extract<Vec4d>(val)));
+            } else if (py::extract<Vec4s>(val).check()) {
+                value.reset(new Vec4SMetadata(py::extract<Vec4s>(val)));
+            } else if (py::extract<Mat4d>(val).check()) {
+                value.reset(new Mat4DMetadata(py::extract<Mat4d>(val)));
+            } else if (py::extract<Mat4s>(val).check()) {
+                value.reset(new Mat4SMetadata(py::extract<Mat4s>(val)));
             } else if (py::extract<Metadata::Ptr>(val).check()) {
                 value = py::extract<Metadata::Ptr>(val);
             } else {
@@ -707,6 +871,11 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     _openvdbmodule::VecConverter<Vec4s>::registerConverter();
     _openvdbmodule::VecConverter<Vec4d>::registerConverter();
 
+    _openvdbmodule::MatConverter<Mat4s>::registerConverter();
+    _openvdbmodule::MatConverter<Mat4d>::registerConverter();
+
+    _openvdbmodule::PointIndexConverter<PointDataIndex32>::registerConverter();
+
     _openvdbmodule::MetaMapConverter::registerConverter();
 
 #define PYOPENVDB_TRANSLATE_EXCEPTION(_classname) \
@@ -733,6 +902,7 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     exportFloatGrid();
     exportIntGrid();
     exportVec3Grid();
+    exportPointGrid();
 
 
     py::def("read",
@@ -806,6 +976,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
 } // BOOST_PYTHON_MODULE
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

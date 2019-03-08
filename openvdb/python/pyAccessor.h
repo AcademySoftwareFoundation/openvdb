@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,11 +46,11 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 template<typename _GridT>
 struct AccessorTraits
 {
-    typedef _GridT                              GridT;
-    typedef GridT                               NonConstGridT;
-    typedef typename NonConstGridT::Ptr         GridPtrT;
-    typedef typename NonConstGridT::Accessor    AccessorT;
-    typedef typename AccessorT::ValueType       ValueT;
+    using GridT = _GridT;
+    using NonConstGridT = GridT;
+    using GridPtrT = typename NonConstGridT::Ptr;
+    using AccessorT = typename NonConstGridT::Accessor;
+    using ValueT = typename AccessorT::ValueType;
 
     static const bool IsConst = false;
 
@@ -76,11 +76,11 @@ struct AccessorTraits
 template<typename _GridT>
 struct AccessorTraits<const _GridT>
 {
-    typedef const _GridT                            GridT;
-    typedef _GridT                                  NonConstGridT;
-    typedef typename NonConstGridT::ConstPtr        GridPtrT;
-    typedef typename NonConstGridT::ConstAccessor   AccessorT;
-    typedef typename AccessorT::ValueType           ValueT;
+    using GridT = const _GridT;
+    using NonConstGridT = _GridT;
+    using GridPtrT = typename NonConstGridT::ConstPtr;
+    using AccessorT = typename NonConstGridT::ConstAccessor;
+    using ValueT = typename AccessorT::ValueType;
 
     static const bool IsConst = true;
 
@@ -124,7 +124,7 @@ extractValueArg(
     py::object obj,
     const char* functionName,
     int argIdx = 0, // args are numbered starting from 1
-    const char* expectedType = NULL)
+    const char* expectedType = nullptr)
 {
     return pyutil::extractArg<typename GridT::ValueType>(
         obj, functionName, AccessorTraits<GridT>::typeName(), argIdx, expectedType);
@@ -156,11 +156,11 @@ template<typename _GridType>
 class AccessorWrap
 {
 public:
-    typedef AccessorTraits<_GridType>       Traits;
-    typedef typename Traits::AccessorT      Accessor;
-    typedef typename Traits::ValueT         ValueType;
-    typedef typename Traits::NonConstGridT  GridType;
-    typedef typename Traits::GridPtrT       GridPtrType;
+    using Traits = AccessorTraits<_GridType>;
+    using Accessor = typename Traits::AccessorT;
+    using ValueType = typename Traits::ValueT;
+    using GridType = typename Traits::NonConstGridT;
+    using GridPtrType = typename Traits::GridPtrT;
 
     AccessorWrap(GridPtrType grid): mGrid(grid), mAccessor(grid->getAccessor()) {}
 
@@ -338,6 +338,6 @@ private:
 
 #endif // OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

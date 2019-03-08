@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -353,7 +353,7 @@ Morph(LevelSetMorphing<GridT, InterruptT>& parent)
     : mParent(&parent)
     , mMinAbsS(ValueType(1e-6))
     , mMap(parent.mTracker.grid().transform().template constMap<MapT>().get())
-    , mTask(0)
+    , mTask(nullptr)
 {
 }
 
@@ -670,6 +670,6 @@ euler(const LeafRange& range, ValueType dt,
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_MORPH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -338,6 +338,12 @@ public:
     /// @details (The default vector size is one element.)
     ParmFactory& setVectorSize(int);
 
+    /// @brief Mark this parameter as hidden from the UI.
+    /// @note Marking parameters as obsolete is preferable to making them invisible as changing
+    /// invisible parameter values will still trigger a re-cook, however this is not possible
+    /// when using multi-parms.
+    ParmFactory& setInvisible();
+
     /// Construct and return the parameter template.
     PRM_Template get() const;
 

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -186,143 +186,20 @@ private:
 
 namespace point_move_internal {
 
+using IndexArray = std::vector<Index>;
 
 using IndexTriple = std::tuple<LeafIndex, Index, Index>;
 using IndexTripleArray = tbb::concurrent_vector<IndexTriple>;
 using GlobalPointIndexMap = std::vector<IndexTripleArray>;
+using GlobalPointIndexIndices = std::vector<IndexArray>;
 
 using IndexPair = std::pair<Index, Index>;
 using IndexPairArray = std::vector<IndexPair>;
 using LocalPointIndexMap = std::vector<IndexPairArray>;
 
-using IndexArray = std::vector<Index>;
-
 using LeafIndexArray = std::vector<LeafIndex>;
 using LeafOffsetArray = std::vector<LeafIndexArray>;
 using LeafMap = std::map<Coord, LeafIndex>;
-
-// TODO: The following infrastructure - ArrayProcessor, PerformTypedMoveOp, processTypedArray()
-// is required to improve AttributeArray copying performance beyond using the virtual function
-// AttributeArray::set(Index, AttributeArray&, Index), however an ABI=6+ addition to AttributeArray
-// could eliminate this cost for the typical case where ValueType and CodecType are the same in
-// source and target arrays, as they are here.
-
-
-/// Helper class used internally by processTypedArray()
-template<typename ValueType, typename OpType>
-struct ArrayProcessor {
-    static inline void call(OpType& op, const AttributeArray& array) {
-#ifdef _MSC_VER
-        op.operator()<ValueType>(array);
-#else
-        op.template operator()<ValueType>(array);
-#endif
-    }
-};
-
-/// @brief Utility function that, given a generic attribute array,
-/// calls a functor with the fully-resolved value type of the array
-template<typename ArrayType, typename OpType>
-bool
-processTypedArray(const ArrayType& array, OpType& op)
-{
-    using namespace openvdb;
-    using namespace openvdb::math;
-    if (array.template hasValueType<bool>())                    ArrayProcessor<bool, OpType>::call(op, array);
-    else if (array.template hasValueType<int16_t>())            ArrayProcessor<int16_t, OpType>::call(op, array);
-    else if (array.template hasValueType<int32_t>())            ArrayProcessor<int32_t, OpType>::call(op, array);
-    else if (array.template hasValueType<int64_t>())            ArrayProcessor<int64_t, OpType>::call(op, array);
-    else if (array.template hasValueType<float>())              ArrayProcessor<float, OpType>::call(op, array);
-    else if (array.template hasValueType<double>())             ArrayProcessor<double, OpType>::call(op, array);
-    else if (array.template hasValueType<Vec3<int32_t>>())      ArrayProcessor<Vec3<int32_t>, OpType>::call(op, array);
-    else if (array.template hasValueType<Vec3<float>>())        ArrayProcessor<Vec3<float>, OpType>::call(op, array);
-    else if (array.template hasValueType<Vec3<double>>())       ArrayProcessor<Vec3<double>, OpType>::call(op, array);
-    else if (array.template hasValueType<GroupType>())          ArrayProcessor<GroupType, OpType>::call(op, array);
-    else if (array.template hasValueType<StringIndexType>())    ArrayProcessor<StringIndexType, OpType>::call(op, array);
-    else if (array.template hasValueType<Mat3<float>>())        ArrayProcessor<Mat3<float>, OpType>::call(op, array);
-    else if (array.template hasValueType<Mat3<double>>())       ArrayProcessor<Mat3<double>, OpType>::call(op, array);
-    else if (array.template hasValueType<Mat4<float>>())        ArrayProcessor<Mat4<float>, OpType>::call(op, array);
-    else if (array.template hasValueType<Mat4<double>>())       ArrayProcessor<Mat4<double>, OpType>::call(op, array);
-    else if (array.template hasValueType<Quat<float>>())        ArrayProcessor<Quat<float>, OpType>::call(op, array);
-    else if (array.template hasValueType<Quat<double>>())       ArrayProcessor<Quat<double>, OpType>::call(op, array);
-    else                                                        return false;
-    return true;
-}
-
-
-/// Cache read and write attribute handles to amortize construction cost
-struct AttributeHandles
-{
-    using HandleArray = std::vector<AttributeHandle<int>::Ptr>;
-
-    AttributeHandles(const size_t size)
-        : mHandles() { mHandles.reserve(size); }
-
-    AttributeArray& getArray(const Index leafOffset)
-    {
-        auto* handle = reinterpret_cast<AttributeWriteHandle<int>*>(mHandles[leafOffset].get());
-        assert(handle);
-        return handle->array();
-    }
-
-    const AttributeArray& getConstArray(const Index leafOffset) const
-    {
-        const auto* handle = mHandles[leafOffset].get();
-        assert(handle);
-        return handle->array();
-    }
-
-    template <typename ValueT>
-    AttributeHandle<ValueT>& getHandle(const Index leafOffset)
-    {
-        auto* handle = reinterpret_cast<AttributeHandle<ValueT>*>(mHandles[leafOffset].get());
-        assert(handle);
-        return *handle;
-    }
-
-    template <typename ValueT>
-    AttributeWriteHandle<ValueT>& getWriteHandle(const Index leafOffset)
-    {
-        auto* handle = reinterpret_cast<AttributeWriteHandle<ValueT>*>(mHandles[leafOffset].get());
-        assert(handle);
-        return *handle;
-    }
-
-    /// Create a handle and reinterpret cast as an int handle to store
-    struct CacheHandleOp
-    {
-        CacheHandleOp(HandleArray& handles)
-            : mHandles(handles) { }
-
-        template<typename ValueT>
-        void operator()(const AttributeArray& array) const
-        {
-            auto* handleAsInt = reinterpret_cast<AttributeHandle<int>*>(
-                new AttributeHandle<ValueT>(array));
-            mHandles.emplace_back(handleAsInt);
-        }
-
-    private:
-        HandleArray& mHandles;
-    }; // struct CacheHandleOp
-
-    template <typename LeafRangeT>
-    void cache(const LeafRangeT& range, const Index attributeIndex)
-    {
-        using namespace openvdb::math;
-
-        mHandles.clear();
-        CacheHandleOp op(mHandles);
-
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-            auto& array = leaf->attributeArray(attributeIndex);
-            processTypedArray(array, op);
-        }
-    }
-
-private:
-    HandleArray mHandles;
-}; // struct AttributeHandles
 
 
 template <typename DeformerT, typename TreeT, typename FilterT>
@@ -433,6 +310,374 @@ indexOffsetFromVoxel(const Index voxelOffset, const LeafT& leaf, IndexArray& off
     return targetOffset;
 }
 
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+
+
+template <typename TreeT>
+struct GlobalMovePointsOp
+{
+    using LeafT = typename TreeT::LeafNodeType;
+    using LeafArrayT = std::vector<LeafT*>;
+    using LeafManagerT = typename tree::LeafManager<TreeT>;
+    using AttributeArrays = std::vector<AttributeArray*>;
+
+    GlobalMovePointsOp(LeafOffsetArray& offsetMap,
+                       LeafManagerT& sourceLeafManager,
+                       const Index attributeIndex,
+                       const GlobalPointIndexMap& moveLeafMap,
+                       const GlobalPointIndexIndices& moveLeafIndices)
+        : mOffsetMap(offsetMap)
+        , mSourceLeafManager(sourceLeafManager)
+        , mAttributeIndex(attributeIndex)
+        , mMoveLeafMap(moveLeafMap)
+        , mMoveLeafIndices(moveLeafIndices) { }
+
+    // A CopyIterator is designed to use the indices in a GlobalPointIndexMap for this leaf
+    // and match the interface required for AttributeArray::copyValues()
+    struct CopyIterator
+    {
+        CopyIterator(const LeafT& leaf, const IndexArray& sortedIndices,
+            const IndexTripleArray& moveIndices, IndexArray& offsets)
+            : mLeaf(leaf)
+            , mSortedIndices(sortedIndices)
+            , mMoveIndices(moveIndices)
+            , mOffsets(offsets) { }
+
+        operator bool() const { return bool(mIt); }
+
+        void reset(Index startIndex, Index endIndex)
+        {
+            mIndex = startIndex;
+            mEndIndex = endIndex;
+            this->advance();
+        }
+
+        CopyIterator& operator++()
+        {
+            this->advance();
+            return *this;
+        }
+
+        Index leafIndex(Index i) const
+        {
+            if (i < mSortedIndices.size()) {
+                return std::get<0>(this->leafIndexTriple(i));
+            }
+            return std::numeric_limits<Index>::max();
+        }
+
+        Index sourceIndex() const
+        {
+            assert(mIt);
+            return std::get<2>(*mIt);
+        }
+
+        Index targetIndex() const
+        {
+            assert(mIt);
+            return indexOffsetFromVoxel(std::get<1>(*mIt), mLeaf, mOffsets);
+        }
+
+    private:
+        void advance()
+        {
+            if (mIndex >= mEndIndex || mIndex >= mSortedIndices.size()) {
+                mIt = nullptr;
+            }
+            else {
+                mIt = &this->leafIndexTriple(mIndex);
+            }
+            ++mIndex;
+        }
+
+        const IndexTriple& leafIndexTriple(Index i) const
+        {
+            return mMoveIndices[mSortedIndices[i]];
+        }
+
+    private:
+        const LeafT& mLeaf;
+        Index mIndex;
+        Index mEndIndex;
+        const IndexArray& mSortedIndices;
+        const IndexTripleArray& mMoveIndices;
+        IndexArray& mOffsets;
+        const IndexTriple* mIt = nullptr;
+    }; // struct CopyIterator
+
+    void operator()(LeafT& leaf, size_t idx) const
+    {
+        const IndexTripleArray& moveIndices = mMoveLeafMap[idx];
+        if (moveIndices.empty())  return;
+        const IndexArray& sortedIndices = mMoveLeafIndices[idx];
+
+        // extract per-voxel offsets for this leaf
+
+        LeafIndexArray& offsets = mOffsetMap[idx];
+
+        // extract target array and ensure data is out-of-core and non-uniform
+
+        auto& targetArray = leaf.attributeArray(mAttributeIndex);
+        targetArray.loadData();
+        targetArray.expand();
+
+        // perform the copy
+
+        CopyIterator copyIterator(leaf, sortedIndices, moveIndices, offsets);
+
+        // use the sorted indices to track the index of the source leaf
+
+        Index sourceLeafIndex = copyIterator.leafIndex(0);
+        Index startIndex = 0;
+
+        for (size_t i = 1; i <= sortedIndices.size(); i++) {
+            Index endIndex = static_cast<Index>(i);
+            Index newSourceLeafIndex = copyIterator.leafIndex(endIndex);
+
+            // when it changes, do a batch-copy of all the indices that lie within this range
+            // TODO: this step could use nested parallelization for cases where there are a
+            // large number of points being moved per attribute
+
+            if (newSourceLeafIndex > sourceLeafIndex) {
+                copyIterator.reset(startIndex, endIndex);
+
+                const LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafIndex);
+                const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
+                sourceArray.loadData();
+
+                targetArray.copyValuesUnsafe(sourceArray, copyIterator);
+
+                sourceLeafIndex = newSourceLeafIndex;
+                startIndex = endIndex;
+            }
+        }
+    }
+
+private:
+    LeafOffsetArray& mOffsetMap;
+    LeafManagerT& mSourceLeafManager;
+    const Index mAttributeIndex;
+    const GlobalPointIndexMap& mMoveLeafMap;
+    const GlobalPointIndexIndices& mMoveLeafIndices;
+}; // struct GlobalMovePointsOp
+
+
+template <typename TreeT>
+struct LocalMovePointsOp
+{
+    using LeafT = typename TreeT::LeafNodeType;
+    using LeafArrayT = std::vector<LeafT*>;
+    using LeafManagerT = typename tree::LeafManager<TreeT>;
+    using AttributeArrays = std::vector<AttributeArray*>;
+
+    LocalMovePointsOp( LeafOffsetArray& offsetMap,
+                       const LeafIndexArray& sourceIndices,
+                       LeafManagerT& sourceLeafManager,
+                       const Index attributeIndex,
+                       const LocalPointIndexMap& moveLeafMap)
+        : mOffsetMap(offsetMap)
+        , mSourceIndices(sourceIndices)
+        , mSourceLeafManager(sourceLeafManager)
+        , mAttributeIndex(attributeIndex)
+        , mMoveLeafMap(moveLeafMap) { }
+
+    // A CopyIterator is designed to use the indices in a LocalPointIndexMap for this leaf
+    // and match the interface required for AttributeArray::copyValues()
+    struct CopyIterator
+    {
+        CopyIterator(const LeafT& leaf, const IndexPairArray& indices, IndexArray& offsets)
+            : mLeaf(leaf)
+            , mIndices(indices)
+            , mOffsets(offsets) { }
+
+        operator bool() const { return mIndex < static_cast<int>(mIndices.size()); }
+
+        CopyIterator& operator++() { ++mIndex; return *this; }
+
+        Index sourceIndex() const
+        {
+            return mIndices[mIndex].second;
+        }
+
+        Index targetIndex() const
+        {
+            return indexOffsetFromVoxel(mIndices[mIndex].first, mLeaf, mOffsets);
+        }
+
+    private:
+        const LeafT& mLeaf;
+        const IndexPairArray& mIndices;
+        IndexArray& mOffsets;
+        int mIndex = 0;
+    }; // struct CopyIterator
+
+    void operator()(LeafT& leaf, size_t idx) const
+    {
+        const IndexPairArray& moveIndices = mMoveLeafMap[idx];
+        if (moveIndices.empty())  return;
+
+        // extract per-voxel offsets for this leaf
+
+        LeafIndexArray& offsets = mOffsetMap[idx];
+
+        // extract source array that has the same origin as the target leaf
+
+        assert(idx < mSourceIndices.size());
+        const Index sourceLeafOffset(mSourceIndices[idx]);
+        LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafOffset);
+        const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
+        sourceArray.loadData();
+
+        // extract target array and ensure data is out-of-core and non-uniform
+
+        auto& targetArray = leaf.attributeArray(mAttributeIndex);
+        targetArray.loadData();
+        targetArray.expand();
+
+        // perform the copy
+
+        CopyIterator copyIterator(leaf, moveIndices, offsets);
+        targetArray.copyValuesUnsafe(sourceArray, copyIterator);
+    }
+
+private:
+    LeafOffsetArray& mOffsetMap;
+    const LeafIndexArray& mSourceIndices;
+    LeafManagerT& mSourceLeafManager;
+    const Index mAttributeIndex;
+    const LocalPointIndexMap& mMoveLeafMap;
+}; // struct LocalMovePointsOp
+
+
+#else
+
+
+// The following infrastructure - ArrayProcessor, PerformTypedMoveOp, processTypedArray()
+// is required to improve AttributeArray copying performance beyond using the virtual function
+// AttributeArray::set(Index, AttributeArray&, Index). An ABI=6 addition to AttributeArray
+// improves this by introducing an AttributeArray::copyValues() method to significantly
+// simplify this logic without incurring the same virtual function cost.
+
+
+/// Helper class used internally by processTypedArray()
+template<typename ValueType, typename OpType>
+struct ArrayProcessor {
+    static inline void call(OpType& op, const AttributeArray& array) {
+#ifdef _MSC_VER
+        op.operator()<ValueType>(array);
+#else
+        op.template operator()<ValueType>(array);
+#endif
+    }
+};
+
+
+/// @brief Utility function that, given a generic attribute array,
+/// calls a functor with the fully-resolved value type of the array
+template<typename ArrayType, typename OpType>
+bool
+processTypedArray(const ArrayType& array, OpType& op)
+{
+    using namespace openvdb;
+    using namespace openvdb::math;
+    if (array.template hasValueType<bool>())                    ArrayProcessor<bool, OpType>::call(op, array);
+    else if (array.template hasValueType<int16_t>())            ArrayProcessor<int16_t, OpType>::call(op, array);
+    else if (array.template hasValueType<int32_t>())            ArrayProcessor<int32_t, OpType>::call(op, array);
+    else if (array.template hasValueType<int64_t>())            ArrayProcessor<int64_t, OpType>::call(op, array);
+    else if (array.template hasValueType<float>())              ArrayProcessor<float, OpType>::call(op, array);
+    else if (array.template hasValueType<double>())             ArrayProcessor<double, OpType>::call(op, array);
+    else if (array.template hasValueType<Vec3<int32_t>>())      ArrayProcessor<Vec3<int32_t>, OpType>::call(op, array);
+    else if (array.template hasValueType<Vec3<float>>())        ArrayProcessor<Vec3<float>, OpType>::call(op, array);
+    else if (array.template hasValueType<Vec3<double>>())       ArrayProcessor<Vec3<double>, OpType>::call(op, array);
+    else if (array.template hasValueType<GroupType>())          ArrayProcessor<GroupType, OpType>::call(op, array);
+    else if (array.template hasValueType<StringIndexType>())    ArrayProcessor<StringIndexType, OpType>::call(op, array);
+    else if (array.template hasValueType<Mat3<float>>())        ArrayProcessor<Mat3<float>, OpType>::call(op, array);
+    else if (array.template hasValueType<Mat3<double>>())       ArrayProcessor<Mat3<double>, OpType>::call(op, array);
+    else if (array.template hasValueType<Mat4<float>>())        ArrayProcessor<Mat4<float>, OpType>::call(op, array);
+    else if (array.template hasValueType<Mat4<double>>())       ArrayProcessor<Mat4<double>, OpType>::call(op, array);
+    else if (array.template hasValueType<Quat<float>>())        ArrayProcessor<Quat<float>, OpType>::call(op, array);
+    else if (array.template hasValueType<Quat<double>>())       ArrayProcessor<Quat<double>, OpType>::call(op, array);
+    else                                                        return false;
+    return true;
+}
+
+
+/// Cache read and write attribute handles to amortize construction cost
+struct AttributeHandles
+{
+    using HandleArray = std::vector<AttributeHandle<int>::Ptr>;
+
+    AttributeHandles(const size_t size)
+        : mHandles() { mHandles.reserve(size); }
+
+    AttributeArray& getArray(const Index leafOffset)
+    {
+        auto* handle = reinterpret_cast<AttributeWriteHandle<int>*>(mHandles[leafOffset].get());
+        assert(handle);
+        return handle->array();
+    }
+
+    const AttributeArray& getConstArray(const Index leafOffset) const
+    {
+        const auto* handle = mHandles[leafOffset].get();
+        assert(handle);
+        return handle->array();
+    }
+
+    template <typename ValueT>
+    AttributeHandle<ValueT>& getHandle(const Index leafOffset)
+    {
+        auto* handle = reinterpret_cast<AttributeHandle<ValueT>*>(mHandles[leafOffset].get());
+        assert(handle);
+        return *handle;
+    }
+
+    template <typename ValueT>
+    AttributeWriteHandle<ValueT>& getWriteHandle(const Index leafOffset)
+    {
+        auto* handle = reinterpret_cast<AttributeWriteHandle<ValueT>*>(mHandles[leafOffset].get());
+        assert(handle);
+        return *handle;
+    }
+
+    /// Create a handle and reinterpret cast as an int handle to store
+    struct CacheHandleOp
+    {
+        CacheHandleOp(HandleArray& handles)
+            : mHandles(handles) { }
+
+        template<typename ValueT>
+        void operator()(const AttributeArray& array) const
+        {
+            auto* handleAsInt = reinterpret_cast<AttributeHandle<int>*>(
+                new AttributeHandle<ValueT>(array));
+            mHandles.emplace_back(handleAsInt);
+        }
+
+    private:
+        HandleArray& mHandles;
+    }; // struct CacheHandleOp
+
+    template <typename LeafRangeT>
+    void cache(const LeafRangeT& range, const Index attributeIndex)
+    {
+        using namespace openvdb::math;
+
+        mHandles.clear();
+        CacheHandleOp op(mHandles);
+
+        for (auto leaf = range.begin(); leaf; ++leaf) {
+            const auto& array = leaf->constAttributeArray(attributeIndex);
+            processTypedArray(array, op);
+        }
+    }
+
+private:
+    HandleArray mHandles;
+}; // struct AttributeHandles
+
+
 template <typename TreeT>
 struct GlobalMovePointsOp
 {
@@ -444,24 +689,28 @@ struct GlobalMovePointsOp
                        AttributeHandles& targetHandles,
                        AttributeHandles& sourceHandles,
                        const Index attributeIndex,
-                       const GlobalPointIndexMap& moveLeafMap)
+                       const GlobalPointIndexMap& moveLeafMap,
+                       const GlobalPointIndexIndices& moveLeafIndices)
         : mOffsetMap(offsetMap)
         , mTargetHandles(targetHandles)
         , mSourceHandles(sourceHandles)
         , mAttributeIndex(attributeIndex)
-        , mMoveLeafMap(moveLeafMap) { }
+        , mMoveLeafMap(moveLeafMap)
+        , mMoveLeafIndices(moveLeafIndices) { }
 
     struct PerformTypedMoveOp
     {
         PerformTypedMoveOp(AttributeHandles& targetHandles, AttributeHandles& sourceHandles,
             Index targetOffset, const LeafT& targetLeaf,
-            IndexArray& offsets, const IndexTripleArray& indices)
+            IndexArray& offsets, const IndexTripleArray& indices,
+            const IndexArray& sortedIndices)
             : mTargetHandles(targetHandles)
             , mSourceHandles(sourceHandles)
             , mTargetOffset(targetOffset)
             , mTargetLeaf(targetLeaf)
             , mOffsets(offsets)
-            , mIndices(indices) { }
+            , mIndices(indices)
+            , mSortedIndices(sortedIndices) { }
 
         template<typename ValueT>
         void operator()(const AttributeArray&) const
@@ -469,23 +718,7 @@ struct GlobalMovePointsOp
             auto& targetHandle = mTargetHandles.getWriteHandle<ValueT>(mTargetOffset);
             targetHandle.expand();
 
-            // build a sorted index vector that references the indices in order of their source
-            // leafs and voxels to ensure determinism in the resulting point orders
-
-            std::vector<int> sortedIndices(mIndices.size());
-            std::iota(std::begin(sortedIndices), std::end(sortedIndices), 0);
-            std::sort(std::begin(sortedIndices), std::end(sortedIndices),
-                [&](int i, int j)
-                {
-                    const Index& indexI0(std::get<0>(mIndices[i]));
-                    const Index& indexJ0(std::get<0>(mIndices[j]));
-                    if (indexI0 < indexJ0)          return true;
-                    if (indexI0 > indexJ0)          return false;
-                    return std::get<2>(mIndices[i]) < std::get<2>(mIndices[j]);
-                }
-            );
-
-            for (const auto& index : sortedIndices) {
+            for (const auto& index : mSortedIndices) {
                 const auto& it = mIndices[index];
                 const auto& sourceHandle = mSourceHandles.getHandle<ValueT>(std::get<0>(it));
                 const Index targetIndex = indexOffsetFromVoxel(std::get<1>(it), mTargetLeaf, mOffsets);
@@ -503,25 +736,35 @@ struct GlobalMovePointsOp
         const LeafT& mTargetLeaf;
         IndexArray& mOffsets;
         const IndexTripleArray& mIndices;
+        const IndexArray& mSortedIndices;
     }; // struct PerformTypedMoveOp
 
     void performMove(Index targetOffset, const LeafT& targetLeaf,
-        IndexArray& offsets, const IndexTripleArray& indices) const
+        IndexArray& offsets, const IndexTripleArray& indices,
+        const IndexArray& sortedIndices) const
     {
         auto& targetArray = mTargetHandles.getArray(targetOffset);
+        targetArray.loadData();
+        targetArray.expand();
 
-        for (const auto& it : indices) {
+        for (const auto& index : sortedIndices) {
+            const auto& it = indices[index];
+
             const auto& sourceArray = mSourceHandles.getConstArray(std::get<0>(it));
-            const Index tgtOffset = indexOffsetFromVoxel(std::get<1>(it), targetLeaf, offsets);
-            targetArray.set(tgtOffset, sourceArray, std::get<2>(it));
+
+            const Index sourceOffset = std::get<2>(it);
+            const Index targetOffset = indexOffsetFromVoxel(std::get<1>(it), targetLeaf, offsets);
+
+            targetArray.set(targetOffset, sourceArray, sourceOffset);
         }
     }
 
     void operator()(LeafT& leaf, size_t aIdx) const
     {
         const Index idx(static_cast<Index>(aIdx));
-        const auto& moveIndices = mMoveLeafMap.at(aIdx);
+        const auto& moveIndices = mMoveLeafMap[aIdx];
         if (moveIndices.empty())  return;
+        const auto& sortedIndices = mMoveLeafIndices[aIdx];
 
         // extract per-voxel offsets for this leaf
 
@@ -529,9 +772,10 @@ struct GlobalMovePointsOp
 
         const auto& array = leaf.constAttributeArray(mAttributeIndex);
 
-        PerformTypedMoveOp op(mTargetHandles, mSourceHandles, idx, leaf, offsets, moveIndices);
+        PerformTypedMoveOp op(mTargetHandles, mSourceHandles, idx, leaf, offsets,
+            moveIndices, sortedIndices);
         if (!processTypedArray(array, op)) {
-            this->performMove(idx, leaf, offsets, moveIndices);
+            this->performMove(idx, leaf, offsets, moveIndices, sortedIndices);
         }
     }
 
@@ -541,7 +785,9 @@ private:
     AttributeHandles& mSourceHandles;
     const Index mAttributeIndex;
     const GlobalPointIndexMap& mMoveLeafMap;
+    const GlobalPointIndexIndices& mMoveLeafIndices;
 }; // struct GlobalMovePointsOp
+
 
 template <typename TreeT>
 struct LocalMovePointsOp
@@ -628,8 +874,10 @@ struct LocalMovePointsOp
         const auto& sourceArray = mSourceHandles.getConstArray(sourceOffset);
 
         for (const auto& it : indices) {
-            const Index tgtOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
-            targetArray.set(tgtOffset, sourceArray, it.second);
+            const Index sourceOffset = it.second;
+            const Index targetOffset = indexOffsetFromVoxel(it.first, targetLeaf, offsets);
+
+            targetArray.set(targetOffset, sourceArray, sourceOffset);
         }
     }
 
@@ -665,6 +913,10 @@ private:
     const Index mAttributeIndex;
     const LocalPointIndexMap& mMoveLeafMap;
 }; // struct LocalMovePointsOp
+
+
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 6
+
 
 } // namespace point_move_internal
 
@@ -709,10 +961,6 @@ inline void movePoints( PointDataGridT& points,
 
     LeafManagerT sourceLeafManager(tree);
     LeafManagerT targetLeafManager(newTree);
-
-    // initialize attribute handles
-    AttributeHandles sourceHandles(sourceLeafManager.leafCount());
-    AttributeHandles targetHandles(targetLeafManager.leafCount());
 
     // extract the existing attribute set
     const auto& existingAttributeSet = points.tree().cbeginLeaf()->attributeSet();
@@ -779,6 +1027,39 @@ inline void movePoints( PointDataGridT& points,
         sourceLeafManager.foreach(op, threaded);
     }
 
+    // build a sorted index vector for each leaf that references the global move map
+    // indices in order of their source leafs and voxels to ensure determinism in the
+    // resulting point orders
+
+    GlobalPointIndexIndices globalMoveLeafIndices(globalMoveLeafMap.size());
+
+    targetLeafManager.foreach(
+        [&](LeafT& /*leaf*/, size_t idx) {
+            const IndexTripleArray& moveIndices = globalMoveLeafMap[idx];
+            if (moveIndices.empty())  return;
+
+            IndexArray& sortedIndices = globalMoveLeafIndices[idx];
+            sortedIndices.resize(moveIndices.size());
+            std::iota(std::begin(sortedIndices), std::end(sortedIndices), 0);
+            std::sort(std::begin(sortedIndices), std::end(sortedIndices),
+                [&](int i, int j)
+                {
+                    const Index& indexI0(std::get<0>(moveIndices[i]));
+                    const Index& indexJ0(std::get<0>(moveIndices[j]));
+                    if (indexI0 < indexJ0)          return true;
+                    if (indexI0 > indexJ0)          return false;
+                    return std::get<2>(moveIndices[i]) < std::get<2>(moveIndices[j]);
+                }
+            );
+        },
+    threaded);
+
+#if OPENVDB_ABI_VERSION_NUMBER < 6
+    // initialize attribute handles
+    AttributeHandles sourceHandles(sourceLeafManager.leafCount());
+    AttributeHandles targetHandles(targetLeafManager.leafCount());
+#endif
+
     for (const auto& it : existingAttributeSet.descriptor().map()) {
 
         const Index attributeIndex = static_cast<Index>(it.second);
@@ -790,6 +1071,20 @@ inline void movePoints( PointDataGridT& points,
             },
         threaded);
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+
+        // move points between leaf nodes
+
+        GlobalMovePointsOp<PointDataTreeT> globalMoveOp(offsetMap,
+            sourceLeafManager, attributeIndex, globalMoveLeafMap, globalMoveLeafIndices);
+        targetLeafManager.foreach(globalMoveOp, threaded);
+
+        // move points within leaf nodes
+
+        LocalMovePointsOp<PointDataTreeT> localMoveOp(offsetMap,
+            sourceIndices, sourceLeafManager, attributeIndex, localMoveLeafMap);
+        targetLeafManager.foreach(localMoveOp, threaded);
+#else
         // cache attribute handles
 
         sourceHandles.cache(sourceLeafManager.leafRange(), attributeIndex);
@@ -798,7 +1093,7 @@ inline void movePoints( PointDataGridT& points,
         // move points between leaf nodes
 
         GlobalMovePointsOp<PointDataTreeT> globalMoveOp(offsetMap, targetHandles,
-            sourceHandles, attributeIndex, globalMoveLeafMap);
+            sourceHandles, attributeIndex, globalMoveLeafMap, globalMoveLeafIndices);
         targetLeafManager.foreach(globalMoveOp, threaded);
 
         // move points within leaf nodes
@@ -807,6 +1102,7 @@ inline void movePoints( PointDataGridT& points,
             sourceIndices, sourceHandles,
             attributeIndex, localMoveLeafMap);
         targetLeafManager.foreach(localMoveOp, threaded);
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 6
     }
 
     points.setTree(newPoints->treePtr());
@@ -995,6 +1291,6 @@ void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
 
 #endif // OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -82,7 +82,6 @@ matchingAttributeSets(const AttributeSet& lhs,
 
         if (a->size() != b->size()) return false;
         if (a->isUniform() != b->isUniform()) return false;
-        if (a->isCompressed() != b->isCompressed()) return false;
         if (a->isHidden() != b->isHidden()) return false;
         if (a->type() != b->type()) return false;
     }
@@ -1072,6 +1071,6 @@ TestAttributeSet::testAttributeSetGroups()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
