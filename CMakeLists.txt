@@ -98,6 +98,7 @@ IF ( OPENVDB_CXX_STRICT )
     IF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
         MESSAGE ( STATUS "Configuring Clang CXX warnings" )
         ADD_DEFINITIONS (
+            -Werror
             -Wall
             -Wextra
             -Wconversion
@@ -106,6 +107,7 @@ IF ( OPENVDB_CXX_STRICT )
     ELSEIF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
         MESSAGE ( STATUS "Configuring GCC CXX warnings" )
         ADD_DEFINITIONS (
+            -Werror
             -Wall
             -Wextra
             -pedantic
