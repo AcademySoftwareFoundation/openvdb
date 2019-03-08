@@ -155,7 +155,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask",
+    hvdb::OpenVDBOpFactory("VDB Occlusion Mask",
         SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
         .addInput("VDBs")
         .setObsoleteParms(obsoleteParms)

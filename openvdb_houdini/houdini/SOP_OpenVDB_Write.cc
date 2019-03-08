@@ -173,8 +173,7 @@ newSopOperator(OP_OperatorTable* table)
     }
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Write", SOP_OpenVDB_Write::factory, parms, *table)
-        .addAlias("OpenVDB Writer")
+    hvdb::OpenVDBOpFactory("VDB Write", SOP_OpenVDB_Write::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to be written to disk")
         .setDocumentation("\

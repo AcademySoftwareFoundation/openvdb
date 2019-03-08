@@ -232,7 +232,11 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, name each output VDB after the input VDB with"
             " a unique segment number appended for ease of identification."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Segment", SOP_OpenVDB_Segment::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Segment by Connectivity",
+        SOP_OpenVDB_Segment::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBSegment")
+#endif
         .addInput("OpenVDB grids")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })

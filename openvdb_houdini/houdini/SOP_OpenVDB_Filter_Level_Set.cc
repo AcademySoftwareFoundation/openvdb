@@ -597,8 +597,11 @@ newSopOperator(OP_OperatorTable* table)
         // Register operator
         if (OP_TYPE_RENORM == op) {
 
-            hvdb::OpenVDBOpFactory("OpenVDB Renormalize Level Set",
+            hvdb::OpenVDBOpFactory("VDB Renormalize SDF",
                 SOP_OpenVDB_Filter_Level_Set::factoryRenormalize, parms, *table)
+#ifndef SESI_OPENVDB
+                .setInternalName("DW_OpenVDBRenormalizeLevelSet")
+#endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDB grids to process")
 #if VDB_COMPILABLE_SOP
@@ -635,8 +638,11 @@ and usage examples.\n");
 
         } else if (OP_TYPE_RESHAPE == op) {
 
-            hvdb::OpenVDBOpFactory("OpenVDB Offset Level Set",
+            hvdb::OpenVDBOpFactory("VDB Reshape SDF",
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
+#ifndef SESI_OPENVDB
+                .setInternalName("DW_OpenVDBOffsetLevelSet")
+#endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
                 .addOptionalInput("Optional VDB Alpha Mask")
@@ -667,8 +673,11 @@ and usage examples.\n");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
-            hvdb::OpenVDBOpFactory("OpenVDB Smooth Level Set",
+            hvdb::OpenVDBOpFactory("VDB Smooth SDF",
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
+#ifndef SESI_OPENVDB
+                .setInternalName("DW_OpenVDBSmoothLevelSet")
+#endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
                 .addOptionalInput("Optional VDB Alpha Mask")
@@ -704,7 +713,7 @@ and usage examples.\n");
 
         } else if (OP_TYPE_RESIZE == op) {
 
-            hvdb::OpenVDBOpFactory("OpenVDB Resize Narrow Band",
+            hvdb::OpenVDBOpFactory("VDB Resize Narrow Band",
                 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")

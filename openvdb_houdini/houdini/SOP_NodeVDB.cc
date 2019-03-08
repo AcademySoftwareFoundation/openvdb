@@ -561,15 +561,14 @@ SOP_NodeVDB::resolveRenamedParm(PRM_ParmList& obsoleteParms,
 
 namespace {
 
-/// @brief OpPolicy for OpenVDB operator types at SESI
-class SESIOpenVDBOpPolicy: public houdini_utils::OpPolicy
+
+/// @brief Default OpPolicy for OpenVDB operator types
+class DefaultOpenVDBOpPolicy: public houdini_utils::OpPolicy
 {
 public:
     std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
         UT_String s(english);
-        // Lowercase
-        s.toLower();
         // Remove non-alphanumeric characters from the name.
         s.forceValidVariableName();
         std::string name = s.toStdString();
@@ -588,15 +587,34 @@ public:
 };
 
 
-/// @brief OpPolicy for OpenVDB operator types at DWA
-class DWAOpenVDBOpPolicy: public houdini_utils::DWAOpPolicy
+/// @brief SideFX OpPolicy for OpenVDB operator types
+class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    /// @brief OpenVDB operators of each flavor (SOP, POP, etc.) share
-    /// an icon named "SOP_OpenVDB", "POP_OpenVDB", etc.
-    std::string getIconName(const houdini_utils::OpFactory& factory) override
+    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
     {
-        return factory.flavorString() + "_OpenVDB";
+        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        UT_String s(name);
+        // Lowercase
+        s.toLower();
+        return s.toStdString();
+    }
+};
+
+
+/// @brief ASWF OpPolicy for OpenVDB operator types
+class ASWFOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
+{
+public:
+    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    {
+        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        return "DW_Open" + name;
+    }
+
+    std::string getLabelName(const houdini_utils::OpFactory& factory) override
+    {
+        return "Open" + factory.english();
     }
 };
 
@@ -604,7 +622,7 @@ public:
 #ifdef SESI_OPENVDB
 using OpenVDBOpPolicy = SESIOpenVDBOpPolicy;
 #else
-using OpenVDBOpPolicy = DWAOpenVDBOpPolicy;
+using OpenVDBOpPolicy = ASWFOpenVDBOpPolicy;
 #endif // SESI_OPENVDB
 
 } // unnamed namespace

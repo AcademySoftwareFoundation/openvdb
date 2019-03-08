@@ -1840,7 +1840,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(nullptr));
     // }
 
-    hvdb::OpenVDBOpFactory("OpenVDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
         .addInput("VDB Volumes")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })

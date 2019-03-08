@@ -166,7 +166,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value"));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry")

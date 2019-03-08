@@ -538,46 +538,13 @@ public:
 
     /// @brief Return a help URL for the operator defined by the given factory.
     virtual std::string getHelpURL(const OpFactory&) { return ""; }
+
+    /// @brief Return a label name for the operator defined by the given factory.
+    /// @details In this base class implementation, this method simply returns
+    /// factory.@link OpFactory::english() english()@endlink.
+    virtual std::string getLabelName(const OpFactory&);
 };
 
-/// @brief Default policy for DWA operator types
-class OPENVDB_HOUDINI_API DWAOpPolicy: public OpPolicy
-{
-public:
-    /// @brief Return a type name for the operator defined by the given factory.
-    /// @details The operator's type name is generated from its English name
-    /// by prepending "DW_" and removing non-alphanumeric characters.
-    /// For example, "My Node" becomes "DW_MyNode".
-    std::string getName(const OpFactory&, const std::string& english) override;
-
-    /// @brief Return a help URL for the operator defined by the given factory.
-    std::string getHelpURL(const OpFactory&) override;
-};
-
-/// @brief Default policies for DWA R&D operator types
-///
-/// See http://mydw.anim.dreamworks.com/display/FX/Houdini+Plugin+and+HDA+Naming+Rules
-
-class DWALevel1RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 1: show-wide
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L1_RnD"; }
-};
-
-class DWALevel2RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 2: global
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L2_RnD"; }
-};
-
-class DWALevel3RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 3: depot, map, most stable
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L3_RnD"; }
-};
 
 ////////////////////////////////////////
 

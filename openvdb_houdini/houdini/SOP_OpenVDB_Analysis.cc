@@ -225,7 +225,7 @@ Normalize (vector -> vector):\n\
 
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Analysis", SOP_OpenVDB_Analysis::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Analysis", SOP_OpenVDB_Analysis::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Analyze")
         .addOptionalInput("Optional VDB mask input")

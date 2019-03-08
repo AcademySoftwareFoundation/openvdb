@@ -489,7 +489,7 @@ Activity Difference:\n\
 
 
     // Register SOP
-    hvdb::OpenVDBOpFactory("OpenVDB Combine", SOP_OpenVDB_Combine::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Combine", SOP_OpenVDB_Combine::factory, parms, *table)
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .setObsoleteParms(obsoleteParms)

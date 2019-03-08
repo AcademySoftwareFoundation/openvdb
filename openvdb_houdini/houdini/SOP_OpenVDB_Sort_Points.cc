@@ -160,7 +160,7 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
         .setTooltip("The size (length of a side) of the cubic bin, in world units."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Sort Points",
+    hvdb::OpenVDBOpFactory("VDB Sort Points",
         SOP_OpenVDB_Sort_Points::factory, parms, *table)
         .addInput("points")
 #if VDB_COMPILABLE_SOP
