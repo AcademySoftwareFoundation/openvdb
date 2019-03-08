@@ -159,7 +159,7 @@ public:
     {
         ValueType sum = 0.0;
         for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
-        return sum / mStencil.size();
+        return sum / ValueType(mStencil.size());
     }
 
     /// @brief Return the smallest value in the stencil buffer.
@@ -334,9 +334,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline ValueType interpolation(const math::Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        const ValueType u = xyz[0] - static_cast<ValueType>(BaseType::mCenter[0]); assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - static_cast<ValueType>(BaseType::mCenter[1]); assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - static_cast<ValueType>(BaseType::mCenter[2]); assert(w>=0 && w<=1);
 
         ValueType V = BaseType::template getValue<0,0,0>();
         ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
@@ -362,9 +362,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        const ValueType u = xyz[0] - static_cast<ValueType>(BaseType::mCenter[0]); assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - static_cast<ValueType>(BaseType::mCenter[1]); assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - static_cast<ValueType>(BaseType::mCenter[2]); assert(w>=0 && w<=1);
 
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
@@ -1307,9 +1307,9 @@ public:
     {
         const Coord& ijk = BaseType::getCenterCoord();
         const ValueType d = ValueType(mStencil[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
-        return math::Vec3<ValueType>(ijk[0] - d*(mStencil[2] - mStencil[1]),
-                                     ijk[1] - d*(mStencil[4] - mStencil[3]),
-                                     ijk[2] - d*(mStencil[6] - mStencil[5]));
+        return math::Vec3<ValueType>(ValueType(ijk[0]) - d*(mStencil[2] - mStencil[1]),
+                                     ValueType(ijk[1]) - d*(mStencil[4] - mStencil[3]),
+                                     ValueType(ijk[2]) - d*(mStencil[6] - mStencil[5]));
     }
 
     /// Return linear offset for the specified stencil point relative to its center

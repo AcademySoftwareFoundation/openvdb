@@ -152,7 +152,7 @@ public:
             mTargetPointCount = Index64(mPointsPerVolume * voxelVolume * double(mVoxelCount));
         } else if (mTargetPointCount > 0) {
             BaseT::start("Uniform scattering with fixed point count");
-            mPointsPerVolume = mTargetPointCount / float(voxelVolume * mVoxelCount);
+            mPointsPerVolume = float(mTargetPointCount) / float(voxelVolume * double(mVoxelCount));
         } else {
             return false;
         }
@@ -242,7 +242,7 @@ public:
         const Vec3R offset(0.5, 0.5, 0.5);
 
         const int ppv = math::Floor(mPointsPerVoxel);
-        const double delta = mPointsPerVoxel - ppv;
+        const double delta = mPointsPerVoxel - float(ppv);
         const bool fractional = !math::isApproxZero(delta, 1.0e-6);
 
         for (ValueIter iter = grid.cbeginValueOn(); iter; ++iter) {
@@ -255,7 +255,7 @@ public:
                 iter.getBoundingBox(bbox);
                 const Coord size(bbox.extents());
                 const Vec3R dmin = bbox.min() - offset;
-                const double d = mPointsPerVoxel * iter.getVoxelCount();
+                const double d = mPointsPerVoxel * float(iter.getVoxelCount());
                 const int m = math::Floor(d);
                 for (int n = 0; n != m; ++n)  BaseT::addPoint(grid, dmin, size);
                 if (BaseT::getRand01() < d - m) BaseT::addPoint(grid, dmin, size);
@@ -327,7 +327,7 @@ public:
         const Vec3R offset(0.5, 0.5, 0.5);
         for (typename GridT::ValueOnCIter iter = grid.cbeginValueOn(); iter; ++iter) {
             if (BaseT::interrupt()) return false;
-            const double d = (*iter) * pointsPerVoxel * iter.getVoxelCount();
+            const double d = double(*iter) * pointsPerVoxel * double(iter.getVoxelCount());
             const int n = int(d);
             if (iter.isVoxelValue()) { // a majority is expected to be voxels
                 const Vec3R dmin =iter.getCoord() - offset;

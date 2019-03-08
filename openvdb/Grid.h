@@ -1355,7 +1355,10 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    this->tree().prune(ValueType(zeroVal<ValueType>() + tolerance));
+    constexpr bool IsString = std::is_same<ValueType, std::string>::value;
+    using ZeroValType =
+        typename std::conditional<IsString, std::string, float>::type;
+    this->tree().prune(ValueType(zeroVal<ZeroValType>() + tolerance));
 }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3

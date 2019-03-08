@@ -68,7 +68,7 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
                 const float dist = float((p-center).length() - radius);
-                ValueT val = ValueT(zero + dist);
+                ValueT val = zero + ValueT(dist);
                 switch (mode) {
                 case SPHERE_DENSE:
                     acc.setValue(xyz, val);

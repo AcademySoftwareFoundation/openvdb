@@ -1084,8 +1084,8 @@ GridSurfacer::operator()(const GridType& grid)
         GU_Detail tmpGeo;
 
         GU_Surfacer surfacer(tmpGeo,
-            UT_Vector3(bbox.min().x(), bbox.min().y(), bbox.min().z()),
-            UT_Vector3(dim[0], dim[1], dim[2]),
+            UT_Vector3(float(bbox.min().x()), float(bbox.min().y()), float(bbox.min().z())),
+            UT_Vector3(float(dim[0]), float(dim[1]), float(dim[2])),
             dim[0], dim[1], dim[2], mGenerateNormals);
 
         typename GridType::ConstAccessor accessor = grid.getConstAccessor();

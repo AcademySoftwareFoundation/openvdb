@@ -368,7 +368,7 @@ erode(int iterations)
 {
     tools::erodeVoxels(*mLeafs, iterations);
     mLeafs->rebuildLeafArray();
-    const ValueType background = mGrid->background() - iterations*mDx;
+    const ValueType background = mGrid->background() - ValueType(iterations) * mDx;
     tools::changeLevelSetBackground(this->leafs(), background);
 }
 

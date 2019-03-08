@@ -497,8 +497,8 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
         // background value.  Otherwise, preserve the input grid's background value.
         using ValueT = typename GridType::ValueType;
         const ValueT halfWidth = ((outGrid.getGridClass() == openvdb::GRID_LEVEL_SET)
-            ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
-            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0])));
+            ? outGrid.background() * ValueT(1.0 / outGrid.voxelSize()[0])
+            : inGrid.background() * ValueT(1.0 / inGrid.voxelSize()[0]));
 
         typename GridType::Ptr tempGrid;
         try {

@@ -71,9 +71,9 @@ public:
     template <typename Source>
     Vec3(Source *a)
     {
-        this->mm[0] = a[0];
-        this->mm[1] = a[1];
-        this->mm[2] = a[2];
+        this->mm[0] = static_cast<T>(a[0]);
+        this->mm[1] = static_cast<T>(a[1]);
+        this->mm[2] = static_cast<T>(a[2]);
     }
 
     /// @brief Construct a Vec3 from a 3-Tuple with a possibly different value type.
@@ -265,9 +265,9 @@ public:
     template <typename S>
     const Vec3<T> &operator*=(S scalar)
     {
-        this->mm[0] = static_cast<T>(this->mm[0] * scalar);
-        this->mm[1] = static_cast<T>(this->mm[1] * scalar);
-        this->mm[2] = static_cast<T>(this->mm[2] * scalar);
+        this->mm[0] *= static_cast<T>(scalar);
+        this->mm[1] *= static_cast<T>(scalar);
+        this->mm[2] *= static_cast<T>(scalar);
         return *this;
     }
 
@@ -275,9 +275,9 @@ public:
     template <typename S>
     const Vec3<T> &operator*=(const Vec3<S> &v1)
     {
-        this->mm[0] *= v1[0];
-        this->mm[1] *= v1[1];
-        this->mm[2] *= v1[2];
+        this->mm[0] *= static_cast<T>(v1[0]);
+        this->mm[1] *= static_cast<T>(v1[1]);
+        this->mm[2] *= static_cast<T>(v1[2]);
         return *this;
     }
 
@@ -285,9 +285,9 @@ public:
     template <typename S>
     const Vec3<T> &operator/=(S scalar)
     {
-        this->mm[0] /= scalar;
-        this->mm[1] /= scalar;
-        this->mm[2] /= scalar;
+        this->mm[0] /= static_cast<T>(scalar);
+        this->mm[1] /= static_cast<T>(scalar);
+        this->mm[2] /= static_cast<T>(scalar);
         return *this;
     }
 
@@ -295,9 +295,9 @@ public:
     template <typename S>
     const Vec3<T> &operator/=(const Vec3<S> &v1)
     {
-        this->mm[0] /= v1[0];
-        this->mm[1] /= v1[1];
-        this->mm[2] /= v1[2];
+        this->mm[0] /= static_cast<T>(v1[0]);
+        this->mm[1] /= static_cast<T>(v1[1]);
+        this->mm[2] /= static_cast<T>(v1[2]);
         return *this;
     }
 
@@ -305,9 +305,9 @@ public:
     template <typename S>
     const Vec3<T> &operator+=(S scalar)
     {
-        this->mm[0] = static_cast<T>(this->mm[0] + scalar);
-        this->mm[1] = static_cast<T>(this->mm[1] + scalar);
-        this->mm[2] = static_cast<T>(this->mm[2] + scalar);
+        this->mm[0] += static_cast<T>(scalar);
+        this->mm[1] += static_cast<T>(scalar);
+        this->mm[2] += static_cast<T>(scalar);
         return *this;
     }
 
@@ -315,9 +315,9 @@ public:
     template <typename S>
     const Vec3<T> &operator+=(const Vec3<S> &v1)
     {
-        this->mm[0] += v1[0];
-        this->mm[1] += v1[1];
-        this->mm[2] += v1[2];
+        this->mm[0] += static_cast<T>(v1[0]);
+        this->mm[1] += static_cast<T>(v1[1]);
+        this->mm[2] += static_cast<T>(v1[2]);
         return *this;
     }
 
@@ -325,9 +325,9 @@ public:
     template <typename S>
     const Vec3<T> &operator-=(S scalar)
     {
-        this->mm[0] -= scalar;
-        this->mm[1] -= scalar;
-        this->mm[2] -= scalar;
+        this->mm[0] -= static_cast<T>(scalar);
+        this->mm[1] -= static_cast<T>(scalar);
+        this->mm[2] -= static_cast<T>(scalar);
         return *this;
     }
 
@@ -335,9 +335,9 @@ public:
     template <typename S>
     const Vec3<T> &operator-=(const Vec3<S> &v1)
     {
-        this->mm[0] -= v1[0];
-        this->mm[1] -= v1[1];
-        this->mm[2] -= v1[2];
+        this->mm[0] -= static_cast<T>(v1[0]);
+        this->mm[1] -= static_cast<T>(v1[1]);
+        this->mm[2] -= static_cast<T>(v1[2]);
         return *this;
     }
 
