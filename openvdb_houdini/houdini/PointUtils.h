@@ -44,7 +44,6 @@
 #include <GA/GA_Attribute.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_ChoiceList.h>
-#include <UT/UT_InfoTree.h>
 
 #include <iosfwd>
 #include <map>
@@ -199,12 +198,24 @@ OPENVDB_HOUDINI_API
 void
 pointDataGridSpecificInfoText(std::ostream&, const openvdb::GridBase&);
 
-/// @brief Populate a UT_InfoTree with VDB Points information, structured for
-///        the mako templates in Houdini 16 and above. All valid OpenVDB Point
-///        grids contained in the provided GU_Detail are added.
+/// @brief  Populates string data with information about the provided OpenVDB
+///         Points grid.
+/// @param  grid          The OpenVDB Points grid to retrieve information from.
+/// @param  countStr      The total point count as a formatted integer.
+/// @param  groupStr      The list of comma separated groups (or "none" if no
+///                       groups exist). Enclosed by parentheses.
+/// @param  attributeStr  The list of comma separated attributes (or "none" if
+///                       no attributes exist). Enclosed by parentheses.
+///                       Each attribute takes the form "name [type] [code]
+///                       [stride]" where code and stride are added for non
+///                       default attributes.
 OPENVDB_HOUDINI_API
 void
-populateInfoTree(UT_InfoTree&, const GU_Detail&);
+collectPointInfo(const openvdb::points::PointDataGrid& grid,
+    std::string& countStr,
+    std::string& groupStr,
+    std::string& attributeStr);
+
 
 ///////////////////////////////////////
 

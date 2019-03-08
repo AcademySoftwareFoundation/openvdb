@@ -235,6 +235,7 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
         child->addProperties("OpenVDB Version", openvdb::getLibraryAbiVersionString());
     }
 
+#ifdef OPENVDB_CUSTOM_MAKO
     UT_StringArray sparseVolumeTreePath({"SOP Info", "Sparse Volumes"});
     if (UT_InfoTree* sparseVolumes = tree.getDescendentPtr(sparseVolumeTreePath)) {
         if (UT_InfoTree* info = sparseVolumes->addChildBranch("OpenVDB Points")) {
@@ -247,9 +248,29 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
             const GU_Detail* tmpGdp = gdLock.getGdp();
             if (!tmpGdp) return;
 
-            populateInfoTree(*info, *tmpGdp);
+            info->addColumnHeading("Point Count");
+            info->addColumnHeading("Point Groups");
+            info->addColumnHeading("Point Attributes");
+
+            for (VdbPrimCIterator it(tmpGdp); it; ++it) {
+                const openvdb::GridBase::ConstPtr grid = it->getConstGridPtr();
+                if (!grid) continue;
+                if (!grid->isType<openvdb::points::PointDataGrid>()) continue;
+
+                const openvdb::points::PointDataGrid& points =
+                    *openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(grid);
+
+                std::string countStr, groupStr, attributeStr;
+                collectPointInfo(points, countStr, groupStr, attributeStr);
+
+                ut_PropertyRow* row = info->addProperties();
+                row->append(countStr);
+                row->append(groupStr);
+                row->append(attributeStr);
+            }
         }
     }
+#endif
 }
 #endif
 

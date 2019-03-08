@@ -1777,30 +1777,6 @@ pointDataGridSpecificInfoText(std::ostream& infoStr, const GridBase& grid)
     infoStr << " attributes: " << attributeStr;
 }
 
-void
-populateInfoTree(UT_InfoTree& infoTree, const GU_Detail& geo) {
-
-    infoTree.addColumnHeading("Count");
-    infoTree.addColumnHeading("Groups");
-    infoTree.addColumnHeading("Attributes");
-
-    for (VdbPrimCIterator it(&geo); it; ++it) {
-        const openvdb::GridBase::ConstPtr grid = it->getConstGridPtr();
-        if (!grid) continue;
-        if (!grid->isType<openvdb::points::PointDataGrid>()) continue;
-
-        const PointDataGrid& points = *gridConstPtrCast<PointDataGrid>(grid);
-
-        std::string countStr, groupStr, attributeStr;
-        collectPointInfo(points, countStr, groupStr, attributeStr);
-
-        ut_PropertyRow* row = infoTree.addProperties();
-        row->append(countStr);
-        row->append(groupStr);
-        row->append(attributeStr);
-    }
-}
-
 namespace {
 
 inline int
