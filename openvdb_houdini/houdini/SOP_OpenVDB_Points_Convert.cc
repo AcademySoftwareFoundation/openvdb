@@ -466,8 +466,11 @@ Unit Vector:\n\
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Convert",
+    hvdb::OpenVDBOpFactory("VDB Points Convert",
         SOP_OpenVDB_Points_Convert::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBPointsConvert")
+#endif
         .addInput("Points to Convert")
         .addOptionalInput("Optional Reference VDB (for transform)")
         .setObsoleteParms(obsoleteParms)

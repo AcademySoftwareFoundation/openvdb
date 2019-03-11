@@ -229,7 +229,7 @@ struct MatConverter
             for (int j = 0; j < MatT::size; ++j) { rowObj.append(m(i, j)); }
             obj.append(rowObj);
         }
-        return obj;
+        return std::move(obj);
     }
 
     /// Extract a matrix from a Python sequence of numeric sequences.

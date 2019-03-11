@@ -3193,7 +3193,7 @@ newSopOperator(OP_OperatorTable* table)
             "determines density and attribute values."));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
+    hvdb::OpenVDBOpFactory("VDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
 #if (UT_VERSION_INT >= 0x10000000) // later than 16.0.0
         .setOperatorTable(VOP_TABLE_NAME)

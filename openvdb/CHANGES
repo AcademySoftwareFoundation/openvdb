@@ -11,9 +11,11 @@ Version 6.0.1 - In development
     - Added GridBase::apply(), which invokes a functor on a grid
       if the resolved grid type is a member of a given type list.
     - Added util::printTime that outputs nicely-formatted time information.
+    - Added a template specialization of std::hash with Coord.
+    - Added CoordBBox::moveMin and CoordBBox::moveMax to move a CoordBBox.
 
     Improvements:
-    - The API of util::CpuTimer has been improved and is now making use
+    - The API of util::CpuTimer has been improved and is now making use of
       a new util::printTime function for nicer output of time information.
     - Significantly improved the performance of point data grid string
       attribute generation.

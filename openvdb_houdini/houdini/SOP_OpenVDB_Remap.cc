@@ -637,7 +637,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Deactivate voxels with values equal to the remapped background value."));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Remap",
+    hvdb::OpenVDBOpFactory("VDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
         .addInput("VDB Grids")
 #if VDB_COMPILABLE_SOP

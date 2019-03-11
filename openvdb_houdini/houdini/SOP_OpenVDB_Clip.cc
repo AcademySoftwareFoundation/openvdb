@@ -197,7 +197,7 @@ Mask VDB:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "").setDefault(PRMzeroDefaults));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
         .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)

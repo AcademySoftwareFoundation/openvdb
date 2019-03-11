@@ -59,6 +59,7 @@ public:
     }
 
     CPPUNIT_TEST_SUITE(TestParticlesToLevelSet);
+    CPPUNIT_TEST(testBlindData);
     CPPUNIT_TEST(testMyParticleList);
     CPPUNIT_TEST(testRasterizeSpheres);
     CPPUNIT_TEST(testRasterizeSpheresAndId);
@@ -67,6 +68,7 @@ public:
     CPPUNIT_TEST(testMaskOutput);
     CPPUNIT_TEST_SUITE_END();
 
+    void testBlindData();
     void testMyParticleList();
     void testRasterizeSpheres();
     void testRasterizeSpheresAndId();
@@ -153,6 +155,44 @@ public:
     // The method below is only required for attribute transfer
     void getAtt(size_t n, openvdb::Index32& att) const { att = openvdb::Index32(n); }
 };
+
+
+void
+TestParticlesToLevelSet::testBlindData()
+{
+    using BlindTypeIF = openvdb::tools::p2ls_internal::BlindData<openvdb::Index, float>;
+
+    BlindTypeIF value(openvdb::Index(8), 5.2f);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(8), value.visible());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(5.2f, value.blind());
+
+    BlindTypeIF value2(openvdb::Index(13), 1.6f);
+
+    { // test equality
+        // only visible portion needs to be equal
+        BlindTypeIF blind(openvdb::Index(13), 6.7f);
+        CPPUNIT_ASSERT(value2 == blind);
+    }
+
+    { // test addition of two blind types
+        BlindTypeIF blind = value + value2;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+13), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(0.0f, blind.blind()); // blind values are both dropped
+    }
+
+    { // test addition of blind type with visible type
+        BlindTypeIF blind = value + 3;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+
+    { // test addition of blind type with type that requires casting
+        // note that this will generate conversion warnings if not handled properly
+        BlindTypeIF blind = value + 3.7;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+}
 
 
 void

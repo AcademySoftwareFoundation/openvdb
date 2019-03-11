@@ -284,8 +284,7 @@ Use mask as frequency multiplier:\n\
     // }
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Noise", SOP_OpenVDB_Noise::factory, parms, *table)
-        .addAlias("OpenVDB LevelSet Noise")
+    hvdb::OpenVDBOpFactory("VDB Noise", SOP_OpenVDB_Noise::factory, parms, *table)
         .addInput("VDB grids to noise")
         .addOptionalInput("Optional VDB grid to use as mask")
 #if VDB_COMPILABLE_SOP

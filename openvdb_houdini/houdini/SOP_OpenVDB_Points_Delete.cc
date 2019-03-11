@@ -120,7 +120,7 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Delete",
+    hvdb::OpenVDBOpFactory("VDB Points Delete",
         SOP_OpenVDB_Points_Delete::factory, parms, *table)
         .addInput("VDB Points")
 #if VDB_COMPILABLE_SOP

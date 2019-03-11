@@ -165,7 +165,7 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
-    hvdb::OpenVDBOpFactory("OpenVDB Ray", SOP_OpenVDB_Ray::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Ray", SOP_OpenVDB_Ray::factory, parms, *table)
         .addInput("points")
         .addInput("level set grids")
 #if VDB_COMPILABLE_SOP

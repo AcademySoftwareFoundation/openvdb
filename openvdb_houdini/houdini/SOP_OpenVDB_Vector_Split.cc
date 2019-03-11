@@ -113,7 +113,7 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
+    hvdb::OpenVDBOpFactory("VDB Vector Split",
         SOP_OpenVDB_Vector_Split::factory, parms, *table)
         .addInput("Vector VDBs to split into scalar VDBs")
 #if VDB_COMPILABLE_SOP

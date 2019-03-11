@@ -21,9 +21,18 @@ New features:
 - Added @vdblink::GridBase::apply() GridBase::apply@endlink,
   which invokes a functor on a grid if the resolved grid type
   is a member of a given type list.
+- Added @vdblink::util::printTime util::printTime@endlink that
+  outputs nicely-formatted time information.
+- Added a template specialization of std::hash with @vdblink::math::Coord Coord@endlink.
+- Added @vdblink::math::CoordBBox::moveMin CoordBBox::moveMin@endlink and
+  @vdblink::math::CoordBBox::moveMax CoordBBox::moveMax@endlink to move a
+  @vdblink::math::CoordBBox CoordBBox@endlink.
 
 @par
 Improvements:
+- The API of @vdblink::util::CpuTimer util::CpuTimer@endlink has been improved
+  and is now making use of a new @vdblink::util::printTime util::printTime@endlink
+  function for nicer output of time information.
 - Significantly improved the performance of point data grid string attribute
   generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
