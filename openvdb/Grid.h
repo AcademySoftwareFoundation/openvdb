@@ -1715,20 +1715,20 @@ namespace internal {
 
 /// @private
 template<typename OpT, typename GridBaseT, typename T, typename ...Ts>
-struct GridApplyImpl { bool operator()(GridBaseT&, OpT&) const { return false; } };
+struct GridApplyImpl { static bool apply(GridBaseT&, OpT&) { return false; } };
 
-// Partial specialization for (nonempty) TypeSets
+// Partial specialization for (nonempty) TypeLists
 /// @private
 template<typename OpT, typename GridBaseT, typename GridT, typename ...GridTs>
 struct GridApplyImpl<OpT, GridBaseT, TypeList<GridT, GridTs...>>
 {
-    bool operator()(GridBaseT& grid, OpT& op) const
+    static bool apply(GridBaseT& grid, OpT& op)
     {
         if (grid.template isType<GridT>()) {
             op(static_cast<typename CopyConstness<GridBaseT, GridT>::Type&>(grid));
             return true;
         }
-        return GridApplyImpl<OpT, GridBaseT, TypeList<GridTs...>>{}(grid, op);
+        return GridApplyImpl<OpT, GridBaseT, TypeList<GridTs...>>::apply(grid, op);
     }
 };
 
@@ -1739,14 +1739,14 @@ template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(OpT& op) const
 {
-    return internal::GridApplyImpl<OpT, const GridBase, GridTypeListT>{}(*this, op);
+    return internal::GridApplyImpl<OpT, const GridBase, GridTypeListT>::apply(*this, op);
 }
 
 template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(OpT& op)
 {
-    return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>{}(*this, op);
+    return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>::apply(*this, op);
 }
 
 } // namespace OPENVDB_VERSION_NAME
