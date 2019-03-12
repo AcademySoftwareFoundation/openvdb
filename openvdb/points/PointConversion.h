@@ -278,107 +278,6 @@ template <> struct ConversionTraits<openvdb::Name>
     }
 }; // ConversionTraits<openvdb::Name>
 
-
-template<typename PointDataTreeType, typename PointIndexTreeType>
-struct InitialiseAttributesOp {
-
-    using LeafManagerT          = typename tree::LeafManager<PointDataTreeType>;
-    using LeafRangeT            = typename LeafManagerT::LeafRange;
-
-    using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
-    using IndexArray            = typename PointIndexLeafNode::IndexArray;
-
-    InitialiseAttributesOp( const PointIndexTreeType& pointIndexTree,
-                            const AttributeSet::Descriptor::Ptr& attributeDescriptor)
-        : mPointIndexTree(pointIndexTree)
-        , mAttributeDescriptor(attributeDescriptor) { }
-
-    void operator()(const typename LeafManagerT::LeafRange& range) const {
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-
-            // obtain the PointIndexLeafNode (using the origin of the current leaf)
-
-            const PointIndexLeafNode* pointIndexLeaf = mPointIndexTree.probeConstLeaf(leaf->origin());
-
-            if (!pointIndexLeaf)    continue;
-
-            // initialise the attribute storage
-
-            const IndexArray& indices = pointIndexLeaf->indices();
-
-            auto pointCount = static_cast<Index>(indices.size());
-
-            leaf->initializeAttributes(mAttributeDescriptor, pointCount);
-        }
-    }
-
-    //////////
-
-    const PointIndexTreeType&               mPointIndexTree;
-    const AttributeSet::Descriptor::Ptr&    mAttributeDescriptor;
-};
-
-template<   typename PointDataTreeType,
-            typename PointIndexTreeType,
-            typename PositionListType>
-struct PopulatePositionAttributeOp {
-
-    using LeafManagerT          = typename tree::LeafManager<PointDataTreeType>;
-    using LeafRangeT            = typename LeafManagerT::LeafRange;
-
-    using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
-    using IndexArray            = typename PointIndexLeafNode::IndexArray;
-
-    using ValueType             = typename PositionListType::value_type;
-
-    PopulatePositionAttributeOp(const PointIndexTreeType& pointIndexTree,
-                                const math::Transform& transform,
-                                const PositionListType& positions)
-        : mPointIndexTree(pointIndexTree)
-        , mTransform(transform)
-        , mPositions(positions) { }
-
-    void operator()(const typename LeafManagerT::LeafRange& range) const {
-
-        for (auto leaf = range.begin(); leaf; ++leaf) {
-
-            // obtain the PointIndexLeafNode (using the origin of the current leaf)
-
-            const PointIndexLeafNode* pointIndexLeaf = mPointIndexTree.probeConstLeaf(leaf->origin());
-
-            if (!pointIndexLeaf)    continue;
-
-            auto attributeWriteHandle = AttributeWriteHandle<Vec3f>::create(leaf->attributeArray("P"));
-
-            Index64 index = 0;
-
-            const IndexArray& indices = pointIndexLeaf->indices();
-
-            for (const Index64 i: indices) {
-                ValueType positionWorldSpace;
-                mPositions.getPos(i, positionWorldSpace);
-
-                const ValueType positionIndexSpace = mTransform.worldToIndex(positionWorldSpace);
-
-                const ValueType positionVoxelSpace = ValueType(
-                            positionIndexSpace.x() - math::Round(positionIndexSpace.x()),
-                            positionIndexSpace.y() - math::Round(positionIndexSpace.y()),
-                            positionIndexSpace.z() - math::Round(positionIndexSpace.z()));
-
-                attributeWriteHandle->set(static_cast<Index>(index), Vec3f(positionVoxelSpace));
-
-                index++;
-            }
-        }
-    }
-
-    //////////
-
-    const PointIndexTreeType&   mPointIndexTree;
-    const math::Transform&      mTransform;
-    const PositionListType&     mPositions;
-};
-
 template<   typename PointDataTreeType,
             typename PointIndexTreeType,
             typename AttributeListType>
@@ -745,23 +644,20 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
                     const math::Transform& xform, Metadata::Ptr positionDefaultValue)
 {
     using PointDataTreeT        = typename PointDataGridT::TreeType;
-    using PointIndexTreeT       = typename PointIndexGridT::TreeType;
+    using LeafT                 = typename PointDataTree::LeafNodeType;
+    using PointIndexLeafT       = typename PointIndexGridT::TreeType::LeafNodeType;
+    using PointIndexT           = typename PointIndexLeafT::ValueType;
     using LeafManagerT          = typename tree::LeafManager<PointDataTreeT>;
-    using LeafRangeT            = typename LeafManagerT::LeafRange;
     using PositionAttributeT    = TypedAttributeArray<Vec3f, CompressionT>;
-
-    using point_conversion_internal::InitialiseAttributesOp;
-    using point_conversion_internal::PopulatePositionAttributeOp;
 
     const NamePair positionType = PositionAttributeT::attributeType();
 
     // construct the Tree using a topology copy of the PointIndexGrid
 
-    const PointIndexTreeT& pointIndexTree(pointIndexGrid.tree());
+    const auto& pointIndexTree = pointIndexGrid.tree();
     typename PointDataTreeT::Ptr treePtr(new PointDataTreeT(pointIndexTree));
 
-    LeafManagerT leafManager = LeafManagerT(*treePtr);
-    LeafRangeT leafRange = leafManager.leafRange();
+    LeafManagerT leafManager(*treePtr);
 
     // create attribute descriptor from position type
 
@@ -773,19 +669,70 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 
     // create point attribute storage on each leaf
 
-    InitialiseAttributesOp<PointDataTreeT, PointIndexTreeT> initialise(
-                                pointIndexGrid.tree(), descriptor);
-    tbb::parallel_for(leafRange, initialise);
+    leafManager.foreach(
+        [&](LeafT& leaf, size_t /*idx*/) {
+
+            // obtain the PointIndexLeafNode (using the origin of the current leaf)
+            const auto* pointIndexLeaf = pointIndexTree.probeConstLeaf(leaf.origin());
+            assert(pointIndexLeaf);
+
+            // initialise the attribute storage
+            Index pointCount(static_cast<Index>(pointIndexLeaf->indices().size()));
+            leaf.initializeAttributes(descriptor, pointCount);
+        },
+    /*threaded=*/true);
 
     // populate position attribute
 
-    PopulatePositionAttributeOp<PointDataTreeT,
-                                PointIndexTreeT,
-                                PositionArrayT> populate(pointIndexTree,
-                                                        xform,
-                                                        positions);
+    const size_t positionIndex = descriptor->find("P");
+    assert(positionIndex != AttributeSet::INVALID_POS);
 
-    tbb::parallel_for(leafRange, populate);
+    leafManager.foreach(
+        [&](LeafT& leaf, size_t /*idx*/) {
+
+            // obtain the PointIndexLeafNode (using the origin of the current leaf)
+            const auto* pointIndexLeaf = pointIndexTree.probeConstLeaf(leaf.origin());
+            assert(pointIndexLeaf);
+
+            auto attributeWriteHandle = AttributeWriteHandle<Vec3f, CompressionT>::create(
+                leaf.attributeArray(positionIndex));
+
+            Index index = 0;
+
+            const PointIndexT
+                *begin = static_cast<PointIndexT*>(nullptr),
+                *end = static_cast<PointIndexT*>(nullptr);
+
+            // iterator over every active voxel in the point index leaf
+
+            for (auto iter = pointIndexLeaf->cbeginValueOn(); iter; ++iter) {
+
+                // find the voxel center
+
+                const Coord& ijk = iter.getCoord();
+                const Vec3d& positionCellCenter(ijk.asVec3d());
+
+                // obtain pointers for this voxel from begin to end in the indices array
+
+                pointIndexLeaf->getIndices(ijk, begin, end);
+
+                while (begin < end) {
+
+                    typename PositionArrayT::value_type positionWorldSpace;
+                    positions.getPos(*begin, positionWorldSpace);
+
+                    // compute the index-space position and then subtract the voxel center
+
+                    const Vec3d positionIndexSpace = xform.worldToIndex(positionWorldSpace);
+                    const Vec3f positionVoxelSpace(positionIndexSpace - positionCellCenter);
+
+                    attributeWriteHandle->set(index++, positionVoxelSpace);
+
+                    ++begin;
+                }
+            }
+        },
+    /*threaded=*/true);
 
     auto grid = PointDataGridT::create(treePtr);
     grid->setTransform(xform.copy());
