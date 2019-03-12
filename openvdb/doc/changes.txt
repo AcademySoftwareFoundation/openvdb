@@ -17,6 +17,10 @@ New features:
 - Added support for @vdblink::Vec4SMetadata Vec4s@endlink,
   @vdblink::Vec4DMetadata Vec4d@endlink
   and @vdblink::Vec4IMetadata Vec4i@endlink metadata.
+- Added a generic @vdblink::TypeList TypeList@endlink class.
+- Added @vdblink::GridBase::apply() GridBase::apply@endlink,
+  which invokes a functor on a grid if the resolved grid type
+  is a member of a given type list.
 - Added @vdblink::util::printTime util::printTime@endlink that
   outputs nicely-formatted time information.
 - Added a template specialization of std::hash with @vdblink::math::Coord Coord@endlink.
@@ -49,6 +53,11 @@ Bug fixes:
 - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 
 @par
+API changes:
+- Moved the @vdblink::CopyConstness CopyConstness@endlink metafunction from
+  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h@endlink.
+
+@par
 Houdini:
 - The Points&nbsp;Convert SOP now reports NaN Positions as warnings when
   converting from Houdini Points to VDB Points.
@@ -56,6 +65,8 @@ Houdini:
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the
   transformation to the internal affine map.
+- Added type lists for sets of commonly-used grid types, including
+  @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
 
 @par
 Python:
