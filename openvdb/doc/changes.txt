@@ -47,6 +47,7 @@ Bug fixes:
 - Fixed a race condition when moving points in point data grids for ABI=6+
   due to non-const access of AttributeArrays resulting in a copy-on-write.
 - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
+- Fix a rounding error bug in point conversion when using floating-point.
 
 @par
 Houdini:
