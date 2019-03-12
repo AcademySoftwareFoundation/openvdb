@@ -56,6 +56,9 @@ Houdini:
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the
   transformation to the internal affine map.
+- Renamed SOP labels to match native Houdini SOPs - New Names:
+  Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF, Project
+  Non-Divergent, Segment by Connectivity, Topology to SDF, Visualize Tree
 
 @par
 Python:
