@@ -657,8 +657,6 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
     const auto& pointIndexTree = pointIndexGrid.tree();
     typename PointDataTreeT::Ptr treePtr(new PointDataTreeT(pointIndexTree));
 
-    LeafManagerT leafManager(*treePtr);
-
     // create attribute descriptor from position type
 
     auto descriptor = AttributeSet::Descriptor::create(positionType);
@@ -667,32 +665,28 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 
     if (positionDefaultValue)   descriptor->setDefaultValue("P", *positionDefaultValue);
 
-    // create point attribute storage on each leaf
-
-    leafManager.foreach(
-        [&](LeafT& leaf, size_t /*idx*/) {
-
-            // obtain the PointIndexLeafNode (using the origin of the current leaf)
-            const auto* pointIndexLeaf = pointIndexTree.probeConstLeaf(leaf.origin());
-            assert(pointIndexLeaf);
-
-            // initialise the attribute storage
-            Index pointCount(static_cast<Index>(pointIndexLeaf->indices().size()));
-            leaf.initializeAttributes(descriptor, pointCount);
-        },
-    /*threaded=*/true);
-
-    // populate position attribute
+    // retrieve position index
 
     const size_t positionIndex = descriptor->find("P");
     assert(positionIndex != AttributeSet::INVALID_POS);
 
+    // populate position attribute
+
+    LeafManagerT leafManager(*treePtr);
     leafManager.foreach(
         [&](LeafT& leaf, size_t /*idx*/) {
 
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
+
             const auto* pointIndexLeaf = pointIndexTree.probeConstLeaf(leaf.origin());
             assert(pointIndexLeaf);
+
+            // initialise the attribute storage
+
+            Index pointCount(static_cast<Index>(pointIndexLeaf->indices().size()));
+            leaf.initializeAttributes(descriptor, pointCount);
+
+            // create write handle for position
 
             auto attributeWriteHandle = AttributeWriteHandle<Vec3f, CompressionT>::create(
                 leaf.attributeArray(positionIndex));
