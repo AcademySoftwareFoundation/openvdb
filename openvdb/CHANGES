@@ -41,6 +41,9 @@ Version 6.0.1 - In development
       Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF,
       Project Non-Divergent, Segment by Connectivity, Topology to SDF,
       Visualize Tree
+    - Added a houdini_utils::OpPolicy::getLabelName() method to allow
+      derived OpPolicy classes to provide their own label naming scheme
+      for tab menus.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
