@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -305,10 +305,44 @@ bool isLogForwarding(OP_OpTypeId);
 /// @}
 
 
+////////////////////////////////////////
+
+
+// Grid type lists, for use with openvdb::GridBase::apply()
+
+using ScalarGridTypes = openvdb::TypeList<
+    openvdb::BoolGrid,
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid,
+    openvdb::Int32Grid,
+    openvdb::Int64Grid>;
+
+using NumericGridTypes = openvdb::TypeList<
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid,
+    openvdb::Int32Grid,
+    openvdb::Int64Grid>;
+
+using RealGridTypes = openvdb::TypeList<
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid>;
+
+using Vec3GridTypes = openvdb::TypeList<
+    openvdb::Vec3SGrid,
+    openvdb::Vec3DGrid,
+    openvdb::Vec3IGrid>;
+
+using PointGridTypes = openvdb::TypeList<
+    openvdb::points::PointDataGrid>;
+
+using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
+
+using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
+
 } // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

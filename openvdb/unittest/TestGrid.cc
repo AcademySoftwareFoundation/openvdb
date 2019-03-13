@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -54,6 +54,7 @@ public:
     CPPUNIT_TEST(testCopyGrid);
     CPPUNIT_TEST(testValueConversion);
     CPPUNIT_TEST(testClipping);
+    CPPUNIT_TEST(testApply);
     CPPUNIT_TEST_SUITE_END();
 
     void testGridRegistry();
@@ -64,6 +65,7 @@ public:
     void testCopyGrid();
     void testValueConversion();
     void testClipping();
+    void testApply();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestGrid);
@@ -459,6 +461,71 @@ TestGrid::testClipping()
     */
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+
+////////////////////////////////////////
+
+
+namespace {
+
+struct GridOp
+{
+    bool isConst = false;
+    template<typename GridT> void operator()(const GridT&) { isConst = true; }
+    template<typename GridT> void operator()(GridT&) { isConst = false; }
+};
+
+} // anonymous namespace
+
+
+void
+TestGrid::testApply()
+{
+    using namespace openvdb;
+
+    const GridBase::Ptr
+        boolGrid = BoolGrid::create(),
+        floatGrid = FloatGrid::create(),
+        doubleGrid = DoubleGrid::create(),
+        intGrid = Int32Grid::create();
+
+    const GridBase::ConstPtr
+        boolCGrid = BoolGrid::create(),
+        floatCGrid = FloatGrid::create(),
+        doubleCGrid = DoubleGrid::create(),
+        intCGrid = Int32Grid::create();
+
+    {
+        using AllowedGridTypes = TypeList<>;
+
+        // Verify that the functor is not applied to any of the grids.
+        GridOp op;
+        CPPUNIT_ASSERT(!boolGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!boolCGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!floatGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!floatCGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!doubleGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!doubleCGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!intGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!intCGrid->apply<AllowedGridTypes>(op));
+    }
+    {
+        using AllowedGridTypes = TypeList<FloatGrid, FloatGrid, DoubleGrid>;
+
+        // Verify that the functor is applied only to grids of the allowed types
+        // and that their constness is respected.
+        GridOp op;
+        CPPUNIT_ASSERT(!boolGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!intGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(floatGrid->apply<AllowedGridTypes>(op));  CPPUNIT_ASSERT(!op.isConst);
+        CPPUNIT_ASSERT(doubleGrid->apply<AllowedGridTypes>(op)); CPPUNIT_ASSERT(!op.isConst);
+
+        CPPUNIT_ASSERT(!boolCGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(!intCGrid->apply<AllowedGridTypes>(op));
+        CPPUNIT_ASSERT(floatCGrid->apply<AllowedGridTypes>(op));  CPPUNIT_ASSERT(op.isConst);
+        CPPUNIT_ASSERT(doubleCGrid->apply<AllowedGridTypes>(op)); CPPUNIT_ASSERT(op.isConst);
+    }
+}
+
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -17,6 +17,10 @@ New features:
 - Added support for @vdblink::Vec4SMetadata Vec4s@endlink,
   @vdblink::Vec4DMetadata Vec4d@endlink
   and @vdblink::Vec4IMetadata Vec4i@endlink metadata.
+- Added a generic @vdblink::TypeList TypeList@endlink class.
+- Added @vdblink::GridBase::apply() GridBase::apply@endlink,
+  which invokes a functor on a grid if the resolved grid type
+  is a member of a given type list.
 - Added @vdblink::util::printTime util::printTime@endlink that
   outputs nicely-formatted time information.
 - Added a template specialization of std::hash with @vdblink::math::Coord Coord@endlink.
@@ -47,6 +51,12 @@ Bug fixes:
 - Fixed a race condition when moving points in point data grids for ABI=6+
   due to non-const access of AttributeArrays resulting in a copy-on-write.
 - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
+- Fix a rounding error bug in point conversion when using floating-point.
+
+@par
+API changes:
+- Moved the @vdblink::CopyConstness CopyConstness@endlink metafunction from
+  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h@endlink.
 
 @par
 Houdini:
@@ -61,6 +71,8 @@ Houdini:
   Non-Divergent, Segment by Connectivity, Topology to SDF, Visualize Tree
 - Added a @b houdini_utils::OpPolicy::getLabelName() method to allow derived
   OpPolicy classes to provide their own label naming scheme for tab menus.
+- Added type lists for sets of commonly-used grid types, including
+  @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
 
 @par
 Python:

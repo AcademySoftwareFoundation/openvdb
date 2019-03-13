@@ -7,6 +7,9 @@ Version 6.0.1 - In development
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.
     - Added support for Vec4s, Vec4d and Vec4i metadata.
+    - Added a generic TypeList class.
+    - Added GridBase::apply(), which invokes a functor on a grid
+      if the resolved grid type is a member of a given type list.
     - Added util::printTime that outputs nicely-formatted time information.
     - Added a template specialization of std::hash with Coord.
     - Added CoordBBox::moveMin and CoordBBox::moveMax to move a CoordBBox.
@@ -29,6 +32,10 @@ Version 6.0.1 - In development
     - Fixed a race condition when moving points in point data grids for ABI=6+
       due to non-const access of AttributeArrays resulting in a copy-on-write.
     - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
+    - Fix a rounding error bug in point conversion when using floating-point.
+
+    API changes:
+    - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
 
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
@@ -44,6 +51,8 @@ Version 6.0.1 - In development
     - Added a houdini_utils::OpPolicy::getLabelName() method to allow
       derived OpPolicy classes to provide their own label naming scheme
       for tab menus.
+    - Added type lists for sets of commonly-used grid types, including
+      ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
