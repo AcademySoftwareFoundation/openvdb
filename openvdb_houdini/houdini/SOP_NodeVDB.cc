@@ -57,6 +57,32 @@
 #include <sstream>
 #include <stdexcept>
 
+/// Enables custom UT_InfoTree data from SOP_NodeVDB::fillInfoTreeNodeSpecific()
+/// which is used to populate the mako templates in Houdini 16 and greater.
+/// The templates are used to provide MMB information on Houdini primitives and
+/// are installed as part of the Houdini toolkit $HH/config/NodeInfoTemplates.
+/// This code has since been absorbed by SideFX, but we continue to keep
+/// it around to demonstrate how to extend the templates in Houdini. Note
+/// that the current implementation is a close duplicate of the data populated
+/// by Houdini, so this will clash with native Houdini names. The templates
+/// may also change in future Houdini versions, so do not expect this to
+/// produce valid results out the box.
+///
+/// For users wishing to customize the .mako files, you can use python to
+/// inspect the current mako structure.
+///
+/// @code
+/// infoTree = hou.node('/obj/geo1/vdbfrompolygons1').infoTree()
+/// sopInfo  = infoTree.branches()['SOP Info']
+/// sparseInfo = sopInfo.branches()['Sparse Volumes']
+/// @endcode
+///
+/// These mako branches are the paths that are populated by UT_InfoTree. The
+/// mako files responsible for producing VDB specific data are geometry.mako,
+/// called by sop.mako.
+///
+//#define OPENVDB_CUSTOM_MAKO
+
 
 namespace openvdb_houdini {
 
