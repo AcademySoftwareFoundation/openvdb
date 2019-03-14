@@ -66,6 +66,11 @@ Houdini:
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the
   transformation to the internal affine map.
+- Renamed SOP labels to match native Houdini SOPs - New Names:
+  Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF, Project
+  Non-Divergent, Segment by Connectivity, Topology to SDF, Visualize Tree
+- Added a @b houdini_utils::OpPolicy::getLabelName() method to allow derived
+  OpPolicy classes to provide their own label naming scheme for tab menus.
 - Added type lists for sets of commonly-used grid types, including
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
 
