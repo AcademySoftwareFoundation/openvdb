@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,102 +24,291 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
+#[=======================================================================[.rst:
 
-# -*- cmake -*-
-# - Find OpenEXR
-#
-# Author : Nicholas Yue yue.nicholas@gmail.com
-#
-# This module will define the following variables:
-#  OPENEXR_INCLUDE_DIRS - Location of the openexr includes
-#  OPENEXR_LIBRARIES - [TODO] Required libraries for all requested bindings
-#  OPENEXR_FOUND - true if OPENEXR was found on the system
-#  OPENEXR_LIBRARYDIR - the full set of library directories
+FindOpenEXR
+---------
 
-FIND_PACKAGE ( PackageHandleStandardArgs )
+Find OpenEXR include dirs and libraries
 
-FIND_PATH ( OPENEXR_LOCATION include/OpenEXR/OpenEXRConfig.h
-  ENV OPENEXR_ROOT
+Use this module by invoking find_package with the form::
+
+  find_package(OpenEXR
+    [version] [EXACT]      # Minimum or EXACT version
+    [REQUIRED]             # Fail with error if OpenEXR is not found
+    [COMPONENTS <libs>...] # OpenEXR libraries by their canonical name
+                           # e.g. "IlmImf" for "libIlmImf"
+    )
+
+IMPORTED Targets
+^^^^^^^^^^^^^^^^
+
+``OpenEXR::IlmImf``
+  The IlmImf library target.
+``OpenEXR::IlmImfUtil``
+  The IlmImfUtil library target.
+
+Result Variables
+^^^^^^^^^^^^^^^^
+
+This will define the following variables:
+
+``OpenEXR_FOUND``
+  True if the system has the OpenEXR library.
+``OpenEXR_VERSION``
+  The version of the OpenEXR library which was found.
+``OpenEXR_INCLUDE_DIRS``
+  Include directories needed to use OpenEXR.
+``OpenEXR_LIBRARIES``
+  Libraries needed to link to OpenEXR.
+``OpenEXR_LIBRARY_DIRS``
+  OpenEXR library directories.
+``OpenEXR_DEFINITIONS``
+  Definitions to use when compiling code that uses OpenEXR.
+``OpenEXR_{COMPONENT}_FOUND``
+  True if the system has the named OpenEXR component.
+
+Cache Variables
+^^^^^^^^^^^^^^^
+
+The following cache variables may also be set:
+
+``OpenEXR_INCLUDE_DIR``
+  The directory containing ``OpenEXR/config-auto.h``.
+``OpenEXR_{COMPONENT}_LIBRARY``
+  Individual component libraries for OpenEXR
+``OpenEXR_{COMPONENT}_DLL``
+  Individual component dlls for OpenEXR on Windows.
+
+Hints
+^^^^^^^^^^^^^^^
+
+Instead of explicitly setting the cache variables, the following variables
+may be provided to tell this module where to look.
+
+``OPENEXR_ROOT``
+  Preferred installation prefix.
+``OPENEXR_INCLUDEDIR``
+  Preferred include directory e.g. <prefix>/include
+``OPENEXR_LIBRARYDIR``
+  Preferred library directory e.g. <prefix>/lib
+``SYSTEM_LIBRARY_PATHS``
+  Paths appended to all include and lib searches.
+
+#]=======================================================================]
+
+MARK_AS_ADVANCED (
+  OpenEXR_INCLUDE_DIR
+  OpenEXR_LIBRARY
+  OPENEXR_NAMESPACE_VERSIONING
+)
+
+SET ( _OPENEXR_COMPONENT_LIST
+  IlmImf
+  IlmImfUtil
+  )
+
+IF ( OpenEXR_FIND_COMPONENTS )
+  SET ( OPENEXR_COMPONENTS_PROVIDED TRUE )
+  SET ( _IGNORED_COMPONENTS "" )
+  FOREACH ( COMPONENT ${OpenEXR_FIND_COMPONENTS} )
+    IF ( NOT ${COMPONENT} IN_LIST _OPENEXR_COMPONENT_LIST )
+      LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
+    ENDIF ()
+  ENDFOREACH()
+
+  IF ( _IGNORED_COMPONENTS )
+    MESSAGE ( STATUS "Ignoring unknown components of OpenEXR:" )
+    FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
+      MESSAGE ( STATUS "  ${COMPONENT}" )
+    ENDFOREACH ()
+    LIST ( REMOVE_ITEM OpenEXR_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
+  ENDIF ()
+ELSE ()
+  SET ( OPENEXR_COMPONENTS_PROVIDED FALSE )
+  SET ( OpenEXR_FIND_COMPONENTS ${_OPENEXR_COMPONENT_LIST} )
+ENDIF ()
+
+# Append OPENEXR_ROOT or $ENV{OPENEXR_ROOT} if set (prioritize the direct cmake var)
+SET ( _OPENEXR_ROOT_SEARCH_DIR "" )
+
+IF ( OPENEXR_ROOT )
+  LIST ( APPEND _OPENEXR_ROOT_SEARCH_DIR ${OPENEXR_ROOT} )
+ELSE ()
+  SET ( _ENV_OPENEXR_ROOT $ENV{OPENEXR_ROOT} )
+  IF ( _ENV_OPENEXR_ROOT )
+    LIST ( APPEND _OPENEXR_ROOT_SEARCH_DIR ${_ENV_OPENEXR_ROOT} )
+  ENDIF ()
+ENDIF ()
+
+# Additionally try and use pkconfig to find OpenEXR
+
+FIND_PACKAGE ( PkgConfig )
+PKG_CHECK_MODULES ( PC_OpenEXR QUIET openexr )
+
+# ------------------------------------------------------------------------
+#  Search for OpenEXR include DIR
+# ------------------------------------------------------------------------
+
+SET ( _OPENEXR_INCLUDE_SEARCH_DIRS "" )
+LIST ( APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
+  ${OPENEXR_INCLUDEDIR}
+  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${PC_OpenEXR_INCLUDE_DIRS}
+  ${SYSTEM_LIBRARY_PATHS}
+  )
+
+# Look for a standard OpenEXR header file.
+FIND_PATH ( OpenEXR_INCLUDE_DIR OpenEXRConfig.h
   NO_DEFAULT_PATH
-  NO_SYSTEM_ENVIRONMENT_PATH
-  PATHS ${SYSTEM_LIBRARY_PATHS}
+  PATHS ${_OPENEXR_INCLUDE_SEARCH_DIRS}
+  PATH_SUFFIXES  include/OpenEXR OpenEXR
   )
 
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenEXR
-  REQUIRED_VARS OPENEXR_LOCATION
+IF ( EXISTS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h" )
+  # Get the EXR version information from the config header
+  FILE ( STRINGS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h"
+    _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR "
+    )
+  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MAJOR" ""
+    _openexr_version_major_string "${_openexr_version_major_string}"
+    )
+  STRING ( STRIP "${_openexr_version_major_string}" OpenEXR_VERSION_MAJOR )
+
+  FILE ( STRINGS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h"
+     _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR "
+    )
+  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" ""
+    _openexr_version_minor_string "${_openexr_version_minor_string}"
+    )
+  STRING ( STRIP "${_openexr_version_minor_string}" OpenEXR_VERSION_MINOR )
+
+  UNSET ( _openexr_version_major_string )
+  UNSET ( _openexr_version_minor_string )
+
+  SET ( OpenEXR_VERSION ${OpenEXR_VERSION_MAJOR}.${OpenEXR_VERSION_MINOR} )
+ENDIF ()
+
+# ------------------------------------------------------------------------
+#  Search for OPENEXR lib DIR
+# ------------------------------------------------------------------------
+
+SET ( _OPENEXR_LIBRARYDIR_SEARCH_DIRS "" )
+
+# Append to _OPENEXR_LIBRARYDIR_SEARCH_DIRS in priority order
+
+LIST ( APPEND _OPENEXR_LIBRARYDIR_SEARCH_DIRS
+  ${OPENEXR_LIBRARYDIR}
+  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${PC_OpenEXR_LIBRARY_DIRS}
+  ${SYSTEM_LIBRARY_PATHS}
   )
 
-OPTION ( OPENEXR_NAMESPACE_VERSIONING "Namespace versioning of libraries" ON )
+# Build suffix directories
 
-IF ( OPENEXR_FOUND )
+SET ( OPENEXR_PATH_SUFFIXES
+  lib64
+  lib
+)
 
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_major_string REGEX "#define OPENEXR_VERSION_MAJOR ")
-  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MAJOR" "" _openexr_version_major_unstrip "${_openexr_version_major_string}")
-  STRING ( STRIP "${_openexr_version_major_unstrip}" OPENEXR_VERSION_MAJOR )
+IF ( ${CMAKE_CXX_COMPILER_ID} STREQUAL GNU )
+  LIST ( INSERT OPENEXR_PATH_SUFFIXES 0 lib/x86_64-linux-gnu )
+ENDIF ()
 
-  FILE ( STRINGS "${OPENEXR_LOCATION}/include/OpenEXR/OpenEXRConfig.h" _openexr_version_minor_string REGEX "#define OPENEXR_VERSION_MINOR ")
-  STRING ( REGEX REPLACE "#define OPENEXR_VERSION_MINOR" "" _openexr_version_minor_unstrip "${_openexr_version_minor_string}")
-  STRING ( STRIP "${_openexr_version_minor_unstrip}" OPENEXR_VERSION_MINOR )
+SET ( _OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
+set ( OpenEXR_LIB_COMPONENTS "" )
 
-  MESSAGE ( STATUS "Found OpenEXR v${OPENEXR_VERSION_MAJOR}.${OPENEXR_VERSION_MINOR} at ${OPENEXR_LOCATION}" )
-
-  IF ( OPENEXR_NAMESPACE_VERSIONING )
-	SET ( ILMIMF_LIBRARY_NAME IlmImf-${OPENEXR_VERSION_MAJOR}_${OPENEXR_VERSION_MINOR} )
-  ELSE ( OPENEXR_NAMESPACE_VERSIONING )
-	SET ( ILMIMF_LIBRARY_NAME IlmImf )
-  ENDIF ( OPENEXR_NAMESPACE_VERSIONING )
-
-  SET ( OPENEXR_INCLUDE_DIRS
-    ${OPENEXR_LOCATION}/include
-    ${OPENEXR_LOCATION}/include/OpenEXR
-    CACHE STRING "Openexr include directories")
-  SET ( OPENEXR_LIBRARYDIR ${OPENEXR_LOCATION}/lib
-    CACHE STRING "Openexr library directories")
-  SET ( OPENEXR_FOUND TRUE )
-
-
-  IF (Openexr_USE_STATIC_LIBS)
-    IF (APPLE)
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR} )
-    ELSEIF (WIN32)
-      # Link library
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR} )
-    ELSE (APPLE)
-      # MESSAGE ( "CMAKE_FIND_LIBRARY_SUFFIXES = " ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      SET ( ORIGINAL_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR}
-		NO_DEFAULT_PATH
-		NO_SYSTEM_ENVIRONMENT_PATH
-		)
-      SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${ORIGINAL_CMAKE_FIND_LIBRARY_SUFFIXES})
-    ENDIF (APPLE)
-  ELSE ()
-    IF (APPLE)
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib")
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR} )
-    ELSEIF (WIN32)
-      # Link library
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR} )
-      # Load library
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-      FIND_LIBRARY ( Openexr_ILMIMF_DLL ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LOCATION}/bin )
-      # MUST reset
-      SET(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
-    ELSE (APPLE)
-      FIND_LIBRARY ( Openexr_ILMIMF_LIBRARY ${ILMIMF_LIBRARY_NAME} PATHS ${OPENEXR_LIBRARYDIR}
-		NO_DEFAULT_PATH
-		NO_CMAKE_ENVIRONMENT_PATH
-		NO_CMAKE_PATH
-		NO_SYSTEM_ENVIRONMENT_PATH
-		NO_CMAKE_SYSTEM_PATH
-		)
-    ENDIF (APPLE)
+FOREACH ( COMPONENT ${OpenEXR_FIND_COMPONENTS} )
+  # library suffix handling
+  IF ( WIN32 )
+    SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".lib" )
   ENDIF ()
 
-  # SET( Openexr_ILMIMF_LIBRARY ${OPENEXR_ILMIMF_LIBRARY_PATH} CACHE STRING "Openexr's IlmImf library")
+  IF ( OPENEXR_USE_STATIC_LIBS )
+    IF ( UNIX )
+      SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
+    ENDIF ()
+  ENDIF ()
 
-ENDIF ( OPENEXR_FOUND )
+  SET ( LIB_NAME ${COMPONENT} )
+  IF ( OPENEXR_NAMESPACE_VERSIONING AND OpenEXR_VERSION )
+    SET ( LIB_NAME "${LIB_NAME}-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}" )
+  ENDIF ()
+
+  FIND_LIBRARY ( OpenEXR_${COMPONENT}_LIBRARY ${LIB_NAME}
+    NO_DEFAULT_PATH
+    PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES ${OPENEXR_PATH_SUFFIXES}
+    )
+  LIST ( APPEND OpenEXR_LIB_COMPONENTS ${OpenEXR_${COMPONENT}_LIBRARY} )
+
+  IF ( NOT OPENEXR_USE_STATIC_LIBS AND WIN32 )
+    SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".dll" )
+    FIND_LIBRARY ( OpenEXR_${COMPONENT}_DLL ${LIB_NAME}
+      NO_DEFAULT_PATH
+      PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
+      PATH_SUFFIXES bin
+      )
+  ENDIF ()
+
+  IF ( OpenEXR_${COMPONENT}_LIBRARY )
+    SET ( OpenEXR_${COMPONENT}_FOUND TRUE )
+  ELSE ()
+    SET ( OpenEXR_${COMPONENT}_FOUND FALSE )
+  ENDIF ()
+ENDFOREACH ()
+
+# reset lib suffix
+
+SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
+
+# ------------------------------------------------------------------------
+#  Cache and set OPENEXR_FOUND
+# ------------------------------------------------------------------------
+
+INCLUDE ( FindPackageHandleStandardArgs )
+FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenEXR
+  FOUND_VAR OpenEXR_FOUND
+  REQUIRED_VARS
+    OpenEXR_INCLUDE_DIR
+    OpenEXR_LIB_COMPONENTS
+  VERSION_VAR OpenEXR_VERSION
+  HANDLE_COMPONENTS
+)
+
+IF ( OpenEXR_FOUND )
+  SET ( OpenEXR_LIBRARIES ${OpenEXR_LIB_COMPONENTS} )
+
+  # We have to add both include and include/OpenEXR to the include
+  # path in case OpenEXR and ILMBase are installed separately
+  GET_FILENAME_COMPONENT ( OpenEXR_INCLUDE_DIR ${OpenEXR_INCLUDE_DIR} DIRECTORY )
+
+  SET ( OpenEXR_INCLUDE_DIRS "" )
+  LIST ( APPEND OpenEXR_INCLUDE_DIRS
+    ${OpenEXR_INCLUDE_DIR}
+    ${OpenEXR_INCLUDE_DIR}/OpenEXR
+    )
+  SET ( OpenEXR_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER} )
+
+  SET ( OpenEXR_LIBRARY_DIRS "" )
+  FOREACH ( LIB ${OpenEXR_LIB_COMPONENTS} )
+    GET_FILENAME_COMPONENT ( _OPENEXR_LIBDIR ${LIB} DIRECTORY )
+    LIST ( APPEND OpenEXR_LIBRARY_DIRS ${_OPENEXR_LIBDIR} )
+  ENDFOREACH ()
+  LIST ( REMOVE_DUPLICATES OpenEXR_LIBRARY_DIRS )
+
+  # Configure imported target
+
+  FOREACH ( COMPONENT ${OpenEXR_FIND_COMPONENTS} )
+    IF ( NOT TARGET OpenEXR::${COMPONENT} )
+      ADD_LIBRARY ( OpenEXR::${COMPONENT} UNKNOWN IMPORTED )
+      SET_TARGET_PROPERTIES ( OpenEXR::${COMPONENT} PROPERTIES
+        IMPORTED_LOCATION "${OpenEXR_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${OpenEXR_DEFINITIONS}"
+        INTERFACE_INCLUDE_DIRECTORIES "${OpenEXR_INCLUDE_DIRS}"
+      )
+    ENDIF ()
+  ENDFOREACH ()
+ELSEIF ( OpenEXR_FIND_REQUIRED )
+  MESSAGE ( FATAL_ERROR "Unable to find OpenEXR" )
+ENDIF ()

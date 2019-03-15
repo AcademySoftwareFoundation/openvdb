@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,31 +24,63 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
+#[=======================================================================[
+
+  CMake Configuration for OpenVDB Maya
+
+#]=======================================================================]
+
 PROJECT ( OpenVDBMaya )
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+# Monitoring <PackageName>_ROOT variables
+IF ( POLICY CMP0074 )
+  CMAKE_POLICY ( SET CMP0074 NEW )
+ENDIF ()
 
-OPTION ( OPENVDB_MAYA_SUBDIR "Install plug-ins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF)
-OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
+###### OpenVDB Maya Options
 
-FIND_PACKAGE ( Maya REQUIRED )
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED )
-FIND_PACKAGE ( ILMBase REQUIRED )
+OPTION ( OPENVDB_MAYA_SUBDIR "Install plug-ins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF )
+OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON )
+
+##########################################################################
+
+MESSAGE ( STATUS "----------------------------------------------------" )
+MESSAGE ( STATUS "------------- Configuring OpenVDBMaya- -------------" )
+MESSAGE ( STATUS "----------------------------------------------------" )
+
+##########################################################################
+
+# Collect and configure lib dependencies
 
 IF ( NOT OPENVDB_BUILD_CORE )
   FIND_PACKAGE ( OpenVDB REQUIRED )
-
-  # Use the library installed
-  SET ( OPENVDB_SHARED_LIB ${OpenVDB_OPENVDB_LIBRARY} )
+  SET ( OPENVDB_SHARED_LIB OpenVDB::openvdb )
 ELSE ()
-  # Use the target
-  SET ( OPENVDB_SHARED_LIB openvdb_shared)
+  SET ( OPENVDB_SHARED_LIB openvdb_shared )
+  INCLUDE_DIRECTORIES ( ../ )
 ENDIF ()
 
-# Include them as system headers to avoid getting spammed by internal
-# warnings
-INCLUDE_DIRECTORIES ( SYSTEM ${MAYA_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( SYSTEM ${ILMBASE_INCLUDE_DIRS} )
+FIND_PACKAGE ( Maya REQUIRED )
+FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
+FIND_PACKAGE ( ILMBase REQUIRED COMPONENTS Half )
 
+SET ( OPENVDB_MAYA_DEPENDANT_LIBS
+  ${OPENVDB_SHARED_LIB}
+  Boost::iostreams
+  Boost::system
+  ILMBase::Half
+)
+
+IF ( USE_BLOSC )
+  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
+  LIST ( APPEND OPENVDB_MAYA_DEPENDANT_LIBS Blosc::blosc )
+ENDIF ()
+
+# @todo sort out tbb for maya - it's provided with maya and we should be using
+# those includes/libs. This will conflict if attempting to build the maya and
+# Houdini plugin
+
+INCLUDE_DIRECTORIES ( SYSTEM ${MAYA_INCLUDE_DIR} )
 ADD_DEFINITIONS ( ${MAYA_DEFINITIONS} )
 
 # This is to work around DWA way of doing stuff
@@ -57,19 +89,15 @@ LIST ( APPEND OPENVDB_MAYA_HEADER "maya/OpenVDBUtil.h" )
 SET  ( OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya )
 FILE ( MAKE_DIRECTORY ${OPENVDB_MAYA_DIR} )
 FILE ( COPY ${OPENVDB_MAYA_HEADER} DESTINATION ${OPENVDB_MAYA_DIR} )
+
 INCLUDE_DIRECTORIES ( ${PROJECT_BINARY_DIR} )
 
-# RPath handling
-IF ( OPENVDB_ENABLE_RPATH )
+##########################################################################
 
-  # when building, don't use the install RPATH already
-  # (but later on when installing)
-  SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-
-  # Use $ORIGIN for relative referencing
-  SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib")
-
-ENDIF ( OPENVDB_ENABLE_RPATH )
+SET( OPENVDB_MAYA_INSTALL_BASE_DIR
+  maya$<$<BOOL:${OPENVDB_MAYA_SUBDIR}>:/>${MAYA_VERSION_NUMBER}
+  CACHE PATH "Openvdb's maya install directory"
+  )
 
 SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
   maya/OpenVDBCopyNode.cc
@@ -88,7 +116,7 @@ SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
 
 SET_SOURCE_FILES_PROPERTIES ( ${OPENVDB_MAYA_MODULE_SOURCE_FILES}
   PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC"
+  COMPILE_FLAGS "-DOPENVDB_PRIVATE"
   )
 
 ADD_LIBRARY ( openvdb_maya SHARED
@@ -96,7 +124,7 @@ ADD_LIBRARY ( openvdb_maya SHARED
   )
 
 TARGET_LINK_LIBRARIES ( openvdb_maya
-  ${OPENVDB_SHARED_LIB}
+  ${OPENVDB_MAYA_DEPENDANT_LIBS}
   ${MAYA_OpenMayaFX_LIBRARY}
   ${MAYA_OpenMayaUI_LIBRARY}
   ${MAYA_OpenMaya_LIBRARY}
@@ -110,9 +138,27 @@ SET_TARGET_PROPERTIES ( openvdb_maya
 
 MAYA_SET_LIBRARY_PROPERTIES ( openvdb_maya )
 
-SET( OPENVDB_MAYA_INSTALL_BASE_DIR
-  maya$<$<BOOL:${OPENVDB_MAYA_SUBDIR}>:/>${MAYA_VERSION_NUMBER}
-  CACHE PATH "Openvdb's maya install directory")
+IF ( OPENVDB_ENABLE_RPATH )
+  # @todo There is probably a better way to do this for imported targets
+  SET ( RPATHS )
+  LIST ( APPEND RPATHS
+    ${Boost_LIBRARY_DIRS}
+    ${ILMBase_LIBRARY_DIRS}
+    ${Blosc_LIBRARY_DIRS}
+  )
+  IF ( OPENVDB_BUILD_CORE )
+    LIST ( APPEND ${CMAKE_INSTALL_PREFIX}/lib )
+  ELSE ()
+    LIST ( APPEND ${OpenVDB_LIBRARY_DIRS} )
+  ENDIF ()
+
+  LIST ( REMOVE_DUPLICATES RPATHS )
+
+  SET_TARGET_PROPERTIES ( openvdb_maya
+    PROPERTIES INSTALL_RPATH "${RPATHS}"
+    )
+  UNSET ( RPATHS )
+ENDIF ()
 
 INSTALL ( TARGETS
   openvdb_maya

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,75 +24,262 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
+#[=======================================================================[.rst:
 
-# -*- cmake -*-
-# - Find OpenVDB
-#
-# Author : Fredrik Salomonsson fredriks@d2.com
-#
-# OpenVDB_FOUND                 Set if OpenVDB is found.
-# OpenVDB_INCLUDE_DIR           OpenVDB's include directory
-# OpenVDB_LIBRARY_DIR           OpenVDB's library directory
-# OpenVDB_<C>_LIBRARY           Specific openvdb library (<C> is upper-case)
-# OpenVDB_LIBRARIES             All openvdb libraries
-# OpenVDB_MAJOR_VERSION         Major version number
-# OpenVDB_MINOR_VERSION         Minor version number
-# OpenVDB_PATCH_VERSION         Patch version number
-#
-# This module read hints about search locations from variables::
-#
-# OPENVDB_ROOT                  Preferred installtion prefix
+FindOpenVDB
+---------
 
-FIND_PACKAGE( PackageHandleStandardArgs )
+Find OpenVDB include dirs and libraries
 
-FIND_PATH( OPENVDB_LOCATION include/openvdb/version.h
-  "$ENV{OPENVDB_ROOT}"
-  NO_DEFAULT_PATH
-  NO_SYSTEM_ENVIRONMENT_PATH
-  PATHS ${SYSTEM_LIBRARY_PATHS}
-  )
+Use this module by invoking find_package with the form::
 
-FIND_PACKAGE_HANDLE_STANDARD_ARGS( OpenVDB
-  REQUIRED_VARS OPENVDB_LOCATION
-  )
-
-IF( OpenVDB_FOUND )
-  SET( OpenVDB_INCLUDE_DIR ${OPENVDB_LOCATION}/include
-    CACHE PATH "OpenVDB include directory")
-
-  SET( OpenVDB_LIBRARY_DIR ${OPENVDB_LOCATION}/lib
-    CACHE PATH "OpenVDB library directory" )
-
-  FIND_LIBRARY( OpenVDB_OPENVDB_LIBRARY openvdb
-    PATHS ${OpenVDB_LIBRARY_DIR}
-    NO_DEFAULT_PATH
-    NO_SYSTEM_ENVIRONMENT_PATH
+  find_package(OpenVDB
+    [version] [EXACT]      # Minimum or EXACT version
+    [REQUIRED]             # Fail with error if OpenVDB is not found
+    [COMPONENTS <libs>...] # OpenVDB libraries by their canonical name
+                           # e.g. "IlmImf" for "libIlmImf"
     )
 
-  SET( OpenVDB_LIBRARIES "")
-  LIST( APPEND OpenVDB_LIBRARIES ${OpenVDB_OPENVDB_LIBRARY} )
+IMPORTED Targets
+^^^^^^^^^^^^^^^^
 
-  SET( OPENVDB_VERSION_FILE ${OpenVDB_INCLUDE_DIR}/openvdb/version.h )
+``OpenVDB::openvdb``
+  The core openvdb library target.
+``OpenVDB::pyopenvdb``
+  The python openvdb library target.
 
-  FILE( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_major_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*")
-  FILE( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_minor_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*")
-  FILE( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_patch_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
+Result Variables
+^^^^^^^^^^^^^^^^
 
-  STRING( REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _openvdb_major_version_number "${openvdb_major_version_str}")
-  STRING( REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _openvdb_minor_version_number "${openvdb_minor_version_str}")
-  STRING( REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _openvdb_patch_version_number "${openvdb_patch_version_str}")
+This will define the following variables:
 
-  SET( OpenVDB_MAJOR_VERSION ${_openvdb_major_version_number}
-    CACHE STRING "OpenVDB major version number" )
-  SET( OpenVDB_MINOR_VERSION ${_openvdb_minor_version_number}
-    CACHE STRING "OpenVDB minor version number" )
-  SET( OpenVDB_PATCH_VERSION ${_openvdb_patch_version_number}
-    CACHE STRING "OpenVDB patch version number" )
+``OpenVDB_FOUND``
+  True if the system has the OpenVDB library.
+``OpenVDB_VERSION``
+  The version of the OpenVDB library which was found.
+``OpenVDB_INCLUDE_DIRS``
+  Include directories needed to use OpenVDB.
+``OpenVDB_LIBRARIES``
+  Libraries needed to link to OpenVDB.
+``OpenVDB_LIBRARY_DIRS``
+  OpenVDB library directories.
+``OpenVDB_DEFINITIONS``
+  Definitions to use when compiling code that uses OpenVDB.
+``OpenVDB_{COMPONENT}_FOUND``
+  True if the system has the named OpenVDB component.
 
-ENDIF( OpenVDB_FOUND )
+Cache Variables
+^^^^^^^^^^^^^^^
+
+The following cache variables may also be set:
+
+``OpenVDB_INCLUDE_DIR``
+  The directory containing ``OpenVDB/config-auto.h``.
+``OpenVDB_{COMPONENT}_LIBRARY``
+  Individual component libraries for OpenVDB
+
+Hints
+^^^^^^^^^^^^^^^
+
+Instead of explicitly setting the cache variables, the following variables
+may be provided to tell this module where to look.
+
+``OPENVDB_ROOT``
+  Preferred installation prefix.
+``OPENVDB_INCLUDEDIR``
+  Preferred include directory e.g. <prefix>/include
+``OPENVDB_LIBRARYDIR``
+  Preferred library directory e.g. <prefix>/lib
+``SYSTEM_LIBRARY_PATHS``
+  Paths appended to all include and lib searches.
+
+#]=======================================================================]
+
+MARK_AS_ADVANCED (
+  OpenVDB_INCLUDE_DIR
+  OpenVDB_LIBRARY
+  OPENVDB_NAMESPACE_VERSIONING
+)
+
+SET ( _OPENVDB_COMPONENT_LIST
+  openvdb
+  )
+
+IF ( OpenVDB_FIND_COMPONENTS )
+  SET ( OPENVDB_COMPONENTS_PROVIDED TRUE )
+  SET ( _IGNORED_COMPONENTS "" )
+  FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
+    IF ( NOT ${COMPONENT} IN_LIST _OPENVDB_COMPONENT_LIST )
+      LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
+    ENDIF ()
+  ENDFOREACH()
+
+  IF ( _IGNORED_COMPONENTS )
+    MESSAGE ( STATUS "Ignoring unknown components of OpenVDB:" )
+    FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
+      MESSAGE ( STATUS "  ${COMPONENT}" )
+    ENDFOREACH ()
+    LIST ( REMOVE_ITEM OpenVDB_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
+  ENDIF ()
+ELSE ()
+  SET ( OPENVDB_COMPONENTS_PROVIDED FALSE )
+  SET ( OpenVDB_FIND_COMPONENTS ${_OPENVDB_COMPONENT_LIST} )
+ENDIF ()
+
+# Append OPENVDB_ROOT or $ENV{OPENVDB_ROOT} if set (prioritize the direct cmake var)
+SET ( _OPENVDB_ROOT_SEARCH_DIR "" )
+
+IF ( OPENVDB_ROOT )
+  LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${OPENVDB_ROOT} )
+ELSE ()
+  SET ( _ENV_OPENVDB_ROOT $ENV{OPENVDB_ROOT} )
+  IF ( _ENV_OPENVDB_ROOT )
+    LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${_ENV_OPENVDB_ROOT} )
+  ENDIF ()
+ENDIF ()
+
+# Additionally try and use pkconfig to find OpenVDB
+
+FIND_PACKAGE ( PkgConfig )
+PKG_CHECK_MODULES ( PC_OpenVDB QUIET openvdb )
+
+# ------------------------------------------------------------------------
+#  Search for OpenVDB include DIR
+# ------------------------------------------------------------------------
+
+SET ( _OPENVDB_INCLUDE_SEARCH_DIRS "" )
+LIST ( APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
+  ${OPENVDB_INCLUDEDIR}
+  ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${PC_OpenVDB_INCLUDE_DIRS}
+  ${SYSTEM_LIBRARY_PATHS}
+  )
+
+# Look for a standard OpenVDB header file.
+FIND_PATH ( OpenVDB_INCLUDE_DIR openvdb/version.h
+  NO_DEFAULT_PATH
+  PATHS ${_OPENVDB_INCLUDE_SEARCH_DIRS}
+  PATH_SUFFIXES include
+  )
+
+IF ( EXISTS "${OpenVDB_INCLUDE_DIR}/openvdb/version.h" )
+  SET ( OPENVDB_VERSION_FILE ${OpenVDB_INCLUDE_DIR}/openvdb/version.h )
+  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*"
+    )
+  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+    OpenVDB_MAJOR_VERSION "${openvdb_version_str}"
+    )
+
+  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*"
+    )
+  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+    OpenVDB_MINOR_VERSION "${openvdb_version_str}"
+    )
+
+  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+    REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*"
+    )
+  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+    OpenVDB_PATCH_VERSION "${openvdb_version_str}"
+    )
+  UNSET ( openvdb_version_str )
+  UNSET ( OPENVDB_VERSION_FILE )
+  SET ( OpenVDB_VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION} )
+ENDIF ()
+
+# ------------------------------------------------------------------------
+#  Search for OPENVDB lib DIR
+# ------------------------------------------------------------------------
+
+SET ( _OPENVDB_LIBRARYDIR_SEARCH_DIRS "" )
+
+# Append to _OPENVDB_LIBRARYDIR_SEARCH_DIRS in priority order
+
+LIST ( APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
+  ${OPENVDB_LIBRARYDIR}
+  ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${PC_OpenVDB_LIBRARY_DIRS}
+  ${SYSTEM_LIBRARY_PATHS}
+  )
+
+# Build suffix directories
+
+SET ( OPENVDB_PATH_SUFFIXES
+  lib64
+  lib
+)
+
+SET ( _OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
+set ( OpenVDB_LIB_COMPONENTS "" )
+
+FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
+  IF ( OPENVDB_USE_STATIC_LIBS )
+    IF ( UNIX )
+      SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
+    ENDIF ()
+  ENDIF ()
+
+  SET ( LIB_NAME ${COMPONENT} )
+  FIND_LIBRARY ( OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
+    NO_DEFAULT_PATH
+    PATHS ${_OPENVDB_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES ${OPENVDB_PATH_SUFFIXES}
+    )
+  LIST ( APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY} )
+
+  IF ( OpenVDB_${COMPONENT}_LIBRARY )
+    SET ( OpenVDB_${COMPONENT}_FOUND TRUE )
+  ELSE ()
+    SET ( OpenVDB_${COMPONENT}_FOUND FALSE )
+  ENDIF ()
+ENDFOREACH ()
+
+# reset lib suffix
+
+SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
+
+# ------------------------------------------------------------------------
+#  Cache and set OPENVDB_FOUND
+# ------------------------------------------------------------------------
+
+INCLUDE ( FindPackageHandleStandardArgs )
+FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenVDB
+  FOUND_VAR OpenVDB_FOUND
+  REQUIRED_VARS
+    OpenVDB_INCLUDE_DIR
+    OpenVDB_LIB_COMPONENTS
+  VERSION_VAR OpenVDB_VERSION
+  HANDLE_COMPONENTS
+)
+
+IF ( OpenVDB_FOUND )
+  SET ( OpenVDB_LIBRARIES
+    ${OpenVDB_LIB_COMPONENTS}
+  )
+  SET ( OpenVDB_INCLUDE_DIRS ${OpenVDB_INCLUDE_DIR} )
+  SET ( OpenVDB_DEFINITIONS ${PC_OpenVDB_CFLAGS_OTHER} )
+
+  SET ( OpenVDB_LIBRARY_DIRS "" )
+  FOREACH ( LIB ${OpenVDB_LIB_COMPONENTS} )
+    GET_FILENAME_COMPONENT ( _OPENVDB_LIBDIR ${LIB} DIRECTORY )
+    LIST ( APPEND OpenVDB_LIBRARY_DIRS ${_OPENVDB_LIBDIR} )
+  ENDFOREACH ()
+  LIST ( REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS )
+
+  # Configure imported target
+
+  FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
+    IF ( NOT TARGET OpenVDB::${COMPONENT} )
+      ADD_LIBRARY ( OpenVDB::${COMPONENT} UNKNOWN IMPORTED )
+      SET_TARGET_PROPERTIES ( OpenVDB::${COMPONENT} PROPERTIES
+        IMPORTED_LOCATION "${OpenVDB_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${OpenVDB_DEFINITIONS}"
+        INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
+      )
+    ENDIF ()
+  ENDFOREACH ()
+ELSEIF ( OpenVDB_FIND_REQUIRED )
+  MESSAGE ( FATAL_ERROR "Unable to find OpenVDB" )
+ENDIF ()

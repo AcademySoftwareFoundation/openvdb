@@ -58,10 +58,6 @@
 #include "GU_PrimVDB.h"
 #include "Utils.h"
 
-#ifndef SESI_OPENVDB
-#include <UT/UT_DSOVersion.h>
-#endif
-
 #if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
 #include <UT/UT_EnvControl.h>
 #endif

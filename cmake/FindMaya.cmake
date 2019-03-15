@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,13 +41,8 @@
 FIND_PACKAGE ( PackageHandleStandardArgs )
 
 FIND_PATH( MAYA_LOCATION include/maya/MTypes.h
-  "$ENV{MAYA_LOCATION}"
   NO_DEFAULT_PATH
-  NO_CMAKE_ENVIRONMENT_PATH
-  NO_CMAKE_PATH
-  NO_SYSTEM_ENVIRONMENT_PATH
-  NO_CMAKE_SYSTEM_PATH
-  PATHS ${SYSTEM_LIBRARY_PATHS}
+  PATHS $ENV{MAYA_LOCATION} ${SYSTEM_LIBRARY_PATHS}
   )
 
 FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Maya
@@ -71,9 +66,9 @@ IF ( MAYA_FOUND )
   STRING ( SUBSTRING ${_MAYA_API_VERSION} 0 4 _MAYA_MAJOR_VERSION_NUMBER )
   STRING ( SUBSTRING ${_MAYA_API_VERSION} 4 2 _MAYA_MINOR_VERSION_NUMBER )
   IF ( _MAYA_MINOR_VERSION_NUMBER LESS 50 )
-	SET ( MAYA_VERSION_NUMBER ${_MAYA_MAJOR_VERSION_NUMBER} CACHE STRING "Maya version")
+    SET ( MAYA_VERSION_NUMBER ${_MAYA_MAJOR_VERSION_NUMBER} CACHE STRING "Maya version")
   ELSE ()
-	SET ( MAYA_VERSION_NUMBER ${_MAYA_MAJOR_VERSION_NUMBER}.5 CACHE STRING "Maya version")
+    SET ( MAYA_VERSION_NUMBER ${_MAYA_MAJOR_VERSION_NUMBER}.5 CACHE STRING "Maya version")
   ENDIF ()
   # MESSAGE ( "MAYA_VERSION_NUMBER = ${MAYA_VERSION_NUMBER}")
 
@@ -90,40 +85,38 @@ IF ( MAYA_FOUND )
   FOREACH ( lib_component ${MAYA_LIBRARY_COMPONENTS} )
     FIND_LIBRARY ( MAYA_${lib_component}_LIBRARY  ${lib_component}
       PATHS ${MAYA_LOCATION}/lib
-	  NO_DEFAULT_PATH
-      NO_SYSTEM_ENVIRONMENT_PATH
+      NO_DEFAULT_PATH
       )
   ENDFOREACH ()
 
   IF ( MAYA_SEARCH_SHIPPED_BOOST )
 
-	# TODO : How to determine shipping version of Boost assocated with Maya
-	SET ( MAYA_BOOST_VERSION "1_52" )
+    # TODO : How to determine shipping version of Boost assocated with Maya
+    SET ( MAYA_BOOST_VERSION "1_52" )
 
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_filesystem )
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_python )
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_regex )
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_signals )
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_system )
-	LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_thread )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_filesystem )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_python )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_regex )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_signals )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_system )
+    LIST ( APPEND MAYA_BOOST_LIBRARY_COMPONENTS awBoost_thread )
 
-	FOREACH ( lib_component ${MAYA_BOOST_LIBRARY_COMPONENTS} )
+    FOREACH ( lib_component ${MAYA_BOOST_LIBRARY_COMPONENTS} )
       FIND_LIBRARY ( MAYA_${lib_component}_LIBRARY  ${lib_component}-${MAYA_BOOST_VERSION}
-		PATHS ${MAYA_LOCATION}/lib
-		NO_DEFAULT_PATH
-		NO_SYSTEM_ENVIRONMENT_PATH
-		)
-	ENDFOREACH ()
+        PATHS ${MAYA_LOCATION}/lib
+        NO_DEFAULT_PATH
+        )
+    ENDFOREACH ()
 
   ENDIF ( MAYA_SEARCH_SHIPPED_BOOST )
 
   IF (APPLE)
     SET ( MAYA_DEFINITIONS
       -DMAC_PLUGIN
-	  -DREQUIRE_IOSTREAM
-	  -DOSMac_
-	  -DOSMac_MachO_
-	  -D_BOOL
+      -DREQUIRE_IOSTREAM
+      -DOSMac_
+      -DOSMac_MachO_
+      -D_BOOL
       )
   ELSEIF (WIN32)
     SET ( MAYA_DEFINITIONS
@@ -162,17 +155,17 @@ IF ( MAYA_FOUND )
   MACRO( MAYA_SET_LIBRARY_PROPERTIES NAME )
     IF (WIN32)
       SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
-		SUFFIX ".mll"
-		PREFIX ""
-		LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin"
-		)
+        SUFFIX ".mll"
+        PREFIX ""
+        LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin"
+        )
     ELSEIF (APPLE)
       SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
-		SUFFIX ".bundle"
-		PREFIX "")
+        SUFFIX ".bundle"
+        PREFIX "")
     ELSE ()
       SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
-		PREFIX "")
+        PREFIX "")
     ENDIF ()
 
   ENDMACRO ()
