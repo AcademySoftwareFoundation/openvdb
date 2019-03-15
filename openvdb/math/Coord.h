@@ -378,12 +378,12 @@ public:
     /// @brief Return @c true if this bounding box is empty (i.e., encloses no coordinates).
     bool empty() const
     {
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wstrict-overflow"
 #endif
         return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]);
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
   #pragma GCC diagnostic pop
 #endif
     }
