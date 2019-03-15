@@ -27,7 +27,7 @@
 #[=======================================================================[.rst:
 
 FindOpenEXR
----------
+-----------
 
 Find OpenEXR include dirs and libraries
 
@@ -81,7 +81,7 @@ The following cache variables may also be set:
   Individual component dlls for OpenEXR on Windows.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -280,7 +280,7 @@ IF ( OpenEXR_FOUND )
   SET ( OpenEXR_LIBRARIES ${OpenEXR_LIB_COMPONENTS} )
 
   # We have to add both include and include/OpenEXR to the include
-  # path in case OpenEXR and ILMBase are installed separately
+  # path in case OpenEXR and IlmBase are installed separately
   GET_FILENAME_COMPONENT ( OpenEXR_INCLUDE_DIR ${OpenEXR_INCLUDE_DIR} DIRECTORY )
 
   SET ( OpenEXR_INCLUDE_DIRS "" )

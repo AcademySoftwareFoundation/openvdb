@@ -43,7 +43,7 @@
 
   Dependencies:
 
-    -  ILMBase
+    -  IlmBase
       - Used for the definition of half (half precision floating points)
         and for additional EXR serialization support. Usually available by
         default in most UNIX distributions.
@@ -157,7 +157,8 @@
           - apt-get install python-epydoc
         - Homebrew:
           - brew install python
-    - CPPUnit
+
+    - CppUnit
       - A unit testing framework module for C++.
       - Installation
         - Homebrew:
@@ -221,9 +222,13 @@
         - From Source:
           - https://www.glfw.org/
       - Usage
-        OpenVDB uses GLFW's CMake installation to find and configure
-        the GLFW dependency. If it cannot be found:
-        - Provide the location of GLFW's CMake folder
+        - Provide Root from environment:
+            export GLFW3_ROOT=<Installation Root Directory>
+        - Provide Root to CMake:
+            -D GLFW3_ROOT=<Installation Root Directory>
+        - OpenVDB uses GLFW's CMake installation to find and configure
+          the GLFW dependency. You should add GLFW's cmake location to
+          CMAKE_PREFIX_PATH where possible, instead of the above:
             -D CMAKE_PREFIX_PATH=<GLFW CMake location>
 
     - Doxygen:
@@ -247,7 +252,7 @@
 
     OpenVDB Core
       Main CMake: openvdb/CMakeLists.txt
-      Required: ILMBase::Half, TBB::tbb, ZLib, Boost::System,
+      Required: IlmBase::Half, TBB::tbb, ZLib, Boost::System,
         Boost::IOStream
       Optional: Blosc, Log4cplus, OpenEXR
 
@@ -255,7 +260,7 @@
       Main CMake: openvdb/cmd/CMakeLists.txt
       Required: (OpenVDB Core + Dependencies), GLFW3 (vdb_view),
         OpenGL (vdb_view), Boost::Thread (vdb_view), OpenEXR (vdb_render)
-        ILMBase (vdb_render)
+        IlmBase (vdb_render)
 
     OpenVDB Python
       Main CMake: openvdb/python/CMakeLists.txt
@@ -263,7 +268,7 @@
 
     OpenVDB Unit Tests
       Main CMake: openvdb/unittest/CMakeLists.txt
-      Required: (OpenVDB Core + Dependencies), CPPUnit
+      Required: (OpenVDB Core + Dependencies), CppUnit
 
   ########################################################################
 
@@ -303,7 +308,7 @@ OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated -
 # @todo OPENVDB_USE_NUMPY options for NumPy
 OPTION ( USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on autmatically if OPENVDB_BUILD_HOUDINI_SOPS is enabled.
-When enabled, you do not need to provide dependency locations for OpenEXR, ILMBase, TBB, Boost and Blosc. You can
+When enabled, you do not need to provide dependency locations for OpenEXR, IlmBase, TBB, Boost and Blosc. You can
 optionally provide your own version of Boost when building against Houdini 16.5 and gerater.]=] OFF )
 OPTION ( USE_BLOSC "Build the library with blosc support." ON )
 OPTION ( USE_LOG4CPLUS "Build the library with log4cplus support." OFF )
@@ -465,7 +470,7 @@ IF ( NOT OPENVDB_BUILD_CORE )
 ELSE ()
   SET ( OPENVDB_ROOT ${CMAKE_CURRENT_SOURCE_DIR} )
   FIND_PACKAGE ( OpenVDB QUIET )
-  MESSAGE ( STATUS "Configuring for OpenVDB Version ${OPENVDB_VERSION}")
+  MESSAGE ( STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 ENDIF ()
 
 #########################################################################

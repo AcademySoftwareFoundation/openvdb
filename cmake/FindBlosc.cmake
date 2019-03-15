@@ -71,7 +71,7 @@ The following cache variables may also be set:
   The path to the Blosc library.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -104,7 +104,7 @@ ELSE ()
   ENDIF ()
 ENDIF ()
 
-# Additionally try and use pkconfig to find ILMBase
+# Additionally try and use pkconfig to find blosc
 
 FIND_PACKAGE ( PkgConfig )
 PKG_CHECK_MODULES ( PC_Blosc QUIET blosc )

@@ -67,7 +67,7 @@ ELSE ()
   INCLUDE_DIRECTORIES ( ../../ )
 ENDIF ()
 
-FIND_PACKAGE ( ILMBase REQUIRED COMPONENTS Half )
+FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
 FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
 FIND_PACKAGE ( ZLIB REQUIRED )
 
@@ -127,7 +127,7 @@ IF ( UNIX )
 ENDIF ()
 
 # Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and ILMBase deps first to ensure the normal
+# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
 # namespaced headers are used over the Houdini 17.5 ones (which will be imported
 # through targets like tbb which are still deployed with Houdini)
 
@@ -136,7 +136,7 @@ SET ( OPENVDB_PYTHON_DEPENDANT_LIBS
   Boost::${BOOST_PYTHON_LIB}
   Boost::iostreams
   Boost::system
-  ILMBase::Half
+  IlmBase::Half
   ${OPENVDB_PYTHON_DEPS}
 )
 
@@ -202,7 +202,7 @@ IF ( OPENVDB_ENABLE_RPATH )
   # @todo There is probably a better way to do this for imported targets
   LIST ( APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
-    ${ILMBase_LIBRARY_DIRS}
+    ${IlmBase_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}

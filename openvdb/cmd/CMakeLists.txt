@@ -62,7 +62,7 @@ ELSE ()
   INCLUDE_DIRECTORIES ( ../../ )
 ENDIF ()
 
-FIND_PACKAGE ( ILMBase REQUIRED COMPONENTS Half Iex IlmThread )
+FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half Iex IlmThread )
 FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
 FIND_PACKAGE ( ZLIB REQUIRED )
 
@@ -81,7 +81,7 @@ IF ( UNIX )
 ENDIF ()
 
 # Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and ILMBase deps first to ensure the normal
+# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
 # namespaced headers are used over the Houdini 17.5 ones (which will be imported
 # through targets like tbb which are still deployed with Houdini)
 
@@ -89,7 +89,7 @@ SET ( OPENVDB_BINARIES_DEPENDANT_LIBS
   ${OPENVDB_LIB}
   Boost::iostreams
   Boost::system
-  ILMBase::Half
+  IlmBase::Half
   )
 
 IF ( USE_LOG4CPLUS )
@@ -131,7 +131,7 @@ IF ( OPENVDB_ENABLE_RPATH )
   # @todo There is probably a better way to do this for imported targets
   LIST ( APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
-    ${ILMBase_LIBRARY_DIRS}
+    ${IlmBase_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}
@@ -208,8 +208,8 @@ IF ( OPENVDB_BUILD_VDB_RENDER )
   ADD_EXECUTABLE ( vdb_render ${VDB_RENDER_SOURCE_FILES} )
   TARGET_LINK_LIBRARIES ( vdb_render
     OpenEXR::IlmImf
-    ILMBase::IlmThread
-    ILMBase::Iex
+    IlmBase::IlmThread
+    IlmBase::Iex
     ${OPENVDB_BINARIES_DEPENDANT_LIBS} # include last - see comment above
     )
   IF ( USE_LOG4CPLUS )

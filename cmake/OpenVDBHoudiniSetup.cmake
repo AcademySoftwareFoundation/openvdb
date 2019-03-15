@@ -27,7 +27,7 @@
 #[=======================================================================[.rst:
 
 OpenVDBHoudiniSetup
----------
+-------------------
 
 Wraps the call the FindPackage ( Houdini ) for OpenVDB builds. This
 ensures that all dependencies that are included with a Houdini
@@ -74,7 +74,7 @@ overwrite user provided values.
 ``BLOSC_LIBRARYDIR``
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -200,7 +200,7 @@ IF (( Houdini_VERSION_MAJOR LESS 16 ) OR
   ENDIF ()
 ENDIF ()
 
-# OpenEXR and ILMBase
+# OpenEXR and IlmBase
 
 IF (( Houdini_VERSION_MAJOR LESS 17 ) OR
   (( Houdini_VERSION_MAJOR EQUAL 17 ) AND ( Houdini_VERSION_MINOR LESS 5 )))
@@ -214,7 +214,7 @@ IF (( Houdini_VERSION_MAJOR LESS 17 ) OR
     SET ( OPENEXR_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
   ENDIF ()
 
-  # ILMBase
+  # IlmBase
   IF ( NOT ILMBASE_INCLUDEDIR )
     SET ( ILMBASE_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
   ENDIF ()

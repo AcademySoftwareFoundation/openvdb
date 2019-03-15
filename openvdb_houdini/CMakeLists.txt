@@ -76,12 +76,13 @@ tag information will not load correctly.]=] OFF )
 SET ( CUSTOM_SESI_TAG_INFO "CMake ${CMAKE_VERSION}"
   CACHE STRING "Custom data to feed to sesitag when compiling the Houdini DSOs." )
 
-##########################################################################
-##########################################################################
+#########################################################################
 
 MESSAGE ( STATUS "----------------------------------------------------" )
 MESSAGE ( STATUS "------------ Configuring OpenVDBHoudini ------------" )
 MESSAGE ( STATUS "----------------------------------------------------" )
+
+#########################################################################
 
 # Configure installation - most of the Houdini variables are set by the
 # root CMake search for the Houdini Installation
@@ -109,7 +110,7 @@ SET ( OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR
 MESSAGE ( STATUS "Houdini base DSO install path: ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}" )
 MESSAGE ( STATUS "Houdini base lib install path: ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}" )
 
-##########################################################################
+#########################################################################
 
 # Collect and configure lib dependencies
 
@@ -129,8 +130,8 @@ SET ( OPENVDB_HOUDINI_DEPENDANT_LIBS
 # their own ILMBASE_/OPENEXR_ # installation
 IF (( Houdini_VERSION_MAJOR GREATER 17 ) OR
     (( Houdini_VERSION_MAJOR EQUAL 17 ) AND ( Houdini_VERSION_MINOR EQUAL 5 )))
-  FIND_PACKAGE ( ILMBase REQUIRED COMPONENTS Half )
-  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS ILMBase::Half )
+  FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
+  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS IlmBase::Half )
 ENDIF ()
 
 # Checking if hdk version is >= 16.5 Houdini 16.5 stopped shipping boost.
@@ -162,7 +163,7 @@ ENDIF ()
 # definitions, including MAKING_DSO
 LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS Houdini )
 
-##########################################################################
+#########################################################################
 
 # Copy the files belonging to houdini_utils
 
@@ -226,7 +227,7 @@ IF ( OPENVDB_ENABLE_RPATH )
   SET ( RPATHS )
   LIST ( APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
-    ${ILMBase_LIBRARY_DIRS}
+    ${IlmBase_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}

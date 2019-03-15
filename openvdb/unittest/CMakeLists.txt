@@ -55,10 +55,10 @@ ELSE ()
   INCLUDE_DIRECTORIES ( ../../ )
 ENDIF ()
 
-FIND_PACKAGE ( ILMBase REQUIRED COMPONENTS Half )
+FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
 FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
 FIND_PACKAGE ( ZLIB REQUIRED )
-FIND_PACKAGE ( CPPUnit REQUIRED )
+FIND_PACKAGE ( CppUnit REQUIRED )
 
 IF ( USE_LOG4CPLUS )
   FIND_PACKAGE ( Log4cplus REQUIRED )
@@ -75,7 +75,7 @@ IF ( UNIX )
 ENDIF ()
 
 # Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and ILMBase deps first to ensure the normal
+# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
 # namespaced headers are used over the Houdini 17.5 ones (which will be imported
 # through targets like tbb which are still deployed with Houdini)
 
@@ -83,8 +83,8 @@ SET ( OPENVDB_TEST_DEPENDANT_LIBS
   ${OPENVDB_LIB}
   Boost::iostreams
   Boost::system
-  ILMBase::Half
-  CPPUnit::CPPUnit
+  IlmBase::Half
+  CppUnit::cppunit
 )
 
 IF ( USE_LOG4CPLUS )

@@ -27,7 +27,7 @@
 #[=======================================================================[.rst:
 
 OpenVDBGLFW3Setup
----------
+-----------------
 
 Wraps the call the FindPackage ( glfw3 ) for OpenVDB builds. Provides
 some extra options for finding the glfw3 installation without polluting
@@ -54,7 +54,7 @@ This will define the following variables:
   The version of the glfw3 library which was found.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 The following variables may be provided to tell this module where to look.
 

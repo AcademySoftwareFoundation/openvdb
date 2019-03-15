@@ -27,7 +27,7 @@
 #[=======================================================================[.rst:
 
 FindLog4cplus
----------
+-------------
 
 Find Log4cplus include dirs and libraries
 
@@ -73,7 +73,7 @@ The following cache variables may also be set:
   The path to the Log4cplus library.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -106,7 +106,7 @@ ELSE ()
   ENDIF ()
 ENDIF ()
 
-# Additionally try and use pkconfig to find ILMBase
+# Additionally try and use pkconfig to find log4cplus
 
 FIND_PACKAGE ( PkgConfig )
 PKG_CHECK_MODULES ( PC_Log4cplus QUIET log4cplus )

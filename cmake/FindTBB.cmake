@@ -27,7 +27,7 @@
 #[=======================================================================[.rst:
 
 FindTBB
----------
+-------
 
 Find Tbb include dirs and libraries
 
@@ -77,7 +77,7 @@ The following cache variables may also be set:
   Individual component libraries for Tbb
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.

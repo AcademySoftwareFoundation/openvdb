@@ -26,32 +26,32 @@
 #
 #[=======================================================================[.rst:
 
-FindILMBase
----------
+FindIlmBase
+-----------
 
-Find ILMBase include dirs and libraries
+Find IlmBase include dirs and libraries
 
 Use this module by invoking find_package with the form::
 
-  find_package(ILMBase
+  find_package(IlmBase
     [version] [EXACT]      # Minimum or EXACT version
-    [REQUIRED]             # Fail with error if ILMBase is not found
-    [COMPONENTS <libs>...] # ILMBase libraries by their canonical name
+    [REQUIRED]             # Fail with error if IlmBase is not found
+    [COMPONENTS <libs>...] # IlmBase libraries by their canonical name
                            # e.g. "Half" for "libHalf"
     )
 
 IMPORTED Targets
 ^^^^^^^^^^^^^^^^
 
-``ILMBase::Half``
+``IlmBase::Half``
   The Half library target.
-``ILMBase::Iex``
+``IlmBase::Iex``
   The Iex library target.
-``ILMBase::IexMath``
+``IlmBase::IexMath``
   The IexMath library target.
-``ILMBase::IlmThread``
+``IlmBase::IlmThread``
   The IlmThread library target.
-``ILMBase::Imath``
+``IlmBase::Imath``
   The Imath library target.
 
 Result Variables
@@ -59,33 +59,33 @@ Result Variables
 
 This will define the following variables:
 
-``ILMBase_FOUND``
-  True if the system has the ILMBase library.
-``ILMBase_VERSION``
-  The version of the ILMBase library which was found.
-``ILMBase_INCLUDE_DIRS``
-  Include directories needed to use ILMBase.
-``ILMBase_LIBRARIES``
-  Libraries needed to link to ILMBase.
-``ILMBase_LIBRARY_DIRS``
-  ILMBase library directories.
-``ILMBase_{COMPONENT}_FOUND``
-  True if the system has the named ILMBase component.
+``IlmBase_FOUND``
+  True if the system has the IlmBase library.
+``IlmBase_VERSION``
+  The version of the IlmBase library which was found.
+``IlmBase_INCLUDE_DIRS``
+  Include directories needed to use IlmBase.
+``IlmBase_LIBRARIES``
+  Libraries needed to link to IlmBase.
+``IlmBase_LIBRARY_DIRS``
+  IlmBase library directories.
+``IlmBase_{COMPONENT}_FOUND``
+  True if the system has the named IlmBase component.
 
 Cache Variables
 ^^^^^^^^^^^^^^^
 
 The following cache variables may also be set:
 
-``ILMBase_INCLUDE_DIR``
-  The directory containing ``ILMBase/config-auto.h``.
-``ILMBase_{COMPONENT}_LIBRARY``
-  Individual component libraries for ILMBase
-``ILMBase_{COMPONENT}_DLL``
-  Individual component dlls for ILMBase on Windows.
+``IlmBase_INCLUDE_DIR``
+  The directory containing ``IlmBase/config-auto.h``.
+``IlmBase_{COMPONENT}_LIBRARY``
+  Individual component libraries for IlmBase
+``IlmBase_{COMPONENT}_DLL``
+  Individual component dlls for IlmBase on Windows.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -102,8 +102,8 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 MARK_AS_ADVANCED (
-  ILMBase_INCLUDE_DIR
-  ILMBase_LIBRARY
+  IlmBase_INCLUDE_DIR
+  IlmBase_LIBRARY
   ILMBASE_NAMESPACE_VERSIONING
 )
 
@@ -115,25 +115,25 @@ SET ( _ILMBASE_COMPONENT_LIST
   Imath
   )
 
-IF ( ILMBase_FIND_COMPONENTS )
+IF ( IlmBase_FIND_COMPONENTS )
   SET ( ILMBASE_COMPONENTS_PROVIDED TRUE )
   SET ( _IGNORED_COMPONENTS "" )
-  FOREACH ( COMPONENT ${ILMBase_FIND_COMPONENTS} )
+  FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
     IF ( NOT ${COMPONENT} IN_LIST _ILMBASE_COMPONENT_LIST )
       LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
     ENDIF ()
   ENDFOREACH()
 
   IF ( _IGNORED_COMPONENTS )
-    MESSAGE ( STATUS "Ignoring unknown components of ILMBase:" )
+    MESSAGE ( STATUS "Ignoring unknown components of IlmBase:" )
     FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
       MESSAGE ( STATUS "  ${COMPONENT}" )
     ENDFOREACH ()
-    LIST ( REMOVE_ITEM ILMBase_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
+    LIST ( REMOVE_ITEM IlmBase_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
   ENDIF ()
 ELSE ()
   SET ( ILMBASE_COMPONENTS_PROVIDED FALSE )
-  SET ( ILMBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST} )
+  SET ( IlmBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST} )
 ENDIF ()
 
 # Append ILMBASE_ROOT or $ENV{ILMBASE_ROOT} if set (prioritize the direct cmake var)
@@ -148,52 +148,52 @@ ELSE ()
   ENDIF ()
 ENDIF ()
 
-# Additionally try and use pkconfig to find ILMBase
+# Additionally try and use pkconfig to find IlmBase
 
 FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_ILMBase QUIET ilmbase )
+PKG_CHECK_MODULES ( PC_IlmBase QUIET ilmbase )
 
 # ------------------------------------------------------------------------
-#  Search for ILMBase include DIR
+#  Search for IlmBase include DIR
 # ------------------------------------------------------------------------
 
 SET ( _ILMBASE_INCLUDE_SEARCH_DIRS "" )
 LIST ( APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
   ${ILMBASE_INCLUDEDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
-  ${PC_ILMBase_INCLUDE_DIRS}
+  ${PC_IlmBase_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
-# Look for a standard OpenEXR header file.
-FIND_PATH ( ILMBase_INCLUDE_DIR IlmBaseConfig.h
+# Look for a standard IlmBase header file.
+FIND_PATH ( IlmBase_INCLUDE_DIR IlmBaseConfig.h
   NO_DEFAULT_PATH
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include/OpenEXR OpenEXR
   )
 
-IF ( EXISTS "${ILMBase_INCLUDE_DIR}/IlmBaseConfig.h" )
+IF ( EXISTS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h" )
   # Get the ILMBASE version information from the config header
-  FILE ( STRINGS "${ILMBase_INCLUDE_DIR}/IlmBaseConfig.h"
+  FILE ( STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
     _ilmbase_version_major_string REGEX "#define ILMBASE_VERSION_MAJOR "
     )
   STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MAJOR" ""
     _ilmbase_version_major_string "${_ilmbase_version_major_string}"
     )
-  STRING ( STRIP "${_ilmbase_version_major_string}" ILMBase_VERSION_MAJOR )
+  STRING ( STRIP "${_ilmbase_version_major_string}" IlmBase_VERSION_MAJOR )
 
-  FILE ( STRINGS "${ILMBase_INCLUDE_DIR}/IlmBaseConfig.h"
+  FILE ( STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
      _ilmbase_version_minor_string REGEX "#define ILMBASE_VERSION_MINOR "
     )
   STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MINOR" ""
     _ilmbase_version_minor_string "${_ilmbase_version_minor_string}"
     )
-  STRING ( STRIP "${_ilmbase_version_minor_string}" ILMBase_VERSION_MINOR )
+  STRING ( STRIP "${_ilmbase_version_minor_string}" IlmBase_VERSION_MINOR )
 
   UNSET ( _ilmbase_version_major_string )
   UNSET ( _ilmbase_version_minor_string )
 
-  SET ( ILMBase_VERSION ${ILMBase_VERSION_MAJOR}.${ILMBase_VERSION_MINOR} )
+  SET ( IlmBase_VERSION ${IlmBase_VERSION_MAJOR}.${IlmBase_VERSION_MINOR} )
 ENDIF ()
 
 # ------------------------------------------------------------------------
@@ -207,7 +207,7 @@ SET ( _ILMBASE_LIBRARYDIR_SEARCH_DIRS "" )
 LIST ( APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${ILMBASE_LIBRARYDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
-  ${PC_ILMBase_LIBRARY_DIRS}
+  ${PC_IlmBase_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
@@ -223,9 +223,9 @@ IF ( ${CMAKE_CXX_COMPILER_ID} STREQUAL GNU )
 ENDIF ()
 
 SET ( _ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-set ( ILMBase_LIB_COMPONENTS "" )
+set ( IlmBase_LIB_COMPONENTS "" )
 
-FOREACH ( COMPONENT ${ILMBase_FIND_COMPONENTS} )
+FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
   # library suffix handling
   IF ( WIN32 )
     SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".lib" )
@@ -238,32 +238,32 @@ FOREACH ( COMPONENT ${ILMBase_FIND_COMPONENTS} )
   ENDIF ()
 
   SET ( LIB_NAME ${COMPONENT} )
-  IF ( ILMBASE_NAMESPACE_VERSIONING AND ILMBase_VERSION )
+  IF ( ILMBASE_NAMESPACE_VERSIONING AND IlmBase_VERSION )
     IF ( NOT ${COMPONENT} STREQUAL "Half" )
-      SET ( LIB_NAME "${LIB_NAME}-${ILMBase_VERSION_MAJOR}_${ILMBase_VERSION_MINOR}" )
+      SET ( LIB_NAME "${LIB_NAME}-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}" )
     ENDIF ()
   ENDIF ()
 
-  FIND_LIBRARY ( ILMBase_${COMPONENT}_LIBRARY ${LIB_NAME}
+  FIND_LIBRARY ( IlmBase_${COMPONENT}_LIBRARY ${LIB_NAME}
     NO_DEFAULT_PATH
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
     )
-  LIST ( APPEND ILMBase_LIB_COMPONENTS ${ILMBase_${COMPONENT}_LIBRARY} )
+  LIST ( APPEND IlmBase_LIB_COMPONENTS ${IlmBase_${COMPONENT}_LIBRARY} )
 
   IF ( NOT ILMBASE_USE_STATIC_LIBS AND WIN32 )
     SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".dll" )
-    FIND_LIBRARY ( ILMBase_${COMPONENT}_DLL ${LIB_NAME}
+    FIND_LIBRARY ( IlmBase_${COMPONENT}_DLL ${LIB_NAME}
       NO_DEFAULT_PATH
       PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
       )
   ENDIF ()
 
-  IF ( ILMBase_${COMPONENT}_LIBRARY )
-    SET ( ILMBase_${COMPONENT}_FOUND TRUE )
+  IF ( IlmBase_${COMPONENT}_LIBRARY )
+    SET ( IlmBase_${COMPONENT}_FOUND TRUE )
   ELSE ()
-    SET ( ILMBase_${COMPONENT}_FOUND FALSE )
+    SET ( IlmBase_${COMPONENT}_FOUND FALSE )
   ENDIF ()
 ENDFOREACH ()
 
@@ -276,49 +276,49 @@ SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
 # ------------------------------------------------------------------------
 
 INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( ILMBase
-  FOUND_VAR ILMBase_FOUND
+FIND_PACKAGE_HANDLE_STANDARD_ARGS ( IlmBase
+  FOUND_VAR IlmBase_FOUND
   REQUIRED_VARS
-    ILMBase_INCLUDE_DIR
-    ILMBase_LIB_COMPONENTS
-  VERSION_VAR ILMBase_VERSION
+    IlmBase_INCLUDE_DIR
+    IlmBase_LIB_COMPONENTS
+  VERSION_VAR IlmBase_VERSION
   HANDLE_COMPONENTS
 )
 
-IF ( ILMBase_FOUND )
-  SET ( ILMBase_LIBRARIES ${ILMBase_LIB_COMPONENTS} )
+IF ( IlmBase_FOUND )
+  SET ( IlmBase_LIBRARIES ${IlmBase_LIB_COMPONENTS} )
 
   # We have to add both include and include/OpenEXR to the include
-  # path in case OpenEXR and ILMBase are installed separately
-  GET_FILENAME_COMPONENT ( ILMBase_INCLUDE_DIR ${ILMBase_INCLUDE_DIR} DIRECTORY )
+  # path in case OpenEXR and IlmBase are installed separately
+  GET_FILENAME_COMPONENT ( IlmBase_INCLUDE_DIR ${IlmBase_INCLUDE_DIR} DIRECTORY )
 
-  SET ( ILMBase_INCLUDE_DIRS )
-  LIST ( APPEND ILMBase_INCLUDE_DIRS
-    ${ILMBase_INCLUDE_DIR}
-    ${ILMBase_INCLUDE_DIR}/OpenEXR
+  SET ( IlmBase_INCLUDE_DIRS )
+  LIST ( APPEND IlmBase_INCLUDE_DIRS
+    ${IlmBase_INCLUDE_DIR}
+    ${IlmBase_INCLUDE_DIR}/OpenEXR
     )
-  SET ( ILMBase_DEFINITIONS ${PC_ILMBase_CFLAGS_OTHER} )
+  SET ( IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER} )
 
-  SET ( ILMBase_LIBRARY_DIRS "" )
-  FOREACH ( LIB ${ILMBase_LIB_COMPONENTS} )
+  SET ( IlmBase_LIBRARY_DIRS "" )
+  FOREACH ( LIB ${IlmBase_LIB_COMPONENTS} )
     GET_FILENAME_COMPONENT ( _ILMBASE_LIBDIR ${LIB} DIRECTORY )
-    LIST ( APPEND ILMBase_LIBRARY_DIRS ${_ILMBASE_LIBDIR} )
+    LIST ( APPEND IlmBase_LIBRARY_DIRS ${_ILMBASE_LIBDIR} )
   ENDFOREACH ()
-  LIST ( REMOVE_DUPLICATES ILMBase_LIBRARY_DIRS )
+  LIST ( REMOVE_DUPLICATES IlmBase_LIBRARY_DIRS )
 
   # Configure imported targets
 
-  FOREACH ( COMPONENT ${ILMBase_FIND_COMPONENTS} )
-    IF ( NOT TARGET ILMBase::${COMPONENT} )
-      ADD_LIBRARY ( ILMBase::${COMPONENT} UNKNOWN IMPORTED )
-      SET_TARGET_PROPERTIES ( ILMBase::${COMPONENT} PROPERTIES
-        IMPORTED_LOCATION "${ILMBase_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${ILMBase_DEFINITIONS}"
-        INTERFACE_INCLUDE_DIRECTORIES "${ILMBase_INCLUDE_DIRS}"
+  FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
+    IF ( NOT TARGET IlmBase::${COMPONENT} )
+      ADD_LIBRARY ( IlmBase::${COMPONENT} UNKNOWN IMPORTED )
+      SET_TARGET_PROPERTIES ( IlmBase::${COMPONENT} PROPERTIES
+        IMPORTED_LOCATION "${IlmBase_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${IlmBase_DEFINITIONS}"
+        INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}"
       )
     ENDIF ()
   ENDFOREACH ()
 
-ELSEIF ( ILMBase_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find ILMBase")
+ELSEIF ( IlmBase_FIND_REQUIRED )
+  MESSAGE ( FATAL_ERROR "Unable to find IlmBase")
 ENDIF ()

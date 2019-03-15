@@ -26,24 +26,24 @@
 #
 #[=======================================================================[.rst:
 
-FindCPPUnit
----------
+FindCppUnit
+-----------
 
-Find CPPUnit include dirs and libraries
+Find CppUnit include dirs and libraries
 
 Use this module by invoking find_package with the form::
 
-  find_package(CPPUnit
+  find_package(CppUnit
     [version] [EXACT]      # Minimum or EXACT version
-    [REQUIRED]             # Fail with error if CPPUnit is not found
+    [REQUIRED]             # Fail with error if CppUnit is not found
     )
 
 
 IMPORTED Targets
 ^^^^^^^^^^^^^^^^
 
-``CPPUnit::CPPUnit``
-  This module defines IMPORTED target CPPUnit::CPPUnit, if CPPUnit has been
+``CppUnit::cppunit``
+  This module defines IMPORTED target CppUnit::cppunit, if CppUnit has been
   found.
 
 Result Variables
@@ -51,29 +51,29 @@ Result Variables
 
 This will define the following variables:
 
-``CPPUnit_FOUND``
-  True if the system has the CPPUnit library.
-``CPPUnit_VERSION``
-  The version of the CPPUnit library which was found.
-``CPPUnit_INCLUDE_DIRS``
-  Include directories needed to use CPPUnit.
-``CPPUnit_LIBRARIES``
-  Libraries needed to link to CPPUnit.
-``CPPUnit_LIBRARY_DIRS``
-  CPPUnit library directories.
+``CppUnit_FOUND``
+  True if the system has the CppUnit library.
+``CppUnit_VERSION``
+  The version of the CppUnit library which was found.
+``CppUnit_INCLUDE_DIRS``
+  Include directories needed to use CppUnit.
+``CppUnit_LIBRARIES``
+  Libraries needed to link to CppUnit.
+``CppUnit_LIBRARY_DIRS``
+  CppUnit library directories.
 
 Cache Variables
 ^^^^^^^^^^^^^^^
 
 The following cache variables may also be set:
 
-``CPPUnit_INCLUDE_DIR``
+``CppUnit_INCLUDE_DIR``
   The directory containing ``cppunit/config-auto.h``.
-``CPPUnit_LIBRARY``
-  The path to the CPPUnit library.
+``CppUnit_LIBRARY``
+  The path to the CppUnit library.
 
 Hints
-^^^^^^^^^^^^^^^
+^^^^^
 
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
@@ -90,8 +90,8 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 MARK_AS_ADVANCED (
-  CPPUnit_INCLUDE_DIR
-  CPPUnit_LIBRARY
+  CppUnit_INCLUDE_DIR
+  CppUnit_LIBRARY
 )
 
 # Append CPPUNIT_ROOT or $ENV{CPPUNIT_ROOT} if set (prioritize the direct cmake var)
@@ -106,50 +106,50 @@ ELSE ()
   ENDIF ()
 ENDIF ()
 
-# Additionally try and use pkconfig to find ILMBase
+# Additionally try and use pkconfig to find cppunit
 
 FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_CPPUnit QUIET cppunit )
+PKG_CHECK_MODULES ( PC_CppUnit QUIET cppunit )
 
 # ------------------------------------------------------------------------
-#  Search for CPPUnit include DIR
+#  Search for CppUnit include DIR
 # ------------------------------------------------------------------------
 
 SET ( _CPPUNIT_INCLUDE_SEARCH_DIRS "" )
 LIST ( APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
   ${CPPUNIT_INCLUDEDIR}
   ${_CPPUNIT_ROOT_SEARCH_DIR}
-  ${PC_CPPUnit_INCLUDE_DIRS}
+  ${PC_CppUnit_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
 # Look for a standard cppunit header file.
-FIND_PATH ( CPPUnit_INCLUDE_DIR cppunit/config-auto.h
+FIND_PATH ( CppUnit_INCLUDE_DIR cppunit/config-auto.h
   NO_DEFAULT_PATH
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
   )
 
-IF ( EXISTS "${CPPUnit_INCLUDE_DIR}/cppunit/config-auto.h" )
-  FILE ( STRINGS "${CPPUnit_INCLUDE_DIR}/cppunit/config-auto.h"
+IF ( EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/config-auto.h" )
+  FILE ( STRINGS "${CppUnit_INCLUDE_DIR}/cppunit/config-auto.h"
     _cppunit_version_string REGEX "#define CPPUNIT_VERSION "
     )
   STRING ( REGEX REPLACE "#define CPPUNIT_VERSION +\"(.+)\".*$" "\\1"
     _cppunit_version_string "${_cppunit_version_string}"
     )
-  STRING ( STRIP "${_cppunit_version_string}" CPPUnit_VERSION )
+  STRING ( STRIP "${_cppunit_version_string}" CppUnit_VERSION )
   UNSET ( _cppunit_version_string )
 ENDIF ()
 
 # ------------------------------------------------------------------------
-#  Search for CPPUnit lib DIR
+#  Search for CppUnit lib DIR
 # ------------------------------------------------------------------------
 
 SET ( _CPPUNIT_LIBRARYDIR_SEARCH_DIRS "" )
 LIST ( APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
   ${CPPUNIT_LIBRARYDIR}
   ${_CPPUNIT_ROOT_SEARCH_DIR}
-  ${PC_CPPUnit_LIBRARY_DIRS}
+  ${PC_CppUnit_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
@@ -168,7 +168,7 @@ SET ( CPPUNIT_PATH_SUFFIXES
   lib
 )
 
-FIND_LIBRARY ( CPPUnit_LIBRARY cppunit
+FIND_LIBRARY ( CppUnit_LIBRARY cppunit
   NO_DEFAULT_PATH
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
@@ -177,33 +177,33 @@ FIND_LIBRARY ( CPPUnit_LIBRARY cppunit
 SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 
 # ------------------------------------------------------------------------
-#  Cache and set CPPUnit_FOUND
+#  Cache and set CppUnit_FOUND
 # ------------------------------------------------------------------------
 
 INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CPPUnit
-  FOUND_VAR CPPUnit_FOUND
+FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CppUnit
+  FOUND_VAR CppUnit_FOUND
   REQUIRED_VARS
-    CPPUnit_LIBRARY
-    CPPUnit_INCLUDE_DIR
-  VERSION_VAR CPPUnit_VERSION
+    CppUnit_LIBRARY
+    CppUnit_INCLUDE_DIR
+  VERSION_VAR CppUnit_VERSION
 )
 
-IF ( CPPUnit_FOUND )
-  SET ( CPPUnit_LIBRARIES ${CPPUnit_LIBRARY} )
-  SET ( CPPUnit_INCLUDE_DIRS ${CPPUnit_INCLUDE_DIR} )
-  SET ( CPPUnit_DEFINITIONS ${PC_CPPUnit_CFLAGS_OTHER} )
+IF ( CppUnit_FOUND )
+  SET ( CppUnit_LIBRARIES ${CppUnit_LIBRARY} )
+  SET ( CppUnit_INCLUDE_DIRS ${CppUnit_INCLUDE_DIR} )
+  SET ( CppUnit_DEFINITIONS ${PC_CppUnit_CFLAGS_OTHER} )
 
-  GET_FILENAME_COMPONENT ( CPPUnit_LIBRARY_DIRS ${CPPUnit_LIBRARY} DIRECTORY )
+  GET_FILENAME_COMPONENT ( CppUnit_LIBRARY_DIRS ${CppUnit_LIBRARY} DIRECTORY )
 
-  IF ( NOT TARGET CPPUnit::CPPUnit )
-    ADD_LIBRARY ( CPPUnit::CPPUnit UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( CPPUnit::CPPUnit PROPERTIES
-      IMPORTED_LOCATION "${CPPUnit_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${CPPUnit_DEFINITIONS}"
-      INTERFACE_INCLUDE_DIRECTORIES "${CPPUnit_INCLUDE_DIRS}"
+  IF ( NOT TARGET CppUnit::cppunit )
+    ADD_LIBRARY ( CppUnit::cppunit UNKNOWN IMPORTED )
+    SET_TARGET_PROPERTIES ( CppUnit::cppunit PROPERTIES
+      IMPORTED_LOCATION "${CppUnit_LIBRARIES}"
+      INTERFACE_COMPILE_DEFINITIONS "${CppUnit_DEFINITIONS}"
+      INTERFACE_INCLUDE_DIRECTORIES "${CppUnit_INCLUDE_DIRS}"
     )
   ENDIF ()
-ELSEIF ( CPPUnit_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find CPPUnit")
+ELSEIF ( CppUnit_FIND_REQUIRED )
+  MESSAGE ( FATAL_ERROR "Unable to find CppUnit")
 ENDIF ()
