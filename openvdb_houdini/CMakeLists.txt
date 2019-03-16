@@ -316,6 +316,7 @@ ADD_CUSTOM_TARGET ( openvdb_houdini_dsos
 
 SET ( SESI_CACHE_TAG_DEFINE "" )
 IF ( OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG AND NOT OPENVDB_HOUDINI_DISABLE_SESI_TAG )
+  MESSAGE ( STATUS "Generating SESI Tag information for Houdini DSOs..." )
   SET ( sesitag_input_file ${CMAKE_CURRENT_BINARY_DIR}/sesitag_input.cache/sesitag_input )
 
   IF ( NOT EXISTS ${sesitag_input_file} )
@@ -337,7 +338,7 @@ IF ( OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG AND NOT OPENVDB_HOUDINI_DISABLE_SESI_TA
 
   STRING ( REPLACE "'" "" SESI_CACHE_TAG_DEFINE ${SESI_CACHE_TAG_DEFINE} )
   STRING ( REPLACE "-D" "" SESI_CACHE_TAG_DEFINE ${SESI_CACHE_TAG_DEFINE} )
-  MESSAGE ( STATUS "Using cache sesi tag data for Houdini DSOs: ${sesitag_input_file}" )
+  MESSAGE ( STATUS "Using cache SESI Tag data for Houdini DSOs: ${sesitag_input_file}" )
 ENDIF ()
 
 # Add all dsos as libraries and configure them for houdini

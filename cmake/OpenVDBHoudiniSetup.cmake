@@ -53,6 +53,8 @@ This will define the following variables:
 
 ``Houdini_FOUND``
   True if the system has Houdini installed.
+``Houdini_VERSION``
+  The version of the Houdini which was found.
 ``OPENVDB_HOUDINI_ABI``
   The ABI version that Houdini uses for it's own OpenVDB installation.
 
@@ -91,7 +93,7 @@ may be provided to tell this module where to look.
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
-SET ( _HOUDINI_ROOT_SEARCH_DIR "" )
+SET ( _HOUDINI_ROOT_SEARCH_DIR )
 
 IF ( HOUDINI_ROOT )
   LIST ( APPEND _HOUDINI_ROOT_SEARCH_DIR ${HOUDINI_ROOT} )
@@ -110,10 +112,27 @@ ENDIF ()
 #  Search for Houdini CMake
 # ------------------------------------------------------------------------
 
+SET ( _HOUDINI_CMAKE_PATH_SUFFIXES )
+
+IF ( APPLE )
+  LIST ( APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
+    Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/cmake
+    Houdini.framework/Versions/Current/Resources/toolkit/cmake
+    Versions/Current/Resources/toolkit/cmake
+    Current/Resources/toolkit/cmake
+    Resources/toolkit/cmake
+    )
+ENDIF ()
+
+LIST ( APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
+  toolkit/cmake
+  cmake
+  )
+
 FIND_PATH ( HOUDINI_CMAKE_LOCATION HoudiniConfig.cmake
   NO_DEFAULT_PATH
   PATHS ${_HOUDINI_ROOT_SEARCH_DIR}
-  PATH_SUFFIXES toolkit/cmake cmake
+  PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES}
   )
 
 IF ( HOUDINI_CMAKE_LOCATION )
@@ -127,37 +146,81 @@ ENDIF ()
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
 FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Houdini
-  REQUIRED_VARS _houdini_hfs_root Houdini_FOUND
+  REQUIRED_VARS _houdini_install_root Houdini_FOUND
   VERSION_VAR Houdini_VERSION
   )
 
-# Additionally link in HoudiniRAY to the imported Houdini target for VRAY_OpenVDB_Points.
-# Note that HoudiniRAY is currently missing from the list of imported Houdini libs
+# ------------------------------------------------------------------------
+#  Configure imported Houdini target
+# ------------------------------------------------------------------------
+
+# Set the relative directory containing Houdini libs and populate an extra list
+# of Houdini dependencies for _houdini_create_libraries.
+
+SET ( _HOUDINI_LIB_DIR )
+SET ( _HOUDINI_EXTRA_LIBRARIES )
+SET ( _HOUDINI_EXTRA_LIBRARY_NAMES )
+
+IF ( APPLE )
+  SET ( _HOUDINI_LIB_DIR
+    Frameworks/Houdini.framework/Versions/Current/Libraries
+    )
+  LIST ( APPEND _HOUDINI_EXTRA_LIBRARIES
+    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
+    ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
+    )
+ELSE ()
+  SET ( _HOUDINI_LIB_DIR dsolib )
+  LIST ( APPEND _HOUDINI_EXTRA_LIBRARIES
+    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
+    ${_HOUDINI_LIB_DIR}/libhboost_regex.so
+    )
+ENDIF ()
+
+LIST ( APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+  HoudiniRAY
+  hboost_regex
+  )
+
+# Additionally link extra deps
 
 _houdini_create_libraries (
-  PATHS dsolib/libHoudiniRAY.so
-  TARGET_NAMES HoudiniRAY
+  PATHS ${_HOUDINI_EXTRA_LIBRARIES}
+  TARGET_NAMES ${_HOUDINI_EXTRA_LIBRARY_NAMES}
   TYPE SHARED
   )
+
+UNSET ( _HOUDINI_EXTRA_LIBRARIES )
+UNSET ( _HOUDINI_EXTRA_LIBRARY_NAMES )
+
+# Set Houdini lib and include directories
+
+SET ( _HOUDINI_INCLUDE_DIR ${_houdini_include_dir} )
+SET ( _HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR} )
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
 # ------------------------------------------------------------------------
 
-# Congfigure dependency hints to point to Houdini. Allow for user overriding is custom
-# Houdini installations are in use
+# Congfigure dependency hints to point to Houdini. Allow for user overriding
+# if custom Houdini installations are in use
 
-# ZLIB
+# ZLIB - FindPackage ( ZLIB ) only supports a few path hints. We use
+# ZLIB_ROOT to find the zlib includes and explicitly set the path to
+# the zlib library
 
 IF ( NOT ZLIB_ROOT )
-  SET ( ZLIB_ROOT ${_houdini_hfs_root}/toolkit/include )
+  SET ( ZLIB_ROOT ${_HOUDINI_INCLUDE_DIR} )
 ENDIF ()
 IF ( NOT ZLIB_LIBRARY )
-  # Full path to zlib library
-  SET ( ZLIB_LIBRARY ${_houdini_hfs_root}/dsolib/libz.so )
+  # Full path to zlib library - FindPackage ( ZLIB )
+  FIND_LIBRARY ( ZLIB_LIBRARY z
+    NO_DEFAULT_PATH
+    PATHS ${_HOUDINI_LIB_DIR}
+    )
   IF ( NOT EXISTS ${ZLIB_LIBRARY} )
     MESSAGE ( WARNING "The OpenVDB Houdini CMake setup is unable to locate libz within "
-      "the Houdini installation at: ${_houdini_hfs_root}. OpenVDB may not build correctly."
+      "the Houdini installation at: ${_HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
       )
   ENDIF ()
 ENDIF ()
@@ -165,19 +228,19 @@ ENDIF ()
 # TBB
 
 IF ( NOT TBB_INCLUDEDIR )
-  SET ( TBB_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
+  SET ( TBB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
 ENDIF ()
 IF ( NOT TBB_LIBRARYDIR )
-  SET ( TBB_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
+  SET ( TBB_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
 ENDIF ()
 
 # Blosc
 
 IF ( NOT BLOSC_INCLUDEDIR )
-  SET ( BLOSC_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
+  SET ( BLOSC_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
 ENDIF ()
 IF ( NOT BLOSC_LIBRARYDIR )
-  SET ( BLOSC_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
+  SET ( BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
 ENDIF ()
 
 # Boost
@@ -193,10 +256,10 @@ IF (( Houdini_VERSION_MAJOR LESS 16 ) OR
   ENDIF ()
   # Reset boost hints if not set
   IF ( NOT BOOST_INCLUDEDIR )
-    SET ( BOOST_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
+    SET ( BOOST_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
   ENDIF ()
   IF ( NOT BOOST_LIBRARYDIR )
-    SET ( BOOST_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
+    SET ( BOOST_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
   ENDIF ()
 ENDIF ()
 
@@ -208,20 +271,27 @@ IF (( Houdini_VERSION_MAJOR LESS 17 ) OR
 
   # OpenEXR
   IF ( NOT OPENEXR_INCLUDEDIR )
-    SET ( OPENEXR_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
+    SET ( OPENEXR_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
   ENDIF ()
   IF ( NOT OPENEXR_LIBRARYDIR )
-    SET ( OPENEXR_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
+    SET ( OPENEXR_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
   ENDIF ()
 
   # IlmBase
   IF ( NOT ILMBASE_INCLUDEDIR )
-    SET ( ILMBASE_INCLUDEDIR ${_houdini_hfs_root}/toolkit/include )
+    SET ( ILMBASE_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
   ENDIF ()
   IF ( NOT ILMBASE_LIBRARYDIR )
-    SET ( ILMBASE_LIBRARYDIR ${_houdini_hfs_root}/dsolib )
+    SET ( ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
   ENDIF ()
 ENDIF ()
+
+UNSET ( _HOUDINI_INCLUDE_DIR )
+UNSET ( _HOUDINI_LIB_DIR )
+
+# ------------------------------------------------------------------------
+#  Configure OpenVDB ABI
+# ------------------------------------------------------------------------
 
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
