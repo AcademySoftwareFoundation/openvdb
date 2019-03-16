@@ -40,7 +40,7 @@ ENDIF ()
 ###### OpenVDB Python Options
 
 OPTION ( USE_NUMPY [=[
-Build the python library with numpy support. Currently requires CMake 3.12.]=] OFF )
+Build the python library with numpy support. Currently requires CMake 3.14.]=] OFF )
 OPTION ( OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
@@ -79,16 +79,17 @@ IF ( USE_BLOSC )
   FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
 ENDIF ()
 
+# NumPy requires CMake 3.14
+IF ( USE_NUMPY AND ( ${CMAKE_VERSION} VERSION_LESS 3.14 ) )
+  MESSAGE ( FATAL_ERROR "No CMake support for FindPackage ( NumPy ) currently "
+    "available for OpenVDB. Requires CMake 3.14." )
+ENDIF ()
+
 SET ( OPENVDB_PYTHON_DEPS )
 
 # If CMake is < 3.12, use the old style python search and alias the variables
 # Note that the Interpreter component is only required for the python test
 IF ( ${CMAKE_VERSION} VERSION_LESS 3.12 )
-  IF ( USE_NUMPY )
-    MESSAGE ( FATAL_ERROR "No CMake support for FindPackage ( NumPy ) currently "
-      "available for OpenVDB. Requires CMake 3.12." )
-  ENDIF ()
-
   FIND_PACKAGE ( PythonInterp ${PYTHON_VERSION} REQUIRED )
   FIND_PACKAGE ( PythonLibs ${PYTHON_VERSION} REQUIRED )
 
