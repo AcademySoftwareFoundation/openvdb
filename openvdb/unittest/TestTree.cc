@@ -479,6 +479,10 @@ void
 evalMinMaxTest()
 {
     using ValueT = typename TreeT::ValueType;
+    constexpr bool Constructible =
+        openvdb::CanConvertType<int, ValueT>::value;
+    using ConvertType =
+        typename std::conditional<Constructible, ValueT, int>::type;
 
     struct Local {
         static bool isEqual(const ValueT& a, const ValueT& b) {
@@ -489,9 +493,9 @@ evalMinMaxTest()
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
-        minusTwo = zero + (-2),
-        plusTwo = zero + 2,
-        five = zero + 5;
+        minusTwo = zero + ConvertType(-2),
+        plusTwo = zero + ConvertType(2),
+        five = zero + ConvertType(5);
 
     TreeT tree(/*background=*/five);
 

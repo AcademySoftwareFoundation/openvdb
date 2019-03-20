@@ -887,13 +887,13 @@ struct MultiResGrid<TreeType>::RestrictOp
     {
         ijk <<= 1;
         // Overlapping grid point
-        ValueType v = 8*acc.getValue(ijk);
+        ValueType v = ValueType(8)*acc.getValue(ijk);
         // neighbors in one axial direction
-        v += 4*(acc.getValue(ijk.offsetBy(-1, 0, 0)) + acc.getValue(ijk.offsetBy( 1, 0, 0)) +// x
+        v += ValueType(4)*(acc.getValue(ijk.offsetBy(-1, 0, 0)) + acc.getValue(ijk.offsetBy( 1, 0, 0)) +// x
                 acc.getValue(ijk.offsetBy( 0,-1, 0)) + acc.getValue(ijk.offsetBy( 0, 1, 0)) +// y
                 acc.getValue(ijk.offsetBy( 0, 0,-1)) + acc.getValue(ijk.offsetBy( 0, 0, 1)));// z
         // neighbors in two axial directions
-        v += 2*(acc.getValue(ijk.offsetBy(-1,-1, 0)) + acc.getValue(ijk.offsetBy(-1, 1, 0)) +// xy
+        v += ValueType(2)*(acc.getValue(ijk.offsetBy(-1,-1, 0)) + acc.getValue(ijk.offsetBy(-1, 1, 0)) +// xy
                 acc.getValue(ijk.offsetBy( 1,-1, 0)) + acc.getValue(ijk.offsetBy( 1, 1, 0)) +// xy
                 acc.getValue(ijk.offsetBy(-1, 0,-1)) + acc.getValue(ijk.offsetBy(-1, 0, 1)) +// xz
                 acc.getValue(ijk.offsetBy( 1, 0,-1)) + acc.getValue(ijk.offsetBy( 1, 0, 1)) +// xz

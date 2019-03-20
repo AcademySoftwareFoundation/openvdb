@@ -80,7 +80,12 @@ TreeT
 TestTreeVisitor::createTestTree() const
 {
     using ValueT = typename TreeT::ValueType;
-    const ValueT zero = openvdb::zeroVal<ValueT>(), one = zero + 1;
+    constexpr bool Constructible =
+        openvdb::CanConvertType<int, ValueT>::value;
+    using ConvertType =
+        typename std::conditional<Constructible, ValueT, int>::type;
+
+    const ValueT zero = openvdb::zeroVal<ValueT>(), one = zero + ConvertType(1);
 
     // Create a sparse test tree comprising the eight corners of
     // a 200 x 200 x 200 cube.
