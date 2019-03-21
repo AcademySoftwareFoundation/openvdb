@@ -41,7 +41,7 @@ ENDIF ()
 
 OPTION ( OPENVDB_TOOLS_RAYTRACER_USE_EXR [=[Build with -DOPENVDB_TOOLS_RAYTRACER_USE_EXR,"
 linking OpenVDB against OpenEXR and enabling EXR serialization output from OpenVDB's ray
-tarcer.]=] OFF )
+tracer.]=] OFF )
 SET ( OPENVDB_LIBRARY_NAME "openvdb" CACHE STRING "The name of the openvdb library to build." )
 
 MARK_AS_ADVANCED (
