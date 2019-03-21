@@ -202,8 +202,8 @@ private:
     template <typename AvgT>
     void doBox( const RangeType& r, Int32 w);
     void doBoxX(const RangeType& r, Int32 w) { this->doBox<Avg<0> >(r,w); }
-    void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
-    void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
+    void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
+    void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
     void doMedian(const RangeType&, int);
     void doOffset(const RangeType&, ValueType);
     /// @return true if the process was interrupted
