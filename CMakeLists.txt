@@ -324,11 +324,12 @@ CMAKE_DEPENDENT_OPTION ( BOOST_PYTHON_NAMESPACE_VERSIONING
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
   OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)." )
 
-# Various dependency library versions - Cache options can be changed
+# Various minimum version requirements - Cache options can be changed
 
 SET ( MINIMUM_BOOST_VERSION 1.55 )
 SET ( MINIMUM_BLOSC_VERSION 1.5 )
 SET ( MINIMUM_GLFW_VERSION 3 )
+SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
 
 #########################################################################
 
@@ -505,6 +506,11 @@ ENDIF ()
 SET ( OPENVDB_ABI_VERSION_NUMBER ${ABI} CACHE STRING "Build for compatibility with version N of the
   OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)."
   FORCE )
+
+IF ( ${OPENVDB_ABI_VERSION_NUMBER} LESS ${MINIMUM_OPENVDB_ABI_VERSION} )
+    MESSAGE ( WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+        "deprecated and will soon be removed." )
+ENDIF ()
 
 IF ( OPENVDB_ABI_VERSION_NUMBER EQUAL 3 )
   ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
