@@ -305,7 +305,6 @@ OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated -
 
 # @todo scalable/concurrent malloc option(s)
 # @todo non-required behavior for blosc, log4cplus (i.e. use if available)
-# @todo OPENVDB_USE_NUMPY options for NumPy
 OPTION ( USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on autmatically if OPENVDB_BUILD_HOUDINI_SOPS is enabled.
 When enabled, you do not need to provide dependency locations for OpenEXR, IlmBase, TBB, Boost and Blosc. You can
@@ -315,7 +314,7 @@ OPTION ( USE_LOG4CPLUS "Build the library with log4cplus support." OFF )
 OPTION ( OPENEXR_NAMESPACE_VERSIONING "Set the expected names of OpenEXR libraries to be version suffixed" OFF )
 OPTION ( ILMBASE_NAMESPACE_VERSIONING "Set the expected names of ILM Base libraries to be version suffixed" OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
-  "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
+  "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
 CMAKE_DEPENDENT_OPTION ( BOOST_PYTHON_NAMESPACE_VERSIONING
   "Set the expected names of Boost.Python libraries to be version suffixed"
@@ -379,9 +378,9 @@ LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" )
 
 FIND_PROGRAM ( CCACHE_PATH ccache )
 IF ( CCACHE_PATH )
-    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
-    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
-    MESSAGE ( STATUS "Using ccache: ${CCACHE_PATH}" )
+  SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
+  SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
+  MESSAGE ( STATUS "Using ccache: ${CCACHE_PATH}" )
 ENDIF ( CCACHE_PATH )
 
 # Build type configuration - default to Release if none is set
@@ -442,7 +441,7 @@ ENDIF ()
 # Configure Houdini installation if necessary
 
 IF ( OPENVDB_BUILD_HOUDINI_SOPS )
-    SET ( USE_HOUDINI ON )
+  SET ( USE_HOUDINI ON )
 ENDIF ()
 
 IF ( APPLE )
@@ -508,8 +507,8 @@ SET ( OPENVDB_ABI_VERSION_NUMBER ${ABI} CACHE STRING "Build for compatibility wi
   FORCE )
 
 IF ( ${OPENVDB_ABI_VERSION_NUMBER} LESS ${MINIMUM_OPENVDB_ABI_VERSION} )
-    MESSAGE ( WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-        "deprecated and will soon be removed." )
+  MESSAGE ( WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+      "deprecated and will soon be removed." )
 ENDIF ()
 
 IF ( OPENVDB_ABI_VERSION_NUMBER EQUAL 3 )
