@@ -59,7 +59,6 @@ IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
-  INCLUDE_DIRECTORIES ( ../../ )
 ENDIF ()
 
 FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half Iex IlmThread )
@@ -144,13 +143,6 @@ IF ( OPENVDB_ENABLE_RPATH )
 
   LIST ( REMOVE_DUPLICATES RPATHS )
 ENDIF ()
-
-# @todo improve the viewer header system
-
-FILE ( GLOB VIEWER_SOURCE_FILES ../viewer/*.h )
-FILE ( MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
-FILE ( COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
-INCLUDE_DIRECTORIES ( ${CMAKE_BINARY_DIR}/dwa )
 
 ##########################################################################
 
@@ -240,6 +232,13 @@ ENDIF ()
 #### vdb_view
 
 IF ( OPENVDB_BUILD_VDB_VIEW )
+
+  # @todo improve the viewer header system
+
+  FILE ( GLOB VIEWER_SOURCE_FILES ../viewer/*.h )
+  FILE ( MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
+  FILE ( COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
+
   IF ( WIN32 )
     MESSAGE ( WARNING "Currently no CMake support for building vdb_view binary on Windows." )
     # @todo
@@ -262,6 +261,11 @@ IF ( OPENVDB_BUILD_VDB_VIEW )
       )
 
     ADD_EXECUTABLE ( vdb_view ${VDB_VIEW_SOURCE_FILES} )
+
+    TARGET_INCLUDE_DIRECTORIES ( vdb_view
+      PRIVATE ${CMAKE_BINARY_DIR}/dwa
+      )
+
     TARGET_LINK_LIBRARIES ( vdb_view
       Boost::thread
       OpenGL::GL
@@ -274,6 +278,7 @@ IF ( OPENVDB_BUILD_VDB_VIEW )
     TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE
       "-DOPENVDB_USE_GLFW_3" "-DGL_GLEXT_PROTOTYPES=1"
       )
+
     IF ( USE_LOG4CPLUS )
       TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE
         "-DOPENVDB_USE_LOG4CPLUS"

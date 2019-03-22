@@ -58,9 +58,6 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 
 # Collect and configure lib dependencies
 
-INCLUDE_DIRECTORIES ( ../ )
-INCLUDE_DIRECTORIES ( . )
-
 IF ( OPENVDB_TOOLS_RAYTRACER_USE_EXR )
   FIND_PACKAGE ( IlmBase REQUIRED )
   FIND_PACKAGE ( OpenEXR REQUIRED )
@@ -323,6 +320,16 @@ ADD_LIBRARY ( openvdb_static STATIC
   )
 ADD_LIBRARY ( openvdb_shared SHARED
   ${OPENVDB_LIBRARY_SOURCE_FILES}
+  )
+
+TARGET_INCLUDE_DIRECTORIES ( openvdb_static
+  PUBLIC ../
+  PRIVATE .
+  )
+
+TARGET_INCLUDE_DIRECTORIES ( openvdb_shared
+  PUBLIC ../
+  PRIVATE .
   )
 
 ##########################################################################

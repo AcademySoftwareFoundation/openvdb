@@ -64,7 +64,6 @@ IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
-  INCLUDE_DIRECTORIES ( ../../ )
 ENDIF ()
 
 FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
@@ -86,6 +85,7 @@ IF ( USE_NUMPY AND ( ${CMAKE_VERSION} VERSION_LESS 3.14 ) )
 ENDIF ()
 
 SET ( OPENVDB_PYTHON_DEPS )
+SET ( OPENVDB_PYTHON_INCLUDES )
 
 # If CMake is < 3.12, use the old style python search and alias the variables
 # Note that the Interpreter component is only required for the python test
@@ -99,7 +99,7 @@ IF ( ${CMAKE_VERSION} VERSION_LESS 3.12 )
   SET ( OPENVDB_PYTHON_DEPS ${PYTHON_LIBRARIES} )
   GET_FILENAME_COMPONENT ( Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY )
 
-  INCLUDE_DIRECTORIES ( SYSTEM ${PYTHON_INCLUDE_DIR} )
+  LIST ( APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR} )
 ELSE ()
   # To ensure consistent versions between components Interpreter, Compiler,
   # Development and NumPy, specify all components at the same time when using
@@ -177,6 +177,10 @@ ENDIF ( NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY )
 
 ADD_LIBRARY ( pyopenvdb SHARED
   ${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
+  )
+
+TARGET_INCLUDE_DIRECTORIES ( pyopenvdb
+  SYSTEM PUBLIC ${OPENVDB_PYTHON_INCLUDES}
   )
 
 IF ( OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES )
