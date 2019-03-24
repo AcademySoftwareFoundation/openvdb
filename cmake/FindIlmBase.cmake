@@ -151,7 +151,7 @@ ENDIF ()
 # Additionally try and use pkconfig to find IlmBase
 
 FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_IlmBase QUIET ilmbase )
+PKG_CHECK_MODULES ( PC_IlmBase QUIET IlmBase )
 
 # ------------------------------------------------------------------------
 #  Search for IlmBase include DIR
@@ -161,7 +161,7 @@ SET ( _ILMBASE_INCLUDE_SEARCH_DIRS "" )
 LIST ( APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
   ${ILMBASE_INCLUDEDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
-  ${PC_IlmBase_INCLUDE_DIRS}
+  ${PC_IlmBase_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
@@ -207,7 +207,7 @@ SET ( _ILMBASE_LIBRARYDIR_SEARCH_DIRS "" )
 LIST ( APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${ILMBASE_LIBRARYDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
-  ${PC_IlmBase_LIBRARY_DIRS}
+  ${PC_IlmBase_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
   )
 
@@ -218,7 +218,7 @@ SET ( ILMBASE_PATH_SUFFIXES
   lib
 )
 
-IF ( ${CMAKE_CXX_COMPILER_ID} STREQUAL GNU )
+IF ( UNIX )
   LIST ( INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu )
 ENDIF ()
 

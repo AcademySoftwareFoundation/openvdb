@@ -209,6 +209,10 @@ set ( Tbb_LIB_COMPONENTS "" )
 
 # platform branching
 
+IF ( UNIX )
+  LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/x86_64-linux-gnu )
+ENDIF ()
+
 IF (APPLE)
   IF (TBB_FOR_CLANG)
     LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/libc++ )
@@ -232,7 +236,6 @@ ELSE ()
     ELSE ()
       LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc4.4 )
     ENDIF ()
-    LIST ( INSERT TBB_PATH_SUFFIXES 1 lib/x86_64-linux-gnu )
   ENDIF ()
 ENDIF ()
 
