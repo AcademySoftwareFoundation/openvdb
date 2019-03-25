@@ -283,11 +283,7 @@ inline typename GridType::ValueType
 getOneValue()
 {
     using ValueT = typename GridType::ValueType;
-    constexpr bool Constructible =
-        openvdb::CanConvertType<int, ValueT>::value;
-    using ConvertType =
-        typename std::conditional<Constructible, ValueT, int>::type;
-    return ValueT(openvdb::zeroVal<ValueT>() + ConvertType(1));
+    return ValueT(openvdb::zeroVal<ValueT>() + 1);
 }
 
 

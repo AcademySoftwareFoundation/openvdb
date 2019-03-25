@@ -310,19 +310,14 @@ TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
 {
     using ValueT = typename TreeT::ValueType;
 
-    constexpr bool Constructible =
-        openvdb::CanConvertType<int, ValueT>::value;
-    using ConvertType =
-        typename std::conditional<Constructible, ValueT, int>::type;
-
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
-        minusOne = zero + ConvertType(-1),
-        minusTwo = zero + ConvertType(-2),
-        one = zero + ConvertType(1),
-        three = zero + ConvertType(3),
-        four = zero + ConvertType(4),
-        five = zero + ConvertType(5);
+        minusOne = zero + (-1),
+        minusTwo = zero + (-2),
+        one = zero + 1,
+        three = zero + 3,
+        four = zero + 4,
+        five = zero + 5;
 
     {
         TreeT aTree(/*background=*/one);
@@ -607,18 +602,14 @@ void
 TestTreeCombine::testCompRepl()
 {
     using ValueT = typename TreeT::ValueType;
-    constexpr bool Constructible =
-        openvdb::CanConvertType<int, ValueT>::value;
-    using ConvertType =
-        typename std::conditional<Constructible, ValueT, int>::type;
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
-        minusOne = zero + ConvertType(-1),
-        one = zero + ConvertType(1),
-        three = zero + ConvertType(3),
-        four = zero + ConvertType(4),
-        five = zero + ConvertType(5);
+        minusOne = zero + (-1),
+        one = zero + 1,
+        three = zero + 3,
+        four = zero + 4,
+        five = zero + 5;
 
     {
         TreeT aTree(/*bg=*/one);

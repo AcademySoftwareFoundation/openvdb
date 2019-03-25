@@ -97,17 +97,12 @@ TestGridTransformer::transformGrid()
 
     typedef typename GridType::ValueType ValueT;
 
-    constexpr bool Constructible =
-        openvdb::CanConvertType<int, ValueT>::value;
-    using ConvertType =
-        typename std::conditional<Constructible, ValueT, int>::type;
-
     const int radius = Sampler::radius();
     const openvdb::Vec3R zeroVec(0, 0, 0), oneVec(1, 1, 1);
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
-        one = zero + ConvertType(1),
-        two = one + ConvertType(1),
+        one = zero + 1,
+        two = one + 1,
         background = one;
     const bool transformTiles = true;
 

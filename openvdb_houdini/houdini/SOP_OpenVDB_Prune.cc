@@ -197,7 +197,7 @@ struct PruneOp {
         using ValueT = typename GridT::ValueType;
 
         if (mode == "value") {
-            openvdb::tools::prune(grid.tree(), ValueT(tolerance));
+            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
         } else if (mode == "inactive") {
             openvdb::tools::pruneInactive(grid.tree());
         } else if (mode == "levelset") {

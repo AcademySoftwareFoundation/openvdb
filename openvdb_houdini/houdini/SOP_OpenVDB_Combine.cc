@@ -860,7 +860,7 @@ struct MulAdd
     explicit MulAdd(float s, float t = 0.0): scale(s), offset(t) {}
 
     void operator()(const ValueT& a, const ValueT&, ValueT& out) const
-        { out = a * ValueT(scale) + ValueT(offset); }
+        { out = ValueT(a * scale + offset); }
 
     /// @return true if the scale is 1 and the offset is 0
     bool isIdentity() const
@@ -897,7 +897,7 @@ struct Blend1
     explicit Blend1(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = ValueT((ONE - ValueT(aMult) * a) * ValueT(bMult) * b); }
+        { out = ValueT((ONE - aMult * a) * bMult * b); }
 };
 
 
@@ -913,7 +913,7 @@ struct Blend2
     explicit Blend2(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = a*ValueT(aMult); out = out + ValueT((ONE - out) * ValueT(bMult)*b); }
+        { out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b); }
 };
 
 
@@ -1031,8 +1031,8 @@ struct SOP_OpenVDB_Combine::CombineOp
             // For level set grids, use the level set rebuild tool to both resample the
             // source grid to match the reference grid and to rebuild the resulting level set.
             const ValueT halfWidth = ((ref.getGridClass() == openvdb::GRID_LEVEL_SET)
-                ? ValueT(this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
-                : src.background() * ValueT(1.0 / src.voxelSize()[0]));
+                ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
+                : ValueT(src.background() * (1.0 / src.voxelSize()[0])));
 
             if (!openvdb::math::isFinite(halfWidth)) {
                 std::stringstream msg;
@@ -1415,6 +1415,7 @@ struct SOP_OpenVDB_Combine::CombineOp
     typename GridT::Ptr postprocess(typename GridT::Ptr resultGrid)
     {
         using ValueT = typename GridT::ValueType;
+        const ValueT ZERO = openvdb::zeroVal<ValueT>();
 
         const bool
             prune = self->evalInt("prune", 0, self->getTime()),
@@ -1429,7 +1430,7 @@ struct SOP_OpenVDB_Combine::CombineOp
             // values match the output grid's background value.
             // Do this first to facilitate pruning.
             openvdb::tools::deactivate(*resultGrid, resultGrid->background(),
-                ValueT(deactivationTolerance));
+                ValueT(ZERO + deactivationTolerance));
         }
 
         if (flood && resultGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
@@ -1437,7 +1438,7 @@ struct SOP_OpenVDB_Combine::CombineOp
         }
         if (prune) {
             const float tolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
-            openvdb::tools::prune(resultGrid->tree(), ValueT(tolerance));
+            openvdb::tools::prune(resultGrid->tree(), ValueT(ZERO + tolerance));
         }
 
         return resultGrid;

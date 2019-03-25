@@ -84,11 +84,6 @@ TestGridIO::readAllTest()
     typedef typename TreeType::NodeCIter NodeCIter;
     const ValueT zero = zeroVal<ValueT>();
 
-    constexpr bool Constructible =
-        openvdb::CanConvertType<int, ValueT>::value;
-    using ConvertType =
-        typename std::conditional<Constructible, ValueT, int>::type;
-
     // For each level of the tree, compute a bit mask for use in converting
     // global coordinates to node origins for nodes at that level.
     // That is, node_origin = global_coordinates & mask[node_level].
@@ -112,14 +107,14 @@ TestGridIO::readAllTest()
 
     // Create trees.
     TreePtr
-        tree1(new TreeType(zero + ConvertType(1))),
-        tree2(new TreeType(zero + ConvertType(2)));
+        tree1(new TreeType(zero + 1)),
+        tree2(new TreeType(zero + 2));
 
     // Set some values.
-    tree1->setValue(coord0, zero + ConvertType(5));
-    tree1->setValue(coord1, zero + ConvertType(6));
-    tree2->setValue(coord0, zero + ConvertType(10));
-    tree2->setValue(coord2, zero + ConvertType(11));
+    tree1->setValue(coord0, zero + 5);
+    tree1->setValue(coord1, zero + 6);
+    tree2->setValue(coord0, zero + 10);
+    tree2->setValue(coord2, zero + 11);
 
     // Create grids with trees and assign transforms.
     math::Transform::Ptr trans1(math::Transform::createLinearTransform(0.1)),
@@ -131,10 +126,10 @@ TestGridIO::readAllTest()
     grid2->setName("temperature");
 
     OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(5)), tree1->getValue(coord0));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(6)), tree1->getValue(coord1));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(10)), tree2->getValue(coord0));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(11)), tree2->getValue(coord2));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 5), tree1->getValue(coord0));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 6), tree1->getValue(coord1));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 10), tree2->getValue(coord0));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 11), tree2->getValue(coord2));
     OPENVDB_NO_FP_EQUALITY_WARNING_END
 
     // count[d] is the number of nodes already visited at depth d.
@@ -209,10 +204,10 @@ TestGridIO::readAllTest()
     CPPUNIT_ASSERT(temperature.get() != NULL);
 
     OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(5)), density->getValue(coord0));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(6)), density->getValue(coord1));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(10)), temperature->getValue(coord0));
-    CPPUNIT_ASSERT_EQUAL(ValueT(zero + ConvertType(11)), temperature->getValue(coord2));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 5), density->getValue(coord0));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 6), density->getValue(coord1));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 10), temperature->getValue(coord0));
+    CPPUNIT_ASSERT_EQUAL(ValueT(zero + 11), temperature->getValue(coord2));
     OPENVDB_NO_FP_EQUALITY_WARNING_END
 
     // Check if we got the correct node origins.

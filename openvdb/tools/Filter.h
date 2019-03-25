@@ -238,7 +238,7 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
     ValueType sum = zeroVal<ValueType>();
     Int32 &i = xyz[Axis], j = i + width;
     for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
-    return sum * static_cast<ValueType>(frac);
+    return static_cast<ValueType>(sum * frac);
 }
 
 
@@ -370,7 +370,7 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
                 if (alpha(xyz, a, b)) {
-                    buffer.setValue(iter.pos(), ValueType(b)*(*iter) + ValueType(a)*avg(xyz));
+                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*avg(xyz)));
                 }
             }
         }
@@ -400,7 +400,7 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer.setValue(iter.pos(), ValueType(b)*(*iter) + ValueType(a)*stencil.median());
+                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*stencil.median()));
                 }
             }
         }
@@ -427,7 +427,7 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) iter.setValue(*iter + ValueType(a)*offset);
+                if (alpha(iter.getCoord(), a, b)) iter.setValue(ValueType(*iter + a*offset));
             }
         }
     } else {

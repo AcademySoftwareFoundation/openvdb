@@ -1355,12 +1355,7 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    constexpr bool Constructible =
-        openvdb::CanConvertType<float, ValueType>::value;
-    using ToleranceType =
-        typename std::conditional<Constructible, ValueType, float>::type;
-
-    this->tree().prune(ValueType(zeroVal<ValueType>() + ToleranceType(tolerance)));
+    this->tree().prune(ValueType(zeroVal<ValueType>() + tolerance));
 }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3

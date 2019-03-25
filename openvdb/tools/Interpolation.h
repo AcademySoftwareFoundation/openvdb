@@ -746,15 +746,15 @@ BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 
     ValueT resultA, resultB;
 
-    resultA = data[0][0][0] + (data[0][0][1] - data[0][0][0]) * ValueT(uvw[2]);
-    resultB = data[0][1][0] + (data[0][1][1] - data[0][1][0]) * ValueT(uvw[2]);
-    ValueT result1 = resultA + (resultB-resultA) * ValueT(uvw[1]);
+    resultA = data[0][0][0] + ValueT((data[0][0][1] - data[0][0][0]) * uvw[2]);
+    resultB = data[0][1][0] + ValueT((data[0][1][1] - data[0][1][0]) * uvw[2]);
+    ValueT result1 = resultA + ValueT((resultB-resultA) * uvw[1]);
 
-    resultA = data[1][0][0] + (data[1][0][1] - data[1][0][0]) * ValueT(uvw[2]);
-    resultB = data[1][1][0] + (data[1][1][1] - data[1][1][0]) * ValueT(uvw[2]);
-    ValueT result2 = resultA + (resultB - resultA) * ValueT(uvw[1]);
+    resultA = data[1][0][0] + ValueT((data[1][0][1] - data[1][0][0]) * uvw[2]);
+    resultB = data[1][1][0] + ValueT((data[1][1][1] - data[1][1][0]) * uvw[2]);
+    ValueT result2 = resultA + ValueT((resultB - resultA) * uvw[1]);
 
-    return result1 + ValueT(uvw[0]) * (result2 - result1);
+    return result1 + ValueT(uvw[0] * (result2 - result1));
 }
 
 
@@ -822,27 +822,27 @@ QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R
             // for a, b and c.
             const ValueT* vz = &data[dx][dy][0];
             const ValueT
-                az = static_cast<ValueT>(0.5) * (vz[0] + vz[2]) - vz[1],
-                bz = static_cast<ValueT>(0.5) * (vz[2] - vz[0]),
+                az = static_cast<ValueT>(0.5 * (vz[0] + vz[2]) - vz[1]),
+                bz = static_cast<ValueT>(0.5 * (vz[2] - vz[0])),
                 cz = static_cast<ValueT>(vz[1]);
-            vy[dy] = static_cast<ValueT>(uvw.z()) * (static_cast<ValueT>(uvw.z()) * az + bz) + cz;
+            vy[dy] = static_cast<ValueT>(uvw.z() * (uvw.z() * az + bz) + cz);
         }//loop over y
         // Fit a parabola to three interpolated samples in y, then
         // evaluate the parabola at y', where y' is the fractional
         // part of inCoord.y.
         const ValueT
-            ay = static_cast<ValueT>(0.5) * (vy[0] + vy[2]) - vy[1],
-            by = static_cast<ValueT>(0.5) * (vy[2] - vy[0]),
+            ay = static_cast<ValueT>(0.5 * (vy[0] + vy[2]) - vy[1]),
+            by = static_cast<ValueT>(0.5 * (vy[2] - vy[0])),
             cy = static_cast<ValueT>(vy[1]);
-        vx[dx] = static_cast<ValueT>(uvw.y()) * (static_cast<ValueT>(uvw.y()) * ay + by) + cy;
+        vx[dx] = static_cast<ValueT>(uvw.y() * (uvw.y() * ay + by) + cy);
     }//loop over x
     // Fit a parabola to three interpolated samples in x, then
     // evaluate the parabola at the fractional part of inCoord.x.
     const ValueT
-        ax = static_cast<ValueT>(0.5) * (vx[0] + vx[2]) - vx[1],
-        bx = static_cast<ValueT>(0.5) * (vx[2] - vx[0]),
+        ax = static_cast<ValueT>(0.5 * (vx[0] + vx[2]) - vx[1]),
+        bx = static_cast<ValueT>(0.5 * (vx[2] - vx[0])),
         cx = static_cast<ValueT>(vx[1]);
-    return static_cast<ValueT>(uvw.x()) * (static_cast<ValueT>(uvw.x()) * ax + bx) + cx;
+    return static_cast<ValueT>(uvw.x() * (uvw.x() * ax + bx) + cx);
 }
 
 template<class TreeT>

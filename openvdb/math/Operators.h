@@ -765,9 +765,9 @@ struct Gradient<ScaleMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-        return  Vec3Type(iGradient[0] * ValueType(map.getInvTwiceScale()[0]),
-                         iGradient[1] * ValueType(map.getInvTwiceScale()[1]),
-                         iGradient[2] * ValueType(map.getInvTwiceScale()[2]) );
+        return  Vec3Type(ValueType(iGradient[0] * map.getInvTwiceScale()[0]),
+                         ValueType(iGradient[1] * map.getInvTwiceScale()[1]),
+                         ValueType(iGradient[2] * map.getInvTwiceScale()[2]) );
     }
 
     // stencil access version
@@ -779,9 +779,9 @@ struct Gradient<ScaleMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-        return  Vec3Type(iGradient[0] * ValueType(map.getInvTwiceScale()[0]),
-                         iGradient[1] * ValueType(map.getInvTwiceScale()[1]),
-                         iGradient[2] * ValueType(map.getInvTwiceScale()[2]) );
+        return  Vec3Type(ValueType(iGradient[0] * map.getInvTwiceScale()[0]),
+                         ValueType(iGradient[1] * map.getInvTwiceScale()[1]),
+                         ValueType(iGradient[2] * map.getInvTwiceScale()[2]) );
     }
 };
 
@@ -799,9 +799,9 @@ struct Gradient<ScaleTranslateMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-        return  Vec3Type(iGradient[0] * ValueType(map.getInvTwiceScale()[0]),
-                         iGradient[1] * ValueType(map.getInvTwiceScale()[1]),
-                         iGradient[2] * ValueType(map.getInvTwiceScale()[2]) );
+        return  Vec3Type(ValueType(iGradient[0] * map.getInvTwiceScale()[0]),
+                         ValueType(iGradient[1] * map.getInvTwiceScale()[1]),
+                         ValueType(iGradient[2] * map.getInvTwiceScale()[2]) );
     }
 
     // Stencil access version
@@ -813,9 +813,9 @@ struct Gradient<ScaleTranslateMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-        return  Vec3Type(iGradient[0] * ValueType(map.getInvTwiceScale()[0]),
-                         iGradient[1] * ValueType(map.getInvTwiceScale()[1]),
-                         iGradient[2] * ValueType(map.getInvTwiceScale()[2]) );
+        return  Vec3Type(ValueType(iGradient[0] * map.getInvTwiceScale()[0]),
+                         ValueType(iGradient[1] * map.getInvTwiceScale()[1]),
+                         ValueType(iGradient[2] * map.getInvTwiceScale()[2]) );
     }
 };
 //@}
@@ -1597,9 +1597,7 @@ struct Laplacian<ScaleMap, DiffScheme>
         ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        return iddx * ValueType(invScaleSqr[0]) +
-               iddy * ValueType(invScaleSqr[1]) +
-               iddz * ValueType(invScaleSqr[2]);
+        return ValueType(iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2]);
     }
 
     // stencil access version
@@ -1614,9 +1612,7 @@ struct Laplacian<ScaleMap, DiffScheme>
         ValueType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        return iddx * ValueType(invScaleSqr[0]) +
-               iddy * ValueType(invScaleSqr[1]) +
-               iddz * ValueType(invScaleSqr[2]);
+        return ValueType(iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2]);
     }
 };
 
@@ -1635,9 +1631,7 @@ struct Laplacian<ScaleTranslateMap, DiffScheme>
         ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        return iddx * ValueType(invScaleSqr[0]) +
-               iddy * ValueType(invScaleSqr[1]) +
-               iddz * ValueType(invScaleSqr[2]);
+        return ValueType(iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2]);
     }
 
     // stencil access version
@@ -1651,9 +1645,7 @@ struct Laplacian<ScaleTranslateMap, DiffScheme>
         ValueType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        return iddx * ValueType(invScaleSqr[0]) +
-               iddy * ValueType(invScaleSqr[1]) +
-               iddz * ValueType(invScaleSqr[2]);
+        return ValueType(iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2]);
     }
 };
 
