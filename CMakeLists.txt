@@ -372,6 +372,13 @@ MARK_AS_ADVANCED (
 
 LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" )
 
+# Add backports to support older versions of CMake
+
+IF ( ${CMAKE_VERSION} VERSION_LESS 3.8 )
+  LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/backports" )
+ENDIF ()
+
+
 #########################################################################
 
 # ccache setup
