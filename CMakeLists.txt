@@ -43,6 +43,17 @@
 
   Dependencies:
 
+    - CMake: >= 3.3
+      - Cross-platform family of tools designed to build, test and package
+        software.
+      - Installation
+        - UNIX apt-get:
+          - apt-get install cmake
+        - Homebrew:
+          - brew install cmake
+        - From Source:
+          - https://cmake.org/
+
     -  IlmBase
       - Used for the definition of half (half precision floating points)
         and for additional EXR serialization support. Usually available by
@@ -120,7 +131,7 @@
         - Provide Root to CMake:
             -D ZLIB_ROOT=<Installation Root Directory>
 
-    - Boost Components: => 1.55
+    - Boost Components: >= 1.55
       - Various boost components are required for some OpenVDB components
         - Boost.System
         - Boost.IOStreams
@@ -175,7 +186,7 @@
             -D CPPUNIT_INCLUDEDIR=<Include path>
             -D CPPUNIT_LIBRARYDIR=<Lib path>
 
-    - Blosc: => 1.5
+    - Blosc: >= 1.5
       - An optional but recommended dependency for improved disk
         compression.
       - Installation
@@ -212,7 +223,7 @@
             -D LOG4CPLUS_INCLUDEDIR=<Include path>
             -D LOG4CPLUS_LIBRARYDIR=<Lib path>
 
-    - GLFW: => 3
+    - GLFW: >= 3
       - Simple API for OpenGL development
       - Installation
         - UNIX apt-get:
@@ -231,7 +242,7 @@
           CMAKE_PREFIX_PATH where possible, instead of the above:
             -D CMAKE_PREFIX_PATH=<GLFW CMake location>
 
-    - Doxygen:
+    - Doxygen: >= 1.8.8
       - Documentation generation from C++
       - Installation
         - UNIX apt-get:
@@ -244,7 +255,7 @@
   Note that various packages have inbuilt CMake module support. See the
   CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
   controls:
-  https://cmake.org/cmake/help/v3.14/manual/cmake-modules.7.html
+  https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html
 
   ########################################################################
 
@@ -252,8 +263,8 @@
 
     OpenVDB Core
       Main CMake: openvdb/CMakeLists.txt
-      Required: IlmBase::Half, TBB::tbb, ZLib, Boost::System,
-        Boost::IOStream
+      Required: IlmBase::Half, TBB::tbb, ZLIB, Boost::system,
+        Boost::iostream
       Optional: Blosc, Log4cplus, OpenEXR
 
     OpenVDB Binaries
@@ -264,7 +275,8 @@
 
     OpenVDB Python
       Main CMake: openvdb/python/CMakeLists.txt
-      Required: (OpenVDB Core + Dependencies), Python, Boost::Python
+      Required: (OpenVDB Core + Dependencies), Python, Boost::python
+      Optional: Numpy
 
     OpenVDB Unit Tests
       Main CMake: openvdb/unittest/CMakeLists.txt
