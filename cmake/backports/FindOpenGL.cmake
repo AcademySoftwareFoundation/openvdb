@@ -196,7 +196,7 @@ endif()
 # This deprecated setting is for backward compatibility with CMake1.4
 set(OPENGL_INCLUDE_PATH ${OPENGL_INCLUDE_DIR})
 
-include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
+include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenGL REQUIRED_VARS ${_OpenGL_REQUIRED_VARS})
 unset(_OpenGL_REQUIRED_VARS)
 
