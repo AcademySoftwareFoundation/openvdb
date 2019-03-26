@@ -113,15 +113,35 @@ ELSE ()
   LIST ( APPEND OPENVDB_PYTHON_DEPS Python::Python )
 ENDIF ()
 
-IF ( BOOST_PYTHON_NAMESPACE_VERSIONING )
-  SET ( BOOST_PYTHON_LIB "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}" )
-ELSE ()
-  SET ( BOOST_PYTHON_LIB "python" )
-ENDIF ()
+# Boost
 
 FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
-  REQUIRED COMPONENTS iostreams system ${BOOST_PYTHON_LIB}
+  REQUIRED COMPONENTS iostreams system
 )
+
+# Boost python handling - try and find both python and pythonXx (version suffixed).
+# Prioritize the version suffixed library, failing if neither exist.
+
+FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
+  QUIET COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+)
+
+IF ( TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} )
+  SET ( BOOST_PYTHON_LIB "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}" )
+  MESSAGE ( STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}" )
+ELSE ()
+  FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
+    QUIET COMPONENTS python
+  )
+  IF ( TARGET Boost::python )
+    SET ( BOOST_PYTHON_LIB "python" )
+    MESSAGE ( STATUS "Found non-suffixed boost_python, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible" )
+  ELSE ()
+    MESSAGE ( FATAL_ERROR "Unable to find boost_python or "
+      "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}." )
+  ENDIF ()
+ENDIF ()
 
 IF ( UNIX )
   FIND_PACKAGE ( Threads REQUIRED )

@@ -316,9 +316,6 @@ OPTION ( ILMBASE_NAMESPACE_VERSIONING "Set the expected names of ILM Base librar
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
-CMAKE_DEPENDENT_OPTION ( BOOST_PYTHON_NAMESPACE_VERSIONING
-  "Set the expected names of Boost.Python libraries to be version suffixed"
-  ON "OPENVDB_BUILD_PYTHON_MODULE" ON )
 
 SET ( OPENVDB_ABI_VERSION_NUMBER "" CACHE STRING "Build for compatibility with version N of the
   OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features will be disabled)." )
