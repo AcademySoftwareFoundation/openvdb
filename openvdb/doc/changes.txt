@@ -21,18 +21,19 @@ New features:
 - Added @vdblink::GridBase::apply() GridBase::apply@endlink,
   which invokes a functor on a grid if the resolved grid type
   is a member of a given type list.
-- Added @vdblink::util::printTime util::printTime@endlink that
-  outputs nicely-formatted time information.
-- Added a template specialization of std::hash with @vdblink::math::Coord Coord@endlink.
-- Added @vdblink::math::CoordBBox::moveMin CoordBBox::moveMin@endlink and
-  @vdblink::math::CoordBBox::moveMax CoordBBox::moveMax@endlink to move a
+- Added @vdblink::util::printTime() printTime@endlink, which outputs
+  nicely formatted time information.
+- Added a @link std::hash<openvdb::math::Coord> std::hash<Coord>@endlink
+  template specialization.
+- Added @vdblink::math::CoordBBox::moveMin moveMin@endlink and
+  @vdblink::math::CoordBBox::moveMax moveMax@endlink methods to
   @vdblink::math::CoordBBox CoordBBox@endlink.
 
 @par
 Improvements:
-- The API of @vdblink::util::CpuTimer util::CpuTimer@endlink has been improved
-  and is now making use of a new @vdblink::util::printTime util::printTime@endlink
-  function for nicer output of time information.
+- @vdblink::util::CpuTimer CpuTimer@endlink now makes use of
+  @vdblink::util::printTime() printTime@endlink for nicer output,
+  and its API has been improved.
 - Significantly improved the performance of point data grid string attribute
   generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
@@ -50,8 +51,14 @@ Bug fixes:
   to the size of the membership vector.
 - Fixed a race condition when moving points in point data grids for ABI=6+
   due to non-const access of AttributeArrays resulting in a copy-on-write.
-- Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
-- Fix a rounding error bug in point conversion when using floating-point.
+- Fixed a bug that caused the @link MeshToVolume.h mesh to volume@endlink
+  converter to consume unlimited memory when it encountered NaNs
+  in vertex positions.
+- Fixed a rounding error bug in
+  @link PointConversion.h point conversion@endlink when using
+  single-precision floating-point.
+- Addressed some type conversion issues and other issues reported by
+  GCC&nbsp;6.
 
 @par
 API changes:
@@ -66,11 +73,14 @@ Houdini:
   point attributes with the same name as an existing point group.
 - The Transform&nbsp;SOP now supports frustum transforms by applying the
   transformation to the internal affine map.
-- Renamed SOP labels to match native Houdini SOPs - New Names:
-  Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF, Project
-  Non-Divergent, Segment by Connectivity, Topology to SDF, Visualize Tree
-- Added a @b houdini_utils::OpPolicy::getLabelName() method to allow derived
-  OpPolicy classes to provide their own label naming scheme for tab menus.
+- Changed the labels (but not the opnames) of several SOPs to match
+  the corresponding native Houdini SOPs.
+  The new labels are Morph&nbsp;SDF, Project&nbsp;Non-Divergent,
+  Rebuild&nbsp;SDF, Renormalize&nbsp;SDF, Reshape&nbsp;SDF,
+  Segment&nbsp;by&nbsp;Connectivity, Smooth&nbsp;SDF,
+  Topology&nbsp;to&nbsp;SDF, and Visualize&nbsp;Tree.
+- Added an @b OpPolicy::getLabelName method to allow derived @b OpPolicy
+  classes to provide their own label naming scheme for tab menus.
 - Added type lists for sets of commonly-used grid types, including
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
 
