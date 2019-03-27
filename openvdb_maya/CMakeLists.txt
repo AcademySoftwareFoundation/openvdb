@@ -53,31 +53,20 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 # Collect and configure lib dependencies
 
 IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
-  SET ( OPENVDB_SHARED_LIB OpenVDB::openvdb )
+  SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
-  SET ( OPENVDB_SHARED_LIB openvdb_shared )
+  SET ( OPENVDB_LIB openvdb_shared )
 ENDIF ()
 
 FIND_PACKAGE ( Maya REQUIRED )
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
-FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
-
-SET ( OPENVDB_MAYA_DEPENDANT_LIBS
-  ${OPENVDB_SHARED_LIB}
-  Boost::iostreams
-  Boost::system
-  IlmBase::Half
-)
-
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-  LIST ( APPEND OPENVDB_MAYA_DEPENDANT_LIBS Blosc::blosc )
-ENDIF ()
 
 # @todo sort out tbb for maya - it's provided with maya and we should be using
 # those includes/libs. This will conflict if attempting to build the maya and
 # Houdini plugin
+
+SET ( OPENVDB_MAYA_DEPENDANT_LIBS
+  ${OPENVDB_LIB}
+)
 
 INCLUDE_DIRECTORIES ( SYSTEM ${MAYA_INCLUDE_DIR} )
 ADD_DEFINITIONS ( ${MAYA_DEFINITIONS} )

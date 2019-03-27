@@ -45,59 +45,19 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 
 ##########################################################################
 
-# Collect and configure lib dependencies
+# Collect lib dependencies
 
 IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
 ENDIF ()
 
-FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
-FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
-FIND_PACKAGE ( ZLIB REQUIRED )
 FIND_PACKAGE ( CppUnit REQUIRED )
 
-IF ( USE_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus REQUIRED )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-ENDIF ()
-
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
-
-IF ( UNIX )
-  FIND_PACKAGE ( Threads REQUIRED )
-ENDIF ()
-
-# Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
-# namespaced headers are used over the Houdini 17.5 ones (which will be imported
-# through targets like tbb which are still deployed with Houdini)
-
-SET ( OPENVDB_TEST_DEPENDANT_LIBS
+SET ( OPENVDB_TEST_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  Boost::iostreams
-  Boost::system
-  IlmBase::Half
   CppUnit::cppunit
-)
-
-IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_TEST_DEPENDANT_LIBS Log4cplus::log4cplus )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_TEST_DEPENDANT_LIBS Blosc::blosc )
-ENDIF ()
-
-LIST ( APPEND OPENVDB_TEST_DEPENDANT_LIBS
-  TBB::tbb
-  ZLIB::ZLIB
-  Threads::Threads
 )
 
 ##########################################################################
@@ -114,7 +74,6 @@ ENDIF ()
 IF ( WIN32 )
   ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DHALF_EXPORTS -DOPENVDB_DLL )
 ENDIF ()
-
 
 ##### VDB unit tests
 
@@ -211,14 +170,15 @@ SET ( UNITTEST_SOURCE_FILES
 
 ADD_EXECUTABLE ( vdb_test ${UNITTEST_SOURCE_FILES} )
 
-TARGET_LINK_LIBRARIES ( vdb_test ${OPENVDB_TEST_DEPENDANT_LIBS} )
-
-IF ( USE_BLOSC )
+IF ( USE_BLOSC OR OpenVDB_USES_BLOSC )
+  # Blosc is a hidden dependency for the core library (not exposed in headers)
+  # so we need to manually link it in here to provide header access for the
+  # blosc relevant unit tests
+  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
+  LIST ( APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc )
   TARGET_COMPILE_DEFINITIONS ( vdb_test PRIVATE "-DOPENVDB_USE_BLOSC" )
 ENDIF ()
 
-IF ( USE_LOG4CPLUS )
-  TARGET_COMPILE_DEFINITIONS ( vdb_test PRIVATE "-DOPENVDB_USE_LOG4CPLUS" )
-ENDIF ()
+TARGET_LINK_LIBRARIES ( vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS} )
 
 ADD_TEST ( vdb_unit_test vdb_test )

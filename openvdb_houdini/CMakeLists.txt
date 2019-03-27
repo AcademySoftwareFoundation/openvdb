@@ -115,52 +115,18 @@ MESSAGE ( STATUS "Houdini base lib install path: ${OPENVDB_HOUDINI_INSTALL_LIB_B
 # Collect and configure lib dependencies
 
 IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
 ENDIF ()
 
-SET ( OPENVDB_HOUDINI_DEPENDANT_LIBS
-  ${OPENVDB_LIB}
-)
-# Checking if hdk version is >= 17.5 Houdini 17.5 stopped shipping ilmbase
-# and openexr so users can optionally set ILMBASE_/OPENEXR_ variables to find
-# their own ILMBASE_/OPENEXR_ # installation
-IF (( Houdini_VERSION_MAJOR GREATER 17 ) OR
-    (( Houdini_VERSION_MAJOR EQUAL 17 ) AND ( Houdini_VERSION_MINOR EQUAL 5 )))
-  FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
-  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS IlmBase::Half )
-ENDIF ()
-
-# Checking if hdk version is >= 16.5 Houdini 16.5 stopped shipping boost.
-# so users can optionally set BOOST_ variables to find their own BOOST_
-# installation
-IF (( Houdini_VERSION_MAJOR GREATER 16 ) OR
-    (( Houdini_VERSION_MAJOR EQUAL 16 ) AND ( Houdini_VERSION_MINOR EQUAL 5 )))
-  FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
-  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS
-    Boost::iostreams
-    Boost::system
-    )
-ENDIF ()
-
-IF ( USE_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus REQUIRED )
-  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS Log4cplus::log4cplus )
-ENDIF ()
-
-FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
-LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS TBB::tbb )
-
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-  LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS Blosc::blosc )
-ENDIF ()
-
 # @note Linking openvdb_houdini against Houdini brings in all interface compile
 # definitions, including MAKING_DSO
-LIST ( APPEND OPENVDB_HOUDINI_DEPENDANT_LIBS Houdini )
+
+SET ( OPENVDB_HOUDINI_DEPENDANT_LIBS
+  ${OPENVDB_LIB}
+  Houdini
+)
 
 #########################################################################
 
@@ -370,12 +336,6 @@ FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
     TAGINFO ${CUSTOM_SESI_TAG_INFO}
   )
 
-  # Add openvdb c flags
-
-  IF ( USE_LOG4CPLUS )
-    TARGET_COMPILE_DEFINITIONS ( ${DSO_NAME} PRIVATE "-DOPENVDB_USE_LOG4CPLUS" )
-  ENDIF ()
-
   # If the sesi tag needs replacing or removing, manually configure the compile
   # options for each DSO and replace the UT_DSO_TAGINFO define
   # @todo ask for more options from sidefx for controlling tag timestamps
@@ -419,9 +379,8 @@ ENDFOREACH ()
 
 # This is only required for the OpenVDB Write SOP which enables a blosc menu
 # option if blosc is supported.
-# @todo If building against an external VDB lib, this should query if the lib
-# was built with blosc
-IF ( USE_BLOSC )
+
+IF ( USE_BLOSC OR OpenVDB_USES_BLOSC )
   TARGET_COMPILE_DEFINITIONS ( SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC" )
 ENDIF ()
 

@@ -39,9 +39,6 @@ ENDIF ()
 
 ###### OpenVDB Core Options
 
-OPTION ( OPENVDB_TOOLS_RAYTRACER_USE_EXR [=[Build with -DOPENVDB_TOOLS_RAYTRACER_USE_EXR,"
-linking OpenVDB against OpenEXR and enabling EXR serialization output from OpenVDB's ray
-tracer.]=] OFF )
 SET ( OPENVDB_LIBRARY_NAME "openvdb" CACHE STRING "The name of the openvdb library to build." )
 
 MARK_AS_ADVANCED (
@@ -58,7 +55,7 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 
 # Collect and configure lib dependencies
 
-IF ( OPENVDB_TOOLS_RAYTRACER_USE_EXR )
+IF ( USE_EXR )
   FIND_PACKAGE ( IlmBase REQUIRED )
   FIND_PACKAGE ( OpenEXR REQUIRED )
 ELSE ()
@@ -94,14 +91,14 @@ ENDIF ()
 # namespaced headers are used over the Houdini 17.5 ones (which will be imported
 # through targets like tbb which are still deployed with Houdini)
 
-SET ( OPENVDB_CORE_DEPENDANT_LIBS
+SET ( OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
   IlmBase::Half
   )
 
-IF ( OPENVDB_TOOLS_RAYTRACER_USE_EXR )
-  LIST ( APPEND OPENVDB_CORE_DEPENDANT_LIBS
+IF ( USE_EXR )
+  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
     IlmBase::IlmThread
     IlmBase::Iex
     IlmBase::Imath
@@ -110,14 +107,14 @@ IF ( OPENVDB_TOOLS_RAYTRACER_USE_EXR )
 ENDIF ()
 
 IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_CORE_DEPENDANT_LIBS Log4cplus::log4cplus )
+  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus )
 ENDIF ()
 
 IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_CORE_DEPENDANT_LIBS Blosc::blosc )
+  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc )
 ENDIF ()
 
-LIST ( APPEND OPENVDB_CORE_DEPENDANT_LIBS
+LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
   ZLIB::ZLIB
   Threads::Threads
@@ -337,9 +334,9 @@ TARGET_INCLUDE_DIRECTORIES ( openvdb_shared
 TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE "-DOPENVDB_PRIVATE" )
 TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE "-DOPENVDB_PRIVATE" )
 
-IF ( OPENVDB_TOOLS_RAYTRACER_USE_EXR )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
+IF ( USE_EXR )
+  TARGET_COMPILE_DEFINITIONS ( openvdb_static PUBLIC "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
+  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PUBLIC "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
 ENDIF ()
 
 IF ( USE_BLOSC )
@@ -355,11 +352,11 @@ ENDIF ()
 ##########################################################################
 
 TARGET_LINK_LIBRARIES ( openvdb_static
-  ${OPENVDB_CORE_DEPENDANT_LIBS}
+  ${OPENVDB_CORE_DEPENDENT_LIBS}
   )
 
 TARGET_LINK_LIBRARIES ( openvdb_shared
-  ${OPENVDB_CORE_DEPENDANT_LIBS}
+  ${OPENVDB_CORE_DEPENDENT_LIBS}
   )
 
 IF ( WIN32 )

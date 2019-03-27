@@ -52,58 +52,17 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 
 ##########################################################################
 
-# Collect and configure lib dependencies
+# Collect lib dependencies shared by all binaries
 
 IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
 ENDIF ()
 
-FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half Iex IlmThread )
-FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
-FIND_PACKAGE ( ZLIB REQUIRED )
-
-IF ( USE_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus REQUIRED )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-ENDIF ()
-
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
-
-IF ( UNIX )
-  FIND_PACKAGE ( Threads REQUIRED )
-ENDIF ()
-
-# Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
-# namespaced headers are used over the Houdini 17.5 ones (which will be imported
-# through targets like tbb which are still deployed with Houdini)
-
-SET ( OPENVDB_BINARIES_DEPENDANT_LIBS
+SET ( OPENVDB_BINARIES_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  Boost::iostreams
-  Boost::system
-  IlmBase::Half
   )
-
-IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_BINARIES_DEPENDANT_LIBS Log4cplus::log4cplus )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_BINARIES_DEPENDANT_LIBS Blosc::blosc )
-ENDIF ()
-
-LIST ( APPEND OPENVDB_BINARIES_DEPENDANT_LIBS
-  TBB::tbb
-  ZLIB::ZLIB
-  Threads::Threads
-)
 
 ##########################################################################
 
@@ -149,11 +108,7 @@ ENDIF ()
 IF ( OPENVDB_BUILD_VDB_LOD )
   SET ( VDB_LOD_SOURCE_FILES  openvdb_lod.cc )
   ADD_EXECUTABLE ( vdb_lod ${VDB_LOD_SOURCE_FILES} )
-  TARGET_LINK_LIBRARIES ( vdb_lod ${OPENVDB_BINARIES_DEPENDANT_LIBS} )
-
-  IF ( USE_LOG4CPLUS )
-    TARGET_COMPILE_DEFINITIONS ( vdb_lod PRIVATE  "-DOPENVDB_USE_LOG4CPLUS" )
-  ENDIF ()
+  TARGET_LINK_LIBRARIES ( vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS} )
 
   IF ( OPENVDB_ENABLE_RPATH )
     SET_TARGET_PROPERTIES ( vdb_lod
@@ -171,10 +126,7 @@ ENDIF ()
 IF ( OPENVDB_BUILD_VDB_PRINT )
   SET ( VDB_PRINT_SOURCE_FILES openvdb_print.cc )
   ADD_EXECUTABLE ( vdb_print ${VDB_PRINT_SOURCE_FILES} )
-  TARGET_LINK_LIBRARIES ( vdb_print ${OPENVDB_BINARIES_DEPENDANT_LIBS} )
-  IF ( USE_LOG4CPLUS )
-    TARGET_COMPILE_DEFINITIONS ( vdb_print PRIVATE "-DOPENVDB_USE_LOG4CPLUS" )
-  ENDIF ()
+  TARGET_LINK_LIBRARIES ( vdb_print ${OPENVDB_BINARIES_DEPENDENT_LIBS} )
 
   IF ( OPENVDB_ENABLE_RPATH )
     SET_TARGET_PROPERTIES ( vdb_print
@@ -190,6 +142,7 @@ ENDIF ()
 #### vdb_render
 
 IF ( OPENVDB_BUILD_VDB_RENDER )
+  FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half Iex IlmThread )
   FIND_PACKAGE ( OpenEXR REQUIRED COMPONENTS IlmImf )
 
   SET ( VDB_RENDER_SOURCE_FILES openvdb_render.cc )
@@ -198,13 +151,8 @@ IF ( OPENVDB_BUILD_VDB_RENDER )
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
-    ${OPENVDB_BINARIES_DEPENDANT_LIBS} # include last - see comment above
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS} # include last - see comment above
     )
-  IF ( USE_LOG4CPLUS )
-    TARGET_COMPILE_DEFINITIONS ( vdb_render PRIVATE
-      "-DOPENVDB_USE_LOG4CPLUS"
-      )
-  ENDIF ()
 
   IF ( OPENVDB_ENABLE_RPATH )
     SET ( OPENVDB_RENDER_RPATHS )
@@ -273,12 +221,6 @@ IF ( OPENVDB_BUILD_VDB_VIEW )
     TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE
       "-DOPENVDB_USE_GLFW_3" "-DGL_GLEXT_PROTOTYPES=1"
       )
-
-    IF ( USE_LOG4CPLUS )
-      TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE
-        "-DOPENVDB_USE_LOG4CPLUS"
-        )
-    ENDIF ()
 
     IF ( OPENVDB_ENABLE_RPATH )
       SET_TARGET_PROPERTIES ( vdb_view

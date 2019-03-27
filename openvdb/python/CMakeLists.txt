@@ -60,22 +60,9 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 # Collect and configure lib dependencies
 
 IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
   SET ( OPENVDB_LIB openvdb_shared )
-ENDIF ()
-
-FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
-FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
-FIND_PACKAGE ( ZLIB REQUIRED )
-
-IF ( USE_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus REQUIRED )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
 ENDIF ()
 
 # NumPy requires CMake 3.14
@@ -113,11 +100,6 @@ ELSE ()
   LIST ( APPEND OPENVDB_PYTHON_DEPS Python::Python )
 ENDIF ()
 
-# Boost
-
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
-  REQUIRED COMPONENTS iostreams system
-)
 
 # Boost python handling - try and find both python and pythonXx (version suffixed).
 # Prioritize the version suffixed library, failing if neither exist.
@@ -143,36 +125,10 @@ ELSE ()
   ENDIF ()
 ENDIF ()
 
-IF ( UNIX )
-  FIND_PACKAGE ( Threads REQUIRED )
-ENDIF ()
-
-# Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
-# namespaced headers are used over the Houdini 17.5 ones (which will be imported
-# through targets like tbb which are still deployed with Houdini)
-
 SET ( OPENVDB_PYTHON_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   Boost::${BOOST_PYTHON_LIB}
-  Boost::iostreams
-  Boost::system
-  IlmBase::Half
   ${OPENVDB_PYTHON_DEPS}
-)
-
-IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_PYTHON_DEPENDENT_LIBS Log4cplus::log4cplus )
-ENDIF ()
-
-IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_PYTHON_DEPENDENT_LIBS Blosc::blosc )
-ENDIF ()
-
-LIST ( APPEND OPENVDB_BINARIES_DEPENDANT_LIBS
-  TBB::tbb
-  ZLIB::ZLIB
-  Threads::Threads
 )
 
 ##########################################################################
@@ -205,10 +161,6 @@ TARGET_INCLUDE_DIRECTORIES ( pyopenvdb
 
 IF ( OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES )
   TARGET_COMPILE_DEFINITIONS ( pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES" )
-ENDIF ()
-
-IF ( USE_LOG4CPLUS )
-  TARGET_COMPILE_DEFINITIONS ( pyopenvdb PUBLIC "-DOPENVDB_USE_LOG4CPLUS" )
 ENDIF ()
 
 IF ( USE_NUMPY )

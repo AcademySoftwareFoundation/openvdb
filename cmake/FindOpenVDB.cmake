@@ -37,7 +37,7 @@ Use this module by invoking find_package with the form::
     [version] [EXACT]      # Minimum or EXACT version
     [REQUIRED]             # Fail with error if OpenVDB is not found
     [COMPONENTS <libs>...] # OpenVDB libraries by their canonical name
-                           # e.g. "IlmImf" for "libIlmImf"
+                           # e.g. "openvdb" for "libopenvdb"
     )
 
 IMPORTED Targets
@@ -45,8 +45,6 @@ IMPORTED Targets
 
 ``OpenVDB::openvdb``
   The core openvdb library target.
-``OpenVDB::pyopenvdb``
-  The python openvdb library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -67,6 +65,12 @@ This will define the following variables:
   Definitions to use when compiling code that uses OpenVDB.
 ``OpenVDB_{COMPONENT}_FOUND``
   True if the system has the named OpenVDB component.
+``OpenVDB_USES_BLOSC``
+  True if the OpenVDB Library has been built with blosc support
+``OpenVDB_USES_LOG4CPLUS``
+  True if the OpenVDB Library has been built with log4cplus support
+``OpenVDB_USES_EXR``
+  True if the OpenVDB Library has been built with openexr support
 
 Cache Variables
 ^^^^^^^^^^^^^^^
@@ -74,7 +78,7 @@ Cache Variables
 The following cache variables may also be set:
 
 ``OpenVDB_INCLUDE_DIR``
-  The directory containing ``OpenVDB/config-auto.h``.
+  The directory containing ``openvdb/version.h``.
 ``OpenVDB_{COMPONENT}_LIBRARY``
   Individual component libraries for OpenVDB
 
@@ -254,32 +258,171 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenVDB
   HANDLE_COMPONENTS
 )
 
-IF ( OpenVDB_FOUND )
-  SET ( OpenVDB_LIBRARIES
-    ${OpenVDB_LIB_COMPONENTS}
-  )
-  SET ( OpenVDB_INCLUDE_DIRS ${OpenVDB_INCLUDE_DIR} )
-  SET ( OpenVDB_DEFINITIONS ${PC_OpenVDB_CFLAGS_OTHER} )
-
-  SET ( OpenVDB_LIBRARY_DIRS "" )
-  FOREACH ( LIB ${OpenVDB_LIB_COMPONENTS} )
-    GET_FILENAME_COMPONENT ( _OPENVDB_LIBDIR ${LIB} DIRECTORY )
-    LIST ( APPEND OpenVDB_LIBRARY_DIRS ${_OPENVDB_LIBDIR} )
-  ENDFOREACH ()
-  LIST ( REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS )
-
-  # Configure imported target
-
-  FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
-    IF ( NOT TARGET OpenVDB::${COMPONENT} )
-      ADD_LIBRARY ( OpenVDB::${COMPONENT} UNKNOWN IMPORTED )
-      SET_TARGET_PROPERTIES ( OpenVDB::${COMPONENT} PROPERTIES
-        IMPORTED_LOCATION "${OpenVDB_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${OpenVDB_DEFINITIONS}"
-        INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
-      )
-    ENDIF ()
-  ENDFOREACH ()
-ELSEIF ( OpenVDB_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find OpenVDB" )
+IF ( NOT OpenVDB_FOUND )
+  IF ( OpenVDB_FIND_REQUIRED )
+    MESSAGE ( FATAL_ERROR "Unable to find OpenVDB" )
+  ENDIF ()
+  RETURN ()
 ENDIF ()
+
+# ------------------------------------------------------------------------
+#  Handle OpenVDB dependencies
+# ------------------------------------------------------------------------
+
+# Add standard dependencies
+
+FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
+FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
+FIND_PACKAGE ( ZLIB REQUIRED )
+FIND_PACKAGE ( Boost REQUIRED COMPONENTS iostreams system )
+
+# Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
+# which we can query for optional deps. This basically runs ldd/otoll/objdump
+# etc to track deps. We could use a vdb_config binary tools here to improve
+# this process
+
+INCLUDE ( GetPrerequisites )
+
+SET ( _EXCLUDE_SYSTEM_PREREQUISITES 1 )
+SET ( _RECURSE_PREREQUISITES 0 )
+SET ( _OPENVDB_PREREQUISITE_LIST )
+
+GET_PREREQUISITES ( ${OpenVDB_openvdb_LIBRARY}
+  _OPENVDB_PREREQUISITE_LIST
+  ${_EXCLUDE_SYSTEM_PREREQUISITES}
+  ${_RECURSE_PREREQUISITES}
+  ""
+  ${SYSTEM_LIBRARY_PATHS}
+)
+
+UNSET ( _EXCLUDE_SYSTEM_PREREQUISITES )
+UNSET ( _RECURSE_PREREQUISITES )
+
+# As the way we resolve optional libraries relies on library file names, use
+# the configuration options from the main CMakeLists.txt to allow users
+# to manually identify the requirements of OpenVDB builds if they know them.
+
+SET ( OpenVDB_USES_BLOSC ${USE_BLOSC} )
+SET ( OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS} )
+SET ( OpenVDB_USES_EXR ${USE_EXR} )
+
+# Search for optional dependencies
+
+FOREACH ( PREREQUISITE ${_OPENVDB_PREREQUISITE_LIST} )
+  SET ( _HAS_DEP )
+  GET_FILENAME_COMPONENT ( PREREQUISITE ${PREREQUISITE} NAME )
+
+  STRING ( FIND ${PREREQUISITE} "blosc" _HAS_DEP )
+  IF ( NOT ${_HAS_DEP} EQUAL -1 )
+    SET ( OpenVDB_USES_BLOSC ON )
+  ENDIF ()
+
+  STRING ( FIND ${PREREQUISITE} "log4cplus" _HAS_DEP )
+  IF ( NOT ${_HAS_DEP} EQUAL -1 )
+    SET ( OpenVDB_USES_LOG4CPLUS ON )
+  ENDIF ()
+
+  STRING ( FIND ${PREREQUISITE} "IlmImf" _HAS_DEP )
+  IF ( NOT ${_HAS_DEP} EQUAL -1 )
+    SET ( OpenVDB_USES_EXR ON )
+  ENDIF ()
+ENDFOREACH ()
+
+UNSET ( _OPENVDB_PREREQUISITE_LIST )
+UNSET ( _HAS_DEP )
+
+IF ( OpenVDB_USES_BLOSC )
+  FIND_PACKAGE ( Blosc REQUIRED )
+ENDIF ()
+
+IF ( OpenVDB_USES_LOG4CPLUS )
+  FIND_PACKAGE ( Log4cplus REQUIRED )
+ENDIF ()
+
+IF ( OpenVDB_USES_EXR )
+  FIND_PACKAGE ( IlmBase REQUIRED )
+  FIND_PACKAGE ( OpenEXR REQUIRED )
+ENDIF ()
+
+IF ( UNIX )
+  FIND_PACKAGE ( Threads REQUIRED )
+ENDIF ()
+
+# Set core deps. Note that the order here is important. If we're building against
+# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
+# namespaced headers are used over the Houdini 17.5 ones (which will be imported
+# through targets like tbb which are still deployed with Houdini)
+
+SET ( _OPENVDB_VISIBLE_DEPENDENCIES
+  Boost::iostreams
+  Boost::system
+  IlmBase::Half
+  )
+
+SET ( _OPENVDB_DEFINITIONS )
+
+IF ( OpenVDB_USES_EXR )
+  LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+    IlmBase::IlmThread
+    IlmBase::Iex
+    IlmBase::Imath
+    OpenEXR::IlmImf
+    )
+  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
+ENDIF ()
+
+IF ( OpenVDB_USES_LOG4CPLUS )
+  LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus )
+  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_USE_LOG4CPLUS" )
+ENDIF ()
+
+LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+  TBB::tbb
+  Threads::Threads
+)
+
+SET ( _OPENVDB_HIDDEN_DEPENDENCIES )
+
+IF ( OpenVDB_USES_BLOSC )
+  LIST ( APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc )
+ENDIF ()
+
+LIST ( APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB )
+
+# ------------------------------------------------------------------------
+#  Configure imported target
+# ------------------------------------------------------------------------
+
+SET ( OpenVDB_LIBRARIES
+  ${OpenVDB_LIB_COMPONENTS}
+)
+SET ( OpenVDB_INCLUDE_DIRS ${OpenVDB_INCLUDE_DIR} )
+
+SET ( OpenVDB_DEFINITIONS )
+LIST ( APPEND OpenVDB_DEFINITIONS "${PC_OpenVDB_CFLAGS_OTHER}" )
+LIST ( APPEND OpenVDB_DEFINITIONS "${_OPENVDB_DEFINITIONS}" )
+LIST ( REMOVE_DUPLICATES OpenVDB_DEFINITIONS )
+
+SET ( OpenVDB_LIBRARY_DIRS )
+FOREACH ( LIB ${OpenVDB_LIB_COMPONENTS} )
+  GET_FILENAME_COMPONENT ( _OPENVDB_LIBDIR ${LIB} DIRECTORY )
+  LIST ( APPEND OpenVDB_LIBRARY_DIRS ${_OPENVDB_LIBDIR} )
+ENDFOREACH ()
+LIST ( REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS )
+
+FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
+  IF ( NOT TARGET OpenVDB::${COMPONENT} )
+    ADD_LIBRARY ( OpenVDB::${COMPONENT} UNKNOWN IMPORTED )
+    SET_TARGET_PROPERTIES ( OpenVDB::${COMPONENT} PROPERTIES
+      IMPORTED_LOCATION "${OpenVDB_${COMPONENT}_LIBRARY}"
+      INTERFACE_COMPILE_OPTIONS "${OpenVDB_DEFINITIONS}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
+      IMPORTED_LINK_DEPENDENT_LIBRARIES "${_OPENVDB_HIDDEN_DEPENDENCIES}" # non visible deps
+      INTERFACE_LINK_LIBRARIES "${_OPENVDB_VISIBLE_DEPENDENCIES}" # visible deps (headers)
+    )
+  ENDIF ()
+ENDFOREACH ()
+
+UNSET ( _OPENVDB_DEFINITIONS )
+UNSET ( _OPENVDB_VISIBLE_DEPENDENCIES )
+UNSET ( _OPENVDB_HIDDEN_DEPENDENCIES )
