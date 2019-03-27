@@ -290,16 +290,15 @@ IF ( IlmBase_FOUND )
 
   # We have to add both include and include/OpenEXR to the include
   # path in case OpenEXR and IlmBase are installed separately
-  GET_FILENAME_COMPONENT ( IlmBase_INCLUDE_DIR ${IlmBase_INCLUDE_DIR} DIRECTORY )
 
   SET ( IlmBase_INCLUDE_DIRS )
   LIST ( APPEND IlmBase_INCLUDE_DIRS
+    ${IlmBase_INCLUDE_DIR}/../
     ${IlmBase_INCLUDE_DIR}
-    ${IlmBase_INCLUDE_DIR}/OpenEXR
     )
   SET ( IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER} )
 
-  SET ( IlmBase_LIBRARY_DIRS "" )
+  SET ( IlmBase_LIBRARY_DIRS )
   FOREACH ( LIB ${IlmBase_LIB_COMPONENTS} )
     GET_FILENAME_COMPONENT ( _ILMBASE_LIBDIR ${LIB} DIRECTORY )
     LIST ( APPEND IlmBase_LIBRARY_DIRS ${_ILMBASE_LIBDIR} )
