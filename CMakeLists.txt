@@ -323,8 +323,6 @@ When enabled, you do not need to provide dependency locations for OpenEXR, IlmBa
 optionally provide your own version of Boost when building against Houdini 16.5 and gerater.]=] OFF )
 OPTION ( USE_BLOSC "Build the library with blosc support." ON )
 OPTION ( USE_LOG4CPLUS "Build the library with log4cplus support." OFF )
-OPTION ( OPENEXR_NAMESPACE_VERSIONING "Set the expected names of OpenEXR libraries to be version suffixed" OFF )
-OPTION ( ILMBASE_NAMESPACE_VERSIONING "Set the expected names of ILM Base libraries to be version suffixed" OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
@@ -367,8 +365,6 @@ ENABLE_TESTING ()
 # Various root level CMake options which are marked as advanced
 MARK_AS_ADVANCED (
   CCACHE_PATH
-  ILMBASE_NAMESPACE_VERSIONING
-  OPENEXR_NAMESPACE_VERSIONING
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_3_ABI_COMPATIBLE
   OPENVDB_ENABLE_RPATH
