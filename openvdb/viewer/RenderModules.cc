@@ -902,7 +902,7 @@ public:
                 insertPoint(pos, index);
                 ++index;
 
-                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / activeVoxels));
+                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / double(activeVoxels)));
                 for (Index64 i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
                     pos = mTransform.indexToWorld(coords[static_cast<size_t>(i * r)]);
                     insertPoint(pos, index);
@@ -1086,10 +1086,10 @@ private:
     {
         mOffset[0] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[0] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[0])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[0])));
         mOffset[1] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[1] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[1])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[1])));
     }
 
     std::vector<GLfloat>& mPoints;
