@@ -29,7 +29,7 @@
 FindOpenVDB
 -----------
 
-Find OpenVDB include dirs and libraries
+Find OpenVDB include dirs, libraries and settings
 
 Use this module by invoking find_package with the form::
 
@@ -71,6 +71,9 @@ This will define the following variables:
   True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_EXR``
   True if the OpenVDB Library has been built with openexr support
+``OpenVDB_ABI``
+  Set if this module was able to determine the ABI number the located
+  OpenVDB Library was built against. Unset otherwise.
 
 Cache Variables
 ^^^^^^^^^^^^^^^
@@ -98,6 +101,8 @@ may be provided to tell this module where to look.
   Paths appended to all include and lib searches.
 
 #]=======================================================================]
+
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
 
 MARK_AS_ADVANCED (
   OpenVDB_INCLUDE_DIR
@@ -145,7 +150,24 @@ ENDIF ()
 # Additionally try and use pkconfig to find OpenVDB
 
 FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_OpenVDB QUIET openvdb )
+PKG_CHECK_MODULES ( PC_OpenVDB QUIET OpenVDB )
+
+# Set various variables to track directories if this is being called from
+# an installed location and from another package. The expected installation
+# directory structure is:
+#  <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake
+#  <root>/include
+#  <root>/bin
+# Note that _ROOT, _INCLUDEDIR and _LIBRARYDIR still take precedence if
+# specified
+
+GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${CMAKE_CURRENT_LIST_DIR} DIRECTORY )
+GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
+GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
+SET ( _OPENVDB_INSTALLED_INCLUDE_DIR ${_IMPORT_PREFIX}/include )
+SET ( _OPENVDB_INSTALLED_LIB_DIR ${_IMPORT_PREFIX}/lib )
+SET ( _OPENVDB_INSTALLED_BIN_DIR ${_IMPORT_PREFIX}/bin )
+UNSET ( _IMPORT_PREFIX )
 
 # ------------------------------------------------------------------------
 #  Search for OpenVDB include DIR
@@ -155,6 +177,7 @@ SET ( _OPENVDB_INCLUDE_SEARCH_DIRS "" )
 LIST ( APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
   ${OPENVDB_INCLUDEDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${_OPENVDB_INSTALLED_INCLUDE_DIR}
   ${PC_OpenVDB_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
@@ -204,6 +227,7 @@ SET ( _OPENVDB_LIBRARYDIR_SEARCH_DIRS "" )
 LIST ( APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
   ${OPENVDB_LIBRARYDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${_OPENVDB_INSTALLED_LIB_DIR}
   ${PC_OpenVDB_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
@@ -266,6 +290,42 @@ IF ( NOT OpenVDB_FOUND )
 ENDIF ()
 
 # ------------------------------------------------------------------------
+#  Determine ABI number
+# ------------------------------------------------------------------------
+
+# Set the ABI number the library was built against. Uses vdb_print
+
+IF ( EXISTS ${_OPENVDB_INSTALLED_BIN_DIR} )
+  SET ( _OPENVDB_INSTALLED_PRINT_BIN "${_OPENVDB_INSTALLED_BIN_DIR}/vdb_print" )
+  IF ( EXISTS ${_OPENVDB_INSTALLED_PRINT_BIN} )
+    SET ( _VDB_PRINT_VERSION_STRING "" )
+    SET ( _VDB_PRINT_RETURN_STATUS "" )
+
+    EXECUTE_PROCESS ( COMMAND ${_OPENVDB_INSTALLED_PRINT_BIN} "--version"
+      RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
+      OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    IF ( NOT ${_VDB_PRINT_RETURN_STATUS} )
+      SET ( OpenVDB_ABI )
+      STRING ( REGEX REPLACE ".*abi([0-9]*).*" "\\1" OpenVDB_ABI ${_VDB_PRINT_VERSION_STRING} )
+    ENDIF ()
+  ENDIF ()
+ENDIF ()
+
+IF ( NOT OpenVDB_FIND_QUIET )
+  IF ( NOT OpenVDB_ABI )
+    MESSAGE ( WARNING "Unable to determine OpenVDB ABI version from OpenVDB installation. The "
+      "library major version \"${OpenVDB_MAJOR_VERSION}\" will be inferred. If this is not correct, "
+      "use add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=N)"
+      )
+  ELSE ()
+    MESSAGE ( STATUS "OpenVDB ABI Version: ${OpenVDB_ABI}" )
+  ENDIF ()
+ENDIF ()
+
+# ------------------------------------------------------------------------
 #  Handle OpenVDB dependencies
 # ------------------------------------------------------------------------
 
@@ -292,7 +352,7 @@ GET_PREREQUISITES ( ${OpenVDB_openvdb_LIBRARY}
   ${_EXCLUDE_SYSTEM_PREREQUISITES}
   ${_RECURSE_PREREQUISITES}
   ""
-  ${SYSTEM_LIBRARY_PATHS}
+  "${SYSTEM_LIBRARY_PATHS}"
 )
 
 UNSET ( _EXCLUDE_SYSTEM_PREREQUISITES )
@@ -360,6 +420,9 @@ SET ( _OPENVDB_VISIBLE_DEPENDENCIES
   )
 
 SET ( _OPENVDB_DEFINITIONS )
+IF ( OpenVDB_ABI )
+  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI}" )
+ENDIF ()
 
 IF ( OpenVDB_USES_EXR )
   LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
