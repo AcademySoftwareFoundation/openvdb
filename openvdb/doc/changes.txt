@@ -73,6 +73,8 @@ Houdini:
   OpPolicy classes to provide their own label naming scheme for tab menus.
 - Added type lists for sets of commonly-used grid types, including
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
+- VDB Vector Merge SOP now copies metadata from the representative
+  scalar grid.
 
 @par
 Python:
