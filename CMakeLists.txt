@@ -312,6 +312,9 @@ OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
+CMAKE_DEPENDENT_OPTION ( OPENVDB_INSTALL_CMAKE_MODULES
+  "Install the provided OpenVDB CMake modules when building the core library"
+  ON "OPENVDB_BUILD_CORE" OFF )
 
 ###### Dependency options
 
@@ -391,6 +394,24 @@ IF ( ${CMAKE_VERSION} VERSION_LESS 3.8 )
   LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/backports" )
 ENDIF ()
 
+# Add cmake modules to installation command
+
+IF ( OPENVDB_INSTALL_CMAKE_MODULES )
+  SET ( OPENVDB_CMAKE_MODULES
+    cmake/FindBlosc.cmake
+    cmake/FindCppUnit.cmake
+    #cmake/FindGLEW.cmake
+    cmake/FindIlmBase.cmake
+    cmake/FindLog4cplus.cmake
+    cmake/FindMaya.cmake
+    cmake/FindOpenEXR.cmake
+    cmake/FindOpenVDB.cmake
+    cmake/FindTBB.cmake
+    cmake/OpenVDBGLFW3Setup.cmake
+    cmake/OpenVDBHoudiniSetup.cmake
+  )
+  INSTALL ( FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/OpenVDB )
+ENDIF ()
 
 #########################################################################
 
