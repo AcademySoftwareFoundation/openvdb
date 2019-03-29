@@ -223,7 +223,7 @@ TARGET_LINK_LIBRARIES ( openvdb_houdini
 
 IF ( OPENVDB_ENABLE_RPATH )
   # @todo There is probably a better way to do this for imported targets
-  SET ( RPATHS )
+  SET ( RPATHS "" )
   LIST ( APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
     ${IlmBase_LIBRARY_DIRS}
