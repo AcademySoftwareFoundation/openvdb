@@ -98,8 +98,6 @@ LIST ( APPEND OPENVDB_TEST_DEPENDANT_LIBS
   TBB::tbb
   ZLIB::ZLIB
   Threads::Threads
-  m
-  stdc++
 )
 
 ##########################################################################

@@ -103,8 +103,6 @@ LIST ( APPEND OPENVDB_BINARIES_DEPENDANT_LIBS
   TBB::tbb
   ZLIB::ZLIB
   Threads::Threads
-  m
-  stdc++
 )
 
 ##########################################################################
@@ -269,8 +267,7 @@ IF ( OPENVDB_BUILD_VDB_VIEW )
       OpenGL::GL
       OpenGL::GLU
       glfw
-      dl
-      ${OPENVDB_BINARIES_DEPENDANT_LIBS} # include last - see comment above
+      ${OPENVDB_BINARIES_DEPENDENT_LIBS} # include last - see comment above
       )
 
     TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE
