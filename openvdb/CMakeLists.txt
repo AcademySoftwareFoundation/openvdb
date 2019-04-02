@@ -221,6 +221,11 @@ SET_SOURCE_FILES_PROPERTIES ( ${VDB_LOD_SOURCE_FILES}
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC"
   )
 
+IF (NOT WIN32)
+  LIST(APPEND UNIX_LIB "m")
+  LIST(APPEND UNIX_LIB "stdc++")
+ENDIF ()
+
 ADD_EXECUTABLE ( vdb_lod
     ${VDB_LOD_SOURCE_FILES}
   )
@@ -229,8 +234,7 @@ TARGET_LINK_LIBRARIES ( vdb_lod
   openvdb_shared
   ${CMAKE_THREAD_LIBS_INIT}
   ${BLOSC_blosc_LIBRARY}
-  m
-  stdc++
+  ${UNIX_LIB}
   )
 
 SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print.cc )
@@ -247,8 +251,7 @@ TARGET_LINK_LIBRARIES ( vdb_print
   openvdb_shared
   ${CMAKE_THREAD_LIBS_INIT}
   ${BLOSC_blosc_LIBRARY}
-  m
-  stdc++
+  ${UNIX_LIB}
   )
 
 SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render.cc )
@@ -267,8 +270,7 @@ TARGET_LINK_LIBRARIES ( vdb_render
   ${Openexr_ILMIMF_LIBRARY}
   ${Ilmbase_ILMTHREAD_LIBRARY}
   ${Ilmbase_IEX_LIBRARY}
-  m
-  stdc++
+  ${UNIX_LIB}
   )
 
 SET ( VDB_VIEW_SOURCE_FILES
@@ -301,8 +303,7 @@ IF (NOT WIN32)
     ${GLFW_LINK_LIBRARY}
     ${GLFW_DEPENDENT_LIBRARIES}
     ${GLEW_GLEW_LIBRARY}
-    m
-    stdc++
+    ${UNIX_LIB}
     )
 ENDIF ()
 
@@ -411,8 +412,7 @@ IF ( OPENVDB_BUILD_UNITTESTS )
   TARGET_LINK_LIBRARIES ( vdb_test
     ${CPPUnit_cppunit_LIBRARY}
     openvdb_shared
-    m
-    stdc++
+    ${UNIX_LIB}
     )
 
   ADD_TEST ( vdb_unit_test vdb_test )
