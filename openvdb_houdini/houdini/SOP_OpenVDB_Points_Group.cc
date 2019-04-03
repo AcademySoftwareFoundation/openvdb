@@ -332,7 +332,7 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Group",
+    hvdb::OpenVDBOpFactory("VDB Points Group",
         SOP_OpenVDB_Points_Group::factory, parms, *table)
         .addInput("VDB Points")
         .addOptionalInput("Optional bounding geometry or level set")

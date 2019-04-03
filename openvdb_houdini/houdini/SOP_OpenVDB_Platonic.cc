@@ -130,7 +130,7 @@ Signed Distance Field:\n\
         .setTooltip("If enabled, generate a fog volume instead of a level set"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Platonic",
+    hvdb::OpenVDBOpFactory("VDB Platonic",
         SOP_OpenVDB_Platonic::factory, parms, *table)
         .setDocumentation("\
 #icon: COMMON/openvdb\n\

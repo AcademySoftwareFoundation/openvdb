@@ -204,8 +204,11 @@ newSopOperator(OP_OperatorTable* table)
             "as a scalar VDB named \"v_pressure\"."));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Remove Divergence",
+    hvdb::OpenVDBOpFactory("VDB Project Non-Divergent",
         SOP_OpenVDB_Remove_Divergence::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBRemoveDivergence")
+#endif
         .addInput("Velocity field VDBs")
         .addOptionalInput("Optional collider VDB or geometry")
 #if VDB_COMPILABLE_SOP

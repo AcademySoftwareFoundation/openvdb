@@ -403,7 +403,7 @@ Measure2::operator()(const LeafRange& range) const
                 const Coord p = voxelIter.getCoord();
                 const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
                 sumA += dd * g.dot(g);
-                sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
+                sumV += dd * g.dot(Vec3T(p.data()));
             }
         }
         double* v = mParent->mArray + leafIter.pos();
@@ -435,7 +435,7 @@ Measure3::operator()(const LeafRange& range) const
                 const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
                 const Real dA = dd * g.dot(g);
                 sumA += dA;
-                sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
+                sumV += dd * g.dot(Vec3T(p.data()));
                 Curv::result(mAcc, p, alpha, beta);
                 sumC += dA * alpha/(2*math::Pow2(beta))*invDx;
             }

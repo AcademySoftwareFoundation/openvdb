@@ -181,7 +181,7 @@ Other:\n\
             "whether or not any of the above values were changed."));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
         .addInput("Input with VDBs")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Metadata::Cache; })

@@ -1633,10 +1633,128 @@ attributeStorageType(const GA_Attribute* const attribute)
 
 
 void
+collectPointInfo(const PointDataGrid& grid,
+                 std::string& countStr,
+                 std::string& groupStr,
+                 std::string& attributeStr)
+{
+    using AttributeSet = openvdb::points::AttributeSet;
+    using Descriptor = openvdb::points::AttributeSet::Descriptor;
+
+    const PointDataTree& tree = grid.constTree();
+
+    // iterate through all leaf nodes to find out if all are out-of-core
+    bool allOutOfCore = true;
+    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
+        if (!iter->buffer().isOutOfCore()) {
+            allOutOfCore = false;
+            break;
+        }
+    }
+
+    openvdb::Index64 totalPointCount = 0;
+
+    // it is more technically correct to rely on the voxel count as this may be
+    // out of sync with the attribute size, however for faster node preview when
+    // the voxel buffers are all out-of-core, count up the sizes of the first
+    // attribute array instead
+
+    if (allOutOfCore) {
+        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
+            if (iter->attributeSet().size() > 0) {
+                totalPointCount += iter->constAttributeArray(0).size();
+            }
+        }
+    }
+    else {
+        totalPointCount = openvdb::points::pointCount(tree);
+    }
+
+    std::ostringstream os;
+    os << openvdb::util::formattedInt(totalPointCount);
+    countStr = os.str();
+
+    os.clear();
+    os.str("");
+
+    const auto iter = tree.cbeginLeaf();
+    if (!iter) return;
+
+    const AttributeSet& attributeSet = iter->attributeSet();
+    const Descriptor& descriptor = attributeSet.descriptor();
+
+    std::string viewportGroupName = "";
+    if (StringMetadata::ConstPtr stringMeta =
+        grid.getMetadata<StringMetadata>(META_GROUP_VIEWPORT)) {
+        viewportGroupName = stringMeta->value();
+    }
+
+    const Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
+
+    bool first = true;
+    for (const auto& it : groupMap) {
+
+        if (first) first = false;
+        else os << ", ";
+
+        // add an asterisk as a viewport group indicator
+        if (it.first == viewportGroupName) os << "*";
+
+        os << it.first << "(";
+
+        // for faster node preview when all the voxel buffers are out-of-core,
+        // don't load the group arrays to display the group sizes, just print
+        // "out-of-core" instead @todo - put the group sizes into the grid
+        // metadata on write for this use case
+
+        if (allOutOfCore) os << "out-of-core";
+        else {
+            const openvdb::points::GroupFilter filter(it.first, attributeSet);
+            os << openvdb::util::formattedInt(pointCount(tree, filter));
+        }
+        os << ")";
+    }
+
+    groupStr = (os.str().empty() ? "none" : os.str());
+
+    os.clear();
+    os.str("");
+
+    const Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
+
+    first = true;
+    for (const auto& it : nameToPosMap) {
+        const openvdb::points::AttributeArray& array = *(attributeSet.getConst(it.second));
+        if (isGroup(array)) continue;
+
+        if (first) first = false;
+        else os << ", ";
+
+        const openvdb::NamePair& type = descriptor.type(it.second);
+        const openvdb::Name& codecType = type.second;
+
+        if (isString(array)) {
+            os << it.first << "[str]";
+        }
+        else {
+            os << it.first << "[" << type.first;
+            // if no value compression, hide the codec
+            os << (codecType != "null" ? "_" + codecType : "");
+            os << "]";
+        }
+
+        if (!array.hasConstantStride()) os << " [dynamic]";
+        else if (array.stride() > 1) os << " [" << array.stride() << "]";
+    }
+
+    attributeStr = (os.str().empty() ? "none" : os.str());
+}
+
+void
 pointDataGridSpecificInfoText(std::ostream& infoStr, const GridBase& grid)
 {
-    const PointDataGrid* pointDataGrid = dynamic_cast<const PointDataGrid*>(&grid);
-
+    const PointDataGrid* pointDataGrid =
+        dynamic_cast<const PointDataGrid*>(&grid);
     if (!pointDataGrid) return;
 
     // match native OpenVDB convention as much as possible
@@ -1651,137 +1769,12 @@ pointDataGridSpecificInfoText(std::ostream& infoStr, const GridBase& grid)
         infoStr <<" <empty>,";
     }
 
-    std::string viewportGroupName = "";
-    if (StringMetadata::ConstPtr stringMeta =
-        grid.getMetadata<StringMetadata>(META_GROUP_VIEWPORT))
-    {
-        viewportGroupName = stringMeta->value();
-    }
+    std::string countStr, groupStr, attributeStr;
+    collectPointInfo(*pointDataGrid, countStr, groupStr, attributeStr);
 
-    const PointDataTree& pointDataTree = pointDataGrid->tree();
-
-    PointDataTree::LeafCIter iter = pointDataTree.cbeginLeaf();
-
-    // iterate through all leaf nodes to find out if all are out-of-core
-    bool allOutOfCore = true;
-    for (; iter; ++iter) {
-        if (!iter->buffer().isOutOfCore()) {
-            allOutOfCore = false;
-            break;
-        }
-    }
-
-    Index64 totalPointCount = 0;
-
-    // it is more technically correct to rely on the voxel count as this may be out of
-    // sync with the attribute size, however for faster node preview when the voxel buffers
-    // are all out-of-core, count up the sizes of the first attribute array instead
-    if (allOutOfCore) {
-        iter = pointDataTree.cbeginLeaf();
-        for (; iter; ++iter) {
-            if (iter->attributeSet().size() > 0) {
-                totalPointCount += iter->constAttributeArray(0).size();
-            }
-        }
-    }
-    else {
-        totalPointCount = pointCount(pointDataTree);
-    }
-
-    infoStr << " count: " << util::formattedInt(totalPointCount) << ",";
-
-    iter = pointDataTree.cbeginLeaf();
-
-    if (!iter.getLeaf()) {
-        infoStr << " attributes: <none>";
-    }
-    else {
-        const AttributeSet::DescriptorPtr& descriptor = iter->attributeSet().descriptorPtr();
-
-        infoStr << " groups: ";
-
-        const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor->groupMap();
-
-        bool first = true;
-        for (AttributeSet::Descriptor::ConstIterator it = groupMap.begin(), it_end = groupMap.end();
-                it != it_end; ++it) {
-            if (first) {
-                first = false;
-            }
-            else {
-                infoStr << ", ";
-            }
-
-            // add an asterisk as a viewport group indicator
-            if (it->first == viewportGroupName)     infoStr << "*";
-
-            infoStr << it->first << "(";
-
-            // for faster node preview when all the voxel buffers are out-of-core, don't load the
-            // group arrays to display the group sizes, just print "out-of-core" instead
-            // @todo - put the group sizes into the grid metadata on write for this use case
-
-            if (allOutOfCore) {
-                infoStr << "out-of-core";
-            }
-            else {
-                GroupFilter filter(it->first, iter->attributeSet());
-                infoStr << util::formattedInt(pointCount(pointDataTree, filter));
-            }
-
-            infoStr << ")";
-        }
-
-        if (first)  infoStr << "<none>";
-
-        infoStr << ",";
-
-        infoStr << " attributes: ";
-
-        const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
-
-        first = true;
-        for (auto it = nameToPosMap.begin(), it_end = nameToPosMap.end(); it != it_end; ++it) {
-            const AttributeArray& array = iter->constAttributeArray(it->second);
-            if (isGroup(array))    continue;
-
-            if (first) {
-                first = false;
-            }
-            else {
-                infoStr << ", ";
-            }
-            const NamePair& type = descriptor->type(it->second);
-
-            const Name valueType = type.first;
-            const Name codecType = type.second;
-
-            infoStr << it->first << "[";
-
-            // if no value compression, hide the codec from the middle-click output
-
-            if (codecType == "null") {
-                infoStr << valueType;
-            }
-            else if (isString(array)) {
-                infoStr << "str";
-            }
-            else {
-                infoStr << valueType << "_" << codecType;
-            }
-
-            if (!array.hasConstantStride()) {
-                infoStr << "[dynamic]";
-            }
-            else if (array.stride() > 1) {
-                infoStr << "[" << array.stride() << "]";
-            }
-
-            infoStr << "]";
-        }
-
-        if (first)  infoStr << "<none>";
-    }
+    infoStr << " count: " << countStr << ",";
+    infoStr << " groups: " << groupStr << ",";
+    infoStr << " attributes: " << attributeStr;
 }
 
 namespace {

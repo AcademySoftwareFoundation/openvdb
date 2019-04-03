@@ -466,8 +466,11 @@ Unit Vector:\n\
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Convert",
+    hvdb::OpenVDBOpFactory("VDB Points Convert",
         SOP_OpenVDB_Points_Convert::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBPointsConvert")
+#endif
         .addInput("Points to Convert")
         .addOptionalInput("Optional Reference VDB (for transform)")
         .setObsoleteParms(obsoleteParms)
@@ -772,7 +775,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
 
                 const auto outputName = getOutputNameMode(evalStdString("outputname", time));
 
-                int i = 0;
+                size_t i = 0;
 
                 for (PointDataGrid::ConstPtr grid : pointGrids) {
 

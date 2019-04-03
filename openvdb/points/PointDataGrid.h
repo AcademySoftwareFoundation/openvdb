@@ -407,12 +407,18 @@ public:
     void validateOffsets() const;
 
     /// @brief Read-write attribute array reference from index
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const size_t pos);
     const AttributeArray& attributeArray(const size_t pos) const;
     const AttributeArray& constAttributeArray(const size_t pos) const;
     /// }
     /// @brief Read-write attribute array reference from name
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const Name& attributeName);
     const AttributeArray& attributeArray(const Name& attributeName) const;
@@ -695,18 +701,18 @@ public:
     /// @brief Leaf index iterator
     IndexAllIter beginIndexAll() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueAllCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueAllCIter, NullFilter>(filter);
     }
     IndexOnIter beginIndexOn() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueOnCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueOnCIter, NullFilter>(filter);
     }
     IndexOffIter beginIndexOff() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueOffCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueOffCIter, NullFilter>(filter);
     }
 
     template<typename IterT, typename FilterT>
@@ -716,17 +722,17 @@ public:
     template<typename FilterT>
     IndexIter<ValueAllCIter, FilterT> beginIndexAll(const FilterT& filter) const
     {
-	return this->beginIndex<ValueAllCIter, FilterT>(filter);
+        return this->beginIndex<ValueAllCIter, FilterT>(filter);
     }
     template<typename FilterT>
     IndexIter<ValueOnCIter, FilterT> beginIndexOn(const FilterT& filter) const
     {
-	return this->beginIndex<ValueOnCIter, FilterT>(filter);
+        return this->beginIndex<ValueOnCIter, FilterT>(filter);
     }
     template<typename FilterT>
     IndexIter<ValueOffCIter, FilterT> beginIndexOff(const FilterT& filter) const
     {
-	return this->beginIndex<ValueOffCIter, FilterT>(filter);
+        return this->beginIndex<ValueOffCIter, FilterT>(filter);
     }
 
     /// @brief Leaf index iterator from voxel

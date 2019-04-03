@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -169,8 +169,6 @@ mip(const GridType& inGrid, const Options& opts)
         }
     }
 
-    const double msec = timer.delta(); // elapsed time
-
     if (outGrids.size() == 1 && opts.preserve) {
         // If -preserve is in effect and there is only one output grid,
         // give it the same name as the input grid.
@@ -178,7 +176,7 @@ mip(const GridType& inGrid, const Options& opts)
     }
 
     OPENVDB_LOG_INFO("processed grid \"" << inGrid.getName() << "\" in "
-        << std::setprecision(3) << (msec / 1000.0) << " sec");
+        << std::setprecision(3) << timer.seconds() << " sec");
 
     return outGrids;
 }
@@ -285,7 +283,7 @@ main(int argc, char *argv[])
 
     if (version) {
         std::cout << "OpenVDB library version: "
-            << openvdb::getLibraryVersionString() << "\n";
+            << openvdb::getLibraryAbiVersionString() << "\n";
         std::cout << "OpenVDB file format version: "
             << openvdb::OPENVDB_FILE_VERSION << std::endl;
         if (outFilename.empty()) return EXIT_SUCCESS;
@@ -364,7 +362,7 @@ main(int argc, char *argv[])
             outFile.write(outGrids);
         }
 
-        const double msec = timer.delta(); // elapsed time
+        const double msec = timer.milliseconds(); // elapsed time
 
         if (outGrids.empty()) {
             OPENVDB_LOG_WARN("wrote empty file " << outFilename << " in "
@@ -386,6 +384,6 @@ main(int argc, char *argv[])
     return exitStatus;
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

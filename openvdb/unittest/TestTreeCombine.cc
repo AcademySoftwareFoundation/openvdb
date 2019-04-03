@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -119,7 +119,7 @@ template<typename ValueT>
 struct OrderDependentCombineOp {
     OrderDependentCombineOp() {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& result) const {
-        result = a + 100 * b; // result is order-dependent on A and B
+        result = a + ValueT(100) * b; // result is order-dependent on A and B
     }
 };
 
@@ -141,7 +141,7 @@ void extendedCombine(TreeT& a, TreeT& b)
     struct ArgsOp {
         static void order(openvdb::CombineArgs<ValueT>& args) {
             // The result is order-dependent on A and B.
-            args.setResult(args.a() + 100 * args.b());
+            args.setResult(args.a() + ValueT(100) * args.b());
             args.setResultIsActive(args.aIsActive() || args.bIsActive());
         }
     };
@@ -154,14 +154,14 @@ template<typename TreeT> void compSum(TreeT& a, TreeT& b) { openvdb::tools::comp
 template<typename TreeT> void compMul(TreeT& a, TreeT& b) { openvdb::tools::compMul(a, b); }\
 template<typename TreeT> void compDiv(TreeT& a, TreeT& b) { openvdb::tools::compDiv(a, b); }\
 
-inline float orderf(float a, float b) { return a + 100 * b; }
+inline float orderf(float a, float b) { return a + 100.0f * b; }
 inline float maxf(float a, float b) { return std::max(a, b); }
 inline float minf(float a, float b) { return std::min(a, b); }
 inline float sumf(float a, float b) { return a + b; }
 inline float mulf(float a, float b) { return a * b; }
 inline float divf(float a, float b) { return a / b; }
 
-inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100*b; }
+inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100.0f*b; }
 inline openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
     const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
     return (aMag > bMag ? a : (bMag > aMag ? b : std::max(a, b)));
@@ -787,7 +787,7 @@ TestTreeCombine::testCsg()
     CPPUNIT_ASSERT(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
-    std::cerr << "file read: " << timer.delta() << " sec\n";
+    std::cerr << "file read: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if TEST_CSG_VERBOSE
@@ -836,7 +836,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     TreePtr aTree(new TreeT(aInputTree));
     TreeT bTree(bInputTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "deep copy: " << timer.delta() << " ms\n";
+    std::cerr << "deep copy: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if (TEST_CSG_VERBOSE > 1)
@@ -855,7 +855,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
     visitor(*aTree, bTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "combine: " << timer.delta() << " ms\n";
+    std::cerr << "combine: " << timer.milliseconds() << " msec\n";
 #endif
 #if (TEST_CSG_VERBOSE > 1)
     std::cerr << "\nActual:\n";
@@ -1070,6 +1070,6 @@ TestTreeCombine::testCompActiveLeafVoxels()
 ////////////////////////////////////////
 
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

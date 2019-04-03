@@ -150,9 +150,8 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", "Separator"));
 
     // Register the SOP
-    hvdb::OpenVDBOpFactory("OpenVDB Sample Points",
+    hvdb::OpenVDBOpFactory("VDB Sample Points",
         SOP_OpenVDB_Sample_Points::factory, parms, *table)
-        .addAlias("OpenVDB Point Sample")
         .setObsoleteParms(obsoleteParms)
         .addInput("Points")
         .addInput("VDBs")

@@ -854,7 +854,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Advect Points",
+    hvdb::OpenVDBOpFactory("VDB Advect Points",
         SOP_OpenVDB_Advect_Points::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Points to Advect")

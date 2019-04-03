@@ -141,7 +141,7 @@ newSopOperator(OP_OperatorTable* table)
             " in accordance with those VDBs' __Vector Type__ attributes (as set,"
             " for example, with the [OpenVDB Create|Node:sop/DW_OpenVDBCreate] node)."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
         .addInput("VDBs to transform")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Transform::Cache; })

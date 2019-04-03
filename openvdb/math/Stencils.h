@@ -159,7 +159,7 @@ public:
     {
         ValueType sum = 0.0;
         for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
-        return sum / mStencil.size();
+        return sum / ValueType(mStencil.size());
     }
 
     /// @brief Return the smallest value in the stencil buffer.
@@ -1315,9 +1315,9 @@ public:
     /// Return linear offset for the specified stencil point relative to its center
     template<int i, int j, int k>
     unsigned int pos() const { return GradPt<i,j,k>::idx; }
-    
+
 private:
-    
+
     inline void init(const Coord& ijk)
     {
         BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
@@ -1329,7 +1329,7 @@ private:
         BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
         BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
-    
+
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;

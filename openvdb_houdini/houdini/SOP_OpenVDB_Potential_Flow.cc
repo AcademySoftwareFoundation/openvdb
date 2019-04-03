@@ -228,7 +228,7 @@ newSopOperator(OP_OperatorTable* table)
 
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Potential Flow",
+    hvdb::OpenVDBOpFactory("VDB Potential Flow",
         SOP_OpenVDB_Potential_Flow::factory, parms, *table)
         .addInput("VDB Surface and optional velocity VDB")
         .addOptionalInput("Optional VDB Mask")

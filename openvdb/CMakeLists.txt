@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -215,7 +215,25 @@ SET_TARGET_PROPERTIES(
   VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
   )
 
-SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print/main.cc )
+SET ( VDB_LOD_SOURCE_FILES  cmd/openvdb_lod.cc )
+SET_SOURCE_FILES_PROPERTIES ( ${VDB_LOD_SOURCE_FILES}
+  PROPERTIES
+  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC"
+  )
+
+ADD_EXECUTABLE ( vdb_lod
+    ${VDB_LOD_SOURCE_FILES}
+  )
+
+TARGET_LINK_LIBRARIES ( vdb_lod
+  openvdb_shared
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${BLOSC_blosc_LIBRARY}
+  m
+  stdc++
+  )
+
+SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_PRINT_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
@@ -233,7 +251,7 @@ TARGET_LINK_LIBRARIES ( vdb_print
   stdc++
   )
 
-SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render/main.cc )
+SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_RENDER_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
@@ -254,7 +272,7 @@ TARGET_LINK_LIBRARIES ( vdb_render
   )
 
 SET ( VDB_VIEW_SOURCE_FILES
-  cmd/openvdb_view/main.cc
+  cmd/openvdb_view.cc
   viewer/Camera.cc
   viewer/ClipBox.cc
   viewer/Font.cc
@@ -370,6 +388,7 @@ SET ( UNITTEST_SOURCE_FILES
   unittest/TestTreeGetSetValues.cc
   unittest/TestTreeIterators.cc
   unittest/TestTreeVisitor.cc
+  unittest/TestTypes.cc
   unittest/TestUtil.cc
   unittest/TestValueAccessor.cc
   unittest/TestVec2Metadata.cc
@@ -427,6 +446,7 @@ IF ( NOT WIN32 )
     )
 ENDIF ()
 INSTALL ( TARGETS
+  vdb_lod
   vdb_print
   vdb_render
   DESTINATION

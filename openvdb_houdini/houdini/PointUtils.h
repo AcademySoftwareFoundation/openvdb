@@ -153,8 +153,8 @@ convertPointDataGridToHoudini(
 /// @brief Populate VDB Points grid metadata from Houdini detail attributes
 ///
 /// @param  grid           grid to be populated with metadata
-/// @param  warnings       list of warnings to be added to the SOP
 /// @param  detail         GU_Detail to extract the detail attributes from
+/// @param  warnings       list of warnings to be added to the SOP
 OPENVDB_HOUDINI_API
 void
 populateMetadataFromHoudini(
@@ -191,10 +191,30 @@ attributeStorageType(const GA_Attribute* const attribute);
 ///////////////////////////////////////
 
 
-/// @brief If the given grid is a PointDataGrid, add node specific info text to the stream provided
+/// @brief If the given grid is a PointDataGrid, add node specific info text to
+///        the stream provided. This is used to populate the MMB window in Houdini
+///        versions 15 and earlier, as well as the Operator Information Window.
 OPENVDB_HOUDINI_API
 void
 pointDataGridSpecificInfoText(std::ostream&, const openvdb::GridBase&);
+
+/// @brief  Populates string data with information about the provided OpenVDB
+///         Points grid.
+/// @param  grid          The OpenVDB Points grid to retrieve information from.
+/// @param  countStr      The total point count as a formatted integer.
+/// @param  groupStr      The list of comma separated groups (or "none" if no
+///                       groups exist). Enclosed by parentheses.
+/// @param  attributeStr  The list of comma separated attributes (or "none" if
+///                       no attributes exist). Enclosed by parentheses.
+///                       Each attribute takes the form "name [type] [code]
+///                       [stride]" where code and stride are added for non
+///                       default attributes.
+OPENVDB_HOUDINI_API
+void
+collectPointInfo(const openvdb::points::PointDataGrid& grid,
+    std::string& countStr,
+    std::string& groupStr,
+    std::string& attributeStr);
 
 
 ///////////////////////////////////////

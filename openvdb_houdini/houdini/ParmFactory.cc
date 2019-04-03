@@ -1039,6 +1039,7 @@ struct OpFactory::Impl
         // the OpFactory and this Impl have been fully constructed.
         mPolicy = policy;
         mName = mPolicy->getName(factory);
+        mLabelName = mPolicy->getLabelName(factory);
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
     }
@@ -1058,7 +1059,7 @@ struct OpFactory::Impl
 
         mInputLabels.push_back(nullptr);
 
-        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
+        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mLabelName.c_str(),
             mConstruct, mParms,
 #if (UT_MAJOR_VERSION_INT >= 16)
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
@@ -1079,7 +1080,7 @@ struct OpFactory::Impl
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -1098,7 +1099,7 @@ struct OpFactory::Impl
 OpFactory::OpFactory(const std::string& english, OP_Constructor ctor,
     ParmList& parms, OP_OperatorTable& table, OpFlavor flavor)
 {
-    this->init(OpPolicyPtr(new DWAOpPolicy), english, ctor, parms, table, flavor);
+    this->init(OpPolicyPtr(new OpPolicy), english, ctor, parms, table, flavor);
 }
 
 
@@ -1307,25 +1308,9 @@ OpPolicy::getName(const OpFactory&, const std::string& english)
 
 //virtual
 std::string
-DWAOpPolicy::getName(const OpFactory&, const std::string& english)
+OpPolicy::getLabelName(const OpFactory& factory)
 {
-    UT_String s(english);
-    // Remove non-alphanumeric characters from the name.
-    s.forceValidVariableName();
-    std::string name = s.toStdString();
-    // Remove spaces and underscores.
-    name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
-    name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
-    name = "DW_" + name;
-    return name;
-}
-
-
-//virtual
-std::string
-DWAOpPolicy::getHelpURL(const OpFactory& factory)
-{
-    return OpPolicy::getHelpURL(factory);
+    return factory.english();
 }
 
 

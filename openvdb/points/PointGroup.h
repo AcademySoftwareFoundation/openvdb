@@ -854,7 +854,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
     using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
-    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
+    const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 

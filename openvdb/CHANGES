@@ -3,15 +3,43 @@ OpenVDB Version History
 
 Version 6.0.1 - In development
 
+    New features:
+    - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
+      VecTraits and added an IsSpecializationOf helper metafunction.
+    - Added support for Vec4s, Vec4d and Vec4i metadata.
+    - Added a generic TypeList class.
+    - Added GridBase::apply(), which invokes a functor on a grid
+      if the resolved grid type is a member of a given type list.
+    - Added util::printTime that outputs nicely-formatted time information.
+    - Added a template specialization of std::hash with Coord.
+    - Added CoordBBox::moveMin and CoordBBox::moveMax to move a CoordBBox.
+
+    Improvements:
+    - The API of util::CpuTimer has been improved and is now making use of
+      a new util::printTime function for nicer output of time information.
+    - Significantly improved the performance of point data grid string
+      attribute generation.
+    - AttributeArray::copy() and the copy assignment operator for
+      AttributeArrays are now thread-safe.
+    - The command-line tools (vdb_print, etc.) now include the library
+      ABI version in their -version output.
+
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata
       to be discarded.
     - Added a check to points::setGroup to compare the maximum index of the
       provided PointIndexTree to the size of the membership vector.
+    - Fixed a race condition when moving points in point data grids for ABI=6+
+      due to non-const access of AttributeArrays resulting in a copy-on-write.
+    - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
+    - Fix a rounding error bug in point conversion when using floating-point.
     - Fixed a crash in tools::extractActiveVoxelSegmentMasks() when the first
       leaf node has no active voxels. [Reported by Rick Hankins]
     - Fixed a bug in tools::segmentActiveVoxels() and tools::segmentSDF() where
       inactive leaf nodes are only pruned when there is more than one segment.
+
+    API changes:
+    - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
 
     Houdini:
     - The Points Convert SOP now reports NaN Positions as warnings when
@@ -20,10 +48,23 @@ Version 6.0.1 - In development
       point attributes with the same name as an existing point group.
     - The Transform SOP now supports frustum transforms by applying the
       transformation to the internal affine map.
+    - Renamed SOP labels to match native Houdini SOPs - New Names:
+      Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF,
+      Project Non-Divergent, Segment by Connectivity, Topology to SDF,
+      Visualize Tree
+    - Added a houdini_utils::OpPolicy::getLabelName() method to allow
+      derived OpPolicy classes to provide their own label naming scheme
+      for tab menus.
+    - Added type lists for sets of commonly-used grid types, including
+      ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
+    - VDB Vector Merge SOP now copies metadata from the representative
+      scalar grid.
 
     Python:
-    - Added limited support for PointDataGrids to the Python module,
-      offering I/O and metadata functionality for now.
+    - Added limited support for point data grids, comprising I/O and
+      metadata functionality for now.
+    - Added support for Mat4s and Mat4d metadata, in the form of nested
+      Python lists (e.g., [[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1]]).
 
 
 Version 6.0.0 - December 18, 2018
@@ -737,14 +778,14 @@ Version 3.2.0 - August 10, 2016
     - Fixed bugs in tree::NodeUnion that could cause crashes.
     - Fixed memory leak in
       tools::mesh_to_volume_internal::ExpandNarrowband
-      [Reported by Kévin Dietrich]
+      [Reported by KÃ©vin Dietrich]
     - Fixed parameter type inconsistencies in math/Stencils.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich and Nick Avramoussis]
+      [Contributed by KÃ©vin Dietrich and Nick Avramoussis]
     - Fixed a bug in the VolumeToMesh tool that produced artifacts for
       adaptive surface extraction on clipped level sets.
       [Reported by Jeff Lait]
-    - Corrected empty grid background value in tools::meshToVolume().
+    - Corrected empty grid background value inÂ tools::meshToVolume().
       [Contributed by Jeff Lait]
     - Fixed a bug in tools::volumeToMesh that could produce NaNs.
       [Reported by Rick Hankins]
@@ -887,7 +928,7 @@ Version 3.1.0 - October 1, 2015
       rather than the square of the magnitude.
     - Fixed parameter type inconsistencies in math/Ray.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich]
+      [Contributed by KÃ©vin Dietrich]
     - Fixed incorrect handling of signed values in tools::clip()
       (and the Clip SOP).
 

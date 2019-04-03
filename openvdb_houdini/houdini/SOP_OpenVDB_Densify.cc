@@ -86,7 +86,7 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDBs to be densified"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
         .addInput("VDBs to densify")
 #if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Densify::Cache; })

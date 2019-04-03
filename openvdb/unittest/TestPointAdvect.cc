@@ -172,7 +172,7 @@ TestPointAdvect::testAdvect()
                 int theId = idHandle.get(*iter);
                 Vec3s position = transform.indexToWorld(
                     positionHandle.get(*iter) + iter.getCoord().asVec3d());
-                Vec3s expectedPosition(positions[theId] + velocityBackground * 10);
+                Vec3s expectedPosition(positions[theId] + velocityBackground * 10.0f);
                 CPPUNIT_ASSERT(math::isApproxEqual(position, expectedPosition, tolerance));
             }
         }
@@ -427,7 +427,7 @@ TestPointAdvect::testZalesaksDisk()
     for (auto leaf = velocity->tree().beginLeaf(); leaf; ++leaf) {
         for (auto iter = leaf->beginValueOn(); iter; ++iter) {
             Vec3s position = xform->indexToWorld(iter.getCoord().asVec3d());
-            Vec3s vel = (position.cross(Vec3s(0, 0, 1)) * 2 * M_PI) / 10;
+            Vec3s vel = (position.cross(Vec3s(0, 0, 1)) * 2.0f * M_PI) / 10.0f;
             iter.setValue(vel);
         }
     }

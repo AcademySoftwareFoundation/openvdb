@@ -947,7 +947,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 {
     const BaseShader& shader = *mShader;
     Vec3Type xyz, nml;
-    const float frac = 1.0f / (1.0f + mSubPixels);
+    const float frac = 1.0f / (1.0f + float(mSubPixels));
     for (size_t j=range.begin(), n=0, je = range.end(); j<je; ++j) {
         for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
             Film::RGBA& bg = mCamera->pixel(i,j);

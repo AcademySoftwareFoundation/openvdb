@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -166,7 +166,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value"));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry")
@@ -279,8 +279,6 @@ SOP_OpenVDB_Fill::~SOP_OpenVDB_Fill()
 namespace {
 
 // Convert a Vec3 value to a vector of another value type or to a scalar value
-
-inline const openvdb::Vec3R& convertValue(const openvdb::Vec3R& val) { return val; }
 
 // Overload for scalar types (discards all but the first vector component)
 template<typename ValueType>
@@ -440,9 +438,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fill)::cookVDBSop(OP_Context& 
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
-
-            GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, *fillOp);
+            it->getGrid().apply<hvdb::VolumeGridTypes>(*fillOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());
@@ -450,6 +446,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fill)::cookVDBSop(OP_Context& 
     return error();
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

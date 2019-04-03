@@ -79,15 +79,15 @@ public:
          Source d, Source e, Source f,
          Source g, Source h, Source i)
     {
-        MyBase::mm[0] = static_cast<ValueType>(a);
-        MyBase::mm[1] = static_cast<ValueType>(b);
-        MyBase::mm[2] = static_cast<ValueType>(c);
-        MyBase::mm[3] = static_cast<ValueType>(d);
-        MyBase::mm[4] = static_cast<ValueType>(e);
-        MyBase::mm[5] = static_cast<ValueType>(f);
-        MyBase::mm[6] = static_cast<ValueType>(g);
-        MyBase::mm[7] = static_cast<ValueType>(h);
-        MyBase::mm[8] = static_cast<ValueType>(i);
+        MyBase::mm[0] = static_cast<T>(a);
+        MyBase::mm[1] = static_cast<T>(b);
+        MyBase::mm[2] = static_cast<T>(c);
+        MyBase::mm[3] = static_cast<T>(d);
+        MyBase::mm[4] = static_cast<T>(e);
+        MyBase::mm[5] = static_cast<T>(f);
+        MyBase::mm[6] = static_cast<T>(g);
+        MyBase::mm[7] = static_cast<T>(h);
+        MyBase::mm[8] = static_cast<T>(i);
     } // constructor1Test
 
     /// Construct matrix from rows or columns vectors (defaults to rows
@@ -109,15 +109,15 @@ public:
     template<typename Source>
     Mat3(Source *a)
     {
-        MyBase::mm[0] = a[0];
-        MyBase::mm[1] = a[1];
-        MyBase::mm[2] = a[2];
-        MyBase::mm[3] = a[3];
-        MyBase::mm[4] = a[4];
-        MyBase::mm[5] = a[5];
-        MyBase::mm[6] = a[6];
-        MyBase::mm[7] = a[7];
-        MyBase::mm[8] = a[8];
+        MyBase::mm[0] = static_cast<T>(a[0]);
+        MyBase::mm[1] = static_cast<T>(a[1]);
+        MyBase::mm[2] = static_cast<T>(a[2]);
+        MyBase::mm[3] = static_cast<T>(a[3]);
+        MyBase::mm[4] = static_cast<T>(a[4]);
+        MyBase::mm[5] = static_cast<T>(a[5]);
+        MyBase::mm[6] = static_cast<T>(a[6]);
+        MyBase::mm[7] = static_cast<T>(a[7]);
+        MyBase::mm[8] = static_cast<T>(a[8]);
     } // constructor1Test
 
     /// Copy constructor

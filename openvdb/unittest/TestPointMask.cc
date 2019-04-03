@@ -129,7 +129,7 @@ TestPointMask::testMask()
     }
 
     { // use a much larger voxel size that splits the points into two regions
-        const float newVoxelSize(2);
+        const float newVoxelSize(4);
         openvdb::math::Transform::Ptr newTransform(
             openvdb::math::Transform::createLinearTransform(newVoxelSize));
 

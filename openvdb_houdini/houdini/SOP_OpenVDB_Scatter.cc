@@ -244,7 +244,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", ""));
 
     // Register the SOP.
-    hvdb::OpenVDBOpFactory("OpenVDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs on which points will be scattered")
 #if VDB_COMPILABLE_SOP

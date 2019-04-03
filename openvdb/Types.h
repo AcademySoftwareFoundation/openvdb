@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -212,27 +212,93 @@ using PointDataIndex64 = PointIndex<Index64, 1>;
 ////////////////////////////////////////
 
 
-template<typename T> struct VecTraits {
+/// @brief Helper metafunction used to determine if the first template
+/// parameter is a specialization of the class template given in the second
+/// template parameter
+template <typename T, template <typename...> class Template>
+struct IsSpecializationOf : std::false_type {};
+
+template <typename... Args, template <typename...> class Template>
+struct IsSpecializationOf<Template<Args...>, Template> : std::true_type {};
+
+
+////////////////////////////////////////
+
+
+template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
+                            IsSpecializationOf<T, math::Vec3>::value ||
+                            IsSpecializationOf<T, math::Vec4>::value>
+struct VecTraits
+{
+    static const bool IsVec = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct VecTraits<T, false>
+{
     static const bool IsVec = false;
     static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec2<T> > {
-    static const bool IsVec = true;
-    static const int Size = 2;
+template<typename T, bool = IsSpecializationOf<T, math::Quat>::value>
+struct QuatTraits
+{
+    static const bool IsQuat = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct QuatTraits<T, false>
+{
+    static const bool IsQuat = false;
+    static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec3<T> > {
-    static const bool IsVec = true;
-    static const int Size = 3;
+template<typename T, bool = IsSpecializationOf<T, math::Mat3>::value ||
+                            IsSpecializationOf<T, math::Mat4>::value>
+struct MatTraits
+{
+    static const bool IsMat = true;
+    static const int Size = T::size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct MatTraits<T, false>
+{
+    static const bool IsMat = false;
+    static const int Size = 1;
     using ElementType = T;
 };
 
-template<typename T> struct VecTraits<math::Vec4<T> > {
-    static const bool IsVec = true;
-    static const int Size = 4;
+template<typename T, bool = VecTraits<T>::IsVec ||
+                            QuatTraits<T>::IsQuat ||
+                            MatTraits<T>::IsMat>
+struct ValueTraits
+{
+    static const bool IsVec = VecTraits<T>::IsVec;
+    static const bool IsQuat = QuatTraits<T>::IsQuat;
+    static const bool IsMat = MatTraits<T>::IsMat;
+    static const bool IsScalar = false;
+    static const int Size = T::size;
+    static const int Elements = IsMat ? Size*Size : Size;
+    using ElementType = typename T::ValueType;
+};
+
+template<typename T>
+struct ValueTraits<T, false>
+{
+    static const bool IsVec = false;
+    static const bool IsQuat = false;
+    static const bool IsMat = false;
+    static const bool IsScalar = true;
+    static const int Size = 1;
+    static const int Elements = 1;
     using ElementType = T;
 };
 
@@ -266,6 +332,167 @@ template<typename T>
 struct CanConvertType<T, ValueMask> { enum {value = CanConvertType<T, bool>::value}; };
 template<typename T>
 struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::value}; };
+
+
+////////////////////////////////////////
+
+
+/// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
+/// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
+/// @details For example,
+/// - CopyConstness<int, int>::Type is @c int
+/// - CopyConstness<int, const int>::Type is @c int
+/// - CopyConstness<const int, int>::Type is <tt>const int</tt>
+/// - CopyConstness<const int, const int>::Type is <tt>const int</tt>
+template<typename FromType, typename ToType> struct CopyConstness {
+    using Type = typename std::remove_const<ToType>::type;
+};
+
+/// @cond OPENVDB_TYPES_INTERNAL
+template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
+    using Type = const ToType;
+};
+/// @endcond
+
+
+////////////////////////////////////////
+
+
+/// @cond OPENVDB_TYPES_INTERNAL
+
+template<typename... Ts> struct TypeList; // forward declaration
+
+namespace internal {
+
+// Implementation details of TypeList
+
+template<typename ListT, typename... Ts> struct TSAppendImpl;
+
+// Append zero or more types.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, OtherTs...> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+// Append another TypeList's members.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, TypeList<OtherTs...>> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+
+// Remove all occurrences of type T.
+template<typename ListT, typename T> struct TSEraseImpl;
+
+// TypeList<>::Erase<int> = TypeList<>
+template<typename T>
+struct TSEraseImpl<TypeList<>, T> { using type = TypeList<>; };
+
+// TypeList<int, char, ...>::Erase<int> = TypeList<char, ...>::Erase<int>
+template<typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T, Ts...>, T> {
+    using type = typename TSEraseImpl<TypeList<Ts...>, T>::type;
+};
+
+// TypeList<float, int, char...>::Erase<int> =
+//     TypeList<float>::Append<TypeList<int, char...>::Erase<int>>
+template<typename T2, typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T2, Ts...>, T> {
+    using type = typename TSAppendImpl<TypeList<T2>,
+        typename TSEraseImpl<TypeList<Ts...>, T>::type>::type;
+};
+
+
+template<typename ListT, typename... Ts> struct TSRemoveImpl;
+
+template<typename ListT>
+struct TSRemoveImpl<ListT> { using type = ListT; };
+
+// Remove one or more types.
+template<typename ListT, typename T, typename... Ts>
+struct TSRemoveImpl<ListT, T, Ts...> {
+    using type = typename TSRemoveImpl<typename TSEraseImpl<ListT, T>::type, Ts...>::type;
+};
+
+// Remove the members of another TypeList.
+template<typename ListT, typename... Ts>
+struct TSRemoveImpl<ListT, TypeList<Ts...>> {
+    using type = typename TSRemoveImpl<ListT, Ts...>::type;
+};
+
+
+template<typename OpT> inline void TSForEachImpl(OpT) {}
+template<typename OpT, typename T, typename... Ts>
+inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
+
+} // namespace internal
+
+/// @endcond
+
+
+/// @brief A list of types (not necessarily unique)
+/// @details Example:
+/// @code
+/// using MyTypes = openvdb::TypeList<int, float, int, double, float>;
+/// @endcode
+template<typename... Ts>
+struct TypeList
+{
+    /// The type of this list
+    using Self = TypeList;
+
+    /// @brief Append types, or the members of another TypeList, to this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = openvdb::TypeList<float, double>;
+    ///     using NumericTypes = IntTypes::Append<RealTypes>;
+    /// }
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16>::Append<Int32, Int64>;
+    ///     using NumericTypes = IntTypes::Append<float>::Append<double>;
+    /// }
+    /// @endcode
+    template<typename... TypesToAppend>
+    using Append = typename internal::TSAppendImpl<Self, TypesToAppend...>::type;
+
+    /// @brief Remove all occurrences of one or more types, or the members of
+    /// another TypeList, from this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using NumericTypes = openvdb::TypeList<float, double, Int16, Int32, Int64>;
+    ///     using LongTypes = openvdb::TypeList<Int64, double>;
+    ///     using ShortTypes = NumericTypes::Remove<LongTypes>; // float, Int16, Int32
+    /// }
+    /// @endcode
+    template<typename... TypesToRemove>
+    using Remove = typename internal::TSRemoveImpl<Self, TypesToRemove...>::type;
+
+    /// @brief Invoke a templated, unary functor on a value of each type in this list.
+    /// @details Example:
+    /// @code
+    /// #include <typeinfo>
+    ///
+    /// template<typename ListT>
+    /// void printTypeList()
+    /// {
+    ///     std::string sep;
+    ///     auto op = [&](auto x) {  // C++14
+    ///         std::cout << sep << typeid(decltype(x)).name(); sep = ", "; };
+    ///     ListT::foreach(op);
+    /// }
+    ///
+    /// using MyTypes = openvdb::TypeList<int, float, double>;
+    /// printTypeList<MyTypes>(); // "i, f, d" (exact output is compiler-dependent)
+    /// @endcode
+    ///
+    /// @note The functor object is passed by value.  Wrap it with @c std::ref
+    /// to use the same object for each type.
+    template<typename OpT>
+    static void foreach(OpT op) { internal::TSForEachImpl<OpT, Ts...>(op); }
+};
 
 
 ////////////////////////////////////////
@@ -356,6 +583,9 @@ template<> inline const char* typeNameAsString<Vec3U16>()           { return "ve
 template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
+template<> inline const char* typeNameAsString<Vec4i>()             { return "vec4i"; }
+template<> inline const char* typeNameAsString<Vec4f>()             { return "vec4s"; }
+template<> inline const char* typeNameAsString<Vec4d>()             { return "vec4d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat3s>()             { return "mat3s"; }
 template<> inline const char* typeNameAsString<Mat3d>()             { return "mat3d"; }
@@ -576,6 +806,6 @@ class PartialCreate {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

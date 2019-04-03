@@ -237,7 +237,7 @@ Position:\n\
         .setDefault("@name=*.z"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
+    hvdb::OpenVDBOpFactory("VDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
         .addInput("Scalar VDBs to merge into vector")
         .setObsoleteParms(obsoleteParms)
@@ -762,7 +762,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Merge)::cookVDBSop(OP_C
                     addMessage(SOP_MESSAGE, ostr.str().c_str());
                 }
 
-                if (GEO_PrimVDB* outVdb = hvdb::createVdbPrimitive(*gdp, outGrid)) {
+                if (GEO_PrimVDB* outVdb = GU_PrimVDB::buildFromGrid(*gdp, outGrid, nonNullVdb, outGridName.c_str())) {
                     primsToGroup.push_back(outVdb);
                 }
 

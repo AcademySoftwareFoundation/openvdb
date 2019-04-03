@@ -73,10 +73,10 @@ public:
     template <typename Source>
     Vec4(Source *a)
     {
-        this->mm[0] = a[0];
-        this->mm[1] = a[1];
-        this->mm[2] = a[2];
-        this->mm[3] = a[3];
+        this->mm[0] = static_cast<T>(a[0]);
+        this->mm[1] = static_cast<T>(a[1]);
+        this->mm[2] = static_cast<T>(a[2]);
+        this->mm[3] = static_cast<T>(a[3]);
     }
 
     /// Conversion constructor

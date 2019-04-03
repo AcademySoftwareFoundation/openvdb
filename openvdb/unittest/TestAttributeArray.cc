@@ -67,8 +67,9 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 
 
 /// @brief io::MappedFile has a private constructor, so declare a class that acts as the friend
-struct TestMappedFile
+class TestMappedFile
 {
+public:
     static openvdb::io::MappedFile::Ptr create(const std::string& filename)
     {
         return openvdb::SharedPtr<openvdb::io::MappedFile>(new openvdb::io::MappedFile(filename));
@@ -988,7 +989,8 @@ TestAttributeArray::testAttributeArrayCopy()
         TypedAttributeArray<half> targetTypedAttr1(size);
         AttributeArray& targetAttr1(targetTypedAttr1);
         for (Index i = 0; i < size; i++) {
-            targetTypedAttr1.set(i, sourceTypedAttr.get(i));
+            targetTypedAttr1.set(i,
+                io::RealToHalf<double>::convert(sourceTypedAttr.get(i)));
         }
 
         // truncated float array
@@ -2326,13 +2328,14 @@ template <typename AttrT>
 void sum(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sum");
-    typename AttrT::ValueType sum = 0;
+    using ValueType = typename AttrT::ValueType;
+    ValueType sum = 0;
     const Index size = attr.size();
     for (Index i = 0; i < size; i++) {
         sum += attr.getUnsafe(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum);
+    CPPUNIT_ASSERT(sum!=ValueType());
 }
 
 template <typename CodecT, typename AttrT>
@@ -2346,7 +2349,7 @@ void sumH(const Name& prefix, const AttrT& attr)
         sum += handle.get(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum);
+    CPPUNIT_ASSERT(sum!=ValueType());
 }
 
 } // namespace profile
@@ -2392,7 +2395,7 @@ TestAttributeArray::testProfile()
                 sum += float(values[i]);
             }
             // to prevent optimisation clean up
-            CPPUNIT_ASSERT(sum);
+            CPPUNIT_ASSERT(sum!=0.0f);
         }
     }
 
