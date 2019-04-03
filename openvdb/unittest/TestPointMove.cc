@@ -265,7 +265,6 @@ TestPointMove::testCachedDeformer()
     CachedDeformer<double> cachedDeformer(cache);
 
     // check initialization is as expected
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
 
@@ -281,7 +280,6 @@ TestPointMove::testCachedDeformer()
 
     // reset should no longer throw and leaf vec pointer should now be non-null
     CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec != nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec->empty());
@@ -309,63 +307,11 @@ TestPointMove::testCachedDeformer()
     // now reset the cached deformer and verify the value is updated
     // (map has precedence over vector)
     cachedDeformer.reset(nullObject, size_t(0));
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
     newPosition.setZero();
     cachedDeformer.apply(newPosition, indexIter);
     CPPUNIT_ASSERT(math::isApproxEqual(newDeformedPosition, newPosition));
-
-    // test map -> vector expansion
-    leaf.mapData.clear();
-    for (int i = 0; i < 16; i++) {
-        leaf.mapData.insert({i, Vec3d(0, i, 0)});
-    }
-
-    cachedDeformer.reset(nullObject, size_t(0));
-
-    // 16 values (or less) so local vector is not populated
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
-
-    // check value access
-    for (int i = 0; i < 16; i++) {
-        DummyIter indexIterI(i);
-        cachedDeformer.apply(newPosition, indexIterI);
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3d(0, i, 0), newPosition));
-    }
-
-    leaf.mapData.insert({16, Vec3d(0, 16, 0)});
-
-    // ValueError thrown because totalSize has not been set correctly
-    CPPUNIT_ASSERT_THROW(cachedDeformer.reset(nullObject, size_t(0)), openvdb::ValueError);
-
-    // use very large total size to prevent local expansion
-    leaf.totalSize = 17 * 256 + 1;
-
-    CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
-
-    // use total size that represents a sequential dataset
-    leaf.totalSize = Index(leaf.mapData.size());
-
-    CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-
-    // greater than 16 values so local vector is populated
-    CPPUNIT_ASSERT_EQUAL(leaf.mapData.size(), cachedDeformer.mLocalLeafVec.size());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec != nullptr);
-
-    // check value access
-    for (int i = 0; i < 17; i++) {
-        DummyIter indexIterI(i);
-        cachedDeformer.apply(newPosition, indexIterI);
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3d(0, i, 0), newPosition));
-    }
 
     // four points, some same leaf, some different
     const float voxelSize = 1.0f;
