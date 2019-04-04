@@ -257,6 +257,23 @@ FOREACH ( COMPONENT ${TBB_FIND_COMPONENTS} )
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
     )
+
+  # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
+  # and correct the library name if so
+  IF ( UNIX AND EXISTS ${Tbb_${COMPONENT}_LIBRARY} )
+    # Ignore files where the first four bytes equals the ELF magic number
+    FILE ( READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_HEX OFFSET 0 LIMIT 4 HEX )
+    IF ( NOT ${Tbb_${COMPONENT}_HEX} STREQUAL "7f454c46" )
+      # Read the first 1024 bytes of the library and match against an "INPUT (file)" regex
+      FILE ( READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_ASCII OFFSET 0 LIMIT 1024 )
+      IF ( "${Tbb_${COMPONENT}_ASCII}" MATCHES "INPUT \\(([^(]+)\\)")
+        # Extract the directory and apply the matched text (in brackets)
+        GET_FILENAME_COMPONENT ( Tbb_${COMPONENT}_DIR "${Tbb_${COMPONENT}_LIBRARY}" DIRECTORY )
+        SET ( Tbb_${COMPONENT}_LIBRARY "${Tbb_${COMPONENT}_DIR}/${CMAKE_MATCH_1}" )
+      ENDIF ()
+    ENDIF ()
+  ENDIF ()
+
   LIST ( APPEND Tbb_LIB_COMPONENTS ${Tbb_${COMPONENT}_LIBRARY} )
 
   IF ( Tbb_${COMPONENT}_LIBRARY )
