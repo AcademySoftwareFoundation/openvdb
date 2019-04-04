@@ -59,6 +59,13 @@ Bug fixes:
   single-precision floating-point.
 - Addressed some type conversion issues and other issues reported by
   GCC&nbsp;6.
+- Fixed a crash in @vdblink::tools::extractActiveVoxelSegmentMasks()
+  extractActiveVoxelSegmentMasks@endlink
+  when the first leaf node had no active voxels.
+  <I>[Reported&nbsp;by&nbsp;Rick&nbsp;Hankins]</I>
+- Fixed a bug in @vdblink::tools::segmentActiveVoxels() segmentActiveVoxels@endlink
+  and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
+  nodes were only pruned when there was more than one segment.
 
 @par
 API changes:
@@ -83,6 +90,8 @@ Houdini:
   classes to provide their own label naming scheme for tab menus.
 - Added type lists for sets of commonly-used grid types, including
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
+- VDB Vector Merge SOP now copies metadata from the representative
+  scalar grid.
 
 @par
 Python:

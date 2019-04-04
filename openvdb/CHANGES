@@ -36,6 +36,11 @@ Version 6.0.1 - In development
     - Fixed a rounding error bug in point conversion when using
       single-precision floating-point.
     - Addressed some type conversion issues and other issues reported by GCC 6.
+    - Fixed a crash in tools::extractActiveVoxelSegmentMasks() when the first
+      leaf node had no active voxels.
+      [Reported by Rick Hankins]
+    - Fixed a bug in tools::segmentActiveVoxels() and tools::segmentSDF() where
+      inactive leaf nodes were only pruned when there was more than one segment.
 
     API changes:
     - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
@@ -57,6 +62,8 @@ Version 6.0.1 - In development
       for tab menus.
     - Added type lists for sets of commonly-used grid types, including
       ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
+    - VDB Vector Merge SOP now copies metadata from the representative
+      scalar grid.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
