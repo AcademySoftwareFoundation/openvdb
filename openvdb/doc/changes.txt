@@ -52,6 +52,12 @@ Bug fixes:
   due to non-const access of AttributeArrays resulting in a copy-on-write.
 - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
 - Fix a rounding error bug in point conversion when using floating-point.
+- Fixed a crash in
+  @vdblink::tools::extractActiveVoxelSegmentMasks() extractActiveVoxelSegmentMasks@endlink
+  when the first leaf node has no active voxels. [Reported by Rick Hankins]
+- Fixed a bug in @vdblink::tools::segmentActiveVoxels() segmentActiveVoxels@endlink
+  and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
+  nodes are only pruned when there is more than one segment.
 
 @par
 API changes:
