@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -133,13 +133,13 @@ public:
     bool empty() const { return (mData == nullptr); }
 #else
     /// Default constructor
-    inline LeafBuffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
+    inline LeafBuffer(): mData(new ValueType[SIZE]) { mOutOfCore = 0; }
     /// Construct a buffer populated with the specified value.
     explicit inline LeafBuffer(const ValueType&);
     /// Copy constructor
     inline LeafBuffer(const LeafBuffer&);
     /// Construct a buffer but don't allocate memory for the full array of values.
-    LeafBuffer(PartialCreate, const ValueType&): mData(nullptr), mOutOfCore(0) {}
+    LeafBuffer(PartialCreate, const ValueType&): mData(nullptr) { mOutOfCore = 0; }
     /// Destructor
     inline ~LeafBuffer();
 
@@ -251,8 +251,8 @@ template<typename T, Index Log2Dim>
 inline
 LeafBuffer<T, Log2Dim>::LeafBuffer(const ValueType& val)
     : mData(new ValueType[SIZE])
-    , mOutOfCore(0)
 {
+    mOutOfCore = 0;
     this->fill(val);
 }
 
@@ -584,6 +584,6 @@ template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 
 #endif // OPENVDB_TREE_LEAFBUFFER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

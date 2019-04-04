@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -148,7 +148,11 @@ public:
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
-    AttributeArray() : mPageHandle() { }
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+    AttributeArray(): mPageHandle() { mOutOfCore = 0; }
+#else
+    AttributeArray(): mPageHandle() {}
+#endif
     virtual ~AttributeArray()
     {
         // if this AttributeArray has been partially read, zero the compressed bytes,
@@ -422,7 +426,7 @@ protected:
     uint8_t mFlags = 0;
     uint8_t mSerializationFlags = 0;
 #if OPENVDB_ABI_VERSION_NUMBER >= 5
-    tbb::atomic<Index32> mOutOfCore = 0; // interpreted as bool
+    tbb::atomic<Index32> mOutOfCore; // interpreted as bool
 #endif
     compression::PageHandle::Ptr mPageHandle;
 
@@ -432,7 +436,7 @@ protected:
     mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mSerializationFlags = 0;
-    tbb::atomic<Index32> mOutOfCore = 0; // interpreted as bool
+    tbb::atomic<Index32> mOutOfCore; // interpreted as bool
     /// used for out-of-core, paged reading
     union {
         compression::PageHandle::Ptr mPageHandle;
@@ -2321,6 +2325,6 @@ AttributeArray& AttributeWriteHandle<ValueType, CodecType>::array()
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
