@@ -307,11 +307,10 @@ OPTION ( OPENVDB_BUILD_BINARIES "Build the vdb binaries" ON )
 OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
-OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini SOPs" OFF )
+OPTION ( OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF )
 OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF )
@@ -326,22 +325,29 @@ determine the ABI number. You may set this to force a given ABI number.]=] )
 # @todo scalable/concurrent malloc option(s)
 # @todo non-required behavior for blosc, log4cplus (i.e. use if available)
 OPTION ( USE_HOUDINI [=[
-Build the library against a Houdini installation. Turns on autmatically if OPENVDB_BUILD_HOUDINI_SOPS is enabled.
-When enabled, you do not need to provide dependency locations for OpenEXR, IlmBase, TBB, Boost and Blosc. You can
-optionally provide your own version of Boost when building against Houdini 16.5 and gerater.]=] OFF )
+Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
+When enabled, you do not need to provide dependency locations for TBB and Blosc. Boost must be provided if
+Houdini Version >= 16.5. OpenEXR/IlmBase must be provided if Houdini Version >= 17.5.]=] OFF )
 OPTION ( USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used.]=] OFF )
+openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
+know it to be required.]=] OFF )
 OPTION ( USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
-to be used.]=] OFF )
+to be used if you know it to be required.]=] OFF )
 OPTION ( USE_EXR [=[
 Use OpenEXR while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used.]=] OFF )
+openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you
+know it to be required.]=] OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
+
+# Deprecated options
+
+OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF )
+OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
 
 # Various minimum version requirements
 
@@ -384,6 +390,7 @@ MARK_AS_ADVANCED (
   USE_HOUDINI
   USE_LOG4CPLUS
   USE_SYSTEM_LIBRARY_PATHS
+  OPENVDB_BUILD_HOUDINI_SOPS
   )
 
 # Add our cmake modules
@@ -484,6 +491,13 @@ ENDIF ()
 # Configure Houdini installation if necessary
 
 IF ( OPENVDB_BUILD_HOUDINI_SOPS )
+  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
+  MESSAGE ( WARNING "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
+    "Use OPENVDB_BUILD_HOUDINI_PLUGIN." )
+  SET ( OPENVDB_BUILD_HOUDINI_PLUGIN ON )
+ENDIF ()
+
+IF ( OPENVDB_BUILD_HOUDINI_PLUGIN )
   SET ( USE_HOUDINI ON )
 ENDIF ()
 
@@ -585,7 +599,7 @@ IF ( OPENVDB_BUILD_UNITTESTS )
   ADD_SUBDIRECTORY ( openvdb/unittest )
 ENDIF ()
 
-IF ( OPENVDB_BUILD_HOUDINI_SOPS )
+IF ( OPENVDB_BUILD_HOUDINI_PLUGIN )
   ADD_SUBDIRECTORY ( openvdb_houdini )
 ENDIF ()
 
