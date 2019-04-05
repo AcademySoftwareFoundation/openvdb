@@ -80,7 +80,7 @@ ENDIF ()
 
 # rpath handling
 
-SET ( RPATHS )
+SET ( RPATHS "" )
 IF ( OPENVDB_ENABLE_RPATH )
   # @todo There is probably a better way to do this for imported targets
   LIST ( APPEND RPATHS
@@ -148,10 +148,10 @@ IF ( OPENVDB_BUILD_VDB_RENDER )
   SET ( VDB_RENDER_SOURCE_FILES openvdb_render.cc )
   ADD_EXECUTABLE ( vdb_render ${VDB_RENDER_SOURCE_FILES} )
   TARGET_LINK_LIBRARIES ( vdb_render
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
-    ${OPENVDB_BINARIES_DEPENDENT_LIBS} # include last - see comment above
     )
 
   IF ( OPENVDB_ENABLE_RPATH )
@@ -211,11 +211,11 @@ IF ( OPENVDB_BUILD_VDB_VIEW )
       )
 
     TARGET_LINK_LIBRARIES ( vdb_view
+      ${OPENVDB_BINARIES_DEPENDENT_LIBS}
       Boost::thread
       OpenGL::GL
       OpenGL::GLU
       glfw
-      ${OPENVDB_BINARIES_DEPENDENT_LIBS} # include last - see comment above
       )
 
     TARGET_COMPILE_DEFINITIONS ( vdb_view PRIVATE

@@ -177,6 +177,7 @@ SET_TARGET_PROPERTIES ( pyopenvdb PROPERTIES
 
 IF ( OPENVDB_ENABLE_RPATH )
   # @todo There is probably a better way to do this for imported targets
+  SET ( RPATHS "" )
   LIST ( APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
     ${IlmBase_LIBRARY_DIRS}
