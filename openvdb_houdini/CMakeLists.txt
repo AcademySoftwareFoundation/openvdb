@@ -33,26 +33,25 @@
 
   There are two main stages for the OpenVDB Houdini build; the OpenVDB
   Houdini base shared library and all subsequent dependent nodes (SOPs,
-  SHOPs, procedurals etc.) By default, both are installed to the same
-  prefix:
+  SHOPs, procedurals etc.) Both are installed to the same prefix:
 
     <prefix>/include  - Shared openvdb_houdini headers
     <prefix>/lib      - Location of libopenvdb_houdini
     <prefix>/dso      - Location of all other .so
 
-  Where prefix is ${CMAKE_INSTALL_PREFIX}/houdini<version>. If you're
-  building the Houdini plug-ins independently of the Core OpenVDB library,
-  users may wish to set CMAKE_INSTALL_PREFIX to $HIH (provided by the
-  Houdini Environment).
+  By default, the prefix is set to the value returned by the Houdini
+  CMake configuration. This is the default installation path for all
+  Houdini plugins. You can disable this behaviour by setting the following
+  variable to OFF:
+    USE_DEFAULT_HOUDINI_INSTALL
 
-  If you wish to build and install the Houdini plug-in alongside the core
-  library, or simply wish to customize the install paths of the above,
-  the following variables can be set and provided to CMake:
+  CMake will instead read from CMAKE_INSTALL_PREFIX. If you're building
+  multiple components of the OpenVDB repository and wish to customize the
+  prefix, the following cached variable can be set:
+    OPENVDB_HOUDINI_INSTALL_PREFIX
 
-   OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR
-     - The prefix for the shared library and headers
-   OPENVDB_HOUDINI_INSTALL_BASE_DIR
-     - The prefix for all other dsos, icons, config files etcs.
+  This allows you to use CMAKE_INSTALL_PREFIX for the core library
+  location and a custom location for the Houdini plugin.
 
 #]=======================================================================]
 
@@ -62,10 +61,13 @@ IF ( POLICY CMP0074 )
   CMAKE_POLICY ( SET CMP0074 NEW )
 ENDIF ()
 
-# CMake options for installation paths (if not overriding OPENVDB_HOUDINI_INSTALL variables)
-OPTION ( OPENVDB_HOUDINI_SUBDIR "Install plugins to <prefix>/houdini/<version> instead of <prefix>/houdini<version>" OFF )
-OPTION ( OPENVDB_HOUDINI_SHORT_VERSION "User major.minor as <version> instead of major.minor.patch" ON )
-OPTION ( OPENVDB_HOUDINI_INSTALL_LIBRARY "Install headers and place the shared library in a lib directory." ON )
+OPTION ( USE_DEFAULT_HOUDINI_INSTALL [=[
+Use the default install location returned by the Houdini CMake function,
+houdini_get_default_install_dir():
+  Linux: $ENV{HOME}/houdiniX.X
+  Mac: $ENV{HOME}/Library/Preferences/houdini/X.X
+  Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
+If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON )
 
 # SESITAG CMake options
 OPTION ( OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG "Build the SESI Tag information on the first run of CMake only." ON )
@@ -76,6 +78,11 @@ tag information will not load correctly.]=] OFF )
 SET ( CUSTOM_SESI_TAG_INFO "CMake ${CMAKE_VERSION}"
   CACHE STRING "Custom data to feed to sesitag when compiling the Houdini DSOs." )
 
+MARK_AS_ADVANCED (
+  CUSTOM_SESI_TAG_INFO
+  OPENVDB_HOUDINI_DISABLE_SESI_TAG
+  )
+
 #########################################################################
 
 MESSAGE ( STATUS "----------------------------------------------------" )
@@ -84,31 +91,22 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 
 #########################################################################
 
-# Configure installation - most of the Houdini variables are set by the
-# root CMake search for the Houdini Installation
+# Configure prefix
 
-SET ( HOUDINI_FOLDER_VERSION "${Houdini_VERSION_MAJOR}.${Houdini_VERSION_MINOR}" )
-IF ( NOT OPENVDB_HOUDINI_SHORT_VERSION )
-  SET ( HOUDINI_FOLDER_VERSION "${HOUDINI_FOLDER_VERSION}.${Houdini_VERSION_PATCH}" )
+IF ( NOT OPENVDB_HOUDINI_INSTALL_PREFIX )
+  IF ( USE_DEFAULT_HOUDINI_INSTALL )
+    # Function from the Houdini CMake which is brought in by OpenVDBHoudiniSetup.cmake
+    houdini_get_default_install_dir( HOUDINI_INSTALL_LOCATION )
+  ELSE ()
+    SET ( HOUDINI_INSTALL_LOCATION ${CMAKE_INSTALL_PREFIX} )
+  ENDIF ()
 ENDIF ()
 
-IF ( OPENVDB_HOUDINI_SUBDIR )
-  SET ( HOUDINI_SUB_DIRECTORY "houdini/${HOUDINI_FOLDER_VERSION}" )
-ELSE ()
-  SET ( HOUDINI_SUB_DIRECTORY "houdini${HOUDINI_FOLDER_VERSION}" )
-ENDIF ()
-
-SET ( OPENVDB_HOUDINI_INSTALL_BASE_DIR
-  ${CMAKE_INSTALL_PREFIX}/${HOUDINI_SUB_DIRECTORY}
-  CACHE PATH "Base install path for OpenVDB Houdini nodes and icons."
-  )
-SET ( OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR
-  ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}
-  CACHE PATH "Base install path for OpenVDB Houdini shared libraries and headers."
+SET ( OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
+  CACHE PATH "Base install path for OpenVDB Houdini shared libraries, dsos and headers."
   )
 
-MESSAGE ( STATUS "Houdini base DSO install path: ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}" )
-MESSAGE ( STATUS "Houdini base lib install path: ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}" )
+MESSAGE ( STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}" )
 
 #########################################################################
 
@@ -361,11 +359,7 @@ FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
       LIST ( APPEND RPATHS ${OpenVDB_LIBRARY_DIRS} )
     ENDIF ()
 
-    IF ( OPENVDB_HOUDINI_INSTALL_LIBRARY )
-      LIST ( APPEND RPATHS ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}/lib )
-    ELSE ()
-      LIST ( APPEND RPATHS ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}/dso )
-    ENDIF ()
+    LIST ( APPEND RPATHS ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib )
 
     LIST ( REMOVE_DUPLICATES RPATHS )
     SET_TARGET_PROPERTIES ( ${DSO_NAME}
@@ -388,46 +382,35 @@ ENDIF ()
 # Installs
 ##########
 
-IF ( OPENVDB_HOUDINI_INSTALL_LIBRARY )
+INSTALL ( DIRECTORY
+  ${OPENVDB_HOUDINI_UTILS_DIR}
+  ${OPENVDB_HOUDINI_LOCAL_DIR}
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/include
+)
 
-  INSTALL ( DIRECTORY
-    ${OPENVDB_HOUDINI_UTILS_DIR}
-    ${OPENVDB_HOUDINI_LOCAL_DIR}
-    DESTINATION ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}/include
-    )
-
-  INSTALL ( TARGETS
-    openvdb_houdini
-    DESTINATION ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}/lib
-    )
-
-ELSE ()
-
-  INSTALL ( TARGETS
-    openvdb_houdini
-    DESTINATION ${OPENVDB_HOUDINI_INSTALL_LIB_BASE_DIR}/dso
-    )
-
-ENDIF ()
+INSTALL ( TARGETS
+  openvdb_houdini
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib
+)
 
 FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
   INSTALL ( TARGETS
     ${DSO_NAME}
-    DESTINATION ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}/dso
+    DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso
     )
 ENDFOREACH ()
 
 INSTALL ( TARGETS
   VRAY_OpenVDB_Points
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}/dso/mantra
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso/mantra
   )
 
 INSTALL ( FILES
   houdini/SOP_OpenVDB.svg
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}/config/Icons
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
   )
 
 INSTALL ( FILES
   houdini/DW_OpenVDBRasterizePoints.cmd
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_BASE_DIR}/scripts/sop
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
   )
