@@ -331,7 +331,7 @@ When enabled, you do not need to provide dependency locations for OpenEXR, IlmBa
 optionally provide your own version of Boost when building against Houdini 16.5 and gerater.]=] OFF )
 OPTION ( USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used.]=] ON )
+openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used.]=] OFF )
 OPTION ( USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
