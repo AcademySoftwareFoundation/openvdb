@@ -315,13 +315,6 @@ IF ( TBB_FOUND )
   ENDFOREACH ()
   LIST ( REMOVE_DUPLICATES Tbb_LIBRARY_DIRS )
 
-  # CMake sometimes struggles to follow TBB's imported target, as libtbb.so
-  # is usually just a file which defines "INPUT (libtbb.so.2)". As it's not
-  # a symlink, we need to include this directory manually incase it's not on
-  # the environment library path
-
-  LINK_DIRECTORIES ( ${Tbb_LIBRARY_DIRS} )
-
   # Configure imported targets
 
   FOREACH ( COMPONENT ${TBB_FIND_COMPONENTS} )
