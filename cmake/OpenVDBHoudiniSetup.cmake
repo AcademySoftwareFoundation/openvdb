@@ -245,8 +245,7 @@ ENDIF ()
 
 # Boost
 
-IF (( Houdini_VERSION_MAJOR LESS 16 ) OR
-  (( Houdini_VERSION_MAJOR EQUAL 16 ) AND ( Houdini_VERSION_MINOR LESS 5 )))
+IF ( Houdini_VERSION VERSION_LESS 16.5 )
   IF ( OPENVDB_BUILD_PYTHON_MODULE )
     # Prior to the introduction of HBoost (Houdini's namespaced and shipped Boost version from 16.5),
     # we built against Houdini's version of Boost which didn't include Boost.Python
@@ -265,8 +264,7 @@ ENDIF ()
 
 # OpenEXR and IlmBase
 
-IF (( Houdini_VERSION_MAJOR LESS 17 ) OR
-  (( Houdini_VERSION_MAJOR EQUAL 17 ) AND ( Houdini_VERSION_MINOR LESS 5 )))
+IF ( Houdini_VERSION VERSION_LESS 17.5 )
   # Prior to 17.5, we needed to use ilmbase and openexr shipped libs from Houdini
 
   # OpenEXR
@@ -296,10 +294,9 @@ UNSET ( _HOUDINI_LIB_DIR )
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-IF ( ( Houdini_VERSION_MAJOR LESS 16 ) OR
-     ( Houdini_VERSION_MAJOR EQUAL 16 ) AND ( Houdini_VERSION_MINOR LESS 5 ) )
+IF ( Houdini_VERSION VERSION_LESS 16.5 )
   SET ( OPENVDB_HOUDINI_ABI 3 )
-ELSEIF (Houdini_VERSION_MAJOR LESS 17)
+ELSEIF ( Houdini_VERSION VERSION_LESS 17 )
   SET ( OPENVDB_HOUDINI_ABI 4 )
 ELSE ()
   SET ( OPENVDB_HOUDINI_ABI 5 )
