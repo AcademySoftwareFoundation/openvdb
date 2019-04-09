@@ -349,6 +349,29 @@ OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
 OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
 
+# Alias deprecated vars
+
+IF ( OPENVDB_BUILD_HOUDINI_SOPS )
+  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
+  MESSAGE ( DEPRECATION "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
+    "Use OPENVDB_BUILD_HOUDINI_PLUGIN." )
+  SET ( OPENVDB_BUILD_HOUDINI_PLUGIN ON )
+ENDIF ()
+
+IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
+  MESSAGE ( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated and will be removed. Use "
+    "-D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version." )
+  IF ( OPENVDB_ABI_VERSION_NUMBER )
+    IF ( NOT ( ${OPENVDB_ABI_VERSION_NUMBER} EQUAL 3 ) )
+      MESSAGE ( WARNING "OPENVDB_ABI_VERSION_NUMBER holds a different ABI value to "
+        "OPENVDB_ENABLE_3_ABI_COMPATIBLE, which will be ignored." )
+    ENDIF ()
+  ELSE ()
+    # Don't bother setting the docstring as we'll update it later
+    SET ( OPENVDB_ABI_VERSION_NUMBER "3" CACHE STRING "" FORCE )
+  ENDIF ()
+ENDIF ()
+
 # Various minimum version requirements
 
 SET ( MINIMUM_BOOST_VERSION 1.55 )
@@ -490,13 +513,6 @@ ENDIF ()
 
 # Configure Houdini installation if necessary
 
-IF ( OPENVDB_BUILD_HOUDINI_SOPS )
-  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
-  MESSAGE ( WARNING "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
-    "Use OPENVDB_BUILD_HOUDINI_PLUGIN." )
-  SET ( OPENVDB_BUILD_HOUDINI_PLUGIN ON )
-ENDIF ()
-
 IF ( OPENVDB_BUILD_HOUDINI_PLUGIN )
   SET ( USE_HOUDINI ON )
 ENDIF ()
@@ -518,13 +534,10 @@ ENDIF ()
 
 #########################################################################
 
-# Configure OpenVDB
-
-# Determine OpenVDB lib and abi versions by calling FIND_PACKAGE with OpenVDB
-# If we're building the core library, the find package call is set to quiet to
-# ignore the missing libs
+# Configure OpenVDB Library and ABI versions
 
 IF ( NOT OPENVDB_BUILD_CORE )
+  # Find VDB installation and determine lib/abi versions
   FIND_PACKAGE ( OpenVDB REQUIRED )
   # Check ABI version was found and explicitly error if attempting to build against
   # an incompatible Houdini version
@@ -536,26 +549,27 @@ IF ( NOT OPENVDB_BUILD_CORE )
     ENDIF ()
   ENDIF ()
 ELSE ()
+  # Only use find package to determine the VDB version in this directory
   SET ( OPENVDB_ROOT ${CMAKE_CURRENT_SOURCE_DIR} )
   FIND_PACKAGE ( OpenVDB QUIET )
   MESSAGE ( STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 ENDIF ()
 
-# Determine the OpenVDB ABI Version. If OPENVDB_ABI_VERSION_NUMBER is defined, use that value,
-# otherwise check the legacy OPENVDB_ENABLE_3_ABI_COMPATIBLE option, falling back to the major
-# library version number
+# Validate the OpenVDB ABI Version. If OpenVDB_ABI is not set, we're either building
+# the core library OR the ABI hasn't been deduced from a VDB installation. Use the
+# value from OPENVDB_ABI_VERSION_NUMBER, falling back to the lib major version number
 
 IF ( NOT OpenVDB_ABI )
   IF ( OPENVDB_ABI_VERSION_NUMBER )
     SET ( OpenVDB_ABI ${OPENVDB_ABI_VERSION_NUMBER} )
-  ELSEIF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
-    MESSAGE ( DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated. Instead use "
-      "-D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version." )
-    SET ( OpenVDB_ABI 3 )
   ELSE ()
     SET ( OpenVDB_ABI ${OpenVDB_MAJOR_VERSION} )
   ENDIF ()
 ENDIF ()
+
+# From the deduced ABI, check against the required ABI for Houdini (if set).
+# Forcefully set the ABI to the required value if necessary - do this after to
+# explicitly warn the user if their chosen value is different.
 
 IF ( OPENVDB_HOUDINI_ABI AND ( NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}" ) )
   MESSAGE ( WARNING "CMake will explicitly set the value of OPENVDB_ABI_VERSION_NUMBER to "
@@ -568,6 +582,9 @@ IF ( ${OpenVDB_ABI} LESS ${MINIMUM_OPENVDB_ABI_VERSION} )
     "deprecated and will soon be removed." )
 ENDIF ()
 
+# The ABI is a global target definition, applicable to all components, so just add it
+# via ADD_DEFINITIONS
+
 IF ( OpenVDB_ABI EQUAL 3 )
   ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
 ENDIF ()
@@ -579,7 +596,7 @@ MESSAGE ( STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
 SET ( OPENVDB_ABI_VERSION_NUMBER ${OpenVDB_ABI} CACHE STRING [=[
 Build for compatibility with version N of the OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features
 will be disabled). If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the installed vdb_print binary to
-determine the ABI number. You may set this to force a given ABI number.]=] )
+determine the ABI number. You may set this to force a given ABI number.]=] FORCE )
 
 ##########################################################################
 
