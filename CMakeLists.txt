@@ -326,8 +326,8 @@ determine the ABI number. You may set this to force a given ABI number.]=] )
 # @todo non-required behavior for blosc, log4cplus (i.e. use if available)
 OPTION ( USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB and Blosc. Boost must be provided if
-Houdini Version >= 16.5. OpenEXR/IlmBase must be provided if Houdini Version >= 17.5.]=] OFF )
+When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
+provided if Houdini Version >= 16.5. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF )
 OPTION ( USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
