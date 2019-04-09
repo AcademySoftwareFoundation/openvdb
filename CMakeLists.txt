@@ -28,264 +28,38 @@
 
   CMake Configuration for OpenVDB
 
-  This file provides most available options for configuring the build and
-  installation of all OpenVDB components. By default the core library,
-  python module and unit tests are built.
-
   The OpenVDB CMake build system generates targets depending on the
   enabled components. It is designed for out of source CMake generation
-  (a build location for CMake to write to will be required). Depending on
-  the components you choose to build, a number of optional and required
-  dependencies are expected. Below is a full list of all dependencies,
-  followed up by each OpenVDB components requirements.
+  (a build location for CMake to write to will be required). For example,
+  from the root of the repository:
 
-  ########################################################################
+    mkdir .build
+    cd .build
+    cmake ../
 
-  Dependencies:
+  Depending on the components you choose to build, a number of optional
+  and required dependencies are expected. See the dependency documentation
+  for more information:
 
-    - CMake: >= 3.3
-      - Cross-platform family of tools designed to build, test and package
-        software.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install cmake
-        - Homebrew:
-          - brew install cmake
-        - From Source:
-          - https://cmake.org/
+    https://www.openvdb.org/documentation/doxygen/dependencies.html
 
-    -  IlmBase
-      - Used for the definition of half (half precision floating points)
-        and for additional EXR serialization support. Usually available by
-        default in most UNIX distributions.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install libilmbase-dev
-        - Homebrew:
-          - brew install ilmbase
-        - From Source:
-          - http://www.openexr.com
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export ILMBASE_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D ILMBASE_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D ILMBASE_INCLUDEDIR=<Include path>
-            -D ILMBASE_LIBRARYDIR=<Lib path>
+  And the documentation on building OpenVDB and more in depth installation
+  instructions:
 
-    - OpenEXR
-      - Used for OpenEXR image serialization support. Usually available by
-        default in most UNIX distributions.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install libopenexr-dev
-        - Homebrew:
-          - brew install openexr
-        - From Source:
-          - http://www.openexr.com
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export OPENEXR_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D OPENEXR_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D OPENEXR_INCLUDEDIR=<Include path>
-            -D OPENEXR_LIBRARYDIR=<Lib path>
+    https://www.openvdb.org/documentation/doxygen/build.html
 
-    - Threading Building Blocks (TBB)
-      - A portable C++ template library for task parallelism.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install libtbb-dev
-        - Homebrew:
-          - brew install tbb
-        - From Source:
-          -  https://www.threadingbuildingblocks.org/
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export TBB_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D TBB_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D TBB_INCLUDEDIR=<Include path>
-            -D TBB_LIBRARYDIR=<Lib path>
-
-    - ZLib
-      - Compression library for disk serialization compression. Usually
-        available by default in most UNIX distributions.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install zlibc
-        - Homebrew:
-          - brew install zlib
-        - From Source:
-          - https://www.zlib.net/
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export ZLIB_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D ZLIB_ROOT=<Installation Root Directory>
-
-    - Boost Components: >= 1.55
-      - Various boost components are required for some OpenVDB components
-        - Boost.System
-        - Boost.IOStreams
-        - Boost.Python
-        - Boost.Thread
-      - Installation
-        - UNIX apt-get:
-          - apt-get install libboost-system-dev
-          - apt-get install libboost-iostreams-dev
-          - apt-get install libboost-python-dev
-          - apt-get install libboost-thread-dev
-        - Homebrew:
-          - brew install boost
-          - brew install boost-python
-        - From Source:
-          - https://www.boost.org/
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export BOOST_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D BOOST_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D BOOST_INCLUDEDIR=<Include path>
-            -D BOOST_LIBRARYDIR=<Lib path>
-
-    - Python
-      - The python interpreter and libraries for C++/python bindings.
-        Usually available by default in most UNIX distributions.
-      - Installation
-        - UNIX apt-get:
-          - apt-get install python-dev
-          - apt-get install python-numpy
-          - apt-get install python-epydoc
-        - Homebrew:
-          - brew install python
-
-    - CppUnit
-      - A unit testing framework module for C++.
-      - Installation
-        - Homebrew:
-          - brew install cppunit
-        - From Source:
-          - https://anongit.freedesktop.org/git/libreoffice/cppunit.git
-      - Usage
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export CPPUNIT_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D CPPUNIT_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D CPPUNIT_INCLUDEDIR=<Include path>
-            -D CPPUNIT_LIBRARYDIR=<Lib path>
-
-    - Blosc: >= 1.5
-      - An optional but recommended dependency for improved disk
-        compression.
-      - Installation
-        - Homebrew:
-          - brew install blosc
-        - From Source:
-          - https://github.com/Blosc/c-blosc/releases.
-      - Usage
-        Make sure that you set USE_BLOSC=ON
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export BLOSC_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D BLOSC_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D BLOSC_INCLUDEDIR=<Include path>
-            -D BLOSC_LIBRARYDIR=<Lib path>
-
-    - Log4cplus
-      - An optional dependency for improved OpenVDB Logging
-      - Installation
-        - UNIX apt-get:
-          - apt-get install liblog4cplus-dev
-        - From Source:
-          - https://github.com/log4cplus/log4cplus
-      - Usage
-        Make sure that you set USE_LOG4CPLUS=ON
-        If CMake cannot find your installation location automatically:
-        - Provide Root from environment:
-            export LOG4CPLUS_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D LOG4CPLUS_ROOT=<Installation Root Directory>
-        - Provide Locations to CMake:
-            -D LOG4CPLUS_INCLUDEDIR=<Include path>
-            -D LOG4CPLUS_LIBRARYDIR=<Lib path>
-
-    - GLFW: >= 3
-      - Simple API for OpenGL development
-      - Installation
-        - UNIX apt-get:
-          - apt-get install libglfw3-dev
-        - Homebrew:
-          - brew install glfw
-        - From Source:
-          - https://www.glfw.org/
-      - Usage
-        - Provide Root from environment:
-            export GLFW3_ROOT=<Installation Root Directory>
-        - Provide Root to CMake:
-            -D GLFW3_ROOT=<Installation Root Directory>
-        - OpenVDB uses GLFW's CMake installation to find and configure
-          the GLFW dependency. You should add GLFW's cmake location to
-          CMAKE_PREFIX_PATH where possible, instead of the above:
-            -D CMAKE_PREFIX_PATH=<GLFW CMake location>
-
-    - Doxygen: >= 1.8.8
-      - Documentation generation from C++
-      - Installation
-        - UNIX apt-get:
-          - apt-get install doxygen
-        - Homebrew:
-          - brew install doxygen
-        - From Source:
-          - http://www.doxygen.nl/
+  This CMakeLists file provides most available options for configuring the
+  build and installation of all OpenVDB components. By default the core
+  library, binaries, python module and unit tests are enabled.
 
   Note that various packages have inbuilt CMake module support. See the
   CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
   controls:
-  https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html
 
-  ########################################################################
+    https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html
 
-  OpenVDB Components and their dependencies:
-
-    OpenVDB Core
-      Main CMake: openvdb/CMakeLists.txt
-      Required: IlmBase::Half, TBB::tbb, ZLIB, Boost::system,
-        Boost::iostream
-      Optional: Blosc, Log4cplus, OpenEXR
-
-    OpenVDB Binaries
-      Main CMake: openvdb/cmd/CMakeLists.txt
-      Required: (OpenVDB Core + Dependencies), GLFW3 (vdb_view),
-        OpenGL (vdb_view), Boost::Thread (vdb_view), OpenEXR (vdb_render)
-        IlmBase (vdb_render)
-
-    OpenVDB Python
-      Main CMake: openvdb/python/CMakeLists.txt
-      Required: (OpenVDB Core + Dependencies), Python, Boost::python
-      Optional: Numpy
-
-    OpenVDB Unit Tests
-      Main CMake: openvdb/unittest/CMakeLists.txt
-      Required: (OpenVDB Core + Dependencies), CppUnit
-
-  ########################################################################
-
-  The CMake supports building the various components of OpenVDB against
-  a prior installation of OpenVDB.
+  OpenVDB's CMake supports building the various components of against a
+  prior installation of OpenVDB.
 
 #]=======================================================================]
 
