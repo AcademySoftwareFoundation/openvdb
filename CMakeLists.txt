@@ -377,7 +377,9 @@ ENDIF ()
 SET ( MINIMUM_BOOST_VERSION 1.55 )
 SET ( MINIMUM_BLOSC_VERSION 1.5 )
 SET ( MINIMUM_GLFW_VERSION 3 )
+# These promote warnings rather than errors
 SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
+SET ( MINIMUM_DOXYGEN_VERSION 1.8.8 )
 
 #########################################################################
 
@@ -442,7 +444,48 @@ IF ( OPENVDB_INSTALL_CMAKE_MODULES )
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
   )
-  INSTALL ( FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/OpenVDB )
+  INSTALL ( FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB )
+ENDIF ()
+
+# Add the doxygen command if required - do this here so we guarantee not to error on
+# unrelated build issues
+
+IF ( OPENVDB_BUILD_DOCS )
+  FIND_PACKAGE ( Doxygen REQUIRED )
+  IF ( DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION )
+    MESSAGE ( WARNING "The doxygen-config doxyfile has been generated with version "
+      "\"${MINIMUM_DOXYGEN_VERSION}\". Found Doxygen version \"${DOXYGEN_VERSION}\". "
+      "Documentation may contain errors."
+      )
+  ENDIF ()
+
+  # @todo use cmake doxygen functions available from cmake 3.9
+  FILE ( READ ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/doxygen-config DOXYGEN_CONFIG_CONTENT )
+  FILE ( WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT} )
+  FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
+    "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
+    )
+
+  ADD_CUSTOM_TARGET ( doc ALL
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/openvdb
+    COMMENT "Generating API documentation with Doxygen" VERBATIM
+    )
+
+  INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION docs )
+ENDIF ()
+
+# Early exit if there's nothing to build
+
+IF ( NOT (
+    OPENVDB_BUILD_CORE OR
+    OPENVDB_BUILD_BINARIES OR
+    OPENVDB_BUILD_PYTHON_MODULE OR
+    OPENVDB_BUILD_UNITTESTS OR
+    OPENVDB_BUILD_HOUDINI_PLUGIN OR
+    OPENVDB_BUILD_MAYA_PLUGIN )
+  )
+  RETURN ()
 ENDIF ()
 
 #########################################################################
@@ -622,21 +665,4 @@ ENDIF ()
 
 IF ( OPENVDB_BUILD_MAYA_PLUGIN )
   ADD_SUBDIRECTORY ( openvdb_maya )
-ENDIF ()
-
-IF ( OPENVDB_BUILD_DOCS )
-  FIND_PACKAGE ( Doxygen REQUIRED )
-
-  FILE ( READ ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/doxygen-config DOXYGEN_CONFIG_CONTENT )
-  FILE ( WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT} )
-  FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config "OUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n" )
-
-  ADD_CUSTOM_TARGET ( doc
-    ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    COMMENT "Generating API documentation with Doxygen" VERBATIM
-    )
-
-  INSTALL ( CODE "EXECUTE_PROCESS(COMMAND \"${CMAKE_COMMAND}\" --build  \"${PROJECT_BINARY_DIR}\" --target doc)")
-  INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION docs)
 ENDIF ()
