@@ -140,8 +140,14 @@ IF ( HOUDINI_CMAKE_LOCATION )
 ENDIF ()
 
 FIND_PACKAGE ( Houdini REQUIRED )
+
+# Note that passing MINIMUM_HOUDINI_VERSION into FIND_PACKAGE ( Houdini ) doesn't work
 IF ( NOT Houdini_FOUND )
   MESSAGE ( FATAL_ERROR "Unable to locate Houdini Installation." )
+ELSEIF ( Houdini_VERSION VERSION_LESS MINIMUM_HOUDINI_VERSION )
+  MESSAGE ( FATAL_ERROR "Unsupported Houdini Version ${Houdini_VERSION}. Minimum "
+    "supported is ${MINIMUM_HOUDINI_VERSION}."
+    )
 ENDIF ()
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
@@ -149,6 +155,28 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Houdini
   REQUIRED_VARS _houdini_install_root Houdini_FOUND
   VERSION_VAR Houdini_VERSION
   )
+
+# ------------------------------------------------------------------------
+#  Add support for older versions of Houdini
+# ------------------------------------------------------------------------
+
+IF ( Houdini_VERSION VERSION_LESS 17 )
+  # Missing function in Houdini 16.5 CMake copied from 17.5 - _houdini variables
+  # are set by the Houdini configuration package
+  function ( houdini_get_default_install_dir output_var )
+    set( _instdir "" )
+    if ( _houdini_platform_linux )
+        set( _instdir $ENV{HOME}/houdini${_houdini_release_version} )
+    elseif ( _houdini_platform_osx )
+        set( _instdir $ENV{HOME}/Library/Preferences/houdini/${_houdini_release_version} )
+    elseif ( _houdini_platform_win )
+        set( _instdir $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\Documents\\houdini${_houdini_release_version} )
+    else ()
+        message( FATAL_ERROR "Invalid platform" )
+    endif ()
+    set( ${output_var} ${_instdir} PARENT_SCOPE )
+  endfunction ()
+ENDIF ()
 
 # ------------------------------------------------------------------------
 #  Configure imported Houdini target
