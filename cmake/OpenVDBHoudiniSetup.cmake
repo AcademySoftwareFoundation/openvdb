@@ -311,6 +311,15 @@ ENDIF ()
 UNSET ( _HOUDINI_INCLUDE_DIR )
 UNSET ( _HOUDINI_LIB_DIR )
 
+# Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
+# Add the required suffix as part of the cmake lib suffix searches
+
+IF ( APPLE )
+  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib" )
+ELSEIF ( UNIX )
+  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.so" )
+ENDIF ()
+
 # ------------------------------------------------------------------------
 #  Configure OpenVDB ABI
 # ------------------------------------------------------------------------
