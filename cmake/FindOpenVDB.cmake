@@ -408,10 +408,11 @@ IF ( UNIX )
   FIND_PACKAGE ( Threads REQUIRED )
 ENDIF ()
 
-# Set core deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the normal
-# namespaced headers are used over the Houdini 17.5 ones (which will be imported
-# through targets like tbb which are still deployed with Houdini)
+# Set deps. Note that the order here is important. If we're building against
+# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
+# users chosen namespaced headers are correctly prioritized. Otherwise other
+# include paths from shared installs (including houdini) may pull in the wrong
+# headers
 
 SET ( _OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams

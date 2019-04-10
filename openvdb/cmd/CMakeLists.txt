@@ -147,11 +147,18 @@ IF ( OPENVDB_BUILD_VDB_RENDER )
 
   SET ( VDB_RENDER_SOURCE_FILES openvdb_render.cc )
   ADD_EXECUTABLE ( vdb_render ${VDB_RENDER_SOURCE_FILES} )
+
+  # Set deps. Note that the order here is important. If we're building against
+  # Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
+  # users chosen namespaced headers are correctly prioritized. Otherwise other
+  # include paths from shared installs (including houdini) may pull in the wrong
+  # headers
+
   TARGET_LINK_LIBRARIES ( vdb_render
-    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
     )
 
   IF ( OPENVDB_ENABLE_RPATH )
