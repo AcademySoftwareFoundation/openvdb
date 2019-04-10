@@ -313,7 +313,6 @@ IF ( IlmBase_FOUND )
   # Configure imported targets
 
   FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
-    message (STATUS ${IlmBase_${COMPONENT}_LIBRARY})
     IF ( NOT TARGET IlmBase::${COMPONENT} )
       ADD_LIBRARY ( IlmBase::${COMPONENT} UNKNOWN IMPORTED )
       SET_TARGET_PROPERTIES ( IlmBase::${COMPONENT} PROPERTIES
