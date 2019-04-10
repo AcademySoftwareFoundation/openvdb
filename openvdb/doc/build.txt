@@ -2,7 +2,7 @@
 
 @page build Building OpenVDB
 
-@section Contents
+@section buildContents Contents
 - @ref buildIntroduction
 - @ref buildCmakeStructure
   - @ref buildDependencies
