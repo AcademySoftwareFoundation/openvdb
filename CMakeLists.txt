@@ -76,6 +76,7 @@ INCLUDE ( CMakeDependentOption )
 
 # @todo SSE/AVX instruction options
 # @todo static/shared library options
+# @todo epydoc and pdflatex
 OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
 OPTION ( OPENVDB_BUILD_BINARIES "Build the vdb binaries" ON )
 OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
@@ -148,10 +149,13 @@ ENDIF ()
 
 # Various minimum version requirements
 
-SET ( MINIMUM_BOOST_VERSION 1.55 )
 SET ( MINIMUM_BLOSC_VERSION 1.5 )
-SET ( MINIMUM_GLFW_VERSION 3 )
+SET ( MINIMUM_BOOST_VERSION 1.53 )
+SET ( MINIMUM_CPPUNIT_VERSION 1.10 )
+SET ( MINIMUM_GLFW_VERSION 3.0 )
 SET ( MINIMUM_HOUDINI_VERSION 16.5 )
+SET ( MINIMUM_LOG4CPLUS_VERSION 1.1.2 )
+SET ( MINIMUM_TBB_VERSION 3.0 )
 # These promote warnings rather than errors
 SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
 SET ( MINIMUM_DOXYGEN_VERSION 1.8.8 )
