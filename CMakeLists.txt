@@ -103,6 +103,9 @@ OPTION ( USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
 provided if Houdini Version >= 16.5. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF )
+OPTION ( USE_MAYA [=[
+Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
+When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF )
 OPTION ( USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
@@ -157,6 +160,7 @@ SET ( MINIMUM_HOUDINI_VERSION 16.5 )
 SET ( MINIMUM_LOG4CPLUS_VERSION 1.1.2 )
 SET ( MINIMUM_TBB_VERSION 3.0 )
 # These promote warnings rather than errors
+SET ( MINIMUM_MAYA_VERSION 2017 )
 SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
 SET ( MINIMUM_DOXYGEN_VERSION 1.8.8 )
 
@@ -192,6 +196,7 @@ MARK_AS_ADVANCED (
   OPENVDB_ENABLE_3_ABI_COMPATIBLE
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
+  USE_MAYA
   USE_LOG4CPLUS
   USE_SYSTEM_LIBRARY_PATHS
   OPENVDB_BUILD_HOUDINI_SOPS
@@ -216,12 +221,12 @@ IF ( OPENVDB_INSTALL_CMAKE_MODULES )
     #cmake/FindGLEW.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
-    cmake/FindMaya.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
+    cmake/OpenVDBMayaSetup.cmake
   )
   INSTALL ( FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB )
 ENDIF ()
@@ -333,25 +338,34 @@ ENDIF ()
 
 ##########################################################################
 
-# Configure Houdini installation if necessary
+# Configure DCC installation if necessary
 
 IF ( OPENVDB_BUILD_HOUDINI_PLUGIN )
   SET ( USE_HOUDINI ON )
 ENDIF ()
 
-IF ( APPLE )
-  IF ( USE_HOUDINI AND OPENVDB_BUILD_MAYA_PLUGIN )
-    MESSAGE ( FATAL_ERROR "On macOS, Houdini is linked with libc++ whereas Maya is linked with libstdc++. "
-      "The different runtimes are not mutually compatible, so build the Houdini and Maya plugins separately "
-      "with the requisite DCC's compiler." )
-  ENDIF ()
+IF ( OPENVDB_BUILD_MAYA_PLUGIN )
+  SET ( USE_MAYA ON )
 ENDIF ()
 
-# If we're building against a Houdini Install, load OpenVDBHoudiniSetup which
-# configures all dependency locations and Houdini libraries for OpenVDB
+IF ( USE_MAYA AND USE_HOUDINI )
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  MESSAGE ( FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met."
+    )
+ENDIF ()
+
+# Configure component dependencies by loading the Houdini/Maya setup
+# scripts. These also find the Houdini/Maya installations
 
 IF ( USE_HOUDINI )
   INCLUDE ( OpenVDBHoudiniSetup )
+ENDIF ()
+
+IF ( USE_MAYA )
+  INCLUDE ( OpenVDBMayaSetup )
 ENDIF ()
 
 #########################################################################
