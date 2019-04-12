@@ -71,11 +71,6 @@
 #include <vector>
 
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -97,12 +92,7 @@ public:
     // The VDB port holds read-only VDBs.
     int isRefInput(unsigned input) const override { return (input == 1); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 };
 
 
@@ -155,9 +145,7 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Points")
         .addInput("VDBs")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Sample_Points::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -445,17 +433,9 @@ private:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Sample_Points::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // this does a shallow copy of the VDB-grids and a deep copy of native Houdini primitives
-        // (the points we modify in this case)
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         GU_Detail* aGdp = gdp; // where the points live

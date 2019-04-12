@@ -56,11 +56,6 @@
 #include <boost/algorithm/string/join.hpp>
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -81,12 +76,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -179,10 +169,8 @@ newSopOperator(OP_OperatorTable* table)
 #endif
         .setObsoleteParms(obsoleteParms)
         .addInput("VDB grids to process")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Rebuild_Level_Set::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -279,18 +267,10 @@ SOP_OpenVDB_Rebuild_Level_Set::updateParmsFlags()
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Rebuild_Level_Set)::cookVDBSop(
+SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
     OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // This does a deep copy of native Houdini primitives
-        // but only a shallow copy of VDB grids.
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Get the group of grids to process.

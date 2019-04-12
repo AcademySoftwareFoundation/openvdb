@@ -48,11 +48,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -145,17 +140,13 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
         OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
         bool processGrids(MorphingParms&, hvdb::Interrupter&);
-#if VDB_COMPILABLE_SOP
     };
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -359,10 +350,8 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Source SDF VDBs to Morph")
         .addInput("Target SDF VDB")
         .addOptionalInput("Optional VDB Alpha Mask")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Morph_Level_Set::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -447,15 +436,9 @@ SOP_OpenVDB_Morph_Level_Set::SOP_OpenVDB_Morph_Level_Set(OP_Network* net,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Morph_Level_Set::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-        duplicateSource(0, context);
-#endif
-
         // Evaluate UI parameters
         MorphingParms parms;
         if (evalMorphingParms(context, parms) >= UT_ERROR_ABORT) return error();
@@ -479,7 +462,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::cookVDBSop(O
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphingParms(
+SOP_OpenVDB_Morph_Level_Set::Cache::evalMorphingParms(
     OP_Context& context, MorphingParms& parms)
 {
     const fpreal now = context.getTime();
@@ -575,7 +558,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
 
 
 bool
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::processGrids(
+SOP_OpenVDB_Morph_Level_Set::Cache::processGrids(
     MorphingParms& parms, hvdb::Interrupter& boss)
 {
     MorphOp op(parms, boss);

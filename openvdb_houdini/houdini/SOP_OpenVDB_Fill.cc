@@ -49,11 +49,6 @@
 template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hutil = houdini_utils;
@@ -81,12 +76,7 @@ public:
         throw std::runtime_error{"unrecognized mode \"" + modeStr + "\""};
     }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -170,9 +160,7 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fill::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -360,16 +348,9 @@ struct FillOp
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fill)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Fill::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal t = context.getTime();
 
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", t));

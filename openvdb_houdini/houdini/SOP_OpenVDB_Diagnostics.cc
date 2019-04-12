@@ -67,11 +67,6 @@
   template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -1387,17 +1382,11 @@ public:
     int selectOperationTests();
     int validateOperationTests();
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
         OP_ERROR cookVDBSop(OP_Context&) override;
         TestData getTestData(const fpreal time) const;
     };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-    TestData getTestData(const fpreal time) const;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -1842,9 +1831,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
         .addInput("VDB Volumes")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1937,7 +1924,7 @@ SOP_OpenVDB_Diagnostics::updateParmsFlags()
 
 
 TestData
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::getTestData(const fpreal time) const
+SOP_OpenVDB_Diagnostics::Cache::getTestData(const fpreal time) const
 {
     TestData test;
 
@@ -1997,14 +1984,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::getTestData(cons
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Diagnostics::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Performing diagnostics");

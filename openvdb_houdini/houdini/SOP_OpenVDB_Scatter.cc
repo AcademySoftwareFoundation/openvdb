@@ -66,11 +66,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -88,12 +83,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -247,9 +237,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs on which points will be scattered")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -768,7 +756,7 @@ cullVDBPoints(openvdb::points::PointDataTree& tree,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
 {
     try {
         hvdb::Interrupter boss("Scattering points on VDBs");
@@ -776,26 +764,12 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Scatter)::cookVDBSop(OP_Contex
         const fpreal time = context.getTime();
         const bool keepGrids = (0 != evalInt("keep", 0, time));
 
-#if VDB_COMPILABLE_SOP
         const auto* vdbgeo = inputGeo(0);
         if (keepGrids && vdbgeo) {
             gdp->replaceWith(*vdbgeo);
         } else {
             gdp->stashAll();
         }
-#else
-        hutil::ScopedInputLock lock(*this, context);
-
-        const GU_Detail* vdbgeo = nullptr;
-        if (keepGrids) {
-            lock.markInputUnlocked(0);
-            duplicateSourceStealable(0, context);
-            vdbgeo = gdp;
-        } else {
-            vdbgeo = inputGeo(0);
-            gdp->clearAndDestroy();
-        }
-#endif
 
         const int seed = static_cast<int>(evalInt("seed", 0, time));
         const auto theSpread = static_cast<float>(evalFloat("spread", 0, time));

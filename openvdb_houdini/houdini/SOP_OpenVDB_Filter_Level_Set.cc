@@ -66,11 +66,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 #undef DWA_DEBUG_MODE
@@ -340,11 +335,7 @@ struct FilterParms
     bool        mInvertMask           = false;
     Accuracy    mAccuracy             = ACCURACY_UPWIND_FIRST;
     TrimMode    mTrimMode             = TrimMode::kAll;
-#if VDB_COMPILABLE_SOP
     bool        mMaskInputNode        = false;
-#else
-    OP_Node*    mMaskInputNode        = nullptr;
-#endif
 };
 
 } // namespace
@@ -371,13 +362,12 @@ protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 
-#if VDB_COMPILABLE_SOP
 public:
     class Cache: public SOP_VDBCacheOptions
     {
     public:
         Cache(OperatorType op): mOpType{op} {}
-#endif
+
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
@@ -426,11 +416,9 @@ public:
         template<typename FilterT>
         void track(const FilterParms&, FilterT&, BossT&, bool verbose);
 
-#if VDB_COMPILABLE_SOP
     private:
         const OperatorType mOpType;
     };
-#endif
 
 private:
     const OperatorType mOpType;
@@ -590,9 +578,7 @@ newSopOperator(OP_OperatorTable* table)
         obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "").setDefault(PRMzeroDefaults));
         obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "").setDefault(PRMoneDefaults));
 
-#if VDB_COMPILABLE_SOP
         auto cacheAllocator = [op]() { return new SOP_OpenVDB_Filter_Level_Set::Cache{op}; };
-#endif
 
         // Register operator
         if (OP_TYPE_RENORM == op) {
@@ -604,9 +590,7 @@ newSopOperator(OP_OperatorTable* table)
 #endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDB grids to process")
-#if VDB_COMPILABLE_SOP
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
-#endif
                 .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -646,9 +630,7 @@ and usage examples.\n");
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
                 .addOptionalInput("Optional VDB Alpha Mask")
-#if VDB_COMPILABLE_SOP
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
-#endif
                 .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -681,9 +663,7 @@ and usage examples.\n");
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
                 .addOptionalInput("Optional VDB Alpha Mask")
-#if VDB_COMPILABLE_SOP
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
-#endif
                 .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -717,9 +697,7 @@ and usage examples.\n");
                 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
-#if VDB_COMPILABLE_SOP
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
-#endif
                 .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -859,7 +837,7 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 // Cook
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::cookVDBSop(
+SOP_OpenVDB_Filter_Level_Set::Cache::cookVDBSop(
     OP_Context& context)
 {
     try {
@@ -874,49 +852,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::cookVDBSop(
 #endif
 
         // Collect filter parameters starting from the topmost node.
-#if VDB_COMPILABLE_SOP
         std::vector<FilterParms> filterParms;
         filterParms.resize(1);
         evalFilterParms(context, filterParms[0]);
-#else
-        OP_AutoLockInputs lock;
-
-        if (verbose) std::cout << "--- " << this->getName() << " ---\n";
-
-        std::vector<FilterParms> filterParms;
-        SOP_OpenVDB_Filter_Level_Set* startNode = this;
-        {
-            // Find adjacent, upstream nodes of the same type as this node.
-            std::vector<SOP_OpenVDB_Filter_Level_Set*> nodes =
-                hutil::getNodeChain(context, this);
-
-            startNode = nodes[0];
-
-            // Collect filter parameters starting from the topmost node.
-            filterParms.resize(nodes.size());
-            for (size_t n = 0, N = filterParms.size(); n < N; ++n) {
-                if (nodes[n]->evalFilterParms(context, filterParms[n]) >= UT_ERROR_ABORT) {
-                    addInputError(0);
-                    return error();
-                }
-            }
-        }
-
-        lock.setNode(startNode);
-        if (lock.lock(context) >= UT_ERROR_ABORT) {
-            addInputError(0);
-            return error();
-        }
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-        lock.markInputUnlocked(0);
-#endif
-        if (startNode->duplicateSourceStealable(
-            0, context, &gdp, myGdpHandle, /*clean=*/true) >= UT_ERROR_ABORT)
-        {
-            return error();
-        }
-#endif // VDB_COMPILABLE_SOP
 
         // Filter grids
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
@@ -970,14 +908,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::cookVDBSop(
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::evalFilterParms(
+SOP_OpenVDB_Filter_Level_Set::Cache::evalFilterParms(
     OP_Context& context, FilterParms& parms)
 {
-#if !VDB_COMPILABLE_SOP
-    hutil::OP_EvalScope evalScope(*this, context);
-    clearErrors(context);
-#endif
-
     fpreal now = context.getTime();
 
     parms.mIterations   = static_cast<int>(evalInt("iterations", 0, now));
@@ -1016,11 +949,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::evalFilterP
 
     if (OP_TYPE_SMOOTH == mOpType || OP_TYPE_RESHAPE == mOpType) {
         if (evalInt("mask", 0, now)) {
-#if VDB_COMPILABLE_SOP
             parms.mMaskInputNode = hasInput(1);
-#else
-            parms.mMaskInputNode = getInput(1, /*mark_used*/true);
-#endif
             parms.mMaskName = evalStdString("maskname", now);
         }
     }
@@ -1035,7 +964,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::evalFilterP
 
 template<typename GridT>
 bool
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::applyFilters(
+SOP_OpenVDB_Filter_Level_Set::Cache::applyFilters(
     GU_PrimVDB* vdbPrim,
     std::vector<FilterParms>& filterParms,
     BossT& boss,
@@ -1081,8 +1010,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::applyFilter
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::filterGrid(
-    OP_Context& context,
+SOP_OpenVDB_Filter_Level_Set::Cache::filterGrid(
+    OP_Context& /*context*/,
     FilterT& filter,
     const FilterParms& parms,
     BossT& boss,
@@ -1093,21 +1022,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::filterGrid(
     typename MaskT::ConstPtr maskGrid;
 
     if (parms.mMaskInputNode) {
-#if VDB_COMPILABLE_SOP
         const GU_Detail* maskGeo = inputGeo(1);
-        (void)context; // [[maybe_unused]]
-#else
-        // record second input
-        if (getInput(1) != parms.mMaskInputNode) {
-            addExtraInput(parms.mMaskInputNode, OP_INTEREST_DATA);
-        }
-
-        GU_DetailHandle maskHandle;
-        maskHandle = static_cast<SOP_Node*>(parms.mMaskInputNode)->getCookedGeoHandle(context);
-
-        GU_DetailHandleAutoReadLock maskScope(maskHandle);
-        const GU_Detail* maskGeo = maskScope.getGdp();
-#endif
 
         if (maskGeo) {
             const GA_PrimitiveGroup* maskGroup =
@@ -1197,7 +1112,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::filterGrid(
 
 template<typename FilterT>
 inline void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::offset(
+SOP_OpenVDB_Filter_Level_Set::Cache::offset(
     const FilterParms&,
     FilterT& filter,
     const float offset,
@@ -1214,7 +1129,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::offset(
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::mean(
+SOP_OpenVDB_Filter_Level_Set::Cache::mean(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,
@@ -1242,7 +1157,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::mean(
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::gaussian(
+SOP_OpenVDB_Filter_Level_Set::Cache::gaussian(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,
@@ -1270,7 +1185,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::gaussian(
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::median(
+SOP_OpenVDB_Filter_Level_Set::Cache::median(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,
@@ -1298,7 +1213,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::median(
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::meanCurvature(
+SOP_OpenVDB_Filter_Level_Set::Cache::meanCurvature(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,
@@ -1315,7 +1230,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::meanCurvatu
 
 template<typename FilterT>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::laplacian(
+SOP_OpenVDB_Filter_Level_Set::Cache::laplacian(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,
@@ -1332,7 +1247,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::laplacian(
 
 template<typename FilterT>
 inline void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::renormalize(
+SOP_OpenVDB_Filter_Level_Set::Cache::renormalize(
     const FilterParms& parms,
     FilterT& filter,
     BossT&,
@@ -1356,7 +1271,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::renormalize
 
 template<typename FilterT>
 inline void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::resizeNarrowBand(
+SOP_OpenVDB_Filter_Level_Set::Cache::resizeNarrowBand(
     const FilterParms& parms,
     FilterT& filter,
     BossT&,
@@ -1384,7 +1299,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::resizeNarro
 
 template<typename FilterT>
 inline void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter_Level_Set)::track(
+SOP_OpenVDB_Filter_Level_Set::Cache::track(
     const FilterParms& parms,
     FilterT& filter,
     BossT& boss,

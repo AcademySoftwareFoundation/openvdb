@@ -73,11 +73,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -100,10 +95,8 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
@@ -114,9 +107,7 @@ public:
             const GU_Detail* pointGeo,
             hvdb::Interrupter&,
             const fpreal time);
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -230,9 +221,7 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional points to instance the cutter object onto\n"
             "(The cutter object is used in place if no points are provided.)")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fracture::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -336,15 +325,9 @@ SOP_OpenVDB_Fracture::updateParmsFlags()
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Fracture::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Converting geometry to volume");
@@ -454,7 +437,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::cookVDBSop(OP_Conte
 
 template<class GridType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
+SOP_OpenVDB_Fracture::Cache::process(
     std::list<openvdb::GridBase::Ptr>& grids,
     const GU_Detail* cutterGeo,
     const GU_Detail* pointGeo,

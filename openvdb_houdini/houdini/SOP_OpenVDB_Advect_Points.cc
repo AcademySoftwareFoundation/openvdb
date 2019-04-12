@@ -66,12 +66,6 @@
 template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -675,16 +669,12 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
         bool evalAdvectionParms(OP_Context&, AdvectionParms&);
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -860,10 +850,8 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Points to Advect")
         .addOptionalInput("Velocity VDB")
         .addOptionalInput("Closest Point VDB")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_DUPLICATE,
             []() { return new SOP_OpenVDB_Advect_Points::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1001,15 +989,9 @@ SOP_OpenVDB_Advect_Points::SOP_OpenVDB_Advect_Points(OP_Network* net,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        duplicateSource(0, context);
-#endif
-
         // Evaluate UI parameters
         const fpreal now = context.getTime();
 
@@ -1099,7 +1081,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::cookVDBSop(OP_
 
 
 bool
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect_Points)::evalAdvectionParms(
+SOP_OpenVDB_Advect_Points::Cache::evalAdvectionParms(
     OP_Context& context, AdvectionParms& parms)
 {
     const fpreal now = context.getTime();

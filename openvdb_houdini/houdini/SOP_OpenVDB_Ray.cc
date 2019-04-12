@@ -59,11 +59,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -86,12 +81,7 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -168,9 +158,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Ray", SOP_OpenVDB_Ray::factory, parms, *table)
         .addInput("points")
         .addInput("level set grids")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Ray::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -433,14 +421,9 @@ private:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Ray)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Ray::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Computing VDB ray intersections");

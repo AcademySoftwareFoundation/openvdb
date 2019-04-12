@@ -59,11 +59,6 @@
 template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -135,12 +130,7 @@ struct SOP_OpenVDB_Sort_Points: public hvdb::SOP_NodeVDB
     SOP_OpenVDB_Sort_Points(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 };
 
 
@@ -163,9 +153,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Sort Points",
         SOP_OpenVDB_Sort_Points::factory, parms, *table)
         .addInput("points")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Sort_Points::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -200,15 +188,9 @@ SOP_OpenVDB_Sort_Points::SOP_OpenVDB_Sort_Points(OP_Network* net, const char* na
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sort_Points)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Sort_Points::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        gdp->stashAll();
-#endif
-
         const fpreal time = context.getTime();
         const GU_Detail* srcGeo = inputGeo(0);
 
@@ -245,10 +227,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sort_Points)::cookVDBSop(OP_Co
 
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
             CopyElements(ptWrangler, srcOffsetArray.get()));
-
-#if !VDB_COMPILABLE_SOP
-        gdp->destroyStashed();
-#endif
 
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

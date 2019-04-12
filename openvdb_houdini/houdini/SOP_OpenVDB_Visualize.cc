@@ -70,12 +70,6 @@
 template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
 #endif
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace std {
 template<> struct is_integral<openvdb::PointIndex32>: public true_type {};
@@ -113,12 +107,7 @@ public:
     static UT_Vector3 colorLevel(int level) { return sColors[std::max(3-level,0)]; }
     static const UT_Vector3& colorSign(bool negative) { return sColors[negative ? 5 : 4]; }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -384,9 +373,7 @@ newSopOperator(OP_OperatorTable* table)
 #endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs to visualize")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1167,14 +1154,9 @@ GridSurfacer::operator()(const GridType& grid)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Visualizing VDBs");

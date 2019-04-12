@@ -52,11 +52,6 @@
 #include <stdexcept>
 #include <string>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace cvdb = openvdb;
@@ -74,12 +69,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -230,10 +220,8 @@ newSopOperator(OP_OperatorTable* table)
 #endif
         .addInput("VDB Grids")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_Topology_To_Level_Set::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -325,15 +313,10 @@ SOP_OpenVDB_Topology_To_Level_Set::resolveObsoleteParms(PRM_ParmList* obsoletePa
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Topology_To_Level_Set)::cookVDBSop(
+SOP_OpenVDB_Topology_To_Level_Set::Cache::cookVDBSop(
     OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         const GU_Detail* inputGeoPt = inputGeo(0);
