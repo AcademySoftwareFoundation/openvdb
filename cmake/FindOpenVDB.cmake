@@ -104,6 +104,11 @@ may be provided to tell this module where to look.
 
 CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
 
+# Support new if() IN_LIST operator
+IF ( POLICY CMP0057 )
+  CMAKE_POLICY ( SET CMP0057 NEW )
+ENDIF ()
+
 MARK_AS_ADVANCED (
   OpenVDB_INCLUDE_DIR
   OpenVDB_LIBRARY

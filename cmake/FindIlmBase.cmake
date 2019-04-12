@@ -101,6 +101,11 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
+# Support new if() IN_LIST operator
+IF ( POLICY CMP0057 )
+  CMAKE_POLICY ( SET CMP0057 NEW )
+ENDIF ()
+
 MARK_AS_ADVANCED (
   IlmBase_INCLUDE_DIR
   IlmBase_LIBRARY
