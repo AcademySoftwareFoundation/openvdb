@@ -2053,7 +2053,7 @@ private:
                 typename VoxelizationDataType::Ptr& dataPtr = mLocalDataTable->local();
                 if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
 
-                voxelizeTriangle(mPrim, *dataPtr);
+                voxelizeTriangle(mPrim, *dataPtr, mInterrupter);
 
             } else if (!(mInterrupter && mInterrupter->wasInterrupted())) {
                 spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount, mInterrupter);
@@ -2088,7 +2088,7 @@ private:
             polygonCount < SubTask::POLYGON_LIMIT ? evalSubdivisionCount(prim) : 0;
 
         if (subdivisionCount <= 0) {
-            voxelizeTriangle(prim, data);
+            voxelizeTriangle(prim, data, mInterrupter);
         } else {
             spawnTasks(prim, *mDataTable, subdivisionCount, polygonCount, mInterrupter);
         }
@@ -2136,7 +2136,7 @@ private:
         tasks.wait();
     }
 
-    static void voxelizeTriangle(const Triangle& prim, VoxelizationDataType& data)
+    static void voxelizeTriangle(const Triangle& prim, VoxelizationDataType& data, Interrupter* const interrupter)
     {
         std::deque<Coord> coordList;
         Coord ijk, nijk;
@@ -2153,14 +2153,20 @@ private:
         data.primIdAcc.setValueOnly(ijk, primId);
 
         while (!coordList.empty()) {
-            ijk = coordList.back();
-            coordList.pop_back();
+            if (interrupter && interrupter->wasInterrupted()) {
+                tbb::task::self().cancel_group_execution();
+                break;
+            }
+            for (Int32 pass = 0; pass < 1048576 && !coordList.empty(); ++pass) {
+                ijk = coordList.back();
+                coordList.pop_back();
 
-            for (Int32 i = 0; i < 26; ++i) {
-                nijk = ijk + util::COORD_OFFSETS[i];
-                if (primId != data.primIdAcc.getValue(nijk)) {
-                    data.primIdAcc.setValueOnly(nijk, primId);
-                    if(updateDistance(nijk, prim, data)) coordList.push_back(nijk);
+                for (Int32 i = 0; i < 26; ++i) {
+                    nijk = ijk + util::COORD_OFFSETS[i];
+                    if (primId != data.primIdAcc.getValue(nijk)) {
+                        data.primIdAcc.setValueOnly(nijk, primId);
+                        if(updateDistance(nijk, prim, data)) coordList.push_back(nijk);
+                    }
                 }
             }
         }
