@@ -47,7 +47,8 @@
  */
 
 #include <UT/UT_Version.h>
-#if (UT_VERSION_INT < 0x0c050157) // earlier than 12.5.343
+
+#if defined(SESI_OPENVDB) || defined(SESI_OPENVDB_PRIM)
 
 #include "GU_PrimVDB.h"
 
@@ -77,27 +78,17 @@
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_UniquePtr.h>
 
-#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
-typedef UT_Vector2T<int32> UT_Vector2i;
-typedef UT_Vector3T<int32> UT_Vector3i;
-#else
 #include <UT/UT_Singleton.h>
-#endif
 
 #include <UT/UT_StopWatch.h>
 
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
-#endif
 #include <SYS/SYS_Types.h>
 #include <SYS/SYS_TypeTraits.h>
 
 #include <openvdb/tools/VolumeToMesh.h>
 
 #include <hboost/function.hpp>
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-#include <hboost/scope_exit.hpp>
-#endif
 
 #include <openvdb/tools/SignedFloodFill.h>
 
@@ -134,9 +125,7 @@ GU_PrimVDB::build(GU_Detail *gdp, bool append_points)
 #else
 
     GU_PrimVDB* primvdb = UTverify_cast<GU_PrimVDB *>(gdp->appendPrimitive(GEO_PRIMVDB));
-#if UT_VERSION_INT >= 0x1000011F // 16.0.287 or later
     primvdb->assignVertex(gdp->appendVertex(), true);
-#endif
 
 #endif
 
@@ -321,31 +310,7 @@ public:
     {
         using namespace openvdb;
 
-        // Grid::merge() is currently broken
-#if 1
         UTparallelReduce(UT_BlockedRange<int>(0, myVox->numTiles()), *this);
-#else
-        (*this)(UT_BlockedRange<int>(0, myVox->numTiles()));
-#endif
-        // This commented out code tests whether Grid::merge() works for
-        // tile values, which currently doesn't as of v0.96.0
-#if 0 //def UT_DEBUG
-{
-    openvdb::FloatGrid::Ptr a = openvdb::FloatGrid::create(/*background*/0.0);
-    openvdb::FloatGrid::Ptr b = openvdb::FloatGrid::create(/*background*/0.0);
-    a->fill(CoordBBox(Coord(16,16,16), Coord(31,31,31)), /*value*/1.0);
-    b->fill(CoordBBox(Coord(0,0,0),    Coord(15,15,15)), /*value*/1.0);
-    int a_count_old = a->activeVoxelCount();
-    int b_count_old = b->activeVoxelCount();
-    a->merge(*b);
-    int a_count_new = a->activeVoxelCount();
-    int b_count_new = b->activeVoxelCount();
-    CoordBBox bbox;
-    cerr << "a_count_old=" << a_count_old << ", b_count_old=" << b_count_old << endl;
-    cerr << "a_count_new=" << a_count_new << ", b_count_new=" << b_count_new << endl;
-    cerr << "bbox=" << a->evalActiveVoxelBoundingBox() << endl;
-}
-#endif
 
         // Check if the VDB grid can be made empty
         openvdb::Coord dim = myGrid->evalActiveVoxelDim();
@@ -1401,28 +1366,6 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
             }
         }
     }
-
-    // Enable this to do slow code path verification
-#if 0
-    for (int tuple_i = 0; tuple_i < TUPLE_SIZE; ++tuple_i) {
-        VoxelTileF* tile = tiles[tuple_i];
-        fpreal32* data = tile->rawData();
-        Coord xyz;
-        for (xyz[2] = 0; xyz[2] < tile_res[2]; ++xyz[2]) {
-            for (xyz[1] = 0; xyz[1] < tile_res[1]; ++xyz[1]) {
-                for (xyz[0] = 0; xyz[0] < tile_res[0]; ++xyz[0]) {
-                    Coord ijk = beg + xyz;
-                    if (!compareVoxel(xyz, tile, data,
-                                      acc.getValue(ijk), tuple_i)) {
-                        UT_ASSERT(!"Voxels are different");
-                        compareVoxel(xyz, tile, data,
-                                     acc.getValue(ijk), tuple_i);
-                    }
-                }
-            }
-        }
-    }
-#endif
 }
 
 template<typename TreeType, typename VolumeT, bool aligned>
@@ -2079,11 +2022,7 @@ GU_PrimVDB::createAttrsFromMetadataAdapter(
                 && meta->typeName() == openvdb::StringMetadata::staticTypeName()
                 && meta->str().empty())
             {
-#if (UT_VERSION_INT >= 0x0e0000AC) // 14.0.172 or later
                 if (!geo.findAttribute(owner, name.c_str())) continue;
-#else
-                if (geo.findAttribute(owner, name.c_str()).isInvalid()) continue;
-#endif
             }
 
             MetaToAttrMap::const_iterator creatorIt =
@@ -2284,7 +2223,7 @@ newGeometryPrim(GA_PrimitiveFactory *factory)
 } // extern "C"
 #endif
 
-#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+#endif // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
