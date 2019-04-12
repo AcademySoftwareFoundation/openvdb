@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,12 +43,21 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
-#include <boost/scoped_array.hpp>
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/int.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_sort.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <deque>
 #include <limits>
+#include <memory>
+#include <set>
+#include <vector>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -544,7 +553,7 @@ struct FillMaskBoundary {
         tree::ValueAccessor<const BoolTreeType> maskAcc(*mFillMask);
         tree::ValueAccessor<const TreeType> distAcc(*mTree);
 
-        boost::scoped_array<char> valueMask(new char[BoolLeafNodeType::SIZE]);
+        std::unique_ptr<char[]> valueMask(new char[BoolLeafNodeType::SIZE]);
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -1010,7 +1019,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
     }
 
     // create mask leafnodes
-    boost::scoped_array<CharLeafNodeType*> maskNodes(new CharLeafNodeType*[numLeafNodes]);
+    std::unique_ptr<CharLeafNodeType*[]> maskNodes(new CharLeafNodeType*[numLeafNodes]);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numLeafNodes),
         LabelBoundaryVoxels<LeafNodeType>(isovalue, &nodes[0], maskNodes.get()));
@@ -1030,7 +1039,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
         std::vector<const BoolLeafNodeType*> fillMaskNodes;
         fillMask->getNodes(fillMaskNodes);
 
-        boost::scoped_array<BoolLeafNodeType*> boundaryMaskNodes(
+        std::unique_ptr<BoolLeafNodeType*[]> boundaryMaskNodes(
             new BoolLeafNodeType*[fillMaskNodes.size()]);
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, fillMaskNodes.size()),
@@ -1138,7 +1147,7 @@ computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
     }
 
     // create mask leafnodes
-    boost::scoped_array<BoolLeafNodeType*> maskNodes(new BoolLeafNodeType*[numLeafNodes]);
+    std::unique_ptr<BoolLeafNodeType*[]> maskNodes(new BoolLeafNodeType*[numLeafNodes]);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numLeafNodes),
         MaskInteriorVoxels<LeafNodeType>(iso, &nodes[0], maskNodes.get()));
@@ -2371,6 +2380,9 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 
     BoolTreeType topologyMask(tree, false, TopologyCopy());
 
+    // prune out any inactive leaf nodes or inactive tiles
+    tools::pruneInactive(topologyMask);
+
     if (topologyMask.hasActiveTiles()) {
         topologyMask.voxelizeActiveTiles();
     }
@@ -2383,7 +2395,7 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     // 1. Split node masks into disjoint segments
     // Note: The LeafNode origin coord is modified to record the 'leafnodes' array offset.
 
-    boost::scoped_array<NodeMaskSegmentPtrVector> nodeSegmentArray(
+    std::unique_ptr<NodeMaskSegmentPtrVector[]> nodeSegmentArray(
         new NodeMaskSegmentPtrVector[leafnodes.size()]);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, leafnodes.size()),
@@ -2452,6 +2464,8 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 
         BoolTreePtrType mask(new BoolTreeType(tree, false, TopologyCopy()));
 
+        tools::pruneInactive(*mask);
+
         if (mask->hasActiveTiles()) {
             mask->voxelizeActiveTiles();
         }
@@ -2480,8 +2494,8 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     if (masks.size() > 1) {
         const size_t segmentCount = masks.size();
 
-        boost::scoped_array<size_t> segmentOrderArray(new size_t[segmentCount]);
-        boost::scoped_array<size_t> voxelCountArray(new size_t[segmentCount]);
+        std::unique_ptr<size_t[]> segmentOrderArray(new size_t[segmentCount]);
+        std::unique_ptr<size_t[]> voxelCountArray(new size_t[segmentCount]);
 
         for (size_t n = 0; n < segmentCount; ++n) {
             segmentOrderArray[n] = n;
@@ -2524,30 +2538,35 @@ segmentActiveVoxels(const GridOrTreeType& volume,
     std::vector<BoolTreePtrType> maskSegmentArray;
     extractActiveVoxelSegmentMasks(inputTree, maskSegmentArray);
 
-    const size_t numSegments = maskSegmentArray.size();
+    // 2. Export segments
 
-    if (numSegments < 2) {
-        // single segment early-out
+    const size_t numSegments = std::max(size_t(1), maskSegmentArray.size());
+    std::vector<TreePtrType> outputSegmentArray(numSegments);
+
+    if (maskSegmentArray.empty()) {
+        // if no active voxels in the original volume, copy just the background
+        // value of the input tree
+        outputSegmentArray[0] = TreePtrType(new TreeType(inputTree.background()));
+    } else if (numSegments == 1) {
+        // if there's only one segment with active voxels, copy the input tree
         TreePtrType segment(new TreeType(inputTree));
+        // however, if the leaf counts do not match due to the pruning of inactive leaf
+        // nodes in the mask, do a topology intersection to drop these inactive leafs
+        if (segment->leafCount() != inputTree.leafCount()) {
+            segment->topologyIntersection(*maskSegmentArray[0]);
+        }
+        outputSegmentArray[0] = segment;
+    } else {
+        const tbb::blocked_range<size_t> segmentRange(0, numSegments);
+        tbb::parallel_for(segmentRange,
+            level_set_util_internal::MaskedCopy<TreeType>(inputTree, outputSegmentArray,
+                maskSegmentArray));
+    }
+
+    for (auto& segment : outputSegmentArray) {
         segments.push_back(
             level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::construct(
                 volume, segment));
-        return;
-    }
-
-    const tbb::blocked_range<size_t> segmentRange(0, numSegments);
-
-    // 2. Export segments
-    std::vector<TreePtrType> outputSegmentArray(numSegments);
-
-    tbb::parallel_for(segmentRange,
-        level_set_util_internal::MaskedCopy<TreeType>(inputTree, outputSegmentArray,
-            maskSegmentArray));
-
-    for (size_t n = 0, N = numSegments; n < N; ++n) {
-        segments.push_back(
-            level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::construct(
-                volume, outputSegmentArray[n]));
     }
 }
 
@@ -2570,38 +2589,33 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
     std::vector<BoolTreePtrType> maskSegmentArray;
     extractActiveVoxelSegmentMasks(*mask, maskSegmentArray);
 
-    const size_t numSegments = maskSegmentArray.size();
+    const size_t numSegments = std::max(size_t(1), maskSegmentArray.size());
+    std::vector<TreePtrType> outputSegmentArray(numSegments);
 
-    if (numSegments < 2) {
-        // single segment early-out
-        TreePtrType segment(new TreeType(inputTree));
+    if (maskSegmentArray.empty()) {
+        // if no active voxels in the original volume, copy just the background
+        // value of the input tree
+        outputSegmentArray[0] = TreePtrType(new TreeType(inputTree.background()));
+    } else {
+        const tbb::blocked_range<size_t> segmentRange(0, numSegments);
+
+        // 3. Expand zero crossing mask to capture sdf narrow band
+        tbb::parallel_for(segmentRange,
+            level_set_util_internal::ExpandNarrowbandMask<TreeType>(inputTree, maskSegmentArray));
+
+        // 4. Export sdf segments
+
+        tbb::parallel_for(segmentRange, level_set_util_internal::MaskedCopy<TreeType>(
+            inputTree, outputSegmentArray, maskSegmentArray));
+
+        tbb::parallel_for(segmentRange,
+            level_set_util_internal::FloodFillSign<TreeType>(inputTree, outputSegmentArray));
+    }
+
+    for (auto& segment : outputSegmentArray) {
         segments.push_back(
             level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::construct(
                 volume, segment));
-        return;
-    }
-
-    const tbb::blocked_range<size_t> segmentRange(0, numSegments);
-
-
-    // 3. Expand zero crossing mask to capture sdf narrow band
-    tbb::parallel_for(segmentRange,
-        level_set_util_internal::ExpandNarrowbandMask<TreeType>(inputTree, maskSegmentArray));
-
-    // 4. Export sdf segments
-    std::vector<TreePtrType> outputSegmentArray(numSegments);
-
-    tbb::parallel_for(segmentRange, level_set_util_internal::MaskedCopy<TreeType>(
-        inputTree, outputSegmentArray, maskSegmentArray));
-
-    tbb::parallel_for(segmentRange,
-        level_set_util_internal::FloodFillSign<TreeType>(inputTree, outputSegmentArray));
-
-
-    for (size_t n = 0, N = numSegments; n < N; ++n) {
-        segments.push_back(
-            level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::construct(
-                volume, outputSegmentArray[n]));
     }
 }
 
@@ -2611,6 +2625,6 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

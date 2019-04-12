@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -56,28 +56,28 @@ namespace openvdb_houdini {
 
 VdbPrimCIterator::VdbPrimCIterator(const GEO_Detail* gdp, const GA_PrimitiveGroup* group,
     FilterFunc filter):
-    mIter(gdp ? new GA_GBPrimitiveIterator(*gdp, group) : NULL),
+    mIter(gdp ? new GA_GBPrimitiveIterator(*gdp, group) : nullptr),
     mFilter(filter)
 {
     // Ensure that, after construction, this iterator points to
     // a valid VDB primitive (if there is one).
-    if (NULL == getPrimitive()) advance();
+    if (nullptr == getPrimitive()) advance();
 }
 
 
 VdbPrimCIterator::VdbPrimCIterator(const GEO_Detail* gdp, GA_Range::safedeletions,
     const GA_PrimitiveGroup* group, FilterFunc filter):
-    mIter(gdp ? new GA_GBPrimitiveIterator(*gdp, group, GA_Range::safedeletions()) : NULL),
+    mIter(gdp ? new GA_GBPrimitiveIterator(*gdp, group, GA_Range::safedeletions()) : nullptr),
     mFilter(filter)
 {
     // Ensure that, after construction, this iterator points to
     // a valid VDB primitive (if there is one).
-    if (NULL == getPrimitive()) advance();
+    if (nullptr == getPrimitive()) advance();
 }
 
 
 VdbPrimCIterator::VdbPrimCIterator(const VdbPrimCIterator& other):
-    mIter(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : NULL),
+    mIter(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : nullptr),
     mFilter(other.mFilter)
 {
 }
@@ -87,7 +87,7 @@ VdbPrimCIterator&
 VdbPrimCIterator::operator=(const VdbPrimCIterator& other)
 {
     if (&other != this) {
-        mIter.reset(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : NULL);
+        mIter.reset(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : nullptr);
         mFilter = other.mFilter;
     }
     return *this;
@@ -99,7 +99,7 @@ VdbPrimCIterator::advance()
 {
     if (mIter) {
         GA_GBPrimitiveIterator& iter = *mIter;
-        for (++iter; iter.getPrimitive() != NULL && getPrimitive() == NULL; ++iter) {}
+        for (++iter; iter.getPrimitive() != nullptr && getPrimitive() == nullptr; ++iter) {}
     }
 }
 
@@ -109,19 +109,15 @@ VdbPrimCIterator::getPrimitive() const
 {
     if (mIter) {
         if (GA_Primitive* prim = mIter->getPrimitive()) {
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
             const GA_PrimitiveTypeId primVdbTypeId = GA_PRIMVDB;
-#else
-            const GA_PrimitiveTypeId primVdbTypeId = GU_PrimVDB::theTypeId();
-#endif
             if (prim->getTypeId() == primVdbTypeId) {
                 GU_PrimVDB* vdb = UTverify_cast<GU_PrimVDB*>(prim);
-                if (mFilter && !mFilter(*vdb)) return NULL;
+                if (mFilter && !mFilter(*vdb)) return nullptr;
                 return vdb;
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -189,7 +185,7 @@ VdbPrimIterator::operator=(const VdbPrimIterator& other)
 GU_PrimVDB*
 createVdbPrimitive(GU_Detail& gdp, GridPtr grid, const char* name)
 {
-    return (!grid ? NULL : GU_PrimVDB::buildFromGrid(gdp, grid, /*src=*/NULL, name));
+    return (!grid ? nullptr : GU_PrimVDB::buildFromGrid(gdp, grid, /*src=*/nullptr, name));
 }
 
 
@@ -197,9 +193,9 @@ GU_PrimVDB*
 replaceVdbPrimitive(GU_Detail& gdp, GridPtr grid, GEO_PrimVDB& src,
     const bool copyAttrs, const char* name)
 {
-    GU_PrimVDB* vdb = NULL;
+    GU_PrimVDB* vdb = nullptr;
     if (grid) {
-        vdb = GU_PrimVDB::buildFromGrid(gdp, grid, (copyAttrs ? &src : NULL), name);
+        vdb = GU_PrimVDB::buildFromGrid(gdp, grid, (copyAttrs ? &src : nullptr), name);
         gdp.destroyPrimitive(src, /*andPoints=*/true);
     }
     return vdb;
@@ -389,6 +385,8 @@ setLogForwarding(OP_OpTypeId opId, bool enable)
         appender = log4cplus::SharedAppenderPtr{
             new HoudiniAppender{opInfo->myOptypeName, getGenericMessageCode(opId)}};
         appender->setName(appenderName);
+        // Don't forward debug or lower-level messages.
+        appender->setThreshold(log4cplus::INFO_LOG_LEVEL);
         logger.addAppender(appender);
     }
 }
@@ -424,6 +422,6 @@ isLogForwarding(OP_OpTypeId opId)
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

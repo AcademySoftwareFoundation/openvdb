@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,19 +44,86 @@
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#if UT_MAJOR_VERSION_INT >= 16
+#include <SOP/SOP_NodeParmsOptions.h>
+#endif
 #include <UT/UT_IntArray.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
-#include <cstring> // for ::strdup()
+#include <algorithm> // for std::for_each(), std::max(), std::remove(), std::sort()
+#include <cstdint> // for std::uintptr_t()
+#include <cstdlib> // for std::atoi()
+#include <cstring> // for std::strcmp(), ::strdup()
 #include <limits>
+#include <ostream>
 #include <sstream>
+#include <stdexcept>
 
 namespace houdini_utils {
 
 namespace {
-/// PRM_SpareData token name for parameter documentation wiki markup
-char const * const PARM_DOC_TOKEN = "houdini_utils::doc";
+
+// PRM_SpareData token names
+
+// SOP input index specifier
+/// @todo Is there an existing constant for this token?
+char const * const kSopInputToken = "sop_input";
+// Parameter documentation wiki markup
+char const * const kParmDocToken = "houdini_utils::doc";
+// String-encoded GA_AttributeOwner
+char const * const kAttrOwnerToken = "houdini_utils::attr_owner";
+// Pointer to an AttrFilterFunc
+char const * const kAttrFilterToken = "houdini_utils::attr_filter";
+
+
+// Add an integer value (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSpareInteger(PRM_SpareData* spare, const char* token, int value)
+{
+    if (spare && token) {
+        spare->addTokenValue(token, std::to_string(value).c_str());
+    }
 }
+
+// Retrieve the integer value with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default integer value.
+inline int
+getSpareInteger(const PRM_SpareData* spare, const char* token, int deflt = 0)
+{
+    if (!spare || !token) return deflt;
+    char const * const str = spare->getValue(token);
+    return str ? std::atoi(str) : deflt;
+}
+
+
+// Add a pointer (encoded into a string) to a PRM_SpareData map
+// under the given token name.
+inline void
+setSparePointer(PRM_SpareData* spare, const char* token, const void* ptr)
+{
+    if (spare && token) {
+        spare->addTokenValue(token,
+            std::to_string(reinterpret_cast<std::uintptr_t>(ptr)).c_str());
+    }
+}
+
+// Retrieve the pointer with the given token name from a PRM_SpareData map.
+// If no such token exists, return the specified default pointer.
+inline const void*
+getSparePointer(const PRM_SpareData* spare, const char* token, const void* deflt = nullptr)
+{
+    if (!spare || !token) return deflt;
+    if (sizeof(std::uintptr_t) > sizeof(unsigned long long)) {
+        throw std::range_error{"houdini_utils::ParmFactory: can't decode pointer from string"};
+    }
+    if (const char* str = spare->getValue(token)) {
+        auto intPtr = static_cast<std::uintptr_t>(std::stoull(str));
+        return reinterpret_cast<void*>(intPtr);
+    }
+    return deflt;
+}
+
+} // anonymous namespace
 
 
 ParmList&
@@ -205,10 +272,15 @@ struct ParmFactory::Impl
         spareData(nullptr),
         multiparms(nullptr),
         typeExtended(PRM_TYPE_NONE),
-        vectorSize(1)
+        vectorSize(1),
+        invisible(false)
     {
         const_cast<PRM_Name*>(name)->harden();
     }
+
+    static PRM_SpareData* getSopInputSpareData(size_t inp); ///< @todo return a const pointer?
+    static void getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+        const PRM_SpareData*, const PRM_Parm*);
 
     PRM_Callback               callbackFunc;
     const PRM_ChoiceList*      choicelist;
@@ -224,6 +296,7 @@ struct ParmFactory::Impl
     PRM_Type                   type;
     PRM_TypeExtended           typeExtended;
     int                        vectorSize;
+    bool                       invisible;
 
     static PRM_SpareData* const sSOPInputSpareData[4];
 };
@@ -232,6 +305,109 @@ struct ParmFactory::Impl
 PRM_SpareData* const ParmFactory::Impl::sSOPInputSpareData[4] = {
         &SOP_Node::theFirstInput, &SOP_Node::theSecondInput,
         &SOP_Node::theThirdInput, &SOP_Node::theFourthInput};
+
+
+// Return one of the predefined PRM_SpareData maps that specify a SOP input number,
+// or construct new PRM_SpareData if none exists for the given input number.
+PRM_SpareData*
+ParmFactory::Impl::getSopInputSpareData(size_t inp)
+{
+    if (inp < 4) return Impl::sSOPInputSpareData[inp];
+
+    auto spare = new PRM_SpareData{SOP_Node::theFirstInput};
+    spare->addTokenValue(kSopInputToken, std::to_string(inp).c_str());
+    return spare;
+}
+
+
+// PRM_ChoiceGenFunc invoked by ParmFactory::setAttrChoiceList()
+void
+ParmFactory::Impl::getAttrChoices(void* op, PRM_Name* choices, int maxChoices,
+    const PRM_SpareData* spare, const PRM_Parm* parm)
+{
+    if (!op || !choices || !parm) return;
+    // This function can only be used in SOPs, because it calls SOP_Node::fillAttribNameMenu().
+    if (static_cast<OP_Node*>(op)->getOpTypeID() != SOP_OPTYPE_ID) return;
+
+    auto* sop = static_cast<SOP_Node*>(op);
+
+    // Extract the SOP input number, the attribute class, and an optional
+    // pointer to a filter functor from the spare data.
+    const int inp = getSpareInteger(spare, kSopInputToken);
+    const int attrOwner = getSpareInteger(spare, kAttrOwnerToken, GA_ATTRIB_INVALID);
+    const auto* attrFilter =
+        static_cast<const AttrFilterFunc*>(getSparePointer(spare, kAttrFilterToken));
+
+    // Marshal pointers to the filter functor and the parameter and SOP for which this function
+    // is being called into blind data that can be passed to SOP_Node::fillAttribNameMenu().
+    struct AttrFilterData {
+        const AttrFilterFunc* func;
+        const PRM_Parm* parm;
+        const SOP_Node* sop;
+    };
+    AttrFilterData cbData{attrFilter, parm, sop};
+
+    // Define a filter callback function to be passed to SOP_Node::fillAttribNameMenu().
+    // Because the latter uses a C-style callback mechanism, this callback must be
+    // equivalent to a static function pointer (as a non-capturing lambda is).
+    auto cb = [](const GA_Attribute* aAttr, void* aData) -> bool {
+        if (!aAttr) return false;
+        // Cast the blind data pointer supplied by SOP_Node::fillAttribNameMenu().
+        const auto* data = static_cast<AttrFilterData*>(aData);
+        if (!data || !data->func) return true; // no filter; accept all attributes
+        // Invoke the filter functor and return the result.
+        return (*(data->func))(*aAttr, *(data->parm), *(data->sop));
+    };
+
+    // Invoke SOP_Node::fillAttribNameMenu() for the appropriate attribute class.
+    switch (attrOwner) {
+        case GA_ATTRIB_VERTEX:
+        case GA_ATTRIB_POINT:
+        case GA_ATTRIB_PRIMITIVE:
+        case GA_ATTRIB_DETAIL:
+            if (cbData.func) {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp, cb, &cbData);
+            } else {
+                sop->fillAttribNameMenu(choices, maxChoices,
+                    static_cast<GA_AttributeOwner>(attrOwner), inp);
+            }
+            break;
+        default: // all attributes
+        {
+            // To collect all classes of attributes, call SOP_Node::fillAttribNameMenu()
+            // once for each class.  Each call appends zero or more PRM_Names to the list
+            // as well as an end-of-list terminator.
+            auto* head = choices;
+            int count = 0, maxCount = maxChoices;
+            for (auto owner:
+                { GA_ATTRIB_VERTEX, GA_ATTRIB_POINT, GA_ATTRIB_PRIMITIVE, GA_ATTRIB_DETAIL })
+            {
+                int numAdded = (cbData.func ?
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp, cb, &cbData) :
+                    sop->fillAttribNameMenu(head, maxCount, owner, inp));
+                if (numAdded > 0) {
+                    // SOP_Node::fillAttribNameMenu() returns the number of entries added
+                    // to the list, not including the terminator.
+                    // Advance the list head pointer so that the next entry to be added
+                    // (if any) overwrites the terminator.
+                    count += numAdded;
+                    head += numAdded;
+                    maxCount -= numAdded;
+                }
+            }
+            if (count) {
+                // Sort the list by name to reproduce the behavior of SOP_Node::allAttribMenu.
+                std::sort(choices, choices + count,
+                    [](const PRM_Name& n1, const PRM_Name& n2) {
+                        return (0 > std::strcmp(n1.getToken(), n2.getToken()));
+                    }
+                );
+            }
+            break;
+        }
+    }
+}
 
 
 ////////////////////////////////////////
@@ -368,20 +544,39 @@ ParmFactory::setChoiceListItems(PRM_ChoiceListType typ, const std::vector<std::s
     return doSetChoiceList(typ, items, /*paired=*/true);
 }
 
+
 ParmFactory&
-ParmFactory::setGroupChoiceList(int inputIndex, PRM_ChoiceListType typ)
+ParmFactory::setGroupChoiceList(size_t inputIndex, PRM_ChoiceListType typ)
 {
-    if (0 <= inputIndex && inputIndex < 4) {
-        mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+    mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
+
 #if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
-        setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
-            nullptr, inputIndex, Impl::sSOPInputSpareData[inputIndex]));
+    setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE, nullptr,
+        static_cast<int>(inputIndex), mImpl->getSopInputSpareData(inputIndex)));
 #else
-        setSpareData(Impl::sSOPInputSpareData[inputIndex]);
+    setSpareData(mImpl->getSopInputSpareData(inputIndex));
 #endif
-    }
+
     return *this;
 }
+
+
+ParmFactory&
+ParmFactory::setAttrChoiceList(size_t inputIndex, GA_AttributeOwner attrOwner,
+    PRM_ChoiceListType typ, AttrFilterFunc attrFilter)
+{
+    setChoiceList(new PRM_ChoiceList{typ, Impl::getAttrChoices});
+
+    mImpl->spareData = new PRM_SpareData;
+    setSpareInteger(mImpl->spareData, kSopInputToken, int(inputIndex));
+    setSpareInteger(mImpl->spareData, kAttrOwnerToken, static_cast<int>(attrOwner));
+    if (attrFilter) {
+        setSparePointer(mImpl->spareData, kAttrFilterToken, new AttrFilterFunc{attrFilter});
+    }
+
+    return *this;
+}
+
 
 ParmFactory&
 ParmFactory::setConditional(const PRM_ConditionalBase* c) { mImpl->conditional = c; return *this; }
@@ -437,7 +632,7 @@ ParmFactory&
 ParmFactory::setDocumentation(const char* doc)
 {
     if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
-    mImpl->spareData->addTokenValue(PARM_DOC_TOKEN, ::strdup(doc ? doc : ""));
+    mImpl->spareData->addTokenValue(kParmDocToken, ::strdup(doc ? doc : ""));
     return *this;
 }
 
@@ -469,7 +664,7 @@ ParmFactory::setRange(const PRM_Range* r) { mImpl->range = r; return *this; }
 ParmFactory&
 ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
 {
-    typedef std::map<std::string, std::string> StringMap;
+    using StringMap = std::map<std::string, std::string>;
     if (!items.empty()) {
         if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
         for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
@@ -499,6 +694,9 @@ ParmFactory::setTypeExtended(PRM_TypeExtended t) { mImpl->typeExtended = t; retu
 ParmFactory&
 ParmFactory::setVectorSize(int n) { mImpl->vectorSize = n; return *this; }
 
+ParmFactory&
+ParmFactory::setInvisible() { mImpl->invisible = true; return *this; }
+
 PRM_Template
 ParmFactory::get() const
 {
@@ -508,21 +706,26 @@ ParmFactory::get() const
 #else
     const char *tooltip = mImpl->tooltip.c_str();
 #endif
+
+    PRM_Template parm;
     if (mImpl->multiType != PRM_MULTITYPE_NONE) {
-        return PRM_Template(
+        parm.initMulti(
             mImpl->multiType,
             const_cast<PRM_Template*>(mImpl->multiparms),
+            PRM_Template::PRM_EXPORT_MIN,
             fpreal(mImpl->vectorSize),
             const_cast<PRM_Name*>(mImpl->name),
             const_cast<PRM_Default*>(mImpl->defaults),
             const_cast<PRM_Range*>(mImpl->range),
+            0, // no callback
             mImpl->spareData,
             tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     } else {
-        return PRM_Template(
+        parm.initialize(
             mImpl->type,
             mImpl->typeExtended,
+            PRM_Template::PRM_EXPORT_MIN,
             mImpl->vectorSize,
             const_cast<PRM_Name*>(mImpl->name),
             const_cast<PRM_Default*>(mImpl->defaults),
@@ -534,6 +737,10 @@ ParmFactory::get() const
             tooltip ? ::strdup(tooltip) : nullptr,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     }
+    if (mImpl->invisible) {
+        parm.setInvisible(true);
+    }
+    return parm;
 }
 
 
@@ -561,7 +768,7 @@ documentParms(std::ostream& os, PRM_Template const * const parmList, int level =
         ++parmIdx, ++parm)
     {
         const auto parmType = parm->getType();
-        if (parmType == PRM_LABEL) continue;
+        if (parmType == PRM_LABEL || parm->getInvisible()) continue;
 
         const auto parmLabel = [parm]() {
             UT_String lbl = parm->getLabel();
@@ -587,11 +794,11 @@ documentParms(std::ostream& os, PRM_Template const * const parmList, int level =
 
         UT_String parmDoc;
         const PRM_SpareData* const spare = parm->getSparePtr();
-        if (spare && spare->getValue(PARM_DOC_TOKEN)) {
+        if (spare && spare->getValue(kParmDocToken)) {
             // If the parameter was documented with setDocumentation(), use that text.
-            // (This relies on PARM_DOC_TOKEN not being paired with nullptr.
+            // (This relies on kParmDocToken not being paired with nullptr.
             // ParmFactory::setDocumentation(), at least, ensures that it isn't.)
-            parmDoc = spare->getValue(PARM_DOC_TOKEN);
+            parmDoc = spare->getValue(kParmDocToken);
             // If the text is empty, suppress this parameter.
             if (!parmDoc.isstring()) continue;
         } else {
@@ -760,7 +967,43 @@ private:
     const std::string mHelpUrl, mDoc;
 };
 
-} // unnamed namespace
+
+#if UT_MAJOR_VERSION_INT >= 16
+
+class OpFactoryVerb: public SOP_NodeVerb
+{
+public:
+    OpFactoryVerb(const std::string& name, SOP_NodeVerb::CookMode cookMode,
+        const OpFactory::CacheAllocFunc& allocator, PRM_Template* parms)
+        : mName{name}
+        , mCookMode{cookMode}
+        , mAllocator{allocator}
+        , mParms{parms}
+    {}
+
+    SOP_NodeParms* allocParms() const override { return new SOP_NodeParmsOptions{mParms}; }
+    SOP_NodeCache* allocCache() const override { return mAllocator(); }
+
+    UT_StringHolder name() const override { return mName; }
+    CookMode cookMode(const SOP_NodeParms*) const override { return mCookMode; }
+
+    void cook(const CookParms& cookParms) const override
+    {
+        if (auto* cache = static_cast<SOP_NodeCacheOptions*>(cookParms.cache())) {
+            cache->doCook(this, cookParms);
+        }
+    }
+
+private:
+    std::string mName;
+    SOP_NodeVerb::CookMode mCookMode;
+    OpFactory::CacheAllocFunc mAllocator;
+    PRM_Template* mParms;
+}; // class OpFactoryVerb
+
+#endif // UT_MAJOR_VERSION_INT >= 16
+
+} // anonymous namespace
 
 
 ////////////////////////////////////////
@@ -796,6 +1039,7 @@ struct OpFactory::Impl
         // the OpFactory and this Impl have been fully constructed.
         mPolicy = policy;
         mName = mPolicy->getName(factory);
+        mLabelName = mPolicy->getLabelName(factory);
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
     }
@@ -815,7 +1059,7 @@ struct OpFactory::Impl
 
         mInputLabels.push_back(nullptr);
 
-        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
+        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mLabelName.c_str(),
             mConstruct, mParms,
 #if (UT_MAJOR_VERSION_INT >= 16)
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
@@ -827,12 +1071,16 @@ struct OpFactory::Impl
 
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
+#if UT_MAJOR_VERSION_INT >= 16
+        if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
+#endif
+
         return op;
     }
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -842,13 +1090,16 @@ struct OpFactory::Impl
     unsigned mFlags;
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
+#if UT_MAJOR_VERSION_INT >= 16
+    OpFactoryVerb* mVerb = nullptr;
+#endif
 };
 
 
 OpFactory::OpFactory(const std::string& english, OP_Constructor ctor,
     ParmList& parms, OP_OperatorTable& table, OpFlavor flavor)
 {
-    this->init(OpPolicyPtr(new DWAOpPolicy), english, ctor, parms, table, flavor);
+    this->init(OpPolicyPtr(new OpPolicy), english, ctor, parms, table, flavor);
 }
 
 
@@ -1026,6 +1277,22 @@ OpFactory::setOperatorTable(const std::string& name)
 }
 
 
+#if UT_MAJOR_VERSION_INT >= 16
+OpFactory&
+OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator)
+{
+    if (flavor() != SOP) {
+        throw std::runtime_error{"expected operator of type SOP, got " + flavorToString(flavor())};
+    }
+    if (!allocator) throw std::invalid_argument{"must provide a cache allocator function"};
+
+    mImpl->mVerb = new OpFactoryVerb{name(), cookMode, allocator, mImpl->mParms};
+
+    return *this;
+}
+#endif
+
+
 ////////////////////////////////////////
 
 
@@ -1041,25 +1308,9 @@ OpPolicy::getName(const OpFactory&, const std::string& english)
 
 //virtual
 std::string
-DWAOpPolicy::getName(const OpFactory&, const std::string& english)
+OpPolicy::getLabelName(const OpFactory& factory)
 {
-    UT_String s(english);
-    // Remove non-alphanumeric characters from the name.
-    s.forceValidVariableName();
-    std::string name = s.toStdString();
-    // Remove spaces and underscores.
-    name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
-    name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
-    name = "DW_" + name;
-    return name;
-}
-
-
-//virtual
-std::string
-DWAOpPolicy::getHelpURL(const OpFactory& factory)
-{
-    return OpPolicy::getHelpURL(factory);
+    return factory.english();
 }
 
 
@@ -1083,22 +1334,12 @@ namespace {
 // (this functionality was added to SOP_Node::primGroupMenu some time ago,
 // possibly as early as Houdini 12.5)
 
-inline int
-lookupGroupInput(const PRM_SpareData *spare)
-{
-    const char  *istring;
-    if (!spare) return 0;
-    istring = spare->getValue("sop_input");
-    return istring ? atoi(istring) : 0;
-}
-
-
 void
 sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     const PRM_SpareData *spare, const PRM_Parm *parm)
 {
     SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
-    int inputIndex = lookupGroupInput(spare);
+    int inputIndex = getSopInputIndex(spare);
 
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
 
@@ -1237,7 +1478,7 @@ sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     menuEntries[n_entries].setLabel(0);
 }
 
-} // unnamed namespace
+} // anonymous namespace
 
 
 #ifdef _MSC_VER
@@ -1273,6 +1514,6 @@ const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 
 } // namespace houdini_utils
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -189,12 +189,16 @@ private:
 }; // class Page
 
 
-/// @brief A PageHandle holds a shared ptr to a Page and a specific stream
+/// @brief A PageHandle holds a unique ptr to a Page and a specific stream
 /// pointer to a point within the decompressed Page buffer
 class OPENVDB_API PageHandle
 {
 public:
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    using Ptr = std::unique_ptr<PageHandle>;
+#else
     using Ptr = std::shared_ptr<PageHandle>;
+#endif
 
     /// @brief Create the page handle
     /// @param page a shared ptr to the page that stores the buffer
@@ -205,9 +209,15 @@ public:
     /// @brief Retrieve a reference to the stored page
     Page& page();
 
+    /// @brief Return the size of the buffer
+    int size() const { return mSize; }
+
     /// @brief Read and return the buffer, loading and decompressing
     /// the Page if necessary.
     std::unique_ptr<char[]> read();
+
+    /// @brief Return a copy of this PageHandle
+    Ptr copy() { return Ptr(new PageHandle(mPage, mIndex, mSize)); }
 
 protected:
     friend class ::TestStreamCompression;
@@ -305,6 +315,6 @@ private:
 
 #endif // OPENVDB_TOOLS_STREAM_COMPRESSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,15 +28,15 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <openvdb/openvdb.h>
 #include <openvdb/util/logging.h>
-#ifdef DWA_OPENVDB
-#include <usagetrack.h>
-#endif
 
 
 namespace {
@@ -262,10 +262,6 @@ printShortListing(const StringVec& filenames, bool metadata)
 int
 main(int argc, char *argv[])
 {
-#ifdef DWA_OPENVDB
-    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-#endif
-
     OPENVDB_START_THREADSAFE_STATIC_WRITE
     gProgName = argv[0];
     if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
@@ -301,7 +297,7 @@ main(int argc, char *argv[])
 
     if (version) {
         std::cout << "OpenVDB library version: "
-            << openvdb::getLibraryVersionString() << "\n";
+            << openvdb::getLibraryAbiVersionString() << "\n";
         std::cout << "OpenVDB file format version: "
             << openvdb::OPENVDB_FILE_VERSION << std::endl;
         if (filenames.empty()) return EXIT_SUCCESS;
@@ -340,12 +336,11 @@ main(int argc, char *argv[])
     }
     catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
-        std::unexpected();
     }
 
     return exitStatus;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

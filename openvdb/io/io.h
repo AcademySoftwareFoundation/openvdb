@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,6 +41,7 @@
 #include <memory>
 #include <string>
 
+class TestMappedFile;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -178,6 +179,7 @@ public:
 
 private:
     friend class File;
+    friend class ::TestMappedFile;
 
     explicit MappedFile(const std::string& filename, bool autoDelete = false);
 
@@ -288,6 +290,6 @@ OPENVDB_API SharedPtr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
 
 #endif // OPENVDB_IO_IO_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -58,11 +58,30 @@ inline Index64 iterCount(const IterT& iter);
 ////////////////////////////////////////
 
 
+namespace index {
+// Enum for informing early-exit optimizations
+// PARTIAL - No optimizations are possible
+// NONE - No indices to evaluate, can skip computation
+// ALL - All indices to evaluate, can skip filtering
+enum State
+{
+    PARTIAL=0,
+    NONE,
+    ALL
+};
+}
+
+
 /// @brief A no-op filter that can be used when iterating over all indices
+/// @see points/IndexFilter.h for the documented interface for an index filter
 class NullFilter
 {
 public:
     static bool initialized() { return true; }
+    static index::State state() { return index::ALL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::ALL; }
+
     template <typename LeafT> void reset(const LeafT&) { }
     template <typename IterT> static bool valid(const IterT&) { return true; }
 }; // class NullFilter
@@ -106,13 +125,16 @@ public:
     Index32 offset() { return mOffset; }
     inline bool next() { this->operator++(); return this->test(); }
 
-    /// @brief For efficiency, Coord assumed to be readily available
+    /// @brief For efficiency, Coord and active state assumed to be readily available
     /// when iterating over indices of a single voxel
     Coord getCoord [[noreturn]] () const {
         OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord.");
     }
     void getCoord [[noreturn]] (Coord& /*coord*/) const {
         OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord.");
+    }
+    bool isValueOn [[noreturn]] () const {
+        OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not test if voxel is active.");
     }
 
     /// @{
@@ -199,6 +221,9 @@ public:
         inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
         /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
         inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
+
+        /// @brief Return @c true if this iterator is pointing to an active value.
+        inline bool isValueOn() const { assert(mIter); return mIter.isValueOn(); }
 
         /// Return the const value iterator
         inline const IteratorT& valueIter() const { return mIter; }
@@ -296,6 +321,9 @@ public:
     /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
     inline void getCoord(Coord& xyz) const { assert(mIterator); xyz = mIterator.getCoord(); }
 
+    /// @brief Return @c true if the value iterator is pointing to an active value.
+    inline bool isValueOn() const { assert(mIterator); return mIterator.valueIter().isValueOn(); }
+
     /// @brief Equality operators
     bool operator==(const IndexIter& other) const { return mIterator == other.mIterator; }
     bool operator!=(const IndexIter& other) const { return !this->operator==(other); }
@@ -327,6 +355,6 @@ inline Index64 iterCount(const IterT& iter)
 
 #endif // OPENVDB_POINTS_INDEX_ITERATOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,18 +30,19 @@
 //
 /// @file SignedFloodFill.h
 ///
-/// @brief Propagates the sign of distance values from the active
-/// voxels in the narrow band to the inactive values outside the
-/// narrow band.
+/// @brief Propagate the signs of distance values from the active voxels
+/// in the narrow band to the inactive values outside the narrow band.
 ///
 /// @author Ken Museth
 
 #ifndef OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Math.h> // for math::negative
+#include <openvdb/version.h>
 #include <openvdb/Types.h> // for Index typedef
+#include <openvdb/math/Math.h> // for math::negative
 #include <openvdb/tree/NodeManager.h>
+#include <map>
 #include <type_traits>
 
 
@@ -132,8 +133,8 @@ public:
     {
         if (LeafT::LEVEL < mMinLevel) return;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        if (!leaf.allocate()) return;//this assures that the buffer is allocated and in-memory
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
+        if (!leaf.allocate()) return; // this assures that the buffer is allocated and in-memory
 #endif
         const typename LeafT::NodeMaskType& valueMask = leaf.getValueMask();
         // WARNING: "Never do what you're about to see at home, we're what you call experts!"
@@ -305,6 +306,6 @@ signedFloodFill(TreeOrLeafManagerT& tree,
 
 #endif // OPENVDB_TOOLS_RESETBACKGROUND_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

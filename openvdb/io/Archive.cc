@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,9 +71,11 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <cerrno> // for errno
 #include <cstdlib> // for getenv()
 #include <cstring> // for std::memcpy()
+#include <ctime> // for std::time()
 #include <iostream>
 #include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <system_error> // for std::error_code()
 
@@ -963,7 +965,7 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
 
     // 6) Generate a new random 16-byte (128-bit) uuid and write it to the stream.
     std::mt19937 ran;
-    ran.seed(std::random_device()());
+    ran.seed(std::mt19937::result_type(std::random_device()() + std::time(nullptr)));
     boost::uuids::basic_random_generator<std::mt19937> gen(&ran);
     mUuid = gen(); // mUuid is mutable
     os << mUuid;
@@ -1020,7 +1022,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
     return false;
 #else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
@@ -1038,7 +1040,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 {
     struct Local {
         static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
             g.readBuffers(istrm, indexBBox);
         }
@@ -1119,7 +1121,7 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     doReadGrid(grid, gd, is, NoBBox());
 }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     std::istream& is, const BBoxd& worldBBox)
@@ -1368,6 +1370,6 @@ Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

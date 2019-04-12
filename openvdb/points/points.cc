@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,6 +42,7 @@ internal::initialize()
 {
     // Register attribute arrays with no compression
     TypedAttributeArray<bool>::registerType();
+    TypedAttributeArray<int8_t>::registerType();
     TypedAttributeArray<int16_t>::registerType();
     TypedAttributeArray<int32_t>::registerType();
     TypedAttributeArray<int64_t>::registerType();
@@ -56,6 +57,8 @@ internal::initialize()
     StringAttributeArray::registerType();
 
     // Register attribute arrays with matrix and quaternion attributes
+    TypedAttributeArray<math::Mat3<float>>::registerType();
+    TypedAttributeArray<math::Mat3<double>>::registerType();
     TypedAttributeArray<math::Mat4<float>>::registerType();
     TypedAttributeArray<math::Mat4<double>>::registerType();
     TypedAttributeArray<math::Quat<float>>::registerType();
@@ -89,13 +92,10 @@ internal::uninitialize()
     AttributeArray::clearRegistry();
 }
 
-void initialize() { internal::initialize(); }
-void uninitialize() { internal::uninitialize(); }
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

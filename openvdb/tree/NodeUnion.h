@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,6 +39,7 @@
 #define OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/Types.h>
 #include <cstring> // for std::memcpy()
 #include <type_traits>
 
@@ -47,7 +48,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-#ifndef OPENVDB_3_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 4
 
 // Forward declaration of traits class
 template<typename T> struct CopyTraits;
@@ -133,7 +134,7 @@ template<> struct CopyTraits<math::Coord> { static const bool IsCopyable = true;
 ////////////////////////////////////////
 
 
-#else // OPENVDB_3_ABI_COMPATIBLE
+#else // OPENVDB_ABI_VERSION_NUMBER <= 3
 
 // Prior to OpenVDB 4 and the introduction of C++11, values of non-POD types
 // were heap-allocated and stored by pointer due to C++98 restrictions on unions.
@@ -217,7 +218,7 @@ struct NodeUnion: public NodeUnionImpl<std::is_class<ValueT>::value, ValueT, Chi
     NodeUnion() {}
 };
 
-#endif // OPENVDB_3_ABI_COMPATIBLE
+#endif
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
@@ -225,6 +226,6 @@ struct NodeUnion: public NodeUnionImpl<std::is_class<ValueT>::value, ValueT, Chi
 
 #endif // OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

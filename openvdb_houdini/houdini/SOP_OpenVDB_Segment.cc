@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,31 +40,23 @@
 
 #include <openvdb/tools/LevelSetUtil.h>
 
-
-#include <GA/GA_ElementGroupTable.h>
-#include <GA/GA_PageHandle.h>
-#include <GA/GA_PageIterator.h>
-#include <GA/GA_AttributeInstanceMatrix.h>
-#include <GEO/GEO_PrimClassifier.h>
-#include <GEO/GEO_PointClassifier.h>
-#include <GU/GU_ConvertParms.h>
-#include <UT/UT_Quaternion.h>
-#include <UT/UT_ScopedPtr.h>
-#include <UT/UT_ValArray.h>
+#include <GA/GA_AttributeRef.h>
+#include <GA/GA_ElementGroup.h>
+#include <GA/GA_Handle.h>
+#include <GA/GA_Types.h>
 #include <UT/UT_Version.h>
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/random.hpp>
-#include <boost/generator_iterator.hpp>
-#include <boost/random/uniform_real.hpp>
-#include <boost/math/constants/constants.hpp>
-
-#include <iostream>
-#include <string>
 #include <sstream>
-#include <limits>
+#include <stdexcept>
+#include <string>
 #include <vector>
-#include <list>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -199,10 +191,17 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
     bool updateParmsFlags() override;
 };
+
 
 ////////////////////////////////////////
 
@@ -233,8 +232,15 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, name each output VDB after the input VDB with"
             " a unique segment number appended for ease of identification."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Segment", SOP_OpenVDB_Segment::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Segment by Connectivity",
+        SOP_OpenVDB_Segment::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBSegment")
+#endif
         .addInput("OpenVDB grids")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -288,23 +294,25 @@ SOP_OpenVDB_Segment::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Segment::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Segment)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
+#endif
 
         const fpreal time = context.getTime();
 
         const GU_Detail* inputGeoPt = inputGeo(0);
         const GA_PrimitiveGroup *group = nullptr;
 
-        hvdb::Interrupter boss("VDB Segment");
+        hvdb::Interrupter boss("Segmenting VDBs");
 
         {
             UT_String str;
             evalString(str, "group", 0, time);
-            group = matchGroup(const_cast<GU_Detail&>(*inputGeoPt), str.toStdString());
+            group = matchGroup(*inputGeoPt, str.toStdString());
         }
 
 
@@ -346,6 +354,6 @@ SOP_OpenVDB_Segment::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

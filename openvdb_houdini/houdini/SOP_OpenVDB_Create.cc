@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,19 +37,29 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/UT_VDBTools.h> // for GridTransformOp, et al.
 #include <openvdb_houdini/Utils.h>
+#include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
+#include <UT/UT_WorkArgs.h>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/case_conv.hpp>
+#include <hboost/algorithm/string/trim.hpp>
+#else
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <UT/UT_Interrupt.h>
-#include <UT/UT_WorkArgs.h>
+#endif
 #include <OBJ/OBJ_Camera.h>
-
-#include <sstream>
+#include <cmath>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 namespace cvdb = openvdb;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -107,8 +117,8 @@ stringToDataType(const std::string& s)
 {
     DataType ret = TYPE_FLOAT;
     std::string str = s;
-    boost::trim(str);
-    boost::to_lower(str);
+    hboost::trim(str);
+    hboost::to_lower(str);
     if (str == dataTypeToString(TYPE_FLOAT)) {
         ret = TYPE_FLOAT;
     } else if (str == dataTypeToString(TYPE_DOUBLE)) {
@@ -148,7 +158,7 @@ public:
     int updateNearPlane(float time);
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
 
@@ -198,12 +208,10 @@ updateNearFarCallback(void* data, int /*idx*/, float time, const PRM_Template*)
 int
 SOP_OpenVDB_Create::updateNearFar(float time)
 {
-    UT_String cameraPath;
-    evalString(cameraPath, "camera", 0, time);
-    cameraPath.harden();
-    if (!cameraPath.isstring()) return 1;
+    const auto cameraPath = evalStdString("camera", time);
+    if (cameraPath.empty()) return 1;
 
-    OBJ_Node *camobj = findOBJNode(cameraPath);
+    OBJ_Node *camobj = findOBJNode(cameraPath.c_str());
     if (!camobj) return 1;
 
     OBJ_Camera* cam = camobj->castToOBJCamera();
@@ -295,26 +303,22 @@ newSopOperator(OP_OperatorTable *table)
     parms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", "Sep"));
 
 
-    {   // Transform type
-        char const * const items[] = {
+    // Transform type
+    parms.add(hutil::ParmFactory(PRM_ORD | PRM_TYPE_JOIN_NEXT, "transform", "Transform")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "linear",   "Linear",
             "frustum",  "Frustum",
-            "refVDB",   "Reference VDB",
-            nullptr
-        };
-
-        parms.add(hutil::ParmFactory(PRM_ORD | PRM_TYPE_JOIN_NEXT, "transform", "Transform")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "The type of transform to assign to each VDB\n\n"
-                "Linear:\n"
-                "   Rotation and scale only\n"
-                "Frustum:\n"
-                "   Perspective projection, with focal length and near and far planes"
-                " from a given camera\n"
-                "Reference VDB:\n"
-                "   Match the transform of an input VDB."));
-    }
+            "refVDB",   "Reference VDB"
+        })
+        .setTooltip(
+            "The type of transform to assign to each VDB\n\n"
+            "Linear:\n"
+            "   Rotation and scale only\n"
+            "Frustum:\n"
+            "   Perspective projection, with focal length and near and far planes"
+            " from a given camera\n"
+            "Reference VDB:\n"
+            "   Match the transform of an input VDB."));
 
     // Toggle to preview the frustum
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewFrustum", "Preview")
@@ -540,7 +544,7 @@ Other:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "matchVoxelSize", "Match Voxel Size"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Create", SOP_OpenVDB_Create::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Create", SOP_OpenVDB_Create::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addOptionalInput("Optional Input to Merge With")
         .addOptionalInput("Optional Reference VDB")
@@ -593,12 +597,12 @@ SOP_OpenVDB_Create::updateParmsFlags()
     bool changed = false;
     UT_String tmpStr;
 
-    const int transformParm = evalInt("transform", 0, 0);
-    const bool linear = transformParm == 0;
-    const bool frustum = transformParm == 1;
-    const bool matching = transformParm == 2;
+    const auto transformParm = evalInt("transform", 0, 0);
+    const bool linear = (transformParm == 0);
+    const bool frustum = (transformParm == 1);
+    const bool matching = (transformParm == 2);
 
-    for (int i = 1, N = evalInt("gridList", 0, 0); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("gridList", 0, 0)); i <= N; ++i) {
 
         evalStringInst("gridClass#", &i, tmpStr, 0, 0);
         openvdb::GridClass gridClass = openvdb::GridBase::stringToGridClass(tmpStr.toStdString());
@@ -649,12 +653,8 @@ SOP_OpenVDB_Create::updateParmsFlags()
     changed |= setVisibleState("rotation", linear);
 
     // frustum transform
-    UT_String cameraPath;
-    evalString(cameraPath, "camera", 0, 0);
-    cameraPath.harden();
-
-    const bool enableFrustumSettings = cameraPath.isstring() &&
-        findOBJNode(cameraPath) != nullptr;
+    const auto cameraPath = evalStdString("camera", 0);
+    const bool enableFrustumSettings = (!cameraPath.empty() && findOBJNode(cameraPath.c_str()));
 
     changed |= enableParm("camera", frustum);
     changed |= enableParm("voxelCount", frustum & enableFrustumSettings);
@@ -697,7 +697,8 @@ void
 SOP_OpenVDB_Create::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
-    if (nullptr != obsoleteParms->getParmPtr("matchVoxelSize")) {
+    PRM_Parm* parm = obsoleteParms->getParmPtr("matchVoxelSize");
+    if (parm && !parm->isFactoryDefault()) {
         const bool matchVoxelSize = obsoleteParms->evalInt("matchVoxelSize", 0, /*time=*/0.0);
         setInt("useVoxelSize", 0, 0.0, !matchVoxelSize);
     }
@@ -748,7 +749,7 @@ SOP_OpenVDB_Create::createNewGrid(
 
 
 OP_ERROR
-SOP_OpenVDB_Create::cookMySop(OP_Context &context)
+SOP_OpenVDB_Create::cookVDBSop(OP_Context &context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -759,16 +760,12 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
         fpreal time = context.getTime();
 
         // Create a group for the grid primitives.
-        GA_PrimitiveGroup* group = nullptr;
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        if(groupStr.isstring()) {
-            group = gdp->newPrimitiveGroup(groupStr.buffer());
-        }
+        const auto groupStr = evalStdString("group", time);
+        GA_PrimitiveGroup* group = (groupStr.empty() ?
+            nullptr : gdp->newPrimitiveGroup(groupStr.c_str()));
 
         // Get reference VDB, if exists
-        const int transformParm = evalInt("transform", 0, time);
-        const bool matchTransfom = transformParm == 2;
+        const bool matchTransfom = (evalInt("transform", 0, time) == 2);
         const GU_PrimVDB* refVdb = (matchTransfom ? getReferenceVdb(context) : nullptr);
 
         // Create a shared transform
@@ -783,7 +780,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
         // Create the grids
         UT_String gridNameStr, tmpStr;
 
-        for (int i = 1, N = evalInt("gridList", 0, 0); i <= N; ++i) {
+        for (int i = 1, N = static_cast<int>(evalInt("gridList", 0, 0)); i <= N; ++i) {
 
             evalStringInst("gridName#", &i, gridNameStr, 0, time);
 
@@ -814,63 +811,66 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                         background = float(evalFloatInst("bgFloat#", &i, 0, time));
                     }
 
-                    createNewGrid<cvdb::FloatGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::FloatGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_DOUBLE:
                 {
                     double background = double(evalFloatInst("bgFloat#", &i, 0, time));
-                    createNewGrid<cvdb::DoubleGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::DoubleGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_INT:
                 {
-                    int background = evalIntInst("bgInt#", &i, 0, time);
-                    createNewGrid<cvdb::Int32Grid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass);
+                    int background = static_cast<int>(evalIntInst("bgInt#", &i, 0, time));
+                    createNewGrid<cvdb::Int32Grid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_BOOL:
                 {
                     bool background = evalIntInst("bgBool#", &i, 0, time);
-                    createNewGrid<cvdb::BoolGrid>(gridNameStr, background,
-                                                  transform, maskGrid, group, gridClass);
+                    createNewGrid<cvdb::BoolGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass);
                     break;
                 }
                 case TYPE_VEC3S:
                 {
-                    cvdb::Vec3f background(float(evalFloatInst("bgVec3f#", &i, 0, time)),
-                                           float(evalFloatInst("bgVec3f#", &i, 1, time)),
-                                           float(evalFloatInst("bgVec3f#", &i, 2, time)));
+                    cvdb::Vec3f background(
+                        float(evalFloatInst("bgVec3f#", &i, 0, time)),
+                        float(evalFloatInst("bgVec3f#", &i, 1, time)),
+                        float(evalFloatInst("bgVec3f#", &i, 2, time)));
 
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
-                    createNewGrid<cvdb::Vec3SGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    createNewGrid<cvdb::Vec3SGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3D:
                 {
-                    cvdb::Vec3d background(double(evalFloatInst("bgVec3f#", &i, 0, time)),
-                                           double(evalFloatInst("bgVec3f#", &i, 1, time)),
-                                           double(evalFloatInst("bgVec3f#", &i, 2, time)));
+                    cvdb::Vec3d background(
+                        double(evalFloatInst("bgVec3f#", &i, 0, time)),
+                        double(evalFloatInst("bgVec3f#", &i, 1, time)),
+                        double(evalFloatInst("bgVec3f#", &i, 2, time)));
 
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
 
-                    createNewGrid<cvdb::Vec3DGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    createNewGrid<cvdb::Vec3DGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
                 case TYPE_VEC3I:
                 {
-                    cvdb::Vec3i background(evalIntInst("bgVec3i#", &i, 0, time),
-                                           evalIntInst("bgVec3i#", &i, 1, time),
-                                           evalIntInst("bgVec3i#", &i, 2, time));
-                    int vecType = evalIntInst("vecType#", &i, 0, time);
-                    createNewGrid<cvdb::Vec3IGrid>(gridNameStr, background,
-                                                   transform, maskGrid, group, gridClass, vecType);
+                    cvdb::Vec3i background(
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 0, time)),
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 1, time)),
+                        static_cast<cvdb::Int32>(evalIntInst("bgVec3i#", &i, 2, time)));
+                    int vecType = static_cast<int>(evalIntInst("vecType#", &i, 0, time));
+                    createNewGrid<cvdb::Vec3IGrid>(
+                        gridNameStr, background, transform, maskGrid, group, gridClass, vecType);
                     break;
                 }
             } // eType switch
@@ -892,21 +892,19 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
         const GU_PrimVDB* refVdb)
 {
     fpreal time = context.getTime();
-    const int transformParm = evalInt("transform", 0, time);
-    const bool linear = transformParm == 0;
-    const bool frustum = transformParm == 1;
+    const auto transformParm = evalInt("transform", 0, time);
+    const bool linear = (transformParm == 0);
+    const bool frustum = (transformParm == 1);
 
     if (frustum) { // nonlinear frustum transform
 
-        UT_String cameraPath;
-        evalString(cameraPath, "camera", 0, time);
-        cameraPath.harden();
-        if (!cameraPath.isstring()) {
+        const auto cameraPath = evalStdString("camera", time);
+        if (cameraPath.empty()) {
             addError(SOP_MESSAGE, "No camera selected");
             return error();
         }
 
-        OBJ_Node *camobj = findOBJNode(cameraPath);
+        OBJ_Node *camobj = findOBJNode(cameraPath.c_str());
         if (!camobj) {
             addError(SOP_MESSAGE, "Camera not found");
             return error();
@@ -926,7 +924,7 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
             nearPlane = static_cast<float>(evalFloat("nearPlane", 0, time)),
             farPlane = static_cast<float>(evalFloat("farPlane", 0, time)),
             voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
-        const int voxelCount = evalInt("voxelCount", 0, time);
+        const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
 
         transform = hvdb::frustumTransformFromCamera(*this, context, *cam,
             offset, nearPlane, farPlane, voxelDepthSize, voxelCount);
@@ -997,10 +995,8 @@ SOP_OpenVDB_Create::getReferenceVdb(OP_Context &context)
     const GU_Detail* refGdp = inputGeo(1, context);
     if (!refGdp) return nullptr;
 
-    UT_String refGroupStr;
-    evalString(refGroupStr, "reference", 0, context.getTime());
-    const GA_PrimitiveGroup* refGroup =
-        matchGroup(const_cast<GU_Detail&>(*refGdp), refGroupStr.toStdString());
+    const GA_PrimitiveGroup* refGroup = matchGroup(
+        *refGdp, evalStdString("reference", context.getTime()));
 
     hvdb::VdbPrimCIterator vdbIter(refGdp, refGroup);
     const GU_PrimVDB* refVdb = *vdbIter;
@@ -1055,6 +1051,6 @@ SOP_OpenVDB_Create::createMaskGrid(const GU_PrimVDB* refVdb,
     return resampledMaskGrid;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -144,7 +144,7 @@ NodeRegistry::deregisterNodes(MFnPlugin& plugin, MStatus& status)
 
             const NodeInfo& node = (*gNodes)[n];
 
-            status = plugin.deregisterData(node.typeId);
+            status = plugin.deregisterNode(node.typeId);
 
             if (!status) {
                 const std::string msg = "Failed to deregister '" +
@@ -192,13 +192,13 @@ uninitializePlugin(MObject obj)
     MStatus status;
     MFnPlugin plugin(obj);
 
+    openvdb_maya::NodeRegistry::deregisterNodes(plugin, status);
+
     status = plugin.deregisterData(OpenVDBData::id);
     if (!status) {
         status.perror("Failed to deregister 'OpenVDBData'");
         return status;
     }
-
-    openvdb_maya::NodeRegistry::deregisterNodes(plugin, status);
 
     return status;
 }
@@ -207,6 +207,6 @@ uninitializePlugin(MObject obj)
 ////////////////////////////////////////
 
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

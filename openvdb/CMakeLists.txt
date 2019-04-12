@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,20 +24,23 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
+cmake_minimum_required(VERSION 3.1)
 PROJECT ( OpenVDBCore )
+
+set(CMAKE_CXX_STANDARD 11)
 
 IF ( USE_GLFW3 )
   FIND_PACKAGE ( GLFW3 REQUIRED )
   SET ( OPENVDB_USE_GLFW_FLAG "-DOPENVDB_USE_GLFW_3" )
   IF ( UNIX AND NOT APPLE )
-	SET ( GLFW_DEPENDENT_LIBRARIES "X11;Xi;Xrandr;Xinerama;Xcursor;Xxf86vm" )
+    SET ( GLFW_DEPENDENT_LIBRARIES "X11;Xi;Xrandr;Xinerama;Xcursor;Xxf86vm" )
   ENDIF ( UNIX AND NOT APPLE )
   SET ( GLFW_LINK_LIBRARY ${GLFW3_glfw_LIBRARY} )
   SET ( GLFW_INCLUDE_DIRECTORY  ${GLFW3_INCLUDE_DIR} CACHE STRING "GLFW3 include directory")
 ELSE ()
   FIND_PACKAGE ( GLFW REQUIRED )
   IF ( UNIX AND NOT APPLE )
-	SET ( GLFW_DEPENDENT_LIBRARIES "X11;Xi;Xrandr;Xinerama;Xcursor;Xxf86vm" )
+    SET ( GLFW_DEPENDENT_LIBRARIES "X11;Xi;Xrandr;Xinerama;Xcursor;Xxf86vm" )
   ENDIF ()
   SET ( GLFW_LINK_LIBRARY ${GLFW_glfw_LIBRARY} )
   SET ( GLFW_INCLUDE_DIRECTORY  ${GLFW_INCLUDE_DIR} CACHE STRING "GLFW include directory")
@@ -120,7 +123,7 @@ INCLUDE_DIRECTORIES ( . ) # So they can simulate referencing installed headers
 
 IF (WIN32)
   # Because of implicit linking!
-  LINK_DIRECTORIES ( SYSTEM ${Boost_LIBRARY_DIR} )
+  LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
 ENDIF ()
 
 INCLUDE_DIRECTORIES ( SYSTEM ${BLOSC_INCLUDE_DIR} )
@@ -212,7 +215,25 @@ SET_TARGET_PROPERTIES(
   VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
   )
 
-SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print/main.cc )
+SET ( VDB_LOD_SOURCE_FILES  cmd/openvdb_lod.cc )
+SET_SOURCE_FILES_PROPERTIES ( ${VDB_LOD_SOURCE_FILES}
+  PROPERTIES
+  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC"
+  )
+
+ADD_EXECUTABLE ( vdb_lod
+    ${VDB_LOD_SOURCE_FILES}
+  )
+
+TARGET_LINK_LIBRARIES ( vdb_lod
+  openvdb_shared
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${BLOSC_blosc_LIBRARY}
+  m
+  stdc++
+  )
+
+SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_PRINT_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
@@ -226,9 +247,11 @@ TARGET_LINK_LIBRARIES ( vdb_print
   openvdb_shared
   ${CMAKE_THREAD_LIBS_INIT}
   ${BLOSC_blosc_LIBRARY}
+  m
+  stdc++
   )
 
-SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render/main.cc )
+SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render.cc )
 SET_SOURCE_FILES_PROPERTIES ( ${VDB_RENDER_SOURCE_FILES}
   PROPERTIES
   COMPILE_FLAGS "-DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
@@ -244,10 +267,12 @@ TARGET_LINK_LIBRARIES ( vdb_render
   ${Openexr_ILMIMF_LIBRARY}
   ${Ilmbase_ILMTHREAD_LIBRARY}
   ${Ilmbase_IEX_LIBRARY}
+  m
+  stdc++
   )
 
 SET ( VDB_VIEW_SOURCE_FILES
-  cmd/openvdb_view/main.cc
+  cmd/openvdb_view.cc
   viewer/Camera.cc
   viewer/ClipBox.cc
   viewer/Font.cc
@@ -262,6 +287,8 @@ IF (NOT WIN32)
   ADD_EXECUTABLE ( vdb_view
     ${VDB_VIEW_SOURCE_FILES}
     )
+  
+  target_include_directories ( vdb_view SYSTEM PRIVATE ${Boost_INCLUDE_DIR} )
 
   TARGET_LINK_LIBRARIES ( vdb_view
     openvdb_shared
@@ -274,6 +301,8 @@ IF (NOT WIN32)
     ${GLFW_LINK_LIBRARY}
     ${GLFW_DEPENDENT_LIBRARIES}
     ${GLEW_GLEW_LIBRARY}
+    m
+    stdc++
     )
 ENDIF ()
 
@@ -359,6 +388,7 @@ SET ( UNITTEST_SOURCE_FILES
   unittest/TestTreeGetSetValues.cc
   unittest/TestTreeIterators.cc
   unittest/TestTreeVisitor.cc
+  unittest/TestTypes.cc
   unittest/TestUtil.cc
   unittest/TestValueAccessor.cc
   unittest/TestVec2Metadata.cc
@@ -381,6 +411,8 @@ IF ( OPENVDB_BUILD_UNITTESTS )
   TARGET_LINK_LIBRARIES ( vdb_test
     ${CPPUnit_cppunit_LIBRARY}
     openvdb_shared
+    m
+    stdc++
     )
 
   ADD_TEST ( vdb_unit_test vdb_test )
@@ -414,6 +446,7 @@ IF ( NOT WIN32 )
     )
 ENDIF ()
 INSTALL ( TARGETS
+  vdb_lod
   vdb_print
   vdb_render
   DESTINATION

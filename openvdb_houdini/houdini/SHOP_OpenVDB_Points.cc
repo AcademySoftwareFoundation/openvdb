@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,7 @@
 
 #include <UT/UT_DSOVersion.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_Ramp.h>
 #include <OP/OP_OperatorTable.h>
 #include <SHOP/SHOP_Node.h>
 #include <SHOP/SHOP_Operator.h>
@@ -220,6 +221,6 @@ newShopOperator(OP_OperatorTable *table)
     info->setRenderMask("*");
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

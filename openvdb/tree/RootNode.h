@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -259,7 +259,7 @@ private:
         bool test() const { assert(mParentNode); return mIter != mParentNode->mTable.end(); }
         operator bool() const { return this->test(); }
 
-        void increment() { ++mIter; this->skip(); }
+        void increment() { if (this->test()) { ++mIter; } this->skip(); }
         bool next() { this->increment(); return this->test(); }
         void increment(Index n) { for (int i = 0; i < n && this->next(); ++i) {} }
 
@@ -2342,7 +2342,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 
             if (childMask.isOn(i)) {
                 // Read in and insert a child node.
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
                 ChildT* child = new ChildT(origin, mBackground);
 #else
                 ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
@@ -2389,7 +2389,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     for (Index n = 0; n < numChildren; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
         Coord origin(vec);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
         ChildT* child = new ChildT(origin, mBackground);
 #else
         ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
@@ -3479,6 +3479,6 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 
 #endif // OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

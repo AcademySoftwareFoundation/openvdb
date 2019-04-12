@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/Types.h>
+#include <type_traits>
 #include <vector>
 
 
@@ -85,12 +86,12 @@ TestMath::testAll()
         CPPUNIT_ASSERT(math::isApproxEqual(a*a*a, 3.0, 1e-6));
     }
     {// isNegative
-        CPPUNIT_ASSERT(!boost::is_signed<unsigned int>::value);
-        CPPUNIT_ASSERT(boost::is_signed<int>::value);
-        CPPUNIT_ASSERT(!boost::is_signed<bool>::value);
-        //CPPUNIT_ASSERT(boost::is_signed<double>::value);//fails!
-        //CPPUNIT_ASSERT(boost::is_signed<float>::value);//fails!
-        
+        CPPUNIT_ASSERT(!std::is_signed<unsigned int>::value);
+        CPPUNIT_ASSERT(std::is_signed<int>::value);
+        CPPUNIT_ASSERT(!std::is_signed<bool>::value);
+        //CPPUNIT_ASSERT(std::is_signed<double>::value);//fails!
+        //CPPUNIT_ASSERT(std::is_signed<float>::value);//fails!
+
         CPPUNIT_ASSERT( math::isNegative(-1.0f));
         CPPUNIT_ASSERT(!math::isNegative( 1.0f));
         CPPUNIT_ASSERT( math::isNegative(-1.0));
@@ -100,6 +101,21 @@ TestMath::testAll()
         CPPUNIT_ASSERT(!math::isNegative(1u));
         CPPUNIT_ASSERT( math::isNegative(-1));
         CPPUNIT_ASSERT(!math::isNegative( 1));
+    }
+    {// zeroVal
+        CPPUNIT_ASSERT_EQUAL(zeroVal<bool>(), false);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<int>(), int(0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<float>(), 0.0f);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<double>(), 0.0);
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3i>(), Vec3i(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3s>(), Vec3s(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Vec3d>(), Vec3d(0,0,0));
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quats>(), Quats::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Quatd>(), Quatd::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3s>(), Mat3s::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat3d>(), Mat3d::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat4s>(), Mat4s::zero());
+        CPPUNIT_ASSERT_EQUAL(zeroVal<Mat4d>(), Mat4d::zero());
     }
 }
 
@@ -233,6 +249,6 @@ TestMath::testMinMaxIndex()
     CPPUNIT_ASSERT_EQUAL(size_t(2), openvdb::math::MaxIndex(j));
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

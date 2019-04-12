@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,8 +38,17 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <set>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -49,12 +58,16 @@ class SOP_OpenVDB_Vector_Split: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Vector_Split(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Vector_Split() override {}
+    ~SOP_OpenVDB_Vector_Split() override = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
 };
 
 
@@ -100,9 +113,12 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
+    hvdb::OpenVDBOpFactory("VDB Vector Split",
         SOP_OpenVDB_Vector_Split::factory, parms, *table)
         .addInput("Vector VDBs to split into scalar VDBs")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Split::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -251,14 +267,15 @@ public:
 
 
 OP_ERROR
-SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Split)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        duplicateSource(0, context);
+#endif
 
         const fpreal time = context.getTime();
-
-        duplicateSource(0, context);
 
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);
         const bool removeSourceGrids = evalInt("remove_sources", 0, time);
@@ -335,6 +352,6 @@ SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

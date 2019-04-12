@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,8 +33,12 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 
+#include <cstdio> // for std::remove()
+#include <cstdlib> // for std::getenv()
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef _MSC_VER
 #include <windows.h>
@@ -46,8 +50,8 @@ using namespace openvdb::points;
 class TestPointGroup: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointGroup);
     CPPUNIT_TEST(testDescriptor);
@@ -74,6 +78,10 @@ class FirstFilter
 {
 public:
     static bool initialized() { return true; }
+
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
 
     template <typename LeafT> void reset(const LeafT&) { }
 
@@ -267,11 +275,12 @@ TestPointGroup::testAppendDrop()
 
         setGroup(tree, "test", true);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
+        GroupFilter filter("test", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(4));
 
         setGroup(tree, "test", false);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
         dropGroup(tree, "test");
     }
@@ -288,6 +297,52 @@ TestPointGroup::testAppendDrop()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(0));
     }
+
+    { // check that newly added groups have empty group membership
+
+        // recreate the grid with 3 points in one leaf
+
+        positions = {{1, 1, 1}, {1, 2, 1}, {2, 1, 1}};
+        grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+        PointDataTree& newTree = grid->tree();
+
+        appendGroup(newTree, "test");
+
+        // test that a completely new group (with a new group attribute)
+        // has empty membership
+
+        CPPUNIT_ASSERT(newTree.cbeginLeaf());
+        GroupFilter filter("test", newTree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree, filter), Index64(0));
+
+        // check that membership in a group that was not created with a
+        // new attribute array is still empty.
+        // we will append a second group, set its membership, then
+        // drop it and append a new group with the same name again
+
+        appendGroup(newTree, "test2");
+
+        PointDataTree::LeafIter leafIter2 = newTree.beginLeaf();
+        CPPUNIT_ASSERT(leafIter2);
+
+        GroupWriteHandle test2Handle = leafIter2->groupWriteHandle("test2");
+
+        test2Handle.set(0, true);
+        test2Handle.set(2, true);
+
+        GroupFilter filter2("test2", newTree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree, filter2), Index64(2));
+
+        // drop and re-add group
+
+        dropGroup(newTree, "test2");
+        appendGroup(newTree, "test2");
+
+        // check that group is fully cleared and does not have previously existing data
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree, filter2), Index64(0));
+    }
+
 }
 
 
@@ -417,15 +472,45 @@ TestPointGroup::testSet()
     appendGroup(tree, "test");
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
-    CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
-
-    std::vector<short> membership{1, 0, 1, 1, 0, 1};
+    GroupFilter filter("test", tree.cbeginLeaf()->attributeSet());
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
     // copy tree for descriptor sharing test
 
     PointDataTree tree2(tree);
 
-    setGroup(tree, pointIndexGrid->tree(), membership, "test");
+    std::vector<short> membership{1, 0, 1, 1, 0, 1};
+
+    // test add to group
+
+    setGroup(tree, "test", true);
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(6));
+
+    // test nothing is done if the index tree contains no valid indices
+
+    tools::PointIndexGrid::Ptr tmpIndexGrid = tools::PointIndexGrid::create();
+    setGroup(tree, tmpIndexGrid->tree(), {0,0,0,0,0,0}, "test", /*remove*/true);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    // test throw on out of range index
+
+    auto indexLeaf = tmpIndexGrid->tree().touchLeaf(tree.cbeginLeaf()->origin());
+    indexLeaf->indices().emplace_back(membership.size());
+    CPPUNIT_ASSERT_THROW(setGroup(tree, tmpIndexGrid->tree(), membership, "test"), IndexError);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    // test remove flag
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/false);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
+    CPPUNIT_ASSERT_EQUAL(Index64(4), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), {0,1,0,0,1,0}, "test", /*remove*/false);
+    CPPUNIT_ASSERT_EQUAL(Index64(6), pointCount(tree, filter));
+
+    setGroup(tree, pointIndexGrid->tree(), membership, "test", /*remove*/true);
 
     // check that descriptor remains shared
 
@@ -436,7 +521,8 @@ TestPointGroup::testSet()
     dropGroup(tree2, "copy1");
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
-    CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
+    GroupFilter filter2("test", tree.cbeginLeaf()->attributeSet());
+    CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter2), Index64(4));
 
     { // IO
         // setup temp directory
@@ -491,7 +577,8 @@ TestPointGroup::testSet()
             CPPUNIT_ASSERT_EQUAL(descriptor.groupMap().size(), size_t(1));
 
             CPPUNIT_ASSERT_EQUAL(pointCount(treex), Index64(6));
-            CPPUNIT_ASSERT_EQUAL(groupPointCount(treex, "test"), Index64(4));
+            GroupFilter filter3("test", leaf.attributeSet());
+            CPPUNIT_ASSERT_EQUAL(pointCount(treex, filter3), Index64(4));
         }
         std::remove(filename.c_str());
     }
@@ -529,11 +616,12 @@ TestPointGroup::testFilter()
         appendGroup(tree, "first");
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first"), Index64(0));
+        GroupFilter filter("first", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
-        FirstFilter filter;
+        FirstFilter filter2;
 
-        setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", filter);
+        setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", filter2);
 
         auto iter = tree.cbeginLeaf();
 
@@ -541,7 +629,8 @@ TestPointGroup::testFilter()
             CPPUNIT_ASSERT_EQUAL(iter->groupPointCount("first"), Index64(1));
         }
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first"), Index64(2));
+        GroupFilter filter3("first", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter3), Index64(2));
     }
 
     const openvdb::BBoxd bbox(openvdb::Vec3d(0, 1.5, 0), openvdb::Vec3d(101, 100.5, 101));
@@ -550,35 +639,39 @@ TestPointGroup::testFilter()
         appendGroup(tree, "bbox");
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(0));
+        GroupFilter filter("bbox", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
-        BBoxFilter filter(*transform, bbox);
+        BBoxFilter filter2(*transform, bbox);
 
-        setGroupByFilter<PointDataTree, BBoxFilter>(tree, "bbox", filter);
+        setGroupByFilter<PointDataTree, BBoxFilter>(tree, "bbox", filter2);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(3));
+        GroupFilter filter3("bbox", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter3), Index64(3));
     }
 
     { // first point filter and bbox filter (intersection of the above two filters)
         appendGroup(tree, "first_bbox");
 
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(0));
+        GroupFilter filter("first_bbox", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter), Index64(0));
 
         using FirstBBoxFilter = BinaryFilter<FirstFilter, BBoxFilter>;
 
         FirstFilter firstFilter;
         BBoxFilter bboxFilter(*transform, bbox);
-        FirstBBoxFilter filter(firstFilter, bboxFilter);
+        FirstBBoxFilter filter2(firstFilter, bboxFilter);
 
-        setGroupByFilter<PointDataTree, FirstBBoxFilter>(tree, "first_bbox", filter);
+        setGroupByFilter<PointDataTree, FirstBBoxFilter>(tree, "first_bbox", filter2);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(1));
+        GroupFilter filter3("first_bbox", tree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree, filter3), Index64(1));
 
         std::vector<Vec3f> positions;
 
         for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-            GroupFilter filterx("first_bbox");
+            GroupFilter filterx("first_bbox", iter->attributeSet());
             auto filterIndexIter = iter->beginIndexOn(filterx);
 
             auto handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
@@ -618,7 +711,8 @@ TestPointGroup::testFilter()
 
         setGroupByRandomTarget(newTree, "random_maximum", target);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_maximum"), target);
+        GroupFilter filter("random_maximum", newTree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree, filter), target);
 
         // random - percentage
 
@@ -626,10 +720,11 @@ TestPointGroup::testFilter()
 
         setGroupByRandomPercentage(newTree, "random_percentage", 33.333333f);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_percentage"), Index64(1000));
+        GroupFilter filter2("random_percentage", newTree.cbeginLeaf()->attributeSet());
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree, filter2), Index64(1000));
     }
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

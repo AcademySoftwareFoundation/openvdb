@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,7 +29,8 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @author Ken Museth, D.J. Hill (openvdb port, added staggered grid support)
-/// @file PointAdvect.h
+///
+/// @file tools/PointAdvect.h
 ///
 /// @brief Class PointAdvect advects points (with position) in a static velocity field
 
@@ -43,11 +44,10 @@
 #include <openvdb/util/NullInterrupter.h>
 #include "Interpolation.h"                 // sampling
 #include "VelocityFields.h"                // VelocityIntegrator
-
-#include <boost/static_assert.hpp>
 #include <tbb/blocked_range.h>             // threading
 #include <tbb/parallel_for.h>              // threading
 #include <tbb/task.h>                      // for cancel
+#include <vector>
 
 
 namespace openvdb {
@@ -62,9 +62,9 @@ template<typename CptGridT = Vec3fGrid>
 class ClosestPointProjector
 {
 public:
-    typedef CptGridT                            CptGridType;
-    typedef typename CptGridType::ConstAccessor CptAccessor;
-    typedef typename CptGridType::ValueType     CptValueType;
+    using CptGridType = CptGridT;
+    using CptAccessor = typename CptGridType::ConstAccessor;
+    using CptValueType = typename CptGridType::ValueType;
 
     ClosestPointProjector():
         mCptIterations(0)
@@ -124,7 +124,7 @@ private:
 /// class PointList {
 ///     ...
 /// public:
-///     typedef internal_vector3_type value_type; // must support [] component access
+///     using value_type = internal_vector3_type; // must support [] component access
 ///     openvdb::Index size() const;              // number of points in list
 ///     value_type& operator[](int n);            // world space position of nth point
 /// };
@@ -140,14 +140,14 @@ template<typename GridT = Vec3fGrid,
 class PointAdvect
 {
 public:
-    typedef GridT                                        GridType;
-    typedef PointListT                                   PointListType;
-    typedef typename PointListT::value_type              LocationType;
-    typedef VelocityIntegrator<GridT, StaggeredVelocity> VelocityFieldIntegrator;
+    using GridType = GridT;
+    using PointListType = PointListT;
+    using LocationType = typename PointListT::value_type;
+    using VelocityFieldIntegrator = VelocityIntegrator<GridT, StaggeredVelocity>;
 
-    PointAdvect(const GridT& velGrid, InterrupterType* interrupter=NULL) :
+    PointAdvect(const GridT& velGrid, InterrupterType* interrupter = nullptr):
         mVelGrid(&velGrid),
-        mPoints(NULL),
+        mPoints(nullptr),
         mIntegrationOrder(1),
         mThreaded(true),
         mInterrupter(interrupter)
@@ -273,14 +273,14 @@ template<typename GridT = Vec3fGrid,
 class ConstrainedPointAdvect
 {
 public:
-    typedef GridT                                        GridType;
-    typedef typename PointListT::value_type              LocationType;
-    typedef VelocityIntegrator<GridT, StaggeredVelocity> VelocityIntegratorType;
-    typedef ClosestPointProjector<CptGridType>           ClosestPointProjectorType;
-    typedef PointListT PointListType;
+    using GridType = GridT;
+    using LocationType = typename PointListT::value_type;
+    using VelocityIntegratorType = VelocityIntegrator<GridT, StaggeredVelocity>;
+    using ClosestPointProjectorType = ClosestPointProjector<CptGridType>;
+    using PointListType = PointListT;
 
     ConstrainedPointAdvect(const GridType& velGrid,
-        const GridType& cptGrid, int cptn, InterrupterType* interrupter = NULL):
+        const GridType& cptGrid, int cptn, InterrupterType* interrupter = nullptr):
         mVelGrid(&velGrid),
         mCptGrid(&cptGrid),
         mCptIter(cptn),
@@ -419,6 +419,6 @@ private:
 
 #endif // OPENVDB_TOOLS_POINT_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

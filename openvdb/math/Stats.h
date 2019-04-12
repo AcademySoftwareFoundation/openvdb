@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,6 +39,7 @@
 
 #include <iosfwd> // for ostringstream
 #include <openvdb/version.h>
+#include <openvdb/Exceptions.h>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -72,7 +73,7 @@ public:
     {
     }
 
-    /// @brief Default copy constructor 
+    /// @brief Default copy constructor
     MinMax(const MinMax &other) = default;
 
     /// Add a single sample.
@@ -109,10 +110,10 @@ public:
     }
 
 protected:
-    
+
     ValueType mMin, mMax;
 };//end MinMax
-    
+
 /// @brief This class computes the minimum and maximum values of a population
 /// of floating-point values.
 class Extrema
@@ -407,6 +408,6 @@ private:
 
 #endif // OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

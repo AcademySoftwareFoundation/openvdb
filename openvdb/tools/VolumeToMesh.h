@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,7 +37,7 @@
 #ifndef OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
+#include <openvdb/Platform.h>
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
@@ -51,7 +51,7 @@
 
 #include <cmath> // for std::isfinite()
 #include <map>
-#include <memory> // for auto_ptr/unique_ptr
+#include <memory>
 #include <set>
 #include <type_traits>
 #include <vector>
@@ -196,17 +196,20 @@ struct VolumeToMesh
 
     //////////
 
+    /// @{
     // Mesh data accessors
 
-    const size_t& pointListSize() const;
-    PointList& pointList();
+    size_t pointListSize() const { return mPointListSize; }
+    PointList& pointList() { return mPoints; }
+    const PointList& pointList() const { return mPoints; }
 
-    const size_t& polygonPoolListSize() const;
-    PolygonPoolList& polygonPoolList();
-    const PolygonPoolList& polygonPoolList() const;
+    size_t polygonPoolListSize() const { return mPolygonPoolListSize; }
+    PolygonPoolList& polygonPoolList() { return mPolygons; }
+    const PolygonPoolList& polygonPoolList() const { return mPolygons; }
 
-    std::vector<uint8_t>& pointFlags();
-    const std::vector<uint8_t>& pointFlags() const;
+    std::vector<uint8_t>& pointFlags() { return mPointFlags; }
+    const std::vector<uint8_t>& pointFlags() const { return mPointFlags; }
+    /// @}
 
 
     //////////
@@ -2335,7 +2338,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
             for (ijk[1] = origin[1]; ijk[1] < end[1]; ijk[1] += dim) {
                 for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
-                    if (!mask.isValueOn(ijk) & isNonManifold(inputAcc, ijk, mIsovalue, dim)) {
+                    if (!mask.isValueOn(ijk) && isNonManifold(inputAcc, ijk, mIsovalue, dim)) {
                         mask.setActiveState(ijk, true);
                     }
                 }
@@ -3786,11 +3789,11 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
     , mIntersectionNodes(&intersectionLeafNodes.front())
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(signFlagsTree)
-    , mPointIndexTree(boost::integer_traits<Index32>::const_max)
+    , mPointIndexTree(std::numeric_limits<Index32>::max())
     , mPointIndexAccessor(pointIndexTree)
     , mIsovalue(iso)
 {
-    pointIndexTree.root().setBackground(boost::integer_traits<Index32>::const_max, false);
+    pointIndexTree.root().setBackground(std::numeric_limits<Index32>::max(), false);
 }
 
 
@@ -3800,7 +3803,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& 
     , mIntersectionNodes(rhs.mIntersectionNodes)
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(mSignFlagsTree)
-    , mPointIndexTree(boost::integer_traits<Index32>::const_max)
+    , mPointIndexTree(std::numeric_limits<Index32>::max())
     , mPointIndexAccessor(mPointIndexTree)
     , mIsovalue(rhs.mIsovalue)
 {
@@ -4833,41 +4836,6 @@ VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity, bool relaxDisorie
 }
 
 
-inline PointList&
-VolumeToMesh::pointList()
-{
-    return mPoints;
-}
-
-
-inline const size_t&
-VolumeToMesh::pointListSize() const
-{
-    return mPointListSize;
-}
-
-
-inline PolygonPoolList&
-VolumeToMesh::polygonPoolList()
-{
-    return mPolygons;
-}
-
-
-inline const PolygonPoolList&
-VolumeToMesh::polygonPoolList() const
-{
-    return mPolygons;
-}
-
-
-inline const size_t&
-VolumeToMesh::polygonPoolListSize() const
-{
-    return mPolygonPoolListSize;
-}
-
-
 inline void
 VolumeToMesh::setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity)
 {
@@ -4901,20 +4869,6 @@ inline void
 VolumeToMesh::setAdaptivityMask(const TreeBase::ConstPtr& tree)
 {
    mAdaptivityMaskTree = tree;
-}
-
-
-inline std::vector<uint8_t>&
-VolumeToMesh::pointFlags()
-{
-    return mPointFlags;
-}
-
-
-inline const std::vector<uint8_t>&
-VolumeToMesh::pointFlags() const
-{
-    return mPointFlags;
 }
 
 
@@ -4972,7 +4926,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
     }
 
     Int16TreeType signFlagsTree(0);
-    Index32TreeType pointIndexTree(boost::integer_traits<Index32>::const_max);
+    Index32TreeType pointIndexTree(std::numeric_limits<Index32>::max());
 
 
     // collect auxiliary data
@@ -5016,7 +4970,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
             typename Int16TreeType::Ptr refSignFlagsTreePt(new Int16TreeType(0));
             typename Index32TreeType::Ptr refPointIndexTreePt(
-                new Index32TreeType(boost::integer_traits<Index32>::const_max));
+                new Index32TreeType(std::numeric_limits<Index32>::max()));
 
             BoolTreeType refIntersectionTree(false);
 
@@ -5336,6 +5290,6 @@ volumeToMesh(
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

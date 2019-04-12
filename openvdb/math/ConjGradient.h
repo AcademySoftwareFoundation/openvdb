@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,7 +41,6 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
-#include <boost/scoped_array.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <algorithm> // for std::lower_bound()
@@ -49,6 +48,7 @@
 #include <cmath> // for std::isfinite()
 #include <limits>
 #include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -108,10 +108,10 @@ terminationDefaults()
 ///     <dt><i>iterations</i>
 ///     <dd>the maximum number of iterations, with or without convergence
 ///     <dt><i>relativeError</i>
-///     <dd>the relative error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| / ||<i>b</i>||
+///     <dd>the relative error ||<i>b</i> &minus; <i>Ax</i>|| / ||<i>b</i>||
 ///         that denotes convergence
 ///     <dt><i>absoluteError</i>
-///     <dd>the absolute error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| that denotes convergence
+///     <dd>the absolute error ||<i>b</i> &minus; <i>Ax</i>|| that denotes convergence
 ///
 /// @throw ArithmeticError if either @a x or @a b is not of the appropriate size.
 template<typename PositiveDefMatrix>
@@ -137,10 +137,10 @@ solve(
 ///     <dt><i>iterations</i>
 ///     <dd>the maximum number of iterations, with or without convergence
 ///     <dt><i>relativeError</i>
-///     <dd>the relative error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| / ||<i>b</i>||
+///     <dd>the relative error ||<i>b</i> &minus; <i>Ax</i>|| / ||<i>b</i>||
 ///         that denotes convergence
 ///     <dt><i>absoluteError</i>
-///     <dd>the absolute error ||<i>b</i> &minus; <i>A</i>@f$\hat{x}@f$|| that denotes convergence
+///     <dd>the absolute error ||<i>b</i> &minus; <i>Ax</i>|| that denotes convergence
 /// @param interrupter  an object adhering to the util::NullInterrupter interface
 ///     with which computation can be interrupted
 ///
@@ -477,9 +477,9 @@ private:
     template<typename OtherValueType> struct EqOp;
 
     const SizeType                  mNumRows;
-    boost::scoped_array<ValueType>  mValueArray;
-    boost::scoped_array<SizeType>   mColumnIdxArray;
-    boost::scoped_array<SizeType>   mRowSizeArray;
+    std::unique_ptr<ValueType[]>    mValueArray;
+    std::unique_ptr<SizeType[]>     mColumnIdxArray;
+    std::unique_ptr<SizeType[]>     mRowSizeArray;
 }; // class SparseStencilMatrix
 
 
@@ -1322,7 +1322,7 @@ public:
         tbb::parallel_for(SizeRange(0, A.numRows()), InitOp(A, mDiag.data()));
     }
 
-    virtual ~JacobiPreconditioner() override = default;
+    ~JacobiPreconditioner() override = default;
 
     void apply(const Vector<ValueType>& r, Vector<ValueType>& z) override
     {
@@ -1797,32 +1797,6 @@ solve(
 
 #endif // OPENVDB_MATH_CONJGRADIENT_HAS_BEEN_INCLUDED
 
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
-//
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////

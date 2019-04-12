@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -115,9 +115,9 @@ MStatus OpenVDBReadNode::initialize()
     aFrameNumbering = eAttr.create("FrameNumbering", "numbering", 0, &stat);
     if (stat != MS::kSuccess) return stat;
 
-	eAttr.addField("Frame.SubTick", 0);
-	eAttr.addField("Fractional frame values", 1);
-	eAttr.addField("Global ticks", 2);
+    eAttr.addField("Frame.SubTick", 0);
+    eAttr.addField("Fractional frame values", 1);
+    eAttr.addField("Global ticks", 2);
 
     eAttr.setConnectable(false);
     stat = addAttribute(aFrameNumbering);
@@ -227,6 +227,6 @@ MStatus OpenVDBReadNode::compute(const MPlug& plug, MDataBlock& data)
     return MS::kUnknownParameter;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -403,7 +403,7 @@ Measure2::operator()(const LeafRange& range) const
                 const Coord p = voxelIter.getCoord();
                 const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
                 sumA += dd * g.dot(g);
-                sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
+                sumV += dd * g.dot(Vec3T(p.data()));
             }
         }
         double* v = mParent->mArray + leafIter.pos();
@@ -435,7 +435,7 @@ Measure3::operator()(const LeafRange& range) const
                 const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
                 const Real dA = dd * g.dot(g);
                 sumA += dA;
-                sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
+                sumV += dd * g.dot(Vec3T(p.data()));
                 Curv::result(mAcc, p, alpha, beta);
                 sumC += dA * alpha/(2*math::Pow2(beta))*invDx;
             }
@@ -604,6 +604,6 @@ levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
 
 #endif // OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

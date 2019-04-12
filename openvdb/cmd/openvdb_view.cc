@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,12 +34,10 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <exception>
-#ifdef DWA_OPENVDB
-#include <usagetrack.h>
-#endif
 
 
 inline void
@@ -86,10 +84,6 @@ usage [[noreturn]] (const char* progName, int status)
 int
 main(int argc, char *argv[])
 {
-#ifdef DWA_OPENVDB
-    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-#endif
-
     const char* progName = argv[0];
     if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
 
@@ -125,7 +119,7 @@ main(int argc, char *argv[])
 
         if (printVersionInfo) {
             std::cout << "OpenVDB library version: "
-                << openvdb::getLibraryVersionString() << "\n";
+                << openvdb::getLibraryAbiVersionString() << "\n";
             std::cout << "OpenVDB file format version: "
                 << openvdb::OPENVDB_FILE_VERSION << std::endl;
             // If there are no files to view, don't print the OpenGL version,
@@ -201,6 +195,6 @@ main(int argc, char *argv[])
     return status;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

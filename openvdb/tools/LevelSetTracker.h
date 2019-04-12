@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,7 +30,7 @@
 
 /// @author Ken Museth
 ///
-/// @file LevelSetTracker.h
+/// @file tools/LevelSetTracker.h
 ///
 /// @brief Performs multi-threaded interface tracking of narrow band
 /// level sets. This is the building-block for most level set
@@ -40,9 +40,6 @@
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <type_traits>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -56,25 +53,45 @@
 #include "ChangeBackground.h"// for changeLevelSetBackground
 #include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
+#include <functional>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+namespace lstrack {
+
+/// @brief How to handle voxels that fall outside the narrow band
+/// @sa @link LevelSetTracker::trimming() trimming@endlink,
+///     @link LevelSetTracker::setTrimming() setTrimming@endlink
+enum class TrimMode {
+    kNone,     ///< Leave out-of-band voxels intact
+    kInterior, ///< Set out-of-band interior voxels to the background value
+    kExterior, ///< Set out-of-band exterior voxels to the background value
+    kAll       ///< Set all out-of-band voxels to the background value
+};
+
+} // namespace lstrack
+
+
 /// @brief Performs multi-threaded interface tracking of narrow band level sets
 template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetTracker
 {
 public:
-    typedef GridT                                GridType;
-    typedef typename GridT::TreeType             TreeType;
-    typedef typename TreeType::LeafNodeType      LeafType;
-    typedef typename TreeType::ValueType         ValueType;
-    typedef typename tree::LeafManager<TreeType> LeafManagerType; // leafs + buffers
-    typedef typename LeafManagerType::LeafRange  LeafRange;
-    typedef typename LeafManagerType::BufferType BufferType;
-    typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskTreeType;
+    using TrimMode = lstrack::TrimMode;
+
+    using GridType = GridT;
+    using TreeType = typename GridT::TreeType;
+    using LeafType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafManagerType = typename tree::LeafManager<TreeType>; // leafs + buffers
+    using LeafRange = typename LeafManagerType::LeafRange;
+    using BufferType = typename LeafManagerType::BufferType;
+    using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
     static_assert(std::is_floating_point<ValueType>::value,
         "LevelSetTracker requires a level set grid with floating-point values");
 
@@ -108,7 +125,10 @@ public:
     /// narrow band of the level set.
     void track();
 
-    /// @brief Remove voxels that are outside the narrow band. (substep of track)
+    /// @brief Set voxels that are outside the narrow band to the background value
+    /// (if trimming is enabled) and prune the grid.
+    /// @details Pruning is done automatically as a step in tracking.
+    /// @sa @link setTrimming() setTrimming@endlink, @link trimming() trimming@endlink
     void prune();
 
     /// @brief Fast but approximate dilation of the narrow band - one
@@ -143,34 +163,42 @@ public:
     State getState() const { return mState; }
 
     /// @brief Set the state of the tracker (see struct defined above)
-    void setState(const State& s) { mState =s; }
+    void setState(const State& s) { mState = s; }
 
     /// @return the spatial finite difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mState.spatialScheme; }
 
     /// @brief Set the spatial finite difference scheme
-    void setSpatialScheme(math::BiasedGradientScheme scheme) { mState.spatialScheme = scheme; }
+    void setSpatialScheme(math::BiasedGradientScheme s) { mState.spatialScheme = s; }
 
     /// @return the temporal integration scheme
     math::TemporalIntegrationScheme getTemporalScheme() const { return mState.temporalScheme; }
 
     /// @brief Set the spatial finite difference scheme
-    void setTemporalScheme(math::TemporalIntegrationScheme scheme) { mState.temporalScheme = scheme;}
+    void setTemporalScheme(math::TemporalIntegrationScheme s) { mState.temporalScheme = s;}
 
     /// @return The number of normalizations performed per track or
     /// normalize call.
-    int  getNormCount() const { return mState.normCount; }
+    int getNormCount() const { return mState.normCount; }
 
     /// @brief Set the number of normalizations performed per track or
     /// normalize call.
     void setNormCount(int n) { mState.normCount = n; }
 
     /// @return the grain-size used for multi-threading
-    int  getGrainSize() const { return mState.grainSize; }
+    int getGrainSize() const { return mState.grainSize; }
 
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mState.grainSize = grainsize; }
+
+    /// @brief Return the trimming mode for voxels outside the narrow band.
+    /// @details Trimming is enabled by default and is applied automatically prior to pruning.
+    /// @sa @link setTrimming() setTrimming@endlink, @link prune() prune@endlink
+    TrimMode trimming() const { return mTrimMode; }
+    /// @brief Specify whether to trim voxels outside the narrow band prior to pruning.
+    /// @sa @link trimming() trimming@endlink, @link prune() prune@endlink
+    void setTrimming(TrimMode mode) { mTrimMode = mode; }
 
     ValueType voxelSize() const { return mDx; }
 
@@ -188,13 +216,13 @@ public:
     const LeafManagerType& leafs() const { return *mLeafs; }
 
 private:
-
     // disallow copy construction and copy by assignment!
     LevelSetTracker(const LevelSetTracker&);// not implemented
     LevelSetTracker& operator=(const LevelSetTracker&);// not implemented
 
     // Private class to perform multi-threaded trimming of
     // voxels that are too far away from the zero-crossing.
+    template<TrimMode Trimming>
     struct Trim
     {
         Trim(LevelSetTracker& tracker) : mTracker(tracker) {}
@@ -209,11 +237,12 @@ private:
              typename MaskT>
     struct Normalizer
     {
-        typedef math::BIAS_SCHEME<SpatialScheme>                             SchemeT;
-        typedef typename SchemeT::template ISStencil<GridType>::StencilType  StencilT;
-        typedef typename MaskT::LeafNodeType MaskLeafT;
-        typedef typename MaskLeafT::ValueOnCIter MaskIterT;
-        typedef typename LeafType::ValueOnCIter VoxelIterT;
+        using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
+        using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+        using MaskLeafT = typename MaskT::LeafNodeType;
+        using MaskIterT = typename MaskLeafT::ValueOnCIter;
+        using VoxelIterT = typename LeafType::ValueOnCIter;
+
         Normalizer(LevelSetTracker& tracker, const MaskT* mask);
         void normalize();
         void operator()(const LeafRange& r) const {mTask(const_cast<Normalizer*>(this), r);}
@@ -229,7 +258,7 @@ private:
         LevelSetTracker& mTracker;
         const MaskT*     mMask;
         const ValueType  mDt, mInvDx;
-        typename boost::function<void (Normalizer*, const LeafRange&)> mTask;
+        typename std::function<void (Normalizer*, const LeafRange&)> mTask;
     }; // Normalizer struct
 
     template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
@@ -248,6 +277,7 @@ private:
     InterruptT*      mInterrupter;
     const ValueType  mDx;
     State            mState;
+    TrimMode         mTrimMode = TrimMode::kAll;
 }; // end of LevelSetTracker class
 
 template<typename GridT, typename InterruptT>
@@ -278,9 +308,13 @@ prune()
 {
     this->startInterrupter("Pruning Level Set");
 
-    // Prune voxels that are too far away from the zero-crossing
-    Trim t(*this);
-    t.trim();
+    // Set voxels that are too far away from the zero crossing to the background value.
+    switch (mTrimMode) {
+        case TrimMode::kNone:     break;
+        case TrimMode::kInterior: Trim<TrimMode::kInterior>(*this).trim(); break;
+        case TrimMode::kExterior: Trim<TrimMode::kExterior>(*this).trim(); break;
+        case TrimMode::kAll:      Trim<TrimMode::kAll>(*this).trim(); break;
+    }
 
     // Remove inactive nodes from tree
     tools::pruneLevelSet(mGrid->tree());
@@ -334,7 +368,7 @@ erode(int iterations)
 {
     tools::erodeVoxels(*mLeafs, iterations);
     mLeafs->rebuildLeafArray();
-    const ValueType background = mGrid->background() - iterations*mDx;
+    const ValueType background = mGrid->background() - ValueType(iterations) * mDx;
     tools::changeLevelSetBackground(this->leafs(), background);
 }
 
@@ -435,44 +469,66 @@ normalize2(const MaskT* mask)
     tmp.normalize();
 }
 
+
 ////////////////////////////////////////////////////////////////////////////
 
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetTracker<GridT, InterruptT>::
-Trim::trim()
-{
-    const int grainSize = mTracker.getGrainSize();
-    const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
-    if (grainSize>0) {
-        tbb::parallel_for(range, *this);
-    } else {
-        (*this)(range);
+template<typename GridT, typename InterruptT>
+template<lstrack::TrimMode Trimming>
+inline void
+LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
+{
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    if (Trimming != TrimMode::kNone) {
+        const int grainSize = mTracker.getGrainSize();
+        const LeafRange range = mTracker.leafs().leafRange(grainSize);
+
+        if (grainSize>0) {
+            tbb::parallel_for(range, *this);
+        } else {
+            (*this)(range);
+        }
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
-/// Prunes away voxels that have moved outside the narrow band
+
+/// Trim away voxels that have moved outside the narrow band
 template<typename GridT, typename InterruptT>
+template<lstrack::TrimMode Trimming>
 inline void
-LevelSetTracker<GridT, InterruptT>::
-Trim::operator()(const LeafRange& range) const
+LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::operator()(const LeafRange& range) const
 {
-    typedef typename LeafType::ValueOnIter VoxelIterT;
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
 
-    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        LeafType &leaf = *leafIter;
-        for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {
-            const ValueType val = *iter;
-            if (val <= -gamma)
-                leaf.setValueOff(iter.pos(), -gamma);
-            else if (val >= gamma)
-                leaf.setValueOff(iter.pos(),  gamma);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    for (auto leafIter = range.begin(); leafIter; ++leafIter) {
+        auto& leaf = *leafIter;
+        for (auto iter = leaf.beginValueOn(); iter; ++iter) {
+            const auto val = *iter;
+            switch (Trimming) { // resolved at compile time
+                case TrimMode::kNone:
+                    break;
+                case TrimMode::kInterior:
+                    if (val <= -gamma) { leaf.setValueOff(iter.pos(), -gamma); }
+                    break;
+                case TrimMode::kExterior:
+                    if (val >= gamma) { leaf.setValueOff(iter.pos(), gamma); }
+                    break;
+                case TrimMode::kAll:
+                    if (val <= -gamma) {
+                        leaf.setValueOff(iter.pos(), -gamma);
+                    } else if (val >= gamma) {
+                        leaf.setValueOff(iter.pos(), gamma);
+                    }
+                    break;
+            }
         }
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -489,7 +545,7 @@ Normalizer(LevelSetTracker& tracker, const MaskT* mask)
     , mDt(tracker.voxelSize()*(TemporalScheme == math::TVD_RK1 ? 0.3f :
                                TemporalScheme == math::TVD_RK2 ? 0.9f : 1.0f))
     , mInvDx(1.0f/tracker.voxelSize())
-    , mTask(0)
+    , mTask(nullptr)
 {
 }
 
@@ -502,6 +558,8 @@ LevelSetTracker<GridT, InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 normalize()
 {
+    namespace ph = std::placeholders;
+
     /// Make sure we have enough temporal auxiliary buffers
     mTracker.mLeafs->rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
 
@@ -512,7 +570,7 @@ normalize()
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(0) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK1", 1);
@@ -520,14 +578,14 @@ normalize()
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK1 (step 1 of 2)", 1);
 
             // Convex combine explicit Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler12, _1, _2);
+            mTask = std::bind(&Normalizer::euler12, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook("Normalizing level set using TVD_RK1 (step 2 of 2)", 1);
@@ -535,21 +593,21 @@ normalize()
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler01, _1, _2);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook("Normalizing level set using TVD_RK3 (step 1 of 3)", 1);
 
             // Convex combine explicit Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler34, _1, _2);
+            mTask = std::bind(&Normalizer::euler34, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook("Normalizing level set using TVD_RK3 (step 2 of 3)", 2);
 
             // Convex combine explicit Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
-            mTask = boost::bind(&Normalizer::euler13, _1, _2);
+            mTask = std::bind(&Normalizer::euler13, ph::_1, ph::_2);
 
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook("Normalizing level set using TVD_RK3 (step 3 of 3)", 2);
@@ -596,7 +654,7 @@ LevelSetTracker<GridT, InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 {
-    typedef typename math::ISGradientNormSqrd<SpatialScheme> GradientT;
+    using GradientT = typename math::ISGradientNormSqrd<SpatialScheme>;
     static const ValueType alpha = ValueType(Nominator)/ValueType(Denominator);
     static const ValueType beta  = ValueType(1) - alpha;
 
@@ -618,8 +676,6 @@ LevelSetTracker<GridT,InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 {
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
-
     mTracker.checkInterrupter();
 
     StencilT stencil(mTracker.grid());
@@ -628,7 +684,7 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
         const ValueType* phi = leafIter.buffer(phiBuffer).data();
         ValueType* result = leafIter.buffer(resultBuffer).data();
         if (mMask == nullptr) {
-            for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+            for (auto iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
                 this->eval<Nominator, Denominator>(stencil, phi, result, iter.pos());
             }//loop over active voxels in the leaf of the level set
@@ -649,6 +705,6 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

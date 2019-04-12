@@ -9,7 +9,7 @@ global proc AEOpenVDBVisualizeTemplate( string $nodeAttr )
 
             editorTemplate -addSeparator;
 
-            editorTemplate -addControl "ActiveValueBoundingBox"; 
+            editorTemplate -addControl "ActiveValueBoundingBox";
             editorTemplate -addControl "InternalNodes";
             editorTemplate -addControl "LeafNodes";
             editorTemplate -addControl "ActiveTiles";
@@ -37,14 +37,14 @@ global proc newOpenVDBVisualizeGridSelection(string $attr)
         -width 300
         -changeCommand ("updateOpenVDBVisualizeGridSelection( \""+$attr+"\" )")
         vdbGridNameMenu;
-        
+
     replaceOpenVDBVisualizeGridSelection($attr);
 }
 
 global proc replaceOpenVDBVisualizeGridSelection(string $attr)
 {
     //connectControl vdbGridNameMenu $attr;
-    
+
     // Clear old items
     {
         string $items[] = `optionMenu -q -ill vdbGridNameMenu`;
@@ -70,7 +70,7 @@ global proc replaceOpenVDBVisualizeGridSelection(string $attr)
 global proc updateOpenVDBVisualizeGridSelection(string $attr)
 {
     string $selectedGrid = `optionMenu -q -value vdbGridNameMenu`;
-    string $selectionAttr = plugNode($attr) + ".VdbSelectedGridNames"; 
+    string $selectionAttr = plugNode($attr) + ".VdbSelectedGridNames";
     setAttr -type "string" $selectionAttr $selectedGrid;
 }
 

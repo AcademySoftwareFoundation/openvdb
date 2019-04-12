@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,7 @@
 #define OPENVDB_POINTS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 
 #include "AttributeArray.h"
+#include "AttributeSet.h"
 #include <memory>
 
 namespace openvdb {
@@ -115,6 +116,7 @@ public:
     bool isUniform() const { return mArray.isUniform(); }
 
     bool get(Index n) const;
+    bool getUnsafe(Index n) const;
 
 protected:
     const GroupAttributeArray& mArray;
@@ -157,24 +159,31 @@ public:
 class GroupFilter
 {
 public:
-    explicit GroupFilter(const Name& attribute)
-        : mAttribute(attribute) { }
+    GroupFilter(const Name& name, const AttributeSet& attributeSet)
+        : mIndex(attributeSet.groupIndex(name)) { }
+
+    explicit GroupFilter(const AttributeSet::Descriptor::GroupIndex& index)
+        : mIndex(index) { }
 
     inline bool initialized() const { return bool(mHandle); }
 
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
-        mHandle.reset(new GroupHandle(leaf.groupHandle(mAttribute)));
+        mHandle.reset(new GroupHandle(leaf.groupHandle(mIndex)));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
         assert(mHandle);
-        return mHandle->get(*iter);
+        return mHandle->getUnsafe(*iter);
     }
 
 private:
-    const Name mAttribute;
+    const AttributeSet::Descriptor::GroupIndex mIndex;
     GroupHandle::Ptr mHandle;
 }; // class GroupFilter
 
@@ -190,6 +199,6 @@ private:
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

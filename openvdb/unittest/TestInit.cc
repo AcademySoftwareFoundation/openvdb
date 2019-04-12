@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,7 +73,7 @@ TestInit::test()
     CPPUNIT_ASSERT(math::TranslationMap::isRegistered());
     CPPUNIT_ASSERT(math::ScaleTranslateMap::isRegistered());
     CPPUNIT_ASSERT(math::NonlinearFrustumMap::isRegistered());
-    
+
     // grid types
     CPPUNIT_ASSERT(BoolGrid::isRegistered());
     CPPUNIT_ASSERT(FloatGrid::isRegistered());
@@ -117,6 +117,6 @@ TestInit::test()
     CPPUNIT_ASSERT(!Vec3DGrid::isRegistered());
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

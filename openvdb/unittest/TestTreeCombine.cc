@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,26 +35,31 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <algorithm> // for std::max() and std::min()
+#include <cmath> // for std::isnan() and std::isinf()
 #include <limits> // for std::numeric_limits
-#include <boost/math/special_functions/fpclassify.hpp> // for boost::math::isnan() and isinf()
+#include <sstream>
+#include <string>
+#include <type_traits>
 
 #define TEST_CSG_VERBOSE 0
 
 #if TEST_CSG_VERBOSE
 #include <openvdb/util/CpuTimer.h>
+#include <iostream>
 #endif
 
 namespace {
-typedef openvdb::tree::Tree4<float, 4, 3, 3>::Type Float433Tree;
-typedef openvdb::Grid<Float433Tree> Float433Grid;
+using Float433Tree = openvdb::tree::Tree4<float, 4, 3, 3>::Type;
+using Float433Grid = openvdb::Grid<Float433Tree>;
 }
 
 
 class TestTreeCombine: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); Float433Grid::registerGrid(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+     void setUp() override { openvdb::initialize(); Float433Grid::registerGrid(); }
+     void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestTreeCombine);
     CPPUNIT_TEST(testCombine);
@@ -114,7 +119,7 @@ template<typename ValueT>
 struct OrderDependentCombineOp {
     OrderDependentCombineOp() {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& result) const {
-        result = a + 100 * b; // result is order-dependent on A and B
+        result = a + ValueT(100) * b; // result is order-dependent on A and B
     }
 };
 
@@ -132,11 +137,11 @@ void combine(TreeT& a, TreeT& b)
 template<typename TreeT>
 void extendedCombine(TreeT& a, TreeT& b)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
     struct ArgsOp {
         static void order(openvdb::CombineArgs<ValueT>& args) {
             // The result is order-dependent on A and B.
-            args.setResult(args.a() + 100 * args.b());
+            args.setResult(args.a() + ValueT(100) * args.b());
             args.setResultIsActive(args.aIsActive() || args.bIsActive());
         }
     };
@@ -149,14 +154,14 @@ template<typename TreeT> void compSum(TreeT& a, TreeT& b) { openvdb::tools::comp
 template<typename TreeT> void compMul(TreeT& a, TreeT& b) { openvdb::tools::compMul(a, b); }\
 template<typename TreeT> void compDiv(TreeT& a, TreeT& b) { openvdb::tools::compDiv(a, b); }\
 
-inline float orderf(float a, float b) { return a + 100 * b; }
+inline float orderf(float a, float b) { return a + 100.0f * b; }
 inline float maxf(float a, float b) { return std::max(a, b); }
 inline float minf(float a, float b) { return std::min(a, b); }
 inline float sumf(float a, float b) { return a + b; }
 inline float mulf(float a, float b) { return a * b; }
 inline float divf(float a, float b) { return a / b; }
 
-inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100*b; }
+inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100.0f*b; }
 inline openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
     const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
     return (aMag > bMag ? a : (bMag > aMag ? b : std::max(a, b)));
@@ -282,11 +287,11 @@ TestTreeCombine::testCompDivByZero()
 
         openvdb::tools::compDiv(a, b);
 
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c0))); //  1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c1))); //  1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c2))); // -1 / 0
-        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c3))); // -1 / 0
-        CPPUNIT_ASSERT(boost::math::isnan(a.getValue(c4))); //  0 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c0))); //  1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c1))); //  1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c2))); // -1 / 0
+        CPPUNIT_ASSERT(std::isinf(a.getValue(c3))); // -1 / 0
+        CPPUNIT_ASSERT(std::isnan(a.getValue(c4))); //  0 / 0
     }
 }
 
@@ -303,7 +308,7 @@ template<typename TreeT, typename TreeComp, typename ValueComp>
 void
 TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
@@ -596,7 +601,7 @@ template<typename TreeT>
 void
 TestTreeCombine::testCompRepl()
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
@@ -725,9 +730,9 @@ TestTreeCombine::testCompRepl()
 void
 TestTreeCombine::testCsg()
 {
-    typedef openvdb::FloatTree TreeT;
-    typedef TreeT::Ptr TreePtr;
-    typedef openvdb::Grid<TreeT> GridT;
+    using TreeT = openvdb::FloatTree;
+    using TreePtr = TreeT::Ptr;
+    using GridT = openvdb::Grid<TreeT>;
 
     struct Local {
         static TreePtr readFile(const std::string& fname) {
@@ -773,16 +778,16 @@ TestTreeCombine::testCsg()
 
     const std::string testDir("/work/rd/fx_tools/vdb_unittest/TestGridCombine::testCsg/");
     smallTree1 = Local::readFile(testDir + "small1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(smallTree1.get() != NULL);
+    CPPUNIT_ASSERT(smallTree1.get() != nullptr);
     smallTree2 = Local::readFile(testDir + "small2.vdb2 Cylinder");
-    CPPUNIT_ASSERT(smallTree2.get() != NULL);
+    CPPUNIT_ASSERT(smallTree2.get() != nullptr);
     largeTree1 = Local::readFile(testDir + "large1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree1.get() != NULL);
+    CPPUNIT_ASSERT(largeTree1.get() != nullptr);
     largeTree2 = Local::readFile(testDir + "large2.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree2.get() != NULL);
+    CPPUNIT_ASSERT(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
-    std::cerr << "file read: " << timer.delta() << " sec\n";
+    std::cerr << "file read: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if TEST_CSG_VERBOSE
@@ -822,7 +827,7 @@ typename TreeT::Ptr
 TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     const TreeT& refTree, const VisitorT& visitor)
 {
-    typedef typename TreeT::Ptr TreePtr;
+    using TreePtr = typename TreeT::Ptr;
 
 #if TEST_CSG_VERBOSE
     openvdb::util::CpuTimer timer;
@@ -831,7 +836,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     TreePtr aTree(new TreeT(aInputTree));
     TreeT bTree(bInputTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "deep copy: " << timer.delta() << " ms\n";
+    std::cerr << "deep copy: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if (TEST_CSG_VERBOSE > 1)
@@ -850,7 +855,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
     visitor(*aTree, bTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "combine: " << timer.delta() << " ms\n";
+    std::cerr << "combine: " << timer.milliseconds() << " msec\n";
 #endif
 #if (TEST_CSG_VERBOSE > 1)
     std::cerr << "\nActual:\n";
@@ -897,9 +902,9 @@ TestTreeCombine::testCsgCopy()
     openvdb::FloatGrid::Ptr intersectionGrid = openvdb::tools::csgIntersectionCopy(*gridA, *gridB);
     openvdb::FloatGrid::Ptr differenceGrid = openvdb::tools::csgDifferenceCopy(*gridA, *gridB);
 
-    CPPUNIT_ASSERT(unionGrid.get() != NULL);
-    CPPUNIT_ASSERT(intersectionGrid.get() != NULL);
-    CPPUNIT_ASSERT(differenceGrid.get() != NULL);
+    CPPUNIT_ASSERT(unionGrid.get() != nullptr);
+    CPPUNIT_ASSERT(intersectionGrid.get() != nullptr);
+    CPPUNIT_ASSERT(differenceGrid.get() != nullptr);
 
     CPPUNIT_ASSERT(!unionGrid->empty());
     CPPUNIT_ASSERT(!intersectionGrid->empty());
@@ -994,22 +999,18 @@ TestTreeCombine::testCompActiveLeafVoxels()
     }
     {
         using BufferT = openvdb::FloatTree::LeafNodeType::Buffer;
-        //std::cout << "FloatTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::Vec3fTree::LeafNodeType::Buffer;
-        //std::cout << "Vec3fTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::BoolTree::LeafNodeType::Buffer;
-        //std::cout << "BoolTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::MaskTree::LeafNodeType::Buffer;
-        //std::cout << "MaskTree: " << std::is_same<BufferT::ValueType, BufferT::StorageType>::value << '\n';
         CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {//replace bool tree
@@ -1069,6 +1070,6 @@ TestTreeCombine::testCompActiveLeafVoxels()
 ////////////////////////////////////////
 
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,12 +36,9 @@ import os, os.path
 import sys
 import unittest
 try:
-    import pyopenvdb as openvdb
-except ImportError:
-    import studioenv
-    from studio.ani import Ani
-    from studio import logging
     from studio import openvdb
+except ImportError:
+    import pyopenvdb as openvdb
 
 
 def valueFactory(zeroValue, elemValue):
@@ -165,7 +162,15 @@ class TestOpenVDB(unittest.TestCase):
 
         self.assertEqual(grid.metadata, {})
 
-        meta = { 'name': 'test', 'saveFloatAsHalf': True, 'xyz': (-1, 0, 1) }
+        meta = {
+            'name':     'test',
+            'xyz':      (-1, 0, 1),
+            'xyzw':     (1.0, 2.25, 3.5, 4.0),
+            'intval':   42,
+            'floatval': 1.25,
+            'mat4val':  [[1]*4]*4,
+            'saveFloatAsHalf': True,
+        }
         grid.metadata = meta
         self.assertEqual(grid.metadata, meta)
 
@@ -178,10 +183,12 @@ class TestOpenVDB(unittest.TestCase):
         for name in meta:
             self.assertTrue(name in grid)
             self.assertEqual(grid[name], meta[name])
+            self.assertEqual(type(grid[name]), type(meta[name]))
 
         for name in grid:
             self.assertTrue(name in grid)
             self.assertEqual(grid[name], meta[name])
+            self.assertEqual(type(grid[name]), type(meta[name]))
 
         self.assertTrue('xyz' in grid)
         del grid['xyz']
@@ -309,6 +316,9 @@ class TestOpenVDB(unittest.TestCase):
         coords = set([(-10, -10, -10), (0, 0, 0), (1, 1, 1)])
 
         for factory in openvdb.GridTypes:
+            # skip value accessor tests for PointDataGrids (value setting methods are disabled)
+            if factory.valueTypeName.startswith('ptdataidx'):
+                continue
             grid = factory()
             zero, one = grid.zeroValue, grid.oneValue
             acc = grid.getAccessor()
@@ -495,7 +505,7 @@ class TestOpenVDB(unittest.TestCase):
             return
 
         # Skip this test if the OpenVDB module was built without NumPy support.
-        arr = np.ndarray((1, 2, 1))
+        arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         try:
             grid.copyFromArray(arr)
@@ -505,11 +515,11 @@ class TestOpenVDB(unittest.TestCase):
         # Verify that a non-three-dimensional array can't be copied into a grid.
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray('abc'))
-        arr = np.ndarray((1, 2))
+        arr = np.zeros((1, 2))
         self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
 
         # Verify that complex-valued arrays are not supported.
-        arr = np.ndarray((1, 2, 1), dtype = complex)
+        arr = np.zeros((1, 2, 1), dtype = complex)
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
 
@@ -541,6 +551,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
@@ -591,7 +604,7 @@ class TestOpenVDB(unittest.TestCase):
             return
 
         # Skip this test if the OpenVDB module was built without NumPy support.
-        arr = np.ndarray((1, 2, 1))
+        arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         try:
             grid.copyFromArray(arr)
@@ -601,11 +614,11 @@ class TestOpenVDB(unittest.TestCase):
         # Verify that a grid can't be copied into a non-three-dimensional array.
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray('abc'))
-        arr = np.ndarray((1, 2))
+        arr = np.zeros((1, 2))
         self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
 
         # Verify that complex-valued arrays are not supported.
-        arr = np.ndarray((1, 2, 1), dtype = complex)
+        arr = np.zeros((1, 2, 1), dtype = complex)
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
 
@@ -632,6 +645,9 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test copying from arrays of various types to grids of various types.
         for cls in openvdb.GridTypes:
+            # skip copying test for PointDataGrids
+            if cls.valueTypeName.startswith('ptdataidx'):
+                continue
             for arr in createArrays():
                 isScalarArray = (len(arr.shape) == 3)
                 isScalarGrid = False
@@ -778,11 +794,7 @@ if __name__ == '__main__':
     print('Testing %s' % os.path.dirname(openvdb.__file__))
     sys.stdout.flush()
 
-    try:
-        logging.configure(sys.argv)
-        args = Ani(sys.argv).userArgs() # strip out ANI-related arguments
-    except NameError:
-        args = sys.argv
+    args = sys.argv
 
     # Unlike CppUnit, PyUnit doesn't use the "-t" flag to identify
     # test names, so for consistency, strip out any "-t" arguments,
@@ -793,6 +805,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

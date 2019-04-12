@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,7 +34,7 @@
  * transmitted, or disclosed in any way without written permission.
  *
  * Produced by:
- * 	Adrian Saldanha
+ *      Adrian Saldanha
  *      Side Effects Software Inc
  *      477 Richmond Street West
  *      Toronto, Ontario
@@ -43,7 +43,7 @@
  *
  * NAME:        UT_VDBUtils.h (UT Library, C++)
  *
- * COMMENTS:    
+ * COMMENTS:
  */
 
 #include "UT_VDBUtils.h"
@@ -52,6 +52,6 @@ namespace openvdb_houdini {
 // empty
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

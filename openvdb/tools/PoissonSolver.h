@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -94,7 +94,6 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Morphology.h" // for erodeVoxels
-#include <boost/scoped_array.hpp>
 
 
 namespace openvdb {
@@ -104,10 +103,10 @@ namespace tools {
 namespace poisson {
 
 // This type should be at least as wide as math::pcg::SizeType.
-typedef Int32 VIndex;
+using VIndex = Int32;
 
 /// The type of a matrix used to represent a three-dimensional %Laplacian operator
-typedef math::pcg::SparseStencilMatrix<double, 7> LaplacianMatrix;
+using LaplacianMatrix = math::pcg::SparseStencilMatrix<double, 7>;
 
 
 //@{
@@ -149,7 +148,7 @@ solve(const TreeType&, math::pcg::State&, Interrupter&, bool staggered = false);
 /// a functor of the form
 /// @code
 /// struct BoundaryOp {
-///     typedef LaplacianMatrix::ValueType ValueType;
+///     using ValueType = LaplacianMatrix::ValueType;
 ///     void operator()(
 ///         const Coord& ijk,          // coordinates of a boundary voxel
 ///         const Coord& ijkNeighbor,  // coordinates of an exterior neighbor of ijk
@@ -266,7 +265,7 @@ createISLaplacian(
 /// a functor of the form
 /// @code
 /// struct BoundaryOp {
-///     typedef LaplacianMatrix::ValueType ValueType;
+///     using ValueType = LaplacianMatrix::ValueType;
 ///     void operator()(
 ///         const Coord& ijk,          // coordinates of a boundary voxel
 ///         const Coord& ijkNeighbor,  // coordinates of an exterior neighbor of ijk
@@ -344,8 +343,8 @@ template<typename VIndexTreeType>
 inline void
 populateIndexTree(VIndexTreeType& result)
 {
-    typedef typename VIndexTreeType::LeafNodeType       LeafT;
-    typedef typename tree::LeafManager<VIndexTreeType>  LeafMgrT;
+    using LeafT = typename VIndexTreeType::LeafNodeType;
+    using LeafMgrT = typename tree::LeafManager<VIndexTreeType>;
 
     // Linearize the tree.
     LeafMgrT leafManager(result);
@@ -354,7 +353,7 @@ populateIndexTree(VIndexTreeType& result)
     if (leafCount == 0) return;
 
     // Count the number of active voxels in each leaf node.
-    boost::scoped_array<VIndex> perLeafCount(new VIndex[leafCount]);
+    std::unique_ptr<VIndex[]> perLeafCount(new VIndex[leafCount]);
     VIndex* perLeafCountPtr = perLeafCount.get();
     leafManager.foreach(internal::LeafCountOp<LeafT>(perLeafCountPtr));
 
@@ -377,7 +376,7 @@ template<typename TreeType>
 inline typename TreeType::template ValueConverter<VIndex>::Type::Ptr
 createIndexTree(const TreeType& tree)
 {
-    typedef typename TreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
+    using VIdxTreeT = typename TreeType::template ValueConverter<VIndex>::Type;
 
     // Construct an output tree with the same active voxel topology as the input tree.
     const VIndex invalidIdx = -1;
@@ -403,11 +402,11 @@ namespace internal {
 template<typename VectorValueType, typename SourceTreeType>
 struct CopyToVecOp
 {
-    typedef typename SourceTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
-    typedef typename VIdxTreeT::LeafNodeType             VIdxLeafT;
-    typedef typename SourceTreeType::LeafNodeType        LeafT;
-    typedef typename SourceTreeType::ValueType           TreeValueT;
-    typedef typename math::pcg::Vector<VectorValueType>  VectorT;
+    using VIdxTreeT = typename SourceTreeType::template ValueConverter<VIndex>::Type;
+    using VIdxLeafT = typename VIdxTreeT::LeafNodeType;
+    using LeafT = typename SourceTreeType::LeafNodeType;
+    using TreeValueT = typename SourceTreeType::ValueType;
+    using VectorT = typename math::pcg::Vector<VectorValueType>;
 
     const SourceTreeType* tree;
     VectorT* vector;
@@ -442,9 +441,9 @@ inline typename math::pcg::Vector<VectorValueType>::Ptr
 createVectorFromTree(const SourceTreeType& tree,
     const typename SourceTreeType::template ValueConverter<VIndex>::Type& idxTree)
 {
-    typedef typename SourceTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
-    typedef tree::LeafManager<const VIdxTreeT>           VIdxLeafMgrT;
-    typedef typename math::pcg::Vector<VectorValueType>  VectorT;
+    using VIdxTreeT = typename SourceTreeType::template ValueConverter<VIndex>::Type;
+    using VIdxLeafMgrT = tree::LeafManager<const VIdxTreeT>;
+    using VectorT = typename math::pcg::Vector<VectorValueType>;
 
     // Allocate the vector.
     const size_t numVoxels = idxTree.activeVoxelCount();
@@ -469,10 +468,10 @@ namespace internal {
 template<typename TreeValueType, typename VIndexTreeType, typename VectorValueType>
 struct CopyFromVecOp
 {
-    typedef typename VIndexTreeType::template ValueConverter<TreeValueType>::Type OutTreeT;
-    typedef typename OutTreeT::LeafNodeType              OutLeafT;
-    typedef typename VIndexTreeType::LeafNodeType        VIdxLeafT;
-    typedef typename math::pcg::Vector<VectorValueType>  VectorT;
+    using OutTreeT = typename VIndexTreeType::template ValueConverter<TreeValueType>::Type;
+    using OutLeafT = typename OutTreeT::LeafNodeType;
+    using VIdxLeafT = typename VIndexTreeType::LeafNodeType;
+    using VectorT = typename math::pcg::Vector<VectorValueType>;
 
     const VectorT* vector;
     OutTreeT* tree;
@@ -483,7 +482,7 @@ struct CopyFromVecOp
     {
         const VectorT& vec = *vector;
         OutLeafT* leaf = tree->probeLeaf(idxLeaf.origin());
-        assert(leaf != NULL);
+        assert(leaf != nullptr);
         for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
             leaf->setValueOnly(it.pos(), static_cast<TreeValueType>(vec[*it]));
         }
@@ -500,8 +499,8 @@ createTreeFromVector(
     const VIndexTreeType& idxTree,
     const TreeValueType& background)
 {
-    typedef typename VIndexTreeType::template ValueConverter<TreeValueType>::Type OutTreeT;
-    typedef typename tree::LeafManager<const VIndexTreeType> VIdxLeafMgrT;
+    using OutTreeT = typename VIndexTreeType::template ValueConverter<TreeValueType>::Type;
+    using VIdxLeafMgrT = typename tree::LeafManager<const VIndexTreeType>;
 
     // Construct an output tree with the same active voxel topology as the index tree.
     typename OutTreeT::Ptr result(new OutTreeT(idxTree, background, TopologyCopy()));
@@ -526,10 +525,10 @@ namespace internal {
 template<typename BoolTreeType, typename BoundaryOp>
 struct ISStaggeredLaplacianOp
 {
-    typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
-    typedef typename VIdxTreeT::LeafNodeType   VIdxLeafT;
-    typedef LaplacianMatrix::ValueType         ValueT;
-    typedef typename math::pcg::Vector<ValueT> VectorT;
+    using VIdxTreeT = typename BoolTreeType::template ValueConverter<VIndex>::Type;
+    using VIdxLeafT = typename VIdxTreeT::LeafNodeType;
+    using ValueT = LaplacianMatrix::ValueType;
+    using VectorT = typename math::pcg::Vector<ValueT>;
 
     LaplacianMatrix* laplacian;
     const VIdxTreeT* idxTree;
@@ -643,9 +642,9 @@ struct ISStaggeredLaplacianOp
 template<typename VIdxTreeT, typename BoundaryOp>
 struct ISLaplacianOp
 {
-    typedef typename VIdxTreeT::LeafNodeType   VIdxLeafT;
-    typedef LaplacianMatrix::ValueType         ValueT;
-    typedef typename math::pcg::Vector<ValueT> VectorT;
+    using VIdxLeafT = typename VIdxTreeT::LeafNodeType;
+    using ValueT = LaplacianMatrix::ValueType;
+    using VectorT = typename math::pcg::Vector<ValueT>;
 
     LaplacianMatrix* laplacian;
     const VIdxTreeT* idxTree;
@@ -717,7 +716,7 @@ inline LaplacianMatrix::Ptr
 createISLaplacian(const typename BoolTreeType::template ValueConverter<VIndex>::Type& idxTree,
     const BoolTreeType& interiorMask, bool staggered)
 {
-    typedef LaplacianMatrix::ValueType ValueT;
+    using ValueT = LaplacianMatrix::ValueType;
     math::pcg::Vector<ValueT> unused(
         static_cast<math::pcg::SizeType>(idxTree.activeVoxelCount()));
     DirichletBoundaryOp<ValueT> op;
@@ -734,8 +733,8 @@ createISLaplacianWithBoundaryConditions(
     typename math::pcg::Vector<LaplacianMatrix::ValueType>& source,
     bool staggered)
 {
-    typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
-    typedef typename tree::LeafManager<const VIdxTreeT>  VIdxLeafMgrT;
+    using VIdxTreeT = typename BoolTreeType::template ValueConverter<VIndex>::Type;
+    using VIdxLeafMgrT = typename tree::LeafManager<const VIdxTreeT>;
 
     // The number of active voxels is the number of degrees of freedom.
     const Index64 numDoF = idxTree.activeVoxelCount();
@@ -785,7 +784,7 @@ inline typename TreeType::Ptr
 solveWithBoundaryConditions(const TreeType& inTree, const BoundaryOp& boundaryOp,
     math::pcg::State& state, Interrupter& interrupter, bool staggered)
 {
-    typedef math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix> DefaultPrecondT;
+    using DefaultPrecondT = math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix>;
     return solveWithBoundaryConditionsAndPreconditioner<DefaultPrecondT>(
         inTree, boundaryOp, state, interrupter, staggered);
 }
@@ -823,11 +822,11 @@ solveWithBoundaryConditionsAndPreconditioner(
     Interrupter& interrupter,
     bool staggered)
 {
-    typedef typename TreeType::ValueType           TreeValueT;
-    typedef LaplacianMatrix::ValueType             VecValueT;
-    typedef typename math::pcg::Vector<VecValueT>  VectorT;
-    typedef typename TreeType::template ValueConverter<VIndex>::Type  VIdxTreeT;
-    typedef typename TreeType::template ValueConverter<bool>::Type    MaskTreeT;
+    using TreeValueT = typename TreeType::ValueType;
+    using VecValueT = LaplacianMatrix::ValueType;
+    using VectorT = typename math::pcg::Vector<VecValueT>;
+    using VIdxTreeT = typename TreeType::template ValueConverter<VIndex>::Type;
+    using MaskTreeT = typename TreeType::template ValueConverter<bool>::Type;
 
     // 1. Create a mapping from active voxels of the input tree to elements of a vector.
     typename VIdxTreeT::ConstPtr idxTree = createIndexTree(domainMask);
@@ -869,32 +868,6 @@ solveWithBoundaryConditionsAndPreconditioner(
 
 #endif // OPENVDB_TOOLS_POISSONSOLVER_HAS_BEEN_INCLUDED
 
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
-//
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////

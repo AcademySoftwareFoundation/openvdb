@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,15 +49,30 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
 
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <limits> // std::numeric_limits
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -75,8 +90,15 @@ public:
 
     void checkActivePart(float time);
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
+    void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
 };
 
@@ -93,7 +115,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the input VDBs to be processed.")
+        .setTooltip("A subset of the input VDBs to be processed")
         .setDocumentation(
             "A subset of the input VDB grids to be processed"
             " (see [specifying volumes|/model/volumes#group])"));
@@ -102,48 +124,71 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
         .setTooltip(
-            "The crossing point of the VDB values that is considered the surface\n\n"
+            "The voxel value that determines the surface of the volume\n\n"
             "Zero works for signed distance fields, while fog volumes"
-            " require a larger positive value (0.5 is a good initial guess)."));
+            " require a small positive value (0.5 is a good initial guess)."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units")
         .setDocumentation(
-            "If enabled, specify sphere sizes in world units, otherwise in voxels."));
+            "If enabled, specify sphere radii in world units, otherwise in voxels."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius in Voxels")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "useradiusmin", "")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "radiusmin", "Min Radius")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
-        .setTooltip("Determines the smallest sphere size, voxel units.")
-        .setDocumentation(nullptr));
+        .setTooltip("The radius of the smallest sphere allowed")
+        .setDocumentation(
+            "The radius of the smallest sphere allowed\n\n"
+            "If disabled, allow spheres of any radius greater than zero."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "minradiusworld", "Min Radius")
-        .setDefault(0.1)
-        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
-        .setTooltip("Determines the smallest sphere size, world units.")
-        .setDocumentation("The radius of the smallest sphere allowed"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "useradiusmax", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius in Voxels")
-        .setDefault(std::numeric_limits<float>::max())
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "radiusmax", "Max Radius")
+        .setDefault(100.0)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
-        .setTooltip("Determines the largest sphere size, voxel units.")
-        .setDocumentation(nullptr));
+        .setTooltip("The radius of the largest sphere allowed")
+        .setDocumentation(
+            "The radius of the largest sphere allowed\n\n"
+            "If disabled, allow arbitrarily large spheres."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradiusworld", "Max Radius")
-        .setDefault(std::numeric_limits<float>::max())
-        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
-        .setTooltip("Determines the largest sphere size, world units.")
-        .setDocumentation("The radius of the largest sphere allowed"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usespheresmin", "")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Max Spheres")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "spheresmin", "Min Spheres")
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 100)
+        .setDefault(1)
+        .setTooltip("The minimum number of spheres to be generated")
+        .setDocumentation(
+            "The minimum number of spheres to be generated\n\n"
+            "If disabled, allow very small VDBs to not generate any spheres.\n\n"
+            "NOTE:\n"
+            "    __Min Spheres__ takes precedence over __Min Radius__.\n"
+            "    Spheres smaller than __Min Radius__ might be generated\n"
+            "    in order to ensure that the minimum sphere count is satisfied."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usespheresmax", "")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
+    parms.add(hutil::ParmFactory(PRM_INT_J, "spheresmax", "Max Spheres")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
         .setDefault(50)
-        .setTooltip("No more than this number of spheres are generated (but possibly fewer)."));
+        .setTooltip("The maximum number of spheres to be generated")
+        .setDocumentation(
+            "The maximum number of spheres to be generated\n\n"
+            "If disabled, allow for up to __Point Count__ spheres to be generated."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "scatter", "Scatter Points")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "scatter", "Point Count")
         .setRange(PRM_RANGE_RESTRICTED, 1000, PRM_RANGE_UI, 50000)
         .setDefault(10000)
         .setTooltip(
-            "How many interior points to consider for the sphere placement\n\n"
+            "The number of candidate sphere centers to consider\n\n"
             "Increasing this count increases the chances of finding optimal sphere sizes."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "overlapping", "Overlapping")
@@ -183,8 +228,26 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
-    hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
+    const float fmax = std::numeric_limits<float>::max();
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Max Spheres").setDefault(50));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius").setDefault(1.0));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius").setDefault(fmax));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "minradiusworld", "").setDefault(0.1));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxradiusworld", "").setDefault(fmax));
+
+    //////////
+
+    hvdb::OpenVDBOpFactory("VDB to Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBToSpheres")
+#endif
         .addInput("VDBs to convert")
+        .setObsoleteParms(obsoleteParms)
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_To_Spheres::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -213,6 +276,39 @@ and usage examples.\n");
 }
 
 
+void
+SOP_OpenVDB_To_Spheres::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    const fpreal time = 0.0;
+    const bool worldUnits = (0 != evalInt("worldunits", 0, time));
+
+    resolveRenamedParm(*obsoleteParms, "spheres", "spheresmax");
+    resolveRenamedParm(*obsoleteParms, "minradius", "radiusmin");
+
+    // If world units are enabled, use the old world-space radius bounds if they exist.
+    if (worldUnits && obsoleteParms->getParmPtr("minradiusworld")) {
+        setFloat("radiusmin", 0, time, obsoleteParms->evalFloat("minradiusworld", 0, time));
+    }
+    {
+        // The old "maxradius" and "maxradiusworld" parameters had default values
+        // of numeric_limits<float>::max(), indicating no upper bound.
+        // That state is now represented by the "useradiusmax" toggle, which defaults to Off.
+        // If "maxradius" (or "maxradiusworld" in world-space mode) had a non-default value,
+        // transfer that value to "radiusmax" and toggle "useradiusmax" on.
+        char const * const oldName = (worldUnits ? "maxradiusworld" : "maxradius");
+        PRM_Parm* parm = obsoleteParms->getParmPtr(oldName);
+        if (parm && !parm->isFactoryDefault()) {
+            setFloat("radiusmax", 0, time, obsoleteParms->evalFloat(oldName, 0, time));
+            setInt("useradiusmax", 0, time, true);
+        }
+    }
+
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 OP_Node*
 SOP_OpenVDB_To_Spheres::factory(OP_Network* net,
     const char* name, OP_Operator* op)
@@ -232,14 +328,10 @@ bool
 SOP_OpenVDB_To_Spheres::updateParmsFlags()
 {
     bool changed = false;
-
-    const bool worldUnits = bool(evalInt("worldunits", 0, 0));
-
-    changed |= setVisibleState("minradius", !worldUnits);
-    changed |= setVisibleState("maxradius", !worldUnits);
-    changed |= setVisibleState("minradiusworld", worldUnits);
-    changed |= setVisibleState("maxradiusworld", worldUnits);
-
+    changed |= enableParm("radiusmin", (0 != evalInt("useradiusmin", 0, 0)));
+    changed |= enableParm("radiusmax", (0 != evalInt("useradiusmax", 0, 0)));
+    changed |= enableParm("spheresmin", (0 != evalInt("usespheresmin", 0, 0)));
+    changed |= enableParm("spheresmax", (0 != evalInt("usespheresmax", 0, 0)));
     return changed;
 }
 
@@ -248,47 +340,53 @@ SOP_OpenVDB_To_Spheres::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_To_Spheres)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        gdp->clearAndDestroy();
+#endif
+
         const fpreal time = context.getTime();
 
-        gdp->clearAndDestroy();
-
-        hvdb::Interrupter boss("OpenVDB to Spheres");
+        hvdb::Interrupter boss("Filling VDBs with spheres");
 
         const GU_Detail* vdbGeo = inputGeo(0);
         if (vdbGeo == nullptr) return error();
 
-        // Get the group of grids to surface.
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
-        const GA_PrimitiveGroup* group =
-            matchGroup(const_cast<GU_Detail&>(*vdbGeo), groupStr.toStdString());
+        const GA_PrimitiveGroup* group = matchGroup(*vdbGeo, evalStdString("group", time));
         hvdb::VdbPrimCIterator vdbIt(vdbGeo, group);
 
         if (!vdbIt) {
-            addWarning(SOP_MESSAGE, "No VDB grids found.");
+            addWarning(SOP_MESSAGE, "No VDBs found.");
             return error();
         }
 
         // Eval attributes
+        const bool
+            addID = (0 != evalInt("doid", 0, time)),
+            addPScale = (0 != evalInt("dopscale", 0, time)),
+            overlapping = (0 != evalInt("overlapping", 0, time)),
+            preserve = (0 != evalInt("preserve", 0, time)),
+            useMinRadius = (0 != evalInt("useradiusmin", 0, time)),
+            useMaxRadius = (0 != evalInt("useradiusmax", 0, time)),
+            useMinSpheres = (0 != evalInt("usespheresmin", 0, time)),
+            useMaxSpheres = (0 != evalInt("usespheresmax", 0, time)),
+            worldUnits = (0 != evalInt("worldunits", 0, time));
+
         const float
+            fmin = std::numeric_limits<float>::min(),
+            fmax = std::numeric_limits<float>::max(),
             isovalue = static_cast<float>(evalFloat("isovalue", 0, time)),
-            minradiusVoxel = static_cast<float>(evalFloat("minradius", 0, time)),
-            maxradiusVoxel = static_cast<float>(evalFloat("maxradius", 0, time)),
-            minradiusWorld = static_cast<float>(evalFloat("minradiusworld", 0, time)),
-            maxradiusWorld = static_cast<float>(evalFloat("maxradiusworld", 0, time));
+            minRadius = !useMinRadius ? fmin : static_cast<float>(evalFloat("radiusmin", 0, time)),
+            maxRadius = !useMaxRadius ? fmax : static_cast<float>(evalFloat("radiusmax", 0, time));
 
-        const bool worldUnits = evalInt("worldunits", 0, time);
+        const int scatter = static_cast<int>(evalInt("scatter", 0, time));
+        const openvdb::Vec2i sphereCount(
+            !useMinSpheres ? 0 : static_cast<int>(evalInt("spheresmin", 0, time)),
+            !useMaxSpheres ? scatter : static_cast<int>(evalInt("spheresmax", 0, time)));
 
-        const int sphereCount = evalInt("spheres", 0, time);
-        const bool overlapping = evalInt("overlapping", 0, time);
-        const int scatter = evalInt("scatter", 0, time);
-        const bool preserve = evalInt("preserve", 0, time);
-
-        const bool addID = evalInt("doid", 0, time) != 0;
         GA_RWHandleI idAttr;
         if (addID) {
             GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
@@ -302,12 +400,12 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
             }
         }
 
-        const bool addPScale = evalInt("dopscale", 0, time) != 0;
         GA_RWHandleF pscaleAttr;
         if (addPScale) {
             GA_RWAttributeRef aRef = gdp->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
             if (!aRef.isValid()) {
-                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
+                aRef = gdp->addFloatTuple(
+                    GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
             }
             pscaleAttr = aRef.getAttribute();
             if(!pscaleAttr.isValid()) {
@@ -319,26 +417,20 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         int idNumber = 1;
 
         GU_ConvertParms parms;
-#if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
-        parms.preserveGroups = true;
-#else
         parms.setKeepGroups(true);
-#endif
 
         std::vector<std::string> skippedGrids;
 
         for (; vdbIt; ++vdbIt) {
             if (boss.wasInterrupted()) break;
 
-            float minradius = minradiusVoxel, maxradius = maxradiusVoxel;
-
+            openvdb::Vec2s radiusRange(minRadius, maxRadius);
             if (worldUnits) {
                 const float voxelScale = float(1.0 / vdbIt->getGrid().voxelSize()[0]);
-                minradius = minradiusWorld * voxelScale;
-                maxradius = maxradiusWorld * voxelScale;
+                radiusRange *= voxelScale;
             }
 
-            maxradius = std::max(maxradius, minradius + float(1e-5));
+            radiusRange[1] = std::max(radiusRange[1], radiusRange[0] + float(1e-5));
 
             std::vector<openvdb::Vec4s> spheres;
 
@@ -348,7 +440,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     openvdb::gridConstPtrCast<openvdb::FloatGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
-                    minradius, maxradius, isovalue, scatter, &boss);
+                    radiusRange[0], radiusRange[1], isovalue, scatter, &boss);
 
 
             } else if (vdbIt->getGrid().type() == openvdb::DoubleGrid::gridType()) {
@@ -357,18 +449,14 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     openvdb::gridConstPtrCast<openvdb::DoubleGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
-                    minradius, maxradius, isovalue, scatter, &boss);
+                    radiusRange[0], radiusRange[1], isovalue, scatter, &boss);
 
             } else {
                 skippedGrids.push_back(vdbIt.getPrimitiveNameOrIndex().toStdString());
                 continue;
             }
 
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
             GA_Detail::OffsetMarker marker(*gdp);
-#else
-            GU_ConvertMarker marker(*gdp);
-#endif
 
             // copy spheres to Houdini
             for (size_t n = 0, N = spheres.size(); n < N; ++n) {
@@ -390,32 +478,22 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 UT_Matrix4 mat = UT_Matrix4::getIdentityMatrix();
                 mat.scale(sphere[3],sphere[3],sphere[3]);
 
-                #if (UT_VERSION_INT >= 0x0c050000)  // 12.5.0 or later
                 GU_PrimSphereParms sphereParms(gdp, ptoff);
                 sphereParms.xform = mat;
                 GU_PrimSphere::build(sphereParms);
-                #else
-                GU_PrimSphereParms sphereParms(gdp, gdp->getGEOPoint(ptoff));
-                sphereParms.xform = mat;
-                GU_PrimSphere::build(sphereParms);
-                #endif
             }
 
             if (preserve) {
                 GUconvertCopySingleVertexPrimAttribsAndGroups(
                     parms, *vdbGeo, vdbIt.getOffset(),
-#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
                     *gdp, marker.primitiveRange(), marker.pointRange());
-#else
-                    *gdp, marker.getPrimitives(), marker.getPoints());
-#endif
             }
             ++idNumber;
         }
 
         if (!skippedGrids.empty()) {
             std::string s = "Only scalar (float/double) grids are supported, the following "
-                "were skipped: '" + boost::algorithm::join(skippedGrids, ", ") + "'.";
+                "were skipped: '" + hboost::algorithm::join(skippedGrids, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
 
@@ -430,6 +508,6 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

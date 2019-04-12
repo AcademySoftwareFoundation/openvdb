@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,10 +35,13 @@
 /// @note This is intended mainly as an example of how to ray-trace
 /// OpenVDB volumes.  It is not a production-quality renderer.
 
+#include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <boost/algorithm/string/predicate.hpp>
@@ -53,9 +56,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/RayTracer.h>
-#ifdef DWA_OPENVDB
-#include <usagetrack.h>
-#endif
 
 
 namespace {
@@ -482,10 +482,6 @@ struct OptParse
 int
 main(int argc, char *argv[])
 {
-#ifdef DWA_OPENVDB
-    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
-#endif
-
     OPENVDB_START_THREADSAFE_STATIC_WRITE
     gProgName = argv[0];
     if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
@@ -594,7 +590,7 @@ main(int argc, char *argv[])
                 opts.verbose = true;
             } else if (arg == "-version" || arg == "--version") {
                 std::cout << "OpenVDB library version: "
-                    << openvdb::getLibraryVersionString() << "\n";
+                    << openvdb::getLibraryAbiVersionString() << "\n";
                 std::cout << "OpenVDB file format version: "
                     << openvdb::OPENVDB_FILE_VERSION << std::endl;
                 return EXIT_SUCCESS;
@@ -715,12 +711,11 @@ main(int argc, char *argv[])
         retcode = EXIT_FAILURE;
     } catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
-        std::unexpected();
     }
 
     return retcode;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

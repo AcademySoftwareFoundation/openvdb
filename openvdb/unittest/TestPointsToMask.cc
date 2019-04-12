@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -133,9 +133,9 @@ TestPointsToMask::testPointsToMask()
     const openvdb::math::Transform::Ptr xform =
         openvdb::math::Transform::createLinearTransform(voxelSize);
 
-    // generate 150,000,000 points
+    // generate lots of points
     std::vector<openvdb::Vec3R> points;
-    unittest_util::genPoints(150000000, points);
+    unittest_util::genPoints(15000000, points);
     PointList pointList(points);
 
     //openvdb::util::CpuTimer timer;
@@ -198,6 +198,6 @@ TestPointsToMask::testPointsToMask()
     }
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

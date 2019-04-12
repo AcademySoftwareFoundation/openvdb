@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -120,6 +120,15 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
         CPPUNIT_ASSERT_EQUAL(isGroup(attr), isGroup(attrB));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+        AttributeArray& baseAttr(attr);
+        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<GroupType>()), baseAttr.valueType());
+        CPPUNIT_ASSERT_EQUAL(Name("grp"), baseAttr.codecType());
+        CPPUNIT_ASSERT_EQUAL(Index(1), baseAttr.valueTypeSize());
+        CPPUNIT_ASSERT_EQUAL(Index(1), baseAttr.storageTypeSize());
+        CPPUNIT_ASSERT(!baseAttr.valueTypeIsFloatingPoint());
+#endif
     }
 
     { // casting
@@ -202,6 +211,15 @@ TestAttributeGroup::testAttributeGroupHandle()
         CPPUNIT_ASSERT(handle3.get(1));
         CPPUNIT_ASSERT(!handle3.get(2));
         CPPUNIT_ASSERT(handle3.get(3));
+    }
+
+    { // test group 3 valid for attributes 1 and 3 (unsafe access)
+        GroupHandle handle3(attr, 3);
+
+        CPPUNIT_ASSERT(!handle3.getUnsafe(0));
+        CPPUNIT_ASSERT(handle3.getUnsafe(1));
+        CPPUNIT_ASSERT(!handle3.getUnsafe(2));
+        CPPUNIT_ASSERT(handle3.getUnsafe(3));
     }
 
     { // group 6 valid for attributes 2 and 3 (using specific offset)
@@ -352,8 +370,8 @@ TestAttributeGroup::testAttributeGroupHandle()
 class GroupNotFilter
 {
 public:
-    GroupNotFilter()
-        : mFilter("") { }
+    explicit GroupNotFilter(const AttributeSet::Descriptor::GroupIndex& index)
+        : mFilter(index) { }
 
     inline bool initialized() const { return mFilter.initialized(); }
 
@@ -377,7 +395,7 @@ struct HandleWrapper
     HandleWrapper(const GroupHandle& handle)
         : mHandle(handle) { }
 
-    GroupHandle groupHandle(const Name& /*name*/) const {
+    GroupHandle groupHandle(const AttributeSet::Descriptor::GroupIndex& /*index*/) const {
         return mHandle;
     }
 
@@ -389,6 +407,10 @@ private:
 void
 TestAttributeGroup::testAttributeGroupFilter()
 {
+    using GroupIndex = AttributeSet::Descriptor::GroupIndex;
+
+    GroupIndex zeroIndex;
+
     typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
@@ -396,7 +418,8 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // group values all zero
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
+        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -414,7 +437,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
 
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
@@ -443,7 +466,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
 
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
@@ -470,7 +493,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group next
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -485,7 +508,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -501,7 +524,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group postfix ++/--
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter("");
+        GroupFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -517,7 +540,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group next
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 
@@ -532,7 +555,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 
@@ -548,7 +571,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group postfix ++
         ValueVoxelCIter indexIter(0, size);
-        GroupNotFilter filter;
+        GroupNotFilter filter(zeroIndex);
         filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
         IndexNotGroupAllIter iter(indexIter, filter);
 
@@ -563,6 +586,6 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

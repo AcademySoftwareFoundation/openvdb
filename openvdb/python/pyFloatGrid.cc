@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,9 +45,11 @@ exportFloatGrid()
     // Add a module-level list that gives the types of all supported Grid classes.
     py::scope().attr("GridTypes") = py::list();
 
+#if defined(PY_OPENVDB_USE_NUMPY) && !defined(PY_OPENVDB_USE_BOOST_PYTHON_NUMPY)
     // Specify that py::numeric::array should refer to the Python type numpy.ndarray
     // (rather than the older Numeric.array).
     py::numeric::array::set_module_and_type("numpy", "ndarray");
+#endif
 
     pyGrid::exportGrid<FloatGrid>();
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
@@ -63,6 +65,6 @@ exportFloatGrid()
         "of a sphere.");
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

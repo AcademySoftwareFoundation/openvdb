@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,9 +34,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for negative()
 #include "io.h" // for getDataCompression(), etc.
-#include <boost/scoped_array.hpp>
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -109,39 +109,39 @@ enum {
 template<typename T>
 struct RealToHalf {
     enum { isReal = false }; // unless otherwise specified, type T is not a floating-point type
-    typedef T HalfT; // type T's half float analogue is T itself
+    using HalfT = T; // type T's half float analogue is T itself
     static HalfT convert(const T& val) { return val; }
 };
 template<> struct RealToHalf<float> {
     enum { isReal = true };
-    typedef half HalfT;
+    using HalfT = half;
     static HalfT convert(float val) { return HalfT(val); }
 };
 template<> struct RealToHalf<double> {
     enum { isReal = true };
-    typedef half HalfT;
+    using HalfT = half;
     // A half can only be constructed from a float, so cast the value to a float first.
     static HalfT convert(double val) { return HalfT(float(val)); }
 };
 template<> struct RealToHalf<Vec2s> {
     enum { isReal = true };
-    typedef Vec2H HalfT;
+    using HalfT = Vec2H;
     static HalfT convert(const Vec2s& val) { return HalfT(val); }
 };
 template<> struct RealToHalf<Vec2d> {
     enum { isReal = true };
-    typedef Vec2H HalfT;
+    using HalfT = Vec2H;
     // A half can only be constructed from a float, so cast the vector's elements to floats first.
     static HalfT convert(const Vec2d& val) { return HalfT(Vec2s(val)); }
 };
 template<> struct RealToHalf<Vec3s> {
     enum { isReal = true };
-    typedef Vec3H HalfT;
+    using HalfT = Vec3H;
     static HalfT convert(const Vec3s& val) { return HalfT(val); }
 };
 template<> struct RealToHalf<Vec3d> {
     enum { isReal = true };
-    typedef Vec3H HalfT;
+    using HalfT = Vec3H;
     // A half can only be constructed from a float, so cast the vector's elements to floats first.
     static HalfT convert(const Vec3d& val) { return HalfT(Vec3s(val)); }
 };
@@ -224,7 +224,7 @@ struct HalfReader</*IsReal=*/false, T> {
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfReader</*IsReal=*/true, T> {
-    typedef typename RealToHalf<T>::HalfT HalfT;
+    using HalfT = typename RealToHalf<T>::HalfT;
     static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         if (data == nullptr) {
@@ -292,7 +292,7 @@ struct HalfWriter</*IsReal=*/false, T> {
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfWriter</*IsReal=*/true, T> {
-    typedef typename RealToHalf<T>::HalfT HalfT;
+    using HalfT = typename RealToHalf<T>::HalfT;
     static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
@@ -305,7 +305,7 @@ struct HalfWriter</*IsReal=*/true, T> {
 /// Specialization to avoid double to float warnings in MSVC
 template<>
 struct HalfWriter</*IsReal=*/true, double> {
-    typedef RealToHalf<double>::HalfT HalfT;
+    using HalfT = RealToHalf<double>::HalfT;
     static inline void write(std::ostream& os, const double* data, Index count,
         uint32_t compression)
     {
@@ -400,7 +400,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     ValueT* tempBuf = destBuf;
-    boost::scoped_array<ValueT> scopedTempBuf;
+    std::unique_ptr<ValueT[]> scopedTempBuf;
 
     Index tempCount = destCount;
 
@@ -475,7 +475,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
     Index tempCount = srcCount;
     ValueT* tempBuf = srcBuf;
-    boost::scoped_array<ValueT> scopedTempBuf;
+    std::unique_ptr<ValueT[]> scopedTempBuf;
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
 
@@ -645,6 +645,6 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
 #endif // OPENVDB_IO_COMPRESSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

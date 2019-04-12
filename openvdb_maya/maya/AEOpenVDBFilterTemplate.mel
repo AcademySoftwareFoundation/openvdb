@@ -17,7 +17,7 @@ global proc
 AEAT_OpenVDBFilterUpdateEnabled( string $node )
 {
     int $operation = `getAttr ($node+".Filter")`;
-          
+
     if ($operation < 3) {
         editorTemplate -dimControl $node "FilterVoxelRadius" 0;
         editorTemplate -dimControl $node "Iterations" 0;

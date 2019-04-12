@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,6 +49,10 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
         , mBitMask(static_cast<GroupType>(1 << offset))
 {
     assert(isGroup(mArray));
+
+    // load data if delay-loaded
+
+    mArray.loadData();
 }
 
 
@@ -58,12 +62,22 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     , mBitMask(bitMask)
 {
     assert(isGroup(mArray));
+
+    // load data if delay-loaded
+
+    mArray.loadData();
 }
 
 
 bool GroupHandle::get(Index n) const
 {
     return (mArray.get(n) & mBitMask) == mBitMask;
+}
+
+
+bool GroupHandle::getUnsafe(Index n) const
+{
+    return (mArray.getUnsafe(n) & mBitMask) == mBitMask;
 }
 
 
@@ -128,6 +142,6 @@ bool GroupWriteHandle::compact()
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

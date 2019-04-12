@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,8 +37,24 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <boost/utility/enable_if.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <UT/UT_Version.h>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+
+#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
+#include <UT/UT_UniquePtr.h>
+#else
+template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
+#endif
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hutil = houdini_utils;
 namespace hvdb = openvdb_houdini;
@@ -56,22 +72,25 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
-protected:
-    bool updateParmsFlags() override;
-    void resolveObsoleteParms(PRM_ParmList*) override;
-    OP_ERROR cookMySop(OP_Context&) override;
-
-    Mode getMode(fpreal time) const
+    static Mode getMode(const std::string& modeStr)
     {
-        UT_String modeStr;
-        evalString(modeStr, "mode", 0, time);
         if (modeStr == "index") return MODE_INDEX;
         if (modeStr == "world") return MODE_WORLD;
         if (modeStr == "geom") return MODE_GEOM;
 
-        std::string err = "unrecognized mode \"" + modeStr.toStdString() + "\"";
-        throw std::runtime_error(err);
+        throw std::runtime_error{"unrecognized mode \"" + modeStr + "\""};
     }
+
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+#else
+protected:
+    OP_ERROR cookVDBSop(OP_Context&) override;
+#endif
+
+protected:
+    bool updateParmsFlags() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -89,24 +108,21 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDBs to be processed"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    {
-        char const * const items[] = {
+    parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Bounds")
+        .setDefault("index")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "index",  "Min and Max in Index Space",
             "world",  "Min and Max in World Space",
-            "geom",   "Reference Geometry",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Bounds")
-            .setDefault("index")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip(
-                "Index Space:\n"
-                "    Interpret the given min and max coordinates in index-space units.\n"
-                "World Space:\n"
-                "    Interpret the given min and max coordinates in world-space units.\n"
-                "Reference Geometry:\n"
-                "    Use the world-space bounds of the reference input geometry.")
-            .setDocumentation(
+            "geom",   "Reference Geometry"
+        })
+        .setTooltip(
+            "Index Space:\n"
+            "    Interpret the given min and max coordinates in index-space units.\n"
+            "World Space:\n"
+            "    Interpret the given min and max coordinates in world-space units.\n"
+            "Reference Geometry:\n"
+            "    Use the world-space bounds of the reference input geometry.")
+        .setDocumentation(
 "How to specify the bounding box to be filled\n\n"
 "Index Space:\n"
 "    Interpret the given min and max coordinates in"
@@ -116,7 +132,6 @@ newSopOperator(OP_OperatorTable* table)
 " [world-space|http://www.openvdb.org/documentation/doxygen/overview.html#subsecWorSpace] units.\n"
 "Reference Geometry:\n"
 "    Use the world-space bounds of the reference input geometry.\n"));
-    }
 
     parms.add(hutil::ParmFactory(PRM_INT_XYZ, "min", "Min Coord")
         .setVectorSize(3)
@@ -151,10 +166,13 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value"));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fill::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -206,8 +224,8 @@ SOP_OpenVDB_Fill::updateParmsFlags()
 
     //int refExists = (nInputs() == 2);
 
-    Mode mode;
-    try { mode = getMode(time); } catch (std::runtime_error&) { mode = MODE_INDEX; }
+    Mode mode = MODE_INDEX;
+    try { mode = getMode(evalStdString("mode", time)); } catch (std::runtime_error&) {}
 
     switch (mode) {
         case MODE_INDEX:
@@ -262,11 +280,9 @@ namespace {
 
 // Convert a Vec3 value to a vector of another value type or to a scalar value
 
-inline const openvdb::Vec3R& convertValue(const openvdb::Vec3R& val) { return val; }
-
 // Overload for scalar types (discards all but the first vector component)
 template<typename ValueType>
-inline typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
+inline typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     return ValueType(val[0]);
@@ -274,9 +290,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec2 types (not currently used)
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 2,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 2, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -285,9 +300,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec3 types
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 3,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 3, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -296,9 +310,8 @@ convertValue(const openvdb::Vec3R& val)
 
 // Overload for Vec4 types (not currently used)
 template<typename ValueType>
-inline typename boost::enable_if_c<
-    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 4,
-    ValueType>::type
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec
+    && openvdb::VecTraits<ValueType>::Size == 4, ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
     using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
@@ -347,33 +360,38 @@ struct FillOp
 
 
 OP_ERROR
-SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fill)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
+        lock.markInputUnlocked(0);
+
+        duplicateSourceStealable(0, context);
+#endif
 
         const fpreal t = context.getTime();
 
-        duplicateSourceStealable(0, context);
+        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", t));
 
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, t);
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
-
-        const openvdb::Vec3R value = SOP_NodeVDB::evalVec3R("val", t);
+        const openvdb::Vec3R value = evalVec3R("val", t);
         const bool
             active = evalInt("active", 0, t),
             sparse = evalInt("sparse", 0, t);
 
-        boost::scoped_ptr<const FillOp> fillOp;
-        switch (getMode(t)) {
+        UT_UniquePtr<const FillOp> fillOp;
+        switch (SOP_OpenVDB_Fill::getMode(evalStdString("mode", t))) {
             case MODE_INDEX:
             {
                 const openvdb::CoordBBox bbox(
                     openvdb::Coord(
-                        evalInt("min", 0, t), evalInt("min", 1, t), evalInt("min", 2, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 0, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 1, t)),
+                        static_cast<openvdb::Int32>(evalInt("min", 2, t))),
                     openvdb::Coord(
-                        evalInt("max", 0, t), evalInt("max", 1, t), evalInt("max", 2, t)));
+                        static_cast<openvdb::Int32>(evalInt("max", 0, t)),
+                        static_cast<openvdb::Int32>(evalInt("max", 1, t)),
+                        static_cast<openvdb::Int32>(evalInt("max", 2, t))));
                 fillOp.reset(new FillOp(bbox, value, active, sparse));
                 break;
             }
@@ -420,9 +438,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
-
-            GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, *fillOp);
+            it->getGrid().apply<hvdb::VolumeGridTypes>(*fillOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());
@@ -430,6 +446,6 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

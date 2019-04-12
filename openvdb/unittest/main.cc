@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,15 +29,18 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <openvdb/openvdb.h>
+#include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/logging.h>
-#include <cppunit/BriefTestProgressListener.h>
 #include <cppunit/CompilerOutputter.h>
+#include <cppunit/TestFailure.h>
+#include <cppunit/TestListener.h>
 #include <cppunit/TestResult.h>
 #include <cppunit/TestResultCollector.h>
 #include <cppunit/TextTestProgressListener.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 #include <algorithm> // for std::shuffle()
+#include <cmath> // for std::round()
 #include <cstdlib> // for EXIT_SUCCESS
 #include <cstring> // for strrchr()
 #include <exception>
@@ -92,6 +95,43 @@ getTestNames(StringVec& nameVec, const CppUnit::Test* test)
         }
     }
 }
+
+
+/// Listener that prints the name, elapsed time, and error status of each test
+class TimedTestProgressListener: public CppUnit::TestListener
+{
+public:
+    void startTest(CppUnit::Test* test) override
+    {
+        mFailed = false;
+        std::cout << test->getName() << std::flush;
+        mTimer.start();
+    }
+
+    void addFailure(const CppUnit::TestFailure& failure) override
+    {
+        std::cout << " : " << (failure.isError() ? "error" : "assertion");
+        mFailed  = true;
+    }
+
+    void endTest(CppUnit::Test*) override
+    {
+        if (!mFailed) {
+            // Print elapsed time only for successful tests.
+            const double msec = mTimer.milliseconds();
+            if (msec > 1.0) {
+              openvdb::util::printTime(std::cout, msec, " : OK (", ")", 4, 1, 0);
+            } else {
+              std::cout << " : OK (<1ms)";
+            }
+        }
+        std::cout << std::endl;
+    }
+
+private:
+    openvdb::util::CpuTimer mTimer;
+    bool mFailed = false;
+};
 
 
 int
@@ -198,7 +238,7 @@ run(int argc, char* argv[])
         controller.addListener(&result);
 
         CppUnit::TextTestProgressListener progress;
-        CppUnit::BriefTestProgressListener vProgress;
+        TimedTestProgressListener vProgress;
         if (verbose) {
             controller.addListener(&vProgress);
         } else {
@@ -231,6 +271,6 @@ main(int argc, char *argv[])
     return run(argc, argv);
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

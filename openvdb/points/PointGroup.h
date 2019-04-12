@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,6 +44,14 @@
 #include "AttributeSet.h"
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
+#include "PointCount.h"
+
+#include <tbb/parallel_reduce.h>
+
+#include <algorithm>
+#include <random>
+#include <string>
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -207,7 +215,7 @@ struct SetGroupOp
 
     //////////
 
-    const GroupIndex        mIndex;
+    const GroupIndex&       mIndex;
 }; // struct SetGroupOp
 
 
@@ -267,7 +275,7 @@ struct SetGroupFromIndexOp
 
     const PointIndexTree& mIndexTree;
     const MembershipArray& mMembership;
-    const GroupIndex mIndex;
+    const GroupIndex& mIndex;
 }; // struct SetGroupFromIndexOp
 
 
@@ -305,8 +313,8 @@ struct SetGroupByFilterOp
 
     //////////
 
-    const GroupIndex mIndex;
-    const FilterT mFilter;
+    const GroupIndex& mIndex;
+    const FilterT& mFilter; // beginIndex takes a copy of mFilter
 }; // struct SetGroupByFilterOp
 
 
@@ -448,6 +456,7 @@ template <typename PointDataTree>
 inline void appendGroup(PointDataTree& tree, const Name& group)
 {
     using Descriptor = AttributeSet::Descriptor;
+    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
 
     using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
@@ -468,9 +477,11 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
 
     if (descriptor->hasGroup(group))    return;
 
+    const bool hasUnusedGroup = groupInfo.unusedGroups() > 0;
+
     // add a new group attribute if there are no unused groups
 
-    if (groupInfo.unusedGroups() == 0) {
+    if (!hasUnusedGroup) {
 
         // find a new internal group name
 
@@ -483,7 +494,8 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         // insert new group attribute
 
         AppendAttributeOp<PointDataTree> append(descriptor, pos);
-        tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
+        LeafManagerT leafManager(tree);
+        tbb::parallel_for(leafManager.leafRange(), append);
     }
     else {
         // make the descriptor unique before we modify the group map
@@ -503,6 +515,12 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
     // add the group mapping to the descriptor
 
     descriptor->setGroup(group, offset);
+
+    // if there was an unused group then we did not need to append a new attribute, so
+    // we must manually clear membership in the new group as its bits may have been
+    // previously set
+
+    if (hasUnusedGroup)    setGroup(tree, group, false);
 }
 
 
@@ -614,6 +632,7 @@ inline void compactGroups(PointDataTree& tree)
 {
     using Descriptor = AttributeSet::Descriptor;
     using GroupIndex = Descriptor::GroupIndex;
+    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
 
     using point_group_internal::CopyGroupOp;
     using point_group_internal::GroupInfo;
@@ -647,7 +666,8 @@ inline void compactGroups(PointDataTree& tree)
         const GroupIndex targetIndex = attributeSet.groupIndex(targetOffset);
 
         CopyGroupOp<PointDataTree> copy(targetIndex, sourceIndex);
-        tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), copy);
+        LeafManagerT leafManager(tree);
+        tbb::parallel_for(leafManager.leafRange(), copy);
 
         descriptor->setGroup(sourceName, targetOffset);
     }
@@ -678,15 +698,9 @@ inline void setGroup(   PointDataTree& tree,
 {
     using Descriptor    = AttributeSet::Descriptor;
     using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
-
-    if (membership.size() != pointCount(tree)) {
-        OPENVDB_THROW(LookupError, "Membership vector size must match number of points.");
-    }
-
     using point_group_internal::SetGroupFromIndexOp;
 
     auto iter = tree.cbeginLeaf();
-
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
@@ -696,19 +710,48 @@ inline void setGroup(   PointDataTree& tree,
         OPENVDB_THROW(LookupError, "Group must exist on Tree before defining membership.");
     }
 
+    {
+        // Check that that the largest index in the PointIndexTree is smaller than the size
+        // of the membership vector. The index tree will be used to lookup membership
+        // values. If the index tree was constructed with nan positions, this index will
+        // differ from the PointDataTree count
+
+        using IndexTreeManager = tree::LeafManager<const PointIndexTree>;
+        IndexTreeManager leafManager(indexTree);
+
+        const int64_t max = tbb::parallel_reduce(leafManager.leafRange(), -1,
+            [](const typename IndexTreeManager::LeafRange& range, int64_t value) -> int64_t {
+                for (auto leaf = range.begin(); leaf; ++leaf) {
+                    auto it = std::max_element(leaf->indices().begin(), leaf->indices().end());
+                    value = std::max(value, static_cast<int64_t>(*it));
+                }
+                return value;
+            },
+            [](const int64_t a, const int64_t b) {
+                return std::max(a, b);
+            }
+        );
+
+        if (max != -1 && membership.size() <= static_cast<size_t>(max)) {
+            OPENVDB_THROW(IndexError, "Group membership vector size must be larger than "
+                " the maximum index within the provided index tree.");
+        }
+    }
+
     const Descriptor::GroupIndex index = attributeSet.groupIndex(group);
+    LeafManagerT leafManager(tree);
 
     // set membership
 
     if (remove) {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, false> set(indexTree, membership, index);
-        tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, true>
+            set(indexTree, membership, index);
+        tbb::parallel_for(leafManager.leafRange(), set);
     }
     else {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, true> set(indexTree, membership, index);
-        tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, false>
+            set(indexTree, membership, index);
+        tbb::parallel_for(leafManager.leafRange(), set);
     }
 }
 
@@ -738,11 +781,12 @@ inline void setGroup(   PointDataTree& tree,
     }
 
     const Descriptor::GroupIndex index = attributeSet.groupIndex(group);
+    LeafManagerT leafManager(tree);
 
     // set membership based on member variable
 
-    if (member)     tbb::parallel_for(LeafManagerT(tree).leafRange(), SetGroupOp<PointDataTree, true>(index));
-    else            tbb::parallel_for(LeafManagerT(tree).leafRange(), SetGroupOp<PointDataTree, false>(index));
+    if (member)     tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTree, true>(index));
+    else            tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTree, false>(index));
 }
 
 
@@ -775,7 +819,9 @@ inline void setGroupByFilter(   PointDataTree& tree,
     // set membership using filter
 
     SetGroupByFilterOp<PointDataTree, FilterT> set(index, filter);
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
+    LeafManagerT leafManager(tree);
+
+    tbb::parallel_for(leafManager.leafRange(), set);
 }
 
 
@@ -808,7 +854,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
     using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
-    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
+    const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -826,6 +872,6 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
 
 #endif // OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

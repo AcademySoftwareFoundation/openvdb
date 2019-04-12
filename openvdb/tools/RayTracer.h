@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,10 +51,12 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/Interpolation.h>
-#include <boost/scoped_array.hpp>
 #include <deque>
+#include <iostream>
 #include <fstream>
+#include <limits>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -278,7 +280,7 @@ public:
         RGBA  operator* (ValueT scale)  const { return RGBA(r*scale, g*scale, b*scale);}
         RGBA  operator+ (const RGBA& rhs) const { return RGBA(r+rhs.r, g+rhs.g, b+rhs.b);}
         RGBA  operator* (const RGBA& rhs) const { return RGBA(r*rhs.r, g*rhs.g, b*rhs.b);}
-        RGBA& operator+=(const RGBA& rhs) { r+=rhs.r; g+=rhs.g; b+=rhs.b, a+=rhs.a; return *this;}
+        RGBA& operator+=(const RGBA& rhs) { r+=rhs.r; g+=rhs.g; b+=rhs.b; a+=rhs.a; return *this;}
 
         void over(const RGBA& rhs)
         {
@@ -333,7 +335,7 @@ public:
         std::string name(fileName);
         if (name.find_last_of(".") == std::string::npos) name.append(".ppm");
 
-        boost::scoped_array<unsigned char> buffer(new unsigned char[3*mSize]);
+        std::unique_ptr<unsigned char[]> buffer(new unsigned char[3*mSize]);
         unsigned char *tmp = buffer.get(), *q = tmp;
         RGBA* p = mPixels.get();
         size_t n = mSize;
@@ -392,7 +394,7 @@ public:
 
 private:
     size_t mWidth, mHeight, mSize;
-    boost::scoped_array<RGBA> mPixels;
+    std::unique_ptr<RGBA[]> mPixels;
 };// Film
 
 
@@ -945,7 +947,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 {
     const BaseShader& shader = *mShader;
     Vec3Type xyz, nml;
-    const float frac = 1.0f / (1.0f + mSubPixels);
+    const float frac = 1.0f / (1.0f + float(mSubPixels));
     for (size_t j=range.begin(), n=0, je = range.end(); j<je; ++j) {
         for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
             Film::RGBA& bg = mCamera->pixel(i,j);
@@ -1118,6 +1120,6 @@ operator()(const tbb::blocked_range<size_t>& range) const
 
 #endif // OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

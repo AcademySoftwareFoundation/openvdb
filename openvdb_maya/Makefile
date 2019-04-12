@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2018 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,13 +32,17 @@
 #   install             install plugins, scripts, etc. into MAYA_DESTDIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
+#   header_test         check for missing or indirectly included headers
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   bits=32|64          build for 32-bit or 64-bit environments (default: 64)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -60,13 +64,16 @@ endif
 # library makefile)
 DESTDIR := /tmp/OpenVDB
 
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
+
 # The directory into which to install Maya plugins, scripts, etc.
 MAYA_DESTDIR := $(DESTDIR)/maya
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(DESTDIR)/lib
+OPENVDB_LIB_DIR := $(DESTDIR_LIB_DIR)
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
@@ -141,8 +148,10 @@ INCLDIRS := \
 CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:
 CXXFLAGS += \
@@ -180,6 +189,30 @@ ifdef MBSD
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
+endif
+
 MAYA_LIBS := \
     -lOpenMayaFX \
     -lOpenMaya \
@@ -214,6 +247,7 @@ MAYA_SRC_NAMES := \
 #
 MAYA_INCLUDE_NAMES := \
     maya/OpenVDBData.h \
+    maya/OpenVDBPlugin.h \
     maya/OpenVDBUtil.h \
 #
 
@@ -253,7 +287,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend install
+.PHONY: all clean depend header_test install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -296,6 +330,15 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 
 depend: $(DEPEND)
 
+# Compile an implicit translation unit for each header to identify any indirect includes
+HEADER_TEST_FILES := $(addprefix header_test-,$(MAYA_INCLUDE_NAMES))
+$(HEADER_TEST_FILES): header_test-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(CXXFLAGS) \
+	    -isystem $(MAYA_INCL_DIR) -fPIC -o /dev/null -
+echo_header_test:
+	@echo "Checking for missing or indirectly included headers"
+header_test: echo_header_test $(HEADER_TEST_FILES)
+
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND) $(MAYA_OBJ_NAMES)
 
@@ -303,6 +346,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2018 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

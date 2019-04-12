@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,10 +38,28 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
+#include <UT/UT_Version.h>
+#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+#include <hboost/algorithm/string/join.hpp>
+#else
 #include <boost/algorithm/string/join.hpp>
+#endif
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#if UT_MAJOR_VERSION_INT >= 16
+#define VDB_COMPILABLE_SOP 1
+#else
+#define VDB_COMPILABLE_SOP 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
+#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
+namespace hboost = boost;
+#endif
 
 
 ////////////////////////////////////////
@@ -127,16 +145,26 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
+#if VDB_COMPILABLE_SOP
+    class Cache: public SOP_VDBCacheOptions
+    {
+#endif
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+        OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
+        bool processGrids(MorphingParms&, hvdb::Interrupter&);
+#if VDB_COMPILABLE_SOP
+    };
+#endif
+
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
-
-    OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
-
-    bool processGrids(MorphingParms&, hvdb::Interrupter&);
 };
 
+
 ////////////////////////////////////////
+
 
 // Build UI and register this operator
 
@@ -150,14 +178,14 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     // Level set grid
-    parms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Source Level Set")
+    parms.add(hutil::ParmFactory(PRM_STRING, "sourcegroup", "Source")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setDocumentation(
             "A subset of the input level set VDBs to be morphed"
             " (see [specifying volumes|/model/volumes#group])"));
 
     // Target grid
-    parms.add(hutil::ParmFactory(PRM_STRING, "targetGroup", "Target Level Set")
+    parms.add(hutil::ParmFactory(PRM_STRING, "targetgroup", "Target")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setDocumentation(
             "The target level set VDB (see [specifying volumes|/model/volumes#group])"));
@@ -165,23 +193,23 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setTooltip("Enable / disable the mask.")
+        .setTooltip("Enable/disable the mask.")
         .setDocumentation(nullptr));
 
     // Alpha grid
-    parms.add(hutil::ParmFactory(PRM_STRING, "maskGroup", "Alpha Mask")
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
         .setChoiceList(&hutil::PrimGroupMenuInput3)
         .setTooltip(
             "An optional scalar VDB to be used for alpha masking"
             " (see [specifying volumes|/model/volumes#group])\n\n"
             "Voxel values are assumed to be between 0 and 1."));
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "morphingHeading", "Morphing").
-        setDocumentation(
+    parms.add(hutil::ParmFactory(PRM_HEADING, "morphingheading", "Morphing")
+        .setDocumentation(
             "These parameters control how the SDF moves from the source to the target."));
 
     // Advect: timestep
-    parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
+    parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Timestep")
         .setDefault(1, "1.0/$FPS")
         .setDocumentation(
             "The number of seconds of movement to apply to the input points\n\n"
@@ -202,9 +230,9 @@ newSopOperator(OP_OperatorTable* table)
         items.push_back(biasedGradientSchemeToMenuName(HJWENO5_BIAS));
 
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "advectSpatial", "Spatial Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "advectspatial", "Spatial Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
+            .setDefault(biasedGradientSchemeToString(HJWENO5_BIAS))
             .setTooltip("Set the spatial finite difference scheme.")
             .setDocumentation(
                 "How accurately the gradients of the signed distance field\n"
@@ -221,25 +249,25 @@ newSopOperator(OP_OperatorTable* table)
             items.push_back(temporalIntegrationSchemeToMenuName(it)); // label
         }
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "advectTemporal", "Temporal Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "advecttemporal", "Temporal Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
+            .setDefault(temporalIntegrationSchemeToString(TVD_RK2))
             .setTooltip("Set the temporal integration scheme.")
             .setDocumentation(
                 "How accurately time is evolved within each advection step\n\n"
                 "The later choices are more accurate but take more time."));
     }
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", "Renormalization")
+    parms.add(hutil::ParmFactory(PRM_HEADING, "renormheading", "Renormalization")
         .setDocumentation(
-            "After morphing the signed distance field, it will often no longer\n"
-            "contain valid distances.  A number of renormalization passes can be\n"
-            "performed to convert it back into a proper signed distance field."));
+            "After morphing the signed distance field, it will often no longer"
+            " contain valid distances.  A number of renormalization passes can be"
+            " performed to convert it back into a proper signed distance field."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Steps")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "normsteps", "Steps")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setTooltip("The number of times to renormalize between each substep."));
+        .setTooltip("The number of times to renormalize between each substep"));
 
     // Renorm: spatial menu
     {
@@ -250,9 +278,9 @@ newSopOperator(OP_OperatorTable* table)
         items.push_back(biasedGradientSchemeToString(HJWENO5_BIAS));
         items.push_back(biasedGradientSchemeToMenuName(HJWENO5_BIAS));
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "renormspatial", "Spatial Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
+            .setDefault(biasedGradientSchemeToString(HJWENO5_BIAS))
             .setTooltip("Set the spatial finite difference scheme.")
             .setDocumentation(
                 "How accurately the gradients of the signed distance field\n"
@@ -269,30 +297,29 @@ newSopOperator(OP_OperatorTable* table)
             items.push_back(temporalIntegrationSchemeToMenuName(it)); // label
         }
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "renormtemporal", "Temporal Scheme")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault(1, ::strdup(temporalIntegrationSchemeToString(TVD_RK2).c_str()))
+            .setDefault(temporalIntegrationSchemeToString(TVD_RK2))
             .setTooltip("Set the temporal integration scheme.")
             .setDocumentation(
                 "How accurately time is evolved during renormalization\n\n"
                 "The later choices are more accurate but take more time."));
     }
 
-
-    parms.add(hutil::ParmFactory(PRM_HEADING, "maskHeading", "Alpha Mask"));
+    parms.add(hutil::ParmFactory(PRM_HEADING, "maskheading", "Alpha Mask"));
 
     //Invert mask.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
         .setTooltip("Invert the optional mask so that alpha value 0 maps to 1 and 1 maps to 0."));
 
     // Min mask range
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "minmask", "Min Mask Cutoff")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setTooltip("Threshold below which to clamp mask values to zero"));
 
     // Max mask range
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxmask", "Max Mask Cutoff")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setTooltip("Threshold above which to clamp mask values to one"));
@@ -301,14 +328,41 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT, "beginTime", "Begin time"));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT, "endTime", "Time step"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Source Level Set"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "targetGroup", "Target"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "maskGroup", "Alpha Mask"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "morphingHeading", "Morphing"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "advectSpatial", "Spatial Scheme")
+        .setDefault(biasedGradientSchemeToString(HJWENO5_BIAS)));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "advectTemporal", "Temporal Scheme")
+        .setDefault(temporalIntegrationSchemeToString(TVD_RK2)));
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", "Renormalization"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Steps")
+        .setDefault(PRMthreeDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Scheme")
+        .setDefault(biasedGradientSchemeToString(HJWENO5_BIAS)));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Scheme")
+        .setDefault(temporalIntegrationSchemeToString(TVD_RK2)));
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "maskHeading", "Alpha Mask"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+        .setDefault(PRMzeroDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+        .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Morph Level Set",
+    hvdb::OpenVDBOpFactory("VDB Morph SDF",
         SOP_OpenVDB_Morph_Level_Set::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBMorphLevelSet")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Source SDF VDBs to Morph")
         .addInput("Target SDF VDB")
         .addOptionalInput("Optional VDB Alpha Mask")
+#if VDB_COMPILABLE_SOP
+        .setVerb(SOP_NodeVerb::COOK_INPLACE,
+            []() { return new SOP_OpenVDB_Morph_Level_Set::Cache; })
+#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -332,6 +386,45 @@ and usage examples.\n");
 }
 
 
+void
+SOP_OpenVDB_Morph_Level_Set::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "advectSpatial", "advectspatial");
+    resolveRenamedParm(*obsoleteParms, "advectTemporal", "advecttemporal");
+    resolveRenamedParm(*obsoleteParms, "lsGroup", "sourcegroup");
+    resolveRenamedParm(*obsoleteParms, "maskGroup", "maskname");
+    resolveRenamedParm(*obsoleteParms, "maxMask", "maxmask");
+    resolveRenamedParm(*obsoleteParms, "minMask", "minmask");
+    resolveRenamedParm(*obsoleteParms, "normSteps", "normsteps");
+    resolveRenamedParm(*obsoleteParms, "renormSpatial", "renormspatial");
+    resolveRenamedParm(*obsoleteParms, "renormTemporal", "renormtemporal");
+    resolveRenamedParm(*obsoleteParms, "targetGroup", "targetgroup");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
+// Enable/disable or show/hide parameters in the UI.
+bool
+SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
+{
+    bool changed = false;
+
+    const bool hasMask = (this->nInputs() == 3);
+    changed |= enableParm("mask", hasMask);
+    const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
+    changed |= enableParm("invert", useMask);
+    changed |= enableParm("minmask", useMask);
+    changed |= enableParm("maxmask", useMask);
+    changed |= enableParm("maskname", useMask);
+
+    return changed;
+}
+
+
 ////////////////////////////////////////
 
 
@@ -352,36 +445,16 @@ SOP_OpenVDB_Morph_Level_Set::SOP_OpenVDB_Morph_Level_Set(OP_Network* net,
 
 ////////////////////////////////////////
 
-// Enable/disable or show/hide parameters in the UI.
-
-bool
-SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
-{
-    bool changed = false;
-
-    const bool hasMask = (this->nInputs() == 3);
-    changed |= enableParm("mask", hasMask);
-    const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
-    changed |= enableParm("invert",    useMask);
-    changed |= enableParm("minMask",   useMask);
-    changed |= enableParm("maxMask",   useMask);
-    changed |= enableParm("maskGroup",useMask);
-
-    return changed;
-}
-
-
-
-////////////////////////////////////////
-
 
 OP_ERROR
-SOP_OpenVDB_Morph_Level_Set::cookMySop(OP_Context& context)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::cookVDBSop(OP_Context& context)
 {
     try {
+#if !VDB_COMPILABLE_SOP
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
         duplicateSource(0, context);
+#endif
 
         // Evaluate UI parameters
         MorphingParms parms;
@@ -406,55 +479,44 @@ SOP_OpenVDB_Morph_Level_Set::cookMySop(OP_Context& context)
 
 
 OP_ERROR
-SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParms& parms)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphingParms(
+    OP_Context& context, MorphingParms& parms)
 {
-    fpreal now = context.getTime();
-    UT_String str;
+    const fpreal now = context.getTime();
 
-    evalString(str, "lsGroup", 0, now);
-    parms.mLSGroup = matchGroup(*gdp, str.toStdString());
+    parms.mLSGroup = matchGroup(*gdp, evalStdString("sourcegroup", now));
 
     parms.mTimeStep = static_cast<float>(evalFloat("timestep", 0, now));
 
-    evalString(str, "advectSpatial", 0, now);
-
     parms.mAdvectSpatial =
-        openvdb::math::stringToBiasedGradientScheme(str.toStdString());
-
+        openvdb::math::stringToBiasedGradientScheme(evalStdString("advectspatial", now));
     if (parms.mAdvectSpatial == openvdb::math::UNKNOWN_BIAS) {
         addError(SOP_MESSAGE, "Morph: Unknown biased gradient");
         return UT_ERROR_ABORT;
     }
 
-    evalString(str, "renormSpatial", 0, now);
-
     parms.mRenormSpatial =
-        openvdb::math::stringToBiasedGradientScheme(str.toStdString());
-
+        openvdb::math::stringToBiasedGradientScheme(evalStdString("renormspatial", now));
     if (parms.mRenormSpatial == openvdb::math::UNKNOWN_BIAS) {
         addError(SOP_MESSAGE, "Renorm: Unknown biased gradient");
         return UT_ERROR_ABORT;
     }
 
-    evalString(str, "advectTemporal", 0, now);
     parms.mAdvectTemporal =
-        openvdb::math::stringToTemporalIntegrationScheme(str.toStdString());
-
+        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("advecttemporal", now));
     if (parms.mAdvectTemporal == openvdb::math::UNKNOWN_TIS) {
         addError(SOP_MESSAGE, "Morph: Unknown temporal integration");
         return UT_ERROR_ABORT;
     }
 
-    evalString(str, "renormTemporal", 0, now);
     parms.mRenormTemporal =
-        openvdb::math::stringToTemporalIntegrationScheme(str.toStdString());
-
+        openvdb::math::stringToTemporalIntegrationScheme(evalStdString("renormtemporal", now));
     if (parms.mRenormTemporal == openvdb::math::UNKNOWN_TIS) {
         addError(SOP_MESSAGE, "Renorm: Unknown temporal integration");
         return UT_ERROR_ABORT;
     }
 
-    parms.mNormCount = evalInt("normSteps", 0, now);
+    parms.mNormCount = static_cast<int>(evalInt("normsteps", 0, now));
 
     const GU_Detail* targetGeo = inputGeo(1);
 
@@ -463,9 +525,8 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         return UT_ERROR_ABORT;
     }
 
-    evalString(str, "targetGroup", 0, now);
-    const GA_PrimitiveGroup *targetGroup =
-        matchGroup(const_cast<GU_Detail&>(*targetGeo), str.toStdString());
+    const GA_PrimitiveGroup* targetGroup =
+        matchGroup(*targetGeo, evalStdString("targetgroup", now));
 
     hvdb::VdbPrimCIterator it(targetGeo, targetGroup);
     if (it) {
@@ -484,9 +545,8 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
     const GU_Detail* maskGeo = evalInt("mask", 0, now) ? inputGeo(2) : nullptr;
 
     if (maskGeo) {
-        evalString(str, "maskGroup", 0, now);
-        const GA_PrimitiveGroup *maskGroup =
-            matchGroup(const_cast<GU_Detail&>(*maskGeo), str.toStdString());
+        const GA_PrimitiveGroup* maskGroup =
+            matchGroup(*maskGeo, evalStdString("maskname", now));
 
         hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
         if (maskIt) {
@@ -503,8 +563,8 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         }
     }
 
-    parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));
-    parms.mMaxMask      = static_cast<float>(evalFloat("maxMask", 0, now));
+    parms.mMinMask      = static_cast<float>(evalFloat("minmask", 0, now));
+    parms.mMaxMask      = static_cast<float>(evalFloat("maxmask", 0, now));
     parms.mInvertMask   = evalInt("invert", 0, now);
 
     return error();
@@ -515,7 +575,8 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
 
 
 bool
-SOP_OpenVDB_Morph_Level_Set::processGrids(MorphingParms& parms, hvdb::Interrupter& boss)
+VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::processGrids(
+    MorphingParms& parms, hvdb::Interrupter& boss)
 {
     MorphOp op(parms, boss);
 
@@ -547,25 +608,25 @@ SOP_OpenVDB_Morph_Level_Set::processGrids(MorphingParms& parms, hvdb::Interrupte
 
     if (!skippedGrids.empty()) {
         std::string s = "The following non-floating-point grids were skipped: "
-            + boost::algorithm::join(skippedGrids, ", ");
+            + hboost::algorithm::join(skippedGrids, ", ");
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
     if (!nonLevelSetGrids.empty()) {
         std::string s = "The following non-level-set grids were skipped: "
-            + boost::algorithm::join(nonLevelSetGrids, ", ");
+            + hboost::algorithm::join(nonLevelSetGrids, ", ");
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
     if (!narrowBands.empty()) {
         std::string s = "The following grids have a narrow band width that is"
-            " less than 3 voxel units: " + boost::algorithm::join(narrowBands, ", ");
+            " less than 3 voxel units: " + hboost::algorithm::join(narrowBands, ", ");
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
     return true;
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

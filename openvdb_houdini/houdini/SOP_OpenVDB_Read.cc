@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,8 @@
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <stdexcept>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -54,12 +56,12 @@ public:
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     int isRefInput(unsigned input) const override { return (input == 0); }
 #endif
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
 };
 
@@ -82,21 +84,19 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
 
     // Get the parameters from the GUI
     // The file name of the vdb we would like to load
-    UT_String file_name;
-    sop->evalString(file_name, "file_name", 0, 0);
+    const auto file_name = sop->evalStdString("file_name", 0);
 
      // Keep track of how many names we have entered
     int count = 0;
 
     // Add the star token to the menu
-    choicenames[0].setToken("*");
-    choicenames[0].setLabel("*");
+    choicenames[0].setTokenAndLabel("*", "*");
     ++count;
 
     try {
         // Open the file and read the header, but don't read in any grids.
         // An exception is thrown if the file is not a valid VDB file.
-        openvdb::io::File file(file_name.toStdString());
+        openvdb::io::File file(file_name);
         file.open();
 
         // Loop over the names of all of the grids in the file.
@@ -107,10 +107,25 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
             // and reserve a spot for the terminating 0.
             if (count > listsize - 2) break;
 
+            std::string gridName = nameIter.gridName(), tokenName = gridName;
+
+            // When a file contains multiple grids with the same name, the names are
+            // distinguished with a trailing array index ("grid[0]", "grid[1]", etc.).
+            // Escape such names as "grid\[0]", "grid\[1]", etc. to inhibit UT_String's
+            // pattern matching.
+            if (tokenName.back() == ']') {
+                auto start = tokenName.find_last_of('[');
+                if (start != std::string::npos && tokenName[start + 1] != ']') {
+                    for (auto i = start + 1; i < tokenName.size() - 1; ++i) {
+                        // Only digits should appear between the last '[' and the trailing ']'.
+                        if (!std::isdigit(tokenName[i])) { start = std::string::npos; break; }
+                    }
+                    if (start != std::string::npos) tokenName.replace(start, 1, "\\[");
+                }
+            }
+
             // Add the grid's name to the list.
-            std::string gridName = nameIter.gridName();
-            choicenames[count].setToken(gridName.c_str());
-            choicenames[count].setLabel(gridName.c_str());
+            choicenames[count].setTokenAndLabel(tokenName.c_str(), gridName.c_str());
             ++count;
         }
 
@@ -118,8 +133,7 @@ populateGridMenu(void* data, PRM_Name* choicenames, int listsize,
     } catch (...) {}
 
     // Terminate the list.
-    choicenames[count].setToken(0);
-    choicenames[count].setLabel(0);
+    choicenames[count].setTokenAndLabel(nullptr, nullptr);
 }
 
 
@@ -153,14 +167,13 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "metadata_only", "Read Metadata Only")
         .setDefault(PRMzeroDefaults)
         .setTooltip(
-            "If enabled, output empty grids populated with"
-            " their metadata and transforms only.\n"));
+            "If enabled, output empty VDBs populated with their metadata and transforms only."));
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     // Clipping toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "clip", "Clip to Reference Bounds")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Clip grids to the bounding box of the reference geometry."));
+        .setTooltip("Clip VDBs to the bounding box of the reference geometry."));
 #endif
 
     // Filename
@@ -169,18 +182,24 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Select a VDB file."));
 
     // Grid name mask
-    parms.add(hutil::ParmFactory(PRM_STRING, "grids",  "Grid(s)")
+    parms.add(hutil::ParmFactory(PRM_STRING, "grids",  "VDB(s)")
         .setDefault(0, "*")
         .setChoiceList(new PRM_ChoiceList(PRM_CHOICELIST_TOGGLE, populateGridMenu))
-        .setTooltip("Grid names separated by white space (wildcards allowed)"));
+        .setTooltip("VDB names separated by white space (wildcards allowed)")
+        .setDocumentation(
+            "VDB names separated by white space (wildcards allowed)\n\n"
+            "NOTE:\n"
+            "    To distinguish between multiple VDBs with the same name,\n"
+            "    append an array index to the name: `density\\[0]`, `density\\[1]`, etc.\n"
+            "    Escape the index with a backslash to inhibit wildcard pattern matching.\n"));
 
     // Toggle to enable/disable grouping
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "enable_grouping", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setDefault(PRMoneDefaults)
         .setTooltip(
-            "If enabled, create a group with the given name that comprises the selected grids.\n"
-            "If disabled, do not group the selected grids."));
+            "If enabled, create a group with the given name that comprises the selected VDBs.\n"
+            "If disabled, do not group the selected VDBs."));
 
     // Name for the output group
     parms.add(hutil::ParmFactory(PRM_STRING, "group",  "Group")
@@ -188,7 +207,7 @@ newSopOperator(OP_OperatorTable* table)
             "import os.path\n"
             "return os.path.splitext(os.path.basename(ch('file_name')))[0]",
             CH_PYTHON_EXPRESSION)
-        .setTooltip("Specify a name for this group of grids."));
+        .setTooltip("Specify a name for this group of VDBs."));
 
     // Missing Frame menu
     {
@@ -211,7 +230,7 @@ newSopOperator(OP_OperatorTable* table)
         .setCallbackFunc(&reloadCB)
         .setTooltip("Reread the VDB file."));
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
 
     // Delayed loading
@@ -225,8 +244,8 @@ newSopOperator(OP_OperatorTable* table)
             "the entire volume to be loaded into memory."));
 
     // Localization file size slider
-    parms.add(hutil::ParmFactory(PRM_FLT_J | PRM_TYPE_JOIN_NEXT,
-        "copylimit", "Copy if smaller than")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "copylimit", "Copy If Smaller Than")
+        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
         .setDefault(0.5f)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
         .setTooltip(
@@ -245,11 +264,10 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Read", SOP_OpenVDB_Read::factory, parms, *table)
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+    hvdb::OpenVDBOpFactory("VDB Read", SOP_OpenVDB_Read::factory, parms, *table)
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         .addOptionalInput("Optional Bounding Geometry")
 #endif
-        .addAlias("OpenVDB Reader")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -306,9 +324,9 @@ SOP_OpenVDB_Read::updateParmsFlags()
     bool changed = false;
     float t = 0.0;
 
-    changed |= enableParm("group", evalInt("enable_grouping", 0, t));
+    changed |= enableParm("group", bool(evalInt("enable_grouping", 0, t)));
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const bool delayedLoad = evalInt("delayload", 0, t);
     changed |= enableParm("copylimit", delayedLoad);
     changed |= enableParm("copylimitlabel", delayedLoad);
@@ -322,7 +340,7 @@ SOP_OpenVDB_Read::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Read::cookMySop(OP_Context& context)
+SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -336,12 +354,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             missingFrameIsError = (0 == evalInt("missingframe", 0, t));
 
         // Get the file name string from the UI.
-        std::string filename;
-        {
-            UT_String s;
-            evalString(s, "file_name", 0, t);
-            filename = s.toStdString();
-        }
+        const std::string filename = evalStdString("file_name", t);
 
         // Get the grid mask string.
         UT_String gridStr;
@@ -362,7 +375,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             //}
         }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
         const bool delayedLoad = evalInt("delayload", 0, t);
         const openvdb::Index64 copyMaxBytes =
             openvdb::Index64(1.0e9 * evalFloat("copylimit", 0, t));
@@ -390,7 +403,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
         openvdb::MetaMap::Ptr fileMetadata;
         try {
             // Open the VDB file, but don't read any grids yet.
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
             file.setCopyMaxBytes(copyMaxBytes);
             file.open(delayedLoad);
 #else
@@ -434,7 +447,7 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             hvdb::GridPtr grid;
             if (readMetadataOnly) {
                 grid = file.readGridMetadata(gridName);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
             } else if (clip) {
                 grid = file.readGrid(gridName, clipBBox);
 #endif
@@ -476,6 +489,6 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

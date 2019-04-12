@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,7 +35,6 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <boost/math/constants/constants.hpp>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -53,7 +52,7 @@ public:
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    OP_ERROR cookMySop(OP_Context&) override;
+    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
 };
 
@@ -65,28 +64,24 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    { // Shapes
-        char const * const items[] = {
+    // Shapes
+    parms.add(hutil::ParmFactory(PRM_ORD, "solidType", "Solid Type")
+        .setTooltip("Select a sphere or one of the five platonic solids")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "sphere",       "Sphere",
             "tetrahedron",  "Tetrahedron",
             "cube",         "Cube",
             "octahedron",   "Octahedron",
             "dodecahedron", "Dodecahedron",
-            "icosahedron",  "Icosahedron",
-            nullptr
-        };
-
-        parms.add(hutil::ParmFactory(PRM_ORD, "solidType", "Solid Type")
-            .setTooltip("Select a sphere or one of the five platonic solids")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
+            "icosahedron",  "Icosahedron"
+        }));
 
     { // Grid Class
-        std::vector<std::string> items;
-        items.push_back(openvdb::GridBase::gridClassToString(openvdb::GRID_LEVEL_SET)); // token
-        items.push_back(openvdb::GridBase::gridClassToMenuName(openvdb::GRID_LEVEL_SET)); // label
-        items.push_back("sdf");
-        items.push_back("Signed Distance Field");
+        const std::vector<std::string> items{
+            openvdb::GridBase::gridClassToString(openvdb::GRID_LEVEL_SET), // token
+            openvdb::GridBase::gridClassToMenuName(openvdb::GRID_LEVEL_SET), // label
+            "sdf", "Signed Distance Field"
+        };
 
         parms.add(hutil::ParmFactory(PRM_STRING, "gridclass", "Grid Class")
             .setDefault(openvdb::GridBase::gridClassToString(openvdb::GRID_LEVEL_SET))
@@ -135,7 +130,7 @@ Signed Distance Field:\n\
         .setTooltip("If enabled, generate a fog volume instead of a level set"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Platonic",
+    hvdb::OpenVDBOpFactory("VDB Platonic",
         SOP_OpenVDB_Platonic::factory, parms, *table)
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
@@ -178,12 +173,7 @@ SOP_OpenVDB_Platonic::updateParmsFlags()
 {
     bool changed = false;
 
-    bool sdfGrid = false;
-    {
-        UT_String gridClassStr;
-        evalString(gridClassStr, "gridclass", 0, 0);
-        sdfGrid = (gridClassStr.toStdString() == "sdf");
-    }
+    const bool sdfGrid = (evalStdString("gridclass", 0) == "sdf");
 
     changed |= enableParm("halfWidth", sdfGrid);
 
@@ -192,7 +182,7 @@ SOP_OpenVDB_Platonic::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
+SOP_OpenVDB_Platonic::cookVDBSop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -200,21 +190,14 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
 
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("OpenVDB Platonic");
+        hvdb::Interrupter boss("Creating VDB platonic solid");
 
         // Read GUI parameters and generate narrow-band level set of sphere
         const float radius = static_cast<float>(evalFloat("scalarRadius", 0, time));
         const openvdb::Vec3f center = evalVec3f("center", time);
         const float voxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
-        float halfWidth = static_cast<float>(evalFloat("halfWidth", 0, time));
-
-        {
-            UT_String gridClassStr;
-            evalString(gridClassStr, "gridclass", 0, 0);
-            if (gridClassStr.toStdString() != "sdf") {
-                halfWidth = 3.0;
-            }
-        }
+        const float halfWidth = ((evalStdString("gridclass", 0) != "sdf") ?
+            3.0f : static_cast<float>(evalFloat("halfWidth", 0, time)));
 
         openvdb::FloatGrid::Ptr grid;
         switch (evalInt("solidType", 0, time)) {
@@ -261,6 +244,6 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

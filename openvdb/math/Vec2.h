@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,7 @@
 #include <openvdb/Exceptions.h>
 #include "Math.h"
 #include "Tuple.h"
+#include <algorithm>
 #include <cmath>
 #include <type_traits>
 
@@ -49,8 +50,8 @@ template<typename T>
 class Vec2: public Tuple<2, T>
 {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
     Vec2() {}
@@ -69,8 +70,8 @@ public:
     template <typename Source>
     Vec2(Source *a)
     {
-        this->mm[0] = a[0];
-        this->mm[1] = a[1];
+        this->mm[0] = static_cast<T>(a[0]);
+        this->mm[1] = static_cast<T>(a[1]);
     } // trivial
 
     /// Conversion constructor
@@ -239,7 +240,7 @@ public:
     }
 
     /// this = normalized this
-    bool normalize(T eps=1.0e-8)
+    bool normalize(T eps = static_cast<T>(1.0e-8))
     {
         T d = length();
         if (isApproxEqual(d, T(0), eps)) {
@@ -273,7 +274,7 @@ public:
         return l2 ? *this/static_cast<T>(sqrt(l2)) : Vec2<T>(1,0);
     }
 
-    /// Returns v, where \f$v_i *= scalar\f$ for \f$i \in [0, 1]\f$
+    /// Multiply each element of this vector by @a scalar.
     template <typename S>
     const Vec2<T> &operator*=(S scalar)
     {
@@ -282,7 +283,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i *= v1_i\f$ for \f$i \in [0, 1]\f$
+    /// Multiply each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec2<T> &operator*=(const Vec2<S> &v1)
     {
@@ -291,7 +292,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i /= scalar\f$ for \f$i \in [0, 1]\f$
+    /// Divide each element of this vector by @a scalar.
     template <typename S>
     const Vec2<T> &operator/=(S scalar)
     {
@@ -300,7 +301,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i /= v1_i\f$ for \f$i \in [0, 1]\f$
+    /// Divide each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec2<T> &operator/=(const Vec2<S> &v1)
     {
@@ -309,7 +310,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 1]\f$
+    /// Add @a scalar to each element of this vector.
     template <typename S>
     const Vec2<T> &operator+=(S scalar)
     {
@@ -318,7 +319,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i += v1_i\f$ for \f$i \in [0, 1]\f$
+    /// Add each element of the given vector to the corresponding element of this vector.
     template <typename S>
     const Vec2<T> &operator+=(const Vec2<S> &v1)
     {
@@ -327,7 +328,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 1]\f$
+    /// Subtract @a scalar from each element of this vector.
     template <typename S>
     const Vec2<T> &operator-=(S scalar)
     {
@@ -336,7 +337,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i -= v1_i\f$ for \f$i \in [0, 1]\f$
+    /// Subtract each element of the given vector from the corresponding element of this vector.
     template <typename S>
     const Vec2<T> &operator-=(const Vec2<S> &v1)
     {
@@ -352,7 +353,7 @@ public:
 
     /// Returns the scalar component of v in the direction of onto, onto need
     /// not be unit. e.g   float c = Vec2f::component(v1,v2);
-    T component(const Vec2<T> &onto, T eps=1.0e-8) const
+    T component(const Vec2<T> &onto, T eps = static_cast<T>(1.0e-8)) const
     {
         T l = onto.length();
         if (isApproxEqual(l,  T(0), eps)) return 0;
@@ -362,7 +363,7 @@ public:
 
     /// Return the projection of v onto the vector, onto need not be unit
     /// e.g.   Vec2f v = Vec2f::projection(v,n);
-    Vec2<T> projection(const Vec2<T> &onto, T eps=1.0e-8) const
+    Vec2<T> projection(const Vec2<T> &onto, T eps = static_cast<T>(1.0e-8)) const
     {
         T l = onto.lengthSqr();
         if (isApproxEqual(l, T(0), eps)) return Vec2::zero();
@@ -375,29 +376,20 @@ public:
     /// e.g.   v.normalize(); Vec2f n = Vec2f::getArbPerpendicular(v);
     Vec2<T> getArbPerpendicular() const { return Vec2<T>(-this->mm[1], this->mm[0]); }
 
-    /// True if a Nan is present in vector
-    bool isNan() const { return isnan(this->mm[0]) || isnan(this->mm[1]); }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const { return isinf(this->mm[0]) || isinf(this->mm[1]); }
-
-    /// True if all no Nan or Inf values present
-    bool isFinite() const { return finite(this->mm[0]) && finite(this->mm[1]); }
-
     /// Predefined constants, e.g.   Vec2f v = Vec2f::xNegAxis();
     static Vec2<T> zero() { return Vec2<T>(0, 0); }
     static Vec2<T> ones() { return Vec2<T>(1, 1); }
 };
 
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 1]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator*(S scalar, const Vec2<T> &v)
 {
     return v * scalar;
 }
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 1]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator*(const Vec2<T> &v, S scalar)
 {
@@ -406,7 +398,7 @@ inline Vec2<typename promote<S, T>::type> operator*(const Vec2<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i * v1_i\f$ for \f$i \in [0, 1]\f$
+/// Multiply corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec2<typename promote<T0, T1>::type> operator*(const Vec2<T0> &v0, const Vec2<T1> &v1)
 {
@@ -414,14 +406,14 @@ inline Vec2<typename promote<T0, T1>::type> operator*(const Vec2<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = scalar / v_i\f$ for \f$i \in [0, 1]\f$
+/// Divide @a scalar by each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator/(S scalar, const Vec2<T> &v)
 {
     return Vec2<typename promote<S, T>::type>(scalar/v[0], scalar/v[1]);
 }
 
-/// Returns V, where \f$V_i = v_i / scalar\f$ for \f$i \in [0, 1]\f$
+/// Divide each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator/(const Vec2<T> &v, S scalar)
 {
@@ -430,7 +422,7 @@ inline Vec2<typename promote<S, T>::type> operator/(const Vec2<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i / v1_i\f$ for \f$i \in [0, 1]\f$
+/// Divide corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec2<typename promote<T0, T1>::type> operator/(const Vec2<T0> &v0, const Vec2<T1> &v1)
 {
@@ -438,7 +430,7 @@ inline Vec2<typename promote<T0, T1>::type> operator/(const Vec2<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i + v1_i\f$ for \f$i \in [0, 1]\f$
+/// Add corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec2<typename promote<T0, T1>::type> operator+(const Vec2<T0> &v0, const Vec2<T1> &v1)
 {
@@ -447,7 +439,7 @@ inline Vec2<typename promote<T0, T1>::type> operator+(const Vec2<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i + scalar\f$ for \f$i \in [0, 1]\f$
+/// Add @a scalar to each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator+(const Vec2<T> &v, S scalar)
 {
@@ -456,7 +448,7 @@ inline Vec2<typename promote<S, T>::type> operator+(const Vec2<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i - v1_i\f$ for \f$i \in [0, 1]\f$
+/// Subtract corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec2<typename promote<T0, T1>::type> operator-(const Vec2<T0> &v0, const Vec2<T1> &v1)
 {
@@ -465,7 +457,7 @@ inline Vec2<typename promote<T0, T1>::type> operator-(const Vec2<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i - scalar\f$ for \f$i \in [0, 1]\f$
+/// Subtract @a scalar from each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator-(const Vec2<T> &v, S scalar)
 {
@@ -495,21 +487,6 @@ isApproxEqual(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& eps)
 {
     return isApproxEqual(a.x(), b.x(), eps.x()) &&
            isApproxEqual(a.y(), b.y(), eps.y());
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec2<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]);
-}
-
-/// Return @c true if all components are exactly equal to zero.
-template<typename T>
-inline bool
-isZero(const Vec2<T>& v)
-{
-    return isZero(v[0]) && isZero(v[1]);
 }
 
 template<typename T>
@@ -576,10 +553,10 @@ inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }
 template <typename T>
 inline Vec2<T> Log(Vec2<T> v) { return v.log(); }
 
-typedef Vec2<int32_t>   Vec2i;
-typedef Vec2<uint32_t>  Vec2ui;
-typedef Vec2<float>     Vec2s;
-typedef Vec2<double>    Vec2d;
+using Vec2i = Vec2<int32_t>;
+using Vec2ui = Vec2<uint32_t>;
+using Vec2s = Vec2<float>;
+using Vec2d = Vec2<double>;
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
@@ -587,6 +564,6 @@ typedef Vec2<double>    Vec2d;
 
 #endif // OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

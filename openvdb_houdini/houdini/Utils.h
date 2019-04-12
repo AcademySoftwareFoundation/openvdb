@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,11 +37,11 @@
 
 #include "GU_PrimVDB.h"
 #include <OP/OP_Node.h> // for OP_OpTypeId
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/type_traits/is_const.hpp>
+#include <functional>
+#include <type_traits>
 
 
 #ifdef SESI_OPENVDB
@@ -57,11 +57,11 @@ class UT_String;
 
 namespace openvdb_houdini {
 
-typedef openvdb::GridBase           Grid;
-typedef openvdb::GridBase::Ptr      GridPtr;
-typedef openvdb::GridBase::ConstPtr GridCPtr;
-typedef openvdb::GridBase&          GridRef;
-typedef const openvdb::GridBase&    GridCRef;
+using Grid = openvdb::GridBase;
+using GridPtr = openvdb::GridBase::Ptr;
+using GridCPtr = openvdb::GridBase::ConstPtr;
+using GridRef = openvdb::GridBase&;
+using GridCRef = const openvdb::GridBase&;
 
 
 /// @brief Iterator over const VDB primitives on a geometry detail
@@ -73,18 +73,18 @@ typedef const openvdb::GridBase&    GridCRef;
 class OPENVDB_HOUDINI_API VdbPrimCIterator
 {
 public:
-    typedef boost::function<bool (const GU_PrimVDB&)> FilterFunc;
+    using FilterFunc = std::function<bool (const GU_PrimVDB&)>;
 
     /// @param gdp
     ///     the geometry detail over which to iterate
     /// @param group
-    ///     a group in the detail over which to iterate (if @c NULL,
+    ///     a group in the detail over which to iterate (if @c nullptr,
     ///     iterate over all VDB primitives)
     /// @param filter
     ///     an optional function or functor that takes a const reference
     ///     to a GU_PrimVDB and returns a boolean specifying whether
     ///     that primitive should be visited (@c true) or not (@c false)
-    explicit VdbPrimCIterator(const GEO_Detail* gdp, const GA_PrimitiveGroup* group = NULL,
+    explicit VdbPrimCIterator(const GEO_Detail* gdp, const GA_PrimitiveGroup* group = nullptr,
         FilterFunc filter = FilterFunc());
 
     VdbPrimCIterator(const VdbPrimCIterator&);
@@ -97,7 +97,7 @@ public:
     //@}
 
     //@{
-    /// Return a pointer to the current VDB primitive (@c NULL if at end).
+    /// Return a pointer to the current VDB primitive (@c nullptr if at end).
     const GU_PrimVDB* getPrimitive() const;
     const GU_PrimVDB* operator*() const { return getPrimitive(); }
     const GU_PrimVDB* operator->() const { return getPrimitive(); }
@@ -109,7 +109,7 @@ public:
     //@}
 
     /// Return @c false if there are no more VDB primitives.
-    operator bool() const { return getPrimitive() != NULL; }
+    operator bool() const { return getPrimitive() != nullptr; }
 
     /// @brief Return the value of the current VDB primitive's @c name attribute.
     /// @param defaultName
@@ -132,9 +132,9 @@ public:
 protected:
     /// Allow primitives to be deleted during iteration.
     VdbPrimCIterator(const GEO_Detail*, GA_Range::safedeletions,
-        const GA_PrimitiveGroup* = NULL, FilterFunc = FilterFunc());
+        const GA_PrimitiveGroup* = nullptr, FilterFunc = FilterFunc());
 
-    boost::shared_ptr<GA_GBPrimitiveIterator> mIter;
+    UT_SharedPtr<GA_GBPrimitiveIterator> mIter;
     FilterFunc mFilter;
 }; // class VdbPrimCIterator
 
@@ -151,27 +151,27 @@ public:
     /// @param gdp
     ///     the geometry detail over which to iterate
     /// @param group
-    ///     a group in the detail over which to iterate (if @c NULL,
+    ///     a group in the detail over which to iterate (if @c nullptr,
     ///     iterate over all VDB primitives)
     /// @param filter
     ///     an optional function or functor that takes a @c const reference
     ///     to a GU_PrimVDB and returns a boolean specifying whether
     ///     that primitive should be visited (@c true) or not (@c false)
-    explicit VdbPrimIterator(GEO_Detail* gdp, const GA_PrimitiveGroup* group = NULL,
+    explicit VdbPrimIterator(GEO_Detail* gdp, const GA_PrimitiveGroup* group = nullptr,
         FilterFunc filter = FilterFunc()):
         VdbPrimCIterator(gdp, group, filter) {}
     /// @brief Allow primitives to be deleted during iteration.
     /// @param gdp
     ///     the geometry detail over which to iterate
     /// @param group
-    ///     a group in the detail over which to iterate (if @c NULL,
+    ///     a group in the detail over which to iterate (if @c nullptr,
     ///     iterate over all VDB primitives)
     /// @param filter
     ///     an optional function or functor that takes a @c const reference
     ///     to a GU_PrimVDB and returns a boolean specifying whether
     ///     that primitive should be visited (@c true) or not (@c false)
     VdbPrimIterator(GEO_Detail* gdp, GA_Range::safedeletions,
-        const GA_PrimitiveGroup* group = NULL, FilterFunc filter = FilterFunc()):
+        const GA_PrimitiveGroup* group = nullptr, FilterFunc filter = FilterFunc()):
         VdbPrimCIterator(gdp, GA_Range::safedeletions(), group, filter) {}
 
     VdbPrimIterator(const VdbPrimIterator&);
@@ -181,7 +181,7 @@ public:
     VdbPrimIterator& operator++() { advance(); return *this; }
 
     //@{
-    /// Return a pointer to the current VDB primitive (@c NULL if at end).
+    /// Return a pointer to the current VDB primitive (@c nullptr if at end).
     GU_PrimVDB* getPrimitive() const {
         return const_cast<GU_PrimVDB*>(VdbPrimCIterator::getPrimitive());
     }
@@ -200,16 +200,19 @@ public:
 class Interrupter
 {
 public:
-    Interrupter(const char* title = NULL):
-        mUTI(UTgetInterrupt()), mRunning(false)
-    {
-        if (title) mUTI->setAppTitle(title);
-    }
+    explicit Interrupter(const char* title = nullptr):
+        mUTI{UTgetInterrupt()}, mRunning{false}, mTitle{title ? title : ""}
+    {}
     ~Interrupter() { if (mRunning) this->end(); }
+
+    Interrupter(const Interrupter&) = default;
+    Interrupter& operator=(const Interrupter&) = default;
 
     /// @brief Signal the start of an interruptible operation.
     /// @param name  an optional descriptive name for the operation
-    void start(const char* name = NULL) { if (!mRunning) { mRunning=true; mUTI->opStart(name); } }
+    void start(const char* name = nullptr) {
+        if (!mRunning) { mRunning = true; mUTI->opStart(name ? name : mTitle.c_str()); }
+    }
     /// Signal the end of an interruptible operation.
     void end() { if (mRunning) { mUTI->opEnd(); mRunning = false; } }
 
@@ -221,6 +224,7 @@ public:
 private:
     UT_Interrupt* mUTI;
     bool mRunning;
+    std::string mTitle;
 };
 
 
@@ -237,7 +241,7 @@ private:
 /// @param name       if non-null, set the new primitive's @c name attribute to this string
 /// @note This operation clears the input grid's metadata.
 OPENVDB_HOUDINI_API
-GU_PrimVDB* createVdbPrimitive(GU_Detail& gdp, GridPtr grid, const char* name = NULL);
+GU_PrimVDB* createVdbPrimitive(GU_Detail& gdp, GridPtr grid, const char* name = nullptr);
 
 
 /// @brief Replace an existing VDB primitive with a new primitive that contains
@@ -252,7 +256,7 @@ GU_PrimVDB* createVdbPrimitive(GU_Detail& gdp, GridPtr grid, const char* name = 
 /// @note This operation clears the input grid's metadata.
 OPENVDB_HOUDINI_API
 GU_PrimVDB* replaceVdbPrimitive(GU_Detail& gdp, GridPtr grid, GEO_PrimVDB& src,
-    const bool copyAttrs = true, const char* name = NULL);
+    const bool copyAttrs = true, const char* name = nullptr);
 
 
 /// @brief Return in @a corners the corners of the given grid's active voxel bounding box.
@@ -304,164 +308,41 @@ bool isLogForwarding(OP_OpTypeId);
 ////////////////////////////////////////
 
 
-/// Helper class used internally by processTypedGrid()
-template<typename GridType, typename OpType, bool IsConst/*=false*/>
-struct GridProcessor {
-    static inline void call(OpType& op, GridPtr grid) {
-#ifdef _MSC_VER
-        op.operator()<GridType>(openvdb::gridPtrCast<GridType>(grid));
-#else
-        op.template operator()<GridType>(openvdb::gridPtrCast<GridType>(grid));
-#endif
-    }
-};
+// Grid type lists, for use with openvdb::GridBase::apply()
 
-/// Helper class used internally by processTypedGrid()
-template<typename GridType, typename OpType>
-struct GridProcessor<GridType, OpType, /*IsConst=*/true> {
-    static inline void call(OpType& op, GridCPtr grid) {
-#ifdef _MSC_VER
-        op.operator()<GridType>(openvdb::gridConstPtrCast<GridType>(grid));
-#else
-        op.template operator()<GridType>(openvdb::gridConstPtrCast<GridType>(grid));
-#endif
-    }
-};
+using ScalarGridTypes = openvdb::TypeList<
+    openvdb::BoolGrid,
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid,
+    openvdb::Int32Grid,
+    openvdb::Int64Grid>;
 
+using NumericGridTypes = openvdb::TypeList<
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid,
+    openvdb::Int32Grid,
+    openvdb::Int64Grid>;
 
-/// Helper function used internally by processTypedGrid()
-template<typename GridType, typename OpType, typename GridPtrType>
-inline void
-doProcessTypedGrid(GridPtrType grid, OpType& op)
-{
-    GridProcessor<GridType, OpType,
-        boost::is_const<typename GridPtrType::element_type>::value>::call(op, grid);
-}
+using RealGridTypes = openvdb::TypeList<
+    openvdb::FloatGrid,
+    openvdb::DoubleGrid>;
 
+using Vec3GridTypes = openvdb::TypeList<
+    openvdb::Vec3SGrid,
+    openvdb::Vec3DGrid,
+    openvdb::Vec3IGrid>;
 
-////////////////////////////////////////
+using PointGridTypes = openvdb::TypeList<
+    openvdb::points::PointDataGrid>;
 
+using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
 
-/// @brief Utility function that, given a generic grid pointer,
-/// calls a functor on the fully-resolved grid
-///
-/// @par Example:
-/// @code
-/// using openvdb::Coord;
-/// using openvdb::CoordBBox;
-///
-/// struct FillOp {
-///     const CoordBBox bbox;
-///
-///     FillOp(const CoordBBox& b): bbox(b) {}
-///
-///     template<typename GridT>
-///     void operator()(typename GridT::Ptr grid) const {
-///         typedef typename GridT::ValueType ValueT;
-///         grid->fill(bbox, ValueT(1));
-///     }
-/// };
-///
-/// CoordBBox bbox(Coord(0,0,0), Coord(10,10,10));
-/// processTypedGrid(myGridPtr, FillOp(bbox));
-/// @endcode
-///
-/// @return @c false if the grid type is unknown or unhandled.
-/// @deprecated Use UTvdbProcessTypedGrid() or GEOvdbProcessTypedGrid() instead.
-template<typename GridPtrType, typename OpType>
-OPENVDB_DEPRECATED
-bool
-processTypedGrid(GridPtrType grid, OpType& op)
-{
-    using namespace openvdb;
-    if (grid->template isType<BoolGrid>())        doProcessTypedGrid<BoolGrid>(grid, op);
-    else if (grid->template isType<FloatGrid>())  doProcessTypedGrid<FloatGrid>(grid, op);
-    else if (grid->template isType<DoubleGrid>()) doProcessTypedGrid<DoubleGrid>(grid, op);
-    else if (grid->template isType<Int32Grid>())  doProcessTypedGrid<Int32Grid>(grid, op);
-    else if (grid->template isType<Int64Grid>())  doProcessTypedGrid<Int64Grid>(grid, op);
-    else if (grid->template isType<Vec3IGrid>())  doProcessTypedGrid<Vec3IGrid>(grid, op);
-    else if (grid->template isType<Vec3SGrid>())  doProcessTypedGrid<Vec3SGrid>(grid, op);
-    else if (grid->template isType<Vec3DGrid>())  doProcessTypedGrid<Vec3DGrid>(grid, op);
-    else return false; ///< @todo throw exception ("unknown grid type")
-    return true;
-}
-
-
-/// @brief Utility function that, given a generic grid pointer, calls
-/// a functor on the fully-resolved grid, provided that the grid's
-/// voxel values are 3-vectors (vec3i, vec3s or vec3d)
-///
-/// Usage:
-/// @code
-/// struct NormalizeOp {
-///     template<typename GridT>
-///     void operator()(typename GridT::Ptr grid) const { normalizeVectors(*grid); }
-/// };
-///
-/// processTypedVec3Grid(myGridPtr, NormalizeOp());
-/// @endcode
-///
-/// @return @c false if the grid type is unknown or non-vector.
-/// @sa UTvdbProcessTypedGridVec3
-/// @deprecated Use UTvdbProcessTypedGridVec3() or GEOvdbProcessTypedGridVec3() instead.
-template<typename GridPtrType, typename OpType>
-OPENVDB_DEPRECATED
-bool
-processTypedVec3Grid(GridPtrType grid, OpType& op)
-{
-    using namespace openvdb;
-    if (grid->template isType<Vec3IGrid>())       doProcessTypedGrid<Vec3IGrid>(grid, op);
-    else if (grid->template isType<Vec3SGrid>())  doProcessTypedGrid<Vec3SGrid>(grid, op);
-    else if (grid->template isType<Vec3DGrid>())  doProcessTypedGrid<Vec3DGrid>(grid, op);
-    else return false; ///< @todo throw exception ("grid type is not vec3")
-    return true;
-}
-
-
-/// @brief Utility function that, given a generic grid pointer,
-/// calls a functor on the fully-resolved grid
-///
-/// @par Example:
-/// @code
-/// using openvdb::Coord;
-/// using openvdb::CoordBBox;
-///
-/// struct FillOp {
-///     const CoordBBox bbox;
-///
-///     FillOp(const CoordBBox& b): bbox(b) {}
-///
-///     template<typename GridT>
-///     void operator()(typename GridT::Ptr grid) const {
-///         typedef typename GridT::ValueType ValueT;
-///         grid->fill(bbox, ValueT(1));
-///     }
-/// };
-///
-/// CoordBBox bbox(Coord(0,0,0), Coord(10,10,10));
-/// processTypedScalarGrid(myGridPtr, FillOp(bbox));
-/// @endcode
-///
-/// @return @c false if the grid type is unknown or non-scalar.
-/// @deprecated Use UTvdbProcessTypedGridScalar() or GEOvdbProcessTypedGridScalar() instead.
-template<typename GridPtrType, typename OpType>
-OPENVDB_DEPRECATED
-bool
-processTypedScalarGrid(GridPtrType grid, OpType& op)
-{
-    using namespace openvdb;
-    if (grid->template isType<FloatGrid>())       doProcessTypedGrid<FloatGrid>(grid, op);
-    else if (grid->template isType<DoubleGrid>()) doProcessTypedGrid<DoubleGrid>(grid, op);
-    else if (grid->template isType<Int32Grid>())  doProcessTypedGrid<Int32Grid>(grid, op);
-    else if (grid->template isType<Int64Grid>())  doProcessTypedGrid<Int64Grid>(grid, op);
-    else return false; ///< @todo throw exception ("grid type is not scalar")
-    return true;
-}
+using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
 
 } // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

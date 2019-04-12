@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,7 +30,7 @@
 //
 /// @file AttributeTransferUtil.h
 /// @author FX R&D Simulation team
-/// @brief Utility methods used by the From Mesh and From Particle SOPs
+/// @brief Utility methods used by the From/To Polygons and From Particles SOPs
 
 #ifndef OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
@@ -43,10 +43,20 @@
 
 #include <GA/GA_PageIterator.h>
 #include <GA/GA_SplittableRange.h>
+#include <GEO/GEO_PrimPolySoup.h>
 #include <SYS/SYS_Types.h>
 #include <UT/UT_Version.h>
-#include <iostream>
+
+#include <algorithm> // for std::sort()
+#include <cmath> // for std::floor()
+#include <limits>
+#include <memory>
+#include <set>
 #include <sstream>
+#include <string>
+#include <type_traits>
+#include <vector>
+
 
 namespace openvdb_houdini {
 
@@ -151,7 +161,8 @@ evalAttr<openvdb::Vec3d>(const GA_Attribute* atr, const GA_AIFTuple* aif,
 
 ////////////////////////////////////////
 
-/// Combine differnet value types.
+
+/// Combine different value types.
 
 template <typename ValueType> inline ValueType
 combine(const ValueType& v0, const ValueType& v1, const ValueType& v2,
@@ -216,9 +227,9 @@ combine(const openvdb::Vec3d& v0, const openvdb::Vec3d& v1,
 
 ////////////////////////////////////////
 
-/// Gets OpenVDB specific value by evaluating GA_Default::get()
-/// with appropriate arguments.
 
+/// @brief Get an OpenVDB-specific value by evaluating GA_Default::get()
+/// with appropriate arguments.
 template <typename ValueType> inline ValueType
 evalAttrDefault(const GA_Defaults& defaults, int idx)
 {
@@ -305,6 +316,94 @@ evalAttrDefault<openvdb::Vec3d>(const GA_Defaults& defaults, int)
     return vec;
 }
 
+template <> inline openvdb::math::Quat<float>
+evalAttrDefault<openvdb::math::Quat<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Quat<float> quat;
+    fpreal32 value;
+
+    for (int i = 0; i < 4; i++) {
+        defaults.get(i, value);
+        quat[i] = float(value);
+    }
+
+    return quat;
+}
+
+template <> inline openvdb::math::Quat<double>
+evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Quat<double> quat;
+    fpreal64 value;
+
+    for (int i = 0; i < 4; i++) {
+        defaults.get(i, value);
+        quat[i] = double(value);
+    }
+
+    return quat;
+}
+
+template <> inline openvdb::math::Mat3<float>
+evalAttrDefault<openvdb::math::Mat3<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<float> mat;
+    fpreal64 value;
+    float* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = float(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat3<double>
+evalAttrDefault<openvdb::math::Mat3<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat3<double> mat;
+    fpreal64 value;
+    double* data = mat.asPointer();
+
+    for (int i = 0; i < 9; i++) {
+        defaults.get(i, value);
+        data[i] = double(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat4<float>
+evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat4<float> mat;
+    fpreal64 value;
+    float* data = mat.asPointer();
+
+    for (int i = 0; i < 16; i++) {
+        defaults.get(i, value);
+        data[i] = float(value);
+    }
+
+    return mat;
+}
+
+template <> inline openvdb::math::Mat4<double>
+evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
+{
+    openvdb::math::Mat4<double> mat;
+    fpreal64 value;
+    double* data = mat.asPointer();
+
+    for (int i = 0; i < 16; i++) {
+        defaults.get(i, value);
+        data[i] = double(value);
+    }
+
+    return mat;
+}
+
 
 ////////////////////////////////////////
 
@@ -312,7 +411,7 @@ evalAttrDefault<openvdb::Vec3d>(const GA_Defaults& defaults, int)
 class AttributeDetailBase
 {
 public:
-    typedef boost::shared_ptr<AttributeDetailBase> Ptr;
+    using Ptr = std::shared_ptr<AttributeDetailBase>;
 
     virtual ~AttributeDetailBase() = default;
 
@@ -334,7 +433,7 @@ protected:
 };
 
 
-typedef std::vector<AttributeDetailBase::Ptr> AttributeDetailList;
+using AttributeDetailList = std::vector<AttributeDetailBase::Ptr>;
 
 
 ////////////////////////////////////////
@@ -344,7 +443,7 @@ template <class VDBGridType>
 class AttributeDetail: public AttributeDetailBase
 {
 public:
-    typedef typename VDBGridType::ValueType ValueType;
+    using ValueType = typename VDBGridType::ValueType;
 
     AttributeDetail(
         openvdb::GridBase::Ptr grid,
@@ -354,14 +453,14 @@ public:
         const bool isVector = false);
 
     void set(const openvdb::Coord& ijk, const GA_Offset (&offsets)[3],
-        const openvdb::Vec3d& weights);
+        const openvdb::Vec3d& weights) override;
 
-    void set(const openvdb::Coord& ijk, GA_Offset offset);
+    void set(const openvdb::Coord& ijk, GA_Offset offset) override;
 
-    openvdb::GridBase::Ptr& grid() { return mGrid; }
-    std::string& name() { return mName; }
+    openvdb::GridBase::Ptr& grid() override { return mGrid; }
+    std::string& name() override { return mName; }
 
-    AttributeDetailBase::Ptr copy();
+    AttributeDetailBase::Ptr copy() override;
 
 protected:
     AttributeDetail();
@@ -379,8 +478,8 @@ private:
 
 template <class VDBGridType>
 AttributeDetail<VDBGridType>::AttributeDetail():
-    mAttribute(NULL),
-    mTupleAIF(NULL),
+    mAttribute(nullptr),
+    mTupleAIF(nullptr),
     mTupleIndex(0)
 {
 }
@@ -450,12 +549,11 @@ AttributeDetail<VDBGridType>::copy()
 
 // TBB object to transfer mesh attributes.
 // Only quads and/or triangles are supported
-// NOTE: This class has all code in the header and so it cannot have
-//       OPENVDB_HOUDINI_API.
+// NOTE: This class has all code in the header and so it cannot have OPENVDB_HOUDINI_API.
 class MeshAttrTransfer
 {
 public:
-    typedef openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter> IterRange;
+    using IterRange = openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter>;
 
     inline
     MeshAttrTransfer(
@@ -551,13 +649,13 @@ MeshAttrTransfer::operator()(IterRange &range) const
     openvdb::Int32Tree::LeafNodeType::ValueOnCIter iter;
 
     openvdb::Coord ijk;
-    unsigned int vtx;
-    GA_Size vtxn;
 
     const bool ptnAttrTransfer = mPointAttributes.size() > 0;
     const bool vtxAttrTransfer = mVertexAttributes.size() > 0;
 
+#if UT_MAJOR_VERSION_INT < 16
     GA_Primitive::const_iterator it;
+#endif
     GA_Offset vtxOffsetList[4], ptnOffsetList[4], vtxOffsets[3], ptnOffsets[3], prmOffset;
     openvdb::Vec3d ptnList[4], xyz, cpt, cpt2, uvw, uvw2;
 
@@ -580,13 +678,23 @@ MeshAttrTransfer::operator()(IterRange &range) const
             // Transfer vertex and point attributes
             const GA_Primitive * primRef = mMeshGdp.getPrimitiveList().get(prmOffset);
 
-            vtxn = primRef->getVertexCount();
+            const GA_Size vtxn = primRef->getVertexCount();
 
             // Get vertex and point offests
+#if UT_MAJOR_VERSION_INT >= 16
+            for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
+                const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
+                ptnOffsetList[vtx] = mMeshGdp.vertexPoint(vtxoff);
+                vtxOffsetList[vtx] = vtxoff;
+
+                UT_Vector3 p = mMeshGdp.getPos3(ptnOffsetList[vtx]);
+                ptnList[vtx][0] = double(p[0]);
+                ptnList[vtx][1] = double(p[1]);
+                ptnList[vtx][2] = double(p[2]);
+            }
+#else
             primRef->beginVertex(it);
-
-            for (vtx = 0; !it.atEnd(); ++it, ++vtx) {
-
+            for (unsigned int vtx = 0; !it.atEnd(); ++it, ++vtx) {
                 ptnOffsetList[vtx] = it.getPointOffset();
                 vtxOffsetList[vtx] = it.getVertexOffset();
 
@@ -595,6 +703,7 @@ MeshAttrTransfer::operator()(IterRange &range) const
                 ptnList[vtx][1] = double(p[1]);
                 ptnList[vtx][2] = double(p[2]);
             }
+#endif
 
             xyz = mTransform.indexToWorld(ijk);
 
@@ -643,24 +752,20 @@ MeshAttrTransfer::operator()(IterRange &range) const
 
 // TBB object to transfer mesh attributes.
 // Only quads and/or triangles are supported
-// NOTE: This class has all code in the header and so it cannot have
-//       OPENVDB_HOUDINI_API.
+// NOTE: This class has all code in the header and so it cannot have OPENVDB_HOUDINI_API.
 class PointAttrTransfer
 {
 public:
-    typedef openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter> IterRange;
+    using IterRange = openvdb::tree::IteratorRange<openvdb::Int32Tree::LeafCIter>;
 
-    inline
-    PointAttrTransfer(
+    inline PointAttrTransfer(
         AttributeDetailList &pointAttributes,
         const openvdb::Int32Grid& closestPtnIdxGrid,
         const GU_Detail& ptGeop);
 
-    inline
-    PointAttrTransfer(const PointAttrTransfer &other);
+    inline PointAttrTransfer(const PointAttrTransfer &other);
 
-    inline
-    ~PointAttrTransfer() {}
+    inline ~PointAttrTransfer() {}
 
     /// Main calls
     inline void runParallel();
@@ -746,7 +851,7 @@ PointAttrTransfer::operator()(IterRange &range) const
 
 struct AttributeCopyBase
 {
-    typedef boost::shared_ptr<AttributeCopyBase> Ptr;
+    using Ptr = std::shared_ptr<AttributeCopyBase>;
 
     virtual ~AttributeCopyBase() {}
     virtual void copy(GA_Offset /*source*/, GA_Offset /*target*/) = 0;
@@ -769,7 +874,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         ValueType data;
         for (int i = 0; i < mTupleSize; ++i) {
@@ -779,15 +884,14 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         doCopy<ValueType>(v0, v1, v2, target, uvw);
     }
 
 private:
-
-    template <typename T>
-    typename boost::enable_if<boost::is_integral<T>, void>::type
+    template<typename T>
+    typename std::enable_if<std::is_integral<T>::value>::type
     doCopy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target, const openvdb::Vec3d& uvw)
     {
         GA_Offset source = v0;
@@ -808,7 +912,7 @@ private:
     }
 
     template <typename T>
-    typename boost::enable_if<boost::is_floating_point<T>, void>::type
+    typename std::enable_if<std::is_floating_point<T>::value>::type
     doCopy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target, const openvdb::Vec3d& uvw)
     {
         ValueType a, b, c;
@@ -839,7 +943,7 @@ public:
     {
     }
 
-    void copy(GA_Offset source, GA_Offset target)
+    void copy(GA_Offset source, GA_Offset target) override
     {
         for (int i = 0; i < mTupleSize; ++i) {
             mAIF.setString(&mTargetAttr, target, mAIF.getString(&mSourceAttr, source, i), i);
@@ -847,7 +951,7 @@ public:
     }
 
     void copy(GA_Offset& v0, GA_Offset& v1, GA_Offset& v2, GA_Offset target,
-        const openvdb::Vec3d& uvw)
+        const openvdb::Vec3d& uvw) override
     {
         GA_Offset source = v0;
         double min = uvw[0];
@@ -934,7 +1038,7 @@ findClosestPrimitiveToPoint(
     std::set<GA_Index>::const_iterator it = primitives.begin();
 
     GA_Offset primOffset = GA_INVALID_OFFSET;
-    const GA_Primitive * primRef = NULL;
+    const GA_Primitive * primRef = nullptr;
     double minDist = std::numeric_limits<double>::max();
 
     openvdb::Vec3d a, b, c, d, tmpUVW;
@@ -1009,7 +1113,7 @@ findClosestPrimitiveToPoint(
     GA_Offset& vert0, GA_Offset& vert1, GA_Offset& vert2, openvdb::Vec3d& uvw)
 {
     GA_Offset primOffset = GA_INVALID_OFFSET;
-    const GA_Primitive * primRef = NULL;
+    const GA_Primitive * primRef = nullptr;
     double minDist = std::numeric_limits<double>::max();
 
     openvdb::Vec3d a, b, c, d, tmpUVW;
@@ -1081,6 +1185,7 @@ findClosestPrimitiveToPoint(
     return primOffset;
 }
 
+
 ////////////////////////////////////////
 
 
@@ -1088,174 +1193,236 @@ template<class GridType>
 class TransferPrimitiveAttributesOp
 {
 public:
-    TransferPrimitiveAttributesOp(
-        const GU_Detail& sourceGeo, GU_Detail& targetGeo, const GridType& indexGrid,
-        std::vector<AttributeCopyBase::Ptr>& primAttributes,
-        std::vector<AttributeCopyBase::Ptr>& vertAttributes);
+    using IndexT = typename GridType::ValueType;
+    using IndexAccT = typename GridType::ConstAccessor;
+    using AttrCopyPtrVec = std::vector<AttributeCopyBase::Ptr>;
 
-    void operator()(const GA_SplittableRange&) const;
+    TransferPrimitiveAttributesOp(
+        const GU_Detail& sourceGeo,
+        GU_Detail& targetGeo,
+        const GridType& indexGrid,
+        AttrCopyPtrVec& primAttributes,
+        AttrCopyPtrVec& vertAttributes)
+        : mSourceGeo(sourceGeo)
+        , mTargetGeo(targetGeo)
+        , mIndexGrid(indexGrid)
+        , mPrimAttributes(primAttributes)
+        , mVertAttributes(vertAttributes)
+    {
+    }
+
+    inline void operator()(const GA_SplittableRange&) const;
+
 private:
+    inline void copyPrimAttrs(const GA_Primitive&, const UT_Vector3&, IndexAccT&) const;
+
+    template<typename PrimT>
+    inline void copyVertAttrs(const PrimT&, const UT_Vector3&, IndexAccT&) const;
+
     const GU_Detail& mSourceGeo;
     GU_Detail& mTargetGeo;
     const GridType& mIndexGrid;
-    std::vector<AttributeCopyBase::Ptr>& mPrimAttributes;
-    std::vector<AttributeCopyBase::Ptr>& mVertAttributes;
+    AttrCopyPtrVec& mPrimAttributes;
+    AttrCopyPtrVec& mVertAttributes;
 };
 
-template<class GridType>
-TransferPrimitiveAttributesOp<GridType>::TransferPrimitiveAttributesOp(
-    const GU_Detail& sourceGeo, GU_Detail& targetGeo, const GridType& indexGrid,
-    std::vector<AttributeCopyBase::Ptr>& primAttributes,
-    std::vector<AttributeCopyBase::Ptr>& vertAttributes)
-    : mSourceGeo(sourceGeo)
-    , mTargetGeo(targetGeo)
-    , mIndexGrid(indexGrid)
-    , mPrimAttributes(primAttributes)
-    , mVertAttributes(vertAttributes)
-{
-
-}
 
 template<class GridType>
-void
+inline void
 TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& range) const
 {
-    typedef typename GridType::ValueType IndexT;
+    if (mPrimAttributes.empty() && mVertAttributes.empty()) return;
 
-    GA_Offset start, end, source, target, v0, v1, v2;
-    const GA_Primitive * primRef = NULL;
-    GA_Primitive::const_iterator vtxIt;
-
-    typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
-    const openvdb::math::Transform& transform = mIndexGrid.transform();
-    openvdb::Vec3d pos, indexPos, uvw;
-    openvdb::Coord ijk, coord;
-    std::vector<GA_Index> primitives(8), similar_primitives(8);
-    int count;
-
-    UT_Vector3 targetN, sourceN;
+    auto polyIdxAcc = mIndexGrid.getConstAccessor();
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
+        auto start = GA_Offset(), end = GA_Offset();
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
-            for (target = start; target < end; ++target) {
+            for (auto targetOffset = start; targetOffset < end; ++targetOffset) {
+                const auto* target = mTargetGeo.getPrimitiveList().get(targetOffset);
+                if (!target) continue;
 
-                primRef = mTargetGeo.getPrimitiveList().get(target);
-                targetN = mTargetGeo.getGEOPrimitive(target)->computeNormal();
+                const auto targetN = mTargetGeo.getGEOPrimitive(targetOffset)->computeNormal();
 
-                if (mPrimAttributes.size() != 0 ) {
-
-                    // Compute avg. vertex position
-                    pos[0] = 0.0;
-                    pos[1] = 0.0;
-                    pos[2] = 0.0;
-                    count = 0;
-
-                    for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
-                        const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
-                        pos[0] += p.x();
-                        pos[1] += p.y();
-                        pos[2] += p.z();
-                    }
-
-                    if (count > 1) pos *= (1.0 / float(count));
-                    indexPos = transform.worldToIndex(pos);
-
-                    // Find closest source primitive to current avg. vertex position.
-                    coord[0] = int(std::floor(indexPos[0]));
-                    coord[1] = int(std::floor(indexPos[1]));
-                    coord[2] = int(std::floor(indexPos[2]));
-
-                    primitives.clear();
-                    similar_primitives.clear();
-                    IndexT primIndex;
-
-                    for (int d = 0; d < 8; ++d) {
-                        ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
-                        ijk[1] = coord[1] + ((d & 0x02) >> 1);
-                        ijk[2] = coord[2] + ((d & 0x04) >> 2);
-
-                        if (acc.probeValue(ijk, primIndex) &&
-                            openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
-
-                            GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
-                            sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
-
-                            if (sourceN.dot(targetN) > 0.5) {
-                                similar_primitives.push_back(primIndex);
-                            } else {
-                                primitives.push_back(primIndex);
-                            }
-                        }
-                    }
-
-                    if (!primitives.empty() || !similar_primitives.empty()) {
-
-                        if (!similar_primitives.empty()) {
-                            source = findClosestPrimitiveToPoint(
-                                mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
-                        } else {
-                            source = findClosestPrimitiveToPoint(
-                                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
-                        }
-
-                        // Transfer attributes
-                        for (size_t n = 0, N = mPrimAttributes.size(); n < N; ++n) {
-                            mPrimAttributes[n]->copy(source, target);
-                        }
-                    }
+                if (!mPrimAttributes.empty()) {
+                    // Transfer primitive attributes.
+                    copyPrimAttrs(*target, targetN, polyIdxAcc);
                 }
 
-                if (mVertAttributes.size() != 0) {
-                    for (primRef->beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
-
-
-                        const UT_Vector3 p = mTargetGeo.getPos3(vtxIt.getPointOffset());
-                        pos[0] = p.x();
-                        pos[1] = p.y();
-                        pos[2] = p.z();
-
-                        indexPos = transform.worldToIndex(pos);
-                        coord[0] = int(std::floor(indexPos[0]));
-                        coord[1] = int(std::floor(indexPos[1]));
-                        coord[2] = int(std::floor(indexPos[2]));
-
-                        int primIndex;
-                        primitives.clear();
-                        similar_primitives.clear();
-
-                        for (int d = 0; d < 8; ++d) {
-                            ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
-                            ijk[1] = coord[1] + ((d & 0x02) >> 1);
-                            ijk[2] = coord[2] + ((d & 0x04) >> 2);
-
-                            if (acc.probeValue(ijk, primIndex) &&
-                                openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
-
-                                GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
-                                sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
-
-                                if (sourceN.dot(targetN) > 0.5) {
-                                    primitives.push_back(primIndex);
+                if (!mVertAttributes.empty()) {
+#if UT_MAJOR_VERSION_INT < 16
+                    // Some required GEO_PrimPolySoup::PolygonIterator methods exist only in H16+.
+                    copyVertAttrs(*target, targetN, polyIdxAcc);
+#else
+                    if (target->getTypeId() != GA_PRIMPOLYSOUP) {
+                        copyVertAttrs(*target, targetN, polyIdxAcc);
+                    } else {
+                        if (const auto* soup = UTverify_cast<const GEO_PrimPolySoup*>(target)) {
+                            // Iterate in parallel over the member polygons of a polygon soup.
+                            using SizeRange = UT_BlockedRange<GA_Size>;
+                            const auto processPolyRange = [&](const SizeRange& range) {
+                                auto threadLocalPolyIdxAcc = mIndexGrid.getConstAccessor();
+                                for (GEO_PrimPolySoup::PolygonIterator it(*soup, range.begin());
+                                    !it.atEnd() && (it.polygon() < range.end()); ++it)
+                                {
+                                    copyVertAttrs(it, it.computeNormal(), threadLocalPolyIdxAcc);
                                 }
-                            }
-                        }
-
-                        if (!primitives.empty() || !similar_primitives.empty()) {
-
-                            if (!similar_primitives.empty()) {
-                                findClosestPrimitiveToPoint(
-                                    mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
-                            } else {
-                                findClosestPrimitiveToPoint(
-                                    mSourceGeo, primitives, pos, v0, v1, v2, uvw);
-                            }
-
-                            for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
-                                mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);
-                            }
+                            };
+                            UTparallelFor(SizeRange(0, soup->getPolygonCount()), processPolyRange);
                         }
                     }
+#endif
                 }
+            }
+        }
+    }
+}
+
+
+/// @brief Find the closest match to the target primitive from among the source primitives
+/// and copy primitive attributes from that primitive to the target primitive.
+/// @note This isn't a particularly useful operation when the target is a polygon soup,
+/// because the entire soup is a single primitive, whereas the source primitives
+/// are likely to be individual polygons.
+template<class GridType>
+inline void
+TransferPrimitiveAttributesOp<GridType>::copyPrimAttrs(
+    const GA_Primitive& targetPrim,
+    const UT_Vector3& targetNormal,
+    IndexAccT& polyIdxAcc) const
+{
+    const auto& transform = mIndexGrid.transform();
+
+    UT_Vector3 sourceN, targetN = targetNormal;
+    const bool isPolySoup = (targetPrim.getTypeId() == GA_PRIMPOLYSOUP);
+
+    // Compute avg. vertex position.
+    openvdb::Vec3d pos(0, 0, 0);
+#if UT_MAJOR_VERSION_INT >= 16
+    int count = static_cast<int>(targetPrim.getVertexCount());
+    for (int vtx = 0; vtx < count; ++vtx) {
+        pos += UTvdbConvert(targetPrim.getPos3(vtx));
+    }
+#else
+    int count = 0;
+    GA_Primitive::const_iterator vtxIt;
+    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
+        pos += UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
+    }
+#endif
+    if (count > 1) pos /= double(count);
+
+    // Find closest source primitive to current avg. vertex position.
+    const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
+
+    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+    IndexT primIndex;
+    openvdb::Coord ijk;
+    for (int d = 0; d < 8; ++d) {
+        ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
+        ijk[1] = coord[1] + ((d & 0x02) >> 1);
+        ijk[2] = coord[2] + ((d & 0x04) >> 2);
+
+        if (polyIdxAcc.probeValue(ijk, primIndex) &&
+            openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
+
+            GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+            sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+
+            // Skip the normal test when the target is a polygon soup, because
+            // the entire soup is a single primitive, whose normal is unlikely
+            // to coincide with any of the source primitives.
+            if (isPolySoup || sourceN.dot(targetN) > 0.5) {
+                similarPrimitives.push_back(primIndex);
+            } else {
+                primitives.push_back(primIndex);
+            }
+        }
+    }
+
+    if (!primitives.empty() || !similarPrimitives.empty()) {
+        GA_Offset source, v0, v1, v2;
+        openvdb::Vec3d uvw;
+        if (!similarPrimitives.empty()) {
+            source = findClosestPrimitiveToPoint(
+                mSourceGeo, similarPrimitives, pos, v0, v1, v2, uvw);
+        } else {
+            source = findClosestPrimitiveToPoint(
+                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+        }
+
+        // Transfer attributes
+        const auto targetOffset = targetPrim.getMapOffset();
+        for (size_t n = 0, N = mPrimAttributes.size(); n < N; ++n) {
+            mPrimAttributes[n]->copy(source, targetOffset);
+        }
+    }
+}
+
+
+/// @brief Find the closest match to the target primitive from among the source primitives
+/// (using slightly different criteria than copyPrimAttrs()) and copy vertex attributes
+/// from that primitive's vertices to the target primitive's vertices.
+/// @note When the target is a polygon soup, @a targetPrim should be a
+/// @b GEO_PrimPolySoup::PolygonIterator that points to one of the member polygons of the soup.
+template<typename GridType>
+template<typename PrimT>
+inline void
+TransferPrimitiveAttributesOp<GridType>::copyVertAttrs(
+    const PrimT& targetPrim,
+    const UT_Vector3& targetNormal,
+    IndexAccT& polyIdxAcc) const
+{
+    const auto& transform = mIndexGrid.transform();
+
+    openvdb::Vec3d pos, uvw;
+    openvdb::Coord ijk;
+    UT_Vector3 sourceNormal;
+    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+
+#if UT_MAJOR_VERSION_INT >= 16
+    for (GA_Size vtx = 0, vtxN = targetPrim.getVertexCount(); vtx < vtxN; ++vtx) {
+        pos = UTvdbConvert(targetPrim.getPos3(vtx));
+#else
+    GA_Primitive::const_iterator vtxIt;
+    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
+        pos = UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
+#endif
+        const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
+
+        primitives.clear();
+        similarPrimitives.clear();
+        int primIndex;
+        for (int d = 0; d < 8; ++d) {
+            ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
+            ijk[1] = coord[1] + ((d & 0x02) >> 1);
+            ijk[2] = coord[2] + ((d & 0x04) >> 2);
+
+            if (polyIdxAcc.probeValue(ijk, primIndex) &&
+                (openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX))
+            {
+                GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+                sourceNormal = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+                if (sourceNormal.dot(targetNormal) > 0.5) {
+                    primitives.push_back(primIndex);
+                }
+            }
+        }
+
+        if (!primitives.empty() || !similarPrimitives.empty()) {
+            GA_Offset v0, v1, v2;
+            if (!similarPrimitives.empty()) {
+                findClosestPrimitiveToPoint(mSourceGeo, similarPrimitives, pos, v0, v1, v2, uvw);
+            } else {
+                findClosestPrimitiveToPoint(mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+            }
+
+            for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
+#if UT_MAJOR_VERSION_INT >= 16
+                mVertAttributes[n]->copy(v0, v1, v2, targetPrim.getVertexOffset(vtx), uvw);
+#else
+                mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);
+#endif
             }
         }
     }
@@ -1264,6 +1431,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
 ////////////////////////////////////////
 
+
 template<class GridType>
 class TransferPointAttributesOp
 {
@@ -1271,7 +1439,7 @@ public:
     TransferPointAttributesOp(
         const GU_Detail& sourceGeo, GU_Detail& targetGeo, const GridType& indexGrid,
         std::vector<AttributeCopyBase::Ptr>& pointAttributes,
-        const GA_PrimitiveGroup* surfacePrims = NULL);
+        const GA_PrimitiveGroup* surfacePrims = nullptr);
 
     void operator()(const GA_SplittableRange&) const;
 private:
@@ -1299,11 +1467,11 @@ template<class GridType>
 void
 TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range) const
 {
-    typedef typename GridType::ValueType IndexT;
+    using IndexT = typename GridType::ValueType;
 
     GA_Offset start, end, vtxOffset, primOffset, target, v0, v1, v2;
 
-    typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
+    typename GridType::ConstAccessor polyIdxAcc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
     std::vector<GA_Index> primitives(8);
@@ -1353,7 +1521,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
                     ijk[1] = coord[1] + ((d & 0x02) >> 1);
                     ijk[2] = coord[2] + ((d & 0x04) >> 2);
 
-                    if (acc.probeValue(ijk, primIndex) &&
+                    if (polyIdxAcc.probeValue(ijk, primIndex) &&
                         openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
                         primitives.push_back(primIndex);
                     }
@@ -1386,7 +1554,7 @@ transferPrimitiveAttributes(
     GU_Detail& targetGeo,
     GridType& indexGrid,
     Interrupter& boss,
-    const GA_PrimitiveGroup *primitives = NULL)
+    const GA_PrimitiveGroup* primitives = nullptr)
 {
     // Match public primitive attributes
     GA_AttributeDict::iterator it = sourceGeo.primitiveAttribs().begin(GA_SCOPE_PUBLIC);
@@ -1399,7 +1567,7 @@ transferPrimitiveAttributes(
     for (; !it.atEnd(); ++it) {
         const GA_Attribute* sourceAttr = it.attrib();
 #if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
-        if (NULL == targetGeo.findPrimitiveAttribute(it.name())) {
+        if (nullptr == targetGeo.findPrimitiveAttribute(it.name())) {
             targetGeo.addPrimAttrib(sourceAttr);
         }
         GA_Attribute* targetAttr = targetGeo.findPrimitiveAttribute(it.name());
@@ -1426,7 +1594,7 @@ transferPrimitiveAttributes(
     for (; !it.atEnd(); ++it) {
         const GA_Attribute* sourceAttr = it.attrib();
 #if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
-        if (NULL == targetGeo.findVertexAttribute(it.name())) {
+        if (nullptr == targetGeo.findVertexAttribute(it.name())) {
             targetGeo.addVertexAttrib(sourceAttr);
         }
         GA_Attribute* targetAttr = targetGeo.findVertexAttribute(it.name());
@@ -1463,7 +1631,7 @@ transferPrimitiveAttributes(
 
             const GA_Attribute* sourceAttr = it.attrib();
 #if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
-            if (NULL == targetGeo.findPointAttribute(it.name())) {
+            if (nullptr == targetGeo.findPointAttribute(it.name())) {
                 targetGeo.addPointAttrib(sourceAttr);
             }
             GA_Attribute* targetAttr = targetGeo.findPointAttribute(it.name());
@@ -1493,6 +1661,6 @@ transferPrimitiveAttributes(
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

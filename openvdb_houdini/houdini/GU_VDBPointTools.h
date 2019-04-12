@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,42 +38,43 @@
 
 #if defined(SESI_OPENVDB)
     #include "GU_Detail.h"
+    #include "GU_DetailHandle.h"
+    #include "GU_PackedContext.h"
+    #include "GU_PackedFragment.h"
+    #include "GU_PackedGeometry.h"
+    #include "GU_PrimPacked.h"
 #else
     #include <GU/GU_Detail.h>
+    #include <GU/GU_DetailHandle.h>
+    #include <GU/GU_PackedContext.h>
+    #include <GU/GU_PackedFragment.h>
+    #include <GU/GU_PackedGeometry.h>
+    #include <GU/GU_PrimPacked.h>
 #endif
 #include <GA/GA_ElementGroup.h>
+#include <UT/UT_SharedPtr.h>
 #include <UT/UT_VectorTypes.h>
-
 #include <UT/UT_Version.h>
-
-#if (UT_MAJOR_VERSION_INT >= 15)
-    #include <GU/GU_PackedContext.h>
-#endif
-
-#if (UT_MAJOR_VERSION_INT >= 14)
-    #include <GU/GU_PrimPacked.h>
-    #include <GU/GU_PackedGeometry.h>
-    #include <GU/GU_PackedFragment.h>
-    #include <GU/GU_DetailHandle.h>
-#endif
 
 #include <openvdb/Platform.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/ParticleAtlas.h>
 #include <openvdb/tools/PointsToMask.h>
 
+#include <vector>
+
 
 /// @brief Houdini point attribute wrapper
-template <typename VectorType>
+template<typename VectorType>
 struct GU_VDBPointList
 {
-    typedef boost::shared_ptr<GU_VDBPointList>          Ptr;
-    typedef boost::shared_ptr<const GU_VDBPointList>    ConstPtr;
+    using Ptr = UT_SharedPtr<GU_VDBPointList>;
+    using ConstPtr = UT_SharedPtr<const GU_VDBPointList>;
 
-    typedef VectorType                                  PosType;
-    typedef typename PosType::value_type                ScalarType;
+    using PosType = VectorType;
+    using ScalarType = typename PosType::value_type;
 
-    GU_VDBPointList(const GU_Detail& detail, const GA_PointGroup* group = NULL)
+    GU_VDBPointList(const GU_Detail& detail, const GA_PointGroup* group = nullptr)
         : mPositionHandle(detail.getP())
         , mVelocityHandle()
         , mRadiusHandle()
@@ -113,7 +114,7 @@ struct GU_VDBPointList
         }
     }
 
-    static Ptr create(const GU_Detail& detail, const GA_PointGroup* group = NULL)
+    static Ptr create(const GU_Detail& detail, const GA_PointGroup* group = nullptr)
     {
         return Ptr(new GU_VDBPointList(detail, group));
     }
@@ -211,13 +212,12 @@ struct IndexToOffsetOp {
     PointArrayType const * const mPointList;
 };
 
-#if (UT_MAJOR_VERSION_INT >= 14)
 
 struct PackedMaskConstructor
 {
     PackedMaskConstructor(const std::vector<const GA_Primitive*>& prims,
         const openvdb::math::Transform& xform)
-        : mPrims(prims.empty() ? NULL : &prims.front())
+        : mPrims(prims.empty() ? nullptr : &prims.front())
         , mXForm(xform)
         , mMaskGrid(new openvdb::MaskGrid(false))
     {
@@ -238,10 +238,7 @@ struct PackedMaskConstructor
 
     void operator()(const tbb::blocked_range<size_t>& range)
     {
-
-#if (UT_MAJOR_VERSION_INT >= 15)
         GU_PackedContext packedcontext;
-#endif
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             const GA_Primitive *prim = mPrims[n];
@@ -251,8 +248,6 @@ struct PackedMaskConstructor
 
             GU_Detail tmpdetail;
             const GU_Detail *detailtouse;
-
-#if (UT_MAJOR_VERSION_INT >= 15)
 
             GU_DetailHandleAutoReadLock readlock(pprim->getPackedDetail(packedcontext));
 
@@ -264,10 +259,6 @@ struct PackedMaskConstructor
                 pprim->unpackWithContext(tmpdetail, packedcontext);
                 detailtouse = &tmpdetail;
             }
-#else
-            pprim->unpack(tmpdetail);
-            detailtouse = &tmpdetail;
-#endif
 
             GU_VDBPointList<openvdb::Vec3R>  points(*detailtouse);
             openvdb::MaskGrid::Ptr grid = openvdb::tools::createPointMask(points, mXForm);
@@ -308,9 +299,6 @@ getPackedPrimitiveOffsets(const GU_Detail& detail, std::vector<const GA_Primitiv
     }
 }
 
-#endif
-
-
 } // namespace GU_VDBPointToolsInternal
 
 
@@ -320,7 +308,7 @@ getPackedPrimitiveOffsets(const GU_Detail& detail, std::vector<const GA_Primitiv
 /// @brief    Utility method to construct a GU_VDBPointList.
 /// @details  The GU_VDBPointList is compatible with the PointIndexGrid and ParticleAtals structures.
 inline GU_VDBPointList<openvdb::Vec3s>::Ptr
-GUvdbCreatePointList(const GU_Detail& detail, const GA_PointGroup* pointGroup = NULL)
+GUvdbCreatePointList(const GU_Detail& detail, const GA_PointGroup* pointGroup = nullptr)
 {
     return GU_VDBPointList<openvdb::Vec3s>::create(detail, pointGroup);
 }
@@ -345,7 +333,7 @@ inline openvdb::tools::PointIndexGrid::Ptr
 GUvdbCreatePointIndexGrid(
     const openvdb::math::Transform& xform,
     const GU_Detail& detail,
-    const GA_PointGroup* pointGroup = NULL)
+    const GA_PointGroup* pointGroup = nullptr)
 {
     GU_VDBPointList<openvdb::Vec3s> points(detail, pointGroup);
     return openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
@@ -368,7 +356,7 @@ template<typename ParticleArrayType>
 inline openvdb::tools::ParticleIndexAtlas::Ptr
 GUvdbCreateParticleAtlas(const double minVoxelSize, const ParticleArrayType& particles)
 {
-    typedef openvdb::tools::ParticleIndexAtlas ParticleIndexAtlas;
+    using ParticleIndexAtlas = openvdb::tools::ParticleIndexAtlas;
     ParticleIndexAtlas::Ptr atlas(new ParticleIndexAtlas());
 
     if (particles.hasRadius()) {
@@ -385,10 +373,8 @@ inline openvdb::MaskGrid::Ptr
 GUvdbCreatePointMaskGrid(
     const openvdb::math::Transform& xform,
     const GU_Detail& detail,
-    const GA_PointGroup* pointGroup = NULL)
+    const GA_PointGroup* pointGroup = nullptr)
 {
-#if (UT_MAJOR_VERSION_INT >= 14)
-
     std::vector<const GA_Primitive*> packed;
     GU_VDBPointToolsInternal::getPackedPrimitiveOffsets(detail, packed);
 
@@ -398,10 +384,8 @@ GUvdbCreatePointMaskGrid(
         return op.getMaskGrid();
     }
 
-#endif
-
-    GU_VDBPointList<openvdb::Vec3R> points( detail, pointGroup );
-    return openvdb::tools::createPointMask( points, xform );
+    GU_VDBPointList<openvdb::Vec3R> points(detail, pointGroup);
+    return openvdb::tools::createPointMask(points, xform);
 }
 
 
@@ -415,7 +399,7 @@ inline openvdb::tools::PointIndexGrid::Ptr
 GUvdbCreatePointOffsetGrid(
     const openvdb::math::Transform& xform,
     const GU_Detail& detail,
-    const GA_PointGroup* pointGroup = NULL)
+    const GA_PointGroup* pointGroup = nullptr)
 {
     GU_VDBPointList<openvdb::Vec3s> points(detail, pointGroup);
 
@@ -430,6 +414,6 @@ GUvdbCreatePointOffsetGrid(
 
 #endif // GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -50,16 +50,20 @@
 #   install_lib         install just the OpenVDB library and its headers
 #                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
+#   header_test         check for missing or indirectly included headers
 #   clean               delete generated files from the local directory
 #   test                run tests
 #
 # Options:
-#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
-#                       (some OpenVDB 4.x features will be disabled)
+#   abi=N               build for compatibility with version N of the
+#                       OpenVDB Grid ABI, where N is 2, 3, 4, etc.
+#                       (some newer features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -69,22 +73,26 @@
 # Note that if you plan to build the Houdini OpenVDB tools (distributed
 # separately), you must build the OpenVDB library and the Houdini tools
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
-# Fortunately, all three are included in the Houdini HDK, so the relevant
+# Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)
+# to set those two environment variables.)  Beginning with Houdini 16.5,
+# you must provide your own distribution of Boost.
 #
 # To build the OpenVDB Python module, you will need local distributions of
-# Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
-# includes Python 2.x as well as the Boost.Python headers.  Unfortunately,
-# it does not include the libboost_python library, nor does it include NumPy,
-# so both Boost.Python and NumPy have to be built separately.
-# Point the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
-# $(NUMPY_INCL_DIR) below to your local distributions of those libraries.
+# Python, Boost.Python, and optionally NumPy.  The Houdini HDK includes
+# Python 2.x, but not the libboost_python library or NumPy or, as of
+# Houdini 16.5, the Boost.Python headers, so both Boost.Python and NumPy
+# have to be built separately.  Point the variables $(BOOST_PYTHON_LIB_DIR),
+# $(BOOST_PYTHON_LIB) and $(NUMPY_INCL_DIR) below to your local distributions
+# of those libraries.
 #
 
 # The directory into which to install libraries, executables and header files
 DESTDIR := /tmp/OpenVDB
+
+# The directory into which to install libraries (e.g., for Linux multiarch support)
+DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
@@ -129,9 +137,9 @@ CONCURRENT_MALLOC_LIB_DIR := $(HDSO)
 
 # The parent directory of the cppunit/ header directory
 # (leave blank if CppUnit is unavailable)
-CPPUNIT_INCL_DIR := /rel/map/generic-2013.22/sys_include
+CPPUNIT_INCL_DIR :=
 # The directory containing libcppunit
-CPPUNIT_LIB_DIR := /rel/depot/third_party_build/cppunit/1.10.2-7/opt-ws5-x86_64-gccWS5_64/lib
+CPPUNIT_LIB_DIR :=
 CPPUNIT_LIB := -lcppunit
 
 # The parent directory of the log4cplus/ header directory
@@ -229,6 +237,11 @@ ifneq (,$(and $(BLOSC_LIB_DIR),$(BLOSC_INCL_DIR),$(BLOSC_LIB)))
     has_blosc := yes
 endif
 
+has_cppunit := no
+ifneq (,$(and $(CPPUNIT_INCL_DIR),$(CPPUNIT_LIB_DIR),$(CPPUNIT_LIB)))
+    has_cppunit := yes
+endif
+
 has_glfw := no
 ifneq (,$(and $(GLFW_LIB_DIR),$(GLFW_INCL_DIR),$(GLFW_LIB)))
     has_glfw := yes
@@ -262,11 +275,37 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (3,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+abi := $(strip $(abi))
+ifneq (,$(abi))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
+    CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
+endif
+
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        CXXFLAGS += \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
 endif
 
 LIBS := \
@@ -344,11 +383,17 @@ INCLUDE_NAMES := \
     points/AttributeSet.h \
     points/IndexFilter.h \
     points/IndexIterator.h \
+    points/PointAdvect.h \
     points/PointAttribute.h \
     points/PointConversion.h \
     points/PointCount.h \
     points/PointDataGrid.h \
+    points/PointDelete.h \
     points/PointGroup.h \
+    points/PointMask.h \
+    points/PointMove.h \
+    points/PointSample.h \
+    points/PointScatter.h \
     points/StreamCompression.h \
     tools/ChangeBackground.h \
     tools/Clip.h \
@@ -370,6 +415,7 @@ INCLUDE_NAMES := \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
+    tools/Mask.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
     tools/MultiResGrid.h \
@@ -381,6 +427,7 @@ INCLUDE_NAMES := \
     tools/PointScatter.h \
     tools/PointsToMask.h \
     tools/PoissonSolver.h \
+    tools/PotentialFlow.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -506,15 +553,22 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeMask.cc \
     unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointAdvect.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointDelete.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointIndexGrid.cc \
+    unittest/TestPointMask.cc \
+    unittest/TestPointMove.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointSample.cc \
+    unittest/TestPointScatter.cc \
     unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
+    unittest/TestPotentialFlow.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
@@ -532,6 +586,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestTreeGetSetValues.cc \
     unittest/TestTreeIterators.cc \
     unittest/TestTreeVisitor.cc \
+    unittest/TestTypes.cc \
     unittest/TestUtil.cc \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
@@ -574,9 +629,10 @@ CMD_INCLUDE_NAMES := \
 #
 
 CMD_SRC_NAMES := \
-    cmd/openvdb_print/main.cc \
-    cmd/openvdb_render/main.cc \
-    cmd/openvdb_view/main.cc \
+    cmd/openvdb_lod.cc \
+    cmd/openvdb_print.cc \
+    cmd/openvdb_render.cc \
+    cmd/openvdb_view.cc \
 #
 
 
@@ -595,6 +651,7 @@ PYTHON_SRC_NAMES := \
     python/pyIntGrid.cc \
     python/pyMetadata.cc \
     python/pyOpenVDBModule.cc \
+    python/pyPointGrid.cc \
     python/pyTransform.cc \
     python/pyVec3Grid.cc \
 #
@@ -651,7 +708,7 @@ else
 LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
 LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
-LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBOPENVDB_SONAME)
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBOPENVDB_SONAME)
 endif
 
 # TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
@@ -666,7 +723,7 @@ else
 LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
 LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
 LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
-LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBVIEWER_SONAME)
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR_LIB_DIR)/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb
@@ -682,7 +739,7 @@ ifeq (no,$(strip $(shared)))
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
     LIBVIEWER := $(LIBVIEWER_SHARED)
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR_LIB_DIR)
 endif # shared
 
 DEPEND := dependencies
@@ -706,7 +763,7 @@ ALL_PRODUCTS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend doc install lib pdfdoc pydoc pytest python test viewerlib
+.PHONY: all clean depend doc header_test install lib pdfdoc pydoc pytest python test viewerlib
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -766,21 +823,21 @@ pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
 
-vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod/main.cc
+vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
+vdb_print: $(LIBOPENVDB) cmd/openvdb_print.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
+vdb_render: $(LIBOPENVDB) cmd/openvdb_render.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render.cc -I . \
 	    -isystem $(EXR_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) \
 	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
 	    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(ILMBASE_LIB) \
@@ -803,9 +860,9 @@ $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1 -fPIC -o $@ $<
 
-vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
+vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view.cc $(LIBVIEWER_OBJ_NAMES) \
 	    -I . $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB)
@@ -884,16 +941,16 @@ install_lib: lib
 	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBOPENVDB) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR_LIB_DIR)
+	@echo "Created $(DESTDIR_LIB_DIR)"
+	cp -f $(LIBOPENVDB) $(DESTDIR_LIB_DIR)
+	pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED) ]; then \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SHARED_NAME); \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SONAME); \
 	    fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR_LIB_DIR)"
 
 install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	if [ -f $(LIBVIEWER) ]; \
@@ -902,12 +959,12 @@ install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
 	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
 	    @echo "Copied vdb_view header files to $(DESTDIR)/include" \
-	    cp -f $(LIBVIEWER) $(DESTDIR)/lib; \
-	    pushd $(DESTDIR)/lib > /dev/null; \
+	    cp -f $(LIBVIEWER) $(DESTDIR_LIB_DIR); \
+	    pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	        if [ -f $(LIBVIEWER_SHARED) ]; then \
 	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_SHARED_NAME); fi; \
 	        popd > /dev/null; \
-	    @echo "Copied libopenvdb_viewer to $(DESTDIR)/lib/"; \
+	    @echo "Copied libopenvdb_viewer to $(DESTDIR_LIB_DIR)"; \
 	fi
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
@@ -970,6 +1027,27 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES) openvdb_viewer
 
 depend: $(DEPEND)
 
+# Compile an implicit translation unit for each header to identify any indirect includes
+HEADER_TEST_CXXFLAGS := $(CXXFLAGS)
+HEADER_TEST_FILES := $(addprefix header_test-,$(INCLUDE_NAMES) $(CMD_INCLUDE_NAMES))
+ifeq (yes,$(has_cppunit))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(UNITTEST_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += -isystem $(CPPUNIT_INCL_DIR)
+endif
+ifeq (yes,$(has_glfw))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(LIBVIEWER_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1
+endif
+ifeq (yes,$(has_python))
+    HEADER_TEST_FILES += $(addprefix header_test-,$(PYTHON_INCLUDE_NAMES))
+    HEADER_TEST_CXXFLAGS += $(PYCXXFLAGS)
+endif
+$(HEADER_TEST_FILES): header_test-%:
+	echo "#include \"$*\"" | $(CXX) -c -x c++ $(HEADER_TEST_CXXFLAGS) -fPIC -o /dev/null -
+echo_header_test:
+	@echo "Checking for missing or indirectly included headers"
+header_test: echo_header_test $(HEADER_TEST_FILES)
+
 clean:
 	$(RM) $(OBJ_NAMES) $(ALL_PRODUCTS) $(DEPEND)
 	$(RM) $(LIBOPENVDB_STATIC)
@@ -983,6 +1061,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2017 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

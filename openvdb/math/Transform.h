@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -53,10 +53,10 @@ OPENVDB_API void
 calculateBounds(const Transform& t, const Vec3d& minWS, const Vec3d& maxWS,
     Vec3d& minIS, Vec3d& maxIS);
 
-/// @brief Calculate an axis-aligned bounding box in index space from a
+/// @todo Calculate an axis-aligned bounding box in index space from a
 /// bounding sphere in world space.
-/// @todo void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
-///     Vec3d& minIS, Vec3d& maxIS);
+//void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
+//    Vec3d& minIS, Vec3d& maxIS);
 
 
 ////////////////////////////////////////
@@ -305,6 +305,6 @@ processTypedMap(TransformType& transform, OpType& op)
 
 #endif // OPENVDB_MATH_TRANSFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
