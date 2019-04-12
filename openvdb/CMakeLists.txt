@@ -122,8 +122,12 @@ ENDIF ()
 LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
   ZLIB::ZLIB
-  Threads::Threads
 )
+IF ( UNIX )
+  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    Threads::Threads
+  )
+ENDIF ()
 
 ##########################################################################
 
