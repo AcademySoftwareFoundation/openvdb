@@ -6,6 +6,11 @@
 @par
 <B>Version 6.0.1</B> - <I>In development</I>
 
+<BLOCKQUOTE>
+As of this release, the minimum Houdini version supported by OpenVDB is now
+Houdini&nbsp;16.5.
+</BLOCKQUOTE>
+
 @par
 New features:
 - Added new @vdblink::QuatTraits QuatTraits@endlink,
