@@ -95,13 +95,20 @@ SET ( OPENVDB_MAYA_DEPENDENT_LIBS
 
 #########################################################################
 
+# WARNING:  Compilation order of these files is extremely important. On
+# MacOS/Clang (and potentially other platform/compiler combos), TBB fails
+# to mutex lock the node registry in OpenVDBPlugin.cc if OpenVDBPlugin.cc
+# is linked in after any of the nodes which create NodeRegistry objects.
+# This is most likely due to the construction order of file static data.
+# @todo  Restructure the node registry implementation
+
 SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
-  maya/OpenVDBCopyNode.cc
   maya/OpenVDBData.cc
+  maya/OpenVDBPlugin.cc
+  maya/OpenVDBCopyNode.cc
   maya/OpenVDBFilterNode.cc
   maya/OpenVDBFromMayaFluidNode.cc
   maya/OpenVDBFromPolygonsNode.cc
-  maya/OpenVDBPlugin.cc
   maya/OpenVDBReadNode.cc
   maya/OpenVDBToPolygonsNode.cc
   maya/OpenVDBTransformNode.cc
