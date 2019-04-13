@@ -38,23 +38,18 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
+
 #include <UT/UT_Version.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
+
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 
-
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////

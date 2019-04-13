@@ -55,11 +55,7 @@
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tree/LeafManager.h>
 #include <boost/algorithm/string/join.hpp>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 #include <iostream>
 #include <random>
 #include <stdexcept>
@@ -70,9 +66,6 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 class SOP_OpenVDB_Scatter: public hvdb::SOP_NodeVDB
@@ -682,9 +675,7 @@ process(const UT_VDBType type, const openvdb::GridBase& grid, OpType& op, const 
     bool success(false);
     success = UTvdbProcessTypedGridTopology(type, grid, op);
     if (!success) {
-#if UT_VERSION_INT >= 0x10000258 // 16.0.600 or later
         success = UTvdbProcessTypedGridPoint(type, grid, op);
-#endif
     }
     if (name) op.print(*name);
     return success;

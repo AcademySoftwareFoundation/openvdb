@@ -45,6 +45,7 @@
 
 #include <UT/UT_Version.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_UniquePtr.h>
 #include <PRM/PRM_Parm.h>
 
 #ifdef SESI_OPENVDB
@@ -60,13 +61,6 @@
 #include <sstream>
 #include <type_traits>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-  #include <UT/UT_UniquePtr.h>
-#else
-  template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
 
 
 namespace hvdb = openvdb_houdini;
@@ -1600,11 +1594,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Finite values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_finite", "Finite Values"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(30)
-#else
         + spacing(35)
-#endif
     )
         .setCallbackFunc(&validateOperationTestsCB)
         .setDefault(PRMoneDefaults)
@@ -1625,9 +1615,6 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Uniform background values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_background", "Uniform Background"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(5)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1647,11 +1634,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Values in range
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_valrange", "Values in Range"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(19)
-#else
         + spacing(23)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1716,11 +1699,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Gradient magnitude
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_gradient", "Gradient Magnitude"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(6)
-#else
         + spacing(7)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1749,11 +1728,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Inactive Tiles
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_activetiles", "Inactive Tiles"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(28)
-#else
         + spacing(36)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1784,11 +1759,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Background values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_backgroundzero", "Background Zero"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(15)
-#else
         + spacing(17)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)

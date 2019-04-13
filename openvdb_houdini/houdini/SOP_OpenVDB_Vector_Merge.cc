@@ -48,11 +48,7 @@
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/regex.hpp>
-#else
-#include <boost/regex.hpp>
-#endif
 #include <functional>
 #include <memory>
 #include <set>
@@ -65,9 +61,6 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 // HAVE_MERGE_GROUP is disabled in Houdini
 #ifdef SESI_OPENVDB

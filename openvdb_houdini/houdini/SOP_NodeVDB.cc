@@ -229,20 +229,6 @@ SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
 ////////////////////////////////////////
 
 
-#if (UT_MAJOR_VERSION_INT < 16)
-void
-SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
-{
-    SOP_Node::fillInfoTreeNodeSpecific(tree, time);
-
-    // Add the OpenVDB library version number to this node's
-    // extended operator information.
-    if (UT_InfoTree* child = tree.addChildBranch("OpenVDB")) {
-        child->addColumnHeading("version");
-        child->addProperties(openvdb::getLibraryVersionString());
-    }
-}
-#else
 void
 SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreeParms& parms)
 {
@@ -291,7 +277,6 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
     }
 #endif
 }
-#endif
 
 
 void
@@ -450,7 +435,6 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
 ////////////////////////////////////////
 
 
-#if UT_MAJOR_VERSION_INT >= 16
 const SOP_NodeVerb*
 SOP_NodeVDB::cookVerb() const
 {
@@ -459,17 +443,14 @@ SOP_NodeVDB::cookVerb() const
     }
     return SOP_Node::cookVerb();
 }
-#endif
 
 
 OP_ERROR
 SOP_NodeVDB::cookMySop(OP_Context& context)
 {
-#if UT_MAJOR_VERSION_INT >= 16
     if (cookVerb()) {
         return cookMyselfAsVerb(context);
     }
-#endif
     return cookVDBSop(context);
 }
 

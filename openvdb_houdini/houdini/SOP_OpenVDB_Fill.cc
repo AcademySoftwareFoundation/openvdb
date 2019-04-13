@@ -35,20 +35,16 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
+
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
 
 
 namespace hutil = houdini_utils;

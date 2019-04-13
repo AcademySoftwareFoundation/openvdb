@@ -910,13 +910,8 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                 // Retrieve the collider grid.
                 UT_String colliderStr;
                 evalString(colliderStr, "collider", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
                 const GA_PrimitiveGroup* colliderGroup = parsePrimitiveGroups(
                     colliderStr.buffer(), GroupCreator(colliderGeo));
-#else
-                const GA_PrimitiveGroup* colliderGroup = parsePrimitiveGroups(
-                    colliderStr.buffer(), const_cast<GU_Detail*>(colliderGeo));
-#endif
                 if (hvdb::VdbPrimCIterator colliderIt =
                     hvdb::VdbPrimCIterator(colliderGeo, colliderGroup))
                 {

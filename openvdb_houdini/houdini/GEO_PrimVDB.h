@@ -108,12 +108,7 @@ public:
     virtual int         getBBox(UT_BoundingBox *bbox) const;
     virtual void        reverse();
     virtual UT_Vector3  computeNormal() const;
-#if (UT_VERSION_INT >= 0x0d000000)
     virtual void        copyPrimitive(const GEO_Primitive *src);
-#else
-    virtual void        copyPrimitive(const GEO_Primitive *src,
-                                      GEO_Point **ptredirect);
-#endif
     virtual void        copyUnwiredForMerge(const GA_Primitive *src,
                                             const GA_MergeMap &map);
 

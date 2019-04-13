@@ -51,22 +51,14 @@ createBox(GU_Detail& gdp, UT_Vector3 corners[8],
     }
 
     if (color != NULL) {
-#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
         GA_RWHandleV3 cd(gdp.addDiffuseAttribute(GA_ATTRIB_POINT));
-#else
-        GA_RWHandleV3 cd(gdp.addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
-#endif
         for (size_t i = 0; i < 8; ++i) {
             cd.set(ptoff[i], *color);
         }
     }
 
     if (alpha < 0.99) {
-#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
         GA_RWHandleF A(gdp.addAlphaAttribute(GA_ATTRIB_POINT));
-#else
-        GA_RWHandleF A(gdp.addAlphaAttribute(GA_ATTRIB_POINT).getAttribute());
-#endif
         for (size_t i = 0; i < 8; ++i) {
             A.set(ptoff[i], alpha);
         }

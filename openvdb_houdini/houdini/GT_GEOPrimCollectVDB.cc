@@ -102,7 +102,6 @@ public:
     appendBox(openvdb::Vec3s corners[NPTS])
     {
         myVertexCounts.append(NPTS * 2);
-#if (UT_VERSION_INT >= 0x0c0002bf) // 12.0.703 or later
         myPos->append(corners[0].asPointer()); // 0
         myPos->append(corners[1].asPointer()); // 1
         myPos->append(corners[2].asPointer()); // 2
@@ -119,26 +118,6 @@ public:
         myPos->append(corners[6].asPointer()); // 13
         myPos->append(corners[7].asPointer()); // 14
         myPos->append(corners[3].asPointer()); // 15
-#else
-        GT_Size offset = myPos->entries();
-        myPos->resize(offset + 16);
-        myPos->setTuple(corners[0].asPointer(), offset++); // 0
-        myPos->setTuple(corners[1].asPointer(), offset++); // 1
-        myPos->setTuple(corners[2].asPointer(), offset++); // 2
-        myPos->setTuple(corners[3].asPointer(), offset++); // 3
-        myPos->setTuple(corners[0].asPointer(), offset++); // 4
-        myPos->setTuple(corners[4].asPointer(), offset++); // 5
-        myPos->setTuple(corners[5].asPointer(), offset++); // 6
-        myPos->setTuple(corners[6].asPointer(), offset++); // 7
-        myPos->setTuple(corners[7].asPointer(), offset++); // 8
-        myPos->setTuple(corners[4].asPointer(), offset++); // 9
-        myPos->setTuple(corners[5].asPointer(), offset++); // 10
-        myPos->setTuple(corners[1].asPointer(), offset++); // 11
-        myPos->setTuple(corners[2].asPointer(), offset++); // 12
-        myPos->setTuple(corners[6].asPointer(), offset++); // 13
-        myPos->setTuple(corners[7].asPointer(), offset++); // 14
-        myPos->setTuple(corners[3].asPointer(), offset++); // 15
-#endif
     }
 
     template <typename GridT>
@@ -203,16 +182,9 @@ public:
 
             for (int i = 0; i < NPTS; i += 2)
             {
-#if (UT_VERSION_INT >= 0x0c0002bf) // 12.0.703 or later
                 myVertexCounts.append(2);
                 myPos->append(lines[i].asPointer());
                 myPos->append(lines[i+1].asPointer());
-#else
-                GT_Size offset = myPos->entries();
-                myPos->resize(offset + 2);
-                myPos->setTuple(lines[i].asPointer(), offset++);
-                myPos->setTuple(lines[i+1].asPointer(), offset++);
-#endif
             }
         }
     }
@@ -234,14 +206,7 @@ public:
     void
     join(const gt_RefineVDB &task)
     {
-#if (UT_VERSION_INT >= 0x0c0002bf) // 12.0.703 or later
         myPos->concat(*task.myPos);
-#else
-        myPos->resize(myPos->entries() + task.myPos->entries());
-        memcpy(myPos->data() + myPos->entries()*myPos->getTupleSize(),
-            task.myPos->data(),
-            task.myPos->entries()*task.myPos->getTupleSize()*sizeof(fpreal32));
-#endif
         myVertexCounts.concat(task.myVertexCounts);
     }
 
@@ -296,13 +261,9 @@ GT_GEOPrimCollectVDB::endCollecting(
     if (!prims.entries())
         return GT_PrimitiveHandle();
 
-#if (UT_VERSION_INT >= 0x0f000000) // 15.0 or later
     GU_DetailHandleAutoReadLock gdl(g->getGeometry(0));
     const GU_Detail* detail = gdl.getGdp();
     gt_RefineVDB task(*detail, prims);
-#else
-    gt_RefineVDB task(g->getGeometry(0), prims);
-#endif
 
     UTparallelReduce(UT_BlockedRange<exint>(0, prims.entries()), task);
 

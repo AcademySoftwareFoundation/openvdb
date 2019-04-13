@@ -354,7 +354,6 @@ SOP_OpenVDB_Topology_To_Level_Set::Cache::cookVDBSop(
             const GU_PrimVDB *vdb = *vdbIt;
 
             if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) {
-#if UT_VERSION_INT >= 0x100001d0 // 16.0.464 or later
                 if (!GEOvdbProcessTypedGridPoint(*vdb, converter)) {
                     if (vdb->getGrid().isType<cvdb::MaskGrid>()) {
                         cvdb::MaskGrid::ConstPtr grid =
@@ -362,22 +361,6 @@ SOP_OpenVDB_Topology_To_Level_Set::Cache::cookVDBSop(
                         converter(*grid);
                     }
                 }
-#else
-                // Handle grid types that are not natively supported by Houdini.
-                if (vdb->getGrid().isType<cvdb::tools::PointIndexGrid>()) {
-                    cvdb::tools::PointIndexGrid::ConstPtr grid =
-                        cvdb::gridConstPtrCast<cvdb::tools::PointIndexGrid>(vdb->getGridPtr());
-                    converter(*grid);
-                } else if (vdb->getGrid().isType<cvdb::points::PointDataGrid>()) {
-                    cvdb::points::PointDataGrid::ConstPtr grid =
-                        cvdb::gridConstPtrCast<cvdb::points::PointDataGrid>(vdb->getGridPtr());
-                    converter(*grid);
-                } else if (vdb->getGrid().isType<cvdb::MaskGrid>()) {
-                    cvdb::MaskGrid::ConstPtr grid =
-                        cvdb::gridConstPtrCast<cvdb::MaskGrid>(vdb->getGridPtr());
-                    converter(*grid);
-                }
-#endif
             }
         }
 

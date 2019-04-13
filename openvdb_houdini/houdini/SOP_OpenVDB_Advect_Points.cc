@@ -44,15 +44,10 @@
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>
-#else
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#endif
 
 #include <algorithm>
 #include <memory>
@@ -60,18 +55,9 @@
 #include <string>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////

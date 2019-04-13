@@ -54,11 +54,7 @@
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <algorithm>
 #include <iostream>
@@ -76,9 +72,6 @@
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 namespace cvdb = openvdb;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 class SOP_OpenVDB_Sample_Points: public hvdb::SOP_NodeVDB

@@ -49,11 +49,7 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <algorithm>
 #include <limits>
@@ -65,9 +61,6 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////

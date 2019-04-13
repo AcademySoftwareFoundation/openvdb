@@ -52,13 +52,8 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>
-#else
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#endif
 
 #include <algorithm>
 #include <iostream>
@@ -74,9 +69,6 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////

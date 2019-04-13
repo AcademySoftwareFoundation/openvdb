@@ -61,13 +61,10 @@
 #include <GU/GU_Surfacer.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_UniquePtr.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <list>
 #include <memory>
@@ -75,25 +72,9 @@
 #include <string>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-
-
-//#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
-//// GA_RWHandleV3 fails to initialize its member variables in some cases.
-//#pragma GCC diagnostic ignored "-Wuninitialized"
-//#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////

@@ -335,12 +335,8 @@ struct DilatedMaskOp
         // Since large dilations and erosions can be expensive, apply them
         // in multiple passes and check for interrupts.
         for (int pass = 0; pass < numPasses; ++pass, numIterations -= kNumIterationsPerPass) {
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
             const bool interrupt = progress.wasInterrupted(
                 /*pct=*/int((100.0 * pass * kNumIterationsPerPass) / std::abs(dilation)));
-#else
-            const bool interrupt = progress.wasInterrupted();
-#endif
             if (interrupt) {
                 maskGrid.reset();
                 throw std::runtime_error{"interrupted"};
@@ -602,9 +598,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                         const auto maskType = UTvdbGetGridType(*maskGrid);
                         DilatedMaskOp op{dilation};
                         if (!UTvdbProcessTypedGridTopology(maskType, *maskGrid, op)) {
-#if UT_VERSION_INT >= 0x10000258 // 16.0.600 or later
                             UTvdbProcessTypedGridPoint(maskType, *maskGrid, op);
-#endif
                         }
                         if (op.maskGrid) maskGrid = op.maskGrid;
                     }

@@ -296,66 +296,6 @@ GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::operator()(
 ////////////////////////////////////////
 
 
-#if (UT_VERSION_INT < 0x0c0500F5) // Prior to 12.5.245
-
-// Symbols in namespace GU_Convert_H12_5 were added to GU_ConvertParms.h in 12.5.245
-
-namespace GU_Convert_H12_5 {
-
-/// Simple helper class for tracking a range of new primitives and points
-class GU_ConvertMarker
-{
-public:
-    GU_ConvertMarker(const GA_Detail &geo)
-        : myGeo(geo)
-        , myPrimBegin(primOff())
-        , myPtBegin(ptOff())
-    {
-    }
-
-    GA_Range getPrimitives() const
-    {
-        return GA_Range(myGeo.getPrimitiveMap(), myPrimBegin, primOff());
-    }
-    GA_Range getPoints() const
-    {
-        return GA_Range(myGeo.getPointMap(), myPtBegin, ptOff());
-    }
-
-    GA_Offset primitiveBegin() const { return myPrimBegin; }
-    GA_Offset pointBegin() const { return myPtBegin; }
-
-    GA_Size numPrimitives() const { return primOff() - myPrimBegin; }
-    GA_Size numPoints() const { return ptOff() - myPtBegin; }
-
-private:
-    GA_Offset primOff() const { return myGeo.getPrimitiveMap().lastOffset() + 1; }
-    GA_Offset ptOff() const { return myGeo.getPointMap().lastOffset() + 1; }
-
-private:
-    const GA_Detail& myGeo;
-    GA_Offset myPrimBegin;
-    GA_Offset myPtBegin;
-};
-
-
-OPENVDB_HOUDINI_API
-void
-GUconvertCopySingleVertexPrimAttribsAndGroups(
-    GU_ConvertParms &parms,
-    const GA_Detail &src,
-    GA_Offset src_primoff,
-    GA_Detail &dst,
-    const GA_Range &dst_prims,
-    const GA_Range &dst_points);
-
-} // namespace GU_Convert_H12_5
-
-using GU_Convert_H12_5::GU_ConvertMarker;
-using GU_Convert_H12_5::GUconvertCopySingleVertexPrimAttribsAndGroups;
-
-#endif // Prior to 12.5.245
-
 #endif // OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC

@@ -46,19 +46,13 @@
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
 #include <memory>
 #include <stdexcept>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
 
 
 namespace hvdb = openvdb_houdini;

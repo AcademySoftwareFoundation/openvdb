@@ -37,11 +37,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/math/constants/constants.hpp>
-#else
-#include <boost/math/constants/constants.hpp>
-#endif
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -50,9 +46,6 @@
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 class SOP_OpenVDB_Transform: public hvdb::SOP_NodeVDB

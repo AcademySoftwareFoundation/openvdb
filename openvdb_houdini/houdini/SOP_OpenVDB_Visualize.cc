@@ -63,13 +63,6 @@
 #include <type_traits>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-#include <memory>
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
 
 namespace std {
 template<> struct is_integral<openvdb::PointIndex32>: public true_type {};
@@ -1217,9 +1210,6 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
             parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
             parms.myOffset = static_cast<float>(iso);
             parms.preserveGroups = false;
-#if UT_MAJOR_VERSION_INT < 16
-            parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);
-#else
             UT_UniquePtr<GA_PrimitiveGroup> groupDeleter;
             if (!group) {
                 parms.primGroup = nullptr;
@@ -1229,7 +1219,6 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                 groupDeleter.reset(parms.primGroup);
                 parms.primGroup->copyMembership(*group);
             }
-#endif
             GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms, adaptivity, /*keep_original*/true);
         }
 #endif // HAVE_SURFACING_PARM
@@ -1258,22 +1247,7 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                     TreeVisualizer draw(*gdp, treeParms, &boss);
 
                     if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
-#if UT_VERSION_INT >= 0x100001d0 // 16.0.464 or later
                         GEOvdbProcessTypedGridPoint(*vdb, draw);
-#else
-                        // Handle grid types that are not natively supported by Houdini.
-                        if (vdb->getGrid().isType<openvdb::tools::PointIndexGrid>()) {
-                            openvdb::tools::PointIndexGrid::ConstPtr grid =
-                                 openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(
-                                     vdb->getGridPtr());
-                            draw(*grid);
-                        } else if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
-                            openvdb::points::PointDataGrid::ConstPtr grid =
-                                 openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(
-                                     vdb->getGridPtr());
-                            draw(*grid);
-                        }
-#endif
                     }
                 }
 

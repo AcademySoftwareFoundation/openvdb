@@ -460,11 +460,9 @@ SOP_OpenVDB_Potential_Flow::Cache::cookVDBSop(OP_Context& context)
                 if (GEOvdbProcessTypedGridTopology(*vdb, op)) {
                     grid = op.mSdfGrid;
                 }
-#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
                 else if (GEOvdbProcessTypedGridPoint(*vdb, op)) {
                     grid = op.mSdfGrid;
                 }
-#endif
             }
         }
 
@@ -485,12 +483,10 @@ SOP_OpenVDB_Potential_Flow::Cache::cookVDBSop(OP_Context& context)
                         maskIt->getGrid(), op)) {
                         mask = op.mMaskGrid;
                     }
-#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
                     else if (UTvdbProcessTypedGridPoint(maskIt->getStorageType(),
                         maskIt->getGrid(), op)) {
                         mask = op.mMaskGrid;
                     }
-#endif
                     else {
                         addWarning(SOP_MESSAGE, "Cannot convert VDB type to mask.");
                     }
