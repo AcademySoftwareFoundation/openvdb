@@ -141,7 +141,9 @@ ENDIF ()
 
 # @todo Should be target definitions
 IF ( WIN32 )
-  ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DHALF_EXPORTS -DOPENVDB_DLL )
+  ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DOPENVDB_DLL )
+ELSE ()
+  ADD_DEFINITIONS ( -fPIC )
 ENDIF ()
 
 ##### Core library configuration
