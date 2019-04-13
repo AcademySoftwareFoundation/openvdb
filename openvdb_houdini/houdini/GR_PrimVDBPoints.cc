@@ -1104,13 +1104,6 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         const UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
         (*shader)->bindVector(r, "offset", positionOffset);
 
-        // Assumes some uniform builtins are already bound. These can be bound with
-        // r->bindBuiltInUniform() and queried with r->printBuiltInUniforms(/*bound_only=*/true)
-        //
-        //  RE_UNIFORM_WIRE_COLOR = glH_WireColor
-        //  RE_UNIFORM_DECORATION_SCALE = glH_DecorationScale
-        //
-
         r->pushUniformColor(RE_UNIFORM_WIRE_COLOR, color);
         r->pushUniformData(RE_UNIFORM_DECORATION_SCALE, &scale);
 

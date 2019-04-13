@@ -34,10 +34,8 @@
 #include "SOP_NodeVDB.h"
 
 #include <houdini_utils/geometry.h>
-//#ifdef OPENVDB_ENABLE_POINTS
 #include <openvdb/points/PointDataGrid.h>
 #include "PointUtils.h"
-//#endif
 #include "Utils.h"
 #include "GEO_PrimVDB.h"
 #include "GU_PrimVDB.h"
@@ -178,17 +176,12 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     startLogForwarding(SOP_OPTYPE_ID);
 #endif
 
-//#ifdef OPENVDB_ENABLE_POINTS
     // Register grid-specific info text for Point Data Grids
     node_info_text::registerGridSpecificInfoText<openvdb::points::PointDataGrid>(
         &pointDataGridSpecificInfoText);
-//#endif
 
     // Set the flag to draw guide geometry
     mySopFlags.setNeedGuide1(true);
-
-    // We can use this to optionally draw the local data window?
-    // mySopFlags.setNeedGuide2(true);
 }
 
 
