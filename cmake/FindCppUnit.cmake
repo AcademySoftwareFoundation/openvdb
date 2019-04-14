@@ -68,7 +68,7 @@ Cache Variables
 The following cache variables may also be set:
 
 ``CppUnit_INCLUDE_DIR``
-  The directory containing ``cppunit/config-auto.h``.
+  The directory containing ``cppunit/Portability.h``.
 ``CppUnit_LIBRARY``
   The path to the CppUnit library.
 
@@ -124,14 +124,14 @@ LIST ( APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
   )
 
 # Look for a standard cppunit header file.
-FIND_PATH ( CppUnit_INCLUDE_DIR cppunit/config-auto.h
+FIND_PATH ( CppUnit_INCLUDE_DIR cppunit/Portability.h
   NO_DEFAULT_PATH
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
   )
 
-IF ( EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/config-auto.h" )
-  FILE ( STRINGS "${CppUnit_INCLUDE_DIR}/cppunit/config-auto.h"
+IF ( EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h" )
+  FILE ( STRINGS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h"
     _cppunit_version_string REGEX "#define CPPUNIT_VERSION "
     )
   STRING ( REGEX REPLACE "#define CPPUNIT_VERSION +\"(.+)\".*$" "\\1"
