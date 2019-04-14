@@ -202,6 +202,11 @@ MARK_AS_ADVANCED (
   OPENVDB_BUILD_HOUDINI_SOPS
   )
 
+# ncrease the number of sections that an object file can contain
+IF (MSVC)
+  ADD_DEFINITIONS("/bigobj")
+ENDIF()
+
 # Add our cmake modules
 
 LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" )
