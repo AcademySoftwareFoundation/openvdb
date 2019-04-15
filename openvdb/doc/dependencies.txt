@@ -111,7 +111,7 @@ apt-get install doxygen                 # doxygen
 @subsection depUsingHomebrew Using Homebrew
 
 [Homebrew](https://brew.sh/) is a package manager for UNIX systems and is
-a recommended alternative to apt-get or manual installation from source.
+an alternative to apt-get or manual installation from source.
 
 @b Note: Homebrew installs blosc 1.16 by default with no option for previous
 versions. OpenVDB recommends Blosc version 1.5 as there are known issues with
