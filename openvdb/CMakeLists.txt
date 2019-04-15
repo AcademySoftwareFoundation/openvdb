@@ -78,6 +78,10 @@ IF ( USE_BLOSC )
       "recommended that you use this version where possible."
       )
   ENDIF ()
+ELSE ()
+  MESSAGE ( STATUS "Blosc is currently disabled - it's recommended to install and "
+    "enable blosc for optimal builds of OpenVDB."
+    )
 ENDIF ()
 
 FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
