@@ -2968,7 +2968,8 @@ GEO_PrimVDB::GridAccessor::setGridAdapter(
     if (myGrid.get() == &grid)
         return;
     setVertexPosition(grid.transform(), prim);
-    myGrid = grid.copyGrid(); // always shallow-copy the source grid
+    myGrid = openvdb::ConstPtrCast<openvdb::GridBase>(
+        grid.copyGrid()); // always shallow-copy the source grid
     myStorageType = UTvdbGetGridType(*myGrid);
 }
 

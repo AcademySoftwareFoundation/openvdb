@@ -56,6 +56,7 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
 #include <stdexcept>

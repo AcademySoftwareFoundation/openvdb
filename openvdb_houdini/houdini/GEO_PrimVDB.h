@@ -112,6 +112,27 @@ public:
     virtual void        copyUnwiredForMerge(const GA_Primitive *src,
                                             const GA_MergeMap &map);
 
+    using GEO_Primitive::getVertexOffset;
+    using GEO_Primitive::getPointOffset;
+    using GEO_Primitive::setPointOffset;
+    using GEO_Primitive::getPos3;
+    using GEO_Primitive::setPos3;
+    SYS_FORCE_INLINE
+    GA_Offset getVertexOffset() const
+    { return getVertexOffset(0); }
+    SYS_FORCE_INLINE
+    GA_Offset getPointOffset() const
+    { return getPointOffset(0); }
+    SYS_FORCE_INLINE
+    void setPointOffset(GA_Offset pt)
+    { setPointOffset(0, pt); }
+    SYS_FORCE_INLINE
+    UT_Vector3 getPos3() const
+    { return getPos3(0); }
+    SYS_FORCE_INLINE
+    void setPos3(const UT_Vector3 &pos)
+    { setPos3(0, pos); }
+
     /// Convert an index in the voxel array into the corresponding worldspace
     /// location
     void                indexToPos(int x, int y, int z, UT_Vector3 &pos) const;

@@ -47,6 +47,7 @@
 #include <UT/UT_BoundingBox.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <cmath>
 #include <stdexcept>
