@@ -737,7 +737,7 @@ struct SwappedCombineOp
 /// <dt><b>CP_COPY</b>
 /// <dd>Create a deep copy of the member.
 /// </dl>
-enum CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
+enum OPENVDB_DEPRECATED CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
 #endif
 
 
