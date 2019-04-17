@@ -159,7 +159,7 @@ public:
     {
         ValueType sum = 0.0;
         for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
-        return sum / mStencil.size();
+        return sum / ValueType(mStencil.size());
     }
 
     /// @brief Return the smallest value in the stencil buffer.

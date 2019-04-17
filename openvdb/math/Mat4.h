@@ -76,7 +76,7 @@ public:
     Mat4(Source *a)
     {
         for (int i = 0; i < 16; i++) {
-            MyBase::mm[i] = a[i];
+            MyBase::mm[i] = static_cast<T>(a[i]);
         }
     }
 
@@ -93,25 +93,25 @@ public:
          Source i, Source j, Source k, Source l,
          Source m, Source n, Source o, Source p)
     {
-        MyBase::mm[ 0] = T(a);
-        MyBase::mm[ 1] = T(b);
-        MyBase::mm[ 2] = T(c);
-        MyBase::mm[ 3] = T(d);
+        MyBase::mm[ 0] = static_cast<T>(a);
+        MyBase::mm[ 1] = static_cast<T>(b);
+        MyBase::mm[ 2] = static_cast<T>(c);
+        MyBase::mm[ 3] = static_cast<T>(d);
 
-        MyBase::mm[ 4] = T(e);
-        MyBase::mm[ 5] = T(f);
-        MyBase::mm[ 6] = T(g);
-        MyBase::mm[ 7] = T(h);
+        MyBase::mm[ 4] = static_cast<T>(e);
+        MyBase::mm[ 5] = static_cast<T>(f);
+        MyBase::mm[ 6] = static_cast<T>(g);
+        MyBase::mm[ 7] = static_cast<T>(h);
 
-        MyBase::mm[ 8] = T(i);
-        MyBase::mm[ 9] = T(j);
-        MyBase::mm[10] = T(k);
-        MyBase::mm[11] = T(l);
+        MyBase::mm[ 8] = static_cast<T>(i);
+        MyBase::mm[ 9] = static_cast<T>(j);
+        MyBase::mm[10] = static_cast<T>(k);
+        MyBase::mm[11] = static_cast<T>(l);
 
-        MyBase::mm[12] = T(m);
-        MyBase::mm[13] = T(n);
-        MyBase::mm[14] = T(o);
-        MyBase::mm[15] = T(p);
+        MyBase::mm[12] = static_cast<T>(m);
+        MyBase::mm[13] = static_cast<T>(n);
+        MyBase::mm[14] = static_cast<T>(o);
+        MyBase::mm[15] = static_cast<T>(p);
     }
 
     /// Construct matrix from rows or columns vectors (defaults to rows

@@ -376,7 +376,17 @@ public:
     bool operator!=(const CoordBBox& rhs) const { return !(*this == rhs); }
 
     /// @brief Return @c true if this bounding box is empty (i.e., encloses no coordinates).
-    bool empty() const { return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]); }
+    bool empty() const
+    {
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
+        return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]);
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+  #pragma GCC diagnostic pop
+#endif
+    }
     /// @brief Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
     operator bool() const { return !this->empty(); }
     /// @brief Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).

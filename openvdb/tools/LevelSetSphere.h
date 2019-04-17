@@ -166,13 +166,13 @@ private:
         // Compute signed distances to sphere using leapfrogging in k
         for (i = imin; i <= imax; ++i) {
             if (util::wasInterrupted(mInterrupt)) return;
-            const auto x2 = math::Pow2(i - c[0]);
+            const auto x2 = math::Pow2(ValueT(i) - c[0]);
             for (j = jmin; j <= jmax; ++j) {
-                const auto x2y2 = math::Pow2(j - c[1]) + x2;
+                const auto x2y2 = math::Pow2(ValueT(j) - c[1]) + x2;
                 for (k = kmin; k <= kmax; k += m) {
                     m = 1;
                     /// Distance in voxel units to sphere
-                    const auto v = math::Sqrt(x2y2 + math::Pow2(k-c[2]))-r0;
+                    const auto v = math::Sqrt(x2y2 + math::Pow2(ValueT(k) - c[2])) - r0;
                     const auto d = math::Abs(v);
                     if (d < w) { // inside narrow band
                         accessor.setValue(ijk, dx*v);// distance in world units

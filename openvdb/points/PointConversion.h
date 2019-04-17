@@ -1023,7 +1023,7 @@ computeVoxelSize(  const PositionWrapper& positions,
 
         previousVoxelCount = voxelCount;
         voxelCount = mask->activeVoxelCount();
-        volume = math::Pow3(voxelSize) * voxelCount;
+        volume = math::Pow3(voxelSize) * static_cast<float>(voxelCount);
 
         // stop if no change in the volume or the volume has increased
 

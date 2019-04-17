@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -202,7 +202,7 @@ public:
     using ValueType = ValueT;
 
     /// @brief Default constructor
-    PagedArray() = default;
+    PagedArray() { mSize = 0; }
 
     /// @brief Destructor removed all allocated pages
     ~PagedArray() { this->clear(); }
@@ -510,7 +510,7 @@ private:
         }
     }
     PageTableT mPageTable;//holds points to allocated pages
-    tbb::atomic<size_t> mSize{0};// current number of elements in array
+    tbb::atomic<size_t> mSize;// current number of elements in array
     size_t mCapacity = 0;//capacity of array given the current page count
     tbb::spin_mutex mGrowthMutex;//Mutex-lock required to grow pages
 }; // Public class PagedArray
@@ -781,6 +781,6 @@ protected:
 
 #endif // OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

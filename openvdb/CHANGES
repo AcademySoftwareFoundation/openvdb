@@ -10,13 +10,13 @@ Version 6.0.1 - In development
     - Added a generic TypeList class.
     - Added GridBase::apply(), which invokes a functor on a grid
       if the resolved grid type is a member of a given type list.
-    - Added util::printTime that outputs nicely-formatted time information.
-    - Added a template specialization of std::hash with Coord.
-    - Added CoordBBox::moveMin and CoordBBox::moveMax to move a CoordBBox.
+    - Added util::printTime(), which outputs nicely formatted time information.
+    - Added a std::hash<Coord> template specialization.
+    - Added CoordBBox::moveMin() and CoordBBox::moveMax() to move a CoordBBox.
 
     Improvements:
-    - The API of util::CpuTimer has been improved and is now making use of
-      a new util::printTime function for nicer output of time information.
+    - util::CpuTimer now makes use of util::printTime() for nicer output,
+      and its API has been improved.
     - Significantly improved the performance of point data grid string
       attribute generation.
     - AttributeArray::copy() and the copy assignment operator for
@@ -31,8 +31,16 @@ Version 6.0.1 - In development
       provided PointIndexTree to the size of the membership vector.
     - Fixed a race condition when moving points in point data grids for ABI=6+
       due to non-const access of AttributeArrays resulting in a copy-on-write.
-    - Fix bug with MeshToVoxel consuming infinite memory when giving NaNs.
-    - Fix a rounding error bug in point conversion when using floating-point.
+    - Fixed a bug that caused the mesh to volume converter to consume
+      unlimited memory when it encountered NaNs in vertex positions.
+    - Fixed a rounding error bug in point conversion when using
+      single-precision floating-point.
+    - Addressed some type conversion issues and other issues reported by GCC 6.
+    - Fixed a crash in tools::extractActiveVoxelSegmentMasks() when the first
+      leaf node had no active voxels.
+      [Reported by Rick Hankins]
+    - Fixed a bug in tools::segmentActiveVoxels() and tools::segmentSDF() where
+      inactive leaf nodes were only pruned when there was more than one segment.
 
     API changes:
     - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
@@ -44,15 +52,18 @@ Version 6.0.1 - In development
       point attributes with the same name as an existing point group.
     - The Transform SOP now supports frustum transforms by applying the
       transformation to the internal affine map.
-    - Renamed SOP labels to match native Houdini SOPs - New Names:
-      Renormalize SDF, Reshape SDF, Smooth SDF, Morph SDF, Rebuild SDF,
-      Project Non-Divergent, Segment by Connectivity, Topology to SDF,
-      Visualize Tree
+    - Changed the labels (but not the opnames) of several SOPs to match
+      the corresponding native Houdini SOPs.  The new labels are
+      Morph SDF, Project Non-Divergent, Rebuild SDF, Renormalize SDF,
+      Reshape SDF, Segment by Connectivity, Smooth SDF, Topology to SDF,
+      and Visualize Tree.
     - Added a houdini_utils::OpPolicy::getLabelName() method to allow
       derived OpPolicy classes to provide their own label naming scheme
       for tab menus.
     - Added type lists for sets of commonly-used grid types, including
       ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
+    - VDB Vector Merge SOP now copies metadata from the representative
+      scalar grid.
 
     Python:
     - Added limited support for point data grids, comprising I/O and

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -856,8 +856,9 @@ TestPointMove::testCustomDeformer()
         const int leafCount = points->tree().leafCount();
         const int pointCount = int(positions.size());
 
-        tbb::atomic<int> resetCalls = 0;
-        tbb::atomic<int> applyCalls = 0;
+        tbb::atomic<int> resetCalls, applyCalls;
+        resetCalls = 0;
+        applyCalls = 0;
 
         // this deformer applies an offset and tracks the number of calls
 
@@ -1184,6 +1185,6 @@ TestPointMove::testPointOrder()
     ASSERT_APPROX_EQUAL(positions1, positions3, __LINE__);
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -70,8 +70,8 @@ public:
     template <typename Source>
     Vec2(Source *a)
     {
-        this->mm[0] = a[0];
-        this->mm[1] = a[1];
+        this->mm[0] = static_cast<T>(a[0]);
+        this->mm[1] = static_cast<T>(a[1]);
     } // trivial
 
     /// Conversion constructor
