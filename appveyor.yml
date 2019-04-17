@@ -6,6 +6,7 @@ configuration: Release
 
 environment:
   CMAKE_GENERATOR: Visual Studio 15 2017 Win64
+  VCPKG_DEFAULT_TRIPLET: x64-windows
 
 os: Visual Studio 2017
 
