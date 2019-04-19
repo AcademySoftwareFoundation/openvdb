@@ -119,6 +119,7 @@ public:
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
+    /// @deprecated ABI versions older than 4 are deprecated.
     OPENVDB_DEPRECATED virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
 #else
     /// @brief Return a new grid of the same type as this grid whose metadata is a
@@ -502,6 +503,7 @@ protected:
 
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Copy another grid's metadata but share its transform.
+    /// @deprecated ABI versions older than 4 are deprecated.
     OPENVDB_DEPRECATED GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
 #else
     /// @brief Copy another grid's metadata but share its transform.
@@ -650,6 +652,7 @@ public:
     explicit Grid(const Grid<OtherTreeType>&);
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// Deep copy another grid's metadata, but share its tree and transform.
+    /// @deprecated ABI versions older than 4 are deprecated.
     OPENVDB_DEPRECATED Grid(const Grid&, ShallowCopy);
 #else
     /// Deep copy another grid's metadata and transform, but share its tree.
@@ -673,6 +676,7 @@ public:
     /// and it shares its transform with this grid;
     /// if @c CP_SHARE, the new grid shares this grid's tree and transform;
     /// if @c CP_COPY, the new grid's tree and transform are deep copies of this grid's.
+    /// @deprecated ABI versions older than 4 are deprecated.
     OPENVDB_DEPRECATED Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
     OPENVDB_DEPRECATED GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const override;
     //@}
