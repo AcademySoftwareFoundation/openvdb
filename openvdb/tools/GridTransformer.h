@@ -496,9 +496,18 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
         // If the output grid is a level set, resample the input grid to have the output grid's
         // background value.  Otherwise, preserve the input grid's background value.
         using ValueT = typename GridType::ValueType;
-        const ValueT halfWidth = ((outGrid.getGridClass() == openvdb::GRID_LEVEL_SET)
+        const bool outIsLevelSet = outGrid.getGridClass() == openvdb::GRID_LEVEL_SET;
+
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+        const ValueT halfWidth = outIsLevelSet
             ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
-            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0])));
+            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0]));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
 
         typename GridType::Ptr tempGrid;
         try {

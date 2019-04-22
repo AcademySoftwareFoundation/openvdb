@@ -238,7 +238,15 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
     ValueType sum = zeroVal<ValueType>();
     Int32 &i = xyz[Axis], j = i + width;
     for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
-    return static_cast<ValueType>(sum * frac);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+    ValueType value = static_cast<ValueType>(sum * frac);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+    return value;
 }
 
 
@@ -370,7 +378,16 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
                 if (alpha(xyz, a, b)) {
-                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*avg(xyz)));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+                    const ValueType value(b*(*iter) + a*avg(xyz));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+                    buffer.setValue(iter.pos(), value);
                 }
             }
         }
@@ -400,7 +417,16 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*stencil.median()));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+                    ValueType value(b*(*iter) + a*stencil.median());
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+                    buffer.setValue(iter.pos(), value);
                 }
             }
         }
@@ -427,7 +453,18 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) iter.setValue(ValueType(*iter + a*offset));
+                if (alpha(iter.getCoord(), a, b)) {
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+                    ValueType value(*iter + a*offset);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+                    iter.setValue(value);
+                }
             }
         }
     } else {
