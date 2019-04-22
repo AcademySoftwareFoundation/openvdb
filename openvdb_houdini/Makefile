@@ -131,6 +131,11 @@ ifneq (,$(INSTALL_DIR))
     $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
 endif
 
+# Error if Houdini version is lower than minimum supported version
+ifeq (1,$(shell expr "$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)" "<" "16.5"))
+    $(error Error: Unsupported Houdini Version: $(HOUDINI_VERSION))
+endif
+
 # Determine the platform.
 ifeq ("$(OS)","Windows_NT")
     WINDOWS_NT := 1

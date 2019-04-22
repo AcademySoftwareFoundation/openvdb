@@ -49,11 +49,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 using namespace openvdb;
@@ -75,12 +70,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -123,9 +113,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Points Delete",
         SOP_OpenVDB_Points_Delete::factory, parms, *table)
         .addInput("VDB Points")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Delete::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -180,15 +168,9 @@ SOP_OpenVDB_Points_Delete::SOP_OpenVDB_Points_Delete(OP_Network* net,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Delete)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Points_Delete::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
-#endif
-
         const std::string groups = evalStdString("vdbpointsgroups", context.getTime());
 
         // early exit if the VDB points group field is empty

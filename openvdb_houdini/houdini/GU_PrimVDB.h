@@ -47,7 +47,13 @@
  */
 
 #include <UT/UT_Version.h>
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
+
+// Using the native OpenVDB Primitive shipped with Houdini is strongly recommended,
+// as there is no guarantee that this code will be kept in sync with Houdini.
+// However, for debugging it can be useful, so supply -DSESI_OPENVDB_PRIM to
+// the compiler to build this custom primitive.
+
+#if !defined(SESI_OPENVDB) && !defined(SESI_OPENVDB_PRIM)
 
 #include <GU/GU_PrimVDB.h>
 
@@ -55,18 +61,14 @@ namespace openvdb_houdini {
 using ::GU_PrimVDB;
 }
 
-#else // earlier than 12.5.343
+#else // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 #ifndef __HDK_GU_PrimVDB__
 #define __HDK_GU_PrimVDB__
 
-//#include "GU_API.h"
 #include <GA/GA_PrimitiveDefinition.h>
 #include "GEO_PrimVDB.h"
 #include <GU/GU_Detail.h>
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-#include <GU/GU_Prim.h>
-#endif
 #include <UT/UT_Matrix4.h>
 #include <UT/UT_VoxelArray.h>
 #include <openvdb/Platform.h>
@@ -76,16 +78,11 @@ using ::GU_PrimVDB;
 class GA_Attribute;
 class GEO_PrimVolume;
 class UT_MemoryCounter;
-#if (UT_VERSION_INT >= 0x0d050000) // 13.5 or later
 class GEO_ConvertParms;
 typedef GEO_ConvertParms GU_ConvertParms;
-#endif
 
 
 class GU_API GU_PrimVDB : public GEO_PrimVDB
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-    , public GU_Primitive
-#endif
 {
 protected:
     /// NOTE: Primitives should not be deleted directly.  They are managed
@@ -97,14 +94,6 @@ public:
     GU_PrimVDB(GU_Detail *gdp, GA_Offset offset=GA_INVALID_OFFSET)
         : GEO_PrimVDB(gdp, offset)
     {}
-
-#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
-    /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
-    GU_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
-               GA_Offset offset, const GU_PrimVDB &src_prim)
-        : GEO_PrimVDB(map, detail, offset, src_prim)
-    {}
-#endif
 
     /// Report approximate memory usage.
     virtual int64 getMemoryUsage() const;
@@ -167,11 +156,6 @@ public:
                                         bool split_disjoint_volumes);
     /// @}
 
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-    virtual void                *castTo (void) const;
-    virtual const GEO_Primitive *castToGeo(void) const;
-#endif
-
     // NOTE:  For static member functions please call in the following
     //        manner.  <ptrvalue> = GU_PrimVDB::<functname>
     //        i.e.        partptr = GU_PrimVDB::build(params...);
@@ -211,25 +195,6 @@ public:
                             const GEO_PrimVolume &src_vol);
 
     virtual void        normal(NormalComp &output) const;
-
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-    virtual int         intersectRay(const UT_Vector3 &o, const UT_Vector3 &d,
-                                float tmax = 1E17F, float tol = 1E-12F,
-                                float *distance = 0, UT_Vector3 *pos = 0,
-                                UT_Vector3 *nml = 0, int accurate = 0,
-                                float *u = 0, float *v = 0,
-                                int ignoretrim = 1) const;
-#endif
-
-    // callermustdelete is true if the returned cache is to be deleted by
-    // the caller.
-#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
-
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
-    SYS_DEPRECATED_HDK(13.0)
-#endif
-    virtual GU_RayIntersect     *createRayCache(int &callermustdelete);
-#endif
 
     /// @brief Transfer any metadata associated with this primitive's
     /// VDB grid to primitive attributes.
@@ -347,13 +312,9 @@ private: // DATA
 
     static GA_PrimitiveDefinition       *theDefinition;
     friend class                         GU_PrimitiveFactory;
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     SYS_DEPRECATED_PUSH_DISABLE()
-#endif
 };
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     SYS_DEPRECATED_POP_DISABLE()
-#endif
 
 
 #ifndef SESI_OPENVDB
@@ -364,7 +325,7 @@ using ::GU_PrimVDB;
 
 #endif // __HDK_GU_PrimVDB__
 
-#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+#endif // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

@@ -47,7 +47,13 @@
  */
 
 #include <UT/UT_Version.h>
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
+
+// Using the native OpenVDB Primitive shipped with Houdini is strongly recommended,
+// as there is no guarantee that this code will be kept in sync with Houdini.
+// However, for debugging it can be useful, so supply -DSESI_OPENVDB_PRIM to
+// the compiler to build this custom primitive.
+
+#if !defined(SESI_OPENVDB) && !defined(SESI_OPENVDB_PRIM)
 
 #include <GEO/GEO_PrimVDB.h>
 
@@ -56,21 +62,14 @@ using ::GEO_VolumeOptions;
 using ::GEO_PrimVDB;
 }
 
-#else // earlier than 12.5.343
+#else // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 #ifndef __HDK_GEO_PrimVDB__
 #define __HDK_GEO_PrimVDB__
 
-//#include "GEO_API.h"
-
 #include <GEO/GEO_Primitive.h>
 #include <GEO/GEO_Vertex.h>
-#if (UT_VERSION_INT < 0x0c010072) // earlier than 12.1.114
-#include <GEO/GEO_PrimVolume.h>
-#else
 #include <GEO/GEO_VolumeOptions.h>
-#endif
-
 #include <GA/GA_Defines.h>
 
 #include <SYS/SYS_AtomicInt.h> // for SYS_AtomicCounter
@@ -88,37 +87,6 @@ class   GEO_PrimVolume;
 class   GEO_PrimVolumeXform;
 class   UT_MemoryCounter;
 
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-struct OPENVDB_HOUDINI_API GEO_VolumeOptions
-{
-    GEO_VolumeOptions()
-    {
-    }
-    GEO_VolumeOptions(GEO_VolumeVis mode, fpreal iso, fpreal density)
-        : myMode(mode)
-        , myIso(iso)
-        , myDensity(density)
-    {
-    }
-    bool operator==(const GEO_VolumeOptions &v) const
-    {
-        OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
-        return (myMode == v.myMode
-                && myIso == v.myIso
-                && myDensity == v.myDensity);
-        OPENVDB_NO_FP_EQUALITY_WARNING_END
-    }
-    bool operator!=(const GEO_VolumeOptions &v) const
-    {
-        return !(*this == v);
-    }
-
-    GEO_VolumeVis           myMode;
-    fpreal                  myIso;
-    fpreal                  myDensity;
-};
-#endif
-
 
 class OPENVDB_HOUDINI_API GEO_PrimVDB : public GEO_Primitive
 {
@@ -130,19 +98,6 @@ protected:
     ///       constructors.
     GEO_PrimVDB(GEO_Detail *d, GA_Offset offset = GA_INVALID_OFFSET);
 
-#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
-    /// NOTE: The constructor should only be called from subclass
-    ///       constructors.
-    GEO_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
-                GA_Offset offset, const GEO_PrimVDB &src_prim);
-#endif
-
-#if (UT_VERSION_INT < 0x10000162)
-    /// NOTE: The destructor should only be called from subclass
-    ///       destructors.
-    virtual ~GEO_PrimVDB();
-#endif
-
 public:
     static GA_PrimitiveFamilyMask       buildFamilyMask()
                                             { return GA_FAMILY_NONE; }
@@ -153,24 +108,10 @@ public:
     virtual int         getBBox(UT_BoundingBox *bbox) const;
     virtual void        reverse();
     virtual UT_Vector3  computeNormal() const;
-#if (UT_VERSION_INT >= 0x0d000000)
     virtual void        copyPrimitive(const GEO_Primitive *src);
-#else
-    virtual void        copyPrimitive(const GEO_Primitive *src,
-                                      GEO_Point **ptredirect);
-#endif
     virtual void        copyUnwiredForMerge(const GA_Primitive *src,
                                             const GA_MergeMap &map);
 
-#if (UT_VERSION_INT < 0x10000162)
-    // Query the number of vertices in the array. This number may be smaller
-    // than the actual size of the array.
-    virtual GA_Size     getVertexCount() const;
-    virtual GA_Offset   getVertexOffset(GA_Size /*index*/) const
-                            { return myVertex; }
-#endif
-
-#if (UT_VERSION_INT >= 0x10000162)
     using GEO_Primitive::getVertexOffset;
     using GEO_Primitive::getPointOffset;
     using GEO_Primitive::setPointOffset;
@@ -191,7 +132,6 @@ public:
     SYS_FORCE_INLINE
     void setPos3(const UT_Vector3 &pos)
     { setPos3(0, pos); }
-#endif
 
     /// Convert an index in the voxel array into the corresponding worldspace
     /// location
@@ -282,11 +222,6 @@ public:
     /// This method assigns a preallocated vertex to the quadric, optionally
     /// creating the topological link between the primitive and new vertex.
     void                 assignVertex(GA_Offset new_vtx, bool update_topology);
-
-#if (UT_VERSION_INT < 0x10000162)
-    /// Defragmentation
-    virtual void        swapVertexOffsets(const GA_Defragment &defrag);
-#endif
 
     /// Evalaute a point given a u,v coordinate (with derivatives)
     virtual bool        evaluatePointRefMap(GA_Offset result_vtx,
@@ -393,22 +328,8 @@ public:
     virtual GEO_Primitive       *copy(int preserve_shared_pts = 0) const;
 
     // Have we been deactivated and stashed?
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     virtual void        stashed(bool beingstashed, GA_Offset offset=GA_INVALID_OFFSET);
-#else
-    virtual void        stashed(int onoff, GA_Offset offset=GA_INVALID_OFFSET);
-#endif
 
-#if (UT_VERSION_INT < 0x10000162)
-    // We need to invalidate the vertex offsets
-    virtual void        clearForDeletion();
-#endif
-
-#if (UT_VERSION_INT < 0x0c050132) // Before 12.5.306
-    virtual void        copyOffsetPrimitive(const GEO_Primitive *src, int base);
-#elif (UT_VERSION_INT < 0x0d000000) // Before 13.0, when the function was deleted
-    virtual void        copyOffsetPrimitive(const GEO_Primitive *src, GA_Index base);
-#endif
     /// @}
 
     /// @{
@@ -490,21 +411,13 @@ public:
     GA_Offset           fastVertexOffset(GA_Size UT_IF_ASSERT_P(index)) const
                         {
                             UT_ASSERT_P(index < 1);
-#if (UT_VERSION_INT >= 0x10000162)
                             return getVertexOffset();
-#else
-                            return myVertex;
-#endif
                         }
 
     void        setVertexPoint(int i, GA_Offset pt)
                 {
                     if (i == 0)
-#if (UT_VERSION_INT >= 0x10000162)
                         setPointOffset(pt);
-#else
-                        wireVertex(myVertex, pt);
-#endif
                 }
 
     /// @brief Computes the total density of the volume, scaled by
@@ -612,23 +525,14 @@ protected:
     typedef SYS_AtomicCounter AtomicUniqueId; // 64-bit
 
     /// Register intrinsic attributes
-#if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
     GA_DECLARE_INTRINSICS(GA_NO_OVERRIDE)
-#else
-    static GA_IntrinsicManager::Registrar
-                        registerIntrinsics(GA_PrimitiveDefinition &defn);
-#endif
 
     /// Return true if the given metadata token is an intrinsic
     static bool         isIntrinsicMetadata(const char *name);
 
     /// @warning vertexPoint() doesn't check the bounds.  Use with caution.
     GA_Offset           vertexPoint(GA_Size) const
-#if (UT_VERSION_INT >= 0x10000162)
     { return getPointOffset(); }
-#else
-    { return getDetail().vertexPoint(myVertex); }
-#endif
 
     /// Report approximate memory usage, excluding sizeof(*this),
     /// because the subclass doesn't have access to myGridAccessor.
@@ -658,10 +562,6 @@ protected:
     /// @brief Replace this primitive's grid with a shallow copy
     /// of another primitive's grid.
     void                copyGridFrom(const GEO_PrimVDB&);
-
-#if (UT_VERSION_INT < 0x10000162) // earlier than 16.0.354
-    GA_Offset myVertex;
-#endif
 
     /// @brief GridAccessor manages access to a GEO_PrimVDB's grid.
     /// @details In keeping with OpenVDB library conventions, the grid
@@ -744,10 +644,6 @@ private:
     GridAccessor            myGridAccessor;
 
     GEO_VolumeOptions       myVis;
-
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    bool                    myStashedState;
-#endif
 
     AtomicUniqueId          myUniqueId;
     AtomicUniqueId          myTreeUniqueId;
@@ -903,7 +799,7 @@ inline bool GEOvdbProcessTypedGridPoint(GEO_PrimVDB &vdb, OpT &op, bool makeUniq
 
 #endif // __HDK_GEO_PrimVDB__
 
-#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+#endif // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

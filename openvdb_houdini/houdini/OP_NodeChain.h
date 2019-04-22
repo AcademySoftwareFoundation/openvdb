@@ -47,7 +47,6 @@
 #include <SYS/SYS_Types.h> // for fpreal
 #include <UT/UT_String.h>
 #include <UT/UT_Thread.h>
-#include <UT/UT_Version.h> // for UT_VERSION_INT
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -79,25 +78,15 @@ getNodeChain(OP_Context& context, NodeType* startNode, bool addInterest = true)
         /// Return the nearest upstream node to the given node, traversing
         /// only input 0 connections and omitting bypassed nodes.
         static inline OP_Node* nextInput(
-#if (UT_VERSION_INT >= 0x0c0500aa) // 12.5.170
             fpreal now,
-#else
-            fpreal /*now*/,
-#endif
             OP_Node* node)
         {
             OP_Node* input = node->getInput(0, /*mark_used=*/true);
-#if (UT_VERSION_INT >= 0x0c0500aa) // 12.5.170
             while (input) {
                 OP_Node* passThrough = input->getPassThroughNode(now, /*mark_used=*/true);
                 if (!passThrough) break;
                 input = passThrough;
             }
-#else
-            while (input && input->getBypass()) {
-                input = input->getInput(0, /*mark_used=*/true);
-            }
-#endif
             return input;
         }
     }; // struct Local

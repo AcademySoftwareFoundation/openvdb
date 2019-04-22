@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 6.0.1 - In development
 
+      As of this release, the minimum Houdini version supported by OpenVDB is
+      now Houdini 16.5.
+
     New features:
     - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
       VecTraits and added an IsSpecializationOf helper metafunction.

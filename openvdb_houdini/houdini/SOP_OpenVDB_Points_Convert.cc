@@ -59,11 +59,6 @@
 #include <utility>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 using namespace openvdb;
@@ -113,12 +108,7 @@ public:
 
     static OUTPUT_NAME_MODE getOutputNameMode(const std::string& modeName);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -474,10 +464,8 @@ Unit Vector:\n\
         .addInput("Points to Convert")
         .addOptionalInput("Optional Reference VDB (for transform)")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERIC,
             []() { return new SOP_OpenVDB_Points_Convert::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -616,13 +604,9 @@ SOP_OpenVDB_Points_Convert::getOutputNameMode(const std::string& modeName)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-#endif
-
         hvdb::Interrupter boss{"Converting points"};
 
         hvdb::WarnFunc warnFunction = [this](const std::string& msg) {
@@ -680,15 +664,11 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
             if (keepOriginalGeo) {
                 // Duplicate primary (left) input geometry
 
-#if !VDB_COMPILABLE_SOP
-                if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
-#else
                 if (const auto* input0 = inputGeo(0)) {
                     gdp->replaceWith(*input0);
                 } else {
                     gdp->stashAll();
                 }
-#endif
 
                 // Extract VDB primitives to delete
 
@@ -701,11 +681,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Convert)::cookVDBSop(OP
                     primsToDelete.append(*vdbIt);
                 }
             } else {
-#if !VDB_COMPILABLE_SOP
-                gdp->clearAndDestroy();
-#else
                 gdp->stashAll();
-#endif
             }
 
             // Extract point grids and names for conversion

@@ -33,11 +33,11 @@ Optional:
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
 
-- Houdini HDK (http://www.sidefx.com/get/download-houdini/), version 15.0
+- Houdini HDK (http://www.sidefx.com/get/download-houdini/), version 16.5
   or later
 
 - Blosc compression library (www.blosc.org), version 1.5.0 or later
-  (included in the Houdini HDK as of version 14.0)
+  (included in the Houdini HDK)
 
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format

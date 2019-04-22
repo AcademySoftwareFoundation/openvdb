@@ -56,11 +56,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -199,10 +194,8 @@ public:
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         fpreal getTime() const { return mTime; }
     protected:
@@ -214,9 +207,7 @@ public:
             ResampleMode resample);
 
         fpreal mTime = 0.0;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -493,9 +484,7 @@ Activity Difference:\n\
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Combine::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -652,15 +641,9 @@ getGridName(const GU_PrimVDB* vdb, const UT_String& defaultName = "")
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Combine)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock{*this, context};
-
-        duplicateSource(0, context);
-#endif
-
         UT_AutoInterrupt progress{"Combining VDBs"};
 
         mTime = context.getTime();
@@ -988,11 +971,7 @@ struct SOP_OpenVDB_Combine::DispatchOp
 // Helper class for use with UTvdbProcessTypedGrid()
 struct SOP_OpenVDB_Combine::CombineOp
 {
-#if VDB_COMPILABLE_SOP
     SOP_OpenVDB_Combine::Cache* self;
-#else
-    SOP_OpenVDB_Combine* self;
-#endif
     Operation op;
     ResampleMode resample;
     UT_String aGridName, bGridName;
@@ -1482,7 +1461,7 @@ SOP_OpenVDB_Combine::DispatchOp<AGridT>::operator()(typename BGridT::ConstPtr)
 
 
 hvdb::GridPtr
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Combine)::combineGrids(
+SOP_OpenVDB_Combine::Cache::combineGrids(
     Operation op,
     hvdb::GridCPtr aGrid,
     hvdb::GridCPtr bGrid,
