@@ -69,13 +69,9 @@ jobs:
     - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
-      env: ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
-    - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=17.0 COMPILER=clang
     - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=16.5 COMPILER=clang
-    - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
-      env: ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=16.0 COMPILER=clang
     - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=6 BLOSC=no MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run core $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
@@ -94,14 +90,10 @@ jobs:
       env: ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run test $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
-    - script: bash travis/travis.run test $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
-      env: ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run houdini $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=17.0 COMPILER=clang
     - script: bash travis/travis.run houdini $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=16.5 COMPILER=clang
-    - script: bash travis/travis.run houdini $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
-      env: ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=16.0 COMPILER=clang
     - script: bash travis/travis.run test $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=6 BLOSC=no MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run test $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
@@ -124,8 +116,6 @@ jobs:
       env: ABI=5 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run run $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=4 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
-    - script: bash travis/travis.run run $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
-      env: ABI=3 BLOSC=yes MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run run $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER
       env: ABI=6 BLOSC=no MODE=release HOUDINI_MAJOR=none COMPILER=clang
     - script: bash travis/travis.run run $ABI $BLOSC $MODE $HOUDINI_MAJOR $COMPILER

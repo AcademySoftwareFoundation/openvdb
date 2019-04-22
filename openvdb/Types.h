@@ -737,7 +737,8 @@ struct SwappedCombineOp
 /// <dt><b>CP_COPY</b>
 /// <dd>Create a deep copy of the member.
 /// </dl>
-enum CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
+/// @deprecated ABI versions older than 4 are deprecated.
+enum OPENVDB_DEPRECATED CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
 #endif
 
 
