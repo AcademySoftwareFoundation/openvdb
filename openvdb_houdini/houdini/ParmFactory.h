@@ -44,9 +44,7 @@
 #include <PRM/PRM_Include.h>
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
-#if UT_MAJOR_VERSION_INT >= 16
 #include <SOP/SOP_NodeVerb.h>
-#endif
 #if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
   // OPENVDB_HOUDINI_API, which has no meaning in a DWA build environment but
   // must at least exist, is normally defined by including openvdb/Platform.h.
@@ -482,7 +480,6 @@ public:
     OpFactory& setInternalName(const std::string& name);
     OpFactory& setOperatorTable(const std::string& name);
 
-#if UT_MAJOR_VERSION_INT >= 16
     /// @brief Functor that returns newly-allocated node caches
     /// for instances of this operator
     /// @details A node cache encapsulates a SOP's cooking logic for thread safety.
@@ -498,7 +495,6 @@ public:
     /// @throw std::runtime_error if this operator is not a SOP
     /// @throw std::invalid_argument if @a allocator is empty
     OpFactory& setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator);
-#endif
 
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
@@ -562,11 +558,7 @@ public:
     }
     ~ScopedInputLock() {}
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
     void markInputUnlocked(exint input) { mLock.markInputUnlocked(input); }
-#else
-    void markInputUnlocked(exint) {}
-#endif
 
 private:
     OP_AutoLockInputs mLock;

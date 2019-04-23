@@ -95,6 +95,14 @@
     #endif
 #endif
 
+// If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an error
+// directive.  This can be optionally suppressed by defining OPENVDB_USE_DEPRECATED_ABI.
+#ifndef OPENVDB_USE_DEPRECATED_ABI
+    #if OPENVDB_ABI_VERSION_NUMBER <= 3
+        #error ABI <= 3 is deprecated, define OPENVDB_USE_DEPRECATED_ABI to suppress this error
+    #endif
+#endif
+
 #if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
     /// @brief The version namespace name for this library version
     /// @hideinitializer

@@ -47,17 +47,11 @@
 #include <UT/UT_BoundingBox.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <cmath>
 #include <stdexcept>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-#include <memory>
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
 
 
 namespace openvdb_houdini {
@@ -511,19 +505,10 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 
                 if (primRef->getTypeId() == GEO_PRIMPOLY && (3 == vtxn || 4 == vtxn)) {
 
-#if UT_MAJOR_VERSION_INT >= 16
                     for (int vtx = 0; vtx < int(vtxn); ++vtx) {
                         prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
                             primRef->getPointIndex(vtx));
                     }
-#else
-                    GA_Primitive::const_iterator vit;
-                    primRef->beginVertex(vit);
-                    for (int vtx = 0; !vit.atEnd(); ++vit, ++vtx) {
-                        prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
-                            mGdp->pointIndex(vit.getPointOffset()));
-                    }
-#endif
 
                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
 
@@ -576,7 +561,6 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
                 primN = mDetail.getGEOPrimitive(i)->computeNormal();
                 interiorPrim = isInteriorPrim(i);
 
-#if UT_MAJOR_VERSION_INT >= 16
                 for (GA_Size vtx = 0, vtxN = primRef->getVertexCount(); vtx < vtxN; ++vtx) {
                     avgN = primN;
                     const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
@@ -592,23 +576,6 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
                     avgN.normalize();
                     mNormalHandle.set(vtxoff, avgN);
                 }
-#else
-                GA_Primitive::const_iterator it;
-                for (primRef->beginVertex(it); !it.atEnd(); ++it) {
-                    avgN = primN;
-                    GA_Offset vtxOffset = mDetail.pointVertex(it.getPointOffset());
-                    while (GAisValid(vtxOffset)) {
-                        primOffset = mDetail.vertexPrimitive(vtxOffset);
-                        if (interiorPrim == isInteriorPrim(primOffset)) {
-                            tmpN = mDetail.getGEOPrimitive(primOffset)->computeNormal();
-                            if (tmpN.dot(primN) > mAngle) avgN += tmpN;
-                        }
-                        vtxOffset = mDetail.vertexToNextVertex(vtxOffset);
-                    }
-                    avgN.normalize();
-                    mNormalHandle.set(*it, avgN);
-                } // prim vtx iteration.
-#endif
             }
         }
     }

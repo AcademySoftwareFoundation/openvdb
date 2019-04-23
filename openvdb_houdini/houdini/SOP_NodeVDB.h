@@ -74,17 +74,11 @@ public:
     SOP_NodeVDB(OP_Network*, const char*, OP_Operator*);
     ~SOP_NodeVDB() override = default;
 
-#if (UT_MAJOR_VERSION_INT < 16)
-    void fillInfoTreeNodeSpecific(UT_InfoTree&, fpreal time) override;
-#else
     void fillInfoTreeNodeSpecific(UT_InfoTree&, const OP_NodeInfoTreeParms&) override;
-#endif
     void getNodeSpecificInfoText(OP_Context&, OP_NodeInfoParms&) override;
 
-#if UT_MAJOR_VERSION_INT >= 16
     /// @brief Return this node's registered verb.
     const SOP_NodeVerb* cookVerb() const override;
-#endif
 
     /// @brief Retrieve a group from a geometry detail by parsing a pattern
     /// (typically, the value of a Group parameter belonging to this node).

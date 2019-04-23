@@ -50,6 +50,7 @@
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
 #include <map>
@@ -59,12 +60,6 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
 
 using namespace openvdb;
 using namespace openvdb::points;

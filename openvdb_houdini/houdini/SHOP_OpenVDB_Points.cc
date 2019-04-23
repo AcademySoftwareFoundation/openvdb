@@ -200,9 +200,7 @@ newShopOperator(OP_OperatorTable *table)
     SHOP_Operator* shop = new SHOP_Operator(SHOP_OpenVDB_Points::nodeName(), "OpenVDB Points",
         SHOP_OpenVDB_Points::factory,
         parms.get(),
-#if (UT_MAJOR_VERSION_INT >= 16)
         /*child_table_name=*/nullptr,
-#endif
         /*min_sources=*/0, /*max_sources=*/0,
         SHOP_Node::myVariableList,
         OP_FLAG_GENERATOR,

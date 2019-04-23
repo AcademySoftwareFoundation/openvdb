@@ -35,7 +35,6 @@
 /// @brief GR Render Hook and Primitive for VDB PointDataGrid
 
 #include <UT/UT_Version.h>
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 
 #include <openvdb/Grid.h>
 #include <openvdb/Platform.h>
@@ -44,14 +43,6 @@
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb_houdini/PointUtils.h>
-
-#if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
-#if defined(__APPLE__) || defined(MACOSX)
-#include <GLUT/glut.h>
-#else
-#include <GL/glx.h>
-#endif
-#endif
 
 #include <DM/DM_RenderTable.h>
 #include <GEO/GEO_PrimVDB.h>
@@ -65,6 +56,7 @@
 #include <RE/RE_ShaderHandle.h>
 #include <RE/RE_VertexArray.h>
 #include <UT/UT_DSOVersion.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <tbb/mutex.h>
 
@@ -75,14 +67,6 @@
 #include <utility>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-#include <memory>
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-
 ////////////////////////////////////////
 
 static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
@@ -90,11 +74,7 @@ static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
 static RE_ShaderHandle theVelocityDecorShader("decor/GL32/user_point_vector3.prog");
 static RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
 static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
-#else
-static RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
-#endif
 
 /// @note  An additional scale for velocity trails to accurately match
 ///        the visualization of velocity for Houdini points
@@ -170,24 +150,12 @@ public:
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
     /// It also may be called outside of a viewport redraw to do picking of the
     /// geometry.
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
     void render(RE_Render*, GR_RenderMode, GR_RenderFlags, GR_DrawParms) override;
-#else
-    void render(RE_Render*, GR_RenderMode, GR_RenderFlags,
-        const GR_DisplayOption*, const RE_MaterialList*) override;
-#endif
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-#if (UT_VERSION_INT < 0x10000000) // earlier than 16.0.0
-    void renderInstances(RE_Render*, GR_RenderMode, GR_RenderFlags,
-        const GR_DisplayOption*, const RE_MaterialList*, int) override {}
-#endif
 
     int renderPick(RE_Render*, const GR_DisplayOption*, unsigned int,
         GR_PickStyle, bool) override { return 0; }
 
     void renderDecoration(RE_Render*, GR_Decoration, const GR_DecorationParms&) override;
-#endif
 
 protected:
     void computeCentroid(const openvdb::points::PointDataGrid& grid);
@@ -227,11 +195,7 @@ private:
 
 
 void
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 newRenderHook(DM_RenderTable* table)
-#else
-newRenderHook(GR_RenderTable* table)
-#endif
 {
     tbb::mutex::scoped_lock lock(sRenderHookRegistryMutex);
 
@@ -259,11 +223,7 @@ grIsPointDataGrid(const GT_PrimitiveHandle& gt_prim)
     const GT_PrimVDB* gt_vdb = static_cast<const GT_PrimVDB*>(gt_prim.get());
     const GEO_PrimVDB* gr_vdb = gt_vdb->getGeoPrimitive();
 
-#if (UT_VERSION_INT >= 0x10000258) // 16.0.600 or later
     return (gr_vdb->getStorageType() == UT_VDB_POINTDATA);
-#else
-    return (gr_vdb->getGrid().isType<openvdb::points::PointDataGrid>());
-#endif
 }
 
 
@@ -643,11 +603,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     // fetch point position attribute, if its cache version matches, no upload is required.
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     RE_VertexArray* posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
-#else
-    RE_VertexArray* posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
-#endif
 
     if (posGeo->getCacheVersion() != version)
     {
@@ -692,11 +648,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     RE_PrimType primType = RE_PRIM_POINTS;
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     myGeo->connectAllPrims(r, RE_GEO_WIRE_IDX, primType, nullptr, true);
-#else
-    myGeo->connectAllPrimsI(r, RE_GEO_WIRE_IDX, primType, nullptr, true);
-#endif
 }
 
 void
@@ -733,11 +685,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
     // fetch wireframe position, if its cache version matches, no upload is required.
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     RE_VertexArray* posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#else
-    RE_VertexArray* posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#endif
 
     if (posWire->getCacheVersion() != version)
     {
@@ -783,11 +731,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
                     instance.data());
     }
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     myWire->connectAllPrims(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, nullptr, true);
-#else
-    myWire->connectAllPrimsI(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, nullptr, true);
-#endif
 }
 
 void
@@ -869,11 +813,7 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
 
     // fetch vector attribute, if its cache version matches, no upload is required.
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, bufferName.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#else
-    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, bufferName.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#endif
 
     if (bufferGeo->getCacheVersion() != version)
     {
@@ -935,14 +875,8 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
     myGeo->clearAttribute(name.c_str());
 }
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 void
 GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
-#else
-void
-GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
-    const GR_DisplayOption* dopts, const RE_MaterialList*)
-#endif
 {
     if (!myGeo && !myWire)  return;
 
@@ -950,11 +884,7 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
 
     if (!gl3)   return;
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
     const GR_CommonDispOption& commonOpts = dp.opts->common();
-#else
-    const GR_CommonDispOption& commonOpts = dopts->common();
-#endif
 
     // draw points
 
@@ -1018,7 +948,6 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags,
 }
 
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 void
 GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_DecorationParms& p)
 {
@@ -1104,13 +1033,6 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         const UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
         (*shader)->bindVector(r, "offset", positionOffset);
 
-        // Assumes some uniform builtins are already bound. These can be bound with
-        // r->bindBuiltInUniform() and queried with r->printBuiltInUniforms(/*bound_only=*/true)
-        //
-        //  RE_UNIFORM_WIRE_COLOR = glH_WireColor
-        //  RE_UNIFORM_DECORATION_SCALE = glH_DecorationScale
-        //
-
         r->pushUniformColor(RE_UNIFORM_WIRE_COLOR, color);
         r->pushUniformData(RE_UNIFORM_DECORATION_SCALE, &scale);
 
@@ -1131,13 +1053,7 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         GR_Primitive::renderDecoration(r, decor, p);
     }
 }
-#endif
 
-
-////////////////////////////////////////
-
-
-#endif // 13.0.0 or later
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
