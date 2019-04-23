@@ -289,24 +289,8 @@ IF ( NOT ILMBASE_LIBRARYDIR )
   SET ( ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
 ENDIF ()
 
-# Boost
-
-IF ( Houdini_VERSION VERSION_LESS 16.5 )
-  IF ( OPENVDB_BUILD_PYTHON_MODULE )
-    # Prior to the introduction of HBoost (Houdini's namespaced and shipped Boost version from 16.5),
-    # we built against Houdini's version of Boost which didn't include Boost.Python
-    SET ( OPENVDB_BUILD_PYTHON_MODULE OFF )
-    MESSAGE ( WARNING "Disabling compilation of the OpenVDB Python module. The python module requires "
-      "Boost.Python which cannot be linked in when building against Houdini Version 16.0 and earlier." )
-  ENDIF ()
-  # Reset boost hints if not set
-  IF ( NOT BOOST_INCLUDEDIR )
-    SET ( BOOST_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
-  ENDIF ()
-  IF ( NOT BOOST_LIBRARYDIR )
-    SET ( BOOST_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
-  ENDIF ()
-ENDIF ()
+# Boost - currently must be provided as VDB is not fully configured to
+# use Houdini's namespaced hboost
 
 UNSET ( _HOUDINI_INCLUDE_DIR )
 UNSET ( _HOUDINI_LIB_DIR )
@@ -327,9 +311,7 @@ ENDIF ()
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-IF ( Houdini_VERSION VERSION_LESS 16.5 )
-  SET ( OPENVDB_HOUDINI_ABI 3 )
-ELSEIF ( Houdini_VERSION VERSION_LESS 17 )
+IF ( Houdini_VERSION VERSION_LESS 17 )
   SET ( OPENVDB_HOUDINI_ABI 4 )
 ELSE ()
   SET ( OPENVDB_HOUDINI_ABI 5 )
