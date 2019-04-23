@@ -117,7 +117,7 @@ ENDIF ()
 # @note Linking openvdb_houdini against Houdini brings in all interface compile
 # definitions, including MAKING_DSO
 
-SET ( OPENVDB_HOUDINI_DEPENDANT_LIBS
+SET ( OPENVDB_HOUDINI_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   Houdini
 )
@@ -178,7 +178,7 @@ TARGET_INCLUDE_DIRECTORIES ( openvdb_houdini PUBLIC
   )
 
 TARGET_LINK_LIBRARIES ( openvdb_houdini PUBLIC
-  ${OPENVDB_HOUDINI_DEPENDANT_LIBS}
+  ${OPENVDB_HOUDINI_DEPENDENT_LIBS}
   )
 
 IF ( OPENVDB_ENABLE_RPATH )
