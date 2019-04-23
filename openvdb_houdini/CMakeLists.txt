@@ -115,7 +115,7 @@ MESSAGE ( STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}" 
 IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
-  SET ( OPENVDB_LIB openvdb_shared )
+  SET ( OPENVDB_LIB openvdb )
 ENDIF ()
 
 # @note Linking openvdb_houdini against Houdini brings in all interface compile

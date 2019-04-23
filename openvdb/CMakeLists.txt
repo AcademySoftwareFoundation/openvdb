@@ -39,11 +39,25 @@ ENDIF ()
 
 ###### OpenVDB Core Options
 
-SET ( OPENVDB_LIBRARY_NAME "openvdb" CACHE STRING "The name of the openvdb library to build." )
+OPTION ( OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON )
+OPTION ( OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON )
+
+SET ( OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
+  "The base name of the built shared openvdb library. Prefixed by \"lib\" on UNIX platforms."
+  )
+SET ( OPENVDB_STATIC_LIBRARY_NAME "openvdb" CACHE STRING
+  "The base name of the built static openvdb library. Prefixed by \"lib\"."
+  )
 
 MARK_AS_ADVANCED (
-  OPENVDB_LIBRARY_NAME
+  OPENVDB_STATIC_LIBRARY_NAME
+  OPENVDB_SHARED_LIBRARY_NAME
   )
+
+IF ( NOT OPENVDB_CORE_SHARED AND NOT OPENVDB_CORE_STATIC )
+  MESSAGE ( FATAL_ERROR "Both static and shared core OpenVDB libraries have been disabled. "
+    "At least one must be enabled when building the core library." )
+ENDIF ()
 
 #########################################################################
 
@@ -79,8 +93,8 @@ IF ( USE_BLOSC )
       )
   ENDIF ()
 ELSE ()
-  MESSAGE ( STATUS "Blosc is currently disabled - it's recommended to install and "
-    "enable blosc for optimal builds of OpenVDB."
+  MESSAGE ( STATUS "Blosc is currently disabled - it's recommended to enable "
+    "blosc for optimal builds of OpenVDB."
     )
 ENDIF ()
 
@@ -115,6 +129,9 @@ IF ( USE_LOG4CPLUS )
   LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus )
 ENDIF ()
 
+# @todo blosc and zlib should be hidden (privately linked in):
+# See FindOpenVDB.cmake
+
 IF ( USE_BLOSC )
   LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc )
 ENDIF ()
@@ -142,8 +159,6 @@ ENDIF ()
 # @todo Should be target definitions
 IF ( WIN32 )
   ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DOPENVDB_DLL )
-ELSE ()
-  ADD_DEFINITIONS ( -fPIC )
 ENDIF ()
 
 ##### Core library configuration
@@ -321,110 +336,149 @@ SET ( OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/Util.h
 )
 
-ADD_LIBRARY ( openvdb_static STATIC
-  ${OPENVDB_LIBRARY_SOURCE_FILES}
-  )
-ADD_LIBRARY ( openvdb_shared SHARED
-  ${OPENVDB_LIBRARY_SOURCE_FILES}
-  )
+# @todo CMake >= 3.12, use an object library to consolidate shared/static
+# builds. There are limitations with earlier versions of CMake when used with
+# imported targets.
 
-TARGET_INCLUDE_DIRECTORIES ( openvdb_static
-  PUBLIC ../
-  PRIVATE .
-  )
+IF ( OPENVDB_CORE_SHARED )
+  ADD_LIBRARY ( openvdb_shared SHARED ${OPENVDB_LIBRARY_SOURCE_FILES} )
+ENDIF ()
 
-TARGET_INCLUDE_DIRECTORIES ( openvdb_shared
-  PUBLIC ../
-  PRIVATE .
-  )
+IF ( OPENVDB_CORE_STATIC )
+  ADD_LIBRARY ( openvdb_static STATIC ${OPENVDB_LIBRARY_SOURCE_FILES} )
+ENDIF ()
+
+# Alias either the shared or static library to the generic OpenVDB
+# target. Dependent components should use this target to build against
+# such that they are always able to find a valid build of OpenVDB
+
+IF ( OPENVDB_CORE_SHARED )
+  ADD_LIBRARY ( openvdb ALIAS openvdb_shared )
+ELSE ()
+  ADD_LIBRARY ( openvdb ALIAS openvdb_static )
+ENDIF ()
+
 
 ##########################################################################
 
 # Configure c flags
 
-TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE "-DOPENVDB_PRIVATE" )
-TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE "-DOPENVDB_PRIVATE" )
+SET ( OPENVDB_CORE_PRIVATE_DEFINES )
+SET ( OPENVDB_CORE_PUBLIC_DEFINES )
+
+# Private defines (not inherited by dependent projects)
+
+LIST ( APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_PRIVATE" )
+IF ( USE_BLOSC )
+  LIST ( APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_USE_BLOSC" )
+ENDIF ()
+
+# Public defines
 
 IF ( USE_EXR )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PUBLIC "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PUBLIC "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
+  LIST ( APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
 ENDIF ()
-
-IF ( USE_BLOSC )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE "-DOPENVDB_USE_BLOSC" )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE "-DOPENVDB_USE_BLOSC" )
-ENDIF ()
-
 IF ( USE_LOG4CPLUS )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PUBLIC "-DOPENVDB_USE_LOG4CPLUS" )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PUBLIC "-DOPENVDB_USE_LOG4CPLUS" )
+  LIST ( APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_USE_LOG4CPLUS" )
 ENDIF ()
 
 ##########################################################################
 
-TARGET_LINK_LIBRARIES ( openvdb_static
-  ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
+# Configure static build
 
-TARGET_LINK_LIBRARIES ( openvdb_shared
-  ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
-
-IF ( WIN32 )
-  SET_TARGET_PROPERTIES ( openvdb_static
-    PROPERTIES OUTPUT_NAME libopenvdb
+IF ( OPENVDB_CORE_STATIC )
+  TARGET_INCLUDE_DIRECTORIES ( openvdb_static
+    PUBLIC ../
+    PRIVATE .
     )
-ELSE ()
+
+  TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES} )
+  TARGET_COMPILE_DEFINITIONS ( openvdb_static PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} )
+
   SET_TARGET_PROPERTIES ( openvdb_static
-    PROPERTIES OUTPUT_NAME openvdb
+    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
+    )
+
+  IF ( WIN32 )
+    SET_TARGET_PROPERTIES ( openvdb_static
+      PROPERTIES PREFIX "lib"
+      )
+  ENDIF ()
+
+  TARGET_LINK_LIBRARIES ( openvdb_static
+    ${OPENVDB_CORE_DEPENDENT_LIBS}
     )
 ENDIF ()
 
-SET_TARGET_PROPERTIES ( openvdb_shared
-  PROPERTIES
-    OUTPUT_NAME ${OPENVDB_LIBRARY_NAME}
-    SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
-    VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-  )
+# Configure shared build
+
+IF ( OPENVDB_CORE_SHARED )
+  TARGET_INCLUDE_DIRECTORIES ( openvdb_shared
+    PUBLIC ../
+    PRIVATE .
+    )
+
+  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES} )
+  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} )
+
+  SET_TARGET_PROPERTIES ( openvdb_shared
+    PROPERTIES
+      OUTPUT_NAME ${OPENVDB_SHARED_LIBRARY_NAME}
+      SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
+      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
+    )
+
+  TARGET_LINK_LIBRARIES ( openvdb_shared
+    ${OPENVDB_CORE_DEPENDENT_LIBS}
+    )
+
+  IF ( OPENVDB_ENABLE_RPATH )
+    # @todo There is probably a better way to do this for imported targets
+    LIST ( APPEND RPATHS
+      ${Boost_LIBRARY_DIRS}
+      ${IlmBase_LIBRARY_DIRS}
+      ${OpenEXR_LIBRARY_DIRS}
+      ${Log4cplus_LIBRARY_DIRS}
+      ${Blosc_LIBRARY_DIRS}
+      ${Tbb_LIBRARY_DIRS}
+      )
+    LIST ( REMOVE_DUPLICATES RPATHS )
+    SET_TARGET_PROPERTIES ( openvdb_shared
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+      )
+  ENDIF ()
+ENDIF ()
+
+UNSET ( OPENVDB_CORE_PRIVATE_DEFINES )
+UNSET ( OPENVDB_CORE_PUBLIC_DEFINES )
+
+##########################################################################
 
 # Installation
 
-INSTALL ( TARGETS
-  openvdb_static
-  DESTINATION
-  lib
-  )
-
-IF ( WIN32 )
+IF ( OPENVDB_CORE_STATIC )
   INSTALL ( TARGETS
-    openvdb_shared
-    RUNTIME DESTINATION bin COMPONENT Runtime
-    ARCHIVE DESTINATION lib COMPONENT Runtime
-    )
-ELSE ()
-  INSTALL ( TARGETS
-    openvdb_shared
+    openvdb_static
     DESTINATION
     lib
     )
 ENDIF ()
 
-IF ( OPENVDB_ENABLE_RPATH )
-  # @todo There is probably a better way to do this for imported targets
-  LIST ( APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${OpenEXR_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  LIST ( REMOVE_DUPLICATES RPATHS )
-  SET_TARGET_PROPERTIES ( openvdb_shared
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
+IF ( OPENVDB_CORE_SHARED )
+  IF ( WIN32 )
+    INSTALL ( TARGETS
+      openvdb_shared
+      RUNTIME DESTINATION bin COMPONENT Runtime
+      ARCHIVE DESTINATION lib COMPONENT Runtime
+      )
+  ELSE ()
+    INSTALL ( TARGETS
+      openvdb_shared
+      DESTINATION
+      lib
+      )
+  ENDIF ()
 ENDIF ()
-
 
 INSTALL ( FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION include/openvdb )
 INSTALL ( FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION include/openvdb/io )

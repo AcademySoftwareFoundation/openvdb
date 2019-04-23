@@ -62,7 +62,7 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
-  SET ( OPENVDB_LIB openvdb_shared )
+  SET ( OPENVDB_LIB openvdb )
 ENDIF ()
 
 # NumPy requires CMake 3.14

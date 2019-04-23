@@ -43,7 +43,7 @@
 
     https://www.openvdb.org/documentation/doxygen/dependencies.html
 
-  And the documentation on building OpenVDB and more in depth installation
+  And the documentation on building OpenVDB for more in depth installation
   instructions:
 
     https://www.openvdb.org/documentation/doxygen/build.html

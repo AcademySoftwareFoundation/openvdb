@@ -82,7 +82,7 @@ MESSAGE ( STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}" )
 IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
-  SET ( OPENVDB_LIB openvdb_shared )
+  SET ( OPENVDB_LIB openvdb )
 ENDIF ()
 
 FIND_PACKAGE ( OpenGL REQUIRED )

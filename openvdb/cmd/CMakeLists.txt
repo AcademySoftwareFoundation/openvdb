@@ -57,7 +57,7 @@ MESSAGE ( STATUS "----------------------------------------------------" )
 IF ( NOT OPENVDB_BUILD_CORE )
   SET ( OPENVDB_LIB OpenVDB::openvdb )
 ELSE ()
-  SET ( OPENVDB_LIB openvdb_shared )
+  SET ( OPENVDB_LIB openvdb )
 ENDIF ()
 
 SET ( OPENVDB_BINARIES_DEPENDENT_LIBS
