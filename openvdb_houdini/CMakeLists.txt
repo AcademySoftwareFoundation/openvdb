@@ -37,11 +37,12 @@
 
     <prefix>/include  - Shared openvdb_houdini headers
     <prefix>/lib      - Location of libopenvdb_houdini
-    <prefix>/dso      - Location of all other .so
+    <prefix>/dso      - Location of all other .so and required files
+                        such as icons and scripts
 
   By default, the prefix is set to the value returned by the Houdini
   CMake configuration. This is the default installation path for all
-  Houdini plugins. You can disable this behaviour by setting the following
+  Houdini plugins. You can disable this behavior by setting the following
   variable to OFF:
     USE_DEFAULT_HOUDINI_INSTALL
 
@@ -70,17 +71,12 @@ houdini_get_default_install_dir():
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON )
 
 # SESITAG CMake options
-OPTION ( OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG "Build the SESI Tag information on the first run of CMake only." ON )
-OPTION ( OPENVDB_HOUDINI_DISABLE_SESI_TAG [=[
-Disable SESI tag information on the OpenVDB DSOs. This is for CI/testing only - dsos without"
-tag information will not load correctly.]=] OFF )
-
-SET ( CUSTOM_SESI_TAG_INFO "CMake ${CMAKE_VERSION}"
-  CACHE STRING "Custom data to feed to sesitag when compiling the Houdini DSOs." )
+OPTION ( OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
+Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
+older Houdini versions and will be removed in Houdini 18. ]=] OFF )
 
 MARK_AS_ADVANCED (
-  CUSTOM_SESI_TAG_INFO
-  OPENVDB_HOUDINI_DISABLE_SESI_TAG
+  OPENVDB_HOUDINI_ENABLE_SESI_TAG
   )
 
 #########################################################################
@@ -181,7 +177,7 @@ TARGET_INCLUDE_DIRECTORIES ( openvdb_houdini PUBLIC
   ${PROJECT_BINARY_DIR}
   )
 
-TARGET_LINK_LIBRARIES ( openvdb_houdini
+TARGET_LINK_LIBRARIES ( openvdb_houdini PUBLIC
   ${OPENVDB_HOUDINI_DEPENDANT_LIBS}
   )
 
@@ -273,55 +269,14 @@ ADD_CUSTOM_TARGET ( openvdb_houdini_dsos
   "which aren't part of the shared library i.e. all targets in OPENVDB_DSO_NAMES."
   )
 
-# If OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG is ON, manually run the sesitag binary
-# and cache the result for all subsequent runs.
-# @note _houdini_bin_dir is set from the HoudiniConfig.cmake module
-
-SET ( SESI_CACHE_TAG_DEFINE "" )
-IF ( OPENVDB_HOUDINI_CACHE_ONCE_SESI_TAG AND NOT OPENVDB_HOUDINI_DISABLE_SESI_TAG )
-  MESSAGE ( STATUS "Generating SESI Tag information for Houdini DSOs..." )
-  SET ( sesitag_input_file ${CMAKE_CURRENT_BINARY_DIR}/sesitag_input.cache/sesitag_input )
-
-  IF ( NOT EXISTS ${sesitag_input_file} )
-    STRING ( TIMESTAMP timestamp "%a %b %d %H:%M:%S %Y" )
-    SET ( tag_info "Generated on: ${timestamp}\n${CUSTOM_SESI_TAG_INFO}" )
-    FILE ( WRITE ${sesitag_input_file} "${tag_info}" )
-  ENDIF ()
-
-  SET ( sesitag_path "${_houdini_bin_dir}/sesitag${CMAKE_EXECUTABLE_SUFFIX}" )
-  EXECUTE_PROCESS (
-    COMMAND ${sesitag_path} -f ${sesitag_input_file}
-    RESULT_VARIABLE status_code
-    OUTPUT_VARIABLE SESI_CACHE_TAG_DEFINE
-  )
-
-  IF ( NOT status_code EQUAL 0 )
-    MESSAGE ( FATAL_ERROR "Error running sesitag: ${status_code}" )
-  ENDIF ()
-
-  STRING ( REPLACE "'" "" SESI_CACHE_TAG_DEFINE ${SESI_CACHE_TAG_DEFINE} )
-  STRING ( REPLACE "-D" "" SESI_CACHE_TAG_DEFINE ${SESI_CACHE_TAG_DEFINE} )
-  MESSAGE ( STATUS "Using cache SESI Tag data for Houdini DSOs: ${sesitag_input_file}" )
-ENDIF ()
-
 # Add all dsos as libraries and configure them for houdini
 
 MESSAGE ( STATUS "Configuring Houdini DSOs..." )
 
 FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
 
-  # Create the lib
-
-  ADD_LIBRARY ( ${DSO_NAME} SHARED
-    houdini/${DSO_NAME}.cc
-    )
-
-  # Link in deps
-
-  TARGET_LINK_LIBRARIES ( ${DSO_NAME}
-    openvdb_houdini
-    ${OPENVDB_HOUDINI_DEPENDANT_LIBS}
-    )
+  ADD_LIBRARY ( ${DSO_NAME} SHARED houdini/${DSO_NAME}.cc )
+  TARGET_LINK_LIBRARIES ( ${DSO_NAME} openvdb_houdini )
 
   # Call houdini_configure_target to setup the sesi tag information. We set
   # INSTDIR to the project build directory and configure the actuall install
@@ -331,16 +286,15 @@ FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
   houdini_configure_target ( ${DSO_NAME}
     INSTDIR ${PROJECT_BINARY_DIR}
     PREFIX ""
-    TAGINFO ${CUSTOM_SESI_TAG_INFO}
+    TAGINFO ""
   )
 
-  # If the sesi tag needs replacing or removing, manually configure the compile
+  # If the sesi tag needs removing, manually configure the compile
   # options for each DSO and replace the UT_DSO_TAGINFO define
-  # @todo ask for more options from sidefx for controlling tag timestamps
 
-  IF ( OPENVDB_HOUDINI_DISABLE_SESI_TAG OR SESI_CACHE_TAG_DEFINE )
+  IF ( NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG )
     GET_TARGET_PROPERTY ( DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS )
-    STRING ( REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "${SESI_CACHE_TAG_DEFINE}" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
+    STRING ( REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
     SET_TARGET_PROPERTIES ( ${DSO_NAME}
       PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
     )
