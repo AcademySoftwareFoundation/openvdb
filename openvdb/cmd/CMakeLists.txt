@@ -39,10 +39,10 @@ ENDIF ()
 
 ###### OpenVDB Binary Component Options
 
-OPTION ( OPENVDB_BUILD_VDB_LOD "Build vdb_lod" ON )
 OPTION ( OPENVDB_BUILD_VDB_PRINT "Build vdb_print" ON )
-OPTION ( OPENVDB_BUILD_VDB_RENDER "Build vdb_render" ON )
-OPTION ( OPENVDB_BUILD_VDB_VIEW "Build vdb_view" ON )
+OPTION ( OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF )
+OPTION ( OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF )
+OPTION ( OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF )
 
 #########################################################################
 
@@ -103,24 +103,6 @@ ENDIF ()
 
 ##### VDB binaries
 
-#### vdb_lod
-
-IF ( OPENVDB_BUILD_VDB_LOD )
-  SET ( VDB_LOD_SOURCE_FILES  openvdb_lod.cc )
-  ADD_EXECUTABLE ( vdb_lod ${VDB_LOD_SOURCE_FILES} )
-  TARGET_LINK_LIBRARIES ( vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS} )
-
-  IF ( OPENVDB_ENABLE_RPATH )
-    SET_TARGET_PROPERTIES ( vdb_lod
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-      )
-  ENDIF ()
-
-  INSTALL ( TARGETS vdb_lod DESTINATION bin )
-ENDIF ()
-
-##########################################################################
-
 #### vdb_print
 
 IF ( OPENVDB_BUILD_VDB_PRINT )
@@ -135,6 +117,24 @@ IF ( OPENVDB_BUILD_VDB_PRINT )
   ENDIF ()
 
   INSTALL ( TARGETS vdb_print DESTINATION bin )
+ENDIF ()
+
+##########################################################################
+
+#### vdb_lod
+
+IF ( OPENVDB_BUILD_VDB_LOD )
+  SET ( VDB_LOD_SOURCE_FILES  openvdb_lod.cc )
+  ADD_EXECUTABLE ( vdb_lod ${VDB_LOD_SOURCE_FILES} )
+  TARGET_LINK_LIBRARIES ( vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS} )
+
+  IF ( OPENVDB_ENABLE_RPATH )
+    SET_TARGET_PROPERTIES ( vdb_lod
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+      )
+  ENDIF ()
+
+  INSTALL ( TARGETS vdb_lod DESTINATION bin )
 ENDIF ()
 
 ##########################################################################
