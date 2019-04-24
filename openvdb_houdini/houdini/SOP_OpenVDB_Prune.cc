@@ -177,7 +177,7 @@ SOP_OpenVDB_Prune::updateParmsFlags()
 
 namespace {
 struct PruneOp {
-    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), tolerance(tol) {}
+    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), pruneTolerance(tol) {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
@@ -185,7 +185,16 @@ struct PruneOp {
         using ValueT = typename GridT::ValueType;
 
         if (mode == "value") {
-            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+            const ValueT tolerance(openvdb::zeroVal<ValueT>() + pruneTolerance);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+            openvdb::tools::prune(grid.tree(), tolerance);
         } else if (mode == "inactive") {
             openvdb::tools::pruneInactive(grid.tree());
         } else if (mode == "levelset") {
@@ -194,7 +203,7 @@ struct PruneOp {
     }
 
     std::string mode;
-    fpreal tolerance;
+    fpreal pruneTolerance;
 };
 }
 

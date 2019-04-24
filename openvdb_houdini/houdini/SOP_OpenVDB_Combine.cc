@@ -843,7 +843,16 @@ struct MulAdd
     explicit MulAdd(float s, float t = 0.0): scale(s), offset(t) {}
 
     void operator()(const ValueT& a, const ValueT&, ValueT& out) const
-        { out = ValueT(a * scale + offset); }
+    {
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+        out = ValueT(a * scale + offset);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+    }
 
     /// @return true if the scale is 1 and the offset is 0
     bool isIdentity() const
@@ -880,7 +889,16 @@ struct Blend1
     explicit Blend1(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = ValueT((ONE - aMult * a) * bMult * b); }
+    {
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+        out = ValueT((ONE - aMult * a) * bMult * b);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+    }
 };
 
 
@@ -896,7 +914,16 @@ struct Blend2
     explicit Blend2(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b); }
+    {
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+        out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+    }
 };
 
 
@@ -1009,9 +1036,17 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (src.getGridClass() == openvdb::GRID_LEVEL_SET) {
             // For level set grids, use the level set rebuild tool to both resample the
             // source grid to match the reference grid and to rebuild the resulting level set.
-            const ValueT halfWidth = ((ref.getGridClass() == openvdb::GRID_LEVEL_SET)
+            const bool refIsLevelSet = ref.getGridClass() == openvdb::GRID_LEVEL_SET;
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+#endif
+            const ValueT halfWidth = refIsLevelSet
                 ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
-                : ValueT(src.background() * (1.0 / src.voxelSize()[0])));
+                : ValueT(src.background() * (1.0 / src.voxelSize()[0]));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
 
             if (!openvdb::math::isFinite(halfWidth)) {
                 std::stringstream msg;
@@ -1404,20 +1439,36 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (deactivate) {
             const float deactivationTolerance =
                 float(self->evalFloat("bgtolerance", 0, self->getTime()));
-
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+            const ValueT tolerance(ZERO + deactivationTolerance);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
             // Mark active output tiles and voxels as inactive if their
             // values match the output grid's background value.
             // Do this first to facilitate pruning.
-            openvdb::tools::deactivate(*resultGrid, resultGrid->background(),
-                ValueT(ZERO + deactivationTolerance));
+            openvdb::tools::deactivate(*resultGrid, resultGrid->background(), tolerance);
         }
 
         if (flood && resultGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
             openvdb::tools::signedFloodFill(resultGrid->tree());
         }
         if (prune) {
-            const float tolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
-            openvdb::tools::prune(resultGrid->tree(), ValueT(ZERO + tolerance));
+            const float pruneTolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
+#if defined(__GNUC__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wconversion"
+  #pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+            const ValueT tolerance(ZERO + pruneTolerance);
+#if defined(__GNUC__)
+  #pragma GCC diagnostic pop
+#endif
+            openvdb::tools::prune(resultGrid->tree(), tolerance);
         }
 
         return resultGrid;
