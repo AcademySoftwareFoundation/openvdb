@@ -1075,6 +1075,48 @@ TestPointMove::testPointData()
         CPPUNIT_ASSERT_EQUAL(short(0), nonZeroGroups2[2]);
         CPPUNIT_ASSERT_EQUAL(short(1), nonZeroGroups2[3]);
     }
+
+    { // larger data set with a cached deformer and group filtering
+        std::vector<openvdb::Vec3R> newPositions;
+        unittest_util::genPoints(10000, newPositions);
+
+        // manually construct point data grid instead of using positionsToGrid()
+
+        const PointAttributeVector<openvdb::Vec3R> pointList(newPositions);
+
+        openvdb::math::Transform::Ptr transform(
+            openvdb::math::Transform::createLinearTransform(/*voxelSize=*/0.1));
+
+        tools::PointIndexGrid::Ptr pointIndexGrid =
+            tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, *transform);
+
+        PointDataGrid::Ptr points =
+                createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
+                                                              pointList, *transform);
+
+        appendGroup(points->tree(), "odd");
+
+        std::vector<short> oddGroups(newPositions.size(), 0);
+        for (int i = 1; i < newPositions.size(); i += 2) {
+            oddGroups[i] = 1;
+        }
+
+        setGroup(points->tree(), pointIndexGrid->tree(), oddGroups, "odd");
+
+        std::vector<std::string> includeGroups{"odd"};
+        std::vector<std::string> excludeGroups;
+
+        auto leaf = points->tree().cbeginLeaf();
+        MultiGroupFilter advectFilter(includeGroups, excludeGroups, leaf->attributeSet());
+        OffsetDeformer offsetDeformer(Vec3d(0, 1, 0));
+
+        CachedDeformer<double>::Cache cache;
+        CachedDeformer<double> cachedDeformer(cache);
+
+        cachedDeformer.evaluate(*points, offsetDeformer, advectFilter);
+
+        movePoints(*points, cachedDeformer);
+    }
 }
 
 
