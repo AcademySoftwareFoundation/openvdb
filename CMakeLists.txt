@@ -514,3 +514,9 @@ ENDIF ()
 IF ( OPENVDB_BUILD_MAYA_PLUGIN )
   ADD_SUBDIRECTORY ( openvdb_maya )
 ENDIF ()
+
+##########################################################################
+
+ADD_CUSTOM_TARGET ( uninstall
+  COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/Uninstall.cmake
+)
