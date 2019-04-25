@@ -33,8 +33,8 @@
   (a build location for CMake to write to will be required). For example,
   from the root of the repository:
 
-    mkdir .build
-    cd .build
+    mkdir build
+    cd build
     cmake ../
 
   Depending on the components you choose to build, a number of optional
@@ -76,15 +76,15 @@ INCLUDE ( CMakeDependentOption )
 
 # @todo SSE/AVX instruction options
 # @todo epydoc and pdflatex
-OPTION ( OPENVDB_BUILD_CORE "Build the core OpenVDB library. Both static and shared versions are enabled by default" ON )
-OPTION ( OPENVDB_BUILD_BINARIES "Build the vdb binaries. Only vdb_print is enabled by default" ON )
+OPTION ( OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON )
+OPTION ( OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON )
 OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
 OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
 OPTION ( OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF )
 OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
-OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
+OPTION ( OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF )
@@ -97,7 +97,7 @@ determine the ABI number. You may set this to force a given ABI number.]=] )
 ###### Dependency options
 
 # @todo scalable/concurrent malloc option(s)
-# @todo non-required behavior for blosc, log4cplus (i.e. use if available)
+# @todo non-required behavior for blosc, log4cplus, ccache (i.e. use if available)
 OPTION ( USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
@@ -120,8 +120,11 @@ know it to be required.]=] OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
+OPTION ( DISABLE_DEPENDENCY_VERSION_CHECKS [=[
+Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
+Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF )
 
-# Deprecated options
+###### Deprecated options
 
 OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF )
 OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF )
@@ -149,19 +152,51 @@ IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
   ENDIF ()
 ENDIF ()
 
-# Various minimum version requirements
+# Various root level CMake options which are marked as advanced
 
+MARK_AS_ADVANCED (
+  OPENVDB_CXX_STRICT
+  OPENVDB_ENABLE_3_ABI_COMPATIBLE
+  OPENVDB_ENABLE_RPATH
+  USE_HOUDINI
+  USE_MAYA
+  USE_LOG4CPLUS
+  USE_SYSTEM_LIBRARY_PATHS
+  OPENVDB_BUILD_HOUDINI_SOPS
+  DISABLE_DEPENDENCY_VERSION_CHECKS
+  )
+
+# Configure minimum version requirements
+
+# @note  Blosc version is currently treated as exception which must be adhered
+# to. The minimum version must be at least 1.5. Previous versions are incompatible.
 SET ( MINIMUM_BLOSC_VERSION 1.5 )
-SET ( MINIMUM_BOOST_VERSION 1.53 )
-SET ( MINIMUM_CPPUNIT_VERSION 1.10 )
-SET ( MINIMUM_GLFW_VERSION 3.0 )
-SET ( MINIMUM_HOUDINI_VERSION 16.5 )
-SET ( MINIMUM_LOG4CPLUS_VERSION 1.1.2 )
-SET ( MINIMUM_TBB_VERSION 3.0 )
-# These promote warnings rather than errors
-SET ( MINIMUM_MAYA_VERSION 2017 )
-SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
-SET ( MINIMUM_DOXYGEN_VERSION 1.8.8 )
+
+IF ( NOT DISABLE_DEPENDENCY_VERSION_CHECKS )
+  # @note  Currently tracking CY2017 of the VFX platform where avaiable
+  SET ( MINIMUM_GCC_VERSION 4.8 )
+  SET ( MINIMUM_CLANG_VERSION 3.8 )
+  SET ( MINIMUM_ICC_VERSION 15 )
+
+  SET ( MINIMUM_BOOST_VERSION 1.61 )
+  SET ( MINIMUM_ILMBASE_VERSION 2.2 )
+  SET ( MINIMUM_OPENEXR_VERSION 2.2 )
+  SET ( MINIMUM_ZLIB_VERSION 1.2.7 )
+  SET ( MINIMUM_TBB_VERSION 4.4 )
+
+  SET ( MINIMUM_PYTHON_VERSION 2.7 )
+  SET ( MINIMUM_NUMPY_VERSION 1.9.2 )
+
+  SET ( MINIMUM_CPPUNIT_VERSION 1.10 )
+  SET ( MINIMUM_GLFW_VERSION 3.0 )
+  SET ( MINIMUM_LOG4CPLUS_VERSION 1.1.2 )
+  SET ( MINIMUM_HOUDINI_VERSION 16.5 )
+
+  # These always promote warnings rather than errors
+  SET ( MINIMUM_MAYA_VERSION 2017 )
+  SET ( MINIMUM_OPENVDB_ABI_VERSION 3 )
+  SET ( MINIMUM_DOXYGEN_VERSION 1.8.8 )
+ENDIF ()
 
 #########################################################################
 
@@ -188,24 +223,6 @@ SET ( THREADS_PREFER_PTHREAD_FLAG TRUE )
 
 ENABLE_TESTING ()
 
-# Various root level CMake options which are marked as advanced
-MARK_AS_ADVANCED (
-  CCACHE_PATH
-  OPENVDB_CXX_STRICT
-  OPENVDB_ENABLE_3_ABI_COMPATIBLE
-  OPENVDB_ENABLE_RPATH
-  USE_HOUDINI
-  USE_MAYA
-  USE_LOG4CPLUS
-  USE_SYSTEM_LIBRARY_PATHS
-  OPENVDB_BUILD_HOUDINI_SOPS
-  )
-
-# ncrease the number of sections that an object file can contain
-IF (MSVC)
-  ADD_DEFINITIONS("/bigobj")
-ENDIF()
-
 # Add our cmake modules
 
 LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" )
@@ -217,12 +234,12 @@ IF ( ${CMAKE_VERSION} VERSION_LESS 3.8 )
 ENDIF ()
 
 # Add cmake modules to installation command
+# @todo fix our glew cmake module
 
 IF ( OPENVDB_INSTALL_CMAKE_MODULES )
   SET ( OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindCppUnit.cmake
-    #cmake/FindGLEW.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
@@ -285,7 +302,7 @@ IF ( CCACHE_PATH )
   SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
   SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
   MESSAGE ( STATUS "Using ccache: ${CCACHE_PATH}" )
-ENDIF ( CCACHE_PATH )
+ENDIF ()
 
 # Build type configuration - default to Release if none is set
 
@@ -311,20 +328,38 @@ ENDIF ()
 
 #########################################################################
 
-# Compiler options
+# Compiler configuration. Add definitions for a number of compiler warnings
+# for sub projects and verify version requirements
+# @todo  add definitions for MSVC and Intel.
+# @todo  add minimum version for MSVC
 
-IF ( OPENVDB_CXX_STRICT )
-  # Add definitions for a number of compiler warnings for GCC and Clang for all sub projects
-  IF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
+SET ( HAS_AVAILABLE_WARNINGS FALSE )
+
+IF ( CMAKE_CXX_COMPILER_ID STREQUAL "Clang" )
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION )
+    MESSAGE ( FATAL_ERROR "Insufficient clang++ version. Minimum required is "
+      "\"${MINIMUM_CLANG_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
+      )
+  ENDIF ()
+  IF ( OPENVDB_CXX_STRICT )
     MESSAGE ( STATUS "Configuring Clang CXX warnings" )
+    SET ( HAS_AVAILABLE_WARNINGS TRUE )
     ADD_DEFINITIONS (
       -Wall
       -Wextra
       -Wconversion
       -Wno-sign-conversion
-    )
-  ELSEIF ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+      )
+  ENDIF ()
+ELSEIF ( CMAKE_CXX_COMPILER_ID STREQUAL "GNU" )
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_GCC_VERSION )
+    MESSAGE ( FATAL_ERROR "Insufficient g++ version. Minimum required is "
+      "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
+      )
+  ENDIF ()
+  IF ( OPENVDB_CXX_STRICT )
     MESSAGE ( STATUS "Configuring GCC CXX warnings" )
+    SET ( HAS_AVAILABLE_WARNINGS TRUE )
     ADD_DEFINITIONS (
       -Wall
       -Wextra
@@ -334,11 +369,23 @@ IF ( OPENVDB_CXX_STRICT )
       -Wconversion
       -Wdisabled-optimization
       -Woverloaded-virtual
-    )
-  ELSE ()
-    MESSAGE ( WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}" )
+      )
   ENDIF ()
+ELSEIF ( CMAKE_CXX_COMPILER_ID STREQUAL "Intel" )
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION} )
+    MESSAGE ( FATAL_ERROR "Insufficient ICC version. Minimum required is "
+      "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
+      )
+  ENDIF ()
+ELSEIF ( CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" )
+  # Increase the number of sections that an object file can contain
+  ADD_DEFINITIONS ( "/bigobj" )
 ENDIF ()
+
+IF ( OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS )
+  MESSAGE ( WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}" )
+ENDIF ()
+UNSET ( HAS_AVAILABLE_WARNINGS )
 
 ##########################################################################
 
@@ -417,7 +464,7 @@ IF ( OPENVDB_HOUDINI_ABI AND ( NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI
   SET ( OpenVDB_ABI ${OPENVDB_HOUDINI_ABI} )
 ENDIF ()
 
-IF ( ${OpenVDB_ABI} LESS ${MINIMUM_OPENVDB_ABI_VERSION} )
+IF ( OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION )
   MESSAGE ( WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
     "deprecated and will soon be removed." )
 ENDIF ()

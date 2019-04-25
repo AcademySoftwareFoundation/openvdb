@@ -46,9 +46,6 @@ Expose (almost) all of the grid types in the python module. Otherwise, only Floa
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
 module with this ON can be very memory-intensive.]=] OFF )
 
-SET ( PYTHON_VERSION "2.7" CACHE STRING "The python version to use when building the OpenVDB
-  Python module. Note that the available version of Boost.Python should also match this." )
-
 #########################################################################
 
 MESSAGE ( STATUS "----------------------------------------------------" )
@@ -77,8 +74,8 @@ SET ( OPENVDB_PYTHON_INCLUDES )
 # If CMake is < 3.12, use the old style python search and alias the variables
 # Note that the Interpreter component is only required for the python test
 IF ( ${CMAKE_VERSION} VERSION_LESS 3.12 )
-  FIND_PACKAGE ( PythonInterp ${PYTHON_VERSION} REQUIRED )
-  FIND_PACKAGE ( PythonLibs ${PYTHON_VERSION} REQUIRED )
+  FIND_PACKAGE ( PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED )
+  FIND_PACKAGE ( PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED )
 
   SET ( Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR} )
   SET ( Python_VERSION_MINOR ${PYTHON_VERSION_MINOR} )
@@ -92,10 +89,20 @@ ELSE ()
   # Development and NumPy, specify all components at the same time when using
   # FindPython
   IF ( USE_NUMPY )
-    FIND_PACKAGE ( Python ${PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy )
+    FIND_PACKAGE ( Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy )
+    IF ( Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION )
+      MESSAGE ( FATAL_ERROR "Could NOT find NumPy (Required is at least version "
+        "\"${MINIMUM_NUMPY_VERSION}\")"
+        )
+    ELSE ()
+      MESSAGE ( STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
+        "version \"${Python_NumPy_VERSION}\", minimum required is "
+        "\"${MINIMUM_NUMPY_VERSION}\")"
+        )
+    ENDIF ()
     LIST ( APPEND OPENVDB_PYTHON_DEPS Python::NumPy )
   ELSE ()
-    FIND_PACKAGE ( Python ${PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development )
+    FIND_PACKAGE ( Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development )
   ENDIF ()
   LIST ( APPEND OPENVDB_PYTHON_DEPS Python::Python )
 ENDIF ()
