@@ -1078,7 +1078,8 @@ TestPointMove::testPointData()
 
     { // larger data set with a cached deformer and group filtering
         std::vector<openvdb::Vec3R> newPositions;
-        unittest_util::genPoints(10000, newPositions);
+        const int count = 10000;
+        unittest_util::genPoints(count, newPositions);
 
         // manually construct point data grid instead of using positionsToGrid()
 
@@ -1115,7 +1116,35 @@ TestPointMove::testPointData()
 
         cachedDeformer.evaluate(*points, offsetDeformer, advectFilter);
 
+        double ySumBefore = 0.0;
+        double ySumAfter = 0.0;
+
+        for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
+            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
+            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                Vec3d position = handle.get(*iter) + iter.getCoord();
+                position = transform->indexToWorld(position);
+                ySumBefore += position.y();
+            }
+        }
+
         movePoints(*points, cachedDeformer);
+
+        for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
+            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
+            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                Vec3d position = handle.get(*iter) + iter.getCoord();
+                position = transform->indexToWorld(position);
+                ySumAfter += position.y();
+            }
+        }
+
+        // total increase in Y should be approximately count / 2
+        // (only odd points are being moved 1.0 in Y)
+        double increaseInY = ySumAfter - ySumBefore;
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(increaseInY, static_cast<double>(count) / 2.0,
+            /*tolerance=*/double(0.01));
     }
 }
 
