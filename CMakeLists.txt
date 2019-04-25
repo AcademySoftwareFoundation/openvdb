@@ -120,6 +120,7 @@ know it to be required.]=] OFF )
 CMAKE_DEPENDENT_OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
+OPTION ( USE_CCACHE "Build using Ccache if found on the path" ON )
 OPTION ( DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF )
@@ -162,6 +163,7 @@ MARK_AS_ADVANCED (
   USE_MAYA
   USE_LOG4CPLUS
   USE_SYSTEM_LIBRARY_PATHS
+  USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   )
@@ -297,11 +299,13 @@ ENDIF ()
 
 # ccache setup
 
-FIND_PROGRAM ( CCACHE_PATH ccache )
-IF ( CCACHE_PATH )
-  SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
-  SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
-  MESSAGE ( STATUS "Using ccache: ${CCACHE_PATH}" )
+IF ( USE_CCACHE )
+  FIND_PROGRAM ( CCACHE_PATH ccache )
+  IF ( CCACHE_PATH )
+    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache )
+    SET_PROPERTY ( GLOBAL PROPERTY RULE_LAUNCH_LINK ccache )
+    MESSAGE ( STATUS "Using ccache: ${CCACHE_PATH}" )
+  ENDIF ()
 ENDIF ()
 
 # Build type configuration - default to Release if none is set
