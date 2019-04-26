@@ -44,6 +44,7 @@ Version 6.0.1 - In development
       [Reported by Rick Hankins]
     - Fixed a bug in tools::segmentActiveVoxels() and tools::segmentSDF() where
       inactive leaf nodes were only pruned when there was more than one segment.
+    - Fixed a crash in point moving when using group filters.
 
     API changes:
     - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
