@@ -250,6 +250,7 @@ IF ( OPENVDB_INSTALL_CMAKE_MODULES )
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
     cmake/OpenVDBMayaSetup.cmake
+    cmake/OpenVDBUtils.cmake
   )
   INSTALL ( FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB )
 ENDIF ()
@@ -440,9 +441,13 @@ IF ( NOT OPENVDB_BUILD_CORE )
     ENDIF ()
   ENDIF ()
 ELSE ()
-  # Only use find package to determine the VDB version in this directory
-  SET ( OPENVDB_ROOT ${CMAKE_CURRENT_SOURCE_DIR} )
-  FIND_PACKAGE ( OpenVDB QUIET )
+  INCLUDE ( "${CMAKE_SOURCE_DIR}/cmake/OpenVDBUtils.cmake" )
+  OPENVDB_VERSION_FROM_HEADER ( "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/version.h"
+    VERSION OpenVDB_VERSION
+    MAJOR   OpenVDB_MAJOR_VERSION
+    MINOR   OpenVDB_MINOR_VERSION
+    PATCH   OpenVDB_PATCH_VERSION
+    )
   MESSAGE ( STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 ENDIF ()
 

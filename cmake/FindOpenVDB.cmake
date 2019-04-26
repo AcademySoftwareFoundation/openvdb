@@ -103,16 +103,17 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
-
-# Support new if() IN_LIST operator
-IF ( POLICY CMP0057 )
-  CMAKE_POLICY ( SET CMP0057 NEW )
+# Monitoring <PackageName>_ROOT variables
+IF ( POLICY CMP0074 )
+  CMAKE_POLICY ( SET CMP0074 NEW )
 ENDIF ()
+
+# Include utility functions for version information
+INCLUDE ( ${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake )
 
 MARK_AS_ADVANCED (
   OpenVDB_INCLUDE_DIR
   OpenVDB_LIBRARY
-  OPENVDB_NAMESPACE_VERSIONING
 )
 
 SET ( _OPENVDB_COMPONENT_LIST
@@ -157,21 +158,32 @@ ENDIF ()
 FIND_PACKAGE ( PkgConfig )
 PKG_CHECK_MODULES ( PC_OpenVDB QUIET OpenVDB )
 
-# Set various variables to track directories if this is being called from
-# an installed location and from another package. The expected installation
-# directory structure is:
-#  <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake
-#  <root>/include
-#  <root>/bin
-# Note that _ROOT, _INCLUDEDIR and _LIBRARYDIR still take precedence if
-# specified
+# This CMake module supports being called from external packages AND from
+# within the OpenVDB repository for building openvdb components with the
+# core library build disabled. Determine where we are being called from:
+#
+# (repo structure = <root>/cmake/FindOpenVDB.cmake)
+# (inst structure = <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake)
 
-GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${CMAKE_CURRENT_LIST_DIR} DIRECTORY )
-GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
-GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
-SET ( _OPENVDB_INSTALLED_INCLUDE_DIR ${_IMPORT_PREFIX}/include )
-SET ( _OPENVDB_INSTALLED_LIB_DIR ${_IMPORT_PREFIX}/lib )
-SET ( _OPENVDB_INSTALLED_BIN_DIR ${_IMPORT_PREFIX}/bin )
+GET_FILENAME_COMPONENT ( _DIR_NAME ${CMAKE_CURRENT_LIST_DIR} NAME )
+
+IF ( ${_DIR_NAME} STREQUAL "cmake" )
+  # Called from root repo for openvdb components
+ELSEIF ( ${_DIR_NAME} STREQUAL "OpenVDB" )
+  # Set the install variable to track directories if this is being called from
+  # an installed location and from another package. The expected installation
+  # directory structure is:
+  #  <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake
+  #  <root>/include
+  #  <root>/bin
+  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${CMAKE_CURRENT_LIST_DIR} DIRECTORY )
+  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
+  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
+  SET ( _OPENVDB_INSTALL ${_IMPORT_PREFIX} )
+  LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${_OPENVDB_INSTALL} )
+ENDIF ()
+
+UNSET ( _DIR_NAME )
 UNSET ( _IMPORT_PREFIX )
 
 # ------------------------------------------------------------------------
@@ -182,7 +194,6 @@ SET ( _OPENVDB_INCLUDE_SEARCH_DIRS "" )
 LIST ( APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
   ${OPENVDB_INCLUDEDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
-  ${_OPENVDB_INSTALLED_INCLUDE_DIR}
   ${PC_OpenVDB_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
@@ -194,32 +205,12 @@ FIND_PATH ( OpenVDB_INCLUDE_DIR openvdb/version.h
   PATH_SUFFIXES include
   )
 
-IF ( EXISTS "${OpenVDB_INCLUDE_DIR}/openvdb/version.h" )
-  SET ( OPENVDB_VERSION_FILE ${OpenVDB_INCLUDE_DIR}/openvdb/version.h )
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    OpenVDB_MAJOR_VERSION "${openvdb_version_str}"
-    )
-
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    OpenVDB_MINOR_VERSION "${openvdb_version_str}"
-    )
-
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    OpenVDB_PATCH_VERSION "${openvdb_version_str}"
-    )
-  UNSET ( openvdb_version_str )
-  UNSET ( OPENVDB_VERSION_FILE )
-  SET ( OpenVDB_VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION} )
-ENDIF ()
+OPENVDB_VERSION_FROM_HEADER ( "${OpenVDB_INCLUDE_DIR}/openvdb/version.h"
+  VERSION OpenVDB_VERSION
+  MAJOR   OpenVDB_MAJOR_VERSION
+  MINOR   OpenVDB_MINOR_VERSION
+  PATCH   OpenVDB_PATCH_VERSION
+  )
 
 # ------------------------------------------------------------------------
 #  Search for OPENVDB lib DIR
@@ -232,7 +223,6 @@ SET ( _OPENVDB_LIBRARYDIR_SEARCH_DIRS "" )
 LIST ( APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
   ${OPENVDB_LIBRARYDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
-  ${_OPENVDB_INSTALLED_LIB_DIR}
   ${PC_OpenVDB_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
   )
@@ -287,43 +277,31 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenVDB
   HANDLE_COMPONENTS
 )
 
-IF ( NOT OpenVDB_FOUND )
-  IF ( OpenVDB_FIND_REQUIRED )
-    MESSAGE ( FATAL_ERROR "Unable to find OpenVDB" )
-  ENDIF ()
-  RETURN ()
-ENDIF ()
-
 # ------------------------------------------------------------------------
 #  Determine ABI number
 # ------------------------------------------------------------------------
 
 # Set the ABI number the library was built against. Uses vdb_print
 
-IF ( EXISTS ${_OPENVDB_INSTALLED_BIN_DIR} )
-  SET ( _OPENVDB_INSTALLED_PRINT_BIN "${_OPENVDB_INSTALLED_BIN_DIR}/vdb_print" )
-  IF ( EXISTS ${_OPENVDB_INSTALLED_PRINT_BIN} )
-    SET ( _VDB_PRINT_VERSION_STRING "" )
-    SET ( _VDB_PRINT_RETURN_STATUS "" )
-
-    EXECUTE_PROCESS ( COMMAND ${_OPENVDB_INSTALLED_PRINT_BIN} "--version"
-      RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
-      OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE
+IF ( _OPENVDB_INSTALL )
+  OPENVDB_ABI_VERSION_FROM_PRINT (
+    "${_OPENVDB_INSTALL}/bin/vdb_print"
+    ABI OpenVDB_ABI
     )
-    IF ( NOT ${_VDB_PRINT_RETURN_STATUS} )
-      SET ( OpenVDB_ABI )
-      STRING ( REGEX REPLACE ".*abi([0-9]*).*" "\\1" OpenVDB_ABI ${_VDB_PRINT_VERSION_STRING} )
-    ENDIF ()
-  ENDIF ()
+ELSE ()
+  # Try and find vdb_print from the include path
+  OPENVDB_ABI_VERSION_FROM_PRINT (
+    "${OpenVDB_INCLUDE_DIR}/../bin/vdb_print"
+    ABI OpenVDB_ABI
+    )
 ENDIF ()
 
 IF ( NOT OpenVDB_FIND_QUIET )
   IF ( NOT OpenVDB_ABI )
-    MESSAGE ( WARNING "Unable to determine OpenVDB ABI version from OpenVDB installation. The "
-      "library major version \"${OpenVDB_MAJOR_VERSION}\" will be inferred. If this is not correct, "
-      "use add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=N)"
+    MESSAGE ( WARNING "Unable to determine OpenVDB ABI version from OpenVDB "
+      "installation. The library major version \"${OpenVDB_MAJOR_VERSION}\" "
+      "will be inferred. If this is not correct, use "
+      "add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=N)"
       )
   ELSE ()
     MESSAGE ( STATUS "OpenVDB ABI Version: ${OpenVDB_ABI}" )
