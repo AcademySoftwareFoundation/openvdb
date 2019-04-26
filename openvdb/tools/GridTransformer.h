@@ -498,16 +498,11 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
         using ValueT = typename GridType::ValueType;
         const bool outIsLevelSet = outGrid.getGridClass() == openvdb::GRID_LEVEL_SET;
 
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const ValueT halfWidth = outIsLevelSet
             ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
             : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0]));
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
         typename GridType::Ptr tempGrid;
         try {

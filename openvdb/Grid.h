@@ -1447,15 +1447,9 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    // Suppress conversion warning that GCC 6.3+ emits when ValueType is int or long int
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const auto value = zeroVal<ValueType>() + tolerance;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     this->tree().prune(static_cast<ValueType>(value));
 }
 

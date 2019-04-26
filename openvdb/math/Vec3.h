@@ -265,16 +265,11 @@ public:
     template <typename S>
     const Vec3<T> &operator*=(S scalar)
     {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto value0 = this->mm[0] * scalar;
         const auto value1 = this->mm[1] * scalar;
         const auto value2 = this->mm[2] * scalar;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         this->mm[0] = static_cast<T>(value0);
         this->mm[1] = static_cast<T>(value1);
         this->mm[2] = static_cast<T>(value2);
@@ -315,16 +310,11 @@ public:
     template <typename S>
     const Vec3<T> &operator+=(S scalar)
     {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto value0 = this->mm[0] + scalar;
         const auto value1 = this->mm[1] + scalar;
         const auto value2 = this->mm[2] + scalar;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         this->mm[0] = static_cast<T>(value0);
         this->mm[1] = static_cast<T>(value1);
         this->mm[2] = static_cast<T>(value2);

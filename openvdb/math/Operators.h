@@ -765,16 +765,11 @@ struct Gradient<ScaleMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto gradient0 = iGradient[0] * map.getInvTwiceScale()[0];
         const auto gradient1 = iGradient[1] * map.getInvTwiceScale()[1];
         const auto gradient2 = iGradient[2] * map.getInvTwiceScale()[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return  Vec3Type(ValueType(gradient0),
                          ValueType(gradient1),
                          ValueType(gradient2));
@@ -789,16 +784,11 @@ struct Gradient<ScaleMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto gradient0 = iGradient[0] * map.getInvTwiceScale()[0];
         const auto gradient1 = iGradient[1] * map.getInvTwiceScale()[1];
         const auto gradient2 = iGradient[2] * map.getInvTwiceScale()[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return  Vec3Type(ValueType(gradient0),
                          ValueType(gradient1),
                          ValueType(gradient2));
@@ -819,16 +809,11 @@ struct Gradient<ScaleTranslateMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto gradient0 = iGradient[0] * map.getInvTwiceScale()[0];
         const auto gradient1 = iGradient[1] * map.getInvTwiceScale()[1];
         const auto gradient2 = iGradient[2] * map.getInvTwiceScale()[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return  Vec3Type(ValueType(gradient0),
                          ValueType(gradient1),
                          ValueType(gradient2));
@@ -843,16 +828,11 @@ struct Gradient<ScaleTranslateMap, CD_2ND>
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto gradient0 = iGradient[0] * map.getInvTwiceScale()[0];
         const auto gradient1 = iGradient[1] * map.getInvTwiceScale()[1];
         const auto gradient2 = iGradient[2] * map.getInvTwiceScale()[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return  Vec3Type(ValueType(gradient0),
                          ValueType(gradient1),
                          ValueType(gradient2));
@@ -1636,16 +1616,10 @@ struct Laplacian<ScaleMap, DiffScheme>
         ValueType iddy = D2<DiffScheme>::inY(grid, ijk);
         ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
         const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 
@@ -1660,16 +1634,10 @@ struct Laplacian<ScaleMap, DiffScheme>
         ValueType iddy = D2<DiffScheme>::inY(stencil);
         ValueType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
         const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 };
@@ -1688,16 +1656,10 @@ struct Laplacian<ScaleTranslateMap, DiffScheme>
         ValueType iddy = D2<DiffScheme>::inY(grid, ijk);
         ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
         const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 
@@ -1711,16 +1673,10 @@ struct Laplacian<ScaleTranslateMap, DiffScheme>
         ValueType iddy = D2<DiffScheme>::inY(stencil);
         ValueType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
         const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 };

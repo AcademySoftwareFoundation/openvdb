@@ -738,20 +738,12 @@ template<class ValueT, size_t N>
 inline ValueT
 BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
-    struct Local
+    auto _interpolate = [](const ValueT& a, const ValueT& b, double weight)
     {
-        static ValueT interpolate(const ValueT& a, const ValueT& b, double weight)
-        {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
-            const auto temp = (b - a) * weight;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
-            return a + ValueT(temp);
-        }
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const auto temp = (b - a) * weight;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return a + ValueT(temp);
     };
 
     // Trilinear interpolation:
@@ -760,14 +752,14 @@ BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
     //     v000 (1-x)(1-y)(1-z) + v001 (1-x)(1-y)z + v010 (1-x)y(1-z) + v011 (1-x)yz
     //   + v100 x(1-y)(1-z)     + v101 x(1-y)z     + v110 xy(1-z)     + v111 xyz
 
-    return  Local::interpolate(
-                Local::interpolate(
-                    Local::interpolate(data[0][0][0], data[0][0][1], uvw[2]),
-                    Local::interpolate(data[0][1][0], data[0][1][1], uvw[2]),
+    return  _interpolate(
+                _interpolate(
+                    _interpolate(data[0][0][0], data[0][0][1], uvw[2]),
+                    _interpolate(data[0][1][0], data[0][1][1], uvw[2]),
                     uvw[1]),
-                Local::interpolate(
-                    Local::interpolate(data[1][0][0], data[1][0][1], uvw[2]),
-                    Local::interpolate(data[1][1][0], data[1][1][1], uvw[2]),
+                _interpolate(
+                    _interpolate(data[1][0][0], data[1][0][1], uvw[2]),
+                    _interpolate(data[1][1][0], data[1][1][1], uvw[2]),
                     uvw[1]),
                 uvw[0]);
 }
@@ -820,24 +812,16 @@ template<class ValueT, size_t N>
 inline ValueT
 QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
-    struct Local
+    auto _interpolate = [](const ValueT* value, double weight)
     {
-        static ValueT interpolate(const ValueT* value, double weight)
-        {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
-            const ValueT
-                a = static_cast<ValueT>(0.5 * (value[0] + value[2]) - value[1]),
-                b = static_cast<ValueT>(0.5 * (value[2] - value[0])),
-                c = static_cast<ValueT>(value[1]);
-            const auto temp = weight * (weight * a + b) + c;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
-            return static_cast<ValueT>(temp);
-        }
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const ValueT
+            a = static_cast<ValueT>(0.5 * (value[0] + value[2]) - value[1]),
+            b = static_cast<ValueT>(0.5 * (value[2] - value[0])),
+            c = static_cast<ValueT>(value[1]);
+        const auto temp = weight * (weight * a + b) + c;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return static_cast<ValueT>(temp);
     };
 
     /// @todo For vector types, interpolate over each component independently.
@@ -856,16 +840,16 @@ QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R
             //
             // for a, b and c.
             const ValueT* vz = &data[dx][dy][0];
-            vy[dy] = Local::interpolate(vz, uvw.z());
+            vy[dy] = _interpolate(vz, uvw.z());
         }//loop over y
         // Fit a parabola to three interpolated samples in y, then
         // evaluate the parabola at y', where y' is the fractional
         // part of inCoord.y.
-        vx[dx] = Local::interpolate(vy, uvw.y());
+        vx[dx] = _interpolate(vy, uvw.y());
     }//loop over x
     // Fit a parabola to three interpolated samples in x, then
     // evaluate the parabola at the fractional part of inCoord.x.
-    return Local::interpolate(vx, uvw.x());
+    return _interpolate(vx, uvw.x());
 }
 
 template<class TreeT>

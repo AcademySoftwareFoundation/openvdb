@@ -334,16 +334,11 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline ValueType interpolation(const math::Vec3<ValueType>& xyz) const
     {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const ValueType u = xyz[0] - BaseType::mCenter[0];
         const ValueType v = xyz[1] - BaseType::mCenter[1];
         const ValueType w = xyz[2] - BaseType::mCenter[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
         assert(u>=0 && u<=1);
         assert(v>=0 && v<=1);
@@ -373,16 +368,11 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& xyz) const
     {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const ValueType u = xyz[0] - BaseType::mCenter[0];
         const ValueType v = xyz[1] - BaseType::mCenter[1];
         const ValueType w = xyz[2] - BaseType::mCenter[2];
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
         assert(u>=0 && u<=1);
         assert(v>=0 && v<=1);
@@ -1329,16 +1319,11 @@ public:
     {
         const Coord& ijk = BaseType::getCenterCoord();
         const ValueType d = ValueType(mStencil[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto value = math::Vec3<ValueType>(   ijk[0] - d*(mStencil[2] - mStencil[1]),
                                                     ijk[1] - d*(mStencil[4] - mStencil[3]),
                                                     ijk[2] - d*(mStencil[6] - mStencil[5]));
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 

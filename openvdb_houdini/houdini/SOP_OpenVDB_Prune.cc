@@ -185,15 +185,9 @@ struct PruneOp {
         using ValueT = typename GridT::ValueType;
 
         if (mode == "value") {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
             const ValueT tolerance(openvdb::zeroVal<ValueT>() + pruneTolerance);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
             openvdb::tools::prune(grid.tree(), tolerance);
         } else if (mode == "inactive") {
             openvdb::tools::pruneInactive(grid.tree());

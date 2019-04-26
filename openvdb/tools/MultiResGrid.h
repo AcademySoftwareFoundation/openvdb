@@ -575,14 +575,9 @@ sampleValue(const Coord& ijk, double level) const
     if ( level0 == level1 ) return v0;
     assert( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( ijk, 0, level1 );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     return a * v0 + (ValueType(1) - a) * v1;
 }
 
@@ -597,14 +592,9 @@ sampleValue(const Vec3R& xyz, double level) const
     if ( level0 == level1 ) return v0;
     assert( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( xyz, 0, level1 );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     return a * v0 + (ValueType(1) - a) * v1;
 }
 
@@ -816,16 +806,11 @@ struct MultiResGrid<TreeType>::FractionOp
         for (typename Range1::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             for (VoxelIter voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 Coord ijk = voxelIter.getCoord();
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 const auto value0 = ijk[0] * scale;
                 const auto value1 = ijk[1] * scale;
                 const auto value2 = ijk[2] * scale;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                 ijk[0] = int(math::Round(value0));
                 ijk[1] = int(math::Round(value1));
                 ijk[2] = int(math::Round(value2));
@@ -864,15 +849,10 @@ struct MultiResGrid<TreeType>::FractionOp
                 const Vec3R xyz =  Vec3R( voxelIter.getCoord().data() );// mid level coord
                 const ValueType v0 = tools::Sampler<Order>::sample( acc0, xyz * scale0 );
                 const ValueType v1 = tools::Sampler<Order>::sample( acc1, xyz * scale1 );
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 const auto value0 = a*v0;
                 const auto value1 = b*v1;
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                 voxelIter.setValue( ValueType(value0 + value1) );
             }
         }

@@ -238,14 +238,9 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
     ValueType sum = zeroVal<ValueType>();
     Int32 &i = xyz[Axis], j = i + width;
     for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     ValueType value = static_cast<ValueType>(sum * frac);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     return value;
 }
 
@@ -378,15 +373,9 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
                 if (alpha(xyz, a, b)) {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                     const ValueType value(b*(*iter) + a*avg(xyz));
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                     buffer.setValue(iter.pos(), value);
                 }
             }
@@ -417,15 +406,9 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                     ValueType value(b*(*iter) + a*stencil.median());
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                     buffer.setValue(iter.pos(), value);
                 }
             }
@@ -454,15 +437,9 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
-#if defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wconversion"
-  #pragma GCC diagnostic ignored "-Wfloat-conversion"
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                     ValueType value(*iter + a*offset);
-#if defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                     iter.setValue(value);
                 }
             }
