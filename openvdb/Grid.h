@@ -1447,7 +1447,10 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    this->tree().prune(ValueType(zeroVal<ValueType>() + tolerance));
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    const auto value = zeroVal<ValueType>() + tolerance;
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    this->tree().prune(static_cast<ValueType>(value));
 }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
