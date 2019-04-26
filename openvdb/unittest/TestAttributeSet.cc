@@ -517,6 +517,7 @@ TestAttributeSet::testAttributeSet()
 {
     // Define and register some common attribute types
     using AttributeS        = TypedAttributeArray<float>;
+    using AttributeB        = TypedAttributeArray<bool>;
     using AttributeI        = TypedAttributeArray<int32_t>;
     using AttributeL        = TypedAttributeArray<int64_t>;
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
@@ -568,6 +569,52 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT_NO_THROW(
             invalidAttrSetA.appendAttribute("testStride2", AttributeI::attributeType(),
             /*stride=*/51, /*constantStride=*/false));
+    }
+
+    { // copy construction with varying attribute types and strides
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        AttributeSet attrSet(descr, /*arrayLength=*/50);
+
+        attrSet.appendAttribute("float1", AttributeS::attributeType(), /*stride=*/1);
+        attrSet.appendAttribute("int1", AttributeI::attributeType(), /*stride=*/1);
+        attrSet.appendAttribute("float3", AttributeS::attributeType(), /*stride=*/3);
+        attrSet.appendAttribute("vector", AttributeVec3s::attributeType(), /*stride=*/1);
+        attrSet.appendAttribute("vector3", AttributeVec3s::attributeType(), /*stride=*/3);
+        attrSet.appendAttribute("bool100", AttributeB::attributeType(), /*stride=*/100);
+
+        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet.getConst("float1")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet.getConst("int1")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet.getConst("float3")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector3")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet.getConst("bool100")->type().first);
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("float1")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("int1")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet.getConst("float3")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("vector")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet.getConst("vector3")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet.getConst("bool100")->stride());
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSet.getConst("float1")->size());
+
+        AttributeSet attrSet2(attrSet, /*arrayLength=*/200);
+
+        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet2.getConst("float1")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet2.getConst("int1")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet2.getConst("float3")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector3")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet2.getConst("bool100")->type().first);
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("float1")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("int1")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet2.getConst("float3")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("vector")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet2.getConst("vector3")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("bool100")->stride());
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(200), attrSet2.getConst("float1")->size());
     }
 
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
