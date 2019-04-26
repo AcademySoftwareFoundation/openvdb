@@ -653,9 +653,6 @@ MeshAttrTransfer::operator()(IterRange &range) const
     const bool ptnAttrTransfer = mPointAttributes.size() > 0;
     const bool vtxAttrTransfer = mVertexAttributes.size() > 0;
 
-#if UT_MAJOR_VERSION_INT < 16
-    GA_Primitive::const_iterator it;
-#endif
     GA_Offset vtxOffsetList[4], ptnOffsetList[4], vtxOffsets[3], ptnOffsets[3], prmOffset;
     openvdb::Vec3d ptnList[4], xyz, cpt, cpt2, uvw, uvw2;
 
@@ -681,7 +678,6 @@ MeshAttrTransfer::operator()(IterRange &range) const
             const GA_Size vtxn = primRef->getVertexCount();
 
             // Get vertex and point offests
-#if UT_MAJOR_VERSION_INT >= 16
             for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
                 const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
                 ptnOffsetList[vtx] = mMeshGdp.vertexPoint(vtxoff);
@@ -692,18 +688,6 @@ MeshAttrTransfer::operator()(IterRange &range) const
                 ptnList[vtx][1] = double(p[1]);
                 ptnList[vtx][2] = double(p[2]);
             }
-#else
-            primRef->beginVertex(it);
-            for (unsigned int vtx = 0; !it.atEnd(); ++it, ++vtx) {
-                ptnOffsetList[vtx] = it.getPointOffset();
-                vtxOffsetList[vtx] = it.getVertexOffset();
-
-                UT_Vector3 p = mMeshGdp.getPos3(ptnOffsetList[vtx]);
-                ptnList[vtx][0] = double(p[0]);
-                ptnList[vtx][1] = double(p[1]);
-                ptnList[vtx][2] = double(p[2]);
-            }
-#endif
 
             xyz = mTransform.indexToWorld(ijk);
 
@@ -1250,10 +1234,6 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                 }
 
                 if (!mVertAttributes.empty()) {
-#if UT_MAJOR_VERSION_INT < 16
-                    // Some required GEO_PrimPolySoup::PolygonIterator methods exist only in H16+.
-                    copyVertAttrs(*target, targetN, polyIdxAcc);
-#else
                     if (target->getTypeId() != GA_PRIMPOLYSOUP) {
                         copyVertAttrs(*target, targetN, polyIdxAcc);
                     } else {
@@ -1271,7 +1251,6 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                             UTparallelFor(SizeRange(0, soup->getPolygonCount()), processPolyRange);
                         }
                     }
-#endif
                 }
             }
         }
@@ -1298,18 +1277,10 @@ TransferPrimitiveAttributesOp<GridType>::copyPrimAttrs(
 
     // Compute avg. vertex position.
     openvdb::Vec3d pos(0, 0, 0);
-#if UT_MAJOR_VERSION_INT >= 16
     int count = static_cast<int>(targetPrim.getVertexCount());
     for (int vtx = 0; vtx < count; ++vtx) {
         pos += UTvdbConvert(targetPrim.getPos3(vtx));
     }
-#else
-    int count = 0;
-    GA_Primitive::const_iterator vtxIt;
-    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt, ++count) {
-        pos += UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
-    }
-#endif
     if (count > 1) pos /= double(count);
 
     // Find closest source primitive to current avg. vertex position.
@@ -1380,14 +1351,8 @@ TransferPrimitiveAttributesOp<GridType>::copyVertAttrs(
     UT_Vector3 sourceNormal;
     std::vector<GA_Index> primitives(8), similarPrimitives(8);
 
-#if UT_MAJOR_VERSION_INT >= 16
     for (GA_Size vtx = 0, vtxN = targetPrim.getVertexCount(); vtx < vtxN; ++vtx) {
         pos = UTvdbConvert(targetPrim.getPos3(vtx));
-#else
-    GA_Primitive::const_iterator vtxIt;
-    for (targetPrim.beginVertex(vtxIt); !vtxIt.atEnd(); ++vtxIt) {
-        pos = UTvdbConvert(mTargetGeo.getPos3(vtxIt.getPointOffset()));
-#endif
         const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
 
         primitives.clear();
@@ -1418,11 +1383,7 @@ TransferPrimitiveAttributesOp<GridType>::copyVertAttrs(
             }
 
             for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
-#if UT_MAJOR_VERSION_INT >= 16
                 mVertAttributes[n]->copy(v0, v1, v2, targetPrim.getVertexOffset(vtx), uvw);
-#else
-                mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);
-#endif
             }
         }
     }
@@ -1566,17 +1527,10 @@ transferPrimitiveAttributes(
     // Primitive attributes
     for (; !it.atEnd(); ++it) {
         const GA_Attribute* sourceAttr = it.attrib();
-#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
         if (nullptr == targetGeo.findPrimitiveAttribute(it.name())) {
             targetGeo.addPrimAttrib(sourceAttr);
         }
         GA_Attribute* targetAttr = targetGeo.findPrimitiveAttribute(it.name());
-#else
-        if (!targetGeo.findPrimitiveAttribute(it.name()).isValid()) {
-            targetGeo.addPrimAttrib(sourceAttr);
-        }
-        GA_Attribute* targetAttr = targetGeo.findPrimitiveAttribute(it.name()).getAttribute();
-#endif
 
         if (sourceAttr && targetAttr) {
             AttributeCopyBase::Ptr att = createAttributeCopier(*sourceAttr, *targetAttr);
@@ -1593,22 +1547,13 @@ transferPrimitiveAttributes(
     // Vertex attributes
     for (; !it.atEnd(); ++it) {
         const GA_Attribute* sourceAttr = it.attrib();
-#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
         if (nullptr == targetGeo.findVertexAttribute(it.name())) {
             targetGeo.addVertexAttrib(sourceAttr);
         }
         GA_Attribute* targetAttr = targetGeo.findVertexAttribute(it.name());
-#else
-        if (!targetGeo.findVertexAttribute(it.name()).isValid()) {
-            targetGeo.addVertexAttrib(sourceAttr);
-        }
-        GA_Attribute* targetAttr = targetGeo.findVertexAttribute(it.name()).getAttribute();
-#endif
 
         if (sourceAttr && targetAttr) {
-#if (UT_VERSION_INT >= 0x0c01007D) // 12.1.125 or later
             targetAttr->hardenAllPages();
-#endif
             AttributeCopyBase::Ptr att = createAttributeCopier(*sourceAttr, *targetAttr);
             if(att) vertAttributeList.push_back(att);
         }
@@ -1630,17 +1575,10 @@ transferPrimitiveAttributes(
             if (std::string(it.name()) == "P") continue; // Ignore previous point positions.
 
             const GA_Attribute* sourceAttr = it.attrib();
-#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
             if (nullptr == targetGeo.findPointAttribute(it.name())) {
                 targetGeo.addPointAttrib(sourceAttr);
             }
             GA_Attribute* targetAttr = targetGeo.findPointAttribute(it.name());
-#else
-            if (!targetGeo.findPointAttribute(it.name()).isValid()) {
-                targetGeo.addPointAttrib(sourceAttr);
-            }
-            GA_Attribute* targetAttr = targetGeo.findPointAttribute(it.name()).getAttribute();
-#endif
 
             if (sourceAttr && targetAttr) {
                 AttributeCopyBase::Ptr att = createAttributeCopier(*sourceAttr, *targetAttr);

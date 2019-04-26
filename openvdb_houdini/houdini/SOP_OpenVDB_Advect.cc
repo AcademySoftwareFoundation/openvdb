@@ -56,12 +56,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -79,12 +73,7 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -300,9 +289,7 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Advect")
         .addInput("Velocity VDB")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Advect::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -585,16 +572,9 @@ processGrids(GU_Detail* gdp, AdvectionParms& parms, hvdb::Interrupter& boss,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Advect)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Advect::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal now = context.getTime();
 
         // Evaluate UI parameters

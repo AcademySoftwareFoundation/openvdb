@@ -44,7 +44,7 @@
 
 #include <UT/UT_Version.h>
 
-#ifndef SESI_OPENVDB
+#if !defined(SESI_OPENVDB) && !defined(SESI_OPENVDB_PRIM)
 
 #include <UT/UT_VDBUtils.h>
 
@@ -766,7 +766,7 @@ inline openvdb::math::Vec2<T>   SYSmax(const openvdb::math::Vec2<T> &v1, const o
 
 #endif // __HDK_UT_VDBUtils__
 
-#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+#endif // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

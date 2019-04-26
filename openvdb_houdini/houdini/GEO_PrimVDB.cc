@@ -47,7 +47,8 @@
  */
 
 #include <UT/UT_Version.h>
-#if (UT_VERSION_INT < 0x0c050157) // earlier than 12.5.343
+
+#if defined(SESI_OPENVDB) || defined(SESI_OPENVDB_PRIM)
 
 #include "GEO_PrimVDB.h"
 
@@ -110,24 +111,6 @@ static const UT_StringHolder    theKWVertex = "vertex"_sh;
 static const UT_StringHolder    theKWVDB = "vdb"_sh;
 static const UT_StringHolder    theKWVDBVis = "vdbvis"_sh;
 
-#if (UT_VERSION_INT < 0x0c0100B6) // earlier than 12.1.182
-static bool
-geo_JVDBError(UT_JSONParser &p, const GA_Primitive *prim, const char *m)
-{
-    p.addFatal("Error loading %s: %s", prim->getTypeName(), m);
-    return false;
-}
-#endif
-
-#if (UT_VERSION_INT < 0x0c010048) // earlier than 12.1.72
-GA_IntrinsicManager::Registrar
-GEO_PrimVDB::registerIntrinsics(GA_PrimitiveDefinition &defn)
-{
-    ///defn.setMergeConstructor(&gaPrimitiveMergeConstructor);
-    return GEO_Primitive::registerIntrinsics(defn);
-}
-#endif
-
 
 GEO_PrimVDB::UniqueId
 GEO_PrimVDB::nextUniqueId()
@@ -146,79 +129,13 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
     , myMetadataUniqueId(GEO_PrimVDB::nextUniqueId())
     , myTransformUniqueId(GEO_PrimVDB::nextUniqueId())
 {
-#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
-    myVertex = allocateVertex();
-#else
-#if (UT_VERSION_INT < 0x10000162)
-    myVertex = GA_INVALID_OFFSET;
-#endif
-#endif
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    myStashedState = false;
-    if (d) d->addVolumeRef();
-#endif
 }
 
-#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
-GEO_PrimVDB::GEO_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
-                         GA_Offset offset, const GEO_PrimVDB &src_prim)
-    : GEO_Primitive(static_cast<GEO_Detail *>(&detail), offset)
-    , myVis(src_prim.myVis)
-{
-    myUniqueId.exchange(src_prim.getUniqueId());
-
-    if (map.isIdentityMap(GA_ATTRIB_VERTEX))
-    {
-        myVertex = src_prim.myVertex;
-    }
-    else
-    {
-        GA_Offset sidx = src_prim.myVertex; // Get source index
-        myVertex = map.mapDestFromSource(GA_ATTRIB_VERTEX, sidx);
-    }
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    myStashedState = false;
-    static_cast<GEO_Detail &>(detail).addVolumeRef();
-#endif
-
-    copyGridFrom(src_prim); // makes a shallow copy
-}
-#endif
-
-#if (UT_VERSION_INT < 0x10000162)
-GEO_PrimVDB::~GEO_PrimVDB()
-{
-    if (GAisValid(myVertex))
-        destroyVertex(myVertex);
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    if (!myStashedState && getParent())
-        getParent()->delVolumeRef();
-#endif
-}
-#endif
-
-#if (UT_VERSION_INT < 0x10000162)
-void
-GEO_PrimVDB::clearForDeletion()
-{
-    myVertex = GA_INVALID_OFFSET;
-    GEO_Primitive::clearForDeletion();
-}
-#endif
-
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
 void
 GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
 {
     // NB: Base class must be unstashed before we can call allocateVertex().
     GEO_Primitive::stashed(beingstashed, offset);
-#if UT_VERSION_INT < 0x1000011F // earlier than 16.0.287
-    myVertex = beingstashed ? GA_INVALID_OFFSET : allocateVertex();
-#else
-#if (UT_VERSION_INT < 0x10000162)
-    myVertex = GA_INVALID_OFFSET;
-#endif
-#endif
     if (!beingstashed)
     {
         // Reset to state as if freshly constructed
@@ -237,24 +154,7 @@ GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
         // as if freshly constructed when unstashing.
         myGridAccessor.clear();
     }
-#else
-void
-GEO_PrimVDB::stashed(int onoff, GA_Offset offset)
-{
-#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
-    if (getParent())
-    {
-        if (onoff)
-            getParent()->delVolumeRef();
-        else
-            getParent()->addVolumeRef();
-    }
-    myStashedState = (onoff != 0);
-#endif
-    // NB: Base class must be unstashed before we can call allocateVertex().
-    GEO_Primitive::stashed(onoff, offset);
-    myVertex = onoff ? GA_INVALID_OFFSET : allocateVertex();
-#endif
+
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0);
 }
@@ -1061,14 +961,6 @@ GEO_PrimVDB::countBaseMemory(UT_MemoryCounter &counter) const
         counter.countShared(size, refcount, ptr);
     }
 }
-
-#if (UT_VERSION_INT < 0x10000162)
-GA_Size
-GEO_PrimVDB::getVertexCount(void) const
-{
-    return 1;
-}
-#endif
 
 
 template <typename GridType>
@@ -2645,9 +2537,6 @@ public:
         return false;
     }
 
-    // Implement these methods to be the same as the H12.5 base class version.
-    // In H12.1, these methods were pure virtual.
-#if 1
     virtual bool
     saveField(const GA_Primitive *pr, int i, UT_JSONValue &val,
               const GA_SaveMap &map) const
@@ -2666,7 +2555,6 @@ public:
         p.stealErrors(*parser);
         return ok;
     }
-#endif
 
     virtual bool
     isEqual(int i, const GA_Primitive *p0, const GA_Primitive *p1) const
@@ -2976,11 +2864,7 @@ GEO_PrimVDB::isDegenerate() const
 // Methods to handle vertex attributes for the attribute dictionary
 //
 void
-#if (UT_VERSION_INT >= 0x0d000000)
 GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc)
-#else
-GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
-#endif
 {
     if (psrc == this) return;
 
@@ -2992,57 +2876,10 @@ GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
     //       vertices, but we should do so across primitives as well.
     GA_VertexWrangler vertex_wrangler(*getParent(), *src->getParent());
 
-#if (UT_VERSION_INT >= 0x10000162)
     GEO_Primitive::copyPrimitive(psrc);
-#else
-    GA_Offset v = myVertex;
-    const GA_IndexMap &src_points = src->getParent()->getPointMap();
-    GA_Index ptind = src_points.indexFromOffset(src->vertexPoint(0));
-#if (UT_VERSION_INT >= 0x0d000000)
-    GA_Offset ptoff = getParent()->pointOffset(ptind);
-    wireVertex(v, ptoff);
-#else
-    GEO_Point *ppt = ptredirect[ptind];
-    wireVertex(v, ppt ? ppt->getMapOffset() : GA_INVALID_OFFSET);
-#endif
-    vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
-#endif
 
     myVis = src->myVis;
 }
-
-#if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
-#if (UT_VERSION_INT >= 0x0c050132) // 12.5.306 or later
-void
-GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, GA_Index basept)
-#else
-void
-GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
-#endif
-{
-    if (psrc == this) return;
-
-    const GEO_PrimVDB   *src = (const GEO_PrimVDB *)psrc;
-    const GA_IndexMap   &points = getParent()->getPointMap();
-    const GA_IndexMap   &src_points = src->getParent()->getPointMap();
-    GA_Offset            ppt;
-
-    copyGridFrom(*src); // makes a shallow copy
-
-    // TODO: Well and good to reuse the attribute handle for all our
-    //       points/vertices, but we should do so across primitives
-    //       as well.
-    GA_VertexWrangler            vertex_wrangler(*getParent(),
-                                                 *src->getParent());
-
-    GA_Offset   v = fastVertexOffset(0);
-    ppt = points.offsetFromIndex(
-            src_points.indexFromOffset(src->vertexPoint(0)) + basept);
-    wireVertex(v, ppt);
-    vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
-    myVis = src->myVis;
-}
-#endif
 
 static inline
 openvdb::math::Vec3d
@@ -3131,12 +2968,8 @@ GEO_PrimVDB::GridAccessor::setGridAdapter(
     if (myGrid.get() == &grid)
         return;
     setVertexPosition(grid.transform(), prim);
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    myGrid = grid.copyGrid(); // always shallow-copy the source grid
-#else
     myGrid = openvdb::ConstPtrCast<openvdb::GridBase>(
         grid.copyGrid()); // always shallow-copy the source grid
-#endif
     myStorageType = UTvdbGetGridType(*myGrid);
 }
 
@@ -3149,67 +2982,12 @@ GEO_PrimVDB::copy(int preserve_shared_pts) const
         return nullptr;
 
     GEO_PrimVDB* vdb = static_cast<GEO_PrimVDB*>(clone);
-#if (UT_VERSION_INT < 0x10000162)
-#if UT_VERSION_INT >= 0x1000011F // 16.0.287 or later
-    vdb->assignVertex(getDetail().appendVertex(), true);
-#endif
-#endif
 
     // Give the clone the same serial number as this primitive.
     vdb->myUniqueId.exchange(this->getUniqueId());
 
     // Give the clone a shallow copy of this primitive's grid.
     vdb->copyGridFrom(*this);
-
-#if (UT_VERSION_INT < 0x10000162)
-    // TODO: Well and good to reuse the attribute handle for all our
-    //       points/vertices, but we should do so across primitives
-    //       as well.
-    GA_ElementWranglerCache      wranglers(*getParent(),
-                                        GA_PointWrangler::INCLUDE_P);
-
-    int nvtx = getVertexCount();
-
-    if (preserve_shared_pts)
-    {
-        UT_SparseArray<GA_Offset *>     addedpoints;
-        GA_Offset                       *ppt_ptr;
-
-        for (int i = 0; i < nvtx; i++)
-        {
-            GA_Offset            src_ppt = vertexPoint(i);
-            GA_Offset            v  = vdb->fastVertexOffset(i);
-            GA_Offset            sv = fastVertexOffset(i);
-
-            GA_Offset ppt;
-            if (!(ppt_ptr = addedpoints(src_ppt)))
-            {
-                ppt = getParent()->appendPointOffset();
-                wranglers.getPoint().copyAttributeValues(ppt, src_ppt);
-                addedpoints.append(src_ppt, new GA_Offset(ppt));
-            }
-            else
-                ppt = *ppt_ptr;
-            vdb->wireVertex(v, ppt);
-            wranglers.getVertex().copyAttributeValues(v, sv);
-        }
-
-        int dummy_index;
-        for (int i = 0; i < addedpoints.entries(); i++)
-            delete (GA_Offset *)addedpoints.getRawEntry(i, dummy_index);
-    }
-    else
-    {
-        for (int i = 0; i < nvtx; i++)
-        {
-            GA_Offset   v = vdb->fastVertexOffset(i);
-            GA_Offset ppt = getParent()->appendPointOffset();
-            vdb->wireVertex(v, ppt);
-            wranglers.getPoint().copyAttributeValues(ppt, vertexPoint(i));
-            wranglers.getVertex().copyAttributeValues(v, fastVertexOffset(i));
-        }
-    }
-#endif
 
     vdb->myVis = myVis;
 
@@ -3223,23 +3001,7 @@ GEO_PrimVDB::copyUnwiredForMerge(const GA_Primitive *prim_src, const GA_MergeMap
 
     const GEO_PrimVDB* src = static_cast<const GEO_PrimVDB*>(prim_src);
 
-#if (UT_VERSION_INT >= 0x10000162)
     GEO_Primitive::copyUnwiredForMerge(prim_src, map);
-#else
-    if (GAisValid(myVertex))
-        destroyVertex(myVertex);
-
-    if (map.isIdentityMap(GA_ATTRIB_VERTEX))
-    {
-        myVertex = src->myVertex;
-    }
-    else
-    {
-        GA_Offset sidx = src->myVertex; // Get source index
-        // Map to dest
-        myVertex = map.mapDestFromSource(GA_ATTRIB_VERTEX, sidx);
-    }
-#endif
 
     copyGridFrom(*src); // makes a shallow copy
 
@@ -3249,7 +3011,6 @@ GEO_PrimVDB::copyUnwiredForMerge(const GA_Primitive *prim_src, const GA_MergeMap
 void
 GEO_PrimVDB::assignVertex(GA_Offset new_vtx, bool update_topology)
 {
-#if (UT_VERSION_INT >= 0x10000162)
     if (getVertexCount() == 1)
     {
         GA_Offset orig_vtx = getVertexOffset();
@@ -3265,29 +3026,7 @@ GEO_PrimVDB::assignVertex(GA_Offset new_vtx, bool update_topology)
     }
     if (update_topology)
         registerVertex(new_vtx);
-#else
-    if (myVertex != new_vtx)
-    {
-        if (GAisValid(myVertex))
-            destroyVertex(myVertex);
-        myVertex = new_vtx;
-        if (update_topology)
-            registerVertex(myVertex);
-    }
-#endif
 }
-
-#if (UT_VERSION_INT < 0x10000162)
-void
-GEO_PrimVDB::swapVertexOffsets(const GA_Defragment &defrag)
-{
-    GA_Offset   v = myVertex;
-    if (defrag.hasOffsetChanged(v))
-    {
-        myVertex = defrag.mapOffset(v);
-    }
-}
-#endif
 
 const char *
 GEO_PrimVDB::getGridName() const
@@ -3566,7 +3305,7 @@ GEO_PrimVDB::isIntrinsicMetadata(const char *name)
     return theMetaNames.contains(name);
 }
 
-#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+#endif // SESI_OPENVDB || SESI_OPENVDB_PRIM
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
