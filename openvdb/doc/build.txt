@@ -7,6 +7,7 @@
 - @ref buildCmakeStructure
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
+  - @ref buildBloscSupport
 - @ref buildComponents
 - @ref buildGuide
   - @ref buildBuildTypes
@@ -136,6 +137,19 @@ respectively.
 In summary try to stick to a single installation workflow and, if in doubt,
 provide direct include/lib paths to isolated software locations.
 
+@subsection buildBloscSupport Blosc Support
+
+Blosc is one of the optional dependencies of all OpenVDB components. It is the
+only dependency which is enabled by default. The documented build steps below
+treat blosc as a required dependency. There are two reasons for this:
+
+ - Blosc produces significantly smaller `.vdb` files
+ - If Blosc is disabled, you will not be able to read or use any `.vdb` files
+   that were created using blosc compression. This includes OpenVDB files from
+   Houdini.
+
+You can disable Blosc using `-D USE_BLOSC=OFF`.
+
 @section buildComponents OpenVDB Components
 
 The following table lists all targets (mainly library and binary components)
@@ -180,6 +194,9 @@ Developers may wish to build a standalone version of OpenVDB to take advantage
 of newer dependencies and newer library features. See
 [here](@ref buildBuildStandalone) for more information.
 
+@b Note: Blosc is treated as a required dependency in these install instructions.
+See the [blosc support](@ref buildBloscSupport) section for more information.
+
 @subsection buildBuildHouMaya Building Against Houdini/Maya
 
 Building against a DCC reduces the list of dependencies you need to provide.
@@ -220,7 +237,8 @@ NumPy          | Scientific computing with Python                               
 
 At a minimum, boost, a matching C++11 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
-installing the above software.
+installing the above software. Note that as Blosc is provided as part of the
+Houdini installation `USE_BLOSC` should be left `ON`.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've
@@ -238,6 +256,7 @@ Required:
 
   - @b HOUDINI_ROOT =`/path/to/houdini/install` # Path to Houdini Install
   - @b USE_HOUDINI =`ON` # Force all components to build against Houdini
+  - @b OPENVDB_BUILD_HOUDINI_PLUGIN =`ON` # Required for building the Houdini Plugin.
 
 Optional:
 
@@ -264,11 +283,6 @@ cmake -D BOOST_ROOT=/path/to/boost/install \
       -D USE_HOUDINI=ON \
       ../
 @endcode
-
-As the Houdini plugin is disabled by default, you may also want to add
-`-D OPENVDB_BUILD_HOUDINI_PLUGIN=ON` to the command. The
-[components](@ref buildComponents) section shows which targets are enabled by
-default.
 
 After the CMake build files have been successfully generated, run make within
 the build directory to compile the project, where the value of the `j` argument
@@ -297,17 +311,19 @@ C++11 Compiler | Matching Houdini compiler and version                          
 Boost          | Components: system, iostreams, python, thread                     | All                              |
 IlmBase        | Used half precision floating points and EXR serialization support | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
+Blosc          | Recommended dependency for improved disk compression              | All*                             |
 CppUnit        | A unit testing framework module for C++                           | Unit Tests                       |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | Optional (Core) / OpenVDB Render |
-Blosc          | Recommended dependency for improved disk compression              | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
 
-At a minimum, boost, a matching C++11 compiler, IlmBase, ZLIB and CMake will be
-required. See the full [dependency list](@ref dependencies) for help with
-downloading and installing the above software.
+* See [blosc support](@ref buildBloscSupport)
+
+At a minimum, boost, a matching C++11 compiler, IlmBase, ZLIB, blosc and CMake
+will be required. See the full [dependency list](@ref dependencies) for help
+with downloading and installing the above software.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've
@@ -501,5 +517,19 @@ cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb \
     -D TBB_LIBRARYDIR=/path/to/tbb/install/lib \
     ../
 @endcode
+
+@subsection troubleshoot2 CMake Error ... Could NOT find XXX (Found unsuitable version: ... )
+
+By default, OpenVDB sets a number of minimum version requires for its
+dependencies. These can be found in the root CMakeList.txt or in the
+[dependency table](@ref dependencies). These minimum versions either track
+the oldest supported [VFX Reference Platform](https://www.vfxplatform.com/) or
+are otherwise required for compatibility. Although not recommended, you can
+bypass these checks with `-D DISABLE_DEPENDENCY_VERSION_CHECKS=ON` if necessary.
+Note that using older or untested dependencies may produce undesired behavior.
+Older versions in particular are not supported by OpenVDB.
+
+@b Note: Boost will produce a version error in the format `Detected version of
+Boost is too old.`
 
 */

@@ -93,8 +93,9 @@ IF ( USE_BLOSC )
       )
   ENDIF ()
 ELSE ()
-  MESSAGE ( STATUS "Blosc is currently disabled - it's recommended to enable "
-    "blosc for optimal builds of OpenVDB."
+  MESSAGE ( WARNING "Blosc support is disabled. It is strongly recommended to "
+    "enable blosc for optimal builds of OpenVDB and to support compatible "
+    "serialization of other OpenVDB installations."
     )
 ENDIF ()
 
