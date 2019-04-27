@@ -26,7 +26,7 @@
 #
 
 # yue.nicholas@gmail.com
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 
 PROJECT ( OpenVDB )
 
@@ -38,14 +38,15 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
 
-OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" ON )
+OPTION ( OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF )
 OPTION ( OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF )
-OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
+OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF )
 OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini SOPs" OFF )
 OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
 OPTION ( OPENVDB_BUILD_CORE "Build the OpenVDB core" ON )
+OPTION ( OPENVDB_BUILD_VIEWER "Build openvdb viewer" OFF)
 OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
+OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" OFF )
 OPTION ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING "Disable the implicit linking of Boost libraries on Windows" ON )
 OPTION ( OPENVDB_CXX_STRICT "Enable or disable a set of pre-defined compiler warnings for clang and gcc" OFF )
 OPTION ( USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON )
@@ -116,7 +117,7 @@ IF ( OPENVDB_CXX_STRICT )
             -Woverloaded-virtual
         )
     ELSE ()
-        MESSAGE ( WARNING "No available CXX warnings for compiler "${CMAKE_CXX_COMPILER_ID} )
+        MESSAGE ( WARNING "No available CXX warnings for compiler" ${CMAKE_CXX_COMPILER_ID} )
     ENDIF ()
 ENDIF ()
 
