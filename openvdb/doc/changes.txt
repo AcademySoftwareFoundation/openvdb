@@ -71,6 +71,8 @@ Bug fixes:
 - Fixed a bug in @vdblink::tools::segmentActiveVoxels() segmentActiveVoxels@endlink
   and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
   nodes were only pruned when there was more than one segment.
+- Fixed a bug that caused @vdblink::points::AttributeArray AttributeArray@endlink
+  equality operators to fail for attributes with non constant strides.
 
 @par
 API changes:
