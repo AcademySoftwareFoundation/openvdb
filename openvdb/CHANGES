@@ -26,6 +26,11 @@ Version 6.0.1 - In development
       AttributeArrays are now thread-safe.
     - The command-line tools (vdb_print, etc.) now include the library
       ABI version in their -version output.
+    - The CMake build system has been significantly improved to support a
+      wider range of build options and use cases. This includes better
+      dependency handling and status reporting, find module installation for
+      external use, more robust handling of different platform configurations
+      and the introduction of dependency and build doxygen documentation.
 
     Bug fixes:
     - Fixed a bug in tools::clip() that caused some grid metadata

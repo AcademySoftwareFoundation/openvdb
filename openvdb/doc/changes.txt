@@ -45,6 +45,11 @@ Improvements:
   and the copy assignment operator for AttributeArrays are now thread-safe.
 - The command-line tools (<TT>vdb_print</TT>, etc.) now include
   the library ABI version in their <TT>-version</TT> output.
+- The CMake build system has been significantly improved to support a
+  wider range of build options and use cases. This includes better
+  dependency handling and status reporting, find module installation for
+  external use, more robust handling of different platform configurations
+  and the introduction of dependency and build doxygen documentation.
 
 @par
 Bug fixes:
