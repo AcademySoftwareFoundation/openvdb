@@ -192,6 +192,29 @@
 #endif
 
 
+/// @brief Bracket code with OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN/_END,
+/// to inhibit warnings about type conversion.
+/// @note Use this sparingly.  Use static casts and explicit type conversion if at all possible.
+/// @details Example:
+/// @code
+/// float value = 0.1f;
+/// OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+/// int valueAsInt = value;
+/// OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+/// @endcode
+#if defined __GNUC__
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
+        _Pragma("GCC diagnostic push") \
+        _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
+        _Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"")
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END \
+        _Pragma("GCC diagnostic pop")
+#else
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+#endif
+
+
 #ifdef _MSC_VER
     /// Visual C++ does not have constants like M_PI unless this is defined.
     /// @note This is needed even though the core library is built with this but

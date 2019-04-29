@@ -253,8 +253,8 @@ TestLevelSetUtil::testSegmentationTools()
 
         openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0);
 
-        auto* leaf1 = grid->tree().touchLeaf(openvdb::Coord(0,0,0));
-        auto* leaf2 = grid->tree().touchLeaf(openvdb::Coord(100,100,100));
+        grid->tree().touchLeaf(openvdb::Coord(0,0,0));
+        grid->tree().touchLeaf(openvdb::Coord(100,100,100));
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), grid->tree().activeVoxelCount());

@@ -575,7 +575,9 @@ sampleValue(const Coord& ijk, double level) const
     if ( level0 == level1 ) return v0;
     assert( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( ijk, 0, level1 );
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     return a * v0 + (ValueType(1) - a) * v1;
 }
 
@@ -590,7 +592,9 @@ sampleValue(const Vec3R& xyz, double level) const
     if ( level0 == level1 ) return v0;
     assert( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( xyz, 0, level1 );
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
     return a * v0 + (ValueType(1) - a) * v1;
 }
 
@@ -802,9 +806,15 @@ struct MultiResGrid<TreeType>::FractionOp
         for (typename Range1::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             for (VoxelIter voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 Coord ijk = voxelIter.getCoord();
-                ijk[0] = int(math::Round(ijk[0] * scale));
-                ijk[1] = int(math::Round(ijk[1] * scale));
-                ijk[2] = int(math::Round(ijk[2] * scale));
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                const auto value0 = ijk[0] * scale;
+                const auto value1 = ijk[1] * scale;
+                const auto value2 = ijk[2] * scale;
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                ijk[0] = int(math::Round(value0));
+                ijk[1] = int(math::Round(value1));
+                ijk[2] = int(math::Round(value2));
+
                 acc.setValueOn( ijk );
             }//loop over active voxels in the fine tree
         }// loop over leaf nodes in the fine tree
@@ -839,7 +849,11 @@ struct MultiResGrid<TreeType>::FractionOp
                 const Vec3R xyz =  Vec3R( voxelIter.getCoord().data() );// mid level coord
                 const ValueType v0 = tools::Sampler<Order>::sample( acc0, xyz * scale0 );
                 const ValueType v1 = tools::Sampler<Order>::sample( acc1, xyz * scale1 );
-                voxelIter.setValue( ValueType(a*v0 + b*v1) );
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                const auto value0 = a*v0;
+                const auto value1 = b*v1;
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                voxelIter.setValue( ValueType(value0 + value1) );
             }
         }
     }
