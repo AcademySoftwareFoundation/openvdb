@@ -72,6 +72,8 @@ Bug fixes:
   and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
   nodes were only pruned when there was more than one segment.
 - Fixed a crash in point moving when using group filters.
+- Fixed a bug where the stride of existing attributes was being ignored
+  during copy-construction of an AttributeSet.
 
 @par
 API changes:
