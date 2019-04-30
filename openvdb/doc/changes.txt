@@ -102,6 +102,9 @@ Houdini:
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
 - VDB Vector Merge SOP now copies metadata from the representative
   scalar grid.
+- Deprecated @b SOP_NodeVDB::duplicateSourceStealable(),
+  @b houdini_utils::getNodeChain(), @b houdini_utils::OP_EvalScope and
+  @b houdini_utils::ScopedInputLock.
 
 @par
 Python:
