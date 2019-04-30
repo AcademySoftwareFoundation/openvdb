@@ -603,7 +603,7 @@ namespace {
 class DefaultOpenVDBOpPolicy: public houdini_utils::OpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
+    static std::string getName(const std::string& english)
     {
         UT_String s(english);
         // Remove non-alphanumeric characters from the name.
@@ -613,6 +613,11 @@ public:
         name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
         name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
         return name;
+    }
+
+    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
+    {
+        return DefaultOpenVDBOpPolicy::getName(english);
     }
 
     /// @brief OpenVDB operators of each flavor (SOP, POP, etc.) share
@@ -628,13 +633,18 @@ public:
 class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    static std::string getName(const std::string& english)
     {
-        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        std::string name = DefaultOpenVDBOpPolicy::getName(english);
         UT_String s(name);
         // Lowercase
         s.toLower();
         return s.toStdString();
+    }
+
+    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
+    {
+        return SESIOpenVDBOpPolicy::getName(english);
     }
 };
 
@@ -643,15 +653,21 @@ public:
 class ASWFOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
-        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        std::string name = DefaultOpenVDBOpPolicy::getName(english);
         return "DW_Open" + name;
     }
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
         return "Open" + factory.english();
+    }
+
+    std::string getFirstName(const houdini_utils::OpFactory& factory) override
+    {
+        // apply SESI operator name renaming to our label name to generate first name
+        return SESIOpenVDBOpPolicy::getName(this->getLabelName(factory));
     }
 };
 
