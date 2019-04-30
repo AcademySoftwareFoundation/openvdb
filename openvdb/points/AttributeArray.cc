@@ -193,8 +193,8 @@ AttributeArray::operator==(const AttributeArray& other) const
     this->loadData();
     other.loadData();
 
-    if(this->mSerializationFlags != other.mSerializationFlags ||
-       this->mFlags != other.mFlags) return false;
+    if (this->mUsePagedRead != other.mUsePagedRead ||
+        this->mFlags != other.mFlags) return false;
     return this->isEqual(other);
 }
 
