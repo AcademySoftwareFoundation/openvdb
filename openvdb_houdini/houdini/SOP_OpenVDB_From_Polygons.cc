@@ -527,6 +527,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_From_Polygons::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBFromPolygons")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("Polygons to Convert")
         .addOptionalInput("Optional Reference VDB (for transform matching)")

@@ -225,6 +225,8 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB to Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBToSpheres")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("VDBs to convert")
         .setObsoleteParms(obsoleteParms)

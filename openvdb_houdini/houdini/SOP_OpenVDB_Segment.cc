@@ -226,6 +226,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Segment::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBSegment")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("OpenVDB grids")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })

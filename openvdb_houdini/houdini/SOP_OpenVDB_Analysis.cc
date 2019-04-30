@@ -215,6 +215,10 @@ Normalize (vector -> vector):\n\
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Analysis", SOP_OpenVDB_Analysis::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Analyze")
         .addOptionalInput("Optional VDB mask input")

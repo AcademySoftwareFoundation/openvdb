@@ -340,6 +340,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Morph_Level_Set::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBMorphLevelSet")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Source SDF VDBs to Morph")

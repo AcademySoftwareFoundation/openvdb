@@ -206,6 +206,10 @@ newSopOperator(OP_OperatorTable* table)
     //////////
 
     hvdb::OpenVDBOpFactory("VDB Fracture", SOP_OpenVDB_Fracture::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("OpenVDB grids to fracture\n"
             "(Required to have matching transforms and narrow band widths)")
         .addInput("Cutter objects (geometry).")

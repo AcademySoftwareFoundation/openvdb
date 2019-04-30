@@ -105,6 +105,10 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Vector Split",
         SOP_OpenVDB_Vector_Split::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("Vector VDBs to split into scalar VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Split::Cache; })
         .setDocumentation("\

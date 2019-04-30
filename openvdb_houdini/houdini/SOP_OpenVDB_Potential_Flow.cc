@@ -220,6 +220,10 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Potential Flow",
         SOP_OpenVDB_Potential_Flow::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDB Surface and optional velocity VDB")
         .addOptionalInput("Optional VDB Mask")
         .setVerb(SOP_NodeVerb::COOK_INPLACE,

@@ -389,6 +389,7 @@ class OPENVDB_HOUDINI_API OpFactory
 {
 public:
     enum OpFlavor { SOP, POP, ROP, VOP, HDA };
+    enum OpHidePolicy { OPHIDE_NONE=0x0, OPHIDE_NATIVE=0x1, OPHIDE_ASWF=0x2 };
 
     /// @brief Return "SOP" for the SOP flavor, "POP" for the POP flavor, etc.
     /// @details Useful in OpPolicy classes for constructing type and icon names.
@@ -480,6 +481,24 @@ public:
     OpFactory& setInternalName(const std::string& name);
     OpFactory& setOperatorTable(const std::string& name);
 
+    /// @brief Hide this operator for the provided OpFactory::OpHidePolicy values.
+    /// @param flags A union of one or more OpFactory::OpHidePolicy values.
+    /// @details Mark this node to be hidden on initialization when the flags
+    /// variable contains the defined OpHidePolicy value.
+    /// @note There can only be one OpHidePolicy defined.
+    OpFactory& setHideFlags(unsigned flags);
+    /// @brief Hide the parent operator for the provided OpFactory::OpHidePolicy values.
+    /// @param flags A union of one or more OpFactory::OpHidePolicy values.
+    /// @details Mark the parent node to be hidden on initialization when the flags
+    /// variable contains the defined OpHidePolicy value.
+    /// @note There can only be one OpHidePolicy defined.
+    OpFactory& setHideParentFlags(unsigned flags);
+
+    /// @brief Set the name of the parent operator.
+    /// @details This is typically the name of the operator shipped with Houdini and is
+    /// only needed where the parent name policy doesn't provide the correct name.
+    OpFactory& setParentName(const std::string& name);
+
     /// @brief Functor that returns newly-allocated node caches
     /// for instances of this operator
     /// @details A node cache encapsulates a SOP's cooking logic for thread safety.
@@ -534,6 +553,10 @@ public:
 
     /// @brief Return a help URL for the operator defined by the given factory.
     virtual std::string getHelpURL(const OpFactory&) { return ""; }
+
+    /// @brief Return the name of the parent operator.
+    /// @note This is typically the name of the native operator if shipped with Houdini.
+    virtual std::string getParentName(const OpFactory&) { return ""; }
 
     /// @brief Return a label name for the operator defined by the given factory.
     /// @details In this base class implementation, this method simply returns

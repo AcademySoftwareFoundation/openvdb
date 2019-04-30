@@ -148,6 +148,10 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Occlusion Mask",
         SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDBs")
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Occlusion_Mask::Cache; })

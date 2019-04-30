@@ -138,6 +138,10 @@ newSopOperator(OP_OperatorTable* table)
             "In Single Level mode, give the output VDB the same name as the input VDB."));
 
     hvdb::OpenVDBOpFactory("VDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_LOD::Cache; })
         .setDocumentation("\

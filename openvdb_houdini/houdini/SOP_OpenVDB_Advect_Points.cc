@@ -832,6 +832,10 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Advect Points",
         SOP_OpenVDB_Advect_Points::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Points to Advect")
         .addOptionalInput("Velocity VDB")

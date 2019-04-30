@@ -281,6 +281,10 @@ Using Voxel Scale Only:\n\
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Source VDB grids to resample")
         .addOptionalInput("Optional transform reference VDB grid")

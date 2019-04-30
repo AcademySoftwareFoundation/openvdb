@@ -189,6 +189,10 @@ Mask VDB:\n\
 
 
     hvdb::OpenVDBOpFactory("VDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDBs")
         .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)

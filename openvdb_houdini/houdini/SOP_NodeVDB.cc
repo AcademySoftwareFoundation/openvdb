@@ -661,7 +661,12 @@ public:
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
-        return "Open" + factory.english();
+        return factory.english();
+    }
+
+    std::string getParentName(const houdini_utils::OpFactory& factory) override
+    {
+        return SESIOpenVDBOpPolicy::getName(factory.english());
     }
 
     std::string getFirstName(const houdini_utils::OpFactory& factory) override

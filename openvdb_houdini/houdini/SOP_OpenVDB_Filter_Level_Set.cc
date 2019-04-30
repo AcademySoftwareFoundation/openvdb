@@ -579,6 +579,8 @@ newSopOperator(OP_OperatorTable* table)
                 SOP_OpenVDB_Filter_Level_Set::factoryRenormalize, parms, *table)
 #ifndef SESI_OPENVDB
                 .setInternalName("DW_OpenVDBRenormalizeLevelSet")
+                .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+                .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDB grids to process")
@@ -618,6 +620,8 @@ and usage examples.\n");
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
 #ifndef SESI_OPENVDB
                 .setInternalName("DW_OpenVDBOffsetLevelSet")
+                .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+                .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
@@ -651,6 +655,8 @@ and usage examples.\n");
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
 #ifndef SESI_OPENVDB
                 .setInternalName("DW_OpenVDBSmoothLevelSet")
+                .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+                .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")

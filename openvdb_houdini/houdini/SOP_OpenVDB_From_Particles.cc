@@ -412,6 +412,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_From_Particles::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBFromParticles")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("Points to convert")
         .addOptionalInput("Optional reference VDB")

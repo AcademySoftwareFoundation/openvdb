@@ -481,6 +481,10 @@ Activity Difference:\n\
 
     // Register SOP
     hvdb::OpenVDBOpFactory("VDB Combine", SOP_OpenVDB_Combine::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .setObsoleteParms(obsoleteParms)

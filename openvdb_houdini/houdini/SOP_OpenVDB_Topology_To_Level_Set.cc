@@ -217,6 +217,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Topology_To_Level_Set::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBTopologyToLevelSet")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("VDB Grids")
         .setObsoleteParms(obsoleteParms)

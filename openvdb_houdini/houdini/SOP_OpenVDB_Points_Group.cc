@@ -325,6 +325,10 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Points Group",
         SOP_OpenVDB_Points_Group::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDB Points")
         .addOptionalInput("Optional bounding geometry or level set")
         .setObsoleteParms(obsoleteParms)

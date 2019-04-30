@@ -1801,6 +1801,10 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     hvdb::OpenVDBOpFactory("VDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("VDB Volumes")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })
         .setDocumentation("\

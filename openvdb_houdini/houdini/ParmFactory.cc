@@ -977,6 +977,21 @@ private:
     PRM_Template* mParms;
 }; // class OpFactoryVerb
 
+static OpFactory::OpHidePolicy getOpHidePolicy()
+{
+    if (const char* envHideStr = std::getenv("OPENVDB_OPHIDE_POLICY")) {
+        std::istringstream stream(envHideStr);
+        unsigned envHideValue = 0;
+        stream >> envHideValue;
+        return OpFactory::OpHidePolicy(envHideValue);
+    } else {
+#ifdef OPENVDB_DEFAULT_OPHIDE_POLICY
+        unsigned defineHideValue = OPENVDB_DEFAULT_OPHIDE_POLICY;
+        return OpFactory::OpHidePolicy(defineHideValue);
+#endif
+    }
+    return OpFactory::OPHIDE_NONE;
+}
 
 } // anonymous namespace
 
@@ -1017,10 +1032,13 @@ struct OpFactory::Impl
         mLabelName = mPolicy->getLabelName(factory);
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
+        mParentName = mPolicy->getParentName(factory);
         mFirstName = mPolicy->getFirstName(factory);
+
+        mHidePolicy = getOpHidePolicy();
     }
 
-    OP_OperatorDW* get()
+    OP_OperatorDW* get(std::string labelSuffix = "")
     {
         // Get the number of required inputs.
         const unsigned minSources = unsigned(mInputLabels.size());
@@ -1035,11 +1053,18 @@ struct OpFactory::Impl
 
         mInputLabels.push_back(nullptr);
 
-        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mLabelName.c_str(),
+        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(),
+            (mLabelName + labelSuffix).c_str(),
             mConstruct, mParms,
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
             minSources, mMaxSources, mVariables, mFlags,
             const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc);
+
+        if (!labelSuffix.empty()) {
+            op->setOpTabSubMenuPath("ASWF");
+        } else {
+            op->setOpTabSubMenuPath("VDB");
+        }
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
@@ -1053,7 +1078,11 @@ struct OpFactory::Impl
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
     std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mParentName;
     std::string mFirstName;
+    OpFactory::OpHidePolicy mHidePolicy;
+    unsigned mHideFlags = 0;
+    unsigned mHideParentFlags = 0;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -1076,7 +1105,21 @@ OpFactory::OpFactory(const std::string& english, OP_Constructor ctor,
 
 OpFactory::~OpFactory()
 {
-    mImpl->mTable->addOperator(mImpl->get());
+    std::string labelSuffix = "";
+
+#ifndef SESI_OPENVDB
+
+    // if no hide policy is active, add an ASWF label suffix to this node to distinguish it
+    // defining a suffix also puts the node into an "ASWF" tab sub-menu instead of "VDB"
+
+    if (mImpl->mHidePolicy == OpFactory::OPHIDE_NONE) {
+        labelSuffix = " (ASWF)";
+    }
+#endif
+
+    mImpl->mTable->addOperator(mImpl->get(labelSuffix));
+
+    // apply any node aliases
 
     for (size_t n = 0, N = mImpl->mAliases.size(); n < N; ++n) {
         const std::string& alias = mImpl->mAliases[n];
@@ -1089,6 +1132,17 @@ OpFactory::~OpFactory()
 
     if (!mImpl->mFirstName.empty()) {
         mImpl->mTable->setOpFirstName(mImpl->mName.c_str(), mImpl->mFirstName.c_str());
+    }
+
+    // set the hidden state(s) in the operator table
+
+    if (mImpl->mHidePolicy) {
+        if (mImpl->mHidePolicy & mImpl->mHideFlags) {
+            mImpl->mTable->addOpHidden(mImpl->mName.c_str());
+        } else if (!mImpl->mParentName.empty() &&
+                    mImpl->mHidePolicy & mImpl->mHideParentFlags) {
+            mImpl->mTable->addOpHidden(mImpl->mParentName.c_str());
+        }
     }
 }
 
@@ -1250,6 +1304,30 @@ OpFactory&
 OpFactory::setOperatorTable(const std::string& name)
 {
     mImpl->mOperatorTableName = name;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setHideFlags(unsigned flags)
+{
+    mImpl->mHideFlags = flags;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setHideParentFlags(unsigned flags)
+{
+    mImpl->mHideParentFlags = flags;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setParentName(const std::string& name)
+{
+    mImpl->mParentName = name;
     return *this;
 }
 

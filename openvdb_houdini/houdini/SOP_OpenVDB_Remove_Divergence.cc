@@ -198,6 +198,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Remove_Divergence::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBRemoveDivergence")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .addInput("Velocity field VDBs")
         .addOptionalInput("Optional collider VDB or geometry")

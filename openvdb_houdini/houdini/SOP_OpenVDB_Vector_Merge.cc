@@ -222,6 +222,10 @@ Position:\n\
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
+#endif
         .addInput("Scalar VDBs to merge into vector")
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Merge::Cache; })

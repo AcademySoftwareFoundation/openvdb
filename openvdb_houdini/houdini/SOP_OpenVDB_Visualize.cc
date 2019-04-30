@@ -364,6 +364,8 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Visualize::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBVisualize")
+        .setHideFlags(houdini_utils::OpFactory::OPHIDE_ASWF)
+        .setHideParentFlags(houdini_utils::OpFactory::OPHIDE_NATIVE)
 #endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs to visualize")
