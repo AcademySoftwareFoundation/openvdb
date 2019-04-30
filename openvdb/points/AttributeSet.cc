@@ -96,11 +96,13 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
 {
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
-        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        const AttributeArray* existingArray = attrSet.getConst(pos);
+        AttributeArray::Ptr array =
+            AttributeArray::create(mDescr->type(pos), arrayLength, existingArray->stride());
 
         // transfer hidden and transient flags
-        if (attrSet.getConst(pos)->isHidden())      array->setHidden(true);
-        if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
+        if (existingArray->isHidden())      array->setHidden(true);
+        if (existingArray->isTransient())   array->setTransient(true);
 
         mAttrs[pos] = array;
     }
