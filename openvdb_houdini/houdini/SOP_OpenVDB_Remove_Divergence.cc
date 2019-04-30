@@ -204,9 +204,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Remove_Divergence::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Remove divergence from VDB velocity fields.\"\"\"\n\
 \n\
 @overview\n\
@@ -232,12 +229,7 @@ can be used to build a simple FLIP solver.\n\
 \n\
 @related\n\
 - [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
-- [Node:sop/solver]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/solver]\n");
 }
 
 

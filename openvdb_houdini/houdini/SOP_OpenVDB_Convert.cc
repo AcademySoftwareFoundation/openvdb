@@ -419,9 +419,6 @@ Polygon Soup:\n\
         .addOptionalInput("Optional VDB masks")
         .setVerb(SOP_NodeVerb::COOK_DUPLICATE, []() { return new SOP_OpenVDB_Convert::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Convert VDB volumes into other primitive types.\"\"\"\n\
 \n\
 @overview\n\
@@ -442,12 +439,7 @@ an adaptivity multiplier.\n\
 - [OpenVDB To Polygons|Node:sop/DW_OpenVDBToPolygons]\n\
 - [OpenVDB To Spheres|Node:sop/DW_OpenVDBToSpheres]\n\
 - [Node:sop/convert]\n\
-- [Node:sop/convertvolume]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/convertvolume]\n");
 }
 
 

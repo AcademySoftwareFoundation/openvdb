@@ -220,9 +220,6 @@ Normalize (vector -> vector):\n\
         .addOptionalInput("Optional VDB mask input")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Analysis::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Compute an analytic property of a VDB volume, such as gradient or curvature.\"\"\"\n\
 \n\
 @overview\n\
@@ -236,12 +233,7 @@ volumes replace the original volumes.\n\
 \n\
 - [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
 - [Node:sop/volumeanalysis]\n\
-- [Node:sop/vdbanalysis]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbanalysis]\n");
 }
 
 

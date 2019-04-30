@@ -223,21 +223,13 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_Topology_To_Level_Set::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Create a level set VDB based on the active voxels of another VDB.\"\"\"\n\
 \n\
 @overview\n\
 \n\
 This node creates a narrow-band level set VDB that conforms to the active voxels\n\
 of the input VDB.  This forms a shell or wrapper that can be used\n\
-to conservatively enclose the input volume.\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+to conservatively enclose the input volume.\n");
 }
 
 

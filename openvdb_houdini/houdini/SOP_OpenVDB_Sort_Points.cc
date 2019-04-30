@@ -149,9 +149,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("points")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Sort_Points::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Reorder points into spatially-organized bins.\"\"\"\n\
 \n\
 @overview\n\
@@ -159,12 +156,7 @@ newSopOperator(OP_OperatorTable* table)
 This node reorders Houdini points so that they are sorted into\n\
 three-dimensional spatial bins.\n\
 By increasing CPU cache locality of point data, sorting can improve the\n\
-performance of algorithms such as rasterization that rely on neighbor access.\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+performance of algorithms such as rasterization that rely on neighbor access.\n");
 }
 
 

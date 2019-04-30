@@ -115,9 +115,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDB Points")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Delete::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Delete points that are members of specific groups.\"\"\"\n\
 \n\
 @overview\n\
@@ -129,12 +126,7 @@ members of the supplied group(s).\n\
 \n\
 @related\n\
 - [OpenVDB Points Convert|Node:sop/DW_OpenVDBPointsConvert]\n\
-- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n");
 }
 
 bool

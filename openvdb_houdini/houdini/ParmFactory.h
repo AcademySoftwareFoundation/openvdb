@@ -445,6 +445,8 @@ public:
     /// @note If the help URL is nonempty, the URL takes precedence over any help text.
     /// @sa helpURL(), setDocumentation()
     const std::string& documentation() const;
+    /// @brief Return true if an ASWF operator.
+    bool isASWF() const;
     /// @brief Return the operator table with which this factory is associated.
     /// @details This accessor is mainly for use by OpPolicy objects.
     const OP_OperatorTable& table() const;
@@ -464,6 +466,9 @@ public:
     /// @note If this factory's OpPolicy specifies a help URL, that URL
     /// takes precedence over documentation supplied with this method.
     OpFactory& setDocumentation(const std::string&);
+    /// @brief Mark operator as an ASWF operator (true by default).
+    /// @note If set, an examples section is added to the documentation.
+    OpFactory& setASWF(bool state);
     /// Add a required input with the given name.
     OpFactory& addInput(const std::string& name);
     /// Add an optional input with the given name.

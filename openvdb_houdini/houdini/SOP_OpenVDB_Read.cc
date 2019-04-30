@@ -269,9 +269,6 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional Bounding Geometry")
 #endif
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Read a `.vdb` file from disk.\"\"\"\n\
 \n\
 @overview\n\
@@ -287,12 +284,7 @@ usually requires the entire volume to be loaded into memory).\n\
 \n\
 @related\n\
 - [OpenVDB Write|Node:sop/DW_OpenVDBWrite]\n\
-- [Node:sop/file]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/file]\n");
 }
 
 

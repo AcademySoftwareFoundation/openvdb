@@ -534,9 +534,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_From_Polygons::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Convert polygonal surfaces and/or surface attributes into VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -571,12 +568,7 @@ Optional reference VDB:\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
 - [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
 - [Node:sop/isooffset]\n\
-- [Node:sop/vdbfrompolygons]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbfrompolygons]\n");
 }
 
 

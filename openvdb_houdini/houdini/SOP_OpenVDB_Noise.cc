@@ -280,9 +280,6 @@ Use mask as frequency multiplier:\n\
         .addOptionalInput("Optional VDB grid to use as mask")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Noise::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Add noise to VDB level sets.\"\"\"\n\
 \n\
 @overview\n\
@@ -293,12 +290,7 @@ An optional mask grid can be provided to control the amount of noise per voxel.\
 \n\
 @related\n\
 - [Node:sop/cloudnoise]\n\
-- [Node:sop/volumevop]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/volumevop]\n");
 }
 
 

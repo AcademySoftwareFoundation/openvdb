@@ -133,9 +133,6 @@ Signed Distance Field:\n\
     hvdb::OpenVDBOpFactory("VDB Platonic",
         SOP_OpenVDB_Platonic::factory, parms, *table)
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Generate a platonic solid as a level set or a fog volume VDB.\"\"\"\n\
 \n\
 @overview\n\
@@ -144,12 +141,7 @@ This node generates a VDB representing a platonic solid as either a level set or
 \n\
 @related\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
-- [Node:sop/platonic]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/platonic]\n");
 }
 
 

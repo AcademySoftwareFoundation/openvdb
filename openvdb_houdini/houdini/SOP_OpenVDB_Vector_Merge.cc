@@ -226,9 +226,6 @@ Position:\n\
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Merge::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Merge three scalar VDB primitives into one vector VDB primitive.\"\"\"\n\
 \n\
 @overview\n\
@@ -245,12 +242,7 @@ TIP:\n\
 \n\
 @related\n\
 - [OpenVDB Vector Split|Node:sop/DW_OpenVDBVectorSplit]\n\
-- [Node:sop/vdbvectormerge]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbvectormerge]\n");
 }
 
 

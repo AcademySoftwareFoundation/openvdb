@@ -895,7 +895,8 @@ public:
         unsigned flags,
         const char** inputlabels,
         const std::string& helpUrl,
-        const std::string& doc)
+        const std::string& doc,
+        const bool isASWF = true)
         : OP_Operator(name, english, construct, multiparms,
             operatorTableName,
             minSources, maxSources, variables, flags, inputlabels)
@@ -912,8 +913,19 @@ public:
             os << "= " << english << " =\n\n"
                 << "#type: node\n"
                 << "#context: " << flavorStr << "\n"
-                << "#internal: " << name << "\n\n"
-                << doc << "\n\n";
+                << "#internal: " << name << "\n";
+                if (isASWF) {
+                    os << "#icon: COMMON/openvdb\n"
+                        << "#tags: vdb\n\n";
+                }
+                os << doc << "\n\n";
+                if (isASWF) {
+                    os << "@examples\n\n"
+                        << "This node is open-source and is maintained by the "
+                        << "Academy Software Foundation ([aswf.io|https://www.aswf.io/]). "
+                        << "See [openvdb.org|https://www.openvdb.org/download/] for "
+                        << "source code and usage examples.\n\n";
+                }
             {
                 std::ostringstream osParm;
                 documentParms(osParm, multiparms);
@@ -1038,7 +1050,7 @@ struct OpFactory::Impl
             mConstruct, mParms,
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
             minSources, mMaxSources, mVariables, mFlags,
-            const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc);
+            const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc, mIsASWF);
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
@@ -1062,6 +1074,11 @@ struct OpFactory::Impl
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
     OpFactoryVerb* mVerb = nullptr;
+#ifdef SESI_OPENVDB
+    bool mIsASWF = false;
+#else
+    bool mIsASWF = true;
+#endif
 };
 
 
@@ -1158,6 +1175,13 @@ OpFactory::documentation() const
 }
 
 
+bool
+OpFactory::isASWF() const
+{
+    return mImpl->mIsASWF;
+}
+
+
 const OP_OperatorTable&
 OpFactory::table() const
 {
@@ -1189,6 +1213,14 @@ OpFactory&
 OpFactory::setDocumentation(const std::string& doc)
 {
     mImpl->mDoc = doc;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setASWF(bool state)
+{
+    mImpl->mIsASWF = state;
     return *this;
 }
 

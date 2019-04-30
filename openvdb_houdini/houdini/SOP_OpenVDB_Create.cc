@@ -541,9 +541,6 @@ Other:\n\
         .addOptionalInput("Optional Input to Merge With")
         .addOptionalInput("Optional Reference VDB")
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Create one or more empty VDB volume primitives.\"\"\"\n\
 \n\
 @overview\n\
@@ -554,12 +551,7 @@ Other:\n\
 - [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
 - [OpenVDB From Polygons|Node:sop/DW_OpenVDBFromPolygons]\n\
 - [OpenVDB Metadata|Node:sop/DW_OpenVDBMetadata]\n\
-- [Node:sop/vdb]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdb]\n");
 }
 
 

@@ -114,9 +114,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Grids to process")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Prune::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Reduce the memory footprint of VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -130,12 +127,7 @@ form of lossy compression.\n\
 \n\
 @related\n\
 - [OpenVDB Densify|Node:sop/DW_OpenVDBDensify]\n\
-- [Node:sop/vdbactivate]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbactivate]\n");
 }
 
 

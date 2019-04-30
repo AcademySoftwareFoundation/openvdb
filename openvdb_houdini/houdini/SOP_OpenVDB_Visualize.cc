@@ -369,9 +369,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Input with VDBs to visualize")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Generate geometry to visualize the internal\n\
 [tree structure|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
 of a VDB volume.\"\"\"\n\
@@ -384,12 +381,7 @@ Among other things, it allows one to evaluate the\n\
 of VDB volumes as well as to examine their extents and the values of individual voxels.\n\
 \n\
 @related\n\
-- [Node:sop/vdbvisualizetree]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbvisualizetree]\n");
 }
 
 

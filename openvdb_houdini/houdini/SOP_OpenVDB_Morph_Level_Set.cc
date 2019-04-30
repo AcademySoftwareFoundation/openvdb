@@ -348,9 +348,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Morph_Level_Set::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Blend between source and target level set VDBs.\"\"\"\n\
 \n\
 @overview\n\
@@ -361,12 +358,7 @@ towards a target narrow-band signed distance field.\n\
 @related\n\
 - [OpenVDB Advect|Node:sop/DW_OpenVDBAdvect]\n\
 - [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
-- [Node:sop/vdbmorphsdf]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbmorphsdf]\n");
 }
 
 

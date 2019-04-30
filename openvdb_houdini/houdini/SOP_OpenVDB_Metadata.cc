@@ -175,9 +175,6 @@ Other:\n\
         .addInput("Input with VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Metadata::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Modify the metadata associated with a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -197,12 +194,7 @@ This node provides more direct access to the standard VDB metadata.\n\
 @related\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
 - [Node:sop/attribcreate]\n\
-- [Node:sop/name]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/name]\n");
 }
 
 

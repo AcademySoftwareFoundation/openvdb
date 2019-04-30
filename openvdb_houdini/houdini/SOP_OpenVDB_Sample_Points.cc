@@ -140,9 +140,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Sample_Points::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Sample VDB voxel values onto points.\"\"\"\n\
 \n\
 @overview\n\
@@ -157,12 +154,7 @@ Point attributes are given the same names as the VDBs from which they are sample
 @related\n\
 - [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
 - [Node:sop/vdbfromparticles]\n\
-- [Node:sop/convertvdbpoints]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/convertvdbpoints]\n");
 
 }
 

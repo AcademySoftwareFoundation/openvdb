@@ -108,9 +108,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Vector VDBs to split into scalar VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Split::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Split a vector VDB primitive into three scalar VDB primitives.\"\"\"\n\
 \n\
 @overview\n\
@@ -125,12 +122,7 @@ TIP:\n\
 \n\
 @related\n\
 - [OpenVDB Vector Merge|Node:sop/DW_OpenVDBVectorMerge]\n\
-- [Node:sop/vdbvectorsplit]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbvectorsplit]\n");
 }
 
 
