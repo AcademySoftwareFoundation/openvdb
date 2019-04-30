@@ -744,7 +744,10 @@ OP_ERROR
 SOP_OpenVDB_Create::cookVDBSop(OP_Context &context)
 {
     try {
-        hutil::ScopedInputLock lock(*this, context);
+        OP_AutoLockInputs lock(this);
+        if (lock.lock(context) >= UT_ERROR_ABORT) {
+            throw std::runtime_error("failed to lock inputs");
+        }
 
         gdp->clearAndDestroy();
         if (getInput(0)) duplicateSource(0, context);
