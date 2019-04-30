@@ -72,6 +72,9 @@ Version 6.0.1 - In development
       ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
     - VDB Vector Merge SOP now copies metadata from the representative
       scalar grid.
+    - Added a houdini_utils::OpFactory::setASWF() method to mark SOPs as
+      being maintained by the ASWF and consolidate some duplicate help
+      text. Help cards now also mention the ASWF.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
