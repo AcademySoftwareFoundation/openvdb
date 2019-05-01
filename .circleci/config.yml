@@ -1,0 +1,272 @@
+
+# Default configuration
+
+defaults: &defaults
+  docker:
+    - image: debian:stretch
+
+# Install Aliases
+
+_install: &install
+  name: Install
+  command: bash ci/install.sh
+
+_cmake:
+  cmake_latest: &install_cmake_latest
+    name: Install CMake Latest
+    command: bash ci/install_cmake.sh latest
+  cmake3_11: &install_cmake3_11
+    name: Install CMake 3.11
+    command: bash ci/install_cmake.sh 3.11.4
+
+_boost:
+  boost_latest: &install_boost_latest
+    name: Install Boost Latest
+    command: bash ci/install_boost.sh latest
+  boost1_66: &install_boost1_66
+    name: Install Boost 1.66
+    command: bash ci/install_boost.sh 1.66.0
+  boost1_61: &install_boost1_61
+    name: Install Boost 1.61
+    command: bash ci/install_boost.sh 1.61.0
+
+_openexr:
+  openexr_latest: &install_openexr_latest
+    name: Install OpenEXR Latest
+    command: bash ci/install_openexr.sh latest
+  openexr2_3: &install_openexr2_3
+    name: Install OpenEXR 2.3.0
+    command: bash ci/install_openexr.sh 2.3.0
+  openexr2_2: &install_openexr2_2
+    name: Install OpenEXR 2.2.0
+    command: bash ci/install_openexr.sh 2.2.0
+
+_tbb:
+  tbb_latest: &install_tbb_latest
+    name: Install TBB Latest
+    command: bash ci/install_tbb.sh latest
+  tbb2018: &install_tbb2018
+    name: Install TBB 2018
+    command: bash ci/install_tbb.sh 2018
+  tbb2017: &install_tbb2017
+    name: Install TBB 2017
+    command: bash ci/install_tbb.sh 2017_U6
+  tbb4_4: &install_tbb4_4
+    name: Install TBB 4.4
+    command: bash ci/install_tbb.sh 4.4
+
+_blosc:
+  blosc_latest: &install_blosc_latest
+    name: Install Blosc Latest
+    command: bash ci/install_blosc.sh latest
+  blosc1_5: &install_blosc1_5
+    name: Install Blosc 1.5.0
+    command: bash ci/install_blosc.sh 1.5.0
+
+_houdini:
+  houdini17_5: &install_houdini17_5
+    name: Install Houdini 17.5
+    command: bash ci/install_houdini.sh 17.5
+  houdini17_0: &install_houdini17_0
+    name: Install Houdini 17.0
+    command: bash ci/install_houdini.sh 17.0
+  houdini16_5: &install_houdini16_5
+    name: Install Houdini 16.5
+    command: bash ci/install_houdini.sh 16.5
+
+# Build and Test Aliases
+
+_build_core:
+  abi6: &build_abi6
+    name: Build ABI 6
+    command: bash ci/build.sh clang++ Release 6 ON
+  abi5: &build_abi5
+    name: Build ABI 5
+    command: bash ci/build.sh clang++ Release 5 ON
+  abi4: &build_abi4
+    name: Build ABI 4
+    command: bash ci/build.sh clang++ Release 4 ON
+  abi6_debug: &build_abi6_debug
+    name: Build ABI 6 (Debug)
+    command: bash ci/build.sh clang++ Debug 6 ON
+  abi6_gcc: &build_abi6_gcc
+    name: Build ABI 6 (GCC)
+    command: bash ci/build.sh g++ Release 6 ON
+  abi6_no_blosc: &build_abi6_no_blosc
+    name: Build ABI 6 (No Blosc)
+    command: bash ci/build.sh clang++ Release 6 OFF
+
+_build_houdini:
+  houdini: &build_houdini
+    name: Build Houdini
+    command: bash ci/build_houdini.sh clang++ Release OFF
+    no_output_timeout: 1200
+  houdini_al: &build_houdini_all
+    name: Build Houdini
+    command: bash ci/build_houdini.sh clang++ Release ON
+    no_output_timeout: 1200
+  houdini_debug: &build_houdini_debug
+    name: Build Houdini (Debug)
+    command: bash ci/build_houdini.sh clang++ Debug OFF
+    no_output_timeout: 1200
+  houdini_gcc: &build_houdini_gcc
+    name: Build Houdini (GCC)
+    command: bash ci/build_houdini.sh g++ Release OFF
+    no_output_timeout: 1200
+
+_test:
+  test: &test
+    name: Unit Tests
+    command: ./build/openvdb/unittest/vdb_test -v
+
+# Jobs
+
+version: 2.1
+jobs:
+  testabi6latest:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_cmake_latest
+      - run: *install_boost_latest
+      - run: *install_tbb_latest
+      - run: *install_openexr_latest
+      - run: *install_blosc_latest
+      - run: *build_abi6
+      - run: *test
+
+  testabi6:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_cmake3_11
+      - run: *install_boost1_66
+      - run: *install_tbb2018
+      - run: *install_openexr2_3
+      - run: *install_blosc1_5
+      - run: *build_abi6
+      - run: *test
+
+  testabi6debug:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_cmake3_11
+      - run: *install_boost1_66
+      - run: *install_tbb2018
+      - run: *install_openexr2_3
+      - run: *install_blosc1_5
+      - run: *build_abi6_debug
+
+  testabi6gcc:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_cmake3_11
+      - run: *install_boost1_66
+      - run: *install_tbb2018
+      - run: *install_openexr2_3
+      - run: *install_blosc1_5
+      - run: *build_abi6_gcc
+
+  testabi6noblosc:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_cmake3_11
+      - run: *install_boost1_66
+      - run: *install_tbb2018
+      - run: *install_openexr2_3
+      - run: *build_abi6_no_blosc
+
+  testabi5:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_boost1_61
+      - run: *install_tbb2017
+      - run: *install_openexr2_3
+      - run: *install_blosc1_5
+      - run: *build_abi5
+      - run: *test
+
+  testabi4:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_boost1_61
+      - run: *install_tbb4_4
+      - run: *install_openexr2_3
+      - run: *install_blosc1_5
+      - run: *build_abi4
+      - run: *test
+
+  testhou175:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_houdini17_5
+      - run: *install_boost1_61
+      - run: *build_houdini_all
+
+  testhou175debug:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_houdini17_5
+      - run: *install_boost1_61
+      - run: *build_houdini_debug
+
+  testhou175gcc:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_houdini17_5
+      - run: *install_boost1_61
+      - run: *build_houdini_gcc
+
+  testhou170:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_houdini17_0
+      - run: *install_boost1_61
+      - run: *build_houdini
+
+  testhou165:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: *install
+      - run: *install_houdini16_5
+      - run: *install_boost1_61
+      - run: *build_houdini
+
+# Workflows
+
+workflows:
+  build_and_test:
+    jobs:
+      - testabi6
+      - testabi5
+      - testabi4
+      - testabi6debug
+      - testabi6gcc
+      - testabi6noblosc
+      - testhou175
+      - testhou170
+      - testhou165
+      - testhou175debug
+      - testhou175gcc
+      # - testabi6latest # work-in-progress
