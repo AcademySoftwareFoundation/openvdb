@@ -34,10 +34,8 @@
 #include "SOP_NodeVDB.h"
 
 #include <houdini_utils/geometry.h>
-//#ifdef OPENVDB_ENABLE_POINTS
 #include <openvdb/points/PointDataGrid.h>
 #include "PointUtils.h"
-//#endif
 #include "Utils.h"
 #include "GEO_PrimVDB.h"
 #include "GU_PrimVDB.h"
@@ -56,6 +54,32 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+
+/// Enables custom UT_InfoTree data from SOP_NodeVDB::fillInfoTreeNodeSpecific()
+/// which is used to populate the mako templates in Houdini 16 and greater.
+/// The templates are used to provide MMB information on Houdini primitives and
+/// are installed as part of the Houdini toolkit $HH/config/NodeInfoTemplates.
+/// This code has since been absorbed by SideFX, but we continue to keep
+/// it around to demonstrate how to extend the templates in Houdini. Note
+/// that the current implementation is a close duplicate of the data populated
+/// by Houdini, so this will clash with native Houdini names. The templates
+/// may also change in future Houdini versions, so do not expect this to
+/// produce valid results out the box.
+///
+/// For users wishing to customize the .mako files, you can use python to
+/// inspect the current mako structure.
+///
+/// @code
+/// infoTree = hou.node('/obj/geo1/vdbfrompolygons1').infoTree()
+/// sopInfo  = infoTree.branches()['SOP Info']
+/// sparseInfo = sopInfo.branches()['Sparse Volumes']
+/// @endcode
+///
+/// These mako branches are the paths that are populated by UT_InfoTree. The
+/// mako files responsible for producing VDB specific data are geometry.mako,
+/// called by sop.mako.
+///
+//#define OPENVDB_CUSTOM_MAKO
 
 
 namespace openvdb_houdini {
@@ -152,17 +176,12 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     startLogForwarding(SOP_OPTYPE_ID);
 #endif
 
-//#ifdef OPENVDB_ENABLE_POINTS
     // Register grid-specific info text for Point Data Grids
     node_info_text::registerGridSpecificInfoText<openvdb::points::PointDataGrid>(
         &pointDataGridSpecificInfoText);
-//#endif
 
     // Set the flag to draw guide geometry
     mySopFlags.setNeedGuide1(true);
-
-    // We can use this to optionally draw the local data window?
-    // mySopFlags.setNeedGuide2(true);
 }
 
 
@@ -210,20 +229,6 @@ SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
 ////////////////////////////////////////
 
 
-#if (UT_MAJOR_VERSION_INT < 16)
-void
-SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
-{
-    SOP_Node::fillInfoTreeNodeSpecific(tree, time);
-
-    // Add the OpenVDB library version number to this node's
-    // extended operator information.
-    if (UT_InfoTree* child = tree.addChildBranch("OpenVDB")) {
-        child->addColumnHeading("version");
-        child->addProperties(openvdb::getLibraryVersionString());
-    }
-}
-#else
 void
 SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreeParms& parms)
 {
@@ -234,8 +239,44 @@ SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, const OP_NodeInfoTreePa
     if (UT_InfoTree* child = tree.addChildMap("OpenVDB")) {
         child->addProperties("OpenVDB Version", openvdb::getLibraryAbiVersionString());
     }
-}
+
+#ifdef OPENVDB_CUSTOM_MAKO
+    UT_StringArray sparseVolumeTreePath({"SOP Info", "Sparse Volumes"});
+    if (UT_InfoTree* sparseVolumes = tree.getDescendentPtr(sparseVolumeTreePath)) {
+        if (UT_InfoTree* info = sparseVolumes->addChildBranch("OpenVDB Points")) {
+
+            OP_Context context(parms.getTime());
+            GU_DetailHandle gdHandle = getCookedGeoHandle(context);
+            if (gdHandle.isNull()) return;
+
+            GU_DetailHandleAutoReadLock gdLock(gdHandle);
+            const GU_Detail* tmpGdp = gdLock.getGdp();
+            if (!tmpGdp) return;
+
+            info->addColumnHeading("Point Count");
+            info->addColumnHeading("Point Groups");
+            info->addColumnHeading("Point Attributes");
+
+            for (VdbPrimCIterator it(tmpGdp); it; ++it) {
+                const openvdb::GridBase::ConstPtr grid = it->getConstGridPtr();
+                if (!grid) continue;
+                if (!grid->isType<openvdb::points::PointDataGrid>()) continue;
+
+                const openvdb::points::PointDataGrid& points =
+                    *openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(grid);
+
+                std::string countStr, groupStr, attributeStr;
+                collectPointInfo(points, countStr, groupStr, attributeStr);
+
+                ut_PropertyRow* row = info->addProperties();
+                row->append(countStr);
+                row->append(groupStr);
+                row->append(attributeStr);
+            }
+        }
+    }
 #endif
+}
 
 
 void
@@ -394,7 +435,6 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
 ////////////////////////////////////////
 
 
-#if UT_MAJOR_VERSION_INT >= 16
 const SOP_NodeVerb*
 SOP_NodeVDB::cookVerb() const
 {
@@ -403,17 +443,14 @@ SOP_NodeVDB::cookVerb() const
     }
     return SOP_Node::cookVerb();
 }
-#endif
 
 
 OP_ERROR
 SOP_NodeVDB::cookMySop(OP_Context& context)
 {
-#if UT_MAJOR_VERSION_INT >= 16
     if (cookVerb()) {
         return cookMyselfAsVerb(context);
     }
-#endif
     return cookVDBSop(context);
 }
 
@@ -561,15 +598,14 @@ SOP_NodeVDB::resolveRenamedParm(PRM_ParmList& obsoleteParms,
 
 namespace {
 
-/// @brief OpPolicy for OpenVDB operator types at SESI
-class SESIOpenVDBOpPolicy: public houdini_utils::OpPolicy
+
+/// @brief Default OpPolicy for OpenVDB operator types
+class DefaultOpenVDBOpPolicy: public houdini_utils::OpPolicy
 {
 public:
     std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
         UT_String s(english);
-        // Lowercase
-        s.toLower();
         // Remove non-alphanumeric characters from the name.
         s.forceValidVariableName();
         std::string name = s.toStdString();
@@ -588,15 +624,34 @@ public:
 };
 
 
-/// @brief OpPolicy for OpenVDB operator types at DWA
-class DWAOpenVDBOpPolicy: public houdini_utils::DWAOpPolicy
+/// @brief SideFX OpPolicy for OpenVDB operator types
+class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    /// @brief OpenVDB operators of each flavor (SOP, POP, etc.) share
-    /// an icon named "SOP_OpenVDB", "POP_OpenVDB", etc.
-    std::string getIconName(const houdini_utils::OpFactory& factory) override
+    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
     {
-        return factory.flavorString() + "_OpenVDB";
+        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        UT_String s(name);
+        // Lowercase
+        s.toLower();
+        return s.toStdString();
+    }
+};
+
+
+/// @brief ASWF OpPolicy for OpenVDB operator types
+class ASWFOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
+{
+public:
+    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    {
+        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
+        return "DW_Open" + name;
+    }
+
+    std::string getLabelName(const houdini_utils::OpFactory& factory) override
+    {
+        return "Open" + factory.english();
     }
 };
 
@@ -604,7 +659,7 @@ public:
 #ifdef SESI_OPENVDB
 using OpenVDBOpPolicy = SESIOpenVDBOpPolicy;
 #else
-using OpenVDBOpPolicy = DWAOpenVDBOpPolicy;
+using OpenVDBOpPolicy = ASWFOpenVDBOpPolicy;
 #endif // SESI_OPENVDB
 
 } // unnamed namespace

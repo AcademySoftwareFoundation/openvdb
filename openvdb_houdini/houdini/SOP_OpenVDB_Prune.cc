@@ -43,11 +43,6 @@
 #include <stdexcept>
 #include <string>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -62,12 +57,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -120,11 +110,9 @@ newSopOperator(OP_OperatorTable* table)
             "Voxel values are considered equal if they differ\n"
             "by less than the specified threshold."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
         .addInput("Grids to process")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Prune::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -189,7 +177,7 @@ SOP_OpenVDB_Prune::updateParmsFlags()
 
 namespace {
 struct PruneOp {
-    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), tolerance(tol) {}
+    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), pruneTolerance(tol) {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
@@ -197,7 +185,10 @@ struct PruneOp {
         using ValueT = typename GridT::ValueType;
 
         if (mode == "value") {
-            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            const ValueT tolerance(openvdb::zeroVal<ValueT>() + pruneTolerance);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            openvdb::tools::prune(grid.tree(), tolerance);
         } else if (mode == "inactive") {
             openvdb::tools::pruneInactive(grid.tree());
         } else if (mode == "levelset") {
@@ -206,24 +197,15 @@ struct PruneOp {
     }
 
     std::string mode;
-    fpreal tolerance;
+    fpreal pruneTolerance;
 };
 }
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Prune)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Prune::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // This does a deep copy of native Houdini primitives
-        // but only a shallow copy of OpenVDB grids.
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Get the group of grids to process.

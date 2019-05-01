@@ -54,11 +54,7 @@
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <algorithm>
 #include <iostream>
@@ -71,19 +67,11 @@
 #include <vector>
 
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 namespace cvdb = openvdb;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 class SOP_OpenVDB_Sample_Points: public hvdb::SOP_NodeVDB
@@ -97,12 +85,7 @@ public:
     // The VDB port holds read-only VDBs.
     int isRefInput(unsigned input) const override { return (input == 1); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 };
 
 
@@ -150,15 +133,12 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep2", "Separator"));
 
     // Register the SOP
-    hvdb::OpenVDBOpFactory("OpenVDB Sample Points",
+    hvdb::OpenVDBOpFactory("VDB Sample Points",
         SOP_OpenVDB_Sample_Points::factory, parms, *table)
-        .addAlias("OpenVDB Point Sample")
         .setObsoleteParms(obsoleteParms)
         .addInput("Points")
         .addInput("VDBs")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Sample_Points::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -446,17 +426,9 @@ private:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Sample_Points)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Sample_Points::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // this does a shallow copy of the VDB-grids and a deep copy of native Houdini primitives
-        // (the points we modify in this case)
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         GU_Detail* aGdp = gdp; // where the points live

@@ -785,6 +785,8 @@ INPUT                  = . \
                          tree \
                          util \
                          doc/doc.txt \
+                         doc/build.txt \
+                         doc/dependencies.txt \
                          doc/faq.txt \
                          doc/math.txt \
                          doc/changes.txt \

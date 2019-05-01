@@ -59,76 +59,14 @@
 #define OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 
 #include <UT/UT_Version.h>
-#if UT_MAJOR_VERSION_INT >= 16
 #include <GOP/GOP_Manager.h>
 #include <SOP/SOP_NodeParmsOptions.h> // for SOP_NodeCacheOptions
 #include <openvdb/Types.h>
 #include <string>
-#endif
-
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-macros"
-#endif
-
-/// @cond SOP_VDBVERBUTILS_INTERNAL
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_PREPROC_IF0(val_, _) val_
-#define VDB_PREPROC_IF1(_, val_) val_
-#define VDB_PREPROC_IF(cond_, val0_, val1_) VDB_PREPROC_IF ## cond_(val0_, val1_)
-#else
-#define VDB_PREPROC_IF(cond_, val_, _) val_
-#endif
-/// @endcond
-
-/// @brief Macro function to select between node and node cache implementations of SOP
-/// methods based on a boolean condition (such as whether SOP compilability is enabled)
-/// @param is_cache_  if 0, select the node method, if 1, select the cache method;
-///                   all other values are invalid
-/// @param cls_       the name of the SOP class
-/// @par Example
-/// @code
-/// #define COMPILABLE 1
-///
-/// class SOP_My_Node: public SOP_NodeVDB
-/// {
-///     ...
-/// #if COMPILABLE
-/// public:
-///     // For a compilable SOP, declare cookVDBSop() as a method of
-///     // a public, inner SOP_NodeCacheOptions subclass named Cache.
-///     class Cache: public SOP_VDBCacheOptions {
-///         OP_ERROR cookVDBSop(OP_Context&) override;
-///     };
-/// #else
-/// protected:
-///     // For a non-compilable SOP, declare cookVDBSop() as a SOP method.
-///     OP_ERROR cookVDBSop(OP_Context&) override;
-/// #endif
-/// };
-///
-/// // Implementation of either the node method (if COMPILABLE is 0)
-/// // or the cache method (if COMPILABLE is 1)
-/// OP_ERROR
-/// VDB_NODE_OR_CACHE(COMPILABLE, SOP_My_Node)::cookVDBSop(OP_Context&)
-/// {
-///     ...
-/// }
-/// @endcode
-/// @hideinitializer
-#define VDB_NODE_OR_CACHE(is_cache_, cls_) \
-    VDB_PREPROC_IF(is_cache_, cls_, cls_::Cache)
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 
 ////////////////////////////////////////
 
-
-#if UT_MAJOR_VERSION_INT >= 16
 
 /// @brief SOP_NodeCacheOptions subclass that adds methods specific to SOP_NodeVDB
 class SOP_VDBCacheOptions: public SOP_NodeCacheOptions
@@ -232,8 +170,6 @@ protected:
     // Handles ad-hoc group creation.
     GOP_Manager         gop;
 }; // class SOP_VDBCacheOptions
-
-#endif
 
 #endif // OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 

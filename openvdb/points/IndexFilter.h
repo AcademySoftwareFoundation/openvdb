@@ -280,7 +280,7 @@ public:
                 mLeafMap[iter->origin()] = SeedCountPair(dist(generator), leafPoints);
                 break;
             }
-            totalPointsFloat += factor * iter->pointCount();
+            totalPointsFloat += factor * static_cast<float>(iter->pointCount());
             const auto leafPoints = static_cast<int>(math::Floor(totalPointsFloat));
             totalPointsFloat -= static_cast<float>(leafPoints);
             totalPoints += leafPoints;

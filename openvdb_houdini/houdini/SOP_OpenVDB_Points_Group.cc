@@ -51,11 +51,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 using namespace openvdb;
@@ -123,10 +118,8 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         OP_ERROR evalGroupParms(OP_Context&, GroupParms&);
         OP_ERROR evalGridGroupParms(const PointDataGrid&, OP_Context&, GroupParms&);
@@ -136,9 +129,7 @@ public:
         void removeViewportMetadata(PointDataGrid&);
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -332,14 +323,12 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Group",
+    hvdb::OpenVDBOpFactory("VDB Points Group",
         SOP_OpenVDB_Points_Group::factory, parms, *table)
         .addInput("VDB Points")
         .addOptionalInput("Optional bounding geometry or level set")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Group::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -443,15 +432,9 @@ SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Points_Group::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
-#endif
-
         // Evaluate UI parameters
         GroupParms parms;
         if (evalGroupParms(context, parms) >= UT_ERROR_ABORT) return error();
@@ -567,7 +550,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::cookVDBSop(OP_C
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGroupParms(
+SOP_OpenVDB_Points_Group::Cache::evalGroupParms(
     OP_Context& context, GroupParms& parms)
 {
     const fpreal time = context.getTime();
@@ -773,7 +756,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGroupParms(
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGridGroupParms(
+SOP_OpenVDB_Points_Group::Cache::evalGridGroupParms(
     const PointDataGrid& grid, OP_Context&, GroupParms& parms)
 {
     auto leafIter = grid.tree().cbeginLeaf();
@@ -844,7 +827,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::evalGridGroupPa
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::performGroupFiltering(
+SOP_OpenVDB_Points_Group::Cache::performGroupFiltering(
     PointDataGrid& outputGrid, const GroupParms& parms)
 {
     // filter typedefs
@@ -978,7 +961,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::performGroupFil
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::setViewportMetadata(
+SOP_OpenVDB_Points_Group::Cache::setViewportMetadata(
     PointDataGrid& outputGrid, const GroupParms& parms)
 {
     outputGrid.insertMeta(openvdb_houdini::META_GROUP_VIEWPORT,
@@ -987,7 +970,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::setViewportMeta
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Points_Group)::removeViewportMetadata(
+SOP_OpenVDB_Points_Group::Cache::removeViewportMetadata(
     PointDataGrid& outputGrid)
 {
     outputGrid.removeMeta(openvdb_houdini::META_GROUP_VIEWPORT);

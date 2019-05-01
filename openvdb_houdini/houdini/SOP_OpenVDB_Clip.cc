@@ -48,11 +48,6 @@
 #include <exception>
 #include <string>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -69,10 +64,8 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
     protected:
@@ -81,9 +74,7 @@ public:
         void getFrustum(OP_Context&);
 
         openvdb::math::Transform::Ptr mFrustum;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -197,13 +188,11 @@ Mask VDB:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "").setDefault(PRMzeroDefaults));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
         .addOptionalInput("Mask VDB or bounding geometry")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Clip::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -346,12 +335,8 @@ struct DilatedMaskOp
         // Since large dilations and erosions can be expensive, apply them
         // in multiple passes and check for interrupts.
         for (int pass = 0; pass < numPasses; ++pass, numIterations -= kNumIterationsPerPass) {
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
             const bool interrupt = progress.wasInterrupted(
                 /*pct=*/int((100.0 * pass * kNumIterationsPerPass) / std::abs(dilation)));
-#else
-            const bool interrupt = progress.wasInterrupted();
-#endif
             if (interrupt) {
                 maskGrid.reset();
                 throw std::runtime_error{"interrupted"};
@@ -471,7 +456,7 @@ struct MaskClipOp
 
 /// Get the selected camera's frustum transform.
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::getFrustum(OP_Context& context)
+SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
 {
     mFrustum.reset();
 
@@ -484,17 +469,10 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::getFrustum(OP_Context& 
     }
 
     OBJ_Camera* camera = nullptr;
-#if VDB_COMPILABLE_SOP
     if (auto* obj = cookparms()->getCwd()->findOBJNode(cameraPath)) {
         camera = obj->castToOBJCamera();
     }
     OP_Node* self = cookparms()->getCwd();
-#else
-    if (auto* obj = findOBJNode(cameraPath)) {
-        camera = obj->castToOBJCamera();
-    }
-    OP_Node* self = this;
-#endif
 
     if (!camera) {
         throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
@@ -546,14 +524,10 @@ SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
     myGuide1->clearAndDestroy();
 
     openvdb::math::Transform::ConstPtr frustum;
-#if !VDB_COMPILABLE_SOP
-    frustum = mFrustum;
-#else
     // Attempt to extract the frustum from our cache.
     if (auto* cache = dynamic_cast<SOP_OpenVDB_Clip::Cache*>(myNodeVerbCache)) {
         frustum = cache->frustum();
     }
-#endif
 
     if (frustum) {
         const UT_Vector3 color{0.9f, 0.0f, 0.0f};
@@ -565,16 +539,9 @@ SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock{*this, context};
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         UT_AutoInterrupt progress{"Clipping VDBs"};
@@ -631,9 +598,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Clip)::cookVDBSop(OP_Context& 
                         const auto maskType = UTvdbGetGridType(*maskGrid);
                         DilatedMaskOp op{dilation};
                         if (!UTvdbProcessTypedGridTopology(maskType, *maskGrid, op)) {
-#if UT_VERSION_INT >= 0x10000258 // 16.0.600 or later
                             UTvdbProcessTypedGridPoint(maskType, *maskGrid, op);
-#endif
                         }
                         if (op.maskGrid) maskGrid = op.maskGrid;
                     }

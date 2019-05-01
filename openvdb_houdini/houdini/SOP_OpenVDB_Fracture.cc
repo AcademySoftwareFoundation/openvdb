@@ -55,13 +55,8 @@
 #include <UT/UT_ValArray.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
 #include <hboost/math/constants/constants.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#include <boost/math/constants/constants.hpp>
-#endif
 
 #include <cmath>
 #include <iostream>
@@ -73,18 +68,9 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////
@@ -100,10 +86,8 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
@@ -114,9 +98,7 @@ public:
             const GU_Detail* pointGeo,
             hvdb::Interrupter&,
             const fpreal time);
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -223,16 +205,14 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
-    hvdb::OpenVDBOpFactory("OpenVDB Fracture", SOP_OpenVDB_Fracture::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Fracture", SOP_OpenVDB_Fracture::factory, parms, *table)
         .addInput("OpenVDB grids to fracture\n"
             "(Required to have matching transforms and narrow band widths)")
         .addInput("Cutter objects (geometry).")
         .addOptionalInput("Optional points to instance the cutter object onto\n"
             "(The cutter object is used in place if no points are provided.)")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fracture::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -336,15 +316,9 @@ SOP_OpenVDB_Fracture::updateParmsFlags()
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Fracture::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Converting geometry to volume");
@@ -454,7 +428,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::cookVDBSop(OP_Conte
 
 template<class GridType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
+SOP_OpenVDB_Fracture::Cache::process(
     std::list<openvdb::GridBase::Ptr>& grids,
     const GU_Detail* cutterGeo,
     const GU_Detail* pointGeo,
@@ -494,7 +468,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
     std::vector<openvdb::Vec3s> instancePoints;
     std::vector<openvdb::math::Quats> instanceRotations;
 
-#if (UT_VERSION_INT >= 0x0d000035) // 13.0.53 or later
     if (pointGeo != nullptr) {
         instancePoints.resize(pointGeo->getNumPoints());
 
@@ -559,108 +532,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
             }
         }
     }
-#else // before 13.0.53
-    if (pointGeo != nullptr) {
-        instancePoints.resize(pointGeo->getNumPoints());
-
-        GA_Range range(pointGeo->getPointRange());
-        GA_Offset start, end;
-
-        // Copy world space instance points.
-        GA_ROPageHandleV3 attribP(pointGeo->getP());
-        for (GA_Iterator it(range); it.blockAdvance(start, end); ) {
-            attribP.setPage(start);
-            for (GA_Offset i = start; i < end; ++i) {
-                UT_Vector3 pos = attribP.get(i);
-                instancePoints[pointGeo->pointIndex(i)] =
-                    openvdb::Vec3s(pos.x(), pos.y(), pos.z());
-            }
-        }
-
-        // Add instance offset if found
-        GA_ROPageHandleV3 attribTrans(pointGeo, GA_ATTRIB_POINT, "trans");
-        if (attribTrans.isValid()) {
-            for (GA_Iterator it(range); it.blockAdvance(start, end); ) {
-                attribTrans.setPage(start);
-                for (GA_Offset i = start; i < end; ++i) {
-                    UT_Vector3 trans = attribTrans.get(i);
-                    instancePoints[pointGeo->pointIndex(i)] +=
-                        openvdb::Vec3s(trans.x(), trans.y(), trans.z());
-                }
-            }
-        }
-
-        if (randomizeRotation) {
-
-            instanceRotations.resize(instancePoints.size());
-
-            // Generate uniform random rotations by picking random points
-            // in the unit cube and forming the unit quaternion.
-            using RandGen = std::mt19937;
-            RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
-            std::uniform_real_distribution<float> uniform01;
-            const float two_pi = 2.0 * hboost::math::constants::pi<float>();
-            for (size_t n = 0, N = instanceRotations.size(); n < N; ++n) {
-
-                const float u  = uniform01(rng);
-                const float c1 = std::sqrt(1-u);
-                const float c2 = std::sqrt(u);
-                const float s1 = two_pi * uniform01(rng);
-                const float s2 = two_pi * uniform01(rng);
-
-                instanceRotations[n][0] = c1 * std::sin(s1);
-                instanceRotations[n][1] = c1 * std::cos(s1);
-                instanceRotations[n][2] = c2 * std::sin(s2);
-                instanceRotations[n][3] = c2 * std::cos(s2);
-            }
-        } else {
-
-            GA_ROAttributeRef refN = pointGeo->findNormalAttribute(GA_ATTRIB_POINT);
-            if (!refN.isValid())
-                refN = pointGeo->findVelocityAttribute(GA_ATTRIB_POINT);
-            GA_ROHandleV3 attrN(refN.getAttribute());
-            GA_ROHandleV3 attrUp(pointGeo, GA_ATTRIB_POINT, "up");
-            GA_ROHandleQ attrRot(pointGeo, GA_ATTRIB_POINT, "rot");
-            GA_ROHandleQ attrOrient(pointGeo, GA_ATTRIB_POINT, "orient");
-
-            if (attrN.isValid() || attrUp.isValid() ||
-                attrRot.isValid() || attrOrient.isValid()) {
-
-                instanceRotations.resize(instancePoints.size());
-                for (size_t i = 0, n = instanceRotations.size(); i < n; ++i) {
-
-                    GA_Offset ptoff = pointGeo->pointOffset(i);
-                    UT_Matrix4D mat4;
-                    UT_QuaternionD quat;
-                    UT_Vector3 normal(0.0, 0.0, 0.0);
-                    UT_Vector3 up(0.0, 0.0, 0.0);
-                    UT_Quaternion rot;
-                    UT_Quaternion orient;
-
-                    if (attrN.isValid())
-                        normal = attrN.get(ptoff);
-                    if (attrUp.isValid())
-                        up = attrUp.get(ptoff);
-                    if (attrRot.isValid())
-                        rot = attrRot.get(ptoff);
-                    if (attrOrient.isValid())
-                        orient = attrOrient.get(ptoff);
-
-                    mat4.instance(UT_Vector3(0.0, 0.0, 0.0),
-                        normal,
-                        /*s*/1.0, /*s3*/nullptr,
-                        attrUp.isValid() ? &up : nullptr,
-                        attrRot.isValid() ? &rot : nullptr,
-                        /*trans*/nullptr,
-                        attrOrient.isValid() ? &orient : nullptr);
-
-                    quat.updateFromRotationMatrix(UT_Matrix3(mat4));
-                    instanceRotations[i].init(quat.x(), quat.y(), quat.z(), quat.w());
-                }
-            }
-        }
-    }
-#endif
     if (boss.wasInterrupted()) return;
 
     std::list<typename GridType::Ptr> residuals;
@@ -741,19 +612,10 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
     }
 
     // Check for multiple cutter objects
-#if (UT_VERSION_INT >= 0x0e000061) // 14.0.97 or later
     GEO_PrimClassifier primClassifier;
     if (separatecutters) {
         primClassifier.classifyBySharedPoints(*cutterGeo);
     }
-#else
-    GEO_PointClassifier pointClassifier;
-    GEO_PrimClassifier primClassifier;
-    if (separatecutters) {
-        pointClassifier.classifyPoints(*cutterGeo);
-        primClassifier.classifyBySharedPoints(*cutterGeo, pointClassifier);
-    }
-#endif
 
     const int cutterObjects = separatecutters ? primClassifier.getNumClass() : 1;
     const float bandWidth = float(backgroundValue / transform->voxelSize()[0]);
@@ -802,19 +664,10 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Fracture)::process(
                                 if ((primRef->getTypeId() == GEO_PRIMPOLY) &&
                                     (3 == vtxn || 4 == vtxn))
                                 {
-#if UT_MAJOR_VERSION_INT >= 16
                                     for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
                                         prim[int(vtx)] = static_cast<Vec4IValueType>(
                                             cutterGeo->pointIndex(primRef->getPointOffset(vtx)));
                                     }
-#else
-                                    GA_Primitive::const_iterator it;
-                                    primRef->beginVertex(it);
-                                    for (unsigned int vtx = 0; !it.atEnd(); ++it, ++vtx) {
-                                        prim[vtx] = static_cast<Vec4IValueType>(
-                                            cutterGeo->pointIndex(it.getPointOffset()));
-                                    }
-#endif
 
                                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
 

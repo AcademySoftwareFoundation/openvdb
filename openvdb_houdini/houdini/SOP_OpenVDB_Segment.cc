@@ -51,11 +51,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -191,12 +186,7 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -232,11 +222,13 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, name each output VDB after the input VDB with"
             " a unique segment number appended for ease of identification."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Segment", SOP_OpenVDB_Segment::factory, parms, *table)
-        .addInput("OpenVDB grids")
-#if VDB_COMPILABLE_SOP
-        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })
+    hvdb::OpenVDBOpFactory("VDB Segment by Connectivity",
+        SOP_OpenVDB_Segment::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBSegment")
 #endif
+        .addInput("OpenVDB grids")
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -290,14 +282,9 @@ SOP_OpenVDB_Segment::updateParmsFlags()
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Segment)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Segment::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         const GU_Detail* inputGeoPt = inputGeo(0);

@@ -56,11 +56,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -199,10 +194,8 @@ public:
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         fpreal getTime() const { return mTime; }
     protected:
@@ -214,9 +207,7 @@ public:
             ResampleMode resample);
 
         fpreal mTime = 0.0;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -489,13 +480,11 @@ Activity Difference:\n\
 
 
     // Register SOP
-    hvdb::OpenVDBOpFactory("OpenVDB Combine", SOP_OpenVDB_Combine::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Combine", SOP_OpenVDB_Combine::factory, parms, *table)
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Combine::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -652,15 +641,9 @@ getGridName(const GU_PrimVDB* vdb, const UT_String& defaultName = "")
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Combine)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock{*this, context};
-
-        duplicateSource(0, context);
-#endif
-
         UT_AutoInterrupt progress{"Combining VDBs"};
 
         mTime = context.getTime();
@@ -860,7 +843,11 @@ struct MulAdd
     explicit MulAdd(float s, float t = 0.0): scale(s), offset(t) {}
 
     void operator()(const ValueT& a, const ValueT&, ValueT& out) const
-        { out = ValueT(a * scale + offset); }
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        out = ValueT(a * scale + offset);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
 
     /// @return true if the scale is 1 and the offset is 0
     bool isIdentity() const
@@ -897,7 +884,11 @@ struct Blend1
     explicit Blend1(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = ValueT((ONE - aMult * a) * bMult * b); }
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        out = ValueT((ONE - aMult * a) * bMult * b);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
 };
 
 
@@ -913,7 +904,11 @@ struct Blend2
     explicit Blend2(float a = 1.0, float b = 1.0):
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
-        { out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b); }
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
 };
 
 
@@ -988,11 +983,7 @@ struct SOP_OpenVDB_Combine::DispatchOp
 // Helper class for use with UTvdbProcessTypedGrid()
 struct SOP_OpenVDB_Combine::CombineOp
 {
-#if VDB_COMPILABLE_SOP
     SOP_OpenVDB_Combine::Cache* self;
-#else
-    SOP_OpenVDB_Combine* self;
-#endif
     Operation op;
     ResampleMode resample;
     UT_String aGridName, bGridName;
@@ -1030,9 +1021,12 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (src.getGridClass() == openvdb::GRID_LEVEL_SET) {
             // For level set grids, use the level set rebuild tool to both resample the
             // source grid to match the reference grid and to rebuild the resulting level set.
-            const ValueT halfWidth = ((ref.getGridClass() == openvdb::GRID_LEVEL_SET)
+            const bool refIsLevelSet = ref.getGridClass() == openvdb::GRID_LEVEL_SET;
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            const ValueT halfWidth = refIsLevelSet
                 ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
-                : ValueT(src.background() * (1.0 / src.voxelSize()[0])));
+                : ValueT(src.background() * (1.0 / src.voxelSize()[0]));
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
             if (!openvdb::math::isFinite(halfWidth)) {
                 std::stringstream msg;
@@ -1425,20 +1419,24 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (deactivate) {
             const float deactivationTolerance =
                 float(self->evalFloat("bgtolerance", 0, self->getTime()));
-
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            const ValueT tolerance(ZERO + deactivationTolerance);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
             // Mark active output tiles and voxels as inactive if their
             // values match the output grid's background value.
             // Do this first to facilitate pruning.
-            openvdb::tools::deactivate(*resultGrid, resultGrid->background(),
-                ValueT(ZERO + deactivationTolerance));
+            openvdb::tools::deactivate(*resultGrid, resultGrid->background(), tolerance);
         }
 
         if (flood && resultGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
             openvdb::tools::signedFloodFill(resultGrid->tree());
         }
         if (prune) {
-            const float tolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
-            openvdb::tools::prune(resultGrid->tree(), ValueT(ZERO + tolerance));
+            const float pruneTolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            const ValueT tolerance(ZERO + pruneTolerance);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            openvdb::tools::prune(resultGrid->tree(), tolerance);
         }
 
         return resultGrid;
@@ -1482,7 +1480,7 @@ SOP_OpenVDB_Combine::DispatchOp<AGridT>::operator()(typename BGridT::ConstPtr)
 
 
 hvdb::GridPtr
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Combine)::combineGrids(
+SOP_OpenVDB_Combine::Cache::combineGrids(
     Operation op,
     hvdb::GridCPtr aGrid,
     hvdb::GridCPtr bGrid,

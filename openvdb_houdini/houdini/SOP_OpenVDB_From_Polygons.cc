@@ -58,11 +58,6 @@
 #include <limits>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -221,10 +216,8 @@ public:
 
     int convertUnits();
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         float voxelSize() const { return mVoxelSize; }
     protected:
@@ -257,9 +250,7 @@ public:
             const GU_Detail&);
 
         float mVoxelSize = 0.1f;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -532,15 +523,16 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB From Polygons",
+    hvdb::OpenVDBOpFactory("VDB from Polygons",
         SOP_OpenVDB_From_Polygons::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBFromPolygons")
+#endif
         .addInput("Polygons to Convert")
         .addOptionalInput("Optional Reference VDB (for transform matching)")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_From_Polygons::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -616,14 +608,10 @@ SOP_OpenVDB_From_Polygons::convertUnits()
     float width;
 
     float voxSize = 0.1f;
-#if VDB_COMPILABLE_SOP
     // Attempt to extract the voxel size from our cache.
     if (const auto* cache = dynamic_cast<SOP_OpenVDB_From_Polygons::Cache*>(myNodeVerbCache)) {
         voxSize = cache->voxelSize();
     }
-#else
-    voxSize = voxelSize();
-#endif
 
     if (toWSUnits) {
         width = static_cast<float>(evalInt("exteriorbandvoxels", 0, 0));
@@ -769,14 +757,9 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Converting geometry to volume");
@@ -996,7 +979,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::cookVDBSop(OP_
 
 // Helper method constructs the attribute detail lists
 int
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::constructGenericAtttributeLists(
+SOP_OpenVDB_From_Polygons::Cache::constructGenericAtttributeLists(
     hvdb::AttributeDetailList &pointAttributes,
     hvdb::AttributeDetailList &vertexAttributes,
     hvdb::AttributeDetailList &primitiveAttributes,
@@ -1136,7 +1119,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::constructGener
 
 template<class ValueType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::addAttributeDetails(
+SOP_OpenVDB_From_Polygons::Cache::addAttributeDetails(
     hvdb::AttributeDetailList &attributeList,
     const GA_Attribute *attribute,
     const GA_AIFTuple *tupleAIF,
@@ -1199,7 +1182,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::addAttributeDe
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Polygons)::transferAttributes(
+SOP_OpenVDB_From_Polygons::Cache::transferAttributes(
     hvdb::AttributeDetailList &pointAttributes,
     hvdb::AttributeDetailList &vertexAttributes,
     hvdb::AttributeDetailList &primitiveAttributes,

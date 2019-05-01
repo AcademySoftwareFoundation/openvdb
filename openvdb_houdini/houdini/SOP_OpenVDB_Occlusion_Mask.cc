@@ -49,11 +49,6 @@
 #include <cmath> // for std::floor()
 #include <stdexcept>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -68,19 +63,15 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
     private:
         openvdb::math::Transform::Ptr mFrustum;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -155,13 +146,11 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask",
+    hvdb::OpenVDBOpFactory("VDB Occlusion Mask",
         SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
         .addInput("VDBs")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Occlusion_Mask::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -207,14 +196,10 @@ SOP_OpenVDB_Occlusion_Mask::cookMyGuide1(OP_Context&)
     myGuide1->clearAndDestroy();
 
     openvdb::math::Transform::ConstPtr frustum;
-#if !VDB_COMPILABLE_SOP
-    frustum = mFrustum;
-#else
     // Attempt to extract the frustum from our cache.
     if (auto* cache = dynamic_cast<SOP_OpenVDB_Occlusion_Mask::Cache*>(myNodeVerbCache)) {
         frustum = cache->frustum();
     }
-#endif
 
     if (frustum) {
         UT_Vector3 color(0.9f, 0.0f, 0.0f);
@@ -436,15 +421,9 @@ private:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Occlusion_Mask)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Camera reference
@@ -455,13 +434,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Occlusion_Mask)::cookVDBSop(OP
         cameraPath.harden();
 
         if (cameraPath.isstring()) {
-#if VDB_COMPILABLE_SOP
             OBJ_Node* camobj = cookparms()->getCwd()->findOBJNode(cameraPath);
             OP_Node* self = cookparms()->getCwd();
-#else
-            OBJ_Node* camobj = findOBJNode(cameraPath);
-            OP_Node* self = this;
-#endif
 
             if (!camobj) {
                 addError(SOP_MESSAGE, "Camera not found");

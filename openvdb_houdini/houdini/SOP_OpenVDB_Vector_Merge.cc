@@ -48,11 +48,7 @@
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/regex.hpp>
-#else
-#include <boost/regex.hpp>
-#endif
 #include <functional>
 #include <memory>
 #include <set>
@@ -61,18 +57,10 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 // HAVE_MERGE_GROUP is disabled in Houdini
 #ifdef SESI_OPENVDB
@@ -90,12 +78,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -237,13 +220,11 @@ Position:\n\
         .setDefault("@name=*.z"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
+    hvdb::OpenVDBOpFactory("VDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
         .addInput("Scalar VDBs to merge into vector")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Merge::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -645,14 +626,9 @@ private:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Merge)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Vector_Merge::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);
@@ -762,7 +738,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Merge)::cookVDBSop(OP_C
                     addMessage(SOP_MESSAGE, ostr.str().c_str());
                 }
 
-                if (GEO_PrimVDB* outVdb = hvdb::createVdbPrimitive(*gdp, outGrid)) {
+                if (GEO_PrimVDB* outVdb = GU_PrimVDB::buildFromGrid(*gdp, outGrid, nonNullVdb, outGridName.c_str())) {
                     primsToGroup.push_back(outVdb);
                 }
 

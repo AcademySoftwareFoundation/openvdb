@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,23 +57,6 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
-
-/// CopyConstness<T1, T2>::Type is either const T2 or T2 with no const qualifier,
-/// depending on whether T1 is const.  For example,
-/// - CopyConstness<int, int>::Type is int
-/// - CopyConstness<int, const int>::Type is int
-/// - CopyConstness<const int, int>::Type is const int
-/// - CopyConstness<const int, const int>::Type is const int
-template<typename FromType, typename ToType> struct CopyConstness {
-    using Type = typename std::remove_const<ToType>::type;
-};
-template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
-    using Type = const ToType;
-};
-
-
-////////////////////////////////////////
-
 
 namespace iter {
 
@@ -1412,6 +1395,6 @@ private:
 
 #endif // OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

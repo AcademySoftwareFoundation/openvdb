@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,111 +24,146 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
-cmake_minimum_required(VERSION 3.1)
-set(CMAKE_CXX_STANDARD 11)
+#[=======================================================================[
 
-PROJECT ( OpenVDB_Houdini )
+  CMake Configuration for the OpenVDB Houdini Plugin.
 
-OPTION ( OPENVDB_HOUDINI_SUBDIR "Install plugins to <prefix>/houdini/<version> instead of <prefix>/houdini<version>" OFF)
-OPTION ( OPENVDB_HOUDINI_SHORT_VERSION "User major.minor as <version> instead of major.minor.patch" ON )
-OPTION ( OPENVDB_HOUDINI_INSTALL_LIBRARY "Install headers and place the shared library in a lib directory." OFF)
-FIND_PACKAGE ( HDK REQUIRED )
+  See the OpenVDBHoudiniSetup.cmake module for more information on how to
+  locate and use a Houdini Installation.
 
-# Checking if hdk version is >= 16.5
-# Houdini 16.5 stopped shipping boost.
-IF (( HDK_VERSION_MAJOR GREATER 16 ) OR 
-    (( HDK_VERSION_MAJOR EQUAL 16 ) AND ( HDK_VERSION_MINOR EQUAL 5 )))
+  There are two main stages for the OpenVDB Houdini build; the OpenVDB
+  Houdini base shared library and all subsequent dependent nodes (SOPs,
+  SHOPs, procedurals etc.) Both are installed to the same prefix:
 
-  FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED )
-  INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
+    <prefix>/include  - Shared openvdb_houdini headers
+    <prefix>/lib      - Location of libopenvdb_houdini
+    <prefix>/dso      - Location of all other .so and required files
+                        such as icons and scripts
 
-ENDIF()
+  By default, the prefix is set to the value returned by the Houdini
+  CMake configuration. This is the default installation path for all
+  Houdini plugins. You can disable this behavior by setting the following
+  variable to OFF:
+    USE_DEFAULT_HOUDINI_INSTALL
 
-IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
+  CMake will instead read from CMAKE_INSTALL_PREFIX. If you're building
+  multiple components of the OpenVDB repository and wish to customize the
+  prefix, the following cached variable can be set:
+    OPENVDB_HOUDINI_INSTALL_PREFIX
 
-  # Set the variables that are otherwise defined in the core module.
-  SET ( OPENVDB_MAJOR_VERSION_NUMBER ${OpenVDB_MAJOR_VERSION} )
-  SET ( OPENVDB_MINOR_VERSION_NUMBER ${OpenVDB_MINOR_VERSION} )
-  SET ( OPENVDB_PATCH_VERSION_NUMBER ${OpenVDB_PATCH_VERSION} )
+  This allows you to use CMAKE_INSTALL_PREFIX for the core library
+  location and a custom location for the Houdini plugin.
 
-  # Use the library installed
-  SET ( OPENVDB_SHARED_LIB ${OpenVDB_OPENVDB_LIBRARY} )
-ELSE ()
-  # Use the target
-  SET ( OPENVDB_SHARED_LIB openvdb_shared)
-ENDIF ( NOT OPENVDB_BUILD_CORE )
+#]=======================================================================]
 
-# This is to work around DWA way of doing stuff - REPEATED WITH VARIATION
-FILE ( GLOB HOUDINI_UTILS_HEADER RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} houdini/*.h )
-
-# Copy the files belonging to houdini_utils
-SET  ( OPENVDB_HOUDINI_UTILS_DIR ${PROJECT_BINARY_DIR}/houdini_utils )
-FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_UTILS_DIR} )
-FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_UTILS_DIR}
-  FILES_MATCHING
-  PATTERN "geometry.h" 
-  PATTERN "ParmFactory.h"
-  PATTERN "OP_NodeChain.h"
-  )
-
-# Copy the files not belonging to houdini_utils to openvdb_houdini
-SET  ( OPENVDB_HOUDINI_LOCAL_DIR ${PROJECT_BINARY_DIR}/openvdb_houdini )
-FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR} )
-FILE ( COPY ${HOUDINI_UTILS_HEADER} DESTINATION ${OPENVDB_HOUDINI_LOCAL_DIR} 
-  PATTERN "geometry.h" EXCLUDE
-  PATTERN "ParmFactory.h" EXCLUDE
-  PATTERN "OP_NodeChain.h" EXCLUDE
-  )
-
-
-INCLUDE_DIRECTORIES (
-  ${OpenVDB_INCLUDE_DIR}
-  # houdini
-  ${OPENVDB_HOUDINI_UTILS_DIR}
-  ${OPENVDB_HOUDINI_LOCAL_DIR}
-  ${PROJECT_BINARY_DIR}
-  )
-
-INCLUDE_DIRECTORIES ( SYSTEM ${HDK_INCLUDE_DIR} )
-# MESSAGE ( "HDK_DEFINITIONS = ${HDK_DEFINITIONS}" )
-
-LINK_DIRECTORIES($ENV{HFS}/dsolib)
-
-IF (NOT WIN32)
-  ADD_DEFINITIONS ( -pthread -fPIC )
+PROJECT ( OpenVDBHoudini )
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+IF ( POLICY CMP0074 )
+  CMAKE_POLICY ( SET CMP0074 NEW )
 ENDIF ()
 
-SET ( OPENVDB_HFS_INSTALL_BASE_DIR
-  ${CMAKE_INSTALL_PREFIX}/houdini$<$<BOOL:${OPENVDB_HOUDINI_SUBDIR}>:/>${HDK_VERSION_MAJOR}.${HDK_VERSION_MINOR}$<$<NOT:$<BOOL:${OPENVDB_HOUDINI_SHORT_VERSION}>>:.${HDK_VERSION_BUILD}> 
-  CACHE PATH "Base install path for houdini"
+OPTION ( USE_DEFAULT_HOUDINI_INSTALL [=[
+Use the default install location returned by the Houdini CMake function,
+houdini_get_default_install_dir():
+  Linux: $ENV{HOME}/houdiniX.X
+  Mac: $ENV{HOME}/Library/Preferences/houdini/X.X
+  Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
+If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON )
+
+# SESITAG CMake options
+OPTION ( OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
+Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
+older Houdini versions and will be removed in Houdini 18. ]=] OFF )
+
+MARK_AS_ADVANCED (
+  OPENVDB_HOUDINI_ENABLE_SESI_TAG
   )
 
-# RPath handling
-IF ( OPENVDB_ENABLE_RPATH )
+#########################################################################
 
-  # when building, don't use the install RPATH already
-  # (but later on when installing)
-  SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+MESSAGE ( STATUS "----------------------------------------------------" )
+MESSAGE ( STATUS "------------ Configuring OpenVDBHoudini ------------" )
+MESSAGE ( STATUS "----------------------------------------------------" )
 
-  # Use $ORIGIN for relative referencing
-  # The second $ORIGIN is present for the openvdb_houdini shared library.
-  IF( OPENVDB_HOUDINI_INSTALL_LIBRARY )
-    SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN/../lib")
+#########################################################################
+
+# Configure prefix
+
+IF ( NOT OPENVDB_HOUDINI_INSTALL_PREFIX )
+  IF ( USE_DEFAULT_HOUDINI_INSTALL )
+    # Function from the Houdini CMake which is brought in by OpenVDBHoudiniSetup.cmake
+    houdini_get_default_install_dir( HOUDINI_INSTALL_LOCATION )
   ELSE ()
-    SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN")
+    SET ( HOUDINI_INSTALL_LOCATION ${CMAKE_INSTALL_PREFIX} )
   ENDIF ()
-  # SET(CMAKE_INSTALL_RPATH "$ORIGIN")
+ENDIF ()
 
-ENDIF ( OPENVDB_ENABLE_RPATH )
+SET ( OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
+  CACHE PATH "Base install path for OpenVDB Houdini shared libraries, dsos and headers."
+  )
+
+MESSAGE ( STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}" )
+
+#########################################################################
+
+# Collect and configure lib dependencies
+
+IF ( NOT OPENVDB_BUILD_CORE )
+  SET ( OPENVDB_LIB OpenVDB::openvdb )
+ELSE ()
+  SET ( OPENVDB_LIB openvdb )
+ENDIF ()
+
+# @note Linking openvdb_houdini against Houdini brings in all interface compile
+# definitions, including MAKING_DSO
+
+SET ( OPENVDB_HOUDINI_DEPENDENT_LIBS
+  ${OPENVDB_LIB}
+  Houdini
+)
+
+#########################################################################
+
+# Copy the files belonging to houdini_utils
+
+SET ( OPENVDB_HOUDINI_UTILS_DIR ${PROJECT_BINARY_DIR}/houdini_utils )
+FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_UTILS_DIR} )
+FILE ( COPY
+    houdini/geometry.h
+    houdini/OP_NodeChain.h
+    houdini/ParmFactory.h
+  DESTINATION
+    ${OPENVDB_HOUDINI_UTILS_DIR}
+  )
+
+# Copy the files belonging to openvdb_houdini
+SET  ( OPENVDB_HOUDINI_LOCAL_DIR ${PROJECT_BINARY_DIR}/openvdb_houdini )
+FILE ( MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR} )
+FILE ( COPY
+    houdini/AttributeTransferUtil.h
+    houdini/GEO_PrimVDB.h
+    houdini/GeometryUtil.h
+    houdini/GT_GEOPrimCollectVDB.h
+    houdini/GU_PrimVDB.h
+    houdini/GU_VDBPointTools.h
+    houdini/PointUtils.h
+    houdini/SOP_NodeVDB.h
+    houdini/SOP_VDBVerbUtils.h
+    houdini/UT_VDBTools.h
+    houdini/UT_VDBUtils.h
+    houdini/Utils.h
+  DESTINATION
+    ${OPENVDB_HOUDINI_LOCAL_DIR}
+  )
 
 ADD_LIBRARY ( openvdb_houdini SHARED
-  houdini/GeometryUtil.cc
   houdini/GEO_PrimVDB.cc
+  houdini/GEO_VDBTranslator.cc
+  houdini/geometry.cc
+  houdini/GeometryUtil.cc
   houdini/GT_GEOPrimCollectVDB.cc
   houdini/GU_PrimVDB.cc
   houdini/GU_VDBPointTools.cc
-  houdini/geometry.cc
   houdini/ParmFactory.cc
   houdini/PointUtils.cc
   houdini/SOP_NodeVDB.cc
@@ -136,118 +171,204 @@ ADD_LIBRARY ( openvdb_houdini SHARED
   houdini/Utils.cc
   )
 
-TARGET_LINK_LIBRARIES ( openvdb_houdini
-  ${OPENVDB_SHARED_LIB}
-  HoudiniPRM
-  HoudiniGEO
-  HoudiniUT
-  HoudiniOP2
-  HoudiniOP3
-  HoudiniAPPS3
+TARGET_INCLUDE_DIRECTORIES ( openvdb_houdini PUBLIC
+  ${OPENVDB_HOUDINI_UTILS_DIR}
+  ${OPENVDB_HOUDINI_LOCAL_DIR}
+  ${PROJECT_BINARY_DIR}
   )
 
-SET_TARGET_PROPERTIES(
-  openvdb_houdini
+TARGET_LINK_LIBRARIES ( openvdb_houdini PUBLIC
+  ${OPENVDB_HOUDINI_DEPENDENT_LIBS}
+  )
+
+IF ( OPENVDB_ENABLE_RPATH )
+  # @todo There is probably a better way to do this for imported targets
+  SET ( RPATHS "" )
+  LIST ( APPEND RPATHS
+    ${Boost_LIBRARY_DIRS}
+    ${IlmBase_LIBRARY_DIRS}
+    ${Log4cplus_LIBRARY_DIRS}
+    ${Blosc_LIBRARY_DIRS}
+    ${Tbb_LIBRARY_DIRS}
+  )
+  IF ( OPENVDB_BUILD_CORE )
+    LIST ( APPEND ${CMAKE_INSTALL_PREFIX}/lib )
+  ELSE ()
+    LIST ( APPEND ${OpenVDB_LIBRARY_DIRS} )
+  ENDIF ()
+
+  LIST ( REMOVE_DUPLICATES RPATHS )
+
+  SET_TARGET_PROPERTIES ( openvdb_houdini
+    PROPERTIES INSTALL_RPATH "${RPATHS}"
+    )
+  UNSET ( RPATHS )
+ENDIF ()
+
+
+SET_TARGET_PROPERTIES ( openvdb_houdini
   PROPERTIES
-  SOVERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}
-  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_PATCH_VERSION_NUMBER}
+    OUTPUT_NAME openvdb_houdini
+    SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
+    VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
   )
 
-SET ( OPENVDB_SOP_NAMES "" )
-LIST ( APPEND OPENVDB_SOP_NAMES "GR_PrimVDBPoints" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Advect" )
-LIST ( APPEND OPENVDB_SOP_NAMES "GEO_VDBTranslator" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Advect_Points" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Analysis" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Clip" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Combine" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Convert" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Create" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Diagnostics" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Fill" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Filter" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Filter_Level_Set" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Fracture" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_From_Particles" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_From_Polygons" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_LOD" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Metadata" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Morph_Level_Set" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Noise" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Occlusion_Mask" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Platonic" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Points_Convert" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Points_Group" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Potential_Flow" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Prune" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Rasterize_Points" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Ray" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Read" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Rebuild_Level_Set" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Remap" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Remove_Divergence" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Resample" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Sample_Points" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Sort_Points" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Scatter" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Segment" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_To_Polygons" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_To_Spheres" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Topology_To_Level_Set" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Transform" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Vector_Merge" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Vector_Split" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Visualize" )
-LIST ( APPEND OPENVDB_SOP_NAMES "SOP_OpenVDB_Write" )
+SET ( OPENVDB_DSO_NAMES
+  GR_PrimVDBPoints
+  SHOP_OpenVDB_Points
+  SOP_OpenVDB_Advect
+  SOP_OpenVDB_Advect_Points
+  SOP_OpenVDB_Analysis
+  SOP_OpenVDB_Clip
+  SOP_OpenVDB_Combine
+  SOP_OpenVDB_Convert
+  SOP_OpenVDB_Create
+  SOP_OpenVDB_Densify
+  SOP_OpenVDB_Diagnostics
+  SOP_OpenVDB_Fill
+  SOP_OpenVDB_Filter
+  SOP_OpenVDB_Filter_Level_Set
+  SOP_OpenVDB_Fracture
+  SOP_OpenVDB_From_Particles
+  SOP_OpenVDB_From_Polygons
+  SOP_OpenVDB_LOD
+  SOP_OpenVDB_Metadata
+  SOP_OpenVDB_Morph_Level_Set
+  SOP_OpenVDB_Noise
+  SOP_OpenVDB_Occlusion_Mask
+  SOP_OpenVDB_Platonic
+  SOP_OpenVDB_Points_Convert
+  SOP_OpenVDB_Points_Delete
+  SOP_OpenVDB_Points_Group
+  SOP_OpenVDB_Potential_Flow
+  SOP_OpenVDB_Prune
+  SOP_OpenVDB_Rasterize_Points
+  SOP_OpenVDB_Ray
+  SOP_OpenVDB_Read
+  SOP_OpenVDB_Rebuild_Level_Set
+  SOP_OpenVDB_Remap
+  SOP_OpenVDB_Remove_Divergence
+  SOP_OpenVDB_Resample
+  SOP_OpenVDB_Sample_Points
+  SOP_OpenVDB_Scatter
+  SOP_OpenVDB_Segment
+  SOP_OpenVDB_Sort_Points
+  SOP_OpenVDB_To_Polygons
+  SOP_OpenVDB_To_Spheres
+  SOP_OpenVDB_Topology_To_Level_Set
+  SOP_OpenVDB_Transform
+  SOP_OpenVDB_Vector_Merge
+  SOP_OpenVDB_Vector_Split
+  SOP_OpenVDB_Visualize
+  SOP_OpenVDB_Write
+  VRAY_OpenVDB_Points
+  )
 
-FOREACH ( SOP_NAME ${OPENVDB_SOP_NAMES} )
-  # MESSAGE ( "SOP_NAME = ${SOP_NAME}" )
+ADD_CUSTOM_TARGET ( openvdb_houdini_dsos
+  COMMENT "Group target which corresponds to all Houdini Nodes and DSOs "
+  "which aren't part of the shared library i.e. all targets in OPENVDB_DSO_NAMES."
+  )
 
-  HDK_ADD_LIBRARY ( ${SOP_NAME}
-    houdini/${SOP_NAME}.cc
+# Add all dsos as libraries and configure them for houdini
+
+MESSAGE ( STATUS "Configuring Houdini DSOs..." )
+
+FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
+
+  ADD_LIBRARY ( ${DSO_NAME} SHARED houdini/${DSO_NAME}.cc )
+  TARGET_LINK_LIBRARIES ( ${DSO_NAME} openvdb_houdini )
+
+  # Call houdini_configure_target to setup the sesi tag information. We set
+  # INSTDIR to the project build directory and configure the actuall install
+  # paths ourselves (otherwise cmake will configure the build to build directly
+  # to the install dir)
+
+  houdini_configure_target ( ${DSO_NAME}
+    INSTDIR ${PROJECT_BINARY_DIR}
+    PREFIX ""
+    TAGINFO ""
+  )
+
+  # If the sesi tag needs removing, manually configure the compile
+  # options for each DSO and replace the UT_DSO_TAGINFO define
+
+  IF ( NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG )
+    GET_TARGET_PROPERTY ( DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS )
+    STRING ( REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
+    SET_TARGET_PROPERTIES ( ${DSO_NAME}
+      PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
     )
+  ENDIF ()
 
-  target_compile_options(${SOP_NAME} PRIVATE -fext-numeric-literals)
+  # Configure rpaths
+  # Encode the path to libopenvdb.so into plugins, and because some
+  # plugins might depend on Houdini libraries that are not linked into
+  # hython (among other tools), encode the Houdini library path as well.
 
-  TARGET_LINK_LIBRARIES ( ${SOP_NAME}
-    openvdb_houdini
-    ${OPENVDB_SHARED_LIB}
-    )
+  IF ( OPENVDB_ENABLE_RPATH )
+    SET ( RPATHS )
+    IF ( OPENVDB_BUILD_CORE )
+      LIST ( APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib )
+    ELSE ()
+      LIST ( APPEND RPATHS ${OpenVDB_LIBRARY_DIRS} )
+    ENDIF ()
 
-  INSTALL ( TARGETS
-    ${SOP_NAME}
-    DESTINATION
-    ${OPENVDB_HFS_INSTALL_BASE_DIR}/dso
-    )
+    LIST ( APPEND RPATHS ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib )
+
+    LIST ( REMOVE_DUPLICATES RPATHS )
+    SET_TARGET_PROPERTIES ( ${DSO_NAME}
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+      )
+  ENDIF ()
+
+  ADD_DEPENDENCIES ( openvdb_houdini_dsos ${DSO_NAME} )
 
 ENDFOREACH ()
 
-# Installation
+# This is only required for the OpenVDB Write SOP which enables a blosc menu
+# option if blosc is supported.
+
+IF ( USE_BLOSC OR OpenVDB_USES_BLOSC )
+  IF ( TARGET SOP_OpenVDB_Write )
+    TARGET_COMPILE_DEFINITIONS ( SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC" )
+  ENDIF ()
+ENDIF ()
+
+##########
+# Installs
+##########
+
+INSTALL ( DIRECTORY
+  ${OPENVDB_HOUDINI_UTILS_DIR}
+  ${OPENVDB_HOUDINI_LOCAL_DIR}
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/include
+)
+
+INSTALL ( TARGETS
+  openvdb_houdini
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib
+)
+
+FOREACH ( DSO_NAME ${OPENVDB_DSO_NAMES} )
+  IF ( DSO_NAME MATCHES "VRAY_*")
+    INSTALL ( TARGETS
+      ${DSO_NAME}
+      DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso/mantra
+      )
+  ELSE ()
+    INSTALL ( TARGETS
+      ${DSO_NAME}
+      DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso
+      )
+  ENDIF ()
+ENDFOREACH ()
+
 INSTALL ( FILES
-  houdini/DW_OpenVDBRasterizePoints.cmd
-  DESTINATION
-  ${OPENVDB_HFS_INSTALL_BASE_DIR}/scripts/sop
+  houdini/SOP_OpenVDB.svg
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
   )
 
-IF( OPENVDB_HOUDINI_INSTALL_LIBRARY )
-  # Install the openvdb_houdini as a proper library
-  INSTALL ( DIRECTORY 
-    ${OPENVDB_HOUDINI_UTILS_DIR}
-    ${OPENVDB_HOUDINI_LOCAL_DIR}
-    DESTINATION ${OPENVDB_HFS_INSTALL_BASE_DIR}/include
-    )
-
-  INSTALL ( TARGETS
-    openvdb_houdini
-    DESTINATION
-    ${OPENVDB_HFS_INSTALL_BASE_DIR}/lib
-    )
-
-ELSE ()
-  
-  INSTALL ( TARGETS
-    openvdb_houdini
-    DESTINATION
-    ${OPENVDB_HFS_INSTALL_BASE_DIR}/dso
-    )
-ENDIF ()
+INSTALL ( FILES
+  houdini/DW_OpenVDBRasterizePoints.cmd
+  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
+  )

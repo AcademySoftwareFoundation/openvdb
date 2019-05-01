@@ -40,13 +40,8 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>
-#else
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#endif
 #include <OBJ/OBJ_Camera.h>
 #include <cmath>
 #include <stdexcept>
@@ -57,9 +52,6 @@
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 namespace cvdb = openvdb;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////
@@ -544,7 +536,7 @@ Other:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "matchVoxelSize", "Match Voxel Size"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Create", SOP_OpenVDB_Create::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Create", SOP_OpenVDB_Create::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addOptionalInput("Optional Input to Merge With")
         .addOptionalInput("Optional Reference VDB")

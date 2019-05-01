@@ -56,25 +56,13 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
 #include <UT/UT_Version.h>
+#include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-#include <memory>
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace std {
@@ -113,12 +101,7 @@ public:
     static UT_Vector3 colorLevel(int level) { return sColors[std::max(3-level,0)]; }
     static const UT_Vector3& colorSign(bool negative) { return sColors[negative ? 5 : 4]; }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -377,13 +360,14 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Visualize", SOP_OpenVDB_Visualize::factory, parms, *table)
-        .addAlias("OpenVDB Visualizer")
+    hvdb::OpenVDBOpFactory("VDB Visualize Tree",
+        SOP_OpenVDB_Visualize::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBVisualize")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs to visualize")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1084,8 +1068,8 @@ GridSurfacer::operator()(const GridType& grid)
         GU_Detail tmpGeo;
 
         GU_Surfacer surfacer(tmpGeo,
-            UT_Vector3(bbox.min().x(), bbox.min().y(), bbox.min().z()),
-            UT_Vector3(dim[0], dim[1], dim[2]),
+            UT_Vector3(float(bbox.min().x()), float(bbox.min().y()), float(bbox.min().z())),
+            UT_Vector3(float(dim[0]), float(dim[1]), float(dim[2])),
             dim[0], dim[1], dim[2], mGenerateNormals);
 
         typename GridType::ConstAccessor accessor = grid.getConstAccessor();
@@ -1164,14 +1148,9 @@ GridSurfacer::operator()(const GridType& grid)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Visualizing VDBs");
@@ -1232,9 +1211,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Cont
             parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
             parms.myOffset = static_cast<float>(iso);
             parms.preserveGroups = false;
-#if UT_MAJOR_VERSION_INT < 16
-            parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);
-#else
             UT_UniquePtr<GA_PrimitiveGroup> groupDeleter;
             if (!group) {
                 parms.primGroup = nullptr;
@@ -1244,7 +1220,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Cont
                 groupDeleter.reset(parms.primGroup);
                 parms.primGroup->copyMembership(*group);
             }
-#endif
             GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms, adaptivity, /*keep_original*/true);
         }
 #endif // HAVE_SURFACING_PARM
@@ -1273,22 +1248,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Visualize)::cookVDBSop(OP_Cont
                     TreeVisualizer draw(*gdp, treeParms, &boss);
 
                     if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
-#if UT_VERSION_INT >= 0x100001d0 // 16.0.464 or later
                         GEOvdbProcessTypedGridPoint(*vdb, draw);
-#else
-                        // Handle grid types that are not natively supported by Houdini.
-                        if (vdb->getGrid().isType<openvdb::tools::PointIndexGrid>()) {
-                            openvdb::tools::PointIndexGrid::ConstPtr grid =
-                                 openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(
-                                     vdb->getGridPtr());
-                            draw(*grid);
-                        } else if (vdb->getGrid().isType<openvdb::points::PointDataGrid>()) {
-                            openvdb::points::PointDataGrid::ConstPtr grid =
-                                 openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(
-                                     vdb->getGridPtr());
-                            draw(*grid);
-                        }
-#endif
                     }
                 }
 

@@ -45,6 +45,7 @@
 
 #include <UT/UT_Version.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_UniquePtr.h>
 #include <PRM/PRM_Parm.h>
 
 #ifdef SESI_OPENVDB
@@ -60,18 +61,6 @@
 #include <sstream>
 #include <type_traits>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-  #include <UT/UT_UniquePtr.h>
-#else
-  template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -1387,17 +1376,11 @@ public:
     int selectOperationTests();
     int validateOperationTests();
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
         OP_ERROR cookVDBSop(OP_Context&) override;
         TestData getTestData(const fpreal time) const;
     };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-    TestData getTestData(const fpreal time) const;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -1611,11 +1594,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Finite values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_finite", "Finite Values"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(30)
-#else
         + spacing(35)
-#endif
     )
         .setCallbackFunc(&validateOperationTestsCB)
         .setDefault(PRMoneDefaults)
@@ -1636,9 +1615,6 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Uniform background values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_background", "Uniform Background"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(5)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1658,11 +1634,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Values in range
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_valrange", "Values in Range"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(19)
-#else
         + spacing(23)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1727,11 +1699,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Gradient magnitude
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_gradient", "Gradient Magnitude"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(6)
-#else
         + spacing(7)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1760,11 +1728,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Inactive Tiles
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_activetiles", "Inactive Tiles"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(28)
-#else
         + spacing(36)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1795,11 +1759,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // { Background values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_backgroundzero", "Background Zero"
-#if (UT_MAJOR_VERSION_INT < 16)
-        + spacing(15)
-#else
         + spacing(17)
-#endif
         )
         .setCallbackFunc(&validateOperationTestsCB)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
@@ -1840,11 +1800,9 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(nullptr));
     // }
 
-    hvdb::OpenVDBOpFactory("OpenVDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
         .addInput("VDB Volumes")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1937,7 +1895,7 @@ SOP_OpenVDB_Diagnostics::updateParmsFlags()
 
 
 TestData
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::getTestData(const fpreal time) const
+SOP_OpenVDB_Diagnostics::Cache::getTestData(const fpreal time) const
 {
     TestData test;
 
@@ -1997,14 +1955,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::getTestData(cons
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Diagnostics)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Diagnostics::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Performing diagnostics");

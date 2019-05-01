@@ -55,12 +55,9 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_VoxelArray.h>
+#include <UT/UT_UniquePtr.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <limits>
 #include <list>
@@ -69,24 +66,10 @@
 #include <string>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
+
 
 namespace {
 enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP };
@@ -109,11 +92,9 @@ public:
 protected:
     bool updateParmsFlags() override;
 
-#if VDB_COMPILABLE_SOP
 public:
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
@@ -141,9 +122,7 @@ public:
             bool computeNormals,
             hvdb::Interrupter& boss,
             const fpreal time);
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 };
 
 
@@ -427,17 +406,18 @@ Polygon Soup:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Convert",
+    hvdb::OpenVDBOpFactory("VDB Convert",
         SOP_OpenVDB_Convert::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBConvert")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to convert")
         .addOptionalInput("Optional reference surface. Can be used "
             "to transfer attributes, sharpen features and to "
             "eliminate seams from fractured pieces.")
         .addOptionalInput("Optional VDB masks")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_DUPLICATE, []() { return new SOP_OpenVDB_Convert::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -1058,7 +1038,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
 // Convert all VDB primitives in the given group to have a new storage type (where possible).
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertVDBType(
+SOP_OpenVDB_Convert::Cache::convertVDBType(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
     const UT_String& outTypeStr,
@@ -1096,7 +1076,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertVDBType(
 
 template <class GridType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::referenceMeshing(
+SOP_OpenVDB_Convert::Cache::referenceMeshing(
     std::list<openvdb::GridBase::ConstPtr>& grids,
     std::list<const GU_PrimVDB*> vdbs,
     GA_PrimitiveGroup* delgroup,
@@ -1327,7 +1307,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::referenceMeshing(
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertToPoly(
+SOP_OpenVDB_Convert::Cache::convertToPoly(
     fpreal time,
     GA_PrimitiveGroup *group,
     bool buildpolysoup,
@@ -1487,18 +1467,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::convertToPoly(
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Convert)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Convert::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // We are intentionally not performing a duplicateSourceStealable() here due to
-        // specific implementation in this SOP which causes undesirable behavior when
-        // attempting to "steal" the geometry
-        duplicateSource(0, context);
-#endif
-
         const fpreal t = context.getTime();
 
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(

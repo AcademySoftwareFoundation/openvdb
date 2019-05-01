@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include <iostream> // must be included before python on macos
 #include <cstring> // for strncmp(), strrchr(), etc.
 #include <limits>
 #include <string>

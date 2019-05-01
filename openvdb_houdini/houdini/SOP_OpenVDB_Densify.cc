@@ -41,11 +41,6 @@
 #include <UT/UT_Version.h>
 #include <stdexcept>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -59,12 +54,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 };
 
 
@@ -86,11 +76,9 @@ newSopOperator(OP_OperatorTable* table)
             "A subset of the input VDBs to be densified"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
         .addInput("VDBs to densify")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Densify::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -156,15 +144,9 @@ struct DensifyOp {
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Densify)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Densify::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Get the group of grids to process.

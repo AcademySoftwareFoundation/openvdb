@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -112,17 +112,22 @@ public:
 
     ~GridBase() override {}
 
+
+    /// @name Copying
+    /// @{
+
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
-    virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
+    /// @deprecated ABI versions older than 4 are deprecated.
+    OPENVDB_DEPRECATED virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
 #else
-    //@{
-    /// @brief Return a new grid of the same type as this grid whose metadata and
-    /// transform are deep copies of this grid's and whose tree is shared with this grid.
+    /// @brief Return a new grid of the same type as this grid whose metadata is a
+    /// deep copy of this grid's and whose tree and transform are shared with this grid.
     virtual GridBase::Ptr copyGrid() = 0;
+    /// @brief Return a new grid of the same type as this grid whose metadata is a
+    /// deep copy of this grid's and whose tree and transform are shared with this grid.
     virtual GridBase::ConstPtr copyGrid() const = 0;
-    //@}
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     virtual GridBase::Ptr copyGridWithNewTree() const = 0;
@@ -130,10 +135,12 @@ public:
     /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     virtual GridBase::Ptr deepCopyGrid() const = 0;
 
+    /// @}
 
-    //
-    // Registry methods
-    //
+
+    /// @name Registry
+    /// @{
+
     /// Create a new grid of the given (registered) type.
     static Ptr createGrid(const Name& type);
 
@@ -143,10 +150,11 @@ public:
     /// Clear the grid type registry.
     static void clearRegistry();
 
+    /// @}
 
-    //
-    // Grid type methods
-    //
+    /// @name Type access
+    /// @{
+
     /// Return the name of this grid's type.
     virtual Name type() const = 0;
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
@@ -155,6 +163,8 @@ public:
     /// Return @c true if this grid is of the same type as the template parameter.
     template<typename GridType>
     bool isType() const { return (this->type() == GridType::gridType()); }
+
+    /// @}
 
     //@{
     /// @brief Return the result of downcasting a GridBase pointer to a Grid pointer
@@ -169,38 +179,56 @@ public:
     static typename GridType::ConstPtr constGrid(const GridBase::ConstPtr&);
     //@}
 
-    //@{
+    /// @name Tree
+    /// @{
+
     /// @brief Return a pointer to this grid's tree, which might be
     /// shared with other grids.  The pointer is guaranteed to be non-null.
     TreeBase::Ptr baseTreePtr();
+    /// @brief Return a pointer to this grid's tree, which might be
+    /// shared with other grids.  The pointer is guaranteed to be non-null.
     TreeBase::ConstPtr baseTreePtr() const { return this->constBaseTreePtr(); }
+    /// @brief Return a pointer to this grid's tree, which might be
+    /// shared with other grids.  The pointer is guaranteed to be non-null.
     virtual TreeBase::ConstPtr constBaseTreePtr() const = 0;
-    //@}
 
-    //@{
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
-    /// @note Calling setTree() on this grid invalidates all references
-    /// previously returned by this method.
+    /// @note Calling @vdblink::GridBase::setTree() setTree@endlink
+    /// on this grid invalidates all references previously returned by this method.
     TreeBase& baseTree() { return const_cast<TreeBase&>(this->constBaseTree()); }
+    /// @brief Return a reference to this grid's tree, which might be
+    /// shared with other grids.
+    /// @note Calling @vdblink::GridBase::setTree() setTree@endlink
+    /// on this grid invalidates all references previously returned by this method.
     const TreeBase& baseTree() const { return this->constBaseTree(); }
+    /// @brief Return a reference to this grid's tree, which might be
+    /// shared with other grids.
+    /// @note Calling @vdblink::GridBase::setTree() setTree@endlink
+    /// on this grid invalidates all references previously returned by this method.
     const TreeBase& constBaseTree() const { return *(this->constBaseTreePtr()); }
-    //@}
 
     /// @brief Associate the given tree with this grid, in place of its existing tree.
     /// @throw ValueError if the tree pointer is null
     /// @throw TypeError if the tree is not of the appropriate type
-    /// @note Invalidates all references previously returned by baseTree()
-    /// or constBaseTree().
+    /// @note Invalidates all references previously returned by
+    /// @vdblink::GridBase::baseTree() baseTree@endlink
+    /// or @vdblink::GridBase::constBaseTree() constBaseTree@endlink.
     virtual void setTree(TreeBase::Ptr) = 0;
 
     /// Set a new tree with the same background value as the previous tree.
     virtual void newTree() = 0;
 
+    /// @}
+
     /// Return @c true if this grid contains only background voxels.
     virtual bool empty() const = 0;
     /// Empty this grid, setting all voxels to the background.
     virtual void clear() = 0;
+
+
+    /// @name Tools
+    /// @{
 
     /// @brief Reduce the memory footprint of this grid by increasing its sparseness
     /// either losslessly (@a tolerance = 0) or lossily (@a tolerance > 0).
@@ -223,10 +251,39 @@ public:
     virtual void clip(const CoordBBox&) = 0;
 #endif
 
+    /// @}
 
-    //
-    // Metadata
-    //
+    /// @{
+    /// @brief If this grid resolves to one of the listed grid types,
+    /// invoke the given functor on the resolved grid.
+    /// @return @c false if this grid's type is not one of the listed types
+    ///
+    /// @par Example:
+    /// @code
+    /// using AllowedGridTypes = openvdb::TypeList<
+    ///     openvdb::Int32Grid, openvdb::Int64Grid,
+    ///     openvdb::FloatGrid, openvdb::DoubleGrid>;
+    ///
+    /// const openvdb::CoordBBox bbox{
+    ///     openvdb::Coord{0,0,0}, openvdb::Coord{10,10,10}};
+    ///
+    /// // Fill the grid if it is one of the allowed types.
+    /// myGridBasePtr->apply<AllowedGridTypes>(
+    ///     [&bbox](auto& grid) { // C++14
+    ///         using GridType = typename std::decay<decltype(grid)>::type;
+    ///         grid.fill(bbox, typename GridType::ValueType(1));
+    ///     }
+    /// );
+    /// @endcode
+    ///
+    /// @see @vdblink::TypeList TypeList@endlink
+    template<typename GridTypeListT, typename OpT> inline bool apply(OpT&) const;
+    template<typename GridTypeListT, typename OpT> inline bool apply(OpT&);
+    /// @}
+
+    /// @name Metadata
+    /// @{
+
     /// Return this grid's user-specified name.
     std::string getName() const;
     /// Specify a name for this grid.
@@ -242,30 +299,44 @@ public:
     bool saveFloatAsHalf() const;
     void setSaveFloatAsHalf(bool);
 
-    /// Return the class of volumetric data (level set, fog volume, etc.) stored in this grid.
+    /// @brief Return the class of volumetric data (level set, fog volume, etc.)
+    /// that is stored in this grid.
+    /// @sa gridClassToString, gridClassToMenuName, stringToGridClass
     GridClass getGridClass() const;
-    /// Specify the class of volumetric data (level set, fog volume, etc.) stored in this grid.
+    /// @brief Specify the class of volumetric data (level set, fog volume, etc.)
+    /// that is stored in this grid.
+    /// @sa gridClassToString, gridClassToMenuName, stringToGridClass
     void setGridClass(GridClass);
     /// Remove the setting specifying the class of this grid's volumetric data.
     void clearGridClass();
+
+    /// @}
 
     /// Return the metadata string value for the given class of volumetric data.
     static std::string gridClassToString(GridClass);
     /// Return a formatted string version of the grid class.
     static std::string gridClassToMenuName(GridClass);
     /// @brief Return the class of volumetric data specified by the given string.
-    /// @details If the string is not one of the ones returned by gridClassToString(),
+    /// @details If the string is not one of the ones returned by
+    /// @vdblink::GridBase::gridClassToString() gridClassToString@endlink,
     /// return @c GRID_UNKNOWN.
     static GridClass stringToGridClass(const std::string&);
 
+    /// @name Metadata
+    /// @{
+
     /// @brief Return the type of vector data (invariant, covariant, etc.) stored
     /// in this grid, assuming that this grid contains a vector-valued tree.
+    /// @sa vecTypeToString, vecTypeExamples, vecTypeDescription, stringToVecType
     VecType getVectorType() const;
     /// @brief Specify the type of vector data (invariant, covariant, etc.) stored
     /// in this grid, assuming that this grid contains a vector-valued tree.
+    /// @sa vecTypeToString, vecTypeExamples, vecTypeDescription, stringToVecType
     void setVectorType(VecType);
     /// Remove the setting specifying the type of vector data stored in this grid.
     void clearVectorType();
+
+    /// @}
 
     /// Return the metadata string value for the given type of vector data.
     static std::string vecTypeToString(VecType);
@@ -277,12 +348,17 @@ public:
     static std::string vecTypeDescription(VecType);
     static VecType stringToVecType(const std::string&);
 
+    /// @name Metadata
+    /// @{
+
     /// Return @c true if this grid's voxel values are in world space and should be
     /// affected by transformations, @c false if they are in local space and should
     /// not be affected by transformations.
     bool isInWorldSpace() const;
     /// Specify whether this grid's voxel values are in world space or in local space.
     void setIsInWorldSpace(bool);
+
+    /// @}
 
     // Standard metadata field names
     // (These fields should normally not be accessed directly, but rather
@@ -301,9 +377,9 @@ public:
     static const char* const META_FILE_VOXEL_COUNT;
 
 
-    //
-    // Statistics
-    //
+    /// @name Statistics
+    /// @{
+
     /// Return the number of active voxels.
     virtual Index64 activeVoxelCount() const = 0;
 
@@ -323,15 +399,18 @@ public:
     /// changes to this grid.
     void addStatsMetadata();
     /// @brief Return a new MetaMap containing just the metadata that
-    /// was added to this grid with addStatsMetadata().
-    /// @details If addStatsMetadata() was never called on this grid,
-    /// return an empty MetaMap.
+    /// was added to this grid with @vdblink::GridBase::addStatsMetadata()
+    /// addStatsMetadata@endlink.
+    /// @details If @vdblink::GridBase::addStatsMetadata() addStatsMetadata@endlink
+    /// was never called on this grid, return an empty MetaMap.
     MetaMap::Ptr getStatsMetadata() const;
 
+    /// @}
 
-    //
-    // Transform methods
-    //
+
+    /// @name Transform
+    /// @{
+
     //@{
     /// @brief Return a pointer to this grid's transform, which might be
     /// shared with other grids.
@@ -342,17 +421,24 @@ public:
     //@{
     /// @brief Return a reference to this grid's transform, which might be
     /// shared with other grids.
-    /// @note Calling setTransform() on this grid invalidates all references
-    /// previously returned by this method.
+    /// @note Calling @vdblink::GridBase::setTransform() setTransform@endlink
+    /// on this grid invalidates all references previously returned by this method.
     math::Transform& transform() { return *mTransform; }
     const math::Transform& transform() const { return *mTransform; }
     const math::Transform& constTransform() const { return *mTransform; }
     //@}
+
+    /// @}
+
+    /// @name Transform
+    /// @{
+
     /// @brief Associate the given transform with this grid, in place of
     /// its existing transform.
     /// @throw ValueError if the transform pointer is null
-    /// @note Invalidates all references previously returned by transform()
-    /// or constTransform().
+    /// @note Invalidates all references previously returned by
+    /// @vdblink::GridBase::transform() transform@endlink
+    /// or @vdblink::GridBase::constTransform() constTransform@endlink.
     void setTransform(math::Transform::Ptr);
 
     /// Return the size of this grid's voxels.
@@ -362,18 +448,19 @@ public:
     Vec3d voxelSize(const Vec3d& xyz) const { return transform().voxelSize(xyz); }
     /// Return true if the voxels in world space are uniformly sized cubes
     bool hasUniformVoxels() const { return mTransform->hasUniformScale(); }
-    //@{
     /// Apply this grid's transform to the given coordinates.
     Vec3d indexToWorld(const Vec3d& xyz) const { return transform().indexToWorld(xyz); }
+    /// Apply this grid's transform to the given coordinates.
     Vec3d indexToWorld(const Coord& ijk) const { return transform().indexToWorld(ijk); }
-    //@}
     /// Apply the inverse of this grid's transform to the given coordinates.
     Vec3d worldToIndex(const Vec3d& xyz) const { return transform().worldToIndex(xyz); }
 
+    /// @}
 
-    //
-    // I/O methods
-    //
+
+    /// @name I/O
+    /// @{
+
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
     virtual void readTopology(std::istream&) = 0;
@@ -404,6 +491,8 @@ public:
     /// Output a human-readable description of this grid.
     virtual void print(std::ostream& = std::cout, int verboseLevel = 1) const = 0;
 
+    /// @}
+
 
 protected:
     /// @brief Initialize with an identity linear transform.
@@ -414,7 +503,8 @@ protected:
 
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// @brief Copy another grid's metadata but share its transform.
-    GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
+    /// @deprecated ABI versions older than 4 are deprecated.
+    OPENVDB_DEPRECATED GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
 #else
     /// @brief Copy another grid's metadata but share its transform.
     GridBase(GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
@@ -562,7 +652,8 @@ public:
     explicit Grid(const Grid<OtherTreeType>&);
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
     /// Deep copy another grid's metadata, but share its tree and transform.
-    Grid(const Grid&, ShallowCopy);
+    /// @deprecated ABI versions older than 4 are deprecated.
+    OPENVDB_DEPRECATED Grid(const Grid&, ShallowCopy);
 #else
     /// Deep copy another grid's metadata and transform, but share its tree.
     Grid(Grid&, ShallowCopy);
@@ -585,8 +676,9 @@ public:
     /// and it shares its transform with this grid;
     /// if @c CP_SHARE, the new grid shares this grid's tree and transform;
     /// if @c CP_COPY, the new grid's tree and transform are deep copies of this grid's.
-    Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
-    GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const override;
+    /// @deprecated ABI versions older than 4 are deprecated.
+    OPENVDB_DEPRECATED Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
+    OPENVDB_DEPRECATED GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const override;
     //@}
 #else
     //@{
@@ -1355,7 +1447,10 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    this->tree().prune(ValueType(zeroVal<ValueType>() + tolerance));
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    const auto value = zeroVal<ValueType>() + tolerance;
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    this->tree().prune(static_cast<ValueType>(value));
 }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
@@ -1619,11 +1714,53 @@ createLevelSet(Real voxelSize, Real halfWidth)
     return grid;
 }
 
+
+////////////////////////////////////////
+
+
+namespace internal {
+
+/// @private
+template<typename OpT, typename GridBaseT, typename T, typename ...Ts>
+struct GridApplyImpl { static bool apply(GridBaseT&, OpT&) { return false; } };
+
+// Partial specialization for (nonempty) TypeLists
+/// @private
+template<typename OpT, typename GridBaseT, typename GridT, typename ...GridTs>
+struct GridApplyImpl<OpT, GridBaseT, TypeList<GridT, GridTs...>>
+{
+    static bool apply(GridBaseT& grid, OpT& op)
+    {
+        if (grid.template isType<GridT>()) {
+            op(static_cast<typename CopyConstness<GridBaseT, GridT>::Type&>(grid));
+            return true;
+        }
+        return GridApplyImpl<OpT, GridBaseT, TypeList<GridTs...>>::apply(grid, op);
+    }
+};
+
+} // namespace internal
+
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(OpT& op) const
+{
+    return internal::GridApplyImpl<OpT, const GridBase, GridTypeListT>::apply(*this, op);
+}
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(OpT& op)
+{
+    return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>::apply(*this, op);
+}
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

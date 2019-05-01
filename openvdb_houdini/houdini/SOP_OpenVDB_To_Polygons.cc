@@ -61,13 +61,10 @@
 #include <GU/GU_Surfacer.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_UniquePtr.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
 
 #include <list>
 #include <memory>
@@ -75,30 +72,9 @@
 #include <string>
 #include <vector>
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-#include <UT/UT_UniquePtr.h>
-#else
-template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
-
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
-
-//#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
-//// GA_RWHandleV3 fails to initialize its member variables in some cases.
-//#pragma GCC diagnostic ignored "-Wuninitialized"
-//#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////
@@ -114,10 +90,8 @@ public:
 
     int isRefInput(unsigned i) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
@@ -128,9 +102,7 @@ public:
             const GU_Detail* refGeo,
             hvdb::Interrupter&,
             const fpreal time);
-#if VDB_COMPILABLE_SOP
     };
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -299,16 +271,17 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
-    hvdb::OpenVDBOpFactory("OpenVDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB to Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBToPolygons")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("OpenVDB grids to surface")
         .addOptionalInput("Optional reference surface. Can be used "
             "to transfer attributes, sharpen features and to "
             "eliminate seams from fractured pieces.")
         .addOptionalInput("Optional VDB masks")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_To_Polygons::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -624,15 +597,9 @@ getMaskFromGrid(const hvdb::GridCPtr& gridPtr, double isovalue = 0.0)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_To_Polygons)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_To_Polygons::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        gdp->clearAndDestroy();
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Surfacing VDB primitives");
@@ -803,7 +770,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_To_Polygons)::cookVDBSop(OP_Co
 
 template<class GridType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_To_Polygons)::referenceMeshing(
+SOP_OpenVDB_To_Polygons::Cache::referenceMeshing(
     std::list<openvdb::GridBase::ConstPtr>& grids,
     openvdb::tools::VolumeToMesh& mesher,
     const GU_Detail* refGeo,

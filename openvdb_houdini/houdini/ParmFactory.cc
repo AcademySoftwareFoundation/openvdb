@@ -44,9 +44,7 @@
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
-#if UT_MAJOR_VERSION_INT >= 16
 #include <SOP/SOP_NodeParmsOptions.h>
-#endif
 #include <UT/UT_IntArray.h>
 #include <UT/UT_WorkArgs.h>
 #include <algorithm> // for std::for_each(), std::max(), std::remove(), std::sort()
@@ -434,7 +432,6 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
 {
     mImpl->choicelist = c;
 
-#if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
     if (c == &PrimGroupMenuInput1) {
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
             nullptr, 0, &SOP_Node::theFirstInput));
@@ -448,17 +445,6 @@ ParmFactory::setChoiceList(const PRM_ChoiceList* c)
         setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE,
             nullptr, 3, &SOP_Node::theFourthInput));
     }
-#else
-    if (c == &PrimGroupMenuInput1) {
-        setSpareData(&SOP_Node::theFirstInput);
-    } else if (c == &PrimGroupMenuInput2) {
-        setSpareData(&SOP_Node::theSecondInput);
-    } else if (c == &PrimGroupMenuInput3) {
-        setSpareData(&SOP_Node::theThirdInput);
-    } else if (c == &PrimGroupMenuInput4) {
-        setSpareData(&SOP_Node::theFourthInput);
-    }
-#endif
 
     return *this;
 }
@@ -550,12 +536,8 @@ ParmFactory::setGroupChoiceList(size_t inputIndex, PRM_ChoiceListType typ)
 {
     mImpl->choicelist = new PRM_ChoiceList(typ, PrimGroupMenu.getChoiceGenerator());
 
-#if (UT_VERSION_INT >= 0x0e000075) // 14.0.117 or later
     setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_PRIMITIVE, nullptr,
         static_cast<int>(inputIndex), mImpl->getSopInputSpareData(inputIndex)));
-#else
-    setSpareData(mImpl->getSopInputSpareData(inputIndex));
-#endif
 
     return *this;
 }
@@ -906,9 +888,7 @@ public:
         const char* english,
         OP_Constructor construct,
         PRM_Template* multiparms,
-#if (UT_MAJOR_VERSION_INT >= 16)
         const char* operatorTableName,
-#endif
         unsigned minSources,
         unsigned maxSources,
         CH_LocalVariable* variables,
@@ -917,9 +897,7 @@ public:
         const std::string& helpUrl,
         const std::string& doc)
         : OP_Operator(name, english, construct, multiparms,
-#if (UT_MAJOR_VERSION_INT >= 16)
             operatorTableName,
-#endif
             minSources, maxSources, variables, flags, inputlabels)
         , mHelpUrl(helpUrl)
     {
@@ -968,8 +946,6 @@ private:
 };
 
 
-#if UT_MAJOR_VERSION_INT >= 16
-
 class OpFactoryVerb: public SOP_NodeVerb
 {
 public:
@@ -1001,7 +977,6 @@ private:
     PRM_Template* mParms;
 }; // class OpFactoryVerb
 
-#endif // UT_MAJOR_VERSION_INT >= 16
 
 } // anonymous namespace
 
@@ -1039,6 +1014,7 @@ struct OpFactory::Impl
         // the OpFactory and this Impl have been fully constructed.
         mPolicy = policy;
         mName = mPolicy->getName(factory);
+        mLabelName = mPolicy->getLabelName(factory);
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
     }
@@ -1058,11 +1034,9 @@ struct OpFactory::Impl
 
         mInputLabels.push_back(nullptr);
 
-        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mEnglish.c_str(),
+        OP_OperatorDW* op = new OP_OperatorDW(mFlavor, mName.c_str(), mLabelName.c_str(),
             mConstruct, mParms,
-#if (UT_MAJOR_VERSION_INT >= 16)
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
-#endif
             minSources, mMaxSources, mVariables, mFlags,
             const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc);
 
@@ -1070,16 +1044,14 @@ struct OpFactory::Impl
 
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
-#if UT_MAJOR_VERSION_INT >= 16
         if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
-#endif
 
         return op;
     }
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -1089,16 +1061,14 @@ struct OpFactory::Impl
     unsigned mFlags;
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
-#if UT_MAJOR_VERSION_INT >= 16
     OpFactoryVerb* mVerb = nullptr;
-#endif
 };
 
 
 OpFactory::OpFactory(const std::string& english, OP_Constructor ctor,
     ParmList& parms, OP_OperatorTable& table, OpFlavor flavor)
 {
-    this->init(OpPolicyPtr(new DWAOpPolicy), english, ctor, parms, table, flavor);
+    this->init(OpPolicyPtr(new OpPolicy), english, ctor, parms, table, flavor);
 }
 
 
@@ -1276,7 +1246,6 @@ OpFactory::setOperatorTable(const std::string& name)
 }
 
 
-#if UT_MAJOR_VERSION_INT >= 16
 OpFactory&
 OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator)
 {
@@ -1289,7 +1258,6 @@ OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& alloca
 
     return *this;
 }
-#endif
 
 
 ////////////////////////////////////////
@@ -1307,32 +1275,14 @@ OpPolicy::getName(const OpFactory&, const std::string& english)
 
 //virtual
 std::string
-DWAOpPolicy::getName(const OpFactory&, const std::string& english)
+OpPolicy::getLabelName(const OpFactory& factory)
 {
-    UT_String s(english);
-    // Remove non-alphanumeric characters from the name.
-    s.forceValidVariableName();
-    std::string name = s.toStdString();
-    // Remove spaces and underscores.
-    name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
-    name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
-    name = "DW_" + name;
-    return name;
-}
-
-
-//virtual
-std::string
-DWAOpPolicy::getHelpURL(const OpFactory& factory)
-{
-    return OpPolicy::getHelpURL(factory);
+    return factory.english();
 }
 
 
 ////////////////////////////////////////
 
-
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 
 const PRM_ChoiceList PrimGroupMenuInput1 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput2 = SOP_Node::primGroupMenu;
@@ -1340,191 +1290,6 @@ const PRM_ChoiceList PrimGroupMenuInput3 = SOP_Node::primGroupMenu;
 const PRM_ChoiceList PrimGroupMenuInput4 = SOP_Node::primGroupMenu;
 
 const PRM_ChoiceList PrimGroupMenu = SOP_Node::primGroupMenu;
-
-#else // earlier than 13.0.0
-
-namespace {
-
-// Extended group name drop-down menu incorporating @c "@<attr>=<value>" syntax
-// (this functionality was added to SOP_Node::primGroupMenu some time ago,
-// possibly as early as Houdini 12.5)
-
-void
-sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
-    const PRM_SpareData *spare, const PRM_Parm *parm)
-{
-    SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
-    int inputIndex = getSopInputIndex(spare);
-
-    const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
-
-    GA_GroupTable::iterator<GA_ElementGroup> ithead;
-
-    GA_GroupTable::iterator<GA_ElementGroup> itpthead;
-    UT_WorkBuffer                buf;
-    UT_String                    primtoken, pttoken;
-    int                          i, n_entries;
-    UT_String                    origgroup;
-    UT_WorkArgs                  wargs;
-    UT_StringArray               allnames;
-    bool                         needseparator = false;
-
-    // Find our original group list so we can flag groups we
-    // as toggleable.
-    origgroup = "";
-    // We don't want to evaluate the expression as the toggle
-    // works on the raw code.
-#if (UT_VERSION_INT >= 0x0c0100B6) // 12.1.182 or later
-    if (parm) parm->getValue(0.0f, origgroup, 0, 0, SYSgetSTID());
-#else
-    if (parm) parm->getValue(0.0f, origgroup, 0, 0, UTgetSTID());
-#endif
-
-    origgroup.tokenize(wargs, ' ');
-
-    UT_SymbolTable table;
-    UT_Thing thing((void *) 0);
-
-    for (i = 0; i < wargs.getArgc(); i++) {
-        table.addSymbol(wargs(i), thing);
-    }
-
-    n_entries = 0;
-
-    if (gdp) {
-        ithead = gdp->primitiveGroups().beginTraverse();
-
-        GA_ROAttributeRef aRef = gdp->findPrimitiveAttribute("name");
-        if (aRef.isValid()) {
-            const GA_AIFSharedStringTuple *stuple = aRef.getAttribute()->getAIFSharedStringTuple();
-            if (stuple) {
-                UT_IntArray handles;
-                stuple->extractStrings(aRef.getAttribute(), allnames, handles);
-            }
-        }
-    }
-
-    if (!ithead.atEnd()) {
-        GA_PrimitiveGroup *primsel;
-        bool includeselection = true;
-
-        if (gdp->selection() && (primsel = gdp->selection()->primitives()) &&
-            includeselection &&
-            primsel->getInternal())     // If not internal we'll catch it below
-        {
-            GOP_GroupParse::buildPrimGroupToken(gdp, primsel, primtoken);
-
-            if (primtoken.length()) {
-                menuEntries[n_entries].setToken(primtoken);
-                menuEntries[n_entries].setLabel("Primitive Selection");
-                n_entries++;
-                needseparator = true;
-            }
-        }
-
-        int                      numprim = 0;
-        int                      startprim = n_entries;
-
-        for (i = n_entries; (i + 1) < themenusize && !ithead.atEnd(); ++ithead, i++) {
-            const GA_PrimitiveGroup* primgrp =
-                static_cast<const GA_PrimitiveGroup *>(ithead.group());
-
-            if (primgrp->getInternal()) continue;
-
-            menuEntries[n_entries].setToken(primgrp->getName());
-
-            // Determine if this group is already in the list.  If so,
-            // we want to put a + in front of it.
-            if (table.findSymbol(primgrp->getName(), &thing)) {
-                buf.sprintf("%s\t*", (const char *) primgrp->getName());
-                menuEntries[n_entries].setLabel(buf.buffer());
-            } else {
-                menuEntries[n_entries].setLabel(primgrp->getName());
-            }
-            numprim++;
-            n_entries++;
-        }
-
-        if (numprim) {
-            PRMsortMenu(&menuEntries[startprim], numprim);
-            needseparator = true;
-        }
-    }
-
-    if (allnames.entries()) {
-        if (needseparator && (n_entries+1 < themenusize)) {
-            needseparator = false;
-            menuEntries[n_entries].setToken(PRM_Name::mySeparator);
-            menuEntries[n_entries].setLabel(PRM_Name::mySeparator);
-            n_entries++;
-        }
-
-        int             numnames = 0;
-        int             startname = n_entries;
-
-        for (int j = 0; j < allnames.entries(); j++) {
-            if (n_entries+1 >= themenusize) break;
-
-            if(!allnames(j).isstring()) continue;
-
-            buf.sprintf("@name=%s", (const char *) allnames(j));
-            menuEntries[n_entries].setToken(buf.buffer());
-
-            // Determine if this group is already in the list.  If so,
-            // we want to put a + in front of it.
-            if (table.findSymbol(buf.buffer(), &thing)) {
-                buf.sprintf("@%s\t*", (const char *) allnames(j));
-                menuEntries[n_entries].setLabel(buf.buffer());
-            } else {
-                buf.sprintf("@%s", (const char *) allnames(j));
-                menuEntries[n_entries].setLabel(buf.buffer());
-            }
-            numnames++;
-            n_entries++;
-        }
-
-        if (numnames) {
-            PRMsortMenu(&menuEntries[startname], numnames);
-            needseparator = true;
-        }
-    }
-
-    menuEntries[n_entries].setToken(0);
-    menuEntries[n_entries].setLabel(0);
-}
-
-} // anonymous namespace
-
-
-#ifdef _MSC_VER
-
-OPENVDB_HOUDINI_API const PRM_ChoiceList
-PrimGroupMenuInput1(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-OPENVDB_HOUDINI_API const PRM_ChoiceList
-PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-OPENVDB_HOUDINI_API const PRM_ChoiceList
-PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-OPENVDB_HOUDINI_API const PRM_ChoiceList
-PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-
-OPENVDB_HOUDINI_API const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-
-#else
-
-const PRM_ChoiceList
-PrimGroupMenuInput1(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-const PRM_ChoiceList
-PrimGroupMenuInput2(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-const PRM_ChoiceList
-PrimGroupMenuInput3(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-const PRM_ChoiceList
-PrimGroupMenuInput4(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-
-const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
-
-#endif
-
-#endif // earlier than 13.0.0
 
 
 } // namespace houdini_utils

@@ -46,11 +46,6 @@
 #include <sstream>
 #include <stdexcept>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -138,10 +133,8 @@ public:
 
     int isRefInput(unsigned input) const override { return (input == 1); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
     private:
@@ -151,9 +144,7 @@ public:
         template<typename GridType>
         void applyNoise(hvdb::Grid& grid, const FractalBoltzmannGenerator&,
             const NoiseSettings&, const hvdb::Grid* maskGrid) const;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -284,13 +275,10 @@ Use mask as frequency multiplier:\n\
     // }
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Noise", SOP_OpenVDB_Noise::factory, parms, *table)
-        .addAlias("OpenVDB LevelSet Noise")
+    hvdb::OpenVDBOpFactory("VDB Noise", SOP_OpenVDB_Noise::factory, parms, *table)
         .addInput("VDB grids to noise")
         .addOptionalInput("Optional VDB grid to use as mask")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Noise::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -357,7 +345,7 @@ SOP_OpenVDB_Noise::updateParmsFlags()
 
 template<typename GridType>
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Noise)::applyNoise(
+SOP_OpenVDB_Noise::Cache::applyNoise(
     hvdb::Grid& grid,
     const FractalBoltzmannGenerator& fbGenerator,
     const NoiseSettings& settings,
@@ -516,17 +504,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Noise)::applyNoise(
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Noise)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Noise::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Evaluate the FractalBoltzmann noise parameters from UI

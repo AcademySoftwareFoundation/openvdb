@@ -38,28 +38,18 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
+
 #include <UT/UT_Version.h>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
+
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
-
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 ////////////////////////////////////////
@@ -145,17 +135,13 @@ public:
 
     int isRefInput(unsigned i ) const override { return (i > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
         OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
         bool processGrids(MorphingParms&, hvdb::Interrupter&);
-#if VDB_COMPILABLE_SOP
     };
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -350,16 +336,17 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Morph Level Set",
+    hvdb::OpenVDBOpFactory("VDB Morph SDF",
         SOP_OpenVDB_Morph_Level_Set::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBMorphLevelSet")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("Source SDF VDBs to Morph")
         .addInput("Target SDF VDB")
         .addOptionalInput("Optional VDB Alpha Mask")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Morph_Level_Set::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -444,15 +431,9 @@ SOP_OpenVDB_Morph_Level_Set::SOP_OpenVDB_Morph_Level_Set(OP_Network* net,
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Morph_Level_Set::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-        duplicateSource(0, context);
-#endif
-
         // Evaluate UI parameters
         MorphingParms parms;
         if (evalMorphingParms(context, parms) >= UT_ERROR_ABORT) return error();
@@ -476,7 +457,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::cookVDBSop(O
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphingParms(
+SOP_OpenVDB_Morph_Level_Set::Cache::evalMorphingParms(
     OP_Context& context, MorphingParms& parms)
 {
     const fpreal now = context.getTime();
@@ -572,7 +553,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::evalMorphing
 
 
 bool
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Morph_Level_Set)::processGrids(
+SOP_OpenVDB_Morph_Level_Set::Cache::processGrids(
     MorphingParms& parms, hvdb::Interrupter& boss)
 {
     MorphOp op(parms, boss);

@@ -67,6 +67,7 @@
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_SharedPtr.h>
+#include <UT/UT_UniquePtr.h>
 #include <UT/UT_WorkArgs.h>
 #include <VEX/VEX_Error.h>
 #include <VOP/VOP_CodeCompilerArgs.h>
@@ -81,24 +82,15 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/task_group.h>
 
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
-  #include <hboost/algorithm/string/classification.hpp> // is_any_of
-  #include <hboost/algorithm/string/join.hpp>
-  #include <hboost/algorithm/string/split.hpp>
-  #ifdef SESI_OPENVDB
-    #include <hboost/mpl/at.hpp>
-    namespace boostmpl = hboost::mpl;
-  #else
-    #include <boost/mpl/at.hpp>
-    namespace boostmpl = boost::mpl;
-  #endif
+#include <hboost/algorithm/string/classification.hpp> // is_any_of
+#include <hboost/algorithm/string/join.hpp>
+#include <hboost/algorithm/string/split.hpp>
+#ifdef SESI_OPENVDB
+#include <hboost/mpl/at.hpp>
+namespace boostmpl = hboost::mpl;
 #else
-  #include <boost/algorithm/string/classification.hpp> // is_any_of
-  #include <boost/algorithm/string/join.hpp>
-  #include <boost/algorithm/string/split.hpp>
-  #include <boost/mpl/at.hpp>
-  namespace hboost = boost;
-  namespace boostmpl = boost::mpl;
+#include <boost/mpl/at.hpp>
+namespace boostmpl = boost::mpl;
 #endif
 
 #include <algorithm> // std::sort
@@ -108,12 +100,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-  #include <UT/UT_UniquePtr.h>
-#else
-  template<typename T> using UT_UniquePtr = std::unique_ptr<T>;
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -3193,11 +3179,9 @@ newSopOperator(OP_OperatorTable* table)
             "determines density and attribute values."));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
+    hvdb::OpenVDBOpFactory("VDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
-#if (UT_VERSION_INT >= 0x10000000) // later than 16.0.0
         .setOperatorTable(VOP_TABLE_NAME)
-#endif
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
         .addInput("Points to rasterize")
         .addOptionalInput("Optional VDB grid that defines the output transform.")
@@ -3261,7 +3245,6 @@ SOP_OpenVDB_Rasterize_Points::factory(OP_Network* net, const char* name, OP_Oper
 }
 
 
-#if UT_MAJOR_VERSION_INT >= 16
 SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
@@ -3269,17 +3252,6 @@ SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
     , mInitialParmNum(this->getParmList()->getEntries())
 {
 }
-#else
-SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
-    const char* name, OP_Operator* op)
-    : hvdb::SOP_NodeVDB(net, name, op)
-    , mCodeGenerator(this, new VOP_LanguageContextTypeList(VOP_LANGUAGE_VEX,
-        VOPconvertToContextType(VEX_CVEX_CONTEXT)), 1, 1)
-    , mInitialParmNum(this->getParmList()->getEntries())
-{
-    setOperatorTable(getOperatorTable(VOP_TABLE_NAME));
-}
-#endif
 
 
 OP_ERROR

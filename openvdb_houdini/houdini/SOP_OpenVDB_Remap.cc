@@ -63,11 +63,6 @@
 #include <sstream>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -463,17 +458,13 @@ struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB
     int sortInputRange();
     int sortOutputRange();
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         void evalRamp(UT_Ramp&, fpreal time);
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 };
 
 
@@ -528,15 +519,11 @@ SOP_OpenVDB_Remap::sortOutputRange()
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remap)::evalRamp(UT_Ramp& ramp, fpreal time)
+SOP_OpenVDB_Remap::Cache::evalRamp(UT_Ramp& ramp, fpreal time)
 {
-#if !VDB_COMPILABLE_SOP
-    updateRampFromMultiParm(time, getParm("function"), ramp);
-#else
     const auto rampStr = evalStdString("function", time);
     UT_IStream strm(rampStr.c_str(), rampStr.size(), UT_ISTREAM_ASCII);
     ramp.load(strm);
-#endif
 }
 
 
@@ -637,12 +624,10 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Deactivate voxels with values equal to the remapped background value."));
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB Remap",
+    hvdb::OpenVDBOpFactory("VDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
         .addInput("VDB Grids")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Remap::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -675,14 +660,9 @@ SOP_OpenVDB_Remap::SOP_OpenVDB_Remap(OP_Network* net, const char* name, OP_Opera
 }
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remap)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Remap::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSourceStealable(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         hvdb::Interrupter boss("Remapping values");

@@ -38,26 +38,15 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb/tools/MultiResGrid.h>
-#include <boost/algorithm/string/join.hpp>
-#if UT_VERSION_INT >= 0x10050000 // 16.5.0 or later
+
 #include <hboost/algorithm/string/join.hpp>
-#else
-#include <boost/algorithm/string/join.hpp>
-#endif
+
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
-#if UT_VERSION_INT < 0x10050000 // earlier than 16.5.0
-namespace hboost = boost;
-#endif
 
 
 class SOP_OpenVDB_LOD: public hvdb::SOP_NodeVDB
@@ -70,12 +59,7 @@ public:
 
     int isRefInput(unsigned input) const override { return (input > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -153,11 +137,9 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip(
             "In Single Level mode, give the output VDB the same name as the input VDB."));
 
-    hvdb::OpenVDBOpFactory("OpenVDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
         .addInput("VDBs")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_LOD::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -301,15 +283,9 @@ isValidRange(float start, float end, float step)
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_LOD)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         // Get the group of grids to process.

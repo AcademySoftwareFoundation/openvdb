@@ -53,11 +53,6 @@
 #include <stdexcept>
 #include <string>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -78,12 +73,7 @@ public:
 
     int isRefInput(unsigned i) const override { return (i == 1); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -290,13 +280,11 @@ Using Voxel Scale Only:\n\
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Resample", SOP_OpenVDB_Resample::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("Source VDB grids to resample")
         .addOptionalInput("Optional transform reference VDB grid")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Resample::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -434,15 +422,9 @@ struct VecXformOp
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Resample)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        // This does a shallow copy of VDB grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
-#endif
-
         auto addWarningCB = [this](const std::string& s) { addWarning(SOP_MESSAGE, s.c_str()); };
 
         const fpreal time = context.getTime();

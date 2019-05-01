@@ -49,11 +49,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -175,17 +170,13 @@ protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
 
-#if VDB_COMPILABLE_SOP
 public:
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
 protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
         OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 private:
     struct FilterOp;
@@ -335,13 +326,11 @@ Offset:\n\
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
         .addOptionalInput("Optional VDB Alpha Mask")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Filter::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -514,14 +503,9 @@ struct SOP_OpenVDB_Filter::FilterOp
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter)::evalFilterParms(
+SOP_OpenVDB_Filter::Cache::evalFilterParms(
     OP_Context& context, GU_Detail&, FilterParmVec& parmVec)
 {
-#if !VDB_COMPILABLE_SOP
-    hutil::OP_EvalScope evalScope(*this, context);
-    clearErrors(context);
-#endif
-
     const fpreal now = context.getTime();
 
     const Operation op = stringToOp(evalStdString("operation", 0));
@@ -537,16 +521,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter)::evalFilterParms(
 #endif
     openvdb::FloatGrid::ConstPtr maskGrid;
     if (this->nInputs() == 2 && evalInt("mask", 0, now)) {
-#if VDB_COMPILABLE_SOP
         const GU_Detail* maskGeo = inputGeo(1);
-#else
-        OP_Node* maskInputNode = getInput(1, /*mark_used*/true);
-        GU_DetailHandle maskHandle;
-        maskHandle = static_cast<SOP_Node*>(maskInputNode)->getCookedGeoHandle(context);
-
-        GU_DetailHandleAutoReadLock maskScope(maskHandle);
-        const GU_Detail *maskGeo = maskScope.getGdp();
-#endif
 
         const auto maskName = evalStdString("maskname", now);
 
@@ -583,8 +558,6 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Filter)::evalFilterParms(
 
 ////////////////////////////////////////
 
-
-#if VDB_COMPILABLE_SOP
 
 OP_ERROR
 SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
@@ -635,92 +608,6 @@ SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
     return error();
 }
 
-#else // if !VDB_COMPILABLE_SOP
-
-OP_ERROR
-SOP_OpenVDB_Filter::cookVDBSop(OP_Context& context)
-{
-    try {
-        OP_AutoLockInputs lock;
-
-        const fpreal now = context.getTime();
-
-        FilterOp filterOp;
-
-        SOP_OpenVDB_Filter* startNode = this;
-        {
-            // Find adjacent, upstream nodes of the same type as this node.
-            std::vector<SOP_OpenVDB_Filter*> nodes = hutil::getNodeChain(context, this);
-
-            startNode = nodes[0];
-
-            // Collect filter parameters starting from the topmost node.
-            FilterParmVec& parmVec = filterOp.opSequence;
-            parmVec.reserve(nodes.size());
-            for (size_t n = 0, N = nodes.size(); n < N; ++n) {
-                if (nodes[n]->evalFilterParms(context, *gdp, parmVec) >= UT_ERROR_ABORT) {
-                    addInputError(0);
-                    return error();
-                }
-            }
-        }
-
-        lock.setNode(startNode);
-        if (lock.lock(context) >= UT_ERROR_ABORT) {
-            addInputError(0);
-            return error();
-        }
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
-        lock.markInputUnlocked(0);
-#endif
-        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean=*/true)
-            >= UT_ERROR_ABORT)
-        {
-            return error();
-        }
-
-        // Get the group of grids to process.
-        const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", now));
-
-        hvdb::Interrupter progress("Filtering VDB grids");
-        filterOp.interrupt = &progress;
-
-        // Process each VDB primitive in the selected group.
-        for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
-
-            if (progress.wasInterrupted()) {
-                throw std::runtime_error("processing was interrupted");
-            }
-
-            GU_PrimVDB* vdbPrim = *it;
-            UT_String name = it.getPrimitiveNameOrIndex();
-
-#ifndef SESI_OPENVDB
-            if (evalInt("verbose", 0, now)) {
-                std::cout << "\nFiltering \"" << name << "\"" << std::endl;
-            }
-#endif
-
-            int success = GEOvdbProcessTypedGridTopology(*vdbPrim, filterOp);
-
-            if (!success) {
-                std::stringstream ss;
-                ss << "VDB grid " << name << " of type "
-                    << vdbPrim->getConstGrid().valueType() << " was skipped";
-                addWarning(SOP_MESSAGE, ss.str().c_str());
-                continue;
-            }
-        }
-
-    } catch (std::exception& e) {
-        addError(SOP_MESSAGE, e.what());
-    }
-    return error();
-}
-
-#endif // VDB_COMPILABLE_SOP
 
 // Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

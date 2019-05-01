@@ -44,9 +44,7 @@
 #include <PRM/PRM_Include.h>
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
-#if UT_MAJOR_VERSION_INT >= 16
 #include <SOP/SOP_NodeVerb.h>
-#endif
 #if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
   // OPENVDB_HOUDINI_API, which has no meaning in a DWA build environment but
   // must at least exist, is normally defined by including openvdb/Platform.h.
@@ -482,7 +480,6 @@ public:
     OpFactory& setInternalName(const std::string& name);
     OpFactory& setOperatorTable(const std::string& name);
 
-#if UT_MAJOR_VERSION_INT >= 16
     /// @brief Functor that returns newly-allocated node caches
     /// for instances of this operator
     /// @details A node cache encapsulates a SOP's cooking logic for thread safety.
@@ -498,7 +495,6 @@ public:
     /// @throw std::runtime_error if this operator is not a SOP
     /// @throw std::invalid_argument if @a allocator is empty
     OpFactory& setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator);
-#endif
 
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
@@ -538,46 +534,13 @@ public:
 
     /// @brief Return a help URL for the operator defined by the given factory.
     virtual std::string getHelpURL(const OpFactory&) { return ""; }
+
+    /// @brief Return a label name for the operator defined by the given factory.
+    /// @details In this base class implementation, this method simply returns
+    /// factory.@link OpFactory::english() english()@endlink.
+    virtual std::string getLabelName(const OpFactory&);
 };
 
-/// @brief Default policy for DWA operator types
-class OPENVDB_HOUDINI_API DWAOpPolicy: public OpPolicy
-{
-public:
-    /// @brief Return a type name for the operator defined by the given factory.
-    /// @details The operator's type name is generated from its English name
-    /// by prepending "DW_" and removing non-alphanumeric characters.
-    /// For example, "My Node" becomes "DW_MyNode".
-    std::string getName(const OpFactory&, const std::string& english) override;
-
-    /// @brief Return a help URL for the operator defined by the given factory.
-    std::string getHelpURL(const OpFactory&) override;
-};
-
-/// @brief Default policies for DWA R&D operator types
-///
-/// See http://mydw.anim.dreamworks.com/display/FX/Houdini+Plugin+and+HDA+Naming+Rules
-
-class DWALevel1RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 1: show-wide
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L1_RnD"; }
-};
-
-class DWALevel2RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 2: global
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L2_RnD"; }
-};
-
-class DWALevel3RnDOpPolicy : public DWAOpPolicy
-{
-public:
-    /// @brief Level 3: depot, map, most stable
-    std::string getIconName(const OpFactory&) override { return "DreamWorks_L3_RnD"; }
-};
 
 ////////////////////////////////////////
 
@@ -595,11 +558,7 @@ public:
     }
     ~ScopedInputLock() {}
 
-#if UT_VERSION_INT >= 0x0f050000 // 15.5.0 or later
     void markInputUnlocked(exint input) { mLock.markInputUnlocked(input); }
-#else
-    void markInputUnlocked(exint) {}
-#endif
 
 private:
     OP_AutoLockInputs mLock;

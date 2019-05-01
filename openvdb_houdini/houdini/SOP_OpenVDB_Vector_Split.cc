@@ -44,11 +44,6 @@
 #include <stdexcept>
 #include <string>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -62,12 +57,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 };
 
 
@@ -113,12 +103,10 @@ newSopOperator(OP_OperatorTable* table)
 #endif
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
+    hvdb::OpenVDBOpFactory("VDB Vector Split",
         SOP_OpenVDB_Vector_Split::factory, parms, *table)
         .addInput("Vector VDBs to split into scalar VDBs")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Split::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -267,14 +255,9 @@ public:
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Vector_Split)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Vector_Split::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        duplicateSource(0, context);
-#endif
-
         const fpreal time = context.getTime();
 
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);

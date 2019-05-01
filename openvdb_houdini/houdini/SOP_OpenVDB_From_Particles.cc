@@ -63,11 +63,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -104,10 +99,8 @@ public:
 
     static const PRM_ChoiceList sPointAttrMenu;
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions
     {
-#endif
     public:
         float voxelSize() const { return mVoxelSize; }
 
@@ -137,9 +130,7 @@ public:
             const openvdb::Int32Grid& closestPtIdxGrid);
 
         float mVoxelSize = 0.1f;
-#if VDB_COMPILABLE_SOP
     }; // class Cache
-#endif
 
 protected:
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -417,15 +408,16 @@ newSopOperator(OP_OperatorTable* table)
     /// @todo obsoleteAttrParms
 
 
-    hvdb::OpenVDBOpFactory("OpenVDB From Particles",
+    hvdb::OpenVDBOpFactory("VDB from Particles",
         SOP_OpenVDB_From_Particles::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBFromParticles")
+#endif
         .addInput("Points to convert")
         .addOptionalInput("Optional reference VDB")
         .setObsoleteParms(obsoleteParms)
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_From_Particles::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -584,14 +576,10 @@ SOP_OpenVDB_From_Particles::convertUnits()
     const fpreal time = CHgetEvalTime();
 
     float voxSize = 0.1f;
-#if VDB_COMPILABLE_SOP
     // Attempt to extract the voxel size from our cache.
     if (const auto* cache = dynamic_cast<SOP_OpenVDB_From_Particles::Cache*>(myNodeVerbCache)) {
         voxSize = cache->voxelSize();
     }
-#else
-    voxSize = voxelSize();
-#endif
 
     if (evalInt("useworldspace", 0, time) != 0) {
         setFloat("halfband", 0, time, evalFloat("halfbandvoxels", 0, time) * voxSize);
@@ -884,7 +872,7 @@ getIgnoredParticleWarning(size_t numTooSmall, size_t numTooLarge)
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convert(
+SOP_OpenVDB_From_Particles::Cache::convert(
     fpreal time,
     ParticleList& paList,
     openvdb::FloatGrid::Ptr sdfGrid,
@@ -917,7 +905,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convert(
 
 
 void
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convertWithAttributes(
+SOP_OpenVDB_From_Particles::Cache::convertWithAttributes(
     fpreal time,
     const GU_Detail& ptGeo,
     ParticleList& paList,
@@ -980,7 +968,7 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::convertWithAt
 
 // Helper method for point attribute transfer
 int
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::constructGenericAtttributeList(
+SOP_OpenVDB_From_Particles::Cache::constructGenericAtttributeList(
     fpreal time,
     hvdb::AttributeDetailList &pointAttributes,
     const GU_Detail& ptGeo,
@@ -1089,14 +1077,9 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::constructGene
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_From_Particles)::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
-#endif
-
         hvdb::Interrupter boss("Creating VDBs from particles");
 
         const GU_Detail* ptGeo = inputGeo(0, context);

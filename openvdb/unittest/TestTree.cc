@@ -247,7 +247,7 @@ TestTree::testWriteHalf()
         std::ostringstream ostr;
         ostr << "half float buffers not significantly smaller than full float ("
             << halfBytes << " vs. " << fullBytes << " bytes)";
-        CPPUNIT_ASSERT_MESSAGE(ostr.str(), halfBytes < size_t(0.75 * fullBytes));
+        CPPUNIT_ASSERT_MESSAGE(ostr.str(), halfBytes < size_t(0.75 * double(fullBytes)));
     } else {
         // For non-real data types, "half float" and "full float" file sizes should be the same.
         CPPUNIT_ASSERT_MESSAGE("full float and half float file sizes differ for data of type "

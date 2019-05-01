@@ -57,11 +57,6 @@
 #include <string>
 #include <vector>
 
-#if UT_MAJOR_VERSION_INT >= 16
-#define VDB_COMPILABLE_SOP 1
-#else
-#define VDB_COMPILABLE_SOP 0
-#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -89,12 +84,7 @@ struct SOP_OpenVDB_Remove_Divergence: public hvdb::SOP_NodeVDB
 
     int isRefInput(unsigned input) const override { return (input > 0); }
 
-#if VDB_COMPILABLE_SOP
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
-#else
-protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
-#endif
 
 protected:
     bool updateParmsFlags() override;
@@ -204,14 +194,15 @@ newSopOperator(OP_OperatorTable* table)
             "as a scalar VDB named \"v_pressure\"."));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Remove Divergence",
+    hvdb::OpenVDBOpFactory("VDB Project Non-Divergent",
         SOP_OpenVDB_Remove_Divergence::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBRemoveDivergence")
+#endif
         .addInput("Velocity field VDBs")
         .addOptionalInput("Optional collider VDB or geometry")
-#if VDB_COMPILABLE_SOP
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Remove_Divergence::Cache; })
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -876,16 +867,10 @@ joinNames(UT_StringArray& names, const char* lastSep = " and ", const char* sep 
 
 
 OP_ERROR
-VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remove_Divergence)::cookVDBSop(
+SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
     OP_Context& context)
 {
     try {
-#if !VDB_COMPILABLE_SOP
-        hutil::ScopedInputLock lock(*this, context);
-        lock.markInputUnlocked(0);
-        duplicateSourceStealable(0, context);
-#endif
-
         const GU_Detail* colliderGeo = inputGeo(1);
 
         const fpreal time = context.getTime();
@@ -925,13 +910,8 @@ VDB_NODE_OR_CACHE(VDB_COMPILABLE_SOP, SOP_OpenVDB_Remove_Divergence)::cookVDBSop
                 // Retrieve the collider grid.
                 UT_String colliderStr;
                 evalString(colliderStr, "collider", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
                 const GA_PrimitiveGroup* colliderGroup = parsePrimitiveGroups(
                     colliderStr.buffer(), GroupCreator(colliderGeo));
-#else
-                const GA_PrimitiveGroup* colliderGroup = parsePrimitiveGroups(
-                    colliderStr.buffer(), const_cast<GU_Detail*>(colliderGeo));
-#endif
                 if (hvdb::VdbPrimCIterator colliderIt =
                     hvdb::VdbPrimCIterator(colliderGeo, colliderGroup))
                 {

@@ -58,25 +58,15 @@
 #include "GU_PrimVDB.h"
 #include "Utils.h"
 
-#ifndef SESI_OPENVDB
-#include <UT/UT_DSOVersion.h>
-#endif
-
-#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
 #include <UT/UT_EnvControl.h>
-#endif
-
 #include <UT/UT_Error.h>
 #include <UT/UT_ErrorManager.h>
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 #include <FS/FS_IStreamDevice.h>
 #include <GA/GA_Stat.h>
-#endif
-
 #include <GU/GU_Detail.h>
 #include <SOP/SOP_Node.h>
 #include <GEO/GEO_IOTranslator.h>
@@ -108,20 +98,13 @@ public:
 
     virtual int         checkMagicNumber(unsigned magic);
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
     virtual bool        fileStat(const char *filename,
                                 GA_Stat &stat,
                                 uint level);
-#endif
 
     virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
     virtual GA_Detail::IOStatus fileSave(const GEO_Detail *gdp, std::ostream &os);
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, const char *fname);
-#else
-    virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, std::ostream &os,
-                                               const char *fname);
-#endif
 };
 
 GEO_IOTranslator *
@@ -155,7 +138,6 @@ GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
     return 0;
 }
 
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 bool
 GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
 {
@@ -239,10 +221,6 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
 
     return true;
 }
-#endif
-
-
-#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
@@ -288,84 +266,6 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
     return ok;
 }
 
-#else
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-GA_Detail::IOStatus
-GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
-#else
-GA_Detail::IOStatus
-GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*/)
-#endif
-{
-    UT_WorkBuffer   buf;
-    GU_Detail       *gdp = static_cast<GU_Detail*>(geogdp);
-
-    if (!is.isRandomAccessFile(buf)) {
-        cerr << "Error: Attempt to load VDB from non-file source.\n";
-        return false;
-    }
-
-    try {
-        // Create and open a VDB file, but don't read any grids yet.
-        openvdb::io::File file(buf.buffer());
-
-        file.open(/*delayLoad*/false);
-
-        // Read the file-level metadata into global attributes.
-        openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
-        if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
-#else
-        if (fileMetadata) {
-            GU_PrimVDB::createAttrsFromMetadata(
-                GA_ATTRIB_GLOBAL, GA_Offset(0), *fileMetadata, *geogdp);
-        }
-#endif
-
-        // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName();
-            nameIter != file.endName(); ++nameIter)
-        {
-            const std::string& gridName = nameIter.gridName();
-
-            if (GridPtr grid = file.readGrid(gridName)) {
-
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
-                // Copy file-level metadata into the grid, then create (if
-                // necessary)
-                // and set a primitive attribute for each metadata item.
-                for (openvdb::MetaMap::ConstMetaIterator fileMetaIt = fileMetadata->beginMeta(),
-                    end = fileMetadata->endMeta(); fileMetaIt != end; ++fileMetaIt)
-                {
-                    // Resolve file- and grid-level metadata name conflicts
-                    // in favor of the grid-level metadata.
-                    if (openvdb::Metadata::Ptr meta = fileMetaIt->second) {
-                        const std::string name = fileMetaIt->first;
-                        if (!(*grid)[name]) {
-                            grid->insertMeta(name, *meta);
-                        }
-                    }
-                }
-#endif
-                // Add a new VDB primitive for this grid.
-                // Note: this clears the grid's metadata.
-                createVdbPrimitive(*gdp, grid);
-            }
-        }
-        file.close();
-
-    } catch (std::exception &e) {
-        cerr << "Load failure: " << e.what() << "\n";
-        return false;
-    }
-
-    return true;
-}
-
-#endif // 16.0.0
-
-
 template <typename FileT, typename OutputT>
 bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
@@ -401,7 +301,7 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 
         fileMetadata.insertMeta("creator", openvdb::StringMetadata(versionStr));
 
-#if defined(SESI_OPENVDB) || (UT_VERSION_INT < 0x0c050157)
+#if defined(SESI_OPENVDB)
         GU_PrimVDB::createMetadataFromAttrs(
             fileMetadata, GA_ATTRIB_GLOBAL, GA_Offset(0), *gdp);
 #endif
@@ -412,13 +312,11 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
         // and compresses level sets and fog volumes well.
         uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
 
-#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
         // Enable Blosc unless backwards compatibility is requested.
         if (openvdb::io::Archive::hasBloscCompression()
             && !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
             compression |= openvdb::io::COMPRESS_BLOSC;
         }
-#endif
         file.setCompression(compression);
 
         file.write(outGrids, fileMetadata);
@@ -439,14 +337,8 @@ GEO_VDBTranslator::fileSave(const GEO_Detail *geogdp, std::ostream &os)
     return fileSaveVDB<openvdb::io::Stream, std::ostream &>(geogdp, os);
 }
 
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, const char *fname)
-#else
-GA_Detail::IOStatus
-GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, std::ostream &,
-    const char *fname)
-#endif
 {
     // Saving via io::File will save grid offsets that allow for partial
     // reading.
