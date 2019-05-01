@@ -166,9 +166,6 @@ ENDIF ()
 
 SET ( OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
-  MetaMap.cc
-  Metadata.cc
-  Platform.cc
   io/Archive.cc
   io/Compression.cc
   io/File.cc
@@ -180,13 +177,16 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   math/Proximity.cc
   math/QuantizedUnitVec.cc
   math/Transform.cc
+  Metadata.cc
+  MetaMap.cc
+  openvdb.cc
+  Platform.cc
   points/AttributeArray.cc
   points/AttributeArrayString.cc
   points/AttributeGroup.cc
   points/AttributeSet.cc
   points/StreamCompression.cc
   points/points.cc
-  openvdb.cc
   util/Formats.cc
   util/Util.cc
   )
@@ -194,13 +194,13 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
 SET ( OPENVDB_LIBRARY_INCLUDE_FILES
   Exceptions.h
   Grid.h
-  Types.h
-  version.h
   Metadata.h
   MetaMap.h
   openvdb.h
   Platform.h
   PlatformConfig.h
+  Types.h
+  version.h
 )
 
 SET ( OPENVDB_LIBRARY_IO_INCLUDE_FILES
