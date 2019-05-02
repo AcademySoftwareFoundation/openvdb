@@ -743,7 +743,7 @@ BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const auto temp = (b - a) * weight;
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-        return a + ValueT(temp);
+        return static_cast<ValueT>(a + ValueT(temp));
     };
 
     // Trilinear interpolation:

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) 2012-2019 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,43 +24,39 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
+#[=======================================================================[.rst:
 
-#-*-cmake-*-
-# - Find CPPUNIT
-#
-# Author : Nicholas Yue yue.nicholas@gmail.com
-#
-# This auxiliary CMake file helps in find the CPPUNIT headers and libraries
-#
-# CPPUNIT_FOUND                  set if CPPUNIT is found.
-# CPPUNIT_INCLUDE_DIR            CPPUNIT's include directory
-# CPPUNIT_cppunit_LIBRARY        CPPUNIT libraries
+Uninstall
+---------
 
-FIND_PACKAGE ( PackageHandleStandardArgs )
+Adds a custom target to the CMake build generation which allows for
+calling::
 
-FIND_PATH( CPPUNIT_LOCATION include/cppunit/Test.h
-  "$ENV{CPPUNIT_ROOT}"
-  NO_DEFAULT_PATH
-  NO_CMAKE_ENVIRONMENT_PATH
-  NO_CMAKE_PATH
-  NO_SYSTEM_ENVIRONMENT_PATH
-  NO_CMAKE_SYSTEM_PATH
-  PATHS ${SYSTEM_LIBRARY_PATHS}
-  )
+  make uninstall
 
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CPPUnit
-  REQUIRED_VARS CPPUNIT_LOCATION
-  )
+to remove an installation of OpenVDB. Relies on the install_manifest
+existing from a previous run of cmake.
 
-IF ( CPPUNIT_FOUND )
+#]=======================================================================]
 
-  SET( CPPUNIT_INCLUDE_DIR "${CPPUNIT_LOCATION}/include" CACHE STRING "CPPUNIT include directory")
-  IF (CPPUnit_USE_STATIC_LIBS)
-	SET( CPPUNIT_LIBRARY_NAME libcppunit.a)
-  ELSE ()
-	SET( CPPUNIT_LIBRARY_NAME cppunit)
+SET ( MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt" )
+
+IF ( NOT EXISTS ${MANIFEST} )
+  MESSAGE ( FATAL_ERROR "Cannot find install manifest: '${MANIFEST}'" )
+ENDIF ()
+
+FILE (STRINGS ${MANIFEST} INSTALLED_FILES )
+FOREACH ( INSTALLED_FILE ${INSTALLED_FILES} )
+  IF ( EXISTS ${INSTALLED_FILE} )
+    MESSAGE ( STATUS "Uninstalling: ${INSTALLED_FILE}")
+    EXEC_PROGRAM (
+       ${CMAKE_COMMAND} ARGS "-E remove ${INSTALLED_FILE}"
+       OUTPUT_VARIABLE stdout
+       RETURN_VALUE RESULT
+    )
+
+    IF ( NOT "${RESULT}" STREQUAL 0 )
+      MESSAGE ( FATAL_ERROR "Failed to remove file: '${INSTALLED_FILE}'." )
+    ENDIF ()
   ENDIF ()
-  FIND_LIBRARY ( CPPUnit_cppunit_LIBRARY ${CPPUNIT_LIBRARY_NAME}
-	PATHS ${CPPUNIT_LOCATION}/lib )
-
-ENDIF ( CPPUNIT_FOUND )
+ENDFOREACH (INSTALLED_FILE)
