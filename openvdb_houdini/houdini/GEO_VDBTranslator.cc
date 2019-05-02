@@ -58,10 +58,6 @@
 #include "GU_PrimVDB.h"
 #include "Utils.h"
 
-#ifndef SESI_OPENVDB
-#include <UT/UT_DSOVersion.h>
-#endif
-
 #include <UT/UT_EnvControl.h>
 #include <UT/UT_Error.h>
 #include <UT/UT_ErrorManager.h>

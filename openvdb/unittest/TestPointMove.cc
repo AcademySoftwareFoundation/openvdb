@@ -1098,7 +1098,7 @@ TestPointMove::testPointData()
         appendGroup(points->tree(), "odd");
 
         std::vector<short> oddGroups(newPositions.size(), 0);
-        for (int i = 1; i < newPositions.size(); i += 2) {
+        for (size_t i = 1; i < newPositions.size(); i += 2) {
             oddGroups[i] = 1;
         }
 
@@ -1122,7 +1122,7 @@ TestPointMove::testPointData()
         for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
             AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                Vec3d position = handle.get(*iter) + iter.getCoord();
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
                 position = transform->indexToWorld(position);
                 ySumBefore += position.y();
             }
@@ -1133,7 +1133,7 @@ TestPointMove::testPointData()
         for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
             AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                Vec3d position = handle.get(*iter) + iter.getCoord();
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
                 position = transform->indexToWorld(position);
                 ySumAfter += position.y();
             }
