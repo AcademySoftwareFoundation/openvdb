@@ -97,8 +97,11 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
         const AttributeArray* existingArray = attrSet.getConst(pos);
-        AttributeArray::Ptr array =
-            AttributeArray::create(mDescr->type(pos), arrayLength, existingArray->stride());
+        const bool constantStride = existingArray->hasConstantStride();
+        const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
+
+        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
+            stride, constantStride);
 
         // transfer hidden and transient flags
         if (existingArray->isHidden())      array->setHidden(true);
