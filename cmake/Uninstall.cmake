@@ -39,24 +39,24 @@ existing from a previous run of cmake.
 
 #]=======================================================================]
 
-SET ( MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt" )
+set(MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/install_manifest.txt")
 
-IF ( NOT EXISTS ${MANIFEST} )
-  MESSAGE ( FATAL_ERROR "Cannot find install manifest: '${MANIFEST}'" )
-ENDIF ()
+if(NOT EXISTS ${MANIFEST})
+  message(FATAL_ERROR "Cannot find install manifest: '${MANIFEST}'")
+endif()
 
-FILE (STRINGS ${MANIFEST} INSTALLED_FILES )
-FOREACH ( INSTALLED_FILE ${INSTALLED_FILES} )
-  IF ( EXISTS ${INSTALLED_FILE} )
-    MESSAGE ( STATUS "Uninstalling: ${INSTALLED_FILE}")
-    EXEC_PROGRAM (
+file(STRINGS ${MANIFEST} INSTALLED_FILES)
+foreach(INSTALLED_FILE ${INSTALLED_FILES})
+  if(EXISTS ${INSTALLED_FILE})
+    message(STATUS "Uninstalling: ${INSTALLED_FILE}")
+    exec_program(
        ${CMAKE_COMMAND} ARGS "-E remove ${INSTALLED_FILE}"
        OUTPUT_VARIABLE stdout
        RETURN_VALUE RESULT
     )
 
-    IF ( NOT "${RESULT}" STREQUAL 0 )
-      MESSAGE ( FATAL_ERROR "Failed to remove file: '${INSTALLED_FILE}'." )
-    ENDIF ()
-  ENDIF ()
-ENDFOREACH (INSTALLED_FILE)
+    if(NOT "${RESULT}" STREQUAL 0)
+      message(FATAL_ERROR "Failed to remove file: '${INSTALLED_FILE}'.")
+    endif()
+  endif()
+endforeach(INSTALLED_FILE)
