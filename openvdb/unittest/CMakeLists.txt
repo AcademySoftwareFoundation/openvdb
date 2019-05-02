@@ -133,15 +133,22 @@ SET ( UNITTEST_SOURCE_FILES
   TestNodeMask.cc
   TestParticleAtlas.cc
   TestParticlesToLevelSet.cc
+  TestPointAdvect.cc
   TestPointAttribute.cc
   TestPointConversion.cc
   TestPointCount.cc
   TestPointDataLeaf.cc
+  TestPointDelete.cc
   TestPointGroup.cc
   TestPointIndexGrid.cc
+  TestPointMask.cc
+  TestPointMove.cc
   TestPointPartitioner.cc
+  TestPointSample.cc
+  TestPointScatter.cc
   TestPointsToMask.cc
   TestPoissonSolver.cc
+  TestPotentialFlow.cc
   TestPrePostAPI.cc
   TestQuadraticInterp.cc
   TestQuantizedUnitVec.cc
@@ -166,6 +173,7 @@ SET ( UNITTEST_SOURCE_FILES
   TestVec3Metadata.cc
   TestVolumeRayIntersector.cc
   TestVolumeToMesh.cc
+  TestVolumeToSpheres.cc
   )
 
 ADD_EXECUTABLE ( vdb_test ${UNITTEST_SOURCE_FILES} )

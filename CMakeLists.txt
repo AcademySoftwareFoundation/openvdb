@@ -350,6 +350,7 @@ IF ( CMAKE_CXX_COMPILER_ID STREQUAL "Clang" )
     MESSAGE ( STATUS "Configuring Clang CXX warnings" )
     SET ( HAS_AVAILABLE_WARNINGS TRUE )
     ADD_DEFINITIONS (
+      -Werror
       -Wall
       -Wextra
       -Wconversion
@@ -366,6 +367,7 @@ ELSEIF ( CMAKE_CXX_COMPILER_ID STREQUAL "GNU" )
     MESSAGE ( STATUS "Configuring GCC CXX warnings" )
     SET ( HAS_AVAILABLE_WARNINGS TRUE )
     ADD_DEFINITIONS (
+      -Werror
       -Wall
       -Wextra
       -pedantic
