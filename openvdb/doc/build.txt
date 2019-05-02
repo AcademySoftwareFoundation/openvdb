@@ -1,0 +1,535 @@
+/**
+
+@page build Building OpenVDB
+
+@section buildContents Contents
+- @ref buildIntroduction
+- @ref buildCmakeStructure
+  - @ref buildDependencies
+  - @ref buildMixingDepInstalls
+  - @ref buildBloscSupport
+- @ref buildComponents
+- @ref buildGuide
+  - @ref buildBuildTypes
+  - @ref buildBuildHouMaya
+    - @ref buildBuildHou
+    - @ref buildBuildMaya
+  - @ref buildBuildStandalone
+- @ref buildUsingOpenVDB
+- @ref buildTroubleshooting
+<!-- - @ref buildContents -->
+
+------------------------------------------------------------------------------
+
+@b Note: The following build instruction are for building OpenVDB with CMake.
+See @b openvdb/INSTALL for instructions on using the older Makefiles directly
+included with OpenVDB.
+
+------------------------------------------------------------------------------
+
+@section buildIntroduction Introduction
+
+[CMake](https://cmake.org/) is a cross-platform family of tools designed to
+help build software. It doesn't *actually* build the project, but instead
+generates the files required for your toolchain such as
+[GNU make](https://www.gnu.org/software/make/). These makefiles have
+historically always been included directly as the tool for building OpenVDB,
+primarily only on UNIX platforms. CMake support ensures a high level of
+flexibility and pre-compile verification to the build process, making it much
+easier to control and customize the installation process for a wider range of
+platforms.
+
+CMake also makes it easier to automatically find and handle dependencies. As
+OpenVDB has a number of required and optional dependencies, it's recommended
+that new users to the software use the CMake build system over the Makefiles.
+If you're completely new to CMake, you may find it useful to read over the
+brief [introduction to CMake](https://cmake.org/runningcmake/) and the CMake
+structure section below. However the [build guide](@ref buildGuide) runs
+through the build process step by step.
+
+@section buildCmakeStructure CMake Structure
+
+CMake will configure a set of build files which represent the commands and
+dependencies for the OpenVDB components you wish to install. Finding and
+handling these dependencies on different platforms comprises the majority
+of the complexity involved in writing CMake. In general, software which uses
+CMake is expected to provide their own configuration files which dependent
+software will locate and use. Not all of OpenVDB's dependencies provide CMake
+support and therefore do not deploy with CMake configurations that OpenVDB can
+use. OpenVDB provides a set of `FindModules` in the `cmake` folder for finding
+these various dependencies e.g. `FindBlosc.cmake`. These are designed such
+that they can theoretically be used by any project that needs to locate the
+given library and are invoked by the `find_package()` call. For more
+information on FindModules and locating packages with CMake, see the following
+CMake documentation:
+
+ - [Using Packages with CMake](https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#using-packages)
+ - [Calling find_package()](https://cmake.org/cmake/help/latest/command/find_package.html)
+
+The other type of file provided by OpenVDB are `OpenVDBSetupX.cmake` includes.
+These are primarily designed to configure the building of OpenVDB components
+against supported DCC's (Houdini/Maya) by locating their installations and
+setting various CMake variables for subsequent `find_package()` dependency
+calls. They also represent packages which already provide their own CMake
+modules, but additionally provide the same input variable interface as OpenVDB's
+other `Find` Modules.
+
+@subsection buildDependencies Locating Dependencies
+
+Each CMake FindModule provides a description of the possible inputs which can
+be provided to help drive the search for OpenVDB dependencies (as well as the
+resulting outputs). They have been homogenized such that these variables
+follow a set convention, typically followed by most CMake projects. For a
+given FindModule e.g. `FindBlosc.cmake`:
+
+  - FindXxx.cmake provides the module interface where Xxx becomes the library
+  name
+  - Invoked with the called `find_package( Xxx )`
+.
+  - @b Inputs - The following variables can be used to help drive the search
+  path on first runs of CMake (i.e. these variables are not
+  [cached](https://cmake.org/cmake/help/latest/command/set.html#set-cache-entry)).
+  They are listed in priority order. Note that the prefix is always capitalized.
+   - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
+   directories
+   - @b XXX_ROOT - Preferred installation prefix. The given dependency is
+   expected to follow a folder structure `XXX_ROOT/include` and `XXX_ROOT/lib`
+   exist
+   - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
+   searches. OpenVDB sets this in the root CMake if `USE_SYSTEM_LIBRARY_PATHS`
+   is enabled.
+.
+  - @b Outputs The following variables are always set if the project is found:
+    - @b Xxx_FOUND - True if the headers and library was found and exists
+    - @b Xxx_VERSION - The library version
+    - @b Xxx_INCLUDE_DIRS - A list of paths to all required include directories
+    - @b Xxx_LIBRARY_DIRS - A list of paths to all required library directories
+    - @b Xxx_LIBRARIES - A list of libraries needed to use Xxx
+  - Each module produces an [imported target](https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries)
+  in the form @b Xxx::xxx, and may generate multiple imported targets if multiple
+  components are found.
+
+@subsection buildMixingDepInstalls Mixing Dependency Installations
+
+There may be a situation where you use a package manager to install some
+dependencies, use a DCC such as Maya to provide others and manually build and
+install others from source. Care must be taken when providing CMake with these
+locations to ensure that the correct files are used. Incorrect use of the above
+variables can lead to difficult to diagnose build and runtime errors.
+
+As an example, let's assume we have a manual installation of TBB (either through
+a Maya installation or a manual installation from source) and we want to use
+this with other dependencies installed through a package manager such as
+homebrew. As homebrew copies all headers and libraries it installs to a
+`<homebrew>/include` `<homebrew>/lib` directory structure, it can be tempting
+to set @b XXX_ROOT variables to points to the `<homebrew>` folder. However you
+may already have an existing installation of TBB through your package manager,
+potentially installed by as a dependency of a completely unrelated piece of
+software. Whilst CMake may report to you the correct include/lib path, this can
+end up being hidden at compile time through these types of shared installations.
+You should not rely on the dependency order of the CMake build system - instead,
+it's important that you try to use the explicit directory paths where possible.
+For example homebrew will install each piece of software to
+`<homebrew>/Cellar/<dep_name>/<dep_version>`, where the subsequent include and
+library directories can be passed to @b XXX_INCLUDEDIR and @b XXX_LIBRARYDIR
+respectively.
+
+In summary try to stick to a single installation workflow and, if in doubt,
+provide direct include/lib paths to isolated software locations.
+
+@subsection buildBloscSupport Blosc Support
+
+Blosc is one of the optional dependencies of all OpenVDB components. It is the
+only dependency which is enabled by default. The documented build steps below
+treat blosc as a required dependency. There are two reasons for this:
+
+ - Blosc produces significantly smaller `.vdb` files
+ - If Blosc is disabled, you will not be able to read or use any `.vdb` files
+   that were created using blosc compression. This includes OpenVDB files from
+   Houdini.
+
+You can disable Blosc using `-D USE_BLOSC=OFF`.
+
+@section buildComponents OpenVDB Components
+
+The following table lists all targets (mainly library and binary components)
+which can be built through the CMake build system. They can be set when using
+CMake from the command line with `-D VAR=ON/OFF` or with a CMake gui:
+
+Component               | Description                                                            | CMake Variable                                    | Default    |
+----------------------- | ---------------------------------------------------------------------- | ------------------------------------------------- | ---------- |
+OpenVDB Core Library    | The Core OpenVDB shared/static library                                 | OPENVDB_BUILD_CORE                                | ON         |
+OpenVDB Print           | Command line binary for displaying information about OpenVDB files     | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_PRINT  | ON / ON    |
+OpenVDB LOD             | Command line binary for generating volume mipmaps from an OpenVDB grid | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_LOD    | ON / OFF   |
+OpenVDB Render          | Command line binary for ray-tracing OpenVDB grids                      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_RENDER | ON / OFF   |
+OpenVDB View            | Command line binary for displaying OpenVDB grids in a GL viewport      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_VIEW   | ON / OFF   |
+OpenVDB Python          | Python module for OpenVDB C++ Python bindings                          | OPENVDB_BUILD_PYTHON_MODULE                       | ON         |
+OpenVDB UnitTests       | OpenVDB's Unit Test suite                                              | OPENVDB_BUILD_UNITTESTS                           | OFF        |
+OpenVDB Houdini Plugin  | The OpenVDB Houdini shared library and OpenVDB Nodes                   | OPENVDB_BUILD_HOUDINI_PLUGIN                      | OFF        |
+OpenVDB Maya Plugin     | The Maya OpenVDB Nodes                                                 | OPENVDB_BUILD_MAYA_PLUGIN                         | OFF        |
+Documentation           | The OpenVDB doxygen documentation                                      | OPENVDB_BUILD_DOCS                                | OFF        |
+
+@section buildGuide Building With CMake
+
+@subsection buildBuildTypes Build Types
+
+The first step is to decide what type of OpenVDB build you're after. This
+primarily boils down to three main options:
+
+ - A standalone OpenVDB build (no Houdini/Maya plugins)
+ - OpenVDB for [Houdini](https://www.sidefx.com/)
+ - OpenVDB for [Maya](https://www.autodesk.co.uk/products/maya/overview)
+
+Each option provides various benefits. Apart from the support for either the
+Houdini or Maya OpenVDB plugins, the latter two options can make it easier for
+new users to install the range of OpenVDB dependencies without having to worry
+about using a package manager or manually installing for source. You'll still
+be able to build and use all components of OpenVDB with these methods. However
+depending on the DCC (Digital Content Creation) software's version, you may
+find that some features of the Core library are restricted to ensure
+compatibility. For more information of building OpenVDB against a Houdini or
+Maya installation, see [here](@ref buildBuildHouMaya).
+
+Developers may wish to build a standalone version of OpenVDB to take advantage
+of newer dependencies and newer library features. See
+[here](@ref buildBuildStandalone) for more information.
+
+@b Note: Blosc is treated as a required dependency in these install instructions.
+See the [blosc support](@ref buildBloscSupport) section for more information.
+
+@subsection buildBuildHouMaya Building Against Houdini/Maya
+
+Building against a DCC reduces the list of dependencies you need to provide.
+You should not mix between Houdini and Maya libraries and should not attempt
+to build the Maya plugin using Houdini libraries and vice-versa. Additionally,
+it's a good idea to read the above section on
+[mixing dependency installations](@ref buildMixingDepInstalls).
+
+DCC      | Supported Version | OpenVDB ABI |
+-------- | ----------------- | ----------- |
+Houdini  | 16.5              | 4           |
+Houdini  | 17.0              | 5           |
+Houdini  | 17.5              | 5           |
+Maya     | 2017              | Any         |
+Maya     | 2018              | Any         |
+Maya     | 2019              | Any         |
+
+@subsection buildBuildHou Building Against Houdini
+
+Houdini ships with a number of libraries that OpenVDB requires. When downloading
+Houdini, take note of the file version information. The version you install will
+determine the compiler version you should try and use to build OpenVDB. For
+example, for @b Linux Houdini 17.5, with a file name of
+`houdini-17.5.219-linux_x86_64_gcc6.3.tar.gz`, GCC 6.3 should be used. You
+will need to install some of the following dependencies depending on which
+OpenVDB components you wish to build.
+
+Package        | Description                                                     | OpenVDB Components |
+-------------- | --------------------------------------------------------------- | ------------------ |
+CMake          | Cross-platform family of tools designed to help build software  | All                |
+C++11 Compiler | Matching Houdini compiler and version                           | All                |
+Boost          | Components: system, iostreams, python, thread                   | All                |
+CppUnit        | A unit testing framework module for C++                         | Unit Tests         |
+GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
+Doxygen        | Documentation generation from C++                               | Documentation      |
+Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
+NumPy          | Scientific computing with Python                                | Optional (Python)  |
+
+At a minimum, boost, a matching C++11 compiler and CMake will be required. See
+the full [dependency list](@ref dependencies) for help with downloading and
+installing the above software. Note that as Blosc is provided as part of the
+Houdini installation `USE_BLOSC` should be left `ON`.
+
+With the necessary dependencies installed, create and enter a directory for
+cmake to write to. It's generally useful to create this in the location you've
+extracted the OpenVDB repository. It will house CMake's generated build files.
+
+@code{.sh}
+mkdir build
+cd build
+@endcode
+
+Now you can call CMake by providing the absolute or relative path to the root
+of the OpenVDB source tree along with the following options:
+
+Required:
+
+  - @b HOUDINI_ROOT =`/path/to/houdini/install` # Path to Houdini Install
+  - @b USE_HOUDINI =`ON` # Force all components to build against Houdini
+  - @b OPENVDB_BUILD_HOUDINI_PLUGIN =`ON` # Required for building the Houdini Plugin.
+
+Optional:
+
+  - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+  =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
+ the link for default values.
+  - @b OPENVDB_HOUDINI_INSTALL_PREFIX =`/path/to/install/dir` # The location to
+ install the Houdini plugin to. Defaults to directories defined by Houdini:
+    - Linux: `$ENV{HOME}/houdiniX.X`
+    - Mac: `$ENV{HOME}/Library/Preferences/houdini/X.X`
+    - Windows: `$ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X`
+  - @b USE_DEFAULT_HOUDINI_INSTALL =`ON` # Use the above default locations if
+  @b OPENVDB_HOUDINI_INSTALL_PREFIX is not specified. If `OFF`, uses the value
+  of @b CMAKE_INSTALL_PREFIX.
+  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
+ CMake may find it automatically
+
+For example on MacOS and where the build folder has been created inside the
+OpenVDB source root:
+
+@code
+cmake -D BOOST_ROOT=/path/to/boost/install \
+      -D HOUDINI_ROOT=/Applications/Houdini/Houdini17.0.506/ \
+      -D USE_HOUDINI=ON \
+      ../
+@endcode
+
+After the CMake build files have been successfully generated, run make within
+the build directory to compile the project, where the value of the `j` argument
+is the number of CPU threads to use for a multi-threaded build.
+@code
+make -j4
+@endcode
+
+Finally, once a successful build has completed, you can install all files.
+@code
+make install
+@endcode
+
+See the [troubleshooting](@ref buildTroubleshooting) section for help with
+CMake and Make errors.
+
+
+@subsection buildBuildMaya Building Against Maya
+
+Supported versions of maya only ship with TBB.
+
+Package        | Description                                                       | OpenVDB Components               |
+-------------- | ---------------------------------------------------------------   | -------------------------------- |
+CMake          | Cross-platform family of tools designed to help build software    | All                              |
+C++11 Compiler | Matching Houdini compiler and version                             | All                              |
+Boost          | Components: system, iostreams, python, thread                     | All                              |
+IlmBase        | Used half precision floating points and EXR serialization support | All                              |
+ZLIB           | Compression library for disk serialization compression            | All                              |
+Blosc          | Recommended dependency for improved disk compression              | All*                             |
+CppUnit        | A unit testing framework module for C++                           | Unit Tests                       |
+GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
+Doxygen        | Documentation generation from C++                                 | Documentation                    |
+OpenEXR        | EXR serialization support                                         | Optional (Core) / OpenVDB Render |
+Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
+NumPy          | Scientific computing with Python                                  | Optional (Python)                |
+
+* See [blosc support](@ref buildBloscSupport)
+
+At a minimum, boost, a matching C++11 compiler, IlmBase, ZLIB, blosc and CMake
+will be required. See the full [dependency list](@ref dependencies) for help
+with downloading and installing the above software.
+
+With the necessary dependencies installed, create and enter a directory for
+cmake to write to. It's generally useful to create this in the location you've
+extracted the OpenVDB repository. It will house CMake's generated build files.
+
+@code{.sh}
+mkdir build
+cd build
+@endcode
+
+Now you can call CMake by providing the absolute or relative path to the root
+of the OpenVDB source tree along with the following options:
+
+Required:
+
+  - @b MAYA_ROOT =`/path/to/maya/install` # Path to Maya Install
+  - @b USE_MAYA =`ON` # Force all components to build against Maya
+
+Optional:
+
+  - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+  =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
+ the link for default values.
+  - @b OPENVDB_MAYA_INSTALL_PREFIX =`/path/to/install/dir` # The location to
+ install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
+  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
+ CMake may find it automatically
+  - @b ILMBASE_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
+
+For example on MacOS and where the build folder has been created inside the
+OpenVDB source root:
+
+@code
+cmake -D BOOST_ROOT=/path/to/boost/install \
+      -D ILMBASE_ROOT=/path/to/ilmbase/install \
+      -D MAYA_ROOT=/Applications/Autodesk/maya2019/ \
+      -D USE_MAYA=ON \
+      ../
+@endcode
+
+As the Maya plugin is disabled by default, you may also want to add
+`-D OPENVDB_BUILD_MAYA_PLUGIN=ON` to the command. The
+[components](@ref buildComponents) section shows which targets are enabled by
+default.
+
+After the CMake build files have been successfully generated, run make within
+the build directory to compile the project, where the value of the `j` argument
+is the number of CPU threads to use for a multi-threaded build.
+@code
+make -j4
+@endcode
+
+Finally, once a successful build has completed, you can install all files.
+@code
+make install
+@endcode
+
+@b Note: The Maya OpenVDB Visualize Node is @b only compatible with Legacy
+OpenGL support. You can enable this in Maya by navigating to
+`Windows->Settings/Preferences->Preferences->Display` and changing
+`Rendering Engine` to OpenGL - Legacy.
+
+See the [troubleshooting](@ref buildTroubleshooting) section for help with
+CMake and Make errors.
+
+
+@subsection buildBuildStandalone Building Standalone
+
+It's recommended you first visit the [dependency list page](@ref dependencies)
+before attempting to run CMake on a standalone build. With the necessary
+dependencies installed, create and enter a directory for cmake to write to.
+It's generally useful to create this in the location you've extracted the
+OpenVDB repository. It will house CMake's generated build files.
+
+@code{.sh}
+mkdir build
+cd build
+@endcode
+
+Now you can call CMake by providing the absolute or relative path to the root
+of the OpenVDB source tree. Below are some common options you may want to
+provide:
+
+- @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+=`/path/to/install/dir` # The location you wish to install OpenVDB to. See
+the link for default values.
+- @b XXX_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
+installed or simply to where your prefered package is installed if it cannot
+locate it.
+
+For example, a typical first attempt at generating the build files may look as
+follows:
+
+@code{.sh}
+cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb ../
+@endcode
+
+See the [components](@ref buildComponents) section to find which targets are
+available, their corresponding CMake flags and their default values.
+
+After the CMake build files have been successfully generated, run make within
+the build directory to compile the project, where the value of the `j` argument
+is the number of CPU threads to use for a multi-threaded build.
+@code
+make -j4
+@endcode
+
+Finally, once a successful build has completed, you can install all files.
+@code
+make install
+@endcode
+
+See the [troubleshooting](@ref buildTroubleshooting) section for help with
+CMake and Make errors.
+
+@section buildUsingOpenVDB Building With OpenVDB
+
+This section is for users wishing to use a build of OpenVDB in their own
+applications with CMake.
+
+The following assumes that OpenVDB was installed with `OPENVDB_BUILD_CORE=ON`
+and `OPENVDB_INSTALL_CMAKE_MODULES=ON`. Don't worry if you didn't specify
+these options directly, they both default to `ON`. This ensures that OpenVDB
+has installed the required CMake modules that your application will need to
+use.
+
+@b Note: Typically, projects provide a @b Config-file rather than a
+@b Find-module for downstream use. OpenVDB currently provides a @b Find-module.
+This may change in the future. Further information
+[here](https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#using-packages).
+
+You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
+OpenVDB as a dependency:
+
+@code{.cmake}
+cmake_minimum_required(VERSION 3.3)
+list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
+find_package(OpenVDB REQUIRED)
+target_link_libraries(myapp OpenVDB::openvdb)
+@endcode
+
+`myapp` in the above is a CMake target, usually created with `add_library()`
+or `add_executable()`. You can optionally provide `CMAKE_MODULE_PATH` as a
+`-D` argument to the cmake command line instead of specifying it in your
+`CMakeLists.txt`.
+
+Note that the `FindOpenVDB.cmake` module relies on the other `FindModules`
+provided in the OpenVDB installation to find it's own dependencies. This may
+require you to provide additional dependency locations for OpenVDB's
+dependencies. See [Locating Dependencies](@ref buildDependencies) or the below
+troubleshooting for more information.
+
+------------------------------------------------------------------------------
+
+@section buildTroubleshooting Troubleshooting
+
+If after reading this guide you're unable to find your specific issue below,
+please get in touch with the OpenVDB TSC.
+
+@b Note: If running into issues when changing CMake settings/dependency paths,
+try clearing the designated CMake build directory and running your `cmake`
+command again.
+
+@subsection troubleshoot1 CMake Error ... Could NOT find XXX (missing: ... )
+
+It's fairly typical that CMake may fail to find some dependencies on first
+runs, especially if you've manually compiled from source your own
+dependencies. Analyzing any dependency errors will help with running further
+invocations of cmake. The [Locating Dependencies](@ref buildDependencies)
+section details the variable format required to point CMake to the correct
+locations. Alternatively, with interactive cmake systems such as `ccmake` or
+CMake GUI, variables which are not found will be shown, allowing you to
+provide them directly.
+
+As an example, earlier versions of
+[Threading Building Blocks (TBB)](https://www.threadingbuildingblocks.org/)
+do not come with CMake modules or
+[pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/) modules.
+For OpenVDB to locate TBB, you typically need to provide this location
+manually:
+
+@code{.sh}
+cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb -D TBB_ROOT=/path/to/tbb/install ../
+@endcode
+
+Note that this is also equivalent to:
+
+@code{.sh}
+cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb \
+    -D TBB_INCLUDEDIR=/path/to/tbb/install/include \
+    -D TBB_LIBRARYDIR=/path/to/tbb/install/lib \
+    ../
+@endcode
+
+@subsection troubleshoot2 CMake Error ... Could NOT find XXX (Found unsuitable version: ... )
+
+By default, OpenVDB sets a number of minimum version requires for its
+dependencies. These can be found in the root CMakeList.txt or in the
+[dependency table](@ref dependencies). These minimum versions either track
+the oldest supported [VFX Reference Platform](https://www.vfxplatform.com/) or
+are otherwise required for compatibility. Although not recommended, you can
+bypass these checks with `-D DISABLE_DEPENDENCY_VERSION_CHECKS=ON` if necessary.
+Note that using older or untested dependencies may produce undesired behavior.
+Older versions in particular are not supported by OpenVDB.
+
+@b Note: Boost will produce a version error in the format `Detected version of
+Boost is too old.`
+
+*/
