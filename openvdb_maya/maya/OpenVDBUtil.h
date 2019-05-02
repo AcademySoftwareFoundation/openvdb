@@ -929,7 +929,7 @@ public:
         unsigned voxelCount = 0;
         for (size_t l = 0, L = leafs.leafCount(); l < L; ++l) {
             indexMap[l] = voxelCount;
-            voxelCount += std::min(leafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
+            voxelCount += std::min(static_cast<size_t>(leafs.leaf(l).onVoxelCount()), voxelsPerLeaf);
         }
 
         std::vector<GLfloat>
