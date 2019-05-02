@@ -10,7 +10,7 @@ container:
 trailing_spaces_task:
   test_script:
     - set +e
-    - git grep -n -I -E '^.+[ ]+$' -- './*' ':(exclude)*.cmake' ':(exclude)*CMakeLists.txt'
+    - git grep -n -I -E '^.+[ ]+$' -- './*'
     - test $? -eq 1
 
 # Search the C++ source code for any tabs
