@@ -1,6 +1,7 @@
 ![OpenVDB](http://www.openvdb.org/images/openvdb_logo.png)
 
 [![Build Status](https://travis-ci.org/AcademySoftwareFoundation/openvdb.svg?branch=master)](https://travis-ci.org/AcademySoftwareFoundation/openvdb)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2774/badge)](https://bestpractices.coreinfrastructure.org/projects/2774)
 
 [Website](http://www.openvdb.org) |
 [Discussion Forum](http://www.openvdb.org/forum) |
