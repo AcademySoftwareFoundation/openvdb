@@ -550,7 +550,6 @@ public:
 class OPENVDB_HOUDINI_API ScopedInputLock
 {
 public:
-    OPENVDB_DEPRECATED
     ScopedInputLock(SOP_Node& node, OP_Context& context)
     {
         mLock.setNode(&node);
@@ -558,10 +557,8 @@ public:
             throw std::runtime_error("failed to lock inputs");
         }
     }
-    OPENVDB_DEPRECATED
     ~ScopedInputLock() {}
 
-    OPENVDB_DEPRECATED
     void markInputUnlocked(exint input) { mLock.markInputUnlocked(input); }
 
 private:
