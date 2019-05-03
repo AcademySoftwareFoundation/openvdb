@@ -93,90 +93,90 @@ may be provided to tell this module where to look.
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
-SET ( _HOUDINI_ROOT_SEARCH_DIR )
+set(_HOUDINI_ROOT_SEARCH_DIR)
 
-IF ( HOUDINI_ROOT )
-  LIST ( APPEND _HOUDINI_ROOT_SEARCH_DIR ${HOUDINI_ROOT} )
-ELSE ()
-  SET ( _ENV_HOUDINI_ROOT $ENV{HOUDINI_ROOT} )
-  IF ( _ENV_HOUDINI_ROOT )
-    LIST ( APPEND _HOUDINI_ROOT_SEARCH_DIR ${_ENV_HOUDINI_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(HOUDINI_ROOT)
+  list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${HOUDINI_ROOT})
+else()
+  set(_ENV_HOUDINI_ROOT $ENV{HOUDINI_ROOT})
+  if(_ENV_HOUDINI_ROOT)
+    list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${_ENV_HOUDINI_ROOT})
+  endif()
+endif()
 
-IF ( DEFINED ENV{HFS} )
-  LIST ( APPEND _HOUDINI_ROOT_SEARCH_DIR $ENV{HFS} )
-ENDIF ()
+if(DEFINED ENV{HFS})
+  list(APPEND _HOUDINI_ROOT_SEARCH_DIR $ENV{HFS})
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for Houdini CMake
 # ------------------------------------------------------------------------
 
-SET ( _HOUDINI_CMAKE_PATH_SUFFIXES )
+set(_HOUDINI_CMAKE_PATH_SUFFIXES)
 
-IF ( APPLE )
-  LIST ( APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
+if(APPLE)
+  list(APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
     Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/cmake
     Houdini.framework/Versions/Current/Resources/toolkit/cmake
     Versions/Current/Resources/toolkit/cmake
     Current/Resources/toolkit/cmake
     Resources/toolkit/cmake
-    )
-ENDIF ()
+  )
+endif()
 
-LIST ( APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
+list(APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
   toolkit/cmake
   cmake
-  )
+)
 
-FIND_PATH ( HOUDINI_CMAKE_LOCATION HoudiniConfig.cmake
+find_path(HOUDINI_CMAKE_LOCATION HoudiniConfig.cmake
   NO_DEFAULT_PATH
   PATHS ${_HOUDINI_ROOT_SEARCH_DIR}
   PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES}
-  )
+)
 
-IF ( HOUDINI_CMAKE_LOCATION )
-  LIST ( APPEND CMAKE_PREFIX_PATH "${HOUDINI_CMAKE_LOCATION}" )
-ENDIF ()
+if(HOUDINI_CMAKE_LOCATION)
+  list(APPEND CMAKE_PREFIX_PATH "${HOUDINI_CMAKE_LOCATION}")
+endif()
 
-FIND_PACKAGE ( Houdini REQUIRED )
+find_package(Houdini REQUIRED)
 
-# Note that passing MINIMUM_HOUDINI_VERSION into FIND_PACKAGE ( Houdini ) doesn't work
-IF ( NOT Houdini_FOUND )
-  MESSAGE ( FATAL_ERROR "Unable to locate Houdini Installation." )
-ELSEIF ( Houdini_VERSION VERSION_LESS MINIMUM_HOUDINI_VERSION )
-  MESSAGE ( FATAL_ERROR "Unsupported Houdini Version ${Houdini_VERSION}. Minimum "
+# Note that passing MINIMUM_HOUDINI_VERSION into find_package(Houdini) doesn't work
+if(NOT Houdini_FOUND)
+  message(FATAL_ERROR "Unable to locate Houdini Installation.")
+elseif(Houdini_VERSION VERSION_LESS MINIMUM_HOUDINI_VERSION)
+  message(FATAL_ERROR "Unsupported Houdini Version ${Houdini_VERSION}. Minimum "
     "supported is ${MINIMUM_HOUDINI_VERSION}."
-    )
-ENDIF ()
+  )
+endif()
 
-FIND_PACKAGE ( PackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Houdini
+find_package(PackageHandleStandardArgs)
+find_package_handle_standard_args(Houdini
   REQUIRED_VARS _houdini_install_root Houdini_FOUND
   VERSION_VAR Houdini_VERSION
-  )
+)
 
 # ------------------------------------------------------------------------
 #  Add support for older versions of Houdini
 # ------------------------------------------------------------------------
 
-IF ( Houdini_VERSION VERSION_LESS 17 )
+if(Houdini_VERSION VERSION_LESS 17)
   # Missing function in Houdini 16.5 CMake copied from 17.5 - _houdini variables
   # are set by the Houdini configuration package
-  function ( houdini_get_default_install_dir output_var )
-    set( _instdir "" )
-    if ( _houdini_platform_linux )
-        set( _instdir $ENV{HOME}/houdini${_houdini_release_version} )
-    elseif ( _houdini_platform_osx )
-        set( _instdir $ENV{HOME}/Library/Preferences/houdini/${_houdini_release_version} )
-    elseif ( _houdini_platform_win )
-        set( _instdir $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\Documents\\houdini${_houdini_release_version} )
-    else ()
-        message( FATAL_ERROR "Invalid platform" )
-    endif ()
-    set( ${output_var} ${_instdir} PARENT_SCOPE )
-  endfunction ()
-ENDIF ()
+  function(houdini_get_default_install_dir output_var)
+    set( _instdir "")
+    if(_houdini_platform_linux)
+        set(_instdir $ENV{HOME}/houdini${_houdini_release_version})
+    elseif(_houdini_platform_osx)
+        set(_instdir $ENV{HOME}/Library/Preferences/houdini/${_houdini_release_version})
+    elseif(_houdini_platform_win)
+        set(_instdir $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\Documents\\houdini${_houdini_release_version})
+    else()
+        message( FATAL_ERROR "Invalid platform")
+    endif()
+    set(${output_var} ${_instdir} PARENT_SCOPE)
+  endfunction()
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure imported Houdini target
@@ -185,46 +185,46 @@ ENDIF ()
 # Set the relative directory containing Houdini libs and populate an extra list
 # of Houdini dependencies for _houdini_create_libraries.
 
-SET ( _HOUDINI_LIB_DIR )
-SET ( _HOUDINI_EXTRA_LIBRARIES )
-SET ( _HOUDINI_EXTRA_LIBRARY_NAMES )
+set(_HOUDINI_LIB_DIR)
+set(_HOUDINI_EXTRA_LIBRARIES)
+set(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
-IF ( APPLE )
-  SET ( _HOUDINI_LIB_DIR
+if(APPLE)
+  set(_HOUDINI_LIB_DIR
     Frameworks/Houdini.framework/Versions/Current/Libraries
-    )
-  LIST ( APPEND _HOUDINI_EXTRA_LIBRARIES
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
     ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
-    )
-ELSE ()
-  SET ( _HOUDINI_LIB_DIR dsolib )
-  LIST ( APPEND _HOUDINI_EXTRA_LIBRARIES
+  )
+else()
+  set(_HOUDINI_LIB_DIR dsolib)
+  list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
     ${_HOUDINI_LIB_DIR}/libhboost_regex.so
-    )
-ENDIF ()
+  )
+endif()
 
-LIST ( APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
   HoudiniRAY
   hboost_regex
-  )
+)
 
 # Additionally link extra deps
 
-_houdini_create_libraries (
+_houdini_create_libraries(
   PATHS ${_HOUDINI_EXTRA_LIBRARIES}
   TARGET_NAMES ${_HOUDINI_EXTRA_LIBRARY_NAMES}
   TYPE SHARED
-  )
+)
 
-UNSET ( _HOUDINI_EXTRA_LIBRARIES )
-UNSET ( _HOUDINI_EXTRA_LIBRARY_NAMES )
+unset(_HOUDINI_EXTRA_LIBRARIES)
+unset(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
 # Set Houdini lib and include directories
 
-SET ( _HOUDINI_INCLUDE_DIR ${_houdini_include_dir} )
-SET ( _HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR} )
+set(_HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
+set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR})
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
@@ -233,76 +233,76 @@ SET ( _HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR} )
 # Congfigure dependency hints to point to Houdini. Allow for user overriding
 # if custom Houdini installations are in use
 
-# ZLIB - FindPackage ( ZLIB ) only supports a few path hints. We use
+# ZLIB - FindPackage ( ZLIB) only supports a few path hints. We use
 # ZLIB_ROOT to find the zlib includes and explicitly set the path to
 # the zlib library
 
-IF ( NOT ZLIB_ROOT )
-  SET ( ZLIB_ROOT ${_HOUDINI_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT ZLIB_LIBRARY )
-  # Full path to zlib library - FindPackage ( ZLIB )
-  FIND_LIBRARY ( ZLIB_LIBRARY z
+if(NOT ZLIB_ROOT)
+  set(ZLIB_ROOT ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT ZLIB_LIBRARY)
+  # Full path to zlib library - FindPackage ( ZLIB)
+  find_library(ZLIB_LIBRARY z
     NO_DEFAULT_PATH
     PATHS ${_HOUDINI_LIB_DIR}
-    )
-  IF ( NOT EXISTS ${ZLIB_LIBRARY} )
-    MESSAGE ( WARNING "The OpenVDB Houdini CMake setup is unable to locate libz within "
+  )
+  if(NOT EXISTS ${ZLIB_LIBRARY})
+    message(WARNING "The OpenVDB Houdini CMake setup is unable to locate libz within "
       "the Houdini installation at: ${_HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
-      )
-  ENDIF ()
-ENDIF ()
+    )
+  endif()
+endif()
 
 # TBB
 
-IF ( NOT TBB_INCLUDEDIR )
-  SET ( TBB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT TBB_LIBRARYDIR )
-  SET ( TBB_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
-ENDIF ()
+if(NOT TBB_INCLUDEDIR)
+  set(TBB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT TBB_LIBRARYDIR)
+  set(TBB_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
 
 # Blosc
 
-IF ( NOT BLOSC_INCLUDEDIR )
-  SET ( BLOSC_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT BLOSC_LIBRARYDIR )
-  SET ( BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
-ENDIF ()
+if(NOT BLOSC_INCLUDEDIR)
+  set(BLOSC_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT BLOSC_LIBRARYDIR)
+  set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
 
 # OpenEXR
 
-IF ( NOT OPENEXR_INCLUDEDIR )
-  SET ( OPENEXR_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT OPENEXR_LIBRARYDIR )
-  SET ( OPENEXR_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
-ENDIF ()
+if(NOT OPENEXR_INCLUDEDIR)
+  set(OPENEXR_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT OPENEXR_LIBRARYDIR)
+  set(OPENEXR_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
 
 # IlmBase
 
-IF ( NOT ILMBASE_INCLUDEDIR )
-  SET ( ILMBASE_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT ILMBASE_LIBRARYDIR )
-  SET ( ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR} )
-ENDIF ()
+if(NOT ILMBASE_INCLUDEDIR)
+  set(ILMBASE_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT ILMBASE_LIBRARYDIR)
+  set(ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
 
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
 
-UNSET ( _HOUDINI_INCLUDE_DIR )
-UNSET ( _HOUDINI_LIB_DIR )
+unset(_HOUDINI_INCLUDE_DIR)
+unset(_HOUDINI_LIB_DIR)
 
 # Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
 
-IF ( APPLE )
-  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib" )
-ELSEIF ( UNIX )
-  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.so" )
-ENDIF ()
+if(APPLE)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
+elseif(UNIX)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.so")
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure OpenVDB ABI
@@ -311,11 +311,11 @@ ENDIF ()
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-IF ( Houdini_VERSION VERSION_LESS 17 )
-  SET ( OPENVDB_HOUDINI_ABI 4 )
-ELSEIF ( Houdini_VERSION VERSION_LESS 18 )
-  SET ( OPENVDB_HOUDINI_ABI 5 )
-ELSE ()
+if(Houdini_VERSION VERSION_LESS 17)
+  set(OPENVDB_HOUDINI_ABI 4)
+elseif(Houdini_VERSION VERSION_LESS 18)
+  set(OPENVDB_HOUDINI_ABI 5)
+else()
   # Anticipated ABI version for H18
-  SET ( OPENVDB_HOUDINI_ABI 6 )
-ENDIF ()
+  set(OPENVDB_HOUDINI_ABI 6)
+endif()

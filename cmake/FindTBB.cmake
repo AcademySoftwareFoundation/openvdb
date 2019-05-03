@@ -94,203 +94,203 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 # Support new if() IN_LIST operator
-IF ( POLICY CMP0057 )
-  CMAKE_POLICY ( SET CMP0057 NEW )
-ENDIF ()
+if(POLICY CMP0057)
+  cmake_policy(SET CMP0057 NEW)
+endif()
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   Tbb_INCLUDE_DIR
   Tbb_LIBRARY
 )
 
-SET ( _TBB_COMPONENT_LIST
+set(_TBB_COMPONENT_LIST
   tbb
   tbbmalloc
-  )
+)
 
-IF ( TBB_FIND_COMPONENTS )
-  SET ( _TBB_COMPONENTS_PROVIDED TRUE )
-  SET ( _IGNORED_COMPONENTS "" )
-  FOREACH ( COMPONENT ${TBB_FIND_COMPONENTS} )
-    IF ( NOT ${COMPONENT} IN_LIST _TBB_COMPONENT_LIST )
-      LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
-    ENDIF ()
-  ENDFOREACH()
+if(TBB_FIND_COMPONENTS)
+  set(_TBB_COMPONENTS_PROVIDED TRUE)
+  set(_IGNORED_COMPONENTS "")
+  foreach(COMPONENT ${TBB_FIND_COMPONENTS})
+    if(NOT ${COMPONENT} IN_LIST _TBB_COMPONENT_LIST)
+      list(APPEND _IGNORED_COMPONENTS ${COMPONENT})
+    endif()
+  endforeach()
 
-  IF ( _IGNORED_COMPONENTS )
-    MESSAGE ( STATUS "Ignoring unknown components of TBB:" )
-    FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
-      MESSAGE ( STATUS "  ${COMPONENT}" )
-    ENDFOREACH ()
-    LIST ( REMOVE_ITEM TBB_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
-  ENDIF ()
-ELSE ()
-  SET ( _TBB_COMPONENTS_PROVIDED FALSE )
-  SET ( TBB_FIND_COMPONENTS ${_TBB_COMPONENT_LIST} )
-ENDIF ()
+  if(_IGNORED_COMPONENTS)
+    message(STATUS "Ignoring unknown components of TBB:")
+    foreach(COMPONENT ${_IGNORED_COMPONENTS})
+      message(STATUS "  ${COMPONENT}")
+    endforeach()
+    list(REMOVE_ITEM TBB_FIND_COMPONENTS ${_IGNORED_COMPONENTS})
+  endif()
+else()
+  set(_TBB_COMPONENTS_PROVIDED FALSE)
+  set(TBB_FIND_COMPONENTS ${_TBB_COMPONENT_LIST})
+endif()
 
 # Append TBB_ROOT or $ENV{TBB_ROOT} if set (prioritize the direct cmake var)
-SET ( _TBB_ROOT_SEARCH_DIR "" )
+set(_TBB_ROOT_SEARCH_DIR "")
 
-IF ( TBB_ROOT )
-  LIST ( APPEND _TBB_ROOT_SEARCH_DIR ${TBB_ROOT} )
-ELSE ()
-  SET ( _ENV_TBB_ROOT $ENV{TBB_ROOT} )
-  IF ( _ENV_TBB_ROOT )
-    LIST ( APPEND _TBB_ROOT_SEARCH_DIR ${_ENV_TBB_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(TBB_ROOT)
+  list(APPEND _TBB_ROOT_SEARCH_DIR ${TBB_ROOT})
+else()
+  set(_ENV_TBB_ROOT $ENV{TBB_ROOT})
+  if(_ENV_TBB_ROOT)
+    list(APPEND _TBB_ROOT_SEARCH_DIR ${_ENV_TBB_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find Tbb
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_Tbb QUIET tbb )
+find_package(PkgConfig)
+pkg_check_modules(PC_Tbb QUIET tbb)
 
 # ------------------------------------------------------------------------
 #  Search for tbb include DIR
 # ------------------------------------------------------------------------
 
-SET ( _TBB_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _TBB_INCLUDE_SEARCH_DIRS
+set(_TBB_INCLUDE_SEARCH_DIRS "")
+list(APPEND _TBB_INCLUDE_SEARCH_DIRS
   ${TBB_INCLUDEDIR}
   ${_TBB_ROOT_SEARCH_DIR}
   ${PC_Tbb_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard tbb header file.
-FIND_PATH ( Tbb_INCLUDE_DIR tbb/tbb_stddef.h
+find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
   NO_DEFAULT_PATH
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
+)
+
+if(EXISTS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h")
+  file(STRINGS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h"
+    _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR "
   )
+  string(REGEX REPLACE "#define TBB_VERSION_MAJOR" ""
+    _tbb_version_major_string "${_tbb_version_major_string}"
+  )
+  string(STRIP "${_tbb_version_major_string}" Tbb_VERSION_MAJOR)
 
-IF ( EXISTS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h" )
-    FILE ( STRINGS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h"
-      _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR "
-      )
-    STRING ( REGEX REPLACE "#define TBB_VERSION_MAJOR" ""
-      _tbb_version_major_string "${_tbb_version_major_string}"
-      )
-    STRING ( STRIP "${_tbb_version_major_string}" Tbb_VERSION_MAJOR )
+  file(STRINGS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h"
+     _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR "
+  )
+  string(REGEX REPLACE "#define TBB_VERSION_MINOR" ""
+    _tbb_version_minor_string "${_tbb_version_minor_string}"
+  )
+  string(STRIP "${_tbb_version_minor_string}" Tbb_VERSION_MINOR)
 
-    FILE ( STRINGS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h"
-       _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR "
-      )
-    STRING ( REGEX REPLACE "#define TBB_VERSION_MINOR" ""
-      _tbb_version_minor_string "${_tbb_version_minor_string}"
-      )
-    STRING ( STRIP "${_tbb_version_minor_string}" Tbb_VERSION_MINOR )
+  unset(_tbb_version_major_string)
+  unset(_tbb_version_minor_string)
 
-    UNSET ( _tbb_version_major_string )
-    UNSET ( _tbb_version_minor_string )
-
-    SET ( Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR} )
-ENDIF ()
+  set(Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR})
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for TBB lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _TBB_LIBRARYDIR_SEARCH_DIRS "" )
+set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
 
 # Append to _TBB_LIBRARYDIR_SEARCH_DIRS in priority order
 
-SET ( _TBB_LIBRARYDIR_SEARCH_DIRS "" )
-LIST ( APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
+set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
+list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
   ${TBB_LIBRARYDIR}
   ${_TBB_ROOT_SEARCH_DIR}
   ${PC_Tbb_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
-SET ( TBB_PATH_SUFFIXES
+set(TBB_PATH_SUFFIXES
   lib64
   lib
 )
 
 # platform branching
 
-IF ( UNIX )
-  LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/x86_64-linux-gnu )
-ENDIF ()
+if(UNIX)
+  list(INSERT TBB_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
+endif()
 
-IF (APPLE)
-  IF (TBB_FOR_CLANG)
-    LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/libc++ )
-  ENDIF ()
-ELSEIF ( WIN32 )
-  IF ( MSVC10 )
-    SET ( TBB_VC_DIR vc10 )
-  ELSEIF ( MSVC11 )
-    SET ( TBB_VC_DIR vc11 )
-  ELSEIF ( MSVC12 )
-    SET ( TBB_VC_DIR vc12 )
-  ENDIF ()
-  LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/intel64/${TBB_VC_DIR} )
-ELSE ()
-  IF ( ${CMAKE_CXX_COMPILER_ID} STREQUAL GNU )
-    IF ( TBB_MATCH_COMPILER_VERSION )
-      STRING ( REGEX MATCHALL "[0-9]+" GCC_VERSION_COMPONENTS ${CMAKE_CXX_COMPILER_VERSION} )
-      LIST ( GET GCC_VERSION_COMPONENTS 0 GCC_MAJOR )
-      LIST ( GET GCC_VERSION_COMPONENTS 1 GCC_MINOR )
-      LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc${GCC_MAJOR}.${GCC_MINOR} )
-    ELSE ()
-      LIST ( INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc4.4 )
-    ENDIF ()
-  ENDIF ()
-ENDIF ()
+if(APPLE)
+  if(TBB_FOR_CLANG)
+    list(INSERT TBB_PATH_SUFFIXES 0 lib/libc++)
+  endif()
+elseif(WIN32)
+  if(MSVC10)
+    set(TBB_VC_DIR vc10)
+  elseif(MSVC11)
+    set(TBB_VC_DIR vc11)
+  elseif(MSVC12)
+    set(TBB_VC_DIR vc12)
+  endif()
+  list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/${TBB_VC_DIR})
+else()
+  if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
+    if(TBB_MATCH_COMPILER_VERSION)
+      string(REGEX MATCHALL "[0-9]+" GCC_VERSION_COMPONENTS ${CMAKE_CXX_COMPILER_VERSION})
+      list(GET GCC_VERSION_COMPONENTS 0 GCC_MAJOR)
+      list(GET GCC_VERSION_COMPONENTS 1 GCC_MINOR)
+      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc${GCC_MAJOR}.${GCC_MINOR})
+    else()
+      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc4.4)
+    endif()
+  endif()
+endif()
 
-IF ( UNIX AND TBB_USE_STATIC_LIBS )
-  SET ( _TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
-ENDIF ()
+if(UNIX AND TBB_USE_STATIC_LIBS)
+  set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
 
-SET ( Tbb_LIB_COMPONENTS "" )
+set(Tbb_LIB_COMPONENTS "")
 
-FOREACH ( COMPONENT ${TBB_FIND_COMPONENTS} )
-  FIND_LIBRARY ( Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
+foreach(COMPONENT ${TBB_FIND_COMPONENTS})
+  find_library(Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
     NO_DEFAULT_PATH
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
-    )
+  )
 
   # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
   # and correct the library name if so
-  IF ( UNIX AND EXISTS ${Tbb_${COMPONENT}_LIBRARY} )
+  if(UNIX AND EXISTS ${Tbb_${COMPONENT}_LIBRARY})
     # Ignore files where the first four bytes equals the ELF magic number
-    FILE ( READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_HEX OFFSET 0 LIMIT 4 HEX )
-    IF ( NOT ${Tbb_${COMPONENT}_HEX} STREQUAL "7f454c46" )
+    file(READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_HEX OFFSET 0 LIMIT 4 HEX)
+    if(NOT ${Tbb_${COMPONENT}_HEX} STREQUAL "7f454c46")
       # Read the first 1024 bytes of the library and match against an "INPUT (file)" regex
-      FILE ( READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_ASCII OFFSET 0 LIMIT 1024 )
-      IF ( "${Tbb_${COMPONENT}_ASCII}" MATCHES "INPUT \\(([^(]+)\\)")
+      file(READ ${Tbb_${COMPONENT}_LIBRARY} Tbb_${COMPONENT}_ASCII OFFSET 0 LIMIT 1024)
+      if("${Tbb_${COMPONENT}_ASCII}" MATCHES "INPUT \\(([^(]+)\\)")
         # Extract the directory and apply the matched text (in brackets)
-        GET_FILENAME_COMPONENT ( Tbb_${COMPONENT}_DIR "${Tbb_${COMPONENT}_LIBRARY}" DIRECTORY )
-        SET ( Tbb_${COMPONENT}_LIBRARY "${Tbb_${COMPONENT}_DIR}/${CMAKE_MATCH_1}" )
-      ENDIF ()
-    ENDIF ()
-  ENDIF ()
+        get_filename_component(Tbb_${COMPONENT}_DIR "${Tbb_${COMPONENT}_LIBRARY}" DIRECTORY)
+        set(Tbb_${COMPONENT}_LIBRARY "${Tbb_${COMPONENT}_DIR}/${CMAKE_MATCH_1}")
+      endif()
+    endif()
+  endif()
 
-  LIST ( APPEND Tbb_LIB_COMPONENTS ${Tbb_${COMPONENT}_LIBRARY} )
+  list(APPEND Tbb_LIB_COMPONENTS ${Tbb_${COMPONENT}_LIBRARY})
 
-  IF ( Tbb_${COMPONENT}_LIBRARY )
-    SET ( TBB_${COMPONENT}_FOUND TRUE )
-  ELSE ()
-    SET ( TBB_${COMPONENT}_FOUND FALSE )
-  ENDIF ()
-ENDFOREACH ()
+  if(Tbb_${COMPONENT}_LIBRARY)
+    set(TBB_${COMPONENT}_FOUND TRUE)
+  else()
+    set(TBB_${COMPONENT}_FOUND FALSE)
+  endif()
+endforeach()
 
-IF ( UNIX AND TBB_USE_STATIC_LIBS )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-  UNSET ( _TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
-ENDIF ()
+if(UNIX AND TBB_USE_STATIC_LIBS)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+  unset(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+endif()
 
 # ------------------------------------------------------------------------
 #  Cache and set TBB_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( TBB
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(TBB
   FOUND_VAR TBB_FOUND
   REQUIRED_VARS
     Tbb_INCLUDE_DIR
@@ -299,32 +299,32 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( TBB
   HANDLE_COMPONENTS
 )
 
-IF ( TBB_FOUND )
-  SET ( Tbb_LIBRARIES
+if(TBB_FOUND)
+  set(Tbb_LIBRARIES
     ${Tbb_LIB_COMPONENTS}
   )
-  SET ( Tbb_INCLUDE_DIRS ${Tbb_INCLUDE_DIR} )
-  SET ( Tbb_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER} )
+  set(Tbb_INCLUDE_DIRS ${Tbb_INCLUDE_DIR})
+  set(Tbb_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER})
 
-  SET ( Tbb_LIBRARY_DIRS "" )
-  FOREACH ( LIB ${Tbb_LIB_COMPONENTS} )
-    GET_FILENAME_COMPONENT ( _TBB_LIBDIR ${LIB} DIRECTORY )
-    LIST ( APPEND Tbb_LIBRARY_DIRS ${_TBB_LIBDIR} )
-  ENDFOREACH ()
-  LIST ( REMOVE_DUPLICATES Tbb_LIBRARY_DIRS )
+  set(Tbb_LIBRARY_DIRS "")
+  foreach(LIB ${Tbb_LIB_COMPONENTS})
+    get_filename_component(_TBB_LIBDIR ${LIB} DIRECTORY)
+    list(APPEND Tbb_LIBRARY_DIRS ${_TBB_LIBDIR})
+  endforeach()
+  list(REMOVE_DUPLICATES Tbb_LIBRARY_DIRS)
 
   # Configure imported targets
 
-  FOREACH ( COMPONENT ${TBB_FIND_COMPONENTS} )
-    IF ( NOT TARGET TBB::${COMPONENT} )
-      ADD_LIBRARY ( TBB::${COMPONENT} UNKNOWN IMPORTED )
-      SET_TARGET_PROPERTIES ( TBB::${COMPONENT} PROPERTIES
+  foreach(COMPONENT ${TBB_FIND_COMPONENTS})
+    if(NOT TARGET TBB::${COMPONENT})
+      add_library(TBB::${COMPONENT} UNKNOWN IMPORTED)
+      set_target_properties(TBB::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${Tbb_${COMPONENT}_LIBRARY}"
         INTERFACE_COMPILE_OPTIONS "${Tbb_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}"
       )
-    ENDIF ()
-  ENDFOREACH ()
-ELSEIF ( TBB_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find TBB")
-ENDIF ()
+    endif()
+  endforeach()
+elseif(TBB_FIND_REQUIRED)
+  message(FATAL_ERROR "Unable to find TBB")
+endif()
