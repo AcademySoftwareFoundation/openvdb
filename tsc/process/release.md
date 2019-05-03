@@ -8,7 +8,7 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
 - [ ] Open a pull request to merge the above changes into `openvdb/master`.  Associate the pull request with the Jira ticket created earlier, and verify that the Travis CI build runs successfully.
 - [ ] Draft a new [GitHub release](https://github.com/AcademySoftwareFoundation/openvdb/releases). Title it "OpenVDB 6.1.0" and tag it as `v6.1.0`.
 
-- [ ] Update `openvdb-website/contents/download/index.html` with the new version number (6.1.0) and release date, and `openvdb-website/contents/index.html` with a news item.  Open the latter in a browser and check that the website renders correctly and that there are no broken links.
+- [ ] Update `openvdb-website/contents/index.html` with a news item announcing the release, and delete the oldest news item.  Open that page in a browser and check that the website renders correctly and that there are no broken links.
 - [ ] Build the documentation (both the `doc` and `pydoc` targets) and replace the contents of `openvdb-website/contents/documentation/doxygen/` with the output.  [_This step should be automated, and the thousands of files it generates should preferably not be committed to the repository._]
 - [ ] Open a pull request to merge the above changes into `openvdb-website/master`.  Associate the pull request with the Jira ticket created earlier.
 - [ ] Post a release announcement to the [OpenVDB forum](https://groups.google.com/forum/#!forum/openvdb-forum).
