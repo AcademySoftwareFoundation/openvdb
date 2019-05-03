@@ -30,64 +30,64 @@
 
 #]=======================================================================]
 
-PROJECT ( OpenVDBMaya )
-CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+project(OpenVDBMaya)
+cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
-IF ( POLICY CMP0074 )
-  CMAKE_POLICY ( SET CMP0074 NEW )
-ENDIF ()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 ###### OpenVDB Maya Options
 
-OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON )
+option(OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
 
-IF ( OPENVDB_MAYA_SUBDIR )
-  MESSAGE ( DEPRECATION "OPENVDB_MAYA_SUBDIR is deprecated and will be removed. "
+if(OPENVDB_MAYA_SUBDIR)
+  message(DEPRECATION "OPENVDB_MAYA_SUBDIR is deprecated and will be removed. "
     "Set OPENVDB_MAYA_INSTALL_PREFIX to your install location."
-    )
-ENDIF ()
+  )
+endif()
 
 ##########################################################################
 
-MESSAGE ( STATUS "----------------------------------------------------" )
-MESSAGE ( STATUS "------------- Configuring OpenVDBMaya --------------" )
-MESSAGE ( STATUS "----------------------------------------------------" )
+message(STATUS "----------------------------------------------------" )
+message(STATUS "------------- Configuring OpenVDBMaya --------------" )
+message(STATUS "----------------------------------------------------" )
 
 #########################################################################
 
 # Configure prefix
 
-IF ( NOT OPENVDB_MAYA_INSTALL_PREFIX )
-  IF ( OPENVDB_MAYA_SUBDIR )
-    SET ( MAYA_INSTALL_LOCATION
+if(NOT OPENVDB_MAYA_INSTALL_PREFIX)
+  if(OPENVDB_MAYA_SUBDIR)
+    set(MAYA_INSTALL_LOCATION
       ${CMAKE_INSTALL_PREFIX}/maya/${Maya_VERSION}
-      )
-  ELSE ()
-    SET ( MAYA_INSTALL_LOCATION
+    )
+  else()
+    set(MAYA_INSTALL_LOCATION
       ${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}
-      )
-  ENDIF ()
-ENDIF ()
+    )
+  endif()
+endif()
 
-SET ( OPENVDB_MAYA_INSTALL_PREFIX ${MAYA_INSTALL_LOCATION}
+set(OPENVDB_MAYA_INSTALL_PREFIX ${MAYA_INSTALL_LOCATION}
   CACHE PATH "Base install path for OpenVDB Maya libraries and headers."
-  )
+)
 
-MESSAGE ( STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}" )
+message(STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}")
 
 #########################################################################
 
 # Collect and configure lib dependencies
 
-IF ( NOT OPENVDB_BUILD_CORE )
-  SET ( OPENVDB_LIB OpenVDB::openvdb )
-ELSE ()
-  SET ( OPENVDB_LIB openvdb )
-ENDIF ()
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
 
-FIND_PACKAGE ( OpenGL REQUIRED )
+find_package(OpenGL REQUIRED)
 
-SET ( OPENVDB_MAYA_DEPENDENT_LIBS
+set(OPENVDB_MAYA_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   Maya
   OpenGL::GL
@@ -102,7 +102,7 @@ SET ( OPENVDB_MAYA_DEPENDENT_LIBS
 # This is most likely due to the construction order of file static data.
 # @todo  Restructure the node registry implementation
 
-SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
+set(OPENVDB_MAYA_MODULE_SOURCE_FILES
   maya/OpenVDBData.cc
   maya/OpenVDBPlugin.cc
   maya/OpenVDBCopyNode.cc
@@ -115,9 +115,9 @@ SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
   maya/OpenVDBUtil.cc
   maya/OpenVDBVisualizeNode.cc
   maya/OpenVDBWriteNode.cc
-  )
+)
 
-SET ( OPENVDB_MAYA_MODULE_MEL_FILES
+set(OPENVDB_MAYA_MODULE_MEL_FILES
   maya/AEOpenVDBCopyTemplate.mel
   maya/AEOpenVDBFilterTemplate.mel
   maya/AEOpenVDBFromMayaFluidTemplate.mel
@@ -127,68 +127,68 @@ SET ( OPENVDB_MAYA_MODULE_MEL_FILES
   maya/AEOpenVDBTransformTemplate.mel
   maya/AEOpenVDBVisualizeTemplate.mel
   maya/AEOpenVDBWriteTemplate.mel
- )
+)
 
 #########################################################################
 
 # This is to work around DWA way of doing stuff
-SET ( OPENVDB_MAYA_HEADERS
+set(OPENVDB_MAYA_HEADERS
   "maya/OpenVDBData.h"
   "maya/OpenVDBUtil.h"
-  )
+)
 
-SET ( OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya )
-FILE ( MAKE_DIRECTORY ${OPENVDB_MAYA_DIR} )
-FILE ( COPY ${OPENVDB_MAYA_HEADERS} DESTINATION ${OPENVDB_MAYA_DIR} )
+set(OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya)
+file(MAKE_DIRECTORY ${OPENVDB_MAYA_DIR})
+file(COPY ${OPENVDB_MAYA_HEADERS} DESTINATION ${OPENVDB_MAYA_DIR})
 
 #########################################################################
 
-ADD_LIBRARY ( openvdb_maya SHARED
+add_library(openvdb_maya SHARED
   ${OPENVDB_MAYA_MODULE_SOURCE_FILES}
-  )
+)
 
-TARGET_INCLUDE_DIRECTORIES ( openvdb_maya PUBLIC ${PROJECT_BINARY_DIR} )
-TARGET_LINK_LIBRARIES ( openvdb_maya ${OPENVDB_MAYA_DEPENDENT_LIBS} )
+target_include_directories(openvdb_maya PUBLIC ${PROJECT_BINARY_DIR})
+target_link_libraries(openvdb_maya ${OPENVDB_MAYA_DEPENDENT_LIBS})
 
-MAYA_SET_LIBRARY_PROPERTIES ( openvdb_maya )
+maya_set_library_properties(openvdb_maya)
 
-SET_TARGET_PROPERTIES ( openvdb_maya
+set_target_properties(openvdb_maya
   PROPERTIES
   OUTPUT_NAME OpenVDB
-  )
+)
 
-IF ( OPENVDB_ENABLE_RPATH )
-  SET ( RPATHS "" )
-  IF ( OPENVDB_BUILD_CORE )
-    LIST ( APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib )
-  ELSE ()
-    LIST ( APPEND RPATHS ${OpenVDB_LIBRARY_DIRS} )
-  ENDIF ()
+if(OPENVDB_ENABLE_RPATH)
+  set(RPATHS "")
+  if(OPENVDB_BUILD_CORE)
+    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+  else()
+    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
+  endif()
 
-  LIST ( REMOVE_DUPLICATES RPATHS )
-  SET_TARGET_PROPERTIES ( openvdb_maya
+  list(REMOVE_DUPLICATES RPATHS)
+  set_target_properties(openvdb_maya
     PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  UNSET ( RPATHS )
-ENDIF ()
+  )
+  unset(RPATHS)
+endif()
 
 #########################################################################
 
-INSTALL ( TARGETS
+install(TARGETS
   openvdb_maya
   DESTINATION
   ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
-  )
+)
 
-INSTALL ( FILES
+install(FILES
   ${OPENVDB_MAYA_MODULE_MEL_FILES}
   DESTINATION
   ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
-  )
+)
 
-IF ( OPENVDB_MAYA_INSTALL_MOD )
-  INSTALL ( CODE
+if(OPENVDB_MAYA_INSTALL_MOD)
+  install(CODE
     "FILE (WRITE ${OPENVDB_MAYA_INSTALL_PREFIX}/openvdb.mod \"+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n\")"
     COMPONENT Runtime
-    )
-ENDIF ()
+  )
+endif()
