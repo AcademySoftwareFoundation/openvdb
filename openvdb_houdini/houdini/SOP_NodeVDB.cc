@@ -603,7 +603,7 @@ namespace {
 class DefaultOpenVDBOpPolicy: public houdini_utils::OpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
+    std::string getValidName(const std::string& english)
     {
         UT_String s(english);
         // Remove non-alphanumeric characters from the name.
@@ -613,6 +613,14 @@ public:
         name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
         name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
         return name;
+    }
+
+    std::string getLowercaseName(const std::string& english)
+    {
+        UT_String s(english);
+        // Lowercase
+        s.toLower();
+        return s.toStdString();
     }
 
     /// @brief OpenVDB operators of each flavor (SOP, POP, etc.) share
@@ -628,13 +636,9 @@ public:
 class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
-        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
-        UT_String s(name);
-        // Lowercase
-        s.toLower();
-        return s.toStdString();
+        return this->getLowercaseName(this->getValidName(english));
     }
 };
 
@@ -643,15 +647,19 @@ public:
 class ASWFOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    std::string getName(const houdini_utils::OpFactory& factory, const std::string& english) override
+    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
-        std::string name = DefaultOpenVDBOpPolicy::getName(factory, english);
-        return "DW_Open" + name;
+        return "DW_Open" + this->getValidName(english);
     }
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
         return "Open" + factory.english();
+    }
+
+    std::string getFirstName(const houdini_utils::OpFactory& factory) override
+    {
+        return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
     }
 };
 

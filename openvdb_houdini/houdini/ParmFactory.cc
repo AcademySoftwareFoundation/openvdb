@@ -1029,6 +1029,7 @@ struct OpFactory::Impl
         mLabelName = mPolicy->getLabelName(factory);
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
+        mFirstName = mPolicy->getFirstName(factory);
     }
 
     OP_OperatorDW* get()
@@ -1064,6 +1065,7 @@ struct OpFactory::Impl
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
     std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mFirstName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -1098,6 +1100,12 @@ OpFactory::~OpFactory()
         if (!alias.empty()) {
             mImpl->mTable->setOpAlias(/*original=*/mImpl->mName.c_str(), alias.c_str());
         }
+    }
+
+    // apply first name if set
+
+    if (!mImpl->mFirstName.empty()) {
+        mImpl->mTable->setOpFirstName(mImpl->mName.c_str(), mImpl->mFirstName.c_str());
     }
 }
 

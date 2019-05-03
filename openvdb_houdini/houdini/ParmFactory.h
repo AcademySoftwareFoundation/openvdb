@@ -544,6 +544,10 @@ public:
     /// @details In this base class implementation, this method simply returns
     /// factory.@link OpFactory::english() english()@endlink.
     virtual std::string getLabelName(const OpFactory&);
+
+    /// @brief Return the inital default name of the op.
+    /// @note An empty first name will disable, reverting to the usual rules.
+    virtual std::string getFirstName(const OpFactory&) { return ""; }
 };
 
 
