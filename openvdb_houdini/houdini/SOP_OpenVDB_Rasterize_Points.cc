@@ -3258,10 +3258,7 @@ OP_ERROR
 SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
 {
     try {
-        OP_AutoLockInputs lock(this);
-        if (lock.lock(context) >= UT_ERROR_ABORT) {
-            throw std::runtime_error("failed to lock inputs");
-        }
+        hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
 
         UT_ErrorManager* log = UTgetErrorManager();

@@ -546,7 +546,6 @@ public:
 
 
 /// @brief Helper class to manage input locking.
-/// @deprecated Verbification renders this redundant (recommend using OP_AutoLockInputs directly)
 class OPENVDB_HOUDINI_API ScopedInputLock
 {
 public:

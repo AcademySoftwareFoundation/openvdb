@@ -78,8 +78,7 @@ Version 6.0.1 - In development
     - VDB Vector Merge SOP now copies metadata from the representative
       scalar grid.
     - Deprecated SOP_NodeVDB::duplicateSourceStealable(),
-      houdini_utils::getNodeChain(), houdini_utils::OP_EvalScope and
-      houdini_utils::ScopedInputLock.
+      houdini_utils::getNodeChain() and houdini_utils::OP_EvalScope.
 
     Python:
     - Added limited support for point data grids, comprising I/O and
