@@ -30,54 +30,54 @@
 
 #]=======================================================================]
 
-PROJECT ( OpenVDBUnitTests )
-CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+project(OpenVDBUnitTests)
+cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
-IF ( POLICY CMP0074 )
-  CMAKE_POLICY ( SET CMP0074 NEW )
-ENDIF ()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 ##########################################################################
 
-MESSAGE ( STATUS "----------------------------------------------------" )
-MESSAGE ( STATUS "----------- Configuring OpenVDBUnitTests -----------" )
-MESSAGE ( STATUS "----------------------------------------------------" )
+message(STATUS "----------------------------------------------------")
+message(STATUS "----------- Configuring OpenVDBUnitTests -----------")
+message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
 # Collect lib dependencies
 
-IF ( NOT OPENVDB_BUILD_CORE )
-  SET ( OPENVDB_LIB OpenVDB::openvdb )
-ELSE ()
-  SET ( OPENVDB_LIB openvdb )
-ENDIF ()
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
 
-FIND_PACKAGE ( CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED )
+find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
 
-SET ( OPENVDB_TEST_DEPENDENT_LIBS
+set(OPENVDB_TEST_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   CppUnit::cppunit
 )
 
 ##########################################################################
 
-IF ( WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING )
-  ADD_DEFINITIONS ( -DBOOST_ALL_NO_LIB )
-ENDIF ()
+if(WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+  add_definitions(-DBOOST_ALL_NO_LIB)
+endif()
 
-IF ( WIN32 )
+if(WIN32)
   # Because of implicit linking!
-  LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
-ENDIF ()
+  link_directories(${Boost_LIBRARY_DIR})
+endif()
 
-IF ( WIN32 )
-  ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DOPENVDB_DLL )
-ENDIF ()
+if(WIN32)
+  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
+endif()
 
 ##### VDB unit tests
 
-SET ( UNITTEST_SOURCE_FILES
+set(UNITTEST_SOURCE_FILES
   main.cc
   TestAttributeArray.cc
   TestAttributeArrayString.cc
@@ -174,19 +174,19 @@ SET ( UNITTEST_SOURCE_FILES
   TestVolumeRayIntersector.cc
   TestVolumeToMesh.cc
   TestVolumeToSpheres.cc
-  )
+)
 
-ADD_EXECUTABLE ( vdb_test ${UNITTEST_SOURCE_FILES} )
+add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 
-IF ( USE_BLOSC OR OpenVDB_USES_BLOSC )
+if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   # Blosc is a hidden dependency for the core library (not exposed in headers)
   # so we need to manually link it in here to provide header access for the
   # blosc relevant unit tests
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-  LIST ( APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc )
-  TARGET_COMPILE_DEFINITIONS ( vdb_test PRIVATE "-DOPENVDB_USE_BLOSC" )
-ENDIF ()
+  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
+  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
+  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
+endif()
 
-TARGET_LINK_LIBRARIES ( vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS} )
+target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
 
-ADD_TEST ( vdb_unit_test vdb_test )
+add_test(vdb_unit_test vdb_test)
