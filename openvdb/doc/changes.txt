@@ -109,9 +109,9 @@ Houdini:
   scalar grid.
 - Added a @b houdini_utils::OpPolicy::getFirstName() method to allow
   derived OpPolicy classes to provide their own first name scheme.
-- Added a @b houdini_utils::OpFactory::setASWF() method to mark SOPs as
-  being maintained by the ASWF and consolidate some duplicate help
-  text. Help cards now also mention the ASWF.
+- Added a @b houdini_utils::OpPolicy::getDocHeader() and
+  @b houdini_utils::OpPolicy::getDocFooter() for customizing the Houdini
+  documentation displayed in the Houdini help card.
 
 @par
 Python:

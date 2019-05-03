@@ -629,6 +629,22 @@ public:
     {
         return factory.flavorString() + "_OpenVDB";
     }
+
+    std::string getDocHeader(const houdini_utils::OpFactory& factory) override
+    {
+        UT_String flavorStr(factory.flavorString());
+        // Lowercase
+        flavorStr.toLower();
+
+        std::ostringstream os;
+        os << "= " << factory.english() << " =\n\n"
+            << "#type: node\n"
+            << "#context: " << flavorStr.toStdString() << "\n"
+            << "#internal: " << this->getName(factory, factory.english()) << "\n\n"
+            << "#icon: COMMON/openvdb\n"
+            << "#tags: vdb\n\n";
+        return os.str();
+    }
 };
 
 
@@ -660,6 +676,17 @@ public:
     std::string getFirstName(const houdini_utils::OpFactory& factory) override
     {
         return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
+    }
+
+    std::string getDocFooter(const houdini_utils::OpFactory& factory) override
+    {
+        std::ostringstream os;
+        os << "@examples\n\n"
+            << "This node is open-source and is maintained by the "
+            << "Academy Software Foundation ([aswf.io|https://www.aswf.io/]). "
+            << "See [openvdb.org|https://www.openvdb.org/download/] for "
+            << "source code and usage examples.\n\n";
+        return os.str();
     }
 };
 
