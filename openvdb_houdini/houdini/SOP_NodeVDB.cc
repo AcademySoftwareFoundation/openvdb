@@ -343,12 +343,14 @@ OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     // traverse upstream nodes, if unload is not possible, duplicate the source
     if (!isSourceStealable(index, context)) {
         duplicateSource(index, context, *pgdp, clean);
         unlockInput(index);
         return error();
     }
+    OPENVDB_NO_DEPRECATION_WARNING_END
 
     // get the input GU_Detail handle and unlock the inputs
     GU_DetailHandle inputgdh = inputGeoHandle(index);
@@ -428,7 +430,10 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
 {
-    return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    auto error = this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
+    OPENVDB_NO_DEPRECATION_WARNING_END
+    return error;
 }
 
 
