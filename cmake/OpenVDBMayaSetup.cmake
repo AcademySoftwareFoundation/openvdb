@@ -72,85 +72,85 @@ variables may be provided to tell this module where to look.
 # Find the Maya installation and use Maya's CMake to initialize
 # the Maya lib
 
-SET ( _MAYA_ROOT_SEARCH_DIR )
+set(_MAYA_ROOT_SEARCH_DIR)
 
-IF ( MAYA_ROOT )
-  LIST ( APPEND _MAYA_ROOT_SEARCH_DIR ${MAYA_ROOT} )
-ELSE ()
-  SET ( _ENV_MAYA_ROOT $ENV{MAYA_ROOT} )
-  IF ( _ENV_MAYA_ROOT )
-    LIST ( APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT} )
-  ENDIF ()
-  SET ( _ENV_MAYA_ROOT $ENV{MAYA_LOCATION} )
-  IF ( _ENV_MAYA_ROOT )
-    LIST ( APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(MAYA_ROOT)
+  list(APPEND _MAYA_ROOT_SEARCH_DIR ${MAYA_ROOT})
+else()
+  set(_ENV_MAYA_ROOT $ENV{MAYA_ROOT})
+  if(_ENV_MAYA_ROOT)
+    list(APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT})
+  endif()
+  set(_ENV_MAYA_ROOT $ENV{MAYA_LOCATION})
+  if(_ENV_MAYA_ROOT)
+    list(APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT})
+  endif()
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for Maya
 # ------------------------------------------------------------------------
 
-FIND_PATH ( Maya_INCLUDE_DIR maya/MTypes.h
+find_path(Maya_INCLUDE_DIR maya/MTypes.h
   NO_DEFAULT_PATH
   PATHS ${_MAYA_ROOT_SEARCH_DIR}
   PATH_SUFFIXES include
-  )
+)
 
-IF ( NOT EXISTS "${Maya_INCLUDE_DIR}/maya/MTypes.h" )
-  MESSAGE ( FATAL_ERROR "Unable to locate Maya Installation." )
-ENDIF ()
+if(NOT EXISTS "${Maya_INCLUDE_DIR}/maya/MTypes.h")
+  message(FATAL_ERROR "Unable to locate Maya Installation.")
+endif()
 
 # Determine Maya version, including point releases. Currently only works for
 # Maya 2016 and onwards so there is no -x64 and -x32 suffixes in the version
-FILE ( STRINGS "${Maya_INCLUDE_DIR}/maya/MTypes.h"
+file(STRINGS "${Maya_INCLUDE_DIR}/maya/MTypes.h"
   _maya_version_string REGEX "#define MAYA_API_VERSION "
-  )
-STRING ( REGEX REPLACE ".*#define[ \t]+MAYA_API_VERSION[ \t]+([0-9]+).*$" "\\1"
+)
+string(REGEX REPLACE ".*#define[ \t]+MAYA_API_VERSION[ \t]+([0-9]+).*$" "\\1"
   _maya_version_string "${_maya_version_string}"
-  )
-STRING ( SUBSTRING ${_maya_version_string} 0 4 Maya_MAJOR_VERSION )
-STRING ( SUBSTRING ${_maya_version_string} 4 2 Maya_MINOR_VERSION )
+)
+string(SUBSTRING ${_maya_version_string} 0 4 Maya_MAJOR_VERSION)
+string(SUBSTRING ${_maya_version_string} 4 2 Maya_MINOR_VERSION)
 
-IF ( Maya_MINOR_VERSION LESS 50 )
-  SET ( Maya_VERSION ${Maya_MAJOR_VERSION} )
-ELSE ()
-  SET ( Maya_VERSION ${Maya_MAJOR_VERSION}.5 )
-ENDIF ()
-UNSET ( _maya_version_string )
+if(Maya_MINOR_VERSION LESS 50)
+  set(Maya_VERSION ${Maya_MAJOR_VERSION})
+else()
+  set(Maya_VERSION ${Maya_MAJOR_VERSION}.5)
+endif()
+unset(_maya_version_string)
 
 # Find required maya libs
 
-SET ( _MAYA_COMPONENT_LIST
+set(_MAYA_COMPONENT_LIST
   OpenMaya
   OpenMayaFX
   OpenMayaUI
   Foundation
-  )
+)
 
-SET ( Maya_LIBRARY_DIR "" )
-IF ( APPLE )
-  SET ( Maya_LIBRARY_DIR ${Maya_INCLUDE_DIR}/../Maya.app/Contents/MacOS/ )
-ELSE ()
-  SET ( Maya_LIBRARY_DIR ${Maya_INCLUDE_DIR}/../lib/ )
-ENDIF ()
+set(Maya_LIBRARY_DIR "")
+if(APPLE)
+  set(Maya_LIBRARY_DIR ${Maya_INCLUDE_DIR}/../Maya.app/Contents/MacOS/)
+else()
+  set(Maya_LIBRARY_DIR ${Maya_INCLUDE_DIR}/../lib/)
+endif()
 
-SET ( Maya_LIB_COMPONENTS "" )
+set(Maya_LIB_COMPONENTS "")
 
-FOREACH ( COMPONENT ${_MAYA_COMPONENT_LIST} )
-  FIND_LIBRARY ( Maya_${COMPONENT}_LIBRARY ${COMPONENT}
+foreach(COMPONENT ${_MAYA_COMPONENT_LIST})
+  find_library(Maya_${COMPONENT}_LIBRARY ${COMPONENT}
     NO_DEFAULT_PATH
     PATHS ${Maya_LIBRARY_DIR}
-    )
-  LIST ( APPEND Maya_LIB_COMPONENTS ${Maya_${COMPONENT}_LIBRARY} )
-ENDFOREACH ()
+  )
+  list(APPEND Maya_LIB_COMPONENTS ${Maya_${COMPONENT}_LIBRARY})
+endforeach()
 
 # ------------------------------------------------------------------------
 #  Cache and set Maya_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Maya
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Maya
   FOUND_VAR Maya_FOUND
   REQUIRED_VARS
     Maya_INCLUDE_DIR
@@ -158,51 +158,51 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Maya
   VERSION_VAR Maya_VERSION
 )
 
-IF ( NOT Maya_FOUND )
-  MESSAGE ( FATAL_ERROR "Unable to locate Maya Installation." )
-ELSEIF ( Maya_VERSION VERSION_LESS MINIMUM_MAYA_VERSION )
-  MESSAGE ( WARNING "Unsupported Maya Version ${Maya_VERSION}. Minimum "
+if(NOT Maya_FOUND)
+  message(FATAL_ERROR "Unable to locate Maya Installation.")
+elseif(Maya_VERSION VERSION_LESS MINIMUM_MAYA_VERSION)
+  message(WARNING "Unsupported Maya Version ${Maya_VERSION}. Minimum "
     "supported is ${MINIMUM_MAYA_VERSION}."
-    )
-ENDIF ()
+  )
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
 # ------------------------------------------------------------------------
 
-IF ( NOT TBB_INCLUDEDIR )
-  SET ( TBB_INCLUDEDIR ${Maya_INCLUDE_DIR} )
-ENDIF ()
-IF ( NOT TBB_LIBRARYDIR )
-  SET ( TBB_LIBRARYDIR ${Maya_LIBRARY_DIR} )
-ENDIF ()
+if(NOT TBB_INCLUDEDIR)
+  set(TBB_INCLUDEDIR ${Maya_INCLUDE_DIR})
+endif()
+if(NOT TBB_LIBRARYDIR)
+  set(TBB_LIBRARYDIR ${Maya_LIBRARY_DIR})
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure Maya
 # ------------------------------------------------------------------------
 
-SET ( Maya_LIBRARIES ${Maya_LIB_COMPONENTS} )
-SET ( Maya_INCLUDE_DIRS ${Maya_INCLUDE_DIR} )
-SET ( Maya_LIBRARY_DIRS ${Maya_LIBRARY_DIR} )
+set(Maya_LIBRARIES ${Maya_LIB_COMPONENTS})
+set(Maya_INCLUDE_DIRS ${Maya_INCLUDE_DIR})
+set(Maya_LIBRARY_DIRS ${Maya_LIBRARY_DIR})
 
-IF ( APPLE )
-  SET ( Maya_DEFINITIONS
+if(APPLE)
+  set(Maya_DEFINITIONS
     -DMAC_PLUGIN
     -DREQUIRE_IOSTREAM
     -DOSMac_
     -DOSMac_MachO_
     -D_BOOL
-    )
-ELSEIF ( WIN32 )
-  SET ( Maya_DEFINITIONS
+  )
+elseif(WIN32)
+  set(Maya_DEFINITIONS
     -DNOMINMAX
     -DNT_PLUGIN
     -DREQUIRE_IOSTREAM
     -D_USE_MATH_DEFINES
     -D_CRT_SECURE_NO_WARNINGS
-    )
-ELSE ()
-  SET ( Maya_DEFINITIONS
+  )
+else()
+  set(Maya_DEFINITIONS
     -D_BOOL
     -DFUNCPROTO
     -DGL_GLEXT_PROTOTYPES=1
@@ -219,37 +219,39 @@ ELSE ()
     -DBits64_
     -DLINUX
     -DLINUX_64
-    )
-ENDIF ()
+  )
+endif()
 
 # Configure imported targets
 
-IF ( NOT TARGET Maya )
-  ADD_LIBRARY ( Maya INTERFACE )
-  FOREACH ( COMPONENT ${_MAYA_COMPONENT_LIST} )
-    ADD_LIBRARY ( Maya::${COMPONENT} UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( Maya::${COMPONENT} PROPERTIES
+if(NOT TARGET Maya)
+  add_library(Maya INTERFACE)
+  foreach(COMPONENT ${_MAYA_COMPONENT_LIST})
+    add_library(Maya::${COMPONENT} UNKNOWN IMPORTED)
+    set_target_properties(Maya::${COMPONENT} PROPERTIES
       IMPORTED_LOCATION "${Maya_${COMPONENT}_LIBRARY}"
       INTERFACE_COMPILE_OPTIONS "${Maya_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${Maya_INCLUDE_DIRS}"
     )
-    TARGET_LINK_LIBRARIES ( Maya INTERFACE Maya::${COMPONENT} )
-  ENDFOREACH ()
-ENDIF ()
+    target_link_libraries(Maya INTERFACE Maya::${COMPONENT})
+  endforeach()
+endif()
 
-MACRO( MAYA_SET_LIBRARY_PROPERTIES NAME )
-  IF (WIN32)
-    SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
+macro(MAYA_SET_LIBRARY_PROPERTIES NAME)
+  if(WIN32)
+    set_target_properties(${NAME} PROPERTIES
       SUFFIX ".mll"
       PREFIX ""
       LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin"
-      )
-  ELSEIF (APPLE)
-    SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
+    )
+  elseif(APPLE)
+    set_target_properties(${NAME} PROPERTIES
       SUFFIX ".bundle"
-      PREFIX "")
-  ELSE ()
-    SET_TARGET_PROPERTIES ( ${NAME} PROPERTIES
-      PREFIX "")
-  ENDIF ()
-ENDMACRO ()
+      PREFIX ""
+    )
+  else()
+    set_target_properties(${NAME} PROPERTIES
+      PREFIX ""
+    )
+  endif()
+endmacro()

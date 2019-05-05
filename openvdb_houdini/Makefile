@@ -216,6 +216,7 @@ ifeq (yes,$(strip $(strict)))
     USING_GCC=$(shell ${CXX} --version | grep GCC)
     ifneq (,$(USING_CLANG))
         WARNING_FLAGS += \
+            -Werror \
             -Wall \
             -Wextra \
             -Wconversion \
@@ -223,6 +224,7 @@ ifeq (yes,$(strip $(strict)))
         #
     else ifneq (,$(USING_GCC))
         WARNING_FLAGS += \
+            -Werror \
             -Wall \
             -Wextra \
             -pedantic \

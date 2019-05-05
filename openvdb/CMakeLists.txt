@@ -30,80 +30,81 @@
 
 #]=======================================================================]
 
-PROJECT ( OpenVDBCore )
-CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+project(OpenVDBCore)
+cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
-IF ( POLICY CMP0074 )
-  CMAKE_POLICY ( SET CMP0074 NEW )
-ENDIF ()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 ###### OpenVDB Core Options
 
-OPTION ( OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON )
-OPTION ( OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON )
+option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON)
+option(OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON)
 
-SET ( OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
+set(OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
   "The base name of the built shared openvdb library. Prefixed by \"lib\" on UNIX platforms."
-  )
-SET ( OPENVDB_STATIC_LIBRARY_NAME "openvdb" CACHE STRING
+)
+set(OPENVDB_STATIC_LIBRARY_NAME "openvdb" CACHE STRING
   "The base name of the built static openvdb library. Prefixed by \"lib\"."
-  )
+)
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   OPENVDB_STATIC_LIBRARY_NAME
   OPENVDB_SHARED_LIBRARY_NAME
-  )
+)
 
-IF ( NOT OPENVDB_CORE_SHARED AND NOT OPENVDB_CORE_STATIC )
-  MESSAGE ( FATAL_ERROR "Both static and shared core OpenVDB libraries have been disabled. "
-    "At least one must be enabled when building the core library." )
-ENDIF ()
+if(NOT OPENVDB_CORE_SHARED AND NOT OPENVDB_CORE_STATIC)
+  message(FATAL_ERROR "Both static and shared core OpenVDB libraries have been disabled. "
+    "At least one must be enabled when building the core library."
+  )
+endif()
 
 #########################################################################
 
-MESSAGE ( STATUS "----------------------------------------------------" )
-MESSAGE ( STATUS "------------- Configuring OpenVDBCore --------------" )
-MESSAGE ( STATUS "----------------------------------------------------" )
+message(STATUS "----------------------------------------------------")
+message(STATUS "------------- Configuring OpenVDBCore --------------")
+message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
 # Collect and configure lib dependencies
 
-IF ( USE_EXR )
-  FIND_PACKAGE ( IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED )
-  FIND_PACKAGE ( OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED )
-ELSE ()
-  FIND_PACKAGE ( IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half )
-ENDIF ()
+if(USE_EXR)
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
+  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
+else()
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+endif()
 
-FIND_PACKAGE ( TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb )
-FIND_PACKAGE ( ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED )
+find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 
-IF ( USE_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED )
-ENDIF ()
+if(USE_LOG4CPLUS)
+  find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
+endif()
 
-IF ( USE_BLOSC )
-  FIND_PACKAGE ( Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED )
-  IF ( Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION )
-    MESSAGE ( WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
+if(USE_BLOSC)
+  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
+  if(Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION)
+    message(WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
       "There have been reported issues with using later versions of Blosc with OpenVDB. "
       "OpenVDB has been tested fully against Blosc ${MINIMUM_BLOSC_VERSION}, it is "
       "recommended that you use this version where possible."
-      )
-  ENDIF ()
-ELSE ()
-  MESSAGE ( WARNING "Blosc support is disabled. It is strongly recommended to "
+    )
+  endif()
+else()
+  message(WARNING "Blosc support is disabled. It is strongly recommended to "
     "enable blosc for optimal builds of OpenVDB and to support compatible "
     "serialization of other OpenVDB installations."
-    )
-ENDIF ()
+  )
+endif()
 
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system )
+find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
 
-IF ( UNIX )
-  FIND_PACKAGE ( Threads REQUIRED )
-ENDIF ()
+if(UNIX)
+  find_package(Threads REQUIRED)
+endif()
 
 # Set deps. Note that the order here is important. If we're building against
 # Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
@@ -111,64 +112,61 @@ ENDIF ()
 # include paths from shared installs (including houdini) may pull in the wrong
 # headers
 
-SET ( OPENVDB_CORE_DEPENDENT_LIBS
+set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
   IlmBase::Half
-  )
+)
 
-IF ( USE_EXR )
-  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
+if(USE_EXR)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
     IlmBase::IlmThread
     IlmBase::Iex
     IlmBase::Imath
     OpenEXR::IlmImf
-    )
-ENDIF ()
+  )
+endif()
 
-IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus )
-ENDIF ()
+if(USE_LOG4CPLUS)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus)
+endif()
 
 # @todo blosc and zlib should be hidden (privately linked in):
 # See FindOpenVDB.cmake
 
-IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc )
-ENDIF ()
+if(USE_BLOSC)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
+endif()
 
-LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
   ZLIB::ZLIB
 )
-IF ( UNIX )
-  LIST ( APPEND OPENVDB_CORE_DEPENDENT_LIBS
+if(UNIX)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
     Threads::Threads
   )
-ENDIF ()
+endif()
 
 ##########################################################################
 
-IF ( WIN32 )
+if(WIN32)
   # Because of implicit linking!
-  LINK_DIRECTORIES ( ${Boost_LIBRARY_DIR} )
-  IF ( OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING )
-    ADD_DEFINITIONS ( -DBOOST_ALL_NO_LIB )
-  ENDIF ()
-ENDIF ()
+  link_directories(${Boost_LIBRARY_DIR})
+  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+    add_definitions(-DBOOST_ALL_NO_LIB)
+  endif()
+endif()
 
 # @todo Should be target definitions
-IF ( WIN32 )
-  ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DOPENVDB_DLL )
-ENDIF ()
+if(WIN32)
+  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
+endif()
 
 ##### Core library configuration
 
-SET ( OPENVDB_LIBRARY_SOURCE_FILES
+set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
-  MetaMap.cc
-  Metadata.cc
-  Platform.cc
   io/Archive.cc
   io/Compression.cc
   io/File.cc
@@ -180,30 +178,33 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   math/Proximity.cc
   math/QuantizedUnitVec.cc
   math/Transform.cc
+  Metadata.cc
+  MetaMap.cc
+  openvdb.cc
+  Platform.cc
   points/AttributeArray.cc
   points/AttributeArrayString.cc
   points/AttributeGroup.cc
   points/AttributeSet.cc
   points/StreamCompression.cc
   points/points.cc
-  openvdb.cc
   util/Formats.cc
   util/Util.cc
-  )
+)
 
-SET ( OPENVDB_LIBRARY_INCLUDE_FILES
+set(OPENVDB_LIBRARY_INCLUDE_FILES
   Exceptions.h
   Grid.h
-  Types.h
-  version.h
   Metadata.h
   MetaMap.h
   openvdb.h
   Platform.h
   PlatformConfig.h
+  Types.h
+  version.h
 )
 
-SET ( OPENVDB_LIBRARY_IO_INCLUDE_FILES
+set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/Archive.h
   io/Compression.h
   io/File.h
@@ -214,7 +215,7 @@ SET ( OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/TempFile.h
 )
 
-SET ( OPENVDB_LIBRARY_MATH_INCLUDE_FILES
+set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/BBox.h
   math/ConjGradient.h
   math/Coord.h
@@ -240,7 +241,7 @@ SET ( OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Vec4.h
 )
 
-SET ( OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
+set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/AttributeArray.h
   points/AttributeArrayString.h
   points/AttributeGroup.h
@@ -261,7 +262,7 @@ SET ( OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/StreamCompression.h
 )
 
-SET ( OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
+set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/ChangeBackground.h
   tools/Clip.h
   tools/Composite.h
@@ -309,7 +310,7 @@ SET ( OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/VolumeToSpheres.h
 )
 
-SET ( OPENVDB_LIBRARY_TREE_INCLUDE_FILES
+set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
   tree/InternalNode.h
   tree/Iterator.h
   tree/LeafBuffer.h
@@ -325,7 +326,7 @@ SET ( OPENVDB_LIBRARY_TREE_INCLUDE_FILES
   tree/ValueAccessor.h
 )
 
-SET ( OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
+set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/CpuTimer.h
   util/Formats.h
   util/logging.h
@@ -341,150 +342,150 @@ SET ( OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
 # builds. There are limitations with earlier versions of CMake when used with
 # imported targets.
 
-IF ( OPENVDB_CORE_SHARED )
-  ADD_LIBRARY ( openvdb_shared SHARED ${OPENVDB_LIBRARY_SOURCE_FILES} )
-ENDIF ()
+if(OPENVDB_CORE_SHARED)
+  add_library(openvdb_shared SHARED ${OPENVDB_LIBRARY_SOURCE_FILES})
+endif()
 
-IF ( OPENVDB_CORE_STATIC )
-  ADD_LIBRARY ( openvdb_static STATIC ${OPENVDB_LIBRARY_SOURCE_FILES} )
-ENDIF ()
+if(OPENVDB_CORE_STATIC)
+  add_library(openvdb_static STATIC ${OPENVDB_LIBRARY_SOURCE_FILES})
+endif()
 
 # Alias either the shared or static library to the generic OpenVDB
 # target. Dependent components should use this target to build against
 # such that they are always able to find a valid build of OpenVDB
 
-IF ( OPENVDB_CORE_SHARED )
-  ADD_LIBRARY ( openvdb ALIAS openvdb_shared )
-ELSE ()
-  ADD_LIBRARY ( openvdb ALIAS openvdb_static )
-ENDIF ()
+if(OPENVDB_CORE_SHARED)
+  add_library(openvdb ALIAS openvdb_shared)
+else()
+  add_library(openvdb ALIAS openvdb_static)
+endif()
 
 
 ##########################################################################
 
 # Configure c flags
 
-SET ( OPENVDB_CORE_PRIVATE_DEFINES )
-SET ( OPENVDB_CORE_PUBLIC_DEFINES )
+set(OPENVDB_CORE_PRIVATE_DEFINES)
+set(OPENVDB_CORE_PUBLIC_DEFINES)
 
 # Private defines (not inherited by dependent projects)
 
-LIST ( APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_PRIVATE" )
-IF ( USE_BLOSC )
-  LIST ( APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_USE_BLOSC" )
-ENDIF ()
+list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_PRIVATE")
+if(USE_BLOSC)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_USE_BLOSC")
+endif()
 
 # Public defines
 
-IF ( USE_EXR )
-  LIST ( APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
-ENDIF ()
-IF ( USE_LOG4CPLUS )
-  LIST ( APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_USE_LOG4CPLUS" )
-ENDIF ()
+if(USE_EXR)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR")
+endif()
+if(USE_LOG4CPLUS)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_USE_LOG4CPLUS")
+endif()
 
 ##########################################################################
 
 # Configure static build
 
-IF ( OPENVDB_CORE_STATIC )
-  TARGET_INCLUDE_DIRECTORIES ( openvdb_static
+if(OPENVDB_CORE_STATIC)
+  target_include_directories(openvdb_static
     PUBLIC ../
     PRIVATE .
-    )
+  )
 
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES} )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_static PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} )
+  target_compile_definitions(openvdb_static PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
+  target_compile_definitions(openvdb_static PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
 
-  SET_TARGET_PROPERTIES ( openvdb_static
+  set_target_properties(openvdb_static
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
-    )
+  )
 
-  IF ( WIN32 )
-    SET_TARGET_PROPERTIES ( openvdb_static
+  if(WIN32)
+    set_target_properties(openvdb_static
       PROPERTIES PREFIX "lib"
-      )
-  ENDIF ()
-
-  TARGET_LINK_LIBRARIES ( openvdb_static
-    ${OPENVDB_CORE_DEPENDENT_LIBS}
     )
-ENDIF ()
+  endif()
+
+  target_link_libraries(openvdb_static
+    ${OPENVDB_CORE_DEPENDENT_LIBS}
+  )
+endif()
 
 # Configure shared build
 
-IF ( OPENVDB_CORE_SHARED )
-  TARGET_INCLUDE_DIRECTORIES ( openvdb_shared
+if(OPENVDB_CORE_SHARED)
+  target_include_directories(openvdb_shared
     PUBLIC ../
     PRIVATE .
-    )
+  )
 
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES} )
-  TARGET_COMPILE_DEFINITIONS ( openvdb_shared PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} )
+  target_compile_definitions(openvdb_shared PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
+  target_compile_definitions(openvdb_shared PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
 
-  SET_TARGET_PROPERTIES ( openvdb_shared
+  set_target_properties(openvdb_shared
     PROPERTIES
       OUTPUT_NAME ${OPENVDB_SHARED_LIBRARY_NAME}
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-    )
+  )
 
-  TARGET_LINK_LIBRARIES ( openvdb_shared
+  target_link_libraries(openvdb_shared
     ${OPENVDB_CORE_DEPENDENT_LIBS}
-    )
+  )
 
-  IF ( OPENVDB_ENABLE_RPATH )
+  if(OPENVDB_ENABLE_RPATH)
     # @todo There is probably a better way to do this for imported targets
-    LIST ( APPEND RPATHS
+    list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
       ${IlmBase_LIBRARY_DIRS}
       ${OpenEXR_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}
       ${Tbb_LIBRARY_DIRS}
-      )
-    LIST ( REMOVE_DUPLICATES RPATHS )
-    SET_TARGET_PROPERTIES ( openvdb_shared
+    )
+    list(REMOVE_DUPLICATES RPATHS)
+    set_target_properties(openvdb_shared
       PROPERTIES INSTALL_RPATH "${RPATHS}"
-      )
-  ENDIF ()
-ENDIF ()
+    )
+  endif()
+endif()
 
-UNSET ( OPENVDB_CORE_PRIVATE_DEFINES )
-UNSET ( OPENVDB_CORE_PUBLIC_DEFINES )
+unset(OPENVDB_CORE_PRIVATE_DEFINES)
+unset(OPENVDB_CORE_PUBLIC_DEFINES)
 
 ##########################################################################
 
 # Installation
 
-IF ( OPENVDB_CORE_STATIC )
-  INSTALL ( TARGETS
+if(OPENVDB_CORE_STATIC)
+  install(TARGETS
     openvdb_static
     DESTINATION
     lib
-    )
-ENDIF ()
+  )
+endif()
 
-IF ( OPENVDB_CORE_SHARED )
-  IF ( WIN32 )
-    INSTALL ( TARGETS
+if(OPENVDB_CORE_SHARED)
+  if(WIN32)
+    install(TARGETS
       openvdb_shared
       RUNTIME DESTINATION bin COMPONENT Runtime
       ARCHIVE DESTINATION lib COMPONENT Runtime
-      )
-  ELSE ()
-    INSTALL ( TARGETS
+    )
+  else()
+    install(TARGETS
       openvdb_shared
       DESTINATION
       lib
-      )
-  ENDIF ()
-ENDIF ()
+    )
+  endif()
+endif()
 
-INSTALL ( FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION include/openvdb )
-INSTALL ( FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION include/openvdb/io )
-INSTALL ( FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION include/openvdb/math )
-INSTALL ( FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION include/openvdb/points )
-INSTALL ( FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION include/openvdb/tools )
-INSTALL ( FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION include/openvdb/tree )
-INSTALL ( FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION include/openvdb/util )
+install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION include/openvdb)
+install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION include/openvdb/io)
+install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION include/openvdb/math)
+install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION include/openvdb/points)
+install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION include/openvdb/tools)
+install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION include/openvdb/tree)
+install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION include/openvdb/util)
