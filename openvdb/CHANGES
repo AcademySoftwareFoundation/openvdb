@@ -79,6 +79,8 @@ Version 6.0.1 - In development
       scalar grid.
     - Added a houdini_utils::OpPolicy::getFirstName() method to allow
       derived OpPolicy classes to provide their own first name scheme.
+    - Deprecated SOP_NodeVDB::duplicateSourceStealable(),
+      houdini_utils::getNodeChain() and houdini_utils::OP_EvalScope.
 
     Python:
     - Added limited support for point data grids, comprising I/O and

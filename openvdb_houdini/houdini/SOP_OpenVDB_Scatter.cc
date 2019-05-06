@@ -54,7 +54,6 @@
 #include <openvdb/tools/Morphology.h> // for tools::dilateVoxels()
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tree/LeafManager.h>
-#include <boost/algorithm/string/join.hpp>
 #include <hboost/algorithm/string/join.hpp>
 #include <iostream>
 #include <random>

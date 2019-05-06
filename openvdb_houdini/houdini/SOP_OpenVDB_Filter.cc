@@ -34,7 +34,6 @@
 ///
 /// @brief Filtering operations for non-level-set grids
 
-#include <houdini_utils/OP_NodeChain.h> // for getNodeChain(), OP_EvalScope
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>

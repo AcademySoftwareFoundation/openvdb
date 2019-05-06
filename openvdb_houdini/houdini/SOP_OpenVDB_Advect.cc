@@ -49,7 +49,7 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/algorithm/string/join.hpp>
+#include <hboost/algorithm/string/join.hpp>
 
 #include <functional>
 #include <stdexcept>
@@ -558,7 +558,7 @@ processGrids(GU_Detail* gdp, AdvectionParms& parms, hvdb::Interrupter& boss,
 
     if (!skippedGrids.empty() && warningCallback) {
         std::string s = "The following non-floating-point grids were skipped: "
-            + boost::algorithm::join(skippedGrids, ", ");
+            + hboost::algorithm::join(skippedGrids, ", ");
         warningCallback(s);
     }
 
