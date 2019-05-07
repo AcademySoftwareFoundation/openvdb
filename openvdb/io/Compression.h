@@ -247,8 +247,10 @@ truncateRealToHalf(const T& val)
 ////////////////////////////////////////
 
 
+OPENVDB_API size_t zipToStreamSize(const char* data, size_t numBytes);
 OPENVDB_API void zipToStream(std::ostream&, const char* data, size_t numBytes);
 OPENVDB_API void unzipFromStream(std::istream&, char* data, size_t numBytes);
+OPENVDB_API size_t bloscToStreamSize(const char* data, size_t valSize, size_t numVals);
 OPENVDB_API void bloscToStream(std::ostream&, const char* data, size_t valSize, size_t numVals);
 OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 
@@ -328,6 +330,35 @@ struct HalfReader</*IsReal=*/true, T> {
 };
 
 
+template<typename T>
+inline size_t
+writeDataSize(const T *data, Index count, uint32_t compression)
+{
+    if (compression & COMPRESS_BLOSC) {
+        return bloscToStreamSize(reinterpret_cast<const char*>(data), sizeof(T), count);
+    } else if (compression & COMPRESS_ZIP) {
+        return zipToStreamSize(reinterpret_cast<const char*>(data), sizeof(T) * count);
+    } else {
+        return sizeof(T) * count;
+    }
+}
+
+
+/// Specialization for std::string output
+template<>
+inline size_t
+writeDataSize<std::string>(const std::string* data, Index count,
+    uint32_t /*compression*/) ///< @todo add compression
+{
+    size_t size(0);
+    for (Index i = 0; i < count; ++i) {
+        const size_t len = data[i].size();
+        size += sizeof(size_t) + (len+1);
+    }
+    return size;
+}
+
+
 /// Write data to a stream.
 /// @param os           the output stream
 /// @param data         the contiguous array of data to write
@@ -373,6 +404,9 @@ template<bool IsReal, typename T> struct HalfWriter;
 /// Partial specialization for non-floating-point types (no float to half quantization)
 template<typename T>
 struct HalfWriter</*IsReal=*/false, T> {
+    static inline size_t writeSize(const T* data, Index count, uint32_t compression) {
+        return writeDataSize(data, count, compression);
+    }
     static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         writeData(os, data, count, compression);
     }
@@ -381,6 +415,13 @@ struct HalfWriter</*IsReal=*/false, T> {
 template<typename T>
 struct HalfWriter</*IsReal=*/true, T> {
     using HalfT = typename RealToHalf<T>::HalfT;
+    static inline size_t writeSize(const T* data, Index count, uint32_t compression) {
+        if (count < 1) return size_t(0);
+        // Convert full float values to half float, then output the half float array.
+        std::vector<HalfT> halfData(count);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<T>::convert(data[i]);
+        return writeDataSize<HalfT>(reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
+    }
     static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
@@ -394,6 +435,14 @@ struct HalfWriter</*IsReal=*/true, T> {
 template<>
 struct HalfWriter</*IsReal=*/true, double> {
     using HalfT = RealToHalf<double>::HalfT;
+    static inline size_t writeSize(const double* data, Index count, uint32_t compression)
+    {
+        if (count < 1) return size_t(0);
+        // Convert full float values to half float, then output the half float array.
+        std::vector<HalfT> halfData(count);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<double>::convert(data[i]);
+        return writeDataSize<HalfT>(reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
+    }
     static inline void write(std::ostream& os, const double* data, Index count,
         uint32_t compression)
     {
@@ -529,6 +578,48 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
                 destBuf[destIdx] = (selectionMask.isOn(destIdx) ? inactiveVal1 : inactiveVal0);
             }
         }
+    }
+}
+
+
+template<typename ValueT, typename MaskT>
+inline size_t
+writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
+    const MaskT& valueMask, uint8_t maskMetadata, bool toHalf, uint32_t compress)
+{
+    using NonConstValueT = typename std::remove_const<ValueT>::type;
+
+    const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
+
+    Index tempCount = srcCount;
+    ValueT* tempBuf = srcBuf;
+    std::unique_ptr<NonConstValueT[]> scopedTempBuf;
+
+    if (maskCompress && maskMetadata != NO_MASK_AND_ALL_VALS) {
+
+        tempCount = 0;
+
+        Index64 onVoxels = valueMask.countOn();
+        if (onVoxels > Index64(0)) {
+            // Create a new array to hold just the active values.
+            scopedTempBuf.reset(new NonConstValueT[onVoxels]);
+            NonConstValueT* localTempBuf = scopedTempBuf.get();
+
+            // Copy active values to a new, contiguous array.
+            for (typename MaskT::OnIterator it = valueMask.beginOn(); it; ++it, ++tempCount) {
+                localTempBuf[tempCount] = srcBuf[it.pos()];
+            }
+
+            tempBuf = scopedTempBuf.get();
+        }
+    }
+
+    // Return the buffer size.
+    if (toHalf) {
+        return HalfWriter<RealToHalf<NonConstValueT>::isReal, NonConstValueT>::writeSize(
+            tempBuf, tempCount, compress);
+    } else {
+        return writeDataSize<NonConstValueT>(tempBuf, tempCount, compress);
     }
 }
 
