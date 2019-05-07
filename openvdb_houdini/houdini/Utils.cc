@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,7 +44,9 @@
 #include <UT/UT_ErrorManager.h>
 #include <CHOP/CHOP_Error.h> // for CHOP_ERROR_MESSAGE
 #include <DOP/DOP_Error.h> // for DOP_MESSAGE
+#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
 #include <POP/POP_Error.h> // for POP_MESSAGE
+#endif
 #include <ROP/ROP_Error.h> // for ROP_MESSAGE
 #include <VOP/VOP_Error.h> // for VOP_MESSAGE
 #include <VOPNET/VOPNET_Error.h> // for VOPNET_MESSAGE
@@ -292,9 +294,9 @@ namespace l4c = log4cplus;
 class HoudiniAppender: public l4c::Appender
 {
 public:
-    /// @param opType  SOP_OPTYPE_NAME, POP_OPTYPE_NAME, etc. (see OP_Node.h)
-    /// @param code    SOP_MESSAGE, SOP_VEX_ERROR, POP_MESSAGE, etc.
-    ///                (see SOP_Error.h, POP_Error.h, etc.)
+    /// @param opType  SOP_OPTYPE_NAME, ROP_OPTYPE_NAME, etc. (see OP_Node.h)
+    /// @param code    SOP_MESSAGE, SOP_VEX_ERROR, ROP_MESSAGE, etc.
+    ///                (see SOP_Error.h, ROP_Error.h, etc.)
     HoudiniAppender(const char* opType, int code): mOpType(opType), mCode(code) {}
 
     ~HoudiniAppender() override
@@ -354,7 +356,9 @@ getGenericMessageCode(OP_OpTypeId opId)
     switch (opId) {
         case CHOP_OPTYPE_ID:   return CHOP_ERROR_MESSAGE;
         case DOP_OPTYPE_ID:    return DOP_MESSAGE;
+#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
         case POP_OPTYPE_ID:    return POP_MESSAGE;
+#endif
         case ROP_OPTYPE_ID:    return ROP_MESSAGE;
         case SOP_OPTYPE_ID:    return SOP_MESSAGE;
         case VOP_OPTYPE_ID:    return VOP_MESSAGE;
@@ -422,6 +426,6 @@ isLogForwarding(OP_OpTypeId opId)
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) 2012-2019 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
