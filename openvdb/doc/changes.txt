@@ -2,13 +2,13 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v6_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 6.0.1</B> - <I>In development</I>
+<B>Version 6.1.0</B> - <I>May 8, 2019</I>
 
+@par
 <BLOCKQUOTE>
-As of this release, the minimum Houdini version supported by OpenVDB is now
-Houdini&nbsp;16.5.
+As of this release, the oldest supported Houdini version is&nbsp;16.5.
 </BLOCKQUOTE>
 
 @par
@@ -42,14 +42,18 @@ Improvements:
 - Significantly improved the performance of point data grid string attribute
   generation.
 - @vdblink::points::AttributeArray::copy() AttributeArray::copy@endlink
-  and the copy assignment operator for AttributeArrays are now thread-safe.
+  and the
+  @vdblink::points::AttributeArray::operator=() AttributeArray@endlink
+  copy assignment operator are now thread-safe.
 - The command-line tools (<TT>vdb_print</TT>, etc.) now include
   the library ABI version in their <TT>-version</TT> output.
+- Further improved the responsiveness of the
+  @link MeshToVolume.h mesh to volume@endlink converter to interrupt requests.
 - The CMake build system has been significantly improved to support a
-  wider range of build options and use cases. This includes better
-  dependency handling and status reporting, find module installation for
-  external use, more robust handling of different platform configurations
-  and the introduction of dependency and build doxygen documentation.
+  wider range of build options and use cases.
+  This includes better dependency handling and status reporting, find module
+  installation for external use, more robust handling of different platform
+  configurations and the introduction of dependency and build documentation.
 
 @par
 Bug fixes:
@@ -59,8 +63,10 @@ Bug fixes:
   to compare the maximum index of the provided
   @vdblink::tools::PointIndexTree PointIndexTree@endlink
   to the size of the membership vector.
-- Fixed a race condition when moving points in point data grids for ABI=6+
-  due to non-const access of AttributeArrays resulting in a copy-on-write.
+- Fixed a race condition introduced in ABI&nbsp;6 when moving points
+  in point data grids, due to non-const access to an
+  @vdblink::points::AttributeArray AttributeArray@endlink
+  triggering a copy-on-write.
 - Fixed a bug that caused the @link MeshToVolume.h mesh to volume@endlink
   converter to consume unlimited memory when it encountered NaNs
   in vertex positions.
@@ -77,10 +83,11 @@ Bug fixes:
   and @vdblink::tools::segmentSDF() segmentSDF@endlink where inactive leaf
   nodes were only pruned when there was more than one segment.
 - Fixed a crash in point moving when using group filters.
-- Fixed a bug where the stride of existing attributes was being ignored
-  during copy-construction of an AttributeSet.
-- Fixed a bug that caused @vdblink::points::AttributeArray AttributeArray@endlink
-  equality operators to fail for attributes with non constant strides.
+- Fixed a bug where the stride of existing attributes was being ignored during
+  copy-construction of an @vdblink::points::AttributeSet AttributeSet@endlink.
+- Fixed a bug that caused @vdblink::points::AttributeArray::operator==()
+  AttributeArray@endlink equality operators to fail for attributes
+  with non-constant strides.
 
 @par
 API changes:
@@ -101,16 +108,16 @@ Houdini:
   Rebuild&nbsp;SDF, Renormalize&nbsp;SDF, Reshape&nbsp;SDF,
   Segment&nbsp;by&nbsp;Connectivity, Smooth&nbsp;SDF,
   Topology&nbsp;to&nbsp;SDF, and Visualize&nbsp;Tree.
-- Added an @b OpPolicy::getLabelName method to allow derived @b OpPolicy
-  classes to provide their own label naming scheme for tab menus.
-- Added type lists for sets of commonly-used grid types, including
+- Added an @b OpPolicy::getFirstName method to allow @b OpPolicy subclasses
+  to provide their own first name scheme.
+- Added an @b OpPolicy::getLabelName method to allow @b OpPolicy subclasses
+  to provide their own label naming scheme for tab menus.
+- Added type lists for sets of commonly used grid types, including
   @b ScalarGridTypes, @b Vec3GridTypes, @b AllGridTypes, etc.
-- VDB Vector Merge SOP now copies metadata from the representative
+- The Vector&nbsp;Merge SOP now copies metadata from the representative
   scalar grid.
-- Added a @b houdini_utils::OpPolicy::getFirstName() method to allow
-  derived OpPolicy classes to provide their own first name scheme.
-- Deprecated @b SOP_NodeVDB::duplicateSourceStealable(),
-  @b houdini_utils::getNodeChain() and @b houdini_utils::OP_EvalScope.
+- Deprecated @b SOP_NodeVDB::duplicateSourceStealable,
+  @b houdini_utils::getNodeChain and @b houdini_utils::OP_EvalScope.
 
 @par
 Python:
