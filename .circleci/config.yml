@@ -58,8 +58,8 @@ _tbb:
     name: Install TBB 2017
     command: bash ci/install_tbb.sh 2017_U6
   tbb4_4: &install_tbb4_4
-    name: Install TBB 4.4
-    command: bash ci/install_tbb.sh 4.4
+    name: Install TBB 4.4.6
+    command: bash ci/install_tbb.sh 4.4.6
 
 _blosc:
   blosc_latest: &install_blosc_latest
