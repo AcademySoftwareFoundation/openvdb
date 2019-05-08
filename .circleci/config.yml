@@ -1,4 +1,9 @@
 
+# A pre-requisite of the GitHub Checks API is:
+# Your project must be using CircleCI 2.0 with Workflows
+# (https://circleci.com/docs/2.0/enable-checks/)
+version: 2
+
 # Default configuration
 
 defaults: &defaults
@@ -121,7 +126,6 @@ _test:
 
 # Jobs
 
-version: 2.1
 jobs:
   testabi6latest:
     <<: *defaults
@@ -256,6 +260,7 @@ jobs:
 # Workflows
 
 workflows:
+  version: 2
   build_and_test:
     jobs:
       - testabi6
