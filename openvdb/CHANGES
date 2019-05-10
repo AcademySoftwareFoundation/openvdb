@@ -3,6 +3,8 @@ OpenVDB Version History
 
 Version 6.1.1 - In development
 
+    Houdini:
+    - VDB Combine does not crash in Copy B if destination isn't a VDB.
 
 Version 6.1.0 - May 8, 2019
 

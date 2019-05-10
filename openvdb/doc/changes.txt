@@ -6,6 +6,10 @@
 @par
 <B>Version 6.1.1</B> - <I>In development</I>
 
+@par
+Houdini:
+- The Convert VDB SOP no longer crashes if in Copy B and destination is not a
+  VDB.
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
 @par
