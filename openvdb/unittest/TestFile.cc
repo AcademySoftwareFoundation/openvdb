@@ -2216,9 +2216,9 @@ TestFile::testCompression()
 
     // Write the grids out with various combinations of compression options
     // and verify that they can be read back successfully.
-    // Currently, only bits 0 and 1 have meaning as compression flags
-    // (see io/Compression.h), so the valid combinations range from 0x0 to 0x3.
-    for (uint32_t flags = 0x0; flags <= 0x3; ++flags) {
+    // See io/Compression.h for the flag values.
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+    for (uint32_t flags : validFlags) {
 
         if (flags != io::COMPRESS_NONE) {
             io::File vdbfile(filename);
