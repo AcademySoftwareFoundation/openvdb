@@ -27,6 +27,8 @@ Developers who wish to contribute code to be considered for inclusion in the Ope
 
 ### Developer Quick Start
 
+See the [build documentation](https://www.openvdb.org/documentation/doxygen/build.html) for help with installations.
+
 #### Linux
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
 
