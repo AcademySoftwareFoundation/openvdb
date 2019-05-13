@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -343,12 +343,14 @@ OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
     OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     // traverse upstream nodes, if unload is not possible, duplicate the source
     if (!isSourceStealable(index, context)) {
         duplicateSource(index, context, *pgdp, clean);
         unlockInput(index);
         return error();
     }
+    OPENVDB_NO_DEPRECATION_WARNING_END
 
     // get the input GU_Detail handle and unlock the inputs
     GU_DetailHandle inputgdh = inputGeoHandle(index);
@@ -428,7 +430,10 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context)
 {
-    return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    auto error = this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
+    OPENVDB_NO_DEPRECATION_WARNING_END
+    return error;
 }
 
 
@@ -603,7 +608,7 @@ namespace {
 class DefaultOpenVDBOpPolicy: public houdini_utils::OpPolicy
 {
 public:
-    static std::string getName(const std::string& english)
+    std::string getValidName(const std::string& english)
     {
         UT_String s(english);
         // Remove non-alphanumeric characters from the name.
@@ -615,9 +620,12 @@ public:
         return name;
     }
 
-    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
+    std::string getLowercaseName(const std::string& english)
     {
-        return DefaultOpenVDBOpPolicy::getName(english);
+        UT_String s(english);
+        // Lowercase
+        s.toLower();
+        return s.toStdString();
     }
 
     /// @brief OpenVDB operators of each flavor (SOP, POP, etc.) share
@@ -633,18 +641,9 @@ public:
 class SESIOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 {
 public:
-    static std::string getName(const std::string& english)
-    {
-        std::string name = DefaultOpenVDBOpPolicy::getName(english);
-        UT_String s(name);
-        // Lowercase
-        s.toLower();
-        return s.toStdString();
-    }
-
     std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
-        return SESIOpenVDBOpPolicy::getName(english);
+        return this->getLowercaseName(this->getValidName(english));
     }
 };
 
@@ -655,8 +654,7 @@ class ASWFOpenVDBOpPolicy: public DefaultOpenVDBOpPolicy
 public:
     std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
-        std::string name = DefaultOpenVDBOpPolicy::getName(english);
-        return "DW_Open" + name;
+        return "DW_Open" + this->getValidName(english);
     }
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
@@ -671,8 +669,7 @@ public:
 
     std::string getFirstName(const houdini_utils::OpFactory& factory) override
     {
-        // apply SESI operator name renaming to our label name to generate first name
-        return SESIOpenVDBOpPolicy::getName(this->getLabelName(factory));
+        return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
     }
 };
 
@@ -698,6 +695,6 @@ OpenVDBOpFactory::OpenVDBOpFactory(
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

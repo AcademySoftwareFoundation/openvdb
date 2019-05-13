@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -102,61 +102,61 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
-IF ( POLICY CMP0074 )
-  CMAKE_POLICY ( SET CMP0074 NEW )
-ENDIF ()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 # Include utility functions for version information
-INCLUDE ( ${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake )
+include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   OpenVDB_INCLUDE_DIR
   OpenVDB_LIBRARY
 )
 
-SET ( _OPENVDB_COMPONENT_LIST
+set(_OPENVDB_COMPONENT_LIST
   openvdb
-  )
+)
 
-IF ( OpenVDB_FIND_COMPONENTS )
-  SET ( OPENVDB_COMPONENTS_PROVIDED TRUE )
-  SET ( _IGNORED_COMPONENTS "" )
-  FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
-    IF ( NOT ${COMPONENT} IN_LIST _OPENVDB_COMPONENT_LIST )
-      LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
-    ENDIF ()
-  ENDFOREACH()
+if(OpenVDB_FIND_COMPONENTS)
+  set(OPENVDB_COMPONENTS_PROVIDED TRUE)
+  set(_IGNORED_COMPONENTS "")
+  foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
+    if(NOT ${COMPONENT} IN_LIST _OPENVDB_COMPONENT_LIST)
+      list(APPEND _IGNORED_COMPONENTS ${COMPONENT})
+    endif()
+  endforeach()
 
-  IF ( _IGNORED_COMPONENTS )
-    MESSAGE ( STATUS "Ignoring unknown components of OpenVDB:" )
-    FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
-      MESSAGE ( STATUS "  ${COMPONENT}" )
-    ENDFOREACH ()
-    LIST ( REMOVE_ITEM OpenVDB_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
-  ENDIF ()
-ELSE ()
-  SET ( OPENVDB_COMPONENTS_PROVIDED FALSE )
-  SET ( OpenVDB_FIND_COMPONENTS ${_OPENVDB_COMPONENT_LIST} )
-ENDIF ()
+  if(_IGNORED_COMPONENTS)
+    message(STATUS "Ignoring unknown components of OpenVDB:")
+    foreach(COMPONENT ${_IGNORED_COMPONENTS})
+      message(STATUS "  ${COMPONENT}")
+    endforeach()
+    list(REMOVE_ITEM OpenVDB_FIND_COMPONENTS ${_IGNORED_COMPONENTS})
+  endif()
+else()
+  set(OPENVDB_COMPONENTS_PROVIDED FALSE)
+  set(OpenVDB_FIND_COMPONENTS ${_OPENVDB_COMPONENT_LIST})
+endif()
 
 # Append OPENVDB_ROOT or $ENV{OPENVDB_ROOT} if set (prioritize the direct cmake var)
-SET ( _OPENVDB_ROOT_SEARCH_DIR "" )
+set(_OPENVDB_ROOT_SEARCH_DIR "")
 
-IF ( OPENVDB_ROOT )
-  LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${OPENVDB_ROOT} )
-ELSE ()
-  SET ( _ENV_OPENVDB_ROOT $ENV{OPENVDB_ROOT} )
-  IF ( _ENV_OPENVDB_ROOT )
-    LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${_ENV_OPENVDB_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(OPENVDB_ROOT)
+  list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${OPENVDB_ROOT})
+else()
+  set(_ENV_OPENVDB_ROOT $ENV{OPENVDB_ROOT})
+  if(_ENV_OPENVDB_ROOT)
+    list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${_ENV_OPENVDB_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find OpenVDB
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_OpenVDB QUIET OpenVDB )
+find_package(PkgConfig)
+pkg_check_modules(PC_OpenVDB QUIET OpenVDB)
 
 # This CMake module supports being called from external packages AND from
 # within the OpenVDB repository for building openvdb components with the
@@ -165,110 +165,110 @@ PKG_CHECK_MODULES ( PC_OpenVDB QUIET OpenVDB )
 # (repo structure = <root>/cmake/FindOpenVDB.cmake)
 # (inst structure = <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake)
 
-GET_FILENAME_COMPONENT ( _DIR_NAME ${CMAKE_CURRENT_LIST_DIR} NAME )
+get_filename_component(_DIR_NAME ${CMAKE_CURRENT_LIST_DIR} NAME)
 
-IF ( ${_DIR_NAME} STREQUAL "cmake" )
+if(${_DIR_NAME} STREQUAL "cmake")
   # Called from root repo for openvdb components
-ELSEIF ( ${_DIR_NAME} STREQUAL "OpenVDB" )
+elseif(${_DIR_NAME} STREQUAL "OpenVDB")
   # Set the install variable to track directories if this is being called from
   # an installed location and from another package. The expected installation
   # directory structure is:
   #  <root>/lib/cmake/OpenVDB/FindOpenVDB.cmake
   #  <root>/include
   #  <root>/bin
-  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${CMAKE_CURRENT_LIST_DIR} DIRECTORY )
-  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
-  GET_FILENAME_COMPONENT ( _IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY )
-  SET ( _OPENVDB_INSTALL ${_IMPORT_PREFIX} )
-  LIST ( APPEND _OPENVDB_ROOT_SEARCH_DIR ${_OPENVDB_INSTALL} )
-ENDIF ()
+  get_filename_component(_IMPORT_PREFIX ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
+  get_filename_component(_IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY)
+  get_filename_component(_IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY)
+  set(_OPENVDB_INSTALL ${_IMPORT_PREFIX})
+  list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${_OPENVDB_INSTALL})
+endif()
 
-UNSET ( _DIR_NAME )
-UNSET ( _IMPORT_PREFIX )
+unset(_DIR_NAME)
+unset(_IMPORT_PREFIX)
 
 # ------------------------------------------------------------------------
 #  Search for OpenVDB include DIR
 # ------------------------------------------------------------------------
 
-SET ( _OPENVDB_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
+set(_OPENVDB_INCLUDE_SEARCH_DIRS "")
+list(APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
   ${OPENVDB_INCLUDEDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
   ${PC_OpenVDB_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard OpenVDB header file.
-FIND_PATH ( OpenVDB_INCLUDE_DIR openvdb/version.h
+find_path(OpenVDB_INCLUDE_DIR openvdb/version.h
   NO_DEFAULT_PATH
   PATHS ${_OPENVDB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
-  )
+)
 
-OPENVDB_VERSION_FROM_HEADER ( "${OpenVDB_INCLUDE_DIR}/openvdb/version.h"
+OPENVDB_VERSION_FROM_HEADER("${OpenVDB_INCLUDE_DIR}/openvdb/version.h"
   VERSION OpenVDB_VERSION
   MAJOR   OpenVDB_MAJOR_VERSION
   MINOR   OpenVDB_MINOR_VERSION
   PATCH   OpenVDB_PATCH_VERSION
-  )
+)
 
 # ------------------------------------------------------------------------
 #  Search for OPENVDB lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _OPENVDB_LIBRARYDIR_SEARCH_DIRS "" )
+set(_OPENVDB_LIBRARYDIR_SEARCH_DIRS "")
 
 # Append to _OPENVDB_LIBRARYDIR_SEARCH_DIRS in priority order
 
-LIST ( APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
+list(APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
   ${OPENVDB_LIBRARYDIR}
   ${_OPENVDB_ROOT_SEARCH_DIR}
   ${PC_OpenVDB_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Build suffix directories
 
-SET ( OPENVDB_PATH_SUFFIXES
+set(OPENVDB_PATH_SUFFIXES
   lib64
   lib
 )
 
 # Static library setup
-IF ( UNIX AND OPENVDB_USE_STATIC_LIBS )
-  SET ( _OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
-ENDIF ()
+if(UNIX AND OPENVDB_USE_STATIC_LIBS)
+  set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
 
-SET ( OpenVDB_LIB_COMPONENTS "" )
+set(OpenVDB_LIB_COMPONENTS "")
 
-FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
-  SET ( LIB_NAME ${COMPONENT} )
-  FIND_LIBRARY ( OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
+foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
+  set(LIB_NAME ${COMPONENT})
+  find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
     NO_DEFAULT_PATH
     PATHS ${_OPENVDB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${OPENVDB_PATH_SUFFIXES}
-    )
-  LIST ( APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY} )
+  )
+  list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
 
-  IF ( OpenVDB_${COMPONENT}_LIBRARY )
-    SET ( OpenVDB_${COMPONENT}_FOUND TRUE )
-  ELSE ()
-    SET ( OpenVDB_${COMPONENT}_FOUND FALSE )
-  ENDIF ()
-ENDFOREACH ()
+  if(OpenVDB_${COMPONENT}_LIBRARY)
+    set(OpenVDB_${COMPONENT}_FOUND TRUE)
+  else()
+    set(OpenVDB_${COMPONENT}_FOUND FALSE)
+  endif()
+endforeach()
 
-IF ( UNIX AND OPENVDB_USE_STATIC_LIBS )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-  UNSET ( _OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
-ENDIF ()
+if(UNIX AND OPENVDB_USE_STATIC_LIBS)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+  unset(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+endif()
 
 # ------------------------------------------------------------------------
 #  Cache and set OPENVDB_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenVDB
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OpenVDB
   FOUND_VAR OpenVDB_FOUND
   REQUIRED_VARS
     OpenVDB_INCLUDE_DIR
@@ -283,30 +283,30 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( OpenVDB
 
 # Set the ABI number the library was built against. Uses vdb_print
 
-IF ( _OPENVDB_INSTALL )
-  OPENVDB_ABI_VERSION_FROM_PRINT (
+if(_OPENVDB_INSTALL)
+  OPENVDB_ABI_VERSION_FROM_PRINT(
     "${_OPENVDB_INSTALL}/bin/vdb_print"
     ABI OpenVDB_ABI
-    )
-ELSE ()
+  )
+else()
   # Try and find vdb_print from the include path
-  OPENVDB_ABI_VERSION_FROM_PRINT (
+  OPENVDB_ABI_VERSION_FROM_PRINT(
     "${OpenVDB_INCLUDE_DIR}/../bin/vdb_print"
     ABI OpenVDB_ABI
-    )
-ENDIF ()
+  )
+endif()
 
-IF ( NOT OpenVDB_FIND_QUIET )
-  IF ( NOT OpenVDB_ABI )
-    MESSAGE ( WARNING "Unable to determine OpenVDB ABI version from OpenVDB "
+if(NOT OpenVDB_FIND_QUIET)
+  if(NOT OpenVDB_ABI)
+    message(WARNING "Unable to determine OpenVDB ABI version from OpenVDB "
       "installation. The library major version \"${OpenVDB_MAJOR_VERSION}\" "
       "will be inferred. If this is not correct, use "
       "add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=N)"
-      )
-  ELSE ()
-    MESSAGE ( STATUS "OpenVDB ABI Version: ${OpenVDB_ABI}" )
-  ENDIF ()
-ENDIF ()
+    )
+  else()
+    message(STATUS "OpenVDB ABI Version: ${OpenVDB_ABI}")
+  endif()
+endif()
 
 # ------------------------------------------------------------------------
 #  Handle OpenVDB dependencies
@@ -314,23 +314,23 @@ ENDIF ()
 
 # Add standard dependencies
 
-FIND_PACKAGE ( IlmBase REQUIRED COMPONENTS Half )
-FIND_PACKAGE ( TBB REQUIRED COMPONENTS tbb )
-FIND_PACKAGE ( ZLIB REQUIRED )
-FIND_PACKAGE ( Boost REQUIRED COMPONENTS iostreams system )
+find_package(IlmBase REQUIRED COMPONENTS Half)
+find_package(TBB REQUIRED COMPONENTS tbb)
+find_package(ZLIB REQUIRED)
+find_package(Boost REQUIRED COMPONENTS iostreams system)
 
 # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
 # which we can query for optional deps. This basically runs ldd/otoll/objdump
 # etc to track deps. We could use a vdb_config binary tools here to improve
 # this process
 
-INCLUDE ( GetPrerequisites )
+include(GetPrerequisites)
 
-SET ( _EXCLUDE_SYSTEM_PREREQUISITES 1 )
-SET ( _RECURSE_PREREQUISITES 0 )
-SET ( _OPENVDB_PREREQUISITE_LIST )
+set(_EXCLUDE_SYSTEM_PREREQUISITES 1)
+set(_RECURSE_PREREQUISITES 0)
+set(_OPENVDB_PREREQUISITE_LIST)
 
-GET_PREREQUISITES ( ${OpenVDB_openvdb_LIBRARY}
+get_prerequisites(${OpenVDB_openvdb_LIBRARY}
   _OPENVDB_PREREQUISITE_LIST
   ${_EXCLUDE_SYSTEM_PREREQUISITES}
   ${_RECURSE_PREREQUISITES}
@@ -338,58 +338,58 @@ GET_PREREQUISITES ( ${OpenVDB_openvdb_LIBRARY}
   "${SYSTEM_LIBRARY_PATHS}"
 )
 
-UNSET ( _EXCLUDE_SYSTEM_PREREQUISITES )
-UNSET ( _RECURSE_PREREQUISITES )
+unset(_EXCLUDE_SYSTEM_PREREQUISITES)
+unset(_RECURSE_PREREQUISITES)
 
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
 
-SET ( OpenVDB_USES_BLOSC ${USE_BLOSC} )
-SET ( OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS} )
-SET ( OpenVDB_USES_EXR ${USE_EXR} )
+set(OpenVDB_USES_BLOSC ${USE_BLOSC})
+set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
+set(OpenVDB_USES_EXR ${USE_EXR})
 
 # Search for optional dependencies
 
-FOREACH ( PREREQUISITE ${_OPENVDB_PREREQUISITE_LIST} )
-  SET ( _HAS_DEP )
-  GET_FILENAME_COMPONENT ( PREREQUISITE ${PREREQUISITE} NAME )
+foreach(PREREQUISITE ${_OPENVDB_PREREQUISITE_LIST})
+  set(_HAS_DEP)
+  get_filename_component(PREREQUISITE ${PREREQUISITE} NAME)
 
-  STRING ( FIND ${PREREQUISITE} "blosc" _HAS_DEP )
-  IF ( NOT ${_HAS_DEP} EQUAL -1 )
-    SET ( OpenVDB_USES_BLOSC ON )
-  ENDIF ()
+  string(FIND ${PREREQUISITE} "blosc" _HAS_DEP)
+  if(NOT ${_HAS_DEP} EQUAL -1)
+    set(OpenVDB_USES_BLOSC ON)
+  endif()
 
-  STRING ( FIND ${PREREQUISITE} "log4cplus" _HAS_DEP )
-  IF ( NOT ${_HAS_DEP} EQUAL -1 )
-    SET ( OpenVDB_USES_LOG4CPLUS ON )
-  ENDIF ()
+  string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
+  if(NOT ${_HAS_DEP} EQUAL -1)
+    set(OpenVDB_USES_LOG4CPLUS ON)
+  endif()
 
-  STRING ( FIND ${PREREQUISITE} "IlmImf" _HAS_DEP )
-  IF ( NOT ${_HAS_DEP} EQUAL -1 )
-    SET ( OpenVDB_USES_EXR ON )
-  ENDIF ()
-ENDFOREACH ()
+  string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
+  if(NOT ${_HAS_DEP} EQUAL -1)
+    set(OpenVDB_USES_EXR ON)
+  endif()
+endforeach()
 
-UNSET ( _OPENVDB_PREREQUISITE_LIST )
-UNSET ( _HAS_DEP )
+unset(_OPENVDB_PREREQUISITE_LIST)
+unset(_HAS_DEP)
 
-IF ( OpenVDB_USES_BLOSC )
-  FIND_PACKAGE ( Blosc REQUIRED )
-ENDIF ()
+if(OpenVDB_USES_BLOSC)
+  find_package(Blosc REQUIRED)
+endif()
 
-IF ( OpenVDB_USES_LOG4CPLUS )
-  FIND_PACKAGE ( Log4cplus REQUIRED )
-ENDIF ()
+if(OpenVDB_USES_LOG4CPLUS)
+  find_package(Log4cplus REQUIRED)
+endif()
 
-IF ( OpenVDB_USES_EXR )
-  FIND_PACKAGE ( IlmBase REQUIRED )
-  FIND_PACKAGE ( OpenEXR REQUIRED )
-ENDIF ()
+if(OpenVDB_USES_EXR)
+  find_package(IlmBase REQUIRED)
+  find_package(OpenEXR REQUIRED)
+endif()
 
-IF ( UNIX )
-  FIND_PACKAGE ( Threads REQUIRED )
-ENDIF ()
+if(UNIX)
+  find_package(Threads REQUIRED)
+endif()
 
 # Set deps. Note that the order here is important. If we're building against
 # Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
@@ -397,83 +397,83 @@ ENDIF ()
 # include paths from shared installs (including houdini) may pull in the wrong
 # headers
 
-SET ( _OPENVDB_VISIBLE_DEPENDENCIES
+set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
   IlmBase::Half
-  )
+)
 
-SET ( _OPENVDB_DEFINITIONS )
-IF ( OpenVDB_ABI )
-  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI}" )
-ENDIF ()
+set(_OPENVDB_DEFINITIONS)
+if(OpenVDB_ABI)
+  list(APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI}")
+endif()
 
-IF ( OpenVDB_USES_EXR )
-  LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+if(OpenVDB_USES_EXR)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
     IlmBase::IlmThread
     IlmBase::Iex
     IlmBase::Imath
     OpenEXR::IlmImf
-    )
-  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR" )
-ENDIF ()
+  )
+  list(APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR")
+endif()
 
-IF ( OpenVDB_USES_LOG4CPLUS )
-  LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus )
-  LIST ( APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_USE_LOG4CPLUS" )
-ENDIF ()
+if(OpenVDB_USES_LOG4CPLUS)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus)
+  list(APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_USE_LOG4CPLUS")
+endif()
 
-LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
   TBB::tbb
 )
-IF ( UNIX )
-  LIST ( APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+if(UNIX)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
     Threads::Threads
   )
-ENDIF ()
+endif()
 
-SET ( _OPENVDB_HIDDEN_DEPENDENCIES )
+set(_OPENVDB_HIDDEN_DEPENDENCIES)
 
-IF ( OpenVDB_USES_BLOSC )
-  LIST ( APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc )
-ENDIF ()
+if(OpenVDB_USES_BLOSC)
+  list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
+endif()
 
-LIST ( APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB )
+list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
 
 # ------------------------------------------------------------------------
 #  Configure imported target
 # ------------------------------------------------------------------------
 
-SET ( OpenVDB_LIBRARIES
+set(OpenVDB_LIBRARIES
   ${OpenVDB_LIB_COMPONENTS}
 )
-SET ( OpenVDB_INCLUDE_DIRS ${OpenVDB_INCLUDE_DIR} )
+set(OpenVDB_INCLUDE_DIRS ${OpenVDB_INCLUDE_DIR})
 
-SET ( OpenVDB_DEFINITIONS )
-LIST ( APPEND OpenVDB_DEFINITIONS "${PC_OpenVDB_CFLAGS_OTHER}" )
-LIST ( APPEND OpenVDB_DEFINITIONS "${_OPENVDB_DEFINITIONS}" )
-LIST ( REMOVE_DUPLICATES OpenVDB_DEFINITIONS )
+set(OpenVDB_DEFINITIONS)
+list(APPEND OpenVDB_DEFINITIONS "${PC_OpenVDB_CFLAGS_OTHER}")
+list(APPEND OpenVDB_DEFINITIONS "${_OPENVDB_DEFINITIONS}")
+list(REMOVE_DUPLICATES OpenVDB_DEFINITIONS)
 
-SET ( OpenVDB_LIBRARY_DIRS "" )
-FOREACH ( LIB ${OpenVDB_LIB_COMPONENTS} )
-  GET_FILENAME_COMPONENT ( _OPENVDB_LIBDIR ${LIB} DIRECTORY )
-  LIST ( APPEND OpenVDB_LIBRARY_DIRS ${_OPENVDB_LIBDIR} )
-ENDFOREACH ()
-LIST ( REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS )
+set(OpenVDB_LIBRARY_DIRS "")
+foreach(LIB ${OpenVDB_LIB_COMPONENTS})
+  get_filename_component(_OPENVDB_LIBDIR ${LIB} DIRECTORY)
+  list(APPEND OpenVDB_LIBRARY_DIRS ${_OPENVDB_LIBDIR})
+endforeach()
+list(REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS)
 
-FOREACH ( COMPONENT ${OpenVDB_FIND_COMPONENTS} )
-  IF ( NOT TARGET OpenVDB::${COMPONENT} )
-    ADD_LIBRARY ( OpenVDB::${COMPONENT} UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( OpenVDB::${COMPONENT} PROPERTIES
+foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
+  if(NOT TARGET OpenVDB::${COMPONENT})
+    add_library(OpenVDB::${COMPONENT} UNKNOWN IMPORTED)
+    set_target_properties(OpenVDB::${COMPONENT} PROPERTIES
       IMPORTED_LOCATION "${OpenVDB_${COMPONENT}_LIBRARY}"
       INTERFACE_COMPILE_OPTIONS "${OpenVDB_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
       IMPORTED_LINK_DEPENDENT_LIBRARIES "${_OPENVDB_HIDDEN_DEPENDENCIES}" # non visible deps
       INTERFACE_LINK_LIBRARIES "${_OPENVDB_VISIBLE_DEPENDENCIES}" # visible deps (headers)
-    )
-  ENDIF ()
-ENDFOREACH ()
+   )
+  endif()
+endforeach()
 
-UNSET ( _OPENVDB_DEFINITIONS )
-UNSET ( _OPENVDB_VISIBLE_DEPENDENCIES )
-UNSET ( _OPENVDB_HIDDEN_DEPENDENCIES )
+unset(_OPENVDB_DEFINITIONS)
+unset(_OPENVDB_VISIBLE_DEPENDENCIES)
+unset(_OPENVDB_HIDDEN_DEPENDENCIES)

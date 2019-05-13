@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -70,92 +70,92 @@ The following functions are provided:
 #]=======================================================================]
 
 
-FUNCTION ( OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE )
-  CMAKE_PARSE_ARGUMENTS ( _VDB "" "VERSION;MAJOR;MINOR;PATCH" "" ${ARGN} )
+function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
+  cmake_parse_arguments(_VDB "" "VERSION;MAJOR;MINOR;PATCH" "" ${ARGN})
 
-  IF ( NOT EXISTS ${OPENVDB_VERSION_FILE} )
-    RETURN ()
-  ENDIF ()
+  if(NOT EXISTS ${OPENVDB_VERSION_FILE})
+    return()
+  endif()
 
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
     REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  )
+  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
     _OpenVDB_MAJOR_VERSION "${openvdb_version_str}"
-    )
+  )
 
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
     REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  )
+  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
     _OpenVDB_MINOR_VERSION "${openvdb_version_str}"
-    )
+  )
 
-  FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
+  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
     REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*"
-    )
-  STRING ( REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  )
+  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
     _OpenVDB_PATCH_VERSION "${openvdb_version_str}"
-    )
-  UNSET ( openvdb_version_str )
+  )
+  unset(openvdb_version_str)
 
-  IF ( _VDB_VERSION )
-    SET ( ${_VDB_VERSION}
+  if(_VDB_VERSION)
+    set(${_VDB_VERSION}
       ${_OpenVDB_MAJOR_VERSION}.${_OpenVDB_MINOR_VERSION}.${_OpenVDB_PATCH_VERSION}
       PARENT_SCOPE
-      )
-  ENDIF  ()
-  IF ( _VDB_MAJOR )
-    SET ( ${_VDB_MAJOR} ${_OpenVDB_MAJOR_VERSION} PARENT_SCOPE )
-  ENDIF ()
-  IF ( _VDB_MINOR )
-    SET ( ${_VDB_MINOR} ${_OpenVDB_MINOR_VERSION} PARENT_SCOPE )
-  ENDIF ()
-  IF ( _VDB_PATCH )
-    SET ( ${_VDB_PATCH} ${_OpenVDB_PATCH_VERSION} PARENT_SCOPE )
-  ENDIF ()
-ENDFUNCTION ()
+    )
+  endif()
+  if(_VDB_MAJOR)
+    set(${_VDB_MAJOR} ${_OpenVDB_MAJOR_VERSION} PARENT_SCOPE)
+  endif()
+  if(_VDB_MINOR)
+    set(${_VDB_MINOR} ${_OpenVDB_MINOR_VERSION} PARENT_SCOPE)
+  endif()
+  if(_VDB_PATCH)
+    set(${_VDB_PATCH} ${_OpenVDB_PATCH_VERSION} PARENT_SCOPE)
+  endif()
+endfunction()
 
 
 ########################################################################
 ########################################################################
 
 
-FUNCTION ( OPENVDB_ABI_VERSION_FROM_PRINT OPENVDB_PRINT )
-  CMAKE_PARSE_ARGUMENTS ( _VDB "QUIET" "ABI" "" ${ARGN} )
+function(OPENVDB_ABI_VERSION_FROM_PRINT OPENVDB_PRINT)
+  cmake_parse_arguments(_VDB "QUIET" "ABI" "" ${ARGN})
 
-  IF ( NOT EXISTS ${OPENVDB_PRINT} )
-    RETURN ()
-  ENDIF ()
+  if(NOT EXISTS ${OPENVDB_PRINT})
+    return()
+  endif()
 
-  SET ( _VDB_PRINT_VERSION_STRING "" )
-  SET ( _VDB_PRINT_RETURN_STATUS "" )
+  set(_VDB_PRINT_VERSION_STRING "")
+  set(_VDB_PRINT_RETURN_STATUS "")
 
-  IF ( ${_VDB_QUIET} )
-    EXECUTE_PROCESS ( COMMAND ${OPENVDB_PRINT} "--version"
+  if(${_VDB_QUIET})
+    execute_process(COMMAND ${OPENVDB_PRINT} "--version"
       RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
       OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
       ERROR_QUIET
       OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
-  ELSE ()
-    EXECUTE_PROCESS ( COMMAND ${OPENVDB_PRINT} "--version"
+    )
+  else()
+    execute_process(COMMAND ${OPENVDB_PRINT} "--version"
       RESULT_VARIABLE _VDB_PRINT_RETURN_STATUS
       OUTPUT_VARIABLE _VDB_PRINT_VERSION_STRING
       OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
-  ENDIF ()
+    )
+  endif()
 
-  IF ( ${_VDB_PRINT_RETURN_STATUS} )
-    RETURN ()
-  ENDIF ()
+  if(${_VDB_PRINT_RETURN_STATUS})
+    return()
+  endif()
 
-  SET ( _OpenVDB_ABI )
-  STRING ( REGEX REPLACE ".*abi([0-9]*).*" "\\1" _OpenVDB_ABI ${_VDB_PRINT_VERSION_STRING} )
-  UNSET ( _VDB_PRINT_RETURN_STATUS )
-  UNSET ( _VDB_PRINT_VERSION_STRING )
+  set(_OpenVDB_ABI)
+  string(REGEX REPLACE ".*abi([0-9]*).*" "\\1" _OpenVDB_ABI ${_VDB_PRINT_VERSION_STRING})
+  unset(_VDB_PRINT_RETURN_STATUS)
+  unset(_VDB_PRINT_VERSION_STRING)
 
-  IF ( _VDB_ABI )
-    SET ( ${_VDB_ABI} ${_OpenVDB_ABI} PARENT_SCOPE )
-  ENDIF ()
-ENDFUNCTION ()
+  if(_VDB_ABI)
+    set(${_VDB_ABI} ${_OpenVDB_ABI} PARENT_SCOPE)
+  endif()
+endfunction()

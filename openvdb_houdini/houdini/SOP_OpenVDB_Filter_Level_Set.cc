@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,7 +41,6 @@
 ///
 /// @note Works with level set grids of floating point type (float/double).
 
-#include <houdini_utils/OP_NodeChain.h> // for getNodeChain(), OP_EvalScope
 #include <houdini_utils/ParmFactory.h>
 
 #include <openvdb_houdini/Utils.h>
@@ -1310,6 +1309,6 @@ SOP_OpenVDB_Filter_Level_Set::Cache::track(
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

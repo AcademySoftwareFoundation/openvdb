@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -102,195 +102,195 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 # Support new if() IN_LIST operator
-IF ( POLICY CMP0057 )
-  CMAKE_POLICY ( SET CMP0057 NEW )
-ENDIF ()
+if(POLICY CMP0057)
+  cmake_policy(SET CMP0057 NEW)
+endif()
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   IlmBase_INCLUDE_DIR
   IlmBase_LIBRARY
 )
 
-SET ( _ILMBASE_COMPONENT_LIST
+set(_ILMBASE_COMPONENT_LIST
   Half
   Iex
   IexMath
   IlmThread
   Imath
-  )
+)
 
-IF ( IlmBase_FIND_COMPONENTS )
-  SET ( ILMBASE_COMPONENTS_PROVIDED TRUE )
-  SET ( _IGNORED_COMPONENTS "" )
-  FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
-    IF ( NOT ${COMPONENT} IN_LIST _ILMBASE_COMPONENT_LIST )
-      LIST ( APPEND _IGNORED_COMPONENTS ${COMPONENT} )
-    ENDIF ()
-  ENDFOREACH()
+if(IlmBase_FIND_COMPONENTS)
+  set(ILMBASE_COMPONENTS_PROVIDED TRUE)
+  set(_IGNORED_COMPONENTS "")
+  foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
+    if(NOT ${COMPONENT} IN_LIST _ILMBASE_COMPONENT_LIST)
+      list(APPEND _IGNORED_COMPONENTS ${COMPONENT})
+    endif()
+  endforeach()
 
-  IF ( _IGNORED_COMPONENTS )
-    MESSAGE ( STATUS "Ignoring unknown components of IlmBase:" )
-    FOREACH ( COMPONENT ${_IGNORED_COMPONENTS} )
-      MESSAGE ( STATUS "  ${COMPONENT}" )
-    ENDFOREACH ()
-    LIST ( REMOVE_ITEM IlmBase_FIND_COMPONENTS ${_IGNORED_COMPONENTS} )
-  ENDIF ()
-ELSE ()
-  SET ( ILMBASE_COMPONENTS_PROVIDED FALSE )
-  SET ( IlmBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST} )
-ENDIF ()
+  if(_IGNORED_COMPONENTS)
+    message(STATUS "Ignoring unknown components of IlmBase:")
+    foreach(COMPONENT ${_IGNORED_COMPONENTS})
+      message(STATUS "  ${COMPONENT}")
+    endforeach()
+    list(REMOVE_ITEM IlmBase_FIND_COMPONENTS ${_IGNORED_COMPONENTS})
+  endif()
+else()
+  set(ILMBASE_COMPONENTS_PROVIDED FALSE)
+  set(IlmBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST})
+endif()
 
 # Append ILMBASE_ROOT or $ENV{ILMBASE_ROOT} if set (prioritize the direct cmake var)
-SET ( _ILMBASE_ROOT_SEARCH_DIR "" )
+set(_ILMBASE_ROOT_SEARCH_DIR "")
 
-IF ( ILMBASE_ROOT )
-  LIST ( APPEND _ILMBASE_ROOT_SEARCH_DIR ${ILMBASE_ROOT} )
-ELSE ()
-  SET ( _ENV_ILMBASE_ROOT $ENV{ILMBASE_ROOT} )
-  IF ( _ENV_ILMBASE_ROOT )
-    LIST ( APPEND _ILMBASE_ROOT_SEARCH_DIR ${_ENV_ILMBASE_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(ILMBASE_ROOT)
+  list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${ILMBASE_ROOT})
+else()
+  set(_ENV_ILMBASE_ROOT $ENV{ILMBASE_ROOT})
+  if(_ENV_ILMBASE_ROOT)
+    list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${_ENV_ILMBASE_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find IlmBase
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_IlmBase QUIET IlmBase )
+find_package(PkgConfig)
+pkg_check_modules(PC_IlmBase QUIET IlmBase)
 
 # ------------------------------------------------------------------------
 #  Search for IlmBase include DIR
 # ------------------------------------------------------------------------
 
-SET ( _ILMBASE_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
+set(_ILMBASE_INCLUDE_SEARCH_DIRS "")
+list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
   ${ILMBASE_INCLUDEDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
   ${PC_IlmBase_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard IlmBase header file.
-FIND_PATH ( IlmBase_INCLUDE_DIR IlmBaseConfig.h
+find_path(IlmBase_INCLUDE_DIR IlmBaseConfig.h
   NO_DEFAULT_PATH
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include/OpenEXR OpenEXR
-  )
+)
 
-IF ( EXISTS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h" )
+if(EXISTS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h")
   # Get the ILMBASE version information from the config header
-  FILE ( STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
+  file(STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
     _ilmbase_version_major_string REGEX "#define ILMBASE_VERSION_MAJOR "
-    )
-  STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MAJOR" ""
+  )
+  string(REGEX REPLACE "#define ILMBASE_VERSION_MAJOR" ""
     _ilmbase_version_major_string "${_ilmbase_version_major_string}"
-    )
-  STRING ( STRIP "${_ilmbase_version_major_string}" IlmBase_VERSION_MAJOR )
+  )
+  string(STRIP "${_ilmbase_version_major_string}" IlmBase_VERSION_MAJOR)
 
-  FILE ( STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
+  file(STRINGS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h"
      _ilmbase_version_minor_string REGEX "#define ILMBASE_VERSION_MINOR "
-    )
-  STRING ( REGEX REPLACE "#define ILMBASE_VERSION_MINOR" ""
+  )
+  string(REGEX REPLACE "#define ILMBASE_VERSION_MINOR" ""
     _ilmbase_version_minor_string "${_ilmbase_version_minor_string}"
-    )
-  STRING ( STRIP "${_ilmbase_version_minor_string}" IlmBase_VERSION_MINOR )
+  )
+  string(STRIP "${_ilmbase_version_minor_string}" IlmBase_VERSION_MINOR)
 
-  UNSET ( _ilmbase_version_major_string )
-  UNSET ( _ilmbase_version_minor_string )
+  unset(_ilmbase_version_major_string)
+  unset(_ilmbase_version_minor_string)
 
-  SET ( IlmBase_VERSION ${IlmBase_VERSION_MAJOR}.${IlmBase_VERSION_MINOR} )
-ENDIF ()
+  set(IlmBase_VERSION ${IlmBase_VERSION_MAJOR}.${IlmBase_VERSION_MINOR})
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for ILMBASE lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _ILMBASE_LIBRARYDIR_SEARCH_DIRS "" )
+set(_ILMBASE_LIBRARYDIR_SEARCH_DIRS "")
 
 # Append to _ILMBASE_LIBRARYDIR_SEARCH_DIRS in priority order
 
-LIST ( APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
+list(APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${ILMBASE_LIBRARYDIR}
   ${_ILMBASE_ROOT_SEARCH_DIR}
   ${PC_IlmBase_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Build suffix directories
 
-SET ( ILMBASE_PATH_SUFFIXES
+set(ILMBASE_PATH_SUFFIXES
   lib64
   lib
 )
 
-IF ( UNIX )
-  LIST ( INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu )
-ENDIF ()
+if(UNIX)
+  list(INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
+endif()
 
-SET ( _ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
+set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 # library suffix handling
-IF ( WIN32 )
-  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+if(WIN32)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
     "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.lib"
-    )
-ELSE ()
-  IF ( ILMBASE_USE_STATIC_LIBS )
-    LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+  )
+else()
+  if(ILMBASE_USE_STATIC_LIBS)
+    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
       "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.a"
-      )
-  ELSE ()
-    IF ( APPLE )
-      LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+    )
+  else()
+    if(APPLE)
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
         "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.dylib"
-        )
-    ELSE ()
-      LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+      )
+    else()
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
         "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.so"
-        )
-    ENDIF ()
-  ENDIF ()
-ENDIF ()
+      )
+    endif()
+  endif()
+endif()
 
-SET ( IlmBase_LIB_COMPONENTS "" )
+set(IlmBase_LIB_COMPONENTS "")
 
-FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
-  FIND_LIBRARY ( IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
+foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
+  find_library(IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
     NO_DEFAULT_PATH
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
-    )
-  LIST ( APPEND IlmBase_LIB_COMPONENTS ${IlmBase_${COMPONENT}_LIBRARY} )
+  )
+  list(APPEND IlmBase_LIB_COMPONENTS ${IlmBase_${COMPONENT}_LIBRARY})
 
-  IF ( WIN32 AND NOT ILMBASE_USE_STATIC_LIBS )
-    SET ( _ILMBASE_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-    SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".dll" )
-    FIND_LIBRARY ( IlmBase_${COMPONENT}_DLL ${COMPONENT}
+  if(WIN32 AND NOT ILMBASE_USE_STATIC_LIBS)
+    set(_ILMBASE_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+    find_library(IlmBase_${COMPONENT}_DLL ${COMPONENT}
       NO_DEFAULT_PATH
       PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
-      )
-    SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_TMP} )
-    UNSET ( _ILMBASE_TMP )
-  ENDIF ()
+    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_TMP})
+    unset(_ILMBASE_TMP)
+  endif()
 
-  IF ( IlmBase_${COMPONENT}_LIBRARY )
-    SET ( IlmBase_${COMPONENT}_FOUND TRUE )
-  ELSE ()
-    SET ( IlmBase_${COMPONENT}_FOUND FALSE )
-  ENDIF ()
-ENDFOREACH ()
+  if(IlmBase_${COMPONENT}_LIBRARY)
+    set(IlmBase_${COMPONENT}_FOUND TRUE)
+  else()
+    set(IlmBase_${COMPONENT}_FOUND FALSE)
+  endif()
+endforeach()
 
 # reset lib suffix
 
-SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-UNSET ( _ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set ILMBASE_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( IlmBase
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(IlmBase
   FOUND_VAR IlmBase_FOUND
   REQUIRED_VARS
     IlmBase_INCLUDE_DIR
@@ -299,39 +299,39 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( IlmBase
   HANDLE_COMPONENTS
 )
 
-IF ( IlmBase_FOUND )
-  SET ( IlmBase_LIBRARIES ${IlmBase_LIB_COMPONENTS} )
+if(IlmBase_FOUND)
+  set(IlmBase_LIBRARIES ${IlmBase_LIB_COMPONENTS})
 
   # We have to add both include and include/OpenEXR to the include
   # path in case OpenEXR and IlmBase are installed separately
 
-  SET ( IlmBase_INCLUDE_DIRS )
-  LIST ( APPEND IlmBase_INCLUDE_DIRS
+  set(IlmBase_INCLUDE_DIRS)
+  list(APPEND IlmBase_INCLUDE_DIRS
     ${IlmBase_INCLUDE_DIR}/../
     ${IlmBase_INCLUDE_DIR}
-    )
-  SET ( IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER} )
+  )
+  set(IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
 
-  SET ( IlmBase_LIBRARY_DIRS "" )
-  FOREACH ( LIB ${IlmBase_LIB_COMPONENTS} )
-    GET_FILENAME_COMPONENT ( _ILMBASE_LIBDIR ${LIB} DIRECTORY )
-    LIST ( APPEND IlmBase_LIBRARY_DIRS ${_ILMBASE_LIBDIR} )
-  ENDFOREACH ()
-  LIST ( REMOVE_DUPLICATES IlmBase_LIBRARY_DIRS )
+  set(IlmBase_LIBRARY_DIRS "")
+  foreach(LIB ${IlmBase_LIB_COMPONENTS})
+    get_filename_component(_ILMBASE_LIBDIR ${LIB} DIRECTORY)
+    list(APPEND IlmBase_LIBRARY_DIRS ${_ILMBASE_LIBDIR})
+  endforeach()
+  list(REMOVE_DUPLICATES IlmBase_LIBRARY_DIRS)
 
   # Configure imported targets
 
-  FOREACH ( COMPONENT ${IlmBase_FIND_COMPONENTS} )
-    IF ( NOT TARGET IlmBase::${COMPONENT} )
-      ADD_LIBRARY ( IlmBase::${COMPONENT} UNKNOWN IMPORTED )
-      SET_TARGET_PROPERTIES ( IlmBase::${COMPONENT} PROPERTIES
+  foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
+    if(NOT TARGET IlmBase::${COMPONENT})
+      add_library(IlmBase::${COMPONENT} UNKNOWN IMPORTED)
+      set_target_properties(IlmBase::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${IlmBase_${COMPONENT}_LIBRARY}"
         INTERFACE_COMPILE_OPTIONS "${IlmBase_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}"
       )
-    ENDIF ()
-  ENDFOREACH ()
+    endif()
+  endforeach()
 
-ELSEIF ( IlmBase_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find IlmBase")
-ENDIF ()
+elseif(IlmBase_FIND_REQUIRED)
+  message(FATAL_ERROR "Unable to find IlmBase")
+endif()

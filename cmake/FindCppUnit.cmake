@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -89,110 +89,110 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   CppUnit_INCLUDE_DIR
   CppUnit_LIBRARY
 )
 
 # Append CPPUNIT_ROOT or $ENV{CPPUNIT_ROOT} if set (prioritize the direct cmake var)
-SET ( _CPPUNIT_ROOT_SEARCH_DIR "" )
+set(_CPPUNIT_ROOT_SEARCH_DIR "")
 
-IF ( CPPUNIT_ROOT )
-  LIST ( APPEND _CPPUNIT_ROOT_SEARCH_DIR ${CPPUNIT_ROOT} )
-ELSE ()
-  SET ( _ENV_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT} )
-  IF ( _ENV_CPPUNIT_ROOT )
-    LIST ( APPEND _CPPUNIT_ROOT_SEARCH_DIR ${_ENV_CPPUNIT_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(CPPUNIT_ROOT)
+  list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${CPPUNIT_ROOT})
+else()
+  set(_ENV_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT})
+  if(_ENV_CPPUNIT_ROOT)
+    list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${_ENV_CPPUNIT_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find cppunit
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_CppUnit QUIET cppunit )
+find_package(PkgConfig)
+pkg_check_modules(PC_CppUnit QUIET cppunit)
 
 # ------------------------------------------------------------------------
 #  Search for CppUnit include DIR
 # ------------------------------------------------------------------------
 
-SET ( _CPPUNIT_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
+set(_CPPUNIT_INCLUDE_SEARCH_DIRS "")
+list(APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
   ${CPPUNIT_INCLUDEDIR}
   ${_CPPUNIT_ROOT_SEARCH_DIR}
   ${PC_CppUnit_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard cppunit header file.
-FIND_PATH ( CppUnit_INCLUDE_DIR cppunit/Portability.h
+find_path(CppUnit_INCLUDE_DIR cppunit/Portability.h
   NO_DEFAULT_PATH
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
-  )
+)
 
-IF ( EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h" )
-  FILE ( STRINGS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h"
+if(EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h")
+  file(STRINGS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h"
     _cppunit_version_string REGEX "#define CPPUNIT_VERSION "
-    )
-  STRING ( REGEX REPLACE "#define CPPUNIT_VERSION +\"(.+)\".*$" "\\1"
+  )
+  string(REGEX REPLACE "#define CPPUNIT_VERSION +\"(.+)\".*$" "\\1"
     _cppunit_version_string "${_cppunit_version_string}"
-    )
-  STRING ( STRIP "${_cppunit_version_string}" CppUnit_VERSION )
-  UNSET ( _cppunit_version_string )
-ENDIF ()
+  )
+  string(STRIP "${_cppunit_version_string}" CppUnit_VERSION)
+  unset(_cppunit_version_string )
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for CppUnit lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _CPPUNIT_LIBRARYDIR_SEARCH_DIRS "" )
-LIST ( APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
+set(_CPPUNIT_LIBRARYDIR_SEARCH_DIRS "")
+list(APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
   ${CPPUNIT_LIBRARYDIR}
   ${_CPPUNIT_ROOT_SEARCH_DIR}
   ${PC_CppUnit_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Library suffix handling
 
-SET ( _CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
+set(_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-IF ( WIN32 )
-  LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+if(WIN32)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
     "_dll.lib"
-    )
-ELSEIF ( UNIX )
-  IF ( CPPUNIT_USE_STATIC_LIBS )
-    LIST ( APPEND CMAKE_FIND_LIBRARY_SUFFIXES
+  )
+elseif(UNIX)
+  if(CPPUNIT_USE_STATIC_LIBS)
+    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
       ".a"
-      )
-  ENDIF ()
-ENDIF ()
+    )
+  endif()
+endif()
 
 # Build suffix directories
 
-SET ( CPPUNIT_PATH_SUFFIXES
+set(CPPUNIT_PATH_SUFFIXES
   lib64
   lib
 )
 
-FIND_LIBRARY ( CppUnit_LIBRARY cppunit
+find_library(CppUnit_LIBRARY cppunit
   NO_DEFAULT_PATH
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
-  )
+)
 
 # Reset library suffix
 
-SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-UNSET ( _CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set CppUnit_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CppUnit
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(CppUnit
   FOUND_VAR CppUnit_FOUND
   REQUIRED_VARS
     CppUnit_LIBRARY
@@ -200,21 +200,21 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CppUnit
   VERSION_VAR CppUnit_VERSION
 )
 
-IF ( CppUnit_FOUND )
-  SET ( CppUnit_LIBRARIES ${CppUnit_LIBRARY} )
-  SET ( CppUnit_INCLUDE_DIRS ${CppUnit_INCLUDE_DIR} )
-  SET ( CppUnit_DEFINITIONS ${PC_CppUnit_CFLAGS_OTHER} )
+if(CppUnit_FOUND)
+  set(CppUnit_LIBRARIES ${CppUnit_LIBRARY})
+  set(CppUnit_INCLUDE_DIRS ${CppUnit_INCLUDE_DIR})
+  set(CppUnit_DEFINITIONS ${PC_CppUnit_CFLAGS_OTHER})
 
-  GET_FILENAME_COMPONENT ( CppUnit_LIBRARY_DIRS ${CppUnit_LIBRARY} DIRECTORY )
+  get_filename_component(CppUnit_LIBRARY_DIRS ${CppUnit_LIBRARY} DIRECTORY)
 
-  IF ( NOT TARGET CppUnit::cppunit )
-    ADD_LIBRARY ( CppUnit::cppunit UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( CppUnit::cppunit PROPERTIES
+  if(NOT TARGET CppUnit::cppunit)
+    add_library(CppUnit::cppunit UNKNOWN IMPORTED)
+    set_target_properties(CppUnit::cppunit PROPERTIES
       IMPORTED_LOCATION "${CppUnit_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${CppUnit_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${CppUnit_INCLUDE_DIRS}"
     )
-  ENDIF ()
-ELSEIF ( CppUnit_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find CppUnit")
-ENDIF ()
+  endif()
+elseif(CppUnit_FIND_REQUIRED)
+  message(FATAL_ERROR "Unable to find CppUnit")
+endif()

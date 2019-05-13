@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -70,7 +70,12 @@ namespace houdini_utils {
 /// along input 0 connections.
 /// @details The list is ordered from the topmost node to @a startNode.
 /// @note Lock the inputs of the topmost node before cooking the chain.
+/// @deprecated This functionality has been marked as deprecated as OpenVDB
+/// is no longer using this due to changes relating to verbification. Please get
+/// in touch with the Technical Steering Committee if you *are* still relying on
+/// this code and would like it to remain in the houdini_utils library.
 template<typename NodeType>
+OPENVDB_DEPRECATED
 inline std::vector<NodeType*>
 getNodeChain(OP_Context& context, NodeType* startNode, bool addInterest = true)
 {
@@ -124,9 +129,14 @@ getNodeChain(OP_Context& context, NodeType* startNode, bool addInterest = true)
 /// (for the duration of the current scope) set the evaluation context
 /// and time for a node other than the one that is currently being cooked.
 /// @internal Entire class is defined in header, so do *NOT* use *_API
+/// @deprecated This functionality has been marked as deprecated as OpenVDB
+/// is no longer using this due to changes relating to verbification. Please get
+/// in touch with the Technical Steering Committee if you *are* still relying on
+/// this code and would like it to remain in the houdini_utils library.
 class OP_EvalScope
 {
 public:
+    OPENVDB_DEPRECATED
     OP_EvalScope(OP_Node& node, OP_Context& context):
         mAutoEvaluator(
             *OPgetDirector()->getCommandManager(),
@@ -139,6 +149,7 @@ public:
         mDirector->pushCwd(mThread, &node);
     }
 
+    OPENVDB_DEPRECATED
     ~OP_EvalScope() { mDirector->popCwd(mThread); }
 
 private:
@@ -151,6 +162,6 @@ private:
 
 #endif // HOUDINI_UTILS_OP_NODECHAIN_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

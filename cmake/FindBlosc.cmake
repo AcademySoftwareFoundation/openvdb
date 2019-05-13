@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -87,110 +87,110 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   Blosc_INCLUDE_DIR
   Blosc_LIBRARY
 )
 
 # Append BLOSC_ROOT or $ENV{BLOSC_ROOT} if set (prioritize the direct cmake var)
-SET ( _BLOSC_ROOT_SEARCH_DIR "" )
+set(_BLOSC_ROOT_SEARCH_DIR "")
 
-IF ( BLOSC_ROOT )
-  LIST ( APPEND _BLOSC_ROOT_SEARCH_DIR ${BLOSC_ROOT} )
-ELSE ()
-  SET ( _ENV_BLOSC_ROOT $ENV{BLOSC_ROOT} )
-  IF ( _ENV_BLOSC_ROOT )
-    LIST ( APPEND _BLOSC_ROOT_SEARCH_DIR ${_ENV_BLOSC_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(BLOSC_ROOT)
+  list(APPEND _BLOSC_ROOT_SEARCH_DIR ${BLOSC_ROOT})
+else()
+  set(_ENV_BLOSC_ROOT $ENV{BLOSC_ROOT})
+  if(_ENV_BLOSC_ROOT)
+    list(APPEND _BLOSC_ROOT_SEARCH_DIR ${_ENV_BLOSC_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find blosc
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_Blosc QUIET blosc )
+find_package(PkgConfig)
+pkg_check_modules(PC_Blosc QUIET blosc)
 
 # ------------------------------------------------------------------------
 #  Search for blosc include DIR
 # ------------------------------------------------------------------------
 
-SET ( _BLOSC_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _BLOSC_INCLUDE_SEARCH_DIRS
+set(_BLOSC_INCLUDE_SEARCH_DIRS "")
+list(APPEND _BLOSC_INCLUDE_SEARCH_DIRS
   ${BLOSC_INCLUDEDIR}
   ${_BLOSC_ROOT_SEARCH_DIR}
   ${PC_Blosc_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard blosc header file.
-FIND_PATH ( Blosc_INCLUDE_DIR blosc.h
+find_path(Blosc_INCLUDE_DIR blosc.h
   NO_DEFAULT_PATH
   PATHS ${_BLOSC_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
-  )
+)
 
-IF ( EXISTS "${Blosc_INCLUDE_DIR}/blosc.h" )
-  FILE ( STRINGS "${Blosc_INCLUDE_DIR}/blosc.h"
+if(EXISTS "${Blosc_INCLUDE_DIR}/blosc.h")
+  file(STRINGS "${Blosc_INCLUDE_DIR}/blosc.h"
     _blosc_version_major_string REGEX "#define BLOSC_VERSION_MAJOR +[0-9]+ "
-    )
-  STRING ( REGEX REPLACE "#define BLOSC_VERSION_MAJOR +([0-9]+).*$" "\\1"
+  )
+  string(REGEX REPLACE "#define BLOSC_VERSION_MAJOR +([0-9]+).*$" "\\1"
     _blosc_version_major_string "${_blosc_version_major_string}"
-    )
-  STRING ( STRIP "${_blosc_version_major_string}" Blosc_VERSION_MAJOR )
+  )
+  string(STRIP "${_blosc_version_major_string}" Blosc_VERSION_MAJOR)
 
-  FILE ( STRINGS "${Blosc_INCLUDE_DIR}/blosc.h"
+  file(STRINGS "${Blosc_INCLUDE_DIR}/blosc.h"
      _blosc_version_minor_string REGEX "#define BLOSC_VERSION_MINOR +[0-9]+ "
-    )
-  STRING ( REGEX REPLACE "#define BLOSC_VERSION_MINOR +([0-9]+).*$" "\\1"
+  )
+  string(REGEX REPLACE "#define BLOSC_VERSION_MINOR +([0-9]+).*$" "\\1"
     _blosc_version_minor_string "${_blosc_version_minor_string}"
-    )
-  STRING ( STRIP "${_blosc_version_minor_string}" Blosc_VERSION_MINOR )
+  )
+  string(STRIP "${_blosc_version_minor_string}" Blosc_VERSION_MINOR)
 
-  UNSET ( _blosc_version_major_string )
-  UNSET ( _blosc_version_minor_string )
+  unset(_blosc_version_major_string)
+  unset(_blosc_version_minor_string)
 
-  SET ( Blosc_VERSION ${Blosc_VERSION_MAJOR}.${Blosc_VERSION_MINOR} )
-ENDIF ()
+  set(Blosc_VERSION ${Blosc_VERSION_MAJOR}.${Blosc_VERSION_MINOR})
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for blosc lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _BLOSC_LIBRARYDIR_SEARCH_DIRS "" )
-LIST ( APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
+set(_BLOSC_LIBRARYDIR_SEARCH_DIRS "")
+list(APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
   ${BLOSC_LIBRARYDIR}
   ${_BLOSC_ROOT_SEARCH_DIR}
   ${PC_Blosc_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Static library setup
-IF ( UNIX AND BLOSC_USE_STATIC_LIBS )
-  SET ( _BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
-ENDIF ()
+if(UNIX AND BLOSC_USE_STATIC_LIBS)
+  set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
 
-SET ( BLOSC_PATH_SUFFIXES
+set(BLOSC_PATH_SUFFIXES
   lib64
   lib
 )
 
-FIND_LIBRARY ( Blosc_LIBRARY blosc
+find_library(Blosc_LIBRARY blosc
   NO_DEFAULT_PATH
   PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${BLOSC_PATH_SUFFIXES}
 )
 
-IF ( UNIX AND BLOSC_USE_STATIC_LIBS )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-  UNSET ( _BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
-ENDIF ()
+if(UNIX AND BLOSC_USE_STATIC_LIBS)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+  unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+endif()
 
 # ------------------------------------------------------------------------
 #  Cache and set Blosc_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Blosc
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Blosc
   FOUND_VAR Blosc_FOUND
   REQUIRED_VARS
     Blosc_LIBRARY
@@ -198,21 +198,21 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Blosc
   VERSION_VAR Blosc_VERSION
 )
 
-IF ( Blosc_FOUND )
-  SET ( Blosc_LIBRARIES ${Blosc_LIBRARY} )
-  SET ( Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR} )
-  SET ( Blosc_DEFINITIONS ${PC_Blosc_CFLAGS_OTHER} )
+if(Blosc_FOUND)
+  set(Blosc_LIBRARIES ${Blosc_LIBRARY})
+  set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
+  set(Blosc_DEFINITIONS ${PC_Blosc_CFLAGS_OTHER})
 
-  GET_FILENAME_COMPONENT ( Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY )
+  get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY)
 
-  IF ( NOT TARGET Blosc::blosc )
-    ADD_LIBRARY ( Blosc::blosc UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( Blosc::blosc PROPERTIES
+  if(NOT TARGET Blosc::blosc)
+    add_library(Blosc::blosc UNKNOWN IMPORTED)
+    set_target_properties(Blosc::blosc PROPERTIES
       IMPORTED_LOCATION "${Blosc_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${Blosc_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
     )
-  ENDIF ()
-ELSEIF ( Blosc_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find Blosc")
-ENDIF ()
+  endif()
+elseif(Blosc_FIND_REQUIRED)
+  message(FATAL_ERROR "Unable to find Blosc")
+endif()

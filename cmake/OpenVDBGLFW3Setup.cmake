@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -66,46 +66,46 @@ The following variables may be provided to tell this module where to look.
 # Find the glfw3 installation and use glfw's CMake to initialize
 # the glfw lib
 
-SET ( _GLFW3_ROOT_SEARCH_DIR "" )
+set(_GLFW3_ROOT_SEARCH_DIR "")
 
-IF ( GLFW3_ROOT )
-  LIST ( APPEND _GLFW3_ROOT_SEARCH_DIR ${GLFW3_ROOT} )
-ELSE ()
-  SET ( _ENV_GLFW_ROOT $ENV{GLFW3_ROOT} )
-  IF ( _ENV_GLFW_ROOT )
-    LIST ( APPEND _GLFW3_ROOT_SEARCH_DIR ${_ENV_GLFW_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(GLFW3_ROOT)
+  list(APPEND _GLFW3_ROOT_SEARCH_DIR ${GLFW3_ROOT})
+else()
+  set(_ENV_GLFW_ROOT $ENV{GLFW3_ROOT})
+  if(_ENV_GLFW_ROOT)
+    list(APPEND _GLFW3_ROOT_SEARCH_DIR ${_ENV_GLFW_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find glfw, though we only use
 # pkg-config to re-direct to the cmake. In other words, glfw's cmake is
 # expected to be installed
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_glfw3 QUIET glfw3 )
+find_package(PkgConfig)
+pkg_check_modules(PC_glfw3 QUIET glfw3)
 
-IF ( PC_glfw3_FOUND )
-  FOREACH ( DIR ${PC_glfw3_LIBRARY_DIRS} )
-    LIST ( APPEND _GLFW3_ROOT_SEARCH_DIR ${DIR} )
-  ENDFOREACH ()
-ENDIF ()
+if(PC_glfw3_FOUND)
+  foreach(DIR ${PC_glfw3_LIBRARY_DIRS})
+    list(APPEND _GLFW3_ROOT_SEARCH_DIR ${DIR})
+  endforeach()
+endif()
 
-FIND_PATH ( GLFW3_CMAKE_LOCATION glfw3Config.cmake
+find_path(GLFW3_CMAKE_LOCATION glfw3Config.cmake
   NO_DEFAULT_PATH
   PATHS ${_GLFW3_ROOT_SEARCH_DIR}
   PATH_SUFFIXES lib/cmake/glfw3 cmake/glfw3 glfw3
-  )
+)
 
-IF ( GLFW3_CMAKE_LOCATION )
-  LIST ( APPEND CMAKE_PREFIX_PATH "${GLFW3_CMAKE_LOCATION}" )
-ENDIF ()
+if(GLFW3_CMAKE_LOCATION)
+  list(APPEND CMAKE_PREFIX_PATH "${GLFW3_CMAKE_LOCATION}")
+endif()
 
-SET ( glfw3_FIND_VERSION ${MINIMUM_GLFW_VERSION} )
-FIND_PACKAGE ( glfw3 ${MINIMUM_GLFW_VERSION} REQUIRED )
+set(glfw3_FIND_VERSION ${MINIMUM_GLFW_VERSION})
+find_package(glfw3 ${MINIMUM_GLFW_VERSION} REQUIRED)
 
-FIND_PACKAGE ( PackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( glfw3
+find_package(PackageHandleStandardArgs)
+find_package_handle_standard_args(glfw3
   REQUIRED_VARS glfw3_DIR glfw3_FOUND
   VERSION_VAR glfw3_VERSION
-  )
+)
 
-UNSET ( glfw3_FIND_VERSION )
+unset(glfw3_FIND_VERSION)

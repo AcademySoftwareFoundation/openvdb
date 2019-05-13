@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,109 +30,112 @@
 
 #]=======================================================================]
 
-PROJECT ( OpenVDBPython )
-CMAKE_MINIMUM_REQUIRED ( VERSION 3.3 )
+project(OpenVDBPython)
+cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
-IF ( POLICY CMP0074 )
-  CMAKE_POLICY ( SET CMP0074 NEW )
-ENDIF ()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 ###### OpenVDB Python Options
 
-OPTION ( USE_NUMPY [=[
-Build the python library with numpy support. Currently requires CMake 3.14.]=] OFF )
-OPTION ( OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
+option(USE_NUMPY [=[
+Build the python library with numpy support. Currently requires CMake 3.14.]=] OFF)
+option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
-module with this ON can be very memory-intensive.]=] OFF )
+module with this ON can be very memory-intensive.]=] OFF)
 
 #########################################################################
 
-MESSAGE ( STATUS "----------------------------------------------------" )
-MESSAGE ( STATUS "------------ Configuring OpenVDBPython -------------" )
-MESSAGE ( STATUS "----------------------------------------------------" )
+message(STATUS "----------------------------------------------------")
+message(STATUS "------------ Configuring OpenVDBPython -------------")
+message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
 # Collect and configure lib dependencies
 
-IF ( NOT OPENVDB_BUILD_CORE )
-  SET ( OPENVDB_LIB OpenVDB::openvdb )
-ELSE ()
-  SET ( OPENVDB_LIB openvdb )
-ENDIF ()
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
 
 # NumPy requires CMake 3.14
-IF ( USE_NUMPY AND ( ${CMAKE_VERSION} VERSION_LESS 3.14 ) )
-  MESSAGE ( FATAL_ERROR "No CMake support for FindPackage ( NumPy ) currently "
-    "available for OpenVDB. Requires CMake 3.14." )
-ENDIF ()
+if(USE_NUMPY AND (${CMAKE_VERSION} VERSION_LESS 3.14))
+  message(FATAL_ERROR "No CMake support for FindPackage ( NumPy) currently "
+    "available for OpenVDB. Requires CMake 3.14."
+  )
+endif()
 
-SET ( OPENVDB_PYTHON_DEPS )
-SET ( OPENVDB_PYTHON_INCLUDES )
+set(OPENVDB_PYTHON_DEPS)
+set(OPENVDB_PYTHON_INCLUDES)
 
 # If CMake is < 3.12, use the old style python search and alias the variables
 # Note that the Interpreter component is only required for the python test
-IF ( ${CMAKE_VERSION} VERSION_LESS 3.12 )
-  FIND_PACKAGE ( PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED )
-  FIND_PACKAGE ( PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED )
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
+  find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
+  find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
 
-  SET ( Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR} )
-  SET ( Python_VERSION_MINOR ${PYTHON_VERSION_MINOR} )
-  SET ( Python_EXECUTABLE ${PYTHON_EXECUTABLE} )
-  SET ( OPENVDB_PYTHON_DEPS ${PYTHON_LIBRARIES} )
-  GET_FILENAME_COMPONENT ( Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY )
+  set(Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
+  set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
+  set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
+  set(OPENVDB_PYTHON_DEPS ${PYTHON_LIBRARIES})
+  get_filename_component(Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY)
 
-  LIST ( APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR} )
-ELSE ()
+  list(APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR})
+else()
   # To ensure consistent versions between components Interpreter, Compiler,
   # Development and NumPy, specify all components at the same time when using
   # FindPython
-  IF ( USE_NUMPY )
-    FIND_PACKAGE ( Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy )
-    IF ( Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION )
-      MESSAGE ( FATAL_ERROR "Could NOT find NumPy (Required is at least version "
+  if(USE_NUMPY)
+    find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy)
+    if(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
+      message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
         "\"${MINIMUM_NUMPY_VERSION}\")"
-        )
-    ELSE ()
-      MESSAGE ( STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
+      )
+    else()
+      message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
         "version \"${Python_NumPy_VERSION}\", minimum required is "
         "\"${MINIMUM_NUMPY_VERSION}\")"
-        )
-    ENDIF ()
-    LIST ( APPEND OPENVDB_PYTHON_DEPS Python::NumPy )
-  ELSE ()
-    FIND_PACKAGE ( Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development )
-  ENDIF ()
-  LIST ( APPEND OPENVDB_PYTHON_DEPS Python::Python )
-ENDIF ()
+      )
+    endif()
+    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
+  else()
+    find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development)
+  endif()
+  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
+endif()
 
 
 # Boost python handling - try and find both python and pythonXx (version suffixed).
 # Prioritize the version suffixed library, failing if neither exist.
 
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
+find_package(Boost ${MINIMUM_BOOST_VERSION}
   QUIET COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
 )
 
-IF ( TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} )
-  SET ( BOOST_PYTHON_LIB "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}" )
-  MESSAGE ( STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}" )
-ELSE ()
-  FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION}
+if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  set(BOOST_PYTHON_LIB "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+  message(STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+else()
+  find_package(Boost ${MINIMUM_BOOST_VERSION}
     QUIET COMPONENTS python
   )
-  IF ( TARGET Boost::python )
-    SET ( BOOST_PYTHON_LIB "python" )
-    MESSAGE ( STATUS "Found non-suffixed boost_python, assuming to be python version "
-      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible" )
-  ELSE ()
-    MESSAGE ( FATAL_ERROR "Unable to find boost_python or "
-      "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}." )
-  ENDIF ()
-ENDIF ()
+  if(TARGET Boost::python)
+    set(BOOST_PYTHON_LIB "python")
+    message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
+    )
+  else()
+    message(FATAL_ERROR "Unable to find boost_python or "
+      "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}."
+    )
+  endif()
+endif()
 
-SET ( OPENVDB_PYTHON_DEPENDENT_LIBS
+set(OPENVDB_PYTHON_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   Boost::${BOOST_PYTHON_LIB}
   ${OPENVDB_PYTHON_DEPS}
@@ -140,7 +143,7 @@ SET ( OPENVDB_PYTHON_DEPENDENT_LIBS
 
 ##########################################################################
 
-SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
+set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
   pyFloatGrid.cc
   pyIntGrid.cc
   pyMetadata.cc
@@ -149,43 +152,43 @@ SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
   pyPointGrid.cc
   pyTransform.cc
   pyVec3Grid.cc
-  )
+)
 
-IF ( NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY )
-  SET ( PYOPENVDB_INSTALL_DIRECTORY
+if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+  set(PYOPENVDB_INSTALL_DIRECTORY
     lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
-    )
-ENDIF ( NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY )
+  )
+endif()
 
-ADD_LIBRARY ( pyopenvdb SHARED
+add_library(pyopenvdb SHARED
   ${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
-  )
+)
 
-TARGET_INCLUDE_DIRECTORIES ( pyopenvdb
+target_include_directories(pyopenvdb
   SYSTEM PUBLIC ${OPENVDB_PYTHON_INCLUDES}
-  )
+)
 
-IF ( OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES )
-  TARGET_COMPILE_DEFINITIONS ( pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES" )
-ENDIF ()
+if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
+  target_compile_definitions(pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
+endif()
 
-IF ( USE_NUMPY )
-  TARGET_COMPILE_DEFINITIONS ( pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY" )
-ENDIF ()
+if(USE_NUMPY)
+  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
+endif()
 
-TARGET_LINK_LIBRARIES ( pyopenvdb
+target_link_libraries(pyopenvdb
   ${OPENVDB_PYTHON_DEPENDENT_LIBS}
-  )
+)
 
-SET_TARGET_PROPERTIES ( pyopenvdb PROPERTIES
+set_target_properties(pyopenvdb PROPERTIES
   PREFIX ""
-  )
+)
 
-IF ( OPENVDB_ENABLE_RPATH )
+if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
-  SET ( RPATHS "" )
-  LIST ( APPEND RPATHS
+  set(RPATHS "")
+  list(APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
     ${IlmBase_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
@@ -193,34 +196,34 @@ IF ( OPENVDB_ENABLE_RPATH )
     ${Tbb_LIBRARY_DIRS}
     ${Python_LIBRARY_DIRS}
   )
-  IF ( OPENVDB_BUILD_CORE )
-    LIST ( APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib )
-  ELSE ()
-    LIST ( APPEND RPATHS ${OpenVDB_LIBRARY_DIRS} )
-  ENDIF ()
+  if(OPENVDB_BUILD_CORE)
+    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+  else()
+    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
+  endif()
 
-  LIST ( REMOVE_DUPLICATES RPATHS )
-  SET_TARGET_PROPERTIES ( pyopenvdb
+  list(REMOVE_DUPLICATES RPATHS)
+  set_target_properties(pyopenvdb
     PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  UNSET ( RPATHS )
-ENDIF ()
-
-SET ( PYTHON_PUBLIC_INCLUDE_NAMES
-  pyopenvdb.h
   )
+  unset(RPATHS)
+endif()
 
-INSTALL ( TARGETS
+set(PYTHON_PUBLIC_INCLUDE_NAMES
+  pyopenvdb.h
+)
+
+install(TARGETS
   pyopenvdb
   DESTINATION
   ${PYOPENVDB_INSTALL_DIRECTORY}
-  )
+)
 
-INSTALL ( FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION include/openvdb/python )
+install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION include/openvdb/python)
 
 # pytest
 
-ADD_TEST ( pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py )
-SET_TESTS_PROPERTIES ( pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}" )
+add_test(pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py)
+set_tests_properties(pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}")
 
 

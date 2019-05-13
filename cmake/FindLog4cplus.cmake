@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -89,110 +89,110 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-MARK_AS_ADVANCED (
+mark_as_advanced(
   Log4cplus_INCLUDE_DIR
   Log4cplus_LIBRARY
 )
 
 # Append LOG4CPLUS_ROOT or $ENV{LOG4CPLUS_ROOT} if set (prioritize the direct cmake var)
-SET ( _LOG4CPLUS_ROOT_SEARCH_DIR "" )
+set(_LOG4CPLUS_ROOT_SEARCH_DIR "")
 
-IF ( LOG4CPLUS_ROOT )
-  LIST ( APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${LOG4CPLUS_ROOT} )
-ELSE ()
-  SET ( _ENV_LOG4CPLUS_ROOT $ENV{LOG4CPLUS_ROOT} )
-  IF ( _ENV_LOG4CPLUS_ROOT )
-    LIST ( APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${_ENV_LOG4CPLUS_ROOT} )
-  ENDIF ()
-ENDIF ()
+if(LOG4CPLUS_ROOT)
+  list(APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${LOG4CPLUS_ROOT})
+else()
+  set(_ENV_LOG4CPLUS_ROOT $ENV{LOG4CPLUS_ROOT})
+  if(_ENV_LOG4CPLUS_ROOT)
+    list(APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${_ENV_LOG4CPLUS_ROOT})
+  endif()
+endif()
 
 # Additionally try and use pkconfig to find log4cplus
 
-FIND_PACKAGE ( PkgConfig )
-PKG_CHECK_MODULES ( PC_Log4cplus QUIET log4cplus )
+find_package(PkgConfig)
+pkg_check_modules(PC_Log4cplus QUIET log4cplus)
 
 # ------------------------------------------------------------------------
 #  Search for Log4cplus include DIR
 # ------------------------------------------------------------------------
 
-SET ( _LOG4CPLUS_INCLUDE_SEARCH_DIRS "" )
-LIST ( APPEND _LOG4CPLUS_INCLUDE_SEARCH_DIRS
+set(_LOG4CPLUS_INCLUDE_SEARCH_DIRS "")
+list(APPEND _LOG4CPLUS_INCLUDE_SEARCH_DIRS
   ${LOG4CPLUS_INCLUDEDIR}
   ${_LOG4CPLUS_ROOT_SEARCH_DIR}
   ${PC_Log4cplus_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 # Look for a standard log4cplus header file.
-FIND_PATH ( Log4cplus_INCLUDE_DIR log4cplus/version.h
+find_path(Log4cplus_INCLUDE_DIR log4cplus/version.h
   NO_DEFAULT_PATH
   PATHS ${_LOG4CPLUS_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
-  )
+)
 
-IF ( EXISTS "${Log4cplus_INCLUDE_DIR}/log4cplus/version.h" )
-  FILE ( STRINGS "${Log4cplus_INCLUDE_DIR}/log4cplus/version.h"
+if(EXISTS "${Log4cplus_INCLUDE_DIR}/log4cplus/version.h")
+  file(STRINGS "${Log4cplus_INCLUDE_DIR}/log4cplus/version.h"
     _log4cplus_version_string REGEX "#define LOG4CPLUS_VERSION LOG4CPLUS_MAKE_VERSION"
-    )
-  STRING ( REGEX REPLACE "#define LOG4CPLUS_VERSION LOG4CPLUS_MAKE_VERSION\((.*)\).*$" "\\1"
+  )
+  string(REGEX REPLACE "#define LOG4CPLUS_VERSION LOG4CPLUS_MAKE_VERSION\((.*)\).*$" "\\1"
     _log4cplus_version_string "${_log4cplus_version_string}"
-    )
-  STRING ( REGEX REPLACE "[(]([0-9]+),.*[)].*$" "\\1"
+  )
+  string(REGEX REPLACE "[(]([0-9]+),.*[)].*$" "\\1"
     Log4cplus_MAJOR_VERSION "${_log4cplus_version_string}"
-    )
-  STRING ( REGEX REPLACE "[(].+, ([0-9]+),.+[)].*$" "\\1"
+  )
+  string(REGEX REPLACE "[(].+, ([0-9]+),.+[)].*$" "\\1"
     Log4cplus_MINOR_VERSION "${_log4cplus_version_string}"
-    )
-  STRING ( REGEX REPLACE "[(].*,.*, ([0-9]+)[)].*$" "\\1"
+  )
+  string(REGEX REPLACE "[(].*,.*, ([0-9]+)[)].*$" "\\1"
     Log4cplus_PATCH_VERSION "${_log4cplus_version_string}"
-    )
-  UNSET ( _log4cplus_version_string )
+  )
+  unset(_log4cplus_version_string)
 
-  SET ( Log4cplus_VERSION ${Log4cplus_MAJOR_VERSION}.${Log4cplus_MINOR_VERSION}.${Log4cplus_PATCH_VERSION} )
-ENDIF ()
+  set(Log4cplus_VERSION ${Log4cplus_MAJOR_VERSION}.${Log4cplus_MINOR_VERSION}.${Log4cplus_PATCH_VERSION})
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for Log4cplus lib DIR
 # ------------------------------------------------------------------------
 
-SET ( _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS "" )
-LIST ( APPEND _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS
+set(_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS "")
+list(APPEND _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS
   ${LOG4CPLUS_LIBRARYDIR}
   ${_LOG4CPLUS_ROOT_SEARCH_DIR}
   ${PC_Log4cplus_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
-  )
+)
 
 
-IF ( UNIX AND LOG4CPLUS_USE_STATIC_LIBS )
-  SET ( _LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES} )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ".a" )
-ENDIF ()
+if(UNIX AND LOG4CPLUS_USE_STATIC_LIBS)
+  set(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+endif()
 
 # Build suffix directories
 
-SET ( LOG4CPLUS_PATH_SUFFIXES
+set(LOG4CPLUS_PATH_SUFFIXES
   lib64
   lib
 )
 
-FIND_LIBRARY ( Log4cplus_LIBRARY log4cplus
+find_library(Log4cplus_LIBRARY log4cplus
   NO_DEFAULT_PATH
   PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${LOG4CPLUS_PATH_SUFFIXES}
-  )
+)
 
-IF ( UNIX AND LOG4CPLUS_USE_STATIC_LIBS )
-  SET ( CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES} )
-  UNSET ( _LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES )
-ENDIF ()
+if(UNIX AND LOG4CPLUS_USE_STATIC_LIBS)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+  unset(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+endif()
 
 # ------------------------------------------------------------------------
 #  Cache and set Log4cplus_FOUND
 # ------------------------------------------------------------------------
 
-INCLUDE ( FindPackageHandleStandardArgs )
-FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Log4cplus
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Log4cplus
   FOUND_VAR Log4cplus_FOUND
   REQUIRED_VARS
     Log4cplus_LIBRARY
@@ -200,21 +200,21 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Log4cplus
   VERSION_VAR Log4cplus_VERSION
 )
 
-IF ( Log4cplus_FOUND )
-  SET ( Log4cplus_LIBRARIES ${Log4cplus_LIBRARY} )
-  SET ( Log4cplus_INCLUDE_DIRS ${Log4cplus_INCLUDE_DIR} )
-  SET ( Log4cplus_DEFINITIONS ${PC_Log4cplus_CFLAGS_OTHER} )
+if(Log4cplus_FOUND)
+  set(Log4cplus_LIBRARIES ${Log4cplus_LIBRARY})
+  set(Log4cplus_INCLUDE_DIRS ${Log4cplus_INCLUDE_DIR})
+  set(Log4cplus_DEFINITIONS ${PC_Log4cplus_CFLAGS_OTHER})
 
-  GET_FILENAME_COMPONENT ( Log4cplus_LIBRARY_DIRS ${Log4cplus_LIBRARY} DIRECTORY )
+  get_filename_component(Log4cplus_LIBRARY_DIRS ${Log4cplus_LIBRARY} DIRECTORY)
 
-  IF ( NOT TARGET Log4cplus::log4cplus )
-    ADD_LIBRARY ( Log4cplus::log4cplus UNKNOWN IMPORTED )
-    SET_TARGET_PROPERTIES ( Log4cplus::log4cplus PROPERTIES
+  if(NOT TARGET Log4cplus::log4cplus)
+    add_library(Log4cplus::log4cplus UNKNOWN IMPORTED)
+    set_target_properties(Log4cplus::log4cplus PROPERTIES
       IMPORTED_LOCATION "${Log4cplus_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${Log4cplus_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${Log4cplus_INCLUDE_DIRS}"
     )
-  ENDIF ()
-ELSEIF ( Log4cplus_FIND_REQUIRED )
-  MESSAGE ( FATAL_ERROR "Unable to find Log4cplus")
-ENDIF ()
+  endif()
+elseif(Log4cplus_FIND_REQUIRED)
+  message(FATAL_ERROR "Unable to find Log4cplus")
+endif()

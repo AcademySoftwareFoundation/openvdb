@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -581,6 +581,8 @@ TestAttributeSet::testAttributeSet()
         attrSet.appendAttribute("vector", AttributeVec3s::attributeType(), /*stride=*/1);
         attrSet.appendAttribute("vector3", AttributeVec3s::attributeType(), /*stride=*/3);
         attrSet.appendAttribute("bool100", AttributeB::attributeType(), /*stride=*/100);
+        attrSet.appendAttribute("boolDynamic", AttributeB::attributeType(), /*size=*/100, false);
+        attrSet.appendAttribute("intDynamic", AttributeI::attributeType(), /*size=*/300, false);
 
         CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet.getConst("float1")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet.getConst("int1")->type().first);
@@ -588,6 +590,8 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector3")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet.getConst("bool100")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet.getConst("boolDynamic")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet.getConst("intDynamic")->type().first);
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("float1")->stride());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("int1")->stride());
@@ -598,7 +602,11 @@ TestAttributeSet::testAttributeSet()
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSet.getConst("float1")->size());
 
-        AttributeSet attrSet2(attrSet, /*arrayLength=*/200);
+        // error as the new length is greater than the data size of the
+        // 'boolDynamic' attribute
+        CPPUNIT_ASSERT_THROW(AttributeSet(attrSet, /*arrayLength=*/200), openvdb::ValueError);
+
+        AttributeSet attrSet2(attrSet, /*arrayLength=*/100);
 
         CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet2.getConst("float1")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet2.getConst("int1")->type().first);
@@ -606,6 +614,8 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector3")->type().first);
         CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet2.getConst("bool100")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet2.getConst("boolDynamic")->type().first);
+        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet2.getConst("intDynamic")->type().first);
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("float1")->stride());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("int1")->stride());
@@ -613,8 +623,14 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("vector")->stride());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet2.getConst("vector3")->stride());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("bool100")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), attrSet2.getConst("boolDynamic")->stride());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), attrSet2.getConst("intDynamic")->stride());
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(200), attrSet2.getConst("float1")->size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("float1")->size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("boolDynamic")->size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("intDynamic")->size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("boolDynamic")->dataSize());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(300), attrSet2.getConst("intDynamic")->dataSize());
     }
 
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
@@ -1118,6 +1134,6 @@ TestAttributeSet::testAttributeSetGroups()
     }
 }
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
