@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -74,7 +74,7 @@
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
@@ -241,6 +241,6 @@ struct VersionId {
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

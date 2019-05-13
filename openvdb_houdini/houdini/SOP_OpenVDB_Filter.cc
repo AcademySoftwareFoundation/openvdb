@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,7 +34,6 @@
 ///
 /// @brief Filtering operations for non-level-set grids
 
-#include <houdini_utils/OP_NodeChain.h> // for getNodeChain(), OP_EvalScope
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -601,6 +600,6 @@ SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
 }
 
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

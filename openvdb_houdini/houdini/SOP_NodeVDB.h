@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -161,6 +161,8 @@ protected:
     /// @warning No attempt to call duplicateSource() or inputGeo() should be made after
     /// calling this method, as there will be no data on the input stream if isSourceStealable()
     /// returns @c true.
+    /// @deprecated     verbification renders this redundant
+    OPENVDB_DEPRECATED
     OP_ERROR duplicateSourceStealable(const unsigned index,
         OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean = true);
 
@@ -181,6 +183,8 @@ protected:
     ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
+    /// @deprecated     verbification renders this redundant
+    OPENVDB_DEPRECATED
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context);
 
     /// @}
@@ -195,6 +199,8 @@ private:
     ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
+    /// @deprecated     verbification renders this redundant
+    OPENVDB_DEPRECATED
     bool isSourceStealable(const unsigned index, OP_Context& context) const;
 }; // class SOP_NodeVDB
 
@@ -244,6 +250,6 @@ namespace node_info_text
 
 #endif // OPENVDB_HOUDINI_SOP_NODEVDB_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

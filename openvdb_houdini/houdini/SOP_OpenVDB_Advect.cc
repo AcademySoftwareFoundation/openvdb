@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,7 +49,7 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 
-#include <boost/algorithm/string/join.hpp>
+#include <hboost/algorithm/string/join.hpp>
 
 #include <functional>
 #include <stdexcept>
@@ -550,7 +550,7 @@ processGrids(GU_Detail* gdp, AdvectionParms& parms, hvdb::Interrupter& boss,
 
     if (!skippedGrids.empty() && warningCallback) {
         std::string s = "The following non-floating-point grids were skipped: "
-            + boost::algorithm::join(skippedGrids, ", ");
+            + hboost::algorithm::join(skippedGrids, ", ");
         warningCallback(s);
     }
 
@@ -672,6 +672,6 @@ SOP_OpenVDB_Advect::Cache::cookVDBSop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
