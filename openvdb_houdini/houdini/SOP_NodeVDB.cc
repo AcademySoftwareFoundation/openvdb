@@ -664,7 +664,7 @@ public:
 
     std::string getParentName(const houdini_utils::OpFactory& factory) override
     {
-        return SESIOpenVDBOpPolicy::getName(factory.english());
+        return this->getLowercaseName(this->getValidName(factory.english()));
     }
 
     std::string getFirstName(const houdini_utils::OpFactory& factory) override
