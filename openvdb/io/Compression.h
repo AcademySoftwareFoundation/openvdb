@@ -262,6 +262,9 @@ OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 /// @param count        the number of elements to read in
 /// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
 ///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @param metadata     optional pointer to a DelayedLoadMetadata object that stores
+///                     the size of the compressed buffer
+/// @param metadataOffset offset into DelayedLoadMetadata, ignored if pointer is null
 /// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
 /// without Blosc support.
 /// @details This default implementation is instantiated only for types
