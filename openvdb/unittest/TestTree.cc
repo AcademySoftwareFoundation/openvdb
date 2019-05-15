@@ -70,6 +70,7 @@ public:
     CPPUNIT_TEST(testValues);
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testSetValueOnly);
+    CPPUNIT_TEST(testSetValueInPlace);
     CPPUNIT_TEST(testEvalMinMax);
     CPPUNIT_TEST(testResize);
     CPPUNIT_TEST(testHasSameTopology);
@@ -102,6 +103,7 @@ public:
     void testValues();
     void testSetValue();
     void testSetValueOnly();
+    void testSetValueInPlace();
     void testEvalMinMax();
     void testResize();
     void testHasSameTopology();
@@ -470,6 +472,84 @@ TestTree::testSetValueOnly()
     CPPUNIT_ASSERT_EQUAL(1, int(tree.activeVoxelCount()));
 }
 
+namespace {
+
+// Simple float wrapper with required interface to be used as ValueType in tree::LeafNode
+// Throws on copy-construction to ensure that all modifications are done in-place.
+struct FloatThrowOnCopy
+{
+    float value = 0.0f;
+
+    using T = FloatThrowOnCopy;
+
+    FloatThrowOnCopy() = default;
+    explicit FloatThrowOnCopy(float _value): value(_value) { }
+
+    FloatThrowOnCopy(const FloatThrowOnCopy&) { throw openvdb::RuntimeError("No Copy"); }
+
+    T operator+(const float rhs) const { return T(value + rhs); }
+    T operator-() const { return T(-value); }
+    bool operator<(const T& other) const { return value < other.value; }
+    bool operator>(const T& other) const { return value > other.value; }
+    bool operator==(const T& other) const { return value == other.value; }
+
+    friend std::ostream& operator<<(std::ostream &stream, const T& other)
+    {
+        stream << other.value;
+        return stream;
+    }
+};
+
+} // namespace
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace math {
+
+OPENVDB_EXACT_IS_APPROX_EQUAL(FloatThrowOnCopy)
+
+} // namespace math
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
+void
+TestTree::testSetValueInPlace()
+{
+    using FloatThrowOnCopyTree = openvdb::tree::Tree4<FloatThrowOnCopy, 5, 4, 3>::Type;
+    using FloatThrowOnCopyGrid = openvdb::Grid<FloatThrowOnCopyTree>;
+
+    FloatThrowOnCopyGrid::registerGrid();
+
+    FloatThrowOnCopyTree tree;
+    const openvdb::Coord c0(5, 10, 20), c1(-5,-10,-20);
+
+    // tile values can legitimately be copied to assess whether a change in value
+    // requires the tile to be voxelized, so activate and voxelize active tiles first
+
+    tree.setActiveState(c0, true);
+    tree.setActiveState(c1, true);
+
+    tree.voxelizeActiveTiles(/*threaded=*/true);
+
+    CPPUNIT_ASSERT_NO_THROW(tree.modifyValue(c0,
+        [](FloatThrowOnCopy& lhs) { lhs.value = 1.4f; }
+    ));
+
+    CPPUNIT_ASSERT_NO_THROW(tree.modifyValueAndActiveState(c1,
+        [](FloatThrowOnCopy& lhs, bool& b) { lhs.value = 2.7f; b = false; }
+    ));
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.4f, tree.getValue(c0).value, 1.0e-7);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.7f, tree.getValue(c1).value, 1.0e-7);
+
+    CPPUNIT_ASSERT(tree.isValueOn(c0));
+    CPPUNIT_ASSERT(!tree.isValueOn(c1));
+
+    // use slower de-allocation to ensure that no value copying occurs
+
+    tree.root().clear();
+}
 
 namespace {
 
