@@ -282,7 +282,7 @@ readData(std::istream& is, T* data, Index count, uint32_t compression,
 
     if (metadata && seek && hasCompression) {
         size_t compressedSize = metadata->getCompressedSize(metadataOffset);
-        is.seekg(compressedSize+8, std::ios_base::cur);
+        is.seekg(compressedSize, std::ios_base::cur);
     } else if (compression & COMPRESS_BLOSC) {
         bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else if (compression & COMPRESS_ZIP) {

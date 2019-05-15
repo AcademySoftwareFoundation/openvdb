@@ -382,10 +382,11 @@ struct PopulateDelayedLoadMetadataOp
 
                 if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
                     // set compressed size value
+                    size_t sizeBytes(8);
                     size_t compressedSize = io::writeCompressedValuesSize(
                         leaf.buffer().data(), LeafT::SIZE,
                         leaf.valueMask(), maskCompressData.metadata, saveFloatAsHalf, compression);
-                    metadata.setCompressedSize(idx, compressedSize);
+                    metadata.setCompressedSize(idx, compressedSize+sizeBytes);
                 }
             }
         );
