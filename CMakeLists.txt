@@ -115,6 +115,7 @@ option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
+option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
 
 ###### Deprecated options
 
@@ -157,6 +158,7 @@ mark_as_advanced(
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  OPENVDB_USE_DEPRECATED_ABI
 )
 
 # Configure minimum version requirements
@@ -467,8 +469,15 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
 endif()
 
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
-  message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-    "deprecated and will soon be removed.")
+  if(OPENVDB_USE_DEPRECATED_ABI)
+    message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+      "deprecated and will soon be removed.")
+  else()
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+      "deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+  endif()
+  # global target definition
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it
