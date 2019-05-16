@@ -21,7 +21,7 @@ namespace io {
 
 /// @brief Store a buffer of data that can be optionally used
 /// during reading for faster delayed-load I/O performance
-class DelayedLoadMetadata: public Metadata
+class OPENVDB_API DelayedLoadMetadata: public Metadata
 {
 public:
     using Ptr = SharedPtr<DelayedLoadMetadata>;
@@ -64,16 +64,28 @@ public:
         return Metadata::isRegisteredType(DelayedLoadMetadata::staticTypeName());
     }
 
+    /// @brief Delete the contents of the mask and compressed size arrays
     void clear();
+    /// @brief Return @c true if both arrays are empty
     bool empty() const;
 
+    /// @brief Resize the mask array
     void resizeMask(size_t size);
+    /// @brief Resize the compressed size array
     void resizeCompressedSize(size_t size);
 
+    /// @brief Return the mask value for a specific index
+    /// @note throws if index is out-of-range or DelayedLoadMask not registered
     MaskType getMask(size_t index) const;
+    /// @brief Set the mask value for a specific index
+    /// @note throws if index is out-of-range
     void setMask(size_t index, const MaskType& value);
 
+    /// @brief Return the compressed size value for a specific index
+    /// @note throws if index is out-of-range or DelayedLoadMask not registered
     CompressedSizeType getCompressedSize(size_t index) const;
+    /// @brief Set the compressed size value for a specific index
+    /// @note throws if index is out-of-range
     void setCompressedSize(size_t index, const CompressedSizeType& value);
 
 protected:
@@ -83,7 +95,7 @@ protected:
 private:
     std::vector<MaskType> mMask;
     std::vector<CompressedSizeType> mCompressedSize;
-};
+}; // class DelayedLoadMetadata
 
 
 } // namespace io
