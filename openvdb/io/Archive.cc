@@ -211,6 +211,7 @@ struct StreamMetadata::Impl
     bool mHalfFloat = false;
     bool mWriteGridStats = false;
     bool mSeekable = false;
+    bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
     bool mCountingPasses = false;
     uint32_t mPass = 0;
     uint64_t mLeaf = 0;
@@ -275,6 +276,7 @@ const void*     StreamMetadata::backgroundPtr() const   { return mImpl->mBackgro
 bool            StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
 bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGridStats; }
 bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
+bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
 uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
@@ -307,6 +309,7 @@ StreamMetadata::str() const
     ostr << "compression: " << compressionToString(compression()) << "\n";
     ostr << "half_float: " << halfFloat() << "\n";
     ostr << "seekable: " << seekable() << "\n";
+    ostr << "delayed_load_meta: " << delayedLoadMeta() << "\n";
     ostr << "pass: " << pass() << "\n";
     ostr << "counting_passes: " << countingPasses() << "\n";
     ostr << "write_grid_stats_metadata: " << writeGridStats() << "\n";

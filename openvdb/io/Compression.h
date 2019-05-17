@@ -504,7 +504,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 
     DelayedLoadMetadata::Ptr delayLoadMeta;
     uint64_t leafIndex(0);
-    if (seek && meta && DelayedLoadMetadata::isRegisteredType()) {
+    if (seek && meta && meta->delayedLoadMeta()) {
         delayLoadMeta =
             meta->gridMetadata().getMetadata<DelayedLoadMetadata>("file_delayed_load");
         leafIndex = meta->leaf();

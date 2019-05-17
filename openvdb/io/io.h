@@ -95,6 +95,8 @@ public:
     bool seekable() const;
     void setSeekable(bool);
 
+    bool delayedLoadMeta() const;
+
     bool countingPasses() const;
     void setCountingPasses(bool);
 
