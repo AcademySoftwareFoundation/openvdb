@@ -583,9 +583,6 @@ newSopOperator(OP_OperatorTable* table)
                 .addInput("Input with VDB grids to process")
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
                 .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Repair level sets represented by VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -604,12 +601,7 @@ NOTE:\n\
 @related\n\
 - [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
 - [OpenVDB Rebuild Level Set|Node:sop/DW_OpenVDBRebuildLevelSet]\n\
-- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n");
 
         } else if (OP_TYPE_RESHAPE == op) {
 
@@ -623,9 +615,6 @@ and usage examples.\n");
                 .addOptionalInput("Optional VDB Alpha Mask")
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
                 .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Offset level sets represented by VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -637,12 +626,7 @@ updates the active voxels to account for the transformation.\n\
 \n\
 @related\n\
 - [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
-- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
@@ -656,9 +640,6 @@ and usage examples.\n");
                 .addOptionalInput("Optional VDB Alpha Mask")
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
                 .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Smooth the surface of a level set represented by a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -675,12 +656,7 @@ this node ensures that the level set remains a valid signed distance field.\n\
 @related\n\
 - [OpenVDB Filter|Node:sop/DW_OpenVDBFilter]\n\
 - [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
-- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n");
 
         } else if (OP_TYPE_RESIZE == op) {
 
@@ -690,9 +666,6 @@ and usage examples.\n");
                 .addInput("Input with VDBs to process")
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
                 .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Change the width of the narrow band of a VDB signed distance field.\"\"\"\n\
 \n\
 @overview\n\
@@ -703,12 +676,7 @@ represented by a VDB volume.\n\
 @related\n\
 - [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
 - [OpenVDB Rebuild Level Set|Node:sop/DW_OpenVDBRebuildLevelSet]\n\
-- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n");
         }
     }
 }

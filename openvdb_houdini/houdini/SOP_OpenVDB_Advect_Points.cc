@@ -839,9 +839,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_DUPLICATE,
             []() { return new SOP_OpenVDB_Advect_Points::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Move points in the input geometry along a VDB velocity field.\"\"\"\n\
 \n\
 @overview\n\
@@ -894,12 +891,7 @@ Closest Point VDB:\n\
 @related\n\
 - [OpenVDB Advect|Node:sop/DW_OpenVDBAdvect]\n\
 - [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
-- [Node:sop/vdbadvectpoints]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbadvectpoints]\n");
 }
 
 

@@ -3,6 +3,12 @@ OpenVDB Version History
 
 Version 6.1.1 - In development
 
+    Houdini:
+    - Added a houdini_utils::OpPolicy::getFirstName() method to allow
+      derived OpPolicy classes to provide their own first name scheme.
+    - Added a houdini_utils::OpPolicy::getDocHeader() and
+      houdini_utils::OpPolicy::getDocFooter() for customizing the Houdini
+      documentation displayed in the Houdini help card.
 
 Version 6.1.0 - May 8, 2019
 

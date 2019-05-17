@@ -230,9 +230,6 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_To_Spheres::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Fill a VDB volume with adaptively-sized spheres.\"\"\"\n\
 \n\
 @overview\n\
@@ -248,12 +245,7 @@ Another use is to produce the initial density volume for cloud modeling.\n\
 @related\n\
 - [OpenVDB Fracture|Node:sop/DW_OpenVDBFracture]\n\
 - [Node:sop/cloud]\n\
-- [Node:sop/vdbtospheres]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbtospheres]\n");
 }
 
 

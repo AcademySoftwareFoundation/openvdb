@@ -177,9 +177,6 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to be written to disk")
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Write a `.vdb` file to disk.\"\"\"\n\
 \n\
 @overview\n\
@@ -192,12 +189,7 @@ options that are not available on the native node.\n\
 \n\
 @related\n\
 - [OpenVDB Read|Node:sop/DW_OpenVDBRead]\n\
-- [Node:sop/file]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/file]\n");
 }
 
 

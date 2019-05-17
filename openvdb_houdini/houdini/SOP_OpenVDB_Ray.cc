@@ -153,20 +153,12 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("level set grids")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Ray::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Project geometry onto a level set VDB volume.\"\"\"\n\
 \n\
 @overview\n\
 \n\
 This node performs geometry projections using level set ray intersections\n\
-or closest point queries.\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+or closest point queries.\n");
 }
 
 

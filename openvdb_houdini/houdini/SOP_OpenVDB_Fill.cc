@@ -158,9 +158,6 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional bounding geometry")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fill::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Fill and activate/deactivate regions of voxels within a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -171,12 +168,7 @@ By default, the operation uses a sparse voxel representation to reduce\n\
 the memory footprint of the output volume.\n\
 \n\
 @related\n\
-- [Node:sop/vdbactivate]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbactivate]\n");
 }
 
 

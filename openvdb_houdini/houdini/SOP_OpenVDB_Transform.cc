@@ -128,9 +128,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDBs to transform")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Transform::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Modify the transforms of VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -140,12 +137,7 @@ It is usually preferable to use Houdini's native [Transform|Node:sop/xform] node
 except if you want to also transform the _values_ of a vector-valued VDB.\n\
 \n\
 @related\n\
-- [Node:sop/xform]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/xform]\n");
 }
 
 

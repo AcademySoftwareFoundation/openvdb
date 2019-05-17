@@ -141,9 +141,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_LOD::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Build an LOD pyramid from a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -154,12 +151,7 @@ The low-resolution versions can be used both as thumbnails for fast processing\n
 and for constant-time, filtered lookups over large areas of a volume.\n\
 \n\
 @related\n\
-- [OpenVDB Resample|Node:sop/DW_OpenVDBResample]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Resample|Node:sop/DW_OpenVDBResample]\n");
 }
 
 

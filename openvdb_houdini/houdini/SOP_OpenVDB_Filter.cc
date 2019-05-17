@@ -331,9 +331,6 @@ Offset:\n\
         .addOptionalInput("Optional VDB Alpha Mask")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Filter::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Filters/smooths the values in a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -355,12 +352,7 @@ NOTE:\n\
 - [OpenVDB Noise|Node:sop/DW_OpenVDBNoise]\n\
 - [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
 - [Node:sop/vdbsmooth]\n\
-- [Node:sop/vdbsmoothsdf]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbsmoothsdf]\n");
 }
 
 

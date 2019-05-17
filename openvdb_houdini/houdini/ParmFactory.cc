@@ -895,7 +895,9 @@ public:
         unsigned flags,
         const char** inputlabels,
         const std::string& helpUrl,
-        const std::string& doc)
+        const std::string& docHeader,
+        const std::string& docBody,
+        const std::string& docFooter)
         : OP_Operator(name, english, construct, multiparms,
             operatorTableName,
             minSources, maxSources, variables, flags, inputlabels)
@@ -903,24 +905,21 @@ public:
     {
 #ifndef SESI_OPENVDB
         // Generate help page markup for this operator if the help URL is empty
-        // and the documentation string is nonempty.
-        if (mHelpUrl.empty() && !doc.empty()) {
-            UT_String flavorStr{OpFactory::flavorToString(flavor)};
-            flavorStr.toLower();
-
+        // and the body documentation string is nonempty.
+        if (mHelpUrl.empty() && !docBody.empty()) {
             std::ostringstream os;
-            os << "= " << english << " =\n\n"
-                << "#type: node\n"
-                << "#context: " << flavorStr << "\n"
-                << "#internal: " << name << "\n\n"
-                << doc << "\n\n";
-            {
-                std::ostringstream osParm;
-                documentParms(osParm, multiparms);
-                const std::string parmDoc = osParm.str();
-                if (!parmDoc.empty()) {
-                    os << "@parameters\n\n" << parmDoc;
-                }
+            if (!docHeader.empty()) {
+                os << docHeader << "\n\n";
+            }
+            os << docBody << "\n\n";
+            if (!docFooter.empty()) {
+                os << docFooter << "\n\n";
+            }
+            std::ostringstream osParm;
+            documentParms(osParm, multiparms);
+            const std::string parmDoc = osParm.str();
+            if (!parmDoc.empty()) {
+                os << "@parameters\n\n" << parmDoc;
             }
 
             const_cast<std::string*>(&mDoc)->assign(os.str());
@@ -1018,6 +1017,8 @@ struct OpFactory::Impl
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
         mFirstName = mPolicy->getFirstName(factory);
+        mDocHeader = mPolicy->getDocHeader(factory);
+        mDocFooter = mPolicy->getDocFooter(factory);
     }
 
     OP_OperatorDW* get()
@@ -1039,7 +1040,8 @@ struct OpFactory::Impl
             mConstruct, mParms,
             UTisstring(mOperatorTableName.c_str()) ? mOperatorTableName.c_str() : 0,
             minSources, mMaxSources, mVariables, mFlags,
-            const_cast<const char**>(&mInputLabels[0]), mHelpUrl, mDoc);
+            const_cast<const char**>(&mInputLabels[0]), mHelpUrl,
+            mDocHeader, mDocBody, mDocFooter);
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
@@ -1052,7 +1054,8 @@ struct OpFactory::Impl
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
-    std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
+    std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl;
+    std::string mDocHeader, mDocBody, mDocFooter, mOperatorTableName;
     std::string mFirstName;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
@@ -1162,7 +1165,7 @@ OpFactory::helpURL() const
 const std::string&
 OpFactory::documentation() const
 {
-    return mImpl->mDoc;
+    return mImpl->mDocBody;
 }
 
 
@@ -1196,7 +1199,7 @@ OpFactory::addAliasVerbatim(const std::string& name)
 OpFactory&
 OpFactory::setDocumentation(const std::string& doc)
 {
-    mImpl->mDoc = doc;
+    mImpl->mDocBody = doc;
     return *this;
 }
 

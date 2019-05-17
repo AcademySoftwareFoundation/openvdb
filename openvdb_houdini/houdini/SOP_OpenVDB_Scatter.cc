@@ -231,9 +231,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDBs on which points will be scattered")
         .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Scatter Houdini or VDB points on a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -254,12 +251,7 @@ surrounding the zero crossing.\n\
 For all other volumes, points are scattered in active voxels.\n\
 \n\
 @related\n\
-- [Node:sop/scatter]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/scatter]\n");
 }
 
 

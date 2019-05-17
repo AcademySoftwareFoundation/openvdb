@@ -467,9 +467,6 @@ Unit Vector:\n\
         .setVerb(SOP_NodeVerb::COOK_GENERIC,
             []() { return new SOP_OpenVDB_Points_Convert::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Convert a point cloud into a VDB Points primitive, or vice versa.\"\"\"\n\
 \n\
 @overview\n\
@@ -486,12 +483,7 @@ Because nearby points often have similar data, there is the possibility\n\
 of aggressively compressing attribute data to minimize data size.\n\
 \n\
 @related\n\
-- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Points Group|Node:sop/DW_OpenVDBPointsGroup]\n");
 }
 
 

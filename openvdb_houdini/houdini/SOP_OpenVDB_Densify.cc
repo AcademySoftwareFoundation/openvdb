@@ -80,9 +80,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDBs to densify")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Densify::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Densify sparse VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -100,12 +97,7 @@ WARNING:\n\
 @related\n\
 - [OpenVDB Fill|Node:sop/DW_OpenVDBFill]\n\
 - [OpenVDB Prune|Node:sop/DW_OpenVDBPrune]\n\
-- [Node:sop/vdbactivate]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbactivate]\n");
 }
 
 

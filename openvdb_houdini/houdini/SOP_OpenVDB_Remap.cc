@@ -629,9 +629,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDB Grids")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Remap::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Perform a remapping of the voxel values in a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
@@ -640,12 +637,7 @@ This node remaps voxel values to a new range, optionally through\n\
 a user-specified transfer function.\n\
 \n\
 @related\n\
-- [Node:sop/volumevop]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/volumevop]\n");
 }
 
 OP_Node*

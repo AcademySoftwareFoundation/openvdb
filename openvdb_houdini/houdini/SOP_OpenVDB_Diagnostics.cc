@@ -1804,9 +1804,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("VDB Volumes")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Diagnostics::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Examine VDB volumes for bad values.\"\"\"\n\
 \n\
 @overview\n\
@@ -1816,12 +1813,7 @@ It provides the option to output either a mask VDB or a point cloud that identif
 the troublesome voxels, and it is optionally able to correct most types of errors.\n\
 \n\
 @related\n\
-- [Node:sop/vdbdiagnostics]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbdiagnostics]\n");
 }
 
 

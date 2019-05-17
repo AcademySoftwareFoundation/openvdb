@@ -224,51 +224,49 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional VDB Mask")
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Potential_Flow::Cache; })
-        .setDocumentation(
-    "#icon: COMMON/openvdb\n"
-    "#tags: vdb\n"
-    "\n"
-    "\"\"\"Generate Potential Flow VDB velocity field. \"\"\"\n"
-    "\n"
-    "@overview\n"
-    "\n"
-    " Potential flow is the non-rotational flow of a fluid around solid moving or deforming"
-    " objects constructed only from velocity values on their surface."
-    " This flow field is not time-dependent and does not require an input fluid flow from the"
-    " previous frame."
-    " With the combination of procedural curl noise, this operator can construct fluid"
-    " flows around obstacles without simulation dependencies, and therefore allows frames to "
-    " be computed in parallel."
-    " The potential flow field is generally used to create a flow field that cancels out movement"
-    " of fluid into or out of a solid object."
-    " A constant surface velocity is given as a parameter to the node, and an additional variable"
-    " surface velocity can also be defined via a velocity VDB added to the first input."
-    " When both are defined, they are added together on the surface boundary."
-    " For objects in three dimensions, the potential flow decays at greater distances to the"
-    " boundary.\n\n"
-    " The node automatically creates the domain of the flow field by dilating the initial solid"
-    " object boundaries."
-    " It is up to the user to determine the dilation extent and therefore velocity decay needed"
-    " for their application."
-    " The primary input is a VDB signed distance field (SDF) on the first input."
-    " The resolution and grid transform for the new velocity field will be taken from the input"
-    " SDF."
-    " If there are multiple SDFs only the first one is used, it is recommended to sample multiple"
-    " SDFs into a single one for multiple obstacles."
-    " This SDF can be accompanied by a VDB velocity field which will be used to impart the SDF"
-    " velocity into the solver."
-    " The potential flow created is divergence free by design and has the same velocity on the"
-    " boundary as the background velocity.\n\n"
-    " The simplest workflow for multiple moving objects is to animate the polygonal geometry and"
-    " then create SDFs and velocity VDBs by using the VDB from Polygons node."
-    " The output can be fed directly into the first input of the Potential Flow SOP."
-    " The second input of the SOP allows a Mask VDB input for modifiying the solution domain"
-    " created by the Potential Flow SOP."
-    " The created domain can either be restricted to the active voxels of the Mask VDB, or"
-    " restricted from creating a domain inside the active voxels."
-    " These modes are defined by the respective __Intersection__ or __Difference__ modes on the"
-    " parameter toggle"
-    );
+        .setDocumentation("\
+\"\"\"Generate Potential Flow VDB velocity field. \"\"\"\n\
+\n\
+@overview\n\
+\n\
+Potential flow is the non-rotational flow of a fluid around solid moving or deforming\
+objects constructed only from velocity values on their surface.\
+This flow field is not time-dependent and does not require an input fluid flow from the\
+previous frame.\
+With the combination of procedural curl noise, this operator can construct fluid\
+flows around obstacles without simulation dependencies, and therefore allows frames to \
+be computed in parallel.\
+The potential flow field is generally used to create a flow field that cancels out movement\
+of fluid into or out of a solid object.\
+A constant surface velocity is given as a parameter to the node, and an additional variable\
+surface velocity can also be defined via a velocity VDB added to the first input.\
+When both are defined, they are added together on the surface boundary.\
+For objects in three dimensions, the potential flow decays at greater distances to the\
+boundary.\n\
+\n\
+The node automatically creates the domain of the flow field by dilating the initial solid\
+object boundaries.\
+It is up to the user to determine the dilation extent and therefore velocity decay needed\
+for their application.\
+The primary input is a VDB signed distance field (SDF) on the first input.\
+The resolution and grid transform for the new velocity field will be taken from the input\
+SDF.\
+If there are multiple SDFs only the first one is used, it is recommended to sample multiple\
+SDFs into a single one for multiple obstacles.\
+This SDF can be accompanied by a VDB velocity field which will be used to impart the SDF\
+velocity into the solver.\
+The potential flow created is divergence free by design and has the same velocity on the\
+boundary as the background velocity.\n\
+\n\
+The simplest workflow for multiple moving objects is to animate the polygonal geometry and\
+then create SDFs and velocity VDBs by using the VDB from Polygons node.\
+The output can be fed directly into the first input of the Potential Flow SOP.\
+The second input of the SOP allows a Mask VDB input for modifiying the solution domain\
+created by the Potential Flow SOP.\
+The created domain can either be restricted to the active voxels of the Mask VDB, or\
+restricted from creating a domain inside the active voxels.\
+These modes are defined by the respective __Intersection__ or __Difference__ modes on the\
+parameter toggle.\n\n");
 }
 
 // Enable or disable parameters in the UI.

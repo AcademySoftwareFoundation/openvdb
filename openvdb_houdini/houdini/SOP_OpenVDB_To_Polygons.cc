@@ -283,9 +283,6 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional VDB masks")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_To_Polygons::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Convert VDB volumes into polygonal meshes.\"\"\"\n\
 \n\
 @overview\n\
@@ -305,12 +302,7 @@ an adaptivity multiplier.\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
 - [OpenVDB From Particles|Node:sop/DW_OpenVDBFromParticles]\n\
 - [Node:sop/convert]\n\
-- [Node:sop/convertvolume]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/convertvolume]\n");
 }
 
 

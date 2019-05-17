@@ -286,9 +286,6 @@ Using Voxel Scale Only:\n\
         .addOptionalInput("Optional transform reference VDB grid")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Resample::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Resample a VDB volume into a new orientation and/or voxel size.\"\"\"\n\
 \n\
 @overview\n\
@@ -301,12 +298,7 @@ an optional reference VDB.\n\
 @related\n\
 - [OpenVDB Combine|Node:sop/DW_OpenVDBCombine]\n\
 - [Node:sop/vdbresample]\n\
-- [Node:sop/xform]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/xform]\n");
 }
 
 

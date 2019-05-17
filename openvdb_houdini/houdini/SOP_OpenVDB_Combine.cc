@@ -486,21 +486,13 @@ Activity Difference:\n\
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Combine::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Combine the values of VDB volumes in various ways.\"\"\"\n\
 \n\
 @related\n\
 \n\
 - [Node:sop/vdbcombine]\n\
 - [Node:sop/volumevop]\n\
-- [Node:sop/volumemix]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/volumemix]\n");
 }
 
 

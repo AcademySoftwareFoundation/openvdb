@@ -230,9 +230,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("OpenVDB grids")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Segment::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Split SDF VDB volumes into connected components.\"\"\"\n\
 \n\
 @overview\n\
@@ -241,12 +238,7 @@ A single SDF VDB may represent multiple disjoint objects.\n\
 This node detects disjoint components and creates a new VDB for each component.\n\
 \n\
 @related\n\
-- [Node:sop/vdbsegmentbyconnectivity]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbsegmentbyconnectivity]\n");
 }
 
 

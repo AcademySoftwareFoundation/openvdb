@@ -152,9 +152,6 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Occlusion_Mask::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Identify voxels of a VDB volume that are in shadow from a given camera.\"\"\"\n\
 \n\
 @overview\n\
@@ -165,12 +162,7 @@ when viewed through the camera.\n\
 \n\
 @related\n\
 - [OpenVDB Clip|Node:sop/DW_OpenVDBClip]\n\
-- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n");
 }
 
 

@@ -543,6 +543,13 @@ public:
     /// @brief Return the inital default name of the op.
     /// @note An empty first name will disable, reverting to the usual rules.
     virtual std::string getFirstName(const OpFactory&) { return ""; }
+
+    /// @brief Return the header to be inserted into the Houdini help card.
+    virtual std::string getDocHeader(const OpFactory&) { return ""; }
+    /// @brief Return the footer to be inserted into the Houdini help card.
+    /// @details This is injected after the documentation body, but before
+    /// the parameter documentation.
+    virtual std::string getDocFooter(const OpFactory&) { return ""; }
 };
 
 

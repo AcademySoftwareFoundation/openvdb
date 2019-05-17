@@ -291,9 +291,6 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("Velocity VDB")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Advect::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Move VDBs in the input geometry along a VDB velocity field.\"\"\"\n\
 \n\
 @overview\n\
@@ -321,12 +318,7 @@ the advected field from the previous frame, do one of the following:\n\
 @related\n\
 - [OpenVDB Advect Points|Node:sop/DW_OpenVDBAdvectPoints]\n\
 - [OpenVDB Morph Level Set|Node:sop/DW_OpenVDBMorphLevelSet]\n\
-- [Node:sop/vdbadvectsdf]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbadvectsdf]\n");
 }
 
 

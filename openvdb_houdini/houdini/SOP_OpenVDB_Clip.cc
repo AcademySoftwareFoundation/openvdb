@@ -194,9 +194,6 @@ Mask VDB:\n\
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Clip::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Clip VDB volumes using a camera frustum, a bounding box, or another VDB as a mask.\"\"\"\n\
 \n\
 @overview\n\
@@ -218,12 +215,7 @@ to the background value.\n\
 \n\
 - [OpenVDB Combine|Node:sop/DW_OpenVDBCombine]\n\
 - [OpenVDB Occlusion Mask|Node:sop/DW_OpenVDBOcclusionMask]\n\
-- [Node:sop/vdbactivate]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbactivate]\n");
 }
 
 

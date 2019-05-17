@@ -214,9 +214,6 @@ newSopOperator(OP_OperatorTable* table)
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fracture::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Split level set VDB volumes into pieces.\"\"\"\n\
 \n\
 @overview\n\
@@ -251,12 +248,7 @@ NOTE:\n\
 @related\n\
 - [OpenVDB Convert|Node:sop/DW_OpenVDBConvert]\n\
 - [OpenVDB From Polygons|Node:sop/DW_OpenVDBFromPolygons]\n\
-- [Node:sop/vdbfracture]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbfracture]\n");
 }
 
 

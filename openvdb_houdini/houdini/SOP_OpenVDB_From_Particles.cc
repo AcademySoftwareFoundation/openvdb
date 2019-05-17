@@ -419,9 +419,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_GENERATOR,
             []() { return new SOP_OpenVDB_From_Particles::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Convert point clouds and/or point attributes into VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -451,12 +448,7 @@ that VDB's contents into the output VDBs.\n\
 - [OpenVDB Create|Node:sop/DW_OpenVDBCreate]\n\
 - [OpenVDB From Polygons|Node:sop/DW_OpenVDBFromPolygons]\n\
 - [Node:sop/isooffset]\n\
-- [Node:sop/vdbfromparticles]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/vdbfromparticles]\n");
 }
 
 

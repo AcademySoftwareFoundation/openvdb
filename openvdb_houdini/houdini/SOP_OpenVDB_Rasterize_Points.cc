@@ -3187,9 +3187,6 @@ newSopOperator(OP_OperatorTable* table)
         .addOptionalInput("Optional VDB grid that defines the output transform.")
         .addOptionalInput("Optional VDB or bounding box mask.")
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Rasterize points into density and attribute volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -3199,12 +3196,7 @@ It has an accompanying creation script that adds a default VOP subnetwork\n\
 and UI parameters for cloud and velocity field modeling.\n\
 \n\
 @related\n\
-- [Node:sop/cloud]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [Node:sop/cloud]\n");
 }
 
 bool

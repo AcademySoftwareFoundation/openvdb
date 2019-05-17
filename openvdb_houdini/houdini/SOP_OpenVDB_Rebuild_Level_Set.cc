@@ -165,9 +165,6 @@ newSopOperator(OP_OperatorTable* table)
         .setVerb(SOP_NodeVerb::COOK_INPLACE,
             []() { return new SOP_OpenVDB_Rebuild_Level_Set::Cache; })
         .setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
 \"\"\"Repair level sets represented by VDB volumes.\"\"\"\n\
 \n\
 @overview\n\
@@ -182,12 +179,7 @@ As such, it can repair more badly damaged level sets than can the\n\
 @related\n\
 - [OpenVDB Offset Level Set|Node:sop/DW_OpenVDBOffsetLevelSet]\n\
 - [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
-- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
-\n\
-@examples\n\
-\n\
-See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
-and usage examples.\n");
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n");
 }
 
 
