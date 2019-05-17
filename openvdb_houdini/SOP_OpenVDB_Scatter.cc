@@ -186,6 +186,19 @@ newSopOperator(OP_OperatorTable* table)
             "For scalar-valued VDBs other than signed distance fields,"
             " use voxel values as local multipliers for point density."));
 
+    parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
+        .setDefault(PRMoneDefaults)
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "none",   "None",
+            "int16",  "16-bit Fixed Point",
+            "int8",   "8-bit Fixed Point"
+        })
+        .setTooltip("The position attribute compression setting.")
+        .setDocumentation(
+            "The position can be stored relative to the center of the voxel.\n"
+            "This means it does not require the full 32-bit float representation,\n"
+            "but can be quantized to a smaller fixed-point value."));
+
     parms.add(hutil::ParmFactory(PRM_STRING, "sdfdomain", "SDF Domain")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "interior",  "Interior",
@@ -296,6 +309,7 @@ SOP_OpenVDB_Scatter::updateParmsFlags()
     changed |= setVisibleState("outputname", (1 == vdbpoints));
     changed |= setVisibleState("customname", (1 == vdbpoints));
     changed |= setVisibleState("cliptoisosurface", (1 == vdbpoints));
+    changed |= setVisibleState("poscompression", (1 == vdbpoints));
 
     changed |= enableParm("customname", (0 != evalInt("outputname", 0, time)));
     changed |= enableParm("sgroup", (1 == evalInt("dogroup", 0, time)));
@@ -491,8 +505,13 @@ private:
 
 struct BaseScatter
 {
-    using PositionArray =
-        openvdb::points::TypedAttributeArray<openvdb::Vec3f, openvdb::points::NullCodec>;
+    using NullCodec = openvdb::points::NullCodec;
+    using FixedCodec16 = openvdb::points::FixedPointCodec<false>;
+    using FixedCodec8 = openvdb::points::FixedPointCodec<true>;
+
+    using PositionArray = openvdb::points::TypedAttributeArray<openvdb::Vec3f, NullCodec>;
+    using PositionArray16 = openvdb::points::TypedAttributeArray<openvdb::Vec3f, FixedCodec16>;
+    using PositionArray8 = openvdb::points::TypedAttributeArray<openvdb::Vec3f, FixedCodec8>;
 
     BaseScatter(const unsigned int seed,
                 const float spread,
@@ -535,19 +554,34 @@ struct VDBUniformScatter : public BaseScatter
     VDBUniformScatter(const openvdb::Index64 count,
                       const unsigned int seed,
                       const float spread,
+                      const int compression,
                       hvdb::Interrupter* interrupter)
         : BaseScatter(seed, spread, interrupter)
         , mCount(count)
+        , mCompression(compression)
     {}
 
-    template <typename GridT>
-    inline void operator()(const GridT& grid)
+    template <typename PositionT, typename GridT>
+    inline void resolveCompression(const GridT& grid)
     {
         using namespace openvdb::points;
         using PointDataGridT =
             openvdb::Grid<typename TreeConverter<typename GridT::TreeType>::Type>;
-        mPoints = uniformPointScatter<GridT, std::mt19937, PositionArray, PointDataGridT,
-                hvdb::Interrupter>(grid, mCount, mSeed, mSpread, mInterrupter);
+        mPoints = openvdb::points::uniformPointScatter<
+            GridT, std::mt19937, PositionT, PointDataGridT, hvdb::Interrupter>(
+                grid, mCount, mSeed, mSpread, mInterrupter);
+    }
+
+    template <typename GridT>
+    inline void operator()(const GridT& grid)
+    {
+        if (mCompression == 1) {
+            this->resolveCompression<PositionArray16>(grid);
+        } else if (mCompression == 2) {
+            this->resolveCompression<PositionArray8>(grid);
+        } else {
+            this->resolveCompression<PositionArray>(grid);
+        }
     }
 
     void print(const std::string &name, std::ostream& os = std::cout) const
@@ -557,6 +591,7 @@ struct VDBUniformScatter : public BaseScatter
     }
 
     const openvdb::Index64 mCount;
+    const int mCompression;
 }; // VDBUniformScatter
 
 
@@ -565,19 +600,33 @@ struct VDBDenseUniformScatter : public BaseScatter
     VDBDenseUniformScatter(const float pointsPerVoxel,
                            const unsigned int seed,
                            const float spread,
+                           const int compression,
                            hvdb::Interrupter* interrupter)
         : BaseScatter(seed, spread, interrupter)
         , mPointsPerVoxel(pointsPerVoxel)
-        {}
+        , mCompression(compression)
+    {}
 
-    template <typename GridT>
-    inline void operator()(const GridT& grid)
+    template <typename PositionT, typename GridT>
+    inline void resolveCompression(const GridT& grid)
     {
         using namespace openvdb::points;
         using PointDataGridT =
             openvdb::Grid<typename TreeConverter<typename GridT::TreeType>::Type>;
-        mPoints = denseUniformPointScatter<GridT, std::mt19937, PositionArray, PointDataGridT,
+        mPoints = denseUniformPointScatter<GridT, std::mt19937, PositionT, PointDataGridT,
                 hvdb::Interrupter>(grid, mPointsPerVoxel, mSeed, mSpread, mInterrupter);
+    }
+
+    template <typename GridT>
+    inline void operator()(const GridT& grid)
+    {
+        if (mCompression == 1) {
+            this->resolveCompression<PositionArray16>(grid);
+        } else if (mCompression == 2) {
+            this->resolveCompression<PositionArray8>(grid);
+        } else {
+            this->resolveCompression<PositionArray>(grid);
+        }
     }
 
     void print(const std::string &name, std::ostream& os = std::cout) const
@@ -587,6 +636,7 @@ struct VDBDenseUniformScatter : public BaseScatter
     }
 
     const float mPointsPerVoxel;
+    const int mCompression;
 }; // VDBDenseUniformScatter
 
 
@@ -595,19 +645,33 @@ struct VDBNonUniformScatter : public BaseScatter
     VDBNonUniformScatter(const float pointsPerVoxel,
                       const unsigned int seed,
                       const float spread,
+                      const int compression,
                       hvdb::Interrupter* interrupter)
         : BaseScatter(seed, spread, interrupter)
         , mPointsPerVoxel(pointsPerVoxel)
+        , mCompression(compression)
     {}
 
-    template <typename GridT>
-    inline void operator()(const GridT& grid)
+    template <typename PositionT, typename GridT>
+    inline void resolveCompression(const GridT& grid)
     {
         using namespace openvdb::points;
         using PointDataGridT =
             openvdb::Grid<typename TreeConverter<typename GridT::TreeType>::Type>;
-        mPoints = nonUniformPointScatter<GridT, std::mt19937, PositionArray, PointDataGridT,
+        mPoints = nonUniformPointScatter<GridT, std::mt19937, PositionT, PointDataGridT,
                 hvdb::Interrupter>(grid, mPointsPerVoxel, mSeed, mSpread, mInterrupter);
+    }
+
+    template <typename GridT>
+    inline void operator()(const GridT& grid)
+    {
+        if (mCompression == 1) {
+            this->resolveCompression<PositionArray16>(grid);
+        } else if (mCompression == 2) {
+            this->resolveCompression<PositionArray8>(grid);
+        } else {
+            this->resolveCompression<PositionArray>(grid);
+        }
     }
 
     void print(const std::string &name, std::ostream& os = std::cout) const
@@ -617,6 +681,7 @@ struct VDBNonUniformScatter : public BaseScatter
     }
 
     const float mPointsPerVoxel;
+    const int mCompression;
 }; // VDBNonUniformScatter
 
 
@@ -785,6 +850,8 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
         const auto pmode = evalInt("pointmode", 0, time);
         const bool vdbPoints = evalInt("vdbpoints", 0, time) == 1;
         const bool clipPoints = vdbPoints && bool(evalInt("cliptoisosurface", 0, time));
+        const int posCompression = vdbPoints ?
+            static_cast<int>(evalInt("poscompression", 0, time)) : 0;
         const bool snapPointsToSurface =
             ((sdfdomain == "surface") && !openvdb::math::isApproxEqual(theSpread, 1.0f));
 
@@ -876,7 +943,7 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
 
             case 0: // fixed point count
                 if (vdbPoints) { // VDB points
-                    VDBUniformScatter scatter(pointCount, seed, spread, &boss);
+                    VDBUniformScatter scatter(pointCount, seed, spread, posCompression, &boss);
                     if (process(gridType, *grid, scatter, name))  {
                         postprocessVDBPoints(scatter, performCull);
                     }
@@ -890,8 +957,8 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
                 if (multiplyDensity && !isSignedDistance) { // local density
                     if (vdbPoints) { // VDB points
                         const auto dim = grid->transform().voxelSize();
-                        VDBNonUniformScatter scatter(
-                            static_cast<float>(density * dim.product()), seed, spread, &boss);
+                        VDBNonUniformScatter scatter(static_cast<float>(density * dim.product()),
+                            seed, spread, posCompression, &boss);
                         if (!UTvdbProcessTypedGridScalar(gridType, *grid, scatter)) {
                             throw std::runtime_error(
                                 "Only scalar grids support voxel scaling of density");
@@ -910,7 +977,8 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
                         const auto dim = grid->transform().voxelSize();
                         const auto totalPointCount = openvdb::Index64(
                             density * dim.product() * double(grid->activeVoxelCount()));
-                        VDBUniformScatter scatter(totalPointCount, seed, spread, &boss);
+                        VDBUniformScatter scatter(
+                            totalPointCount, seed, spread, posCompression, &boss);
                         if (process(gridType, *grid, scatter, name))  {
                             postprocessVDBPoints(scatter, performCull);
                         }
@@ -923,7 +991,8 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
 
             case 2: // points per voxel
                 if (vdbPoints) { // VDB points
-                    VDBDenseUniformScatter scatter(ptsPerVox, seed, spread, &boss);
+                    VDBDenseUniformScatter scatter(
+                        ptsPerVox, seed, spread, posCompression, &boss);
                     if (process(gridType, *grid, scatter, name))  {
                         postprocessVDBPoints(scatter, performCull);
                     }
