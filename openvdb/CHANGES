@@ -3,6 +3,15 @@ OpenVDB Version History
 
 Version 6.1.1 - In development
 
+    Improvements:
+    - FindOpenVDB.cmake now correctly propagates CXX version requirements.
+
+    Python:
+    - Updated python module CMake to always produce a .so for the python plugin
+      on UNIX platforms.
+    - Python 3 support improvements to python/pyOpenVDBModule.cc
+      [Reported by yurivict]
+
 
 Version 6.1.0 - May 8, 2019
 

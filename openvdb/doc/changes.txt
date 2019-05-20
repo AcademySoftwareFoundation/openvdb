@@ -6,6 +6,17 @@
 @par
 <B>Version 6.1.1</B> - <I>In development</I>
 
+@par
+Improvements:
+- FindOpenVDB.cmake now correctly propagates CXX version requirements.
+
+@par
+Python:
+- Updated python module CMake to always produce a .so for the python plugin
+  on UNIX platforms.
+- Python 3 support improvements to python/pyOpenVDBModule.cc
+  [Reported by yurivict]
+
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
 @par
