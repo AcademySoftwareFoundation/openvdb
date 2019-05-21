@@ -6,6 +6,12 @@
 @par
 <B>Version 6.1.1</B> - <I>In development</I>
 
+@par
+Bug fixes:
+- Fixed a bug in @vdblink::tools::computeScalarPotential() computeScalarPotential
+  @endlink that could produce a corrupt result due to invalid memory access.
+  <I>[Reported by Edwin Braun]</I>
+
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
 @par
