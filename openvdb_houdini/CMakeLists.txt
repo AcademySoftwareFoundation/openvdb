@@ -129,9 +129,9 @@ set(OPENVDB_HOUDINI_DEPENDENT_LIBS
 set(OPENVDB_HOUDINI_UTILS_DIR ${PROJECT_BINARY_DIR}/houdini_utils)
 file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_UTILS_DIR})
 file(COPY
-    houdini/geometry.h
-    houdini/OP_NodeChain.h
-    houdini/ParmFactory.h
+    geometry.h
+    OP_NodeChain.h
+    ParmFactory.h
   DESTINATION
     ${OPENVDB_HOUDINI_UTILS_DIR}
 )
@@ -140,35 +140,35 @@ file(COPY
 set(OPENVDB_HOUDINI_LOCAL_DIR ${PROJECT_BINARY_DIR}/openvdb_houdini)
 file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR})
 file(COPY
-    houdini/AttributeTransferUtil.h
-    houdini/GEO_PrimVDB.h
-    houdini/GeometryUtil.h
-    houdini/GT_GEOPrimCollectVDB.h
-    houdini/GU_PrimVDB.h
-    houdini/GU_VDBPointTools.h
-    houdini/PointUtils.h
-    houdini/SOP_NodeVDB.h
-    houdini/SOP_VDBVerbUtils.h
-    houdini/UT_VDBTools.h
-    houdini/UT_VDBUtils.h
-    houdini/Utils.h
+    AttributeTransferUtil.h
+    GEO_PrimVDB.h
+    GeometryUtil.h
+    GT_GEOPrimCollectVDB.h
+    GU_PrimVDB.h
+    GU_VDBPointTools.h
+    PointUtils.h
+    SOP_NodeVDB.h
+    SOP_VDBVerbUtils.h
+    UT_VDBTools.h
+    UT_VDBUtils.h
+    Utils.h
   DESTINATION
     ${OPENVDB_HOUDINI_LOCAL_DIR}
 )
 
 add_library(openvdb_houdini SHARED
-  houdini/GEO_PrimVDB.cc
-  houdini/GEO_VDBTranslator.cc
-  houdini/geometry.cc
-  houdini/GeometryUtil.cc
-  houdini/GT_GEOPrimCollectVDB.cc
-  houdini/GU_PrimVDB.cc
-  houdini/GU_VDBPointTools.cc
-  houdini/ParmFactory.cc
-  houdini/PointUtils.cc
-  houdini/SOP_NodeVDB.cc
-  houdini/UT_VDBUtils.cc
-  houdini/Utils.cc
+  GEO_PrimVDB.cc
+  GEO_VDBTranslator.cc
+  geometry.cc
+  GeometryUtil.cc
+  GT_GEOPrimCollectVDB.cc
+  GU_PrimVDB.cc
+  GU_VDBPointTools.cc
+  ParmFactory.cc
+  PointUtils.cc
+  SOP_NodeVDB.cc
+  UT_VDBUtils.cc
+  Utils.cc
 )
 
 target_include_directories(openvdb_houdini PUBLIC
@@ -275,7 +275,7 @@ message(STATUS "Configuring Houdini DSOs...")
 
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
 
-  add_library(${DSO_NAME} SHARED houdini/${DSO_NAME}.cc)
+  add_library(${DSO_NAME} SHARED ${DSO_NAME}.cc)
   target_link_libraries(${DSO_NAME} openvdb_houdini)
 
   # Call houdini_configure_target to setup the sesi tag information. We set
@@ -364,11 +364,11 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
 endforeach()
 
 install(FILES
-  houdini/SOP_OpenVDB.svg
+  SOP_OpenVDB.svg
   DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
 )
 
 install(FILES
-  houdini/DW_OpenVDBRasterizePoints.cmd
+  DW_OpenVDBRasterizePoints.cmd
   DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
 )
