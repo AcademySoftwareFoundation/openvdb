@@ -7,6 +7,11 @@
 <B>Version 6.1.1</B> - <I>In development</I>
 
 @par
+Improvements:
+- Improved directory and file path lookups of some CMake commands in
+  the root CMakeLists.txt <I>[Reported by Daniel Elliott]</I>
+
+@par
 Bug fixes:
 - Fixed a bug in @vdblink::tools::computeScalarPotential() computeScalarPotential
   @endlink that could produce a corrupt result due to invalid memory access.
