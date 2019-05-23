@@ -218,12 +218,12 @@ enable_testing()
 
 # Add our cmake modules
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
 
 if(${CMAKE_VERSION} VERSION_LESS 3.8)
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/backports")
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
 endif()
 
 # Add cmake modules to installation command
@@ -434,7 +434,7 @@ if(NOT OPENVDB_BUILD_CORE)
     endif()
   endif()
 else()
-  include("${CMAKE_SOURCE_DIR}/cmake/OpenVDBUtils.cmake")
+  include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
   OPENVDB_VERSION_FROM_HEADER("${CMAKE_CURRENT_SOURCE_DIR}/openvdb/version.h"
     VERSION OpenVDB_VERSION
     MAJOR   OpenVDB_MAJOR_VERSION
