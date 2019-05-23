@@ -7,10 +7,23 @@
 <B>Version 6.1.1</B> - <I>In development</I>
 
 @par
+Improvements:
+- FindOpenVDB.cmake now correctly propagates CXX version requirements.
+- Improved directory and file path lookups of some CMake commands in
+  the root CMakeLists.txt <I>[Reported by Daniel Elliott]</I>
+
+@par
 Bug fixes:
 - Fixed a bug in @vdblink::tools::computeScalarPotential() computeScalarPotential
   @endlink that could produce a corrupt result due to invalid memory access.
   <I>[Reported by Edwin Braun]</I>
+
+@par
+Python:
+- Updated python module CMake to always produce a .so for the python plugin
+  on UNIX platforms.
+- Python 3 support improvements to python/pyOpenVDBModule.cc
+  <I>[Reported by yurivict]</I>
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
