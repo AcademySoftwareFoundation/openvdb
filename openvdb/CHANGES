@@ -7,6 +7,8 @@ Version 6.1.1 - In development
     - FindOpenVDB.cmake now correctly propagates CXX version requirements.
     - Improved directory and file path lookups of some CMake commands in
       the root CMakeLists.txt [Reported by Daniel Elliott]
+    - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState() now
+      in-place modify voxel values for improved performance.
 
     Bug fixes:
     - Fixed a bug in tools::computeScalarPotential() that could produce a
