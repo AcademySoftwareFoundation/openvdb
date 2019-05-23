@@ -5,6 +5,8 @@ Version 6.1.1 - In development
 
     Improvements:
     - FindOpenVDB.cmake now correctly propagates CXX version requirements.
+    - Improved directory and file path lookups of some CMake commands in
+      the root CMakeLists.txt [Reported by Daniel Elliott]
 
     Bug fixes:
     - Fixed a bug in tools::computeScalarPotential() that could produce a

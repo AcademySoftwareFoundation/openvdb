@@ -9,6 +9,8 @@
 @par
 Improvements:
 - FindOpenVDB.cmake now correctly propagates CXX version requirements.
+- Improved directory and file path lookups of some CMake commands in
+  the root CMakeLists.txt <I>[Reported by Daniel Elliott]</I>
 
 @par
 Bug fixes:
