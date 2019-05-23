@@ -339,6 +339,64 @@ using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
 
 using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
 
+
+namespace internal {
+
+/// @private
+template<typename OpT>
+class MakeUniqueOp
+{
+public:
+    explicit MakeUniqueOp(OpT& op): mOp(op) {}
+
+    template<typename GridT>
+    void operator()(GridT& grid)
+    {
+        auto treePtr = grid.baseTreePtr();
+        if (treePtr.use_count() > 2) { // grid + treePtr = 2
+            grid.setTree(treePtr->copy());
+        }
+        mOp(grid);
+    }
+
+private:
+    OpT& mOp;
+};
+
+} // namespace internal
+
+
+/// @brief If the given primitive's grid resolves to one of the listed grid types,
+/// invoke the functor @a op on the resolved grid.
+/// @return @c true if the functor was invoked, @c false otherwise
+template<typename GridTypeListT, typename OpT>
+inline bool
+GEOvdbApply(const GEO_PrimVDB& vdb, OpT& op)
+{
+    if (vdb.hasGrid()) {
+        return vdb.getGrid().apply<GridTypeListT>(op);
+    }
+    return false;
+}
+
+/// @brief If the given primitive's grid resolves to one of the listed grid types,
+/// invoke the functor @a op on the resolved grid.
+/// @details If @a makeUnique is true, deep copy the grid's tree before invoking the functor.
+/// @return @c true if the functor was invoked, @c false otherwise
+template<typename GridTypeListT, typename OpT>
+inline bool
+GEOvdbApply(GEO_PrimVDB& vdb, OpT& op, bool makeUnique = true)
+{
+    if (vdb.hasGrid()) {
+        if (!makeUnique) {
+            return vdb.getGrid().apply<GridTypeListT>(op);
+        }
+        internal::MakeUniqueOp<OpT> uniqueOp(op);
+        return vdb.getGrid().apply<GridTypeListT>(uniqueOp);
+    }
+    return false;
+}
+
 } // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
