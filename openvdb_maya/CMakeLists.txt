@@ -103,38 +103,38 @@ set(OPENVDB_MAYA_DEPENDENT_LIBS
 # @todo  Restructure the node registry implementation
 
 set(OPENVDB_MAYA_MODULE_SOURCE_FILES
-  maya/OpenVDBData.cc
-  maya/OpenVDBPlugin.cc
-  maya/OpenVDBCopyNode.cc
-  maya/OpenVDBFilterNode.cc
-  maya/OpenVDBFromMayaFluidNode.cc
-  maya/OpenVDBFromPolygonsNode.cc
-  maya/OpenVDBReadNode.cc
-  maya/OpenVDBToPolygonsNode.cc
-  maya/OpenVDBTransformNode.cc
-  maya/OpenVDBUtil.cc
-  maya/OpenVDBVisualizeNode.cc
-  maya/OpenVDBWriteNode.cc
+  OpenVDBData.cc
+  OpenVDBPlugin.cc
+  OpenVDBCopyNode.cc
+  OpenVDBFilterNode.cc
+  OpenVDBFromMayaFluidNode.cc
+  OpenVDBFromPolygonsNode.cc
+  OpenVDBReadNode.cc
+  OpenVDBToPolygonsNode.cc
+  OpenVDBTransformNode.cc
+  OpenVDBUtil.cc
+  OpenVDBVisualizeNode.cc
+  OpenVDBWriteNode.cc
 )
 
 set(OPENVDB_MAYA_MODULE_MEL_FILES
-  maya/AEOpenVDBCopyTemplate.mel
-  maya/AEOpenVDBFilterTemplate.mel
-  maya/AEOpenVDBFromMayaFluidTemplate.mel
-  maya/AEOpenVDBFromPolygonsTemplate.mel
-  maya/AEOpenVDBReadTemplate.mel
-  maya/AEOpenVDBToPolygonsTemplate.mel
-  maya/AEOpenVDBTransformTemplate.mel
-  maya/AEOpenVDBVisualizeTemplate.mel
-  maya/AEOpenVDBWriteTemplate.mel
+  AEOpenVDBCopyTemplate.mel
+  AEOpenVDBFilterTemplate.mel
+  AEOpenVDBFromMayaFluidTemplate.mel
+  AEOpenVDBFromPolygonsTemplate.mel
+  AEOpenVDBReadTemplate.mel
+  AEOpenVDBToPolygonsTemplate.mel
+  AEOpenVDBTransformTemplate.mel
+  AEOpenVDBVisualizeTemplate.mel
+  AEOpenVDBWriteTemplate.mel
 )
 
 #########################################################################
 
 # This is to work around DWA way of doing stuff
 set(OPENVDB_MAYA_HEADERS
-  "maya/OpenVDBData.h"
-  "maya/OpenVDBUtil.h"
+  "OpenVDBData.h"
+  "OpenVDBUtil.h"
 )
 
 set(OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya)
