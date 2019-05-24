@@ -13,6 +13,10 @@ Improvements:
 - Improved directory and file path lookups of some CMake commands in
   the root <TT>CMakeLists.txt</TT>.
   <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
+- @vdblink::tree::LeafNode::modifyValue() LeafNode::modifyValue@endlink and
+  @vdblink::tree::LeafNode::modifyValueAndActiveState()
+  LeafNode::modifyValueAndActiveState@endlink now modify voxel values
+  in place for improved performance.
 
 @par
 Bug fixes:

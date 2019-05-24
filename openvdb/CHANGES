@@ -8,6 +8,8 @@ Version 6.1.1 - In development
     - Improved directory and file path lookups of some CMake commands in
       the root CMakeLists.txt
       [Reported by Daniel Elliott]
+    - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState()
+      now modify voxel values in place for improved performance.
 
     Bug fixes:
     - Fixed a bug in tools::computeScalarPotential() that could produce
