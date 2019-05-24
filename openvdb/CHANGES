@@ -27,6 +27,8 @@ Version 6.1.1 - In development
       a given type list.
     - Fixed a regression in the Fill SOP that caused it to modify VDBs
       in the input detail.
+    - The Combine SOP no longer crashes in Copy B mode when the destination
+      is not a VDB.
 
 
 Version 6.1.0 - May 8, 2019

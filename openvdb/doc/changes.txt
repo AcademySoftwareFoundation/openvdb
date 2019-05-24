@@ -39,6 +39,8 @@ Houdini:
   a given type list.
 - Fixed a regression in the Fill&nbsp;SOP that caused it to modify VDBs
   in the input detail.
+- The Combine&nbsp;SOP no longer crashes in <B>Copy&nbsp;B</B> mode when the
+  destination is not a&nbsp;VDB.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
