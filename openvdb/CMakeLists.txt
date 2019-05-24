@@ -77,7 +77,11 @@ else()
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
-find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+if(USE_TBBMALLOC)
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb tbbmalloc tbbmalloc_proxy)
+else()
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+endif()
 find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 
 if(USE_LOG4CPLUS)
@@ -104,6 +108,10 @@ find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system
 
 if(UNIX)
   find_package(Threads REQUIRED)
+endif()
+
+if(USE_JEMALLOC)
+  find_package(Jemalloc REQUIRED)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
@@ -142,9 +150,19 @@ list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
   ZLIB::ZLIB
 )
+
 if(UNIX)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
+endif()
+
+if(USE_JEMALLOC)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Jemalloc::jemalloc)
+endif()
+
+if(USE_TBBMALLOC)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    Threads::Threads
+    TBB::tbbmalloc
+    TBB::tbbmalloc_proxy
   )
 endif()
 

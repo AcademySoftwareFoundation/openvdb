@@ -100,6 +100,16 @@ option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
 know it to be required.]=] ON)
+option(USE_JEMALLOC [=[
+Use Jemalloc while building openvdb components. If USE_JEMALLOC is OFF, CMake attempts to query the
+located openvdb build configuration to decide on Jemalloc support. You may set this to off to disable Jemalloc.
+Although not strictly required, it is strongly recommended to use a concurrent memory allocator.
+Note that you must choose between Jemalloc or TBB malloc, or otherwise disable them both.]=] ON)
+option(USE_TBBMALLOC [=[
+Use TBB malloc while building openvdb components. If USE_TBBMALLOC is OFF, CMake attempts to query the
+located openvdb build configuration to decide on TBB malloc support. You may set this to on to force TBB malloc
+to be used. Although not required, it is strongly recommended to use a concurrent memory allocator.
+Note that you must choose between Jemalloc or TBB malloc, or otherwise disable them both.]=] OFF)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -152,6 +162,7 @@ mark_as_advanced(
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
   USE_MAYA
+  USE_JEMALLOC
   USE_LOG4CPLUS
   USE_SYSTEM_LIBRARY_PATHS
   USE_CCACHE
@@ -233,6 +244,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindCppUnit.cmake
+    cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
