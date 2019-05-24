@@ -342,6 +342,9 @@ using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
 
 namespace internal {
 
+// Functor for use with GEOvdbApply() to deep copy a grid's tree,
+// if it is shared with other grids, before invoking a user-supplied
+// functor on the grid
 /// @private
 template<typename OpT>
 class MakeUniqueOp
@@ -381,8 +384,9 @@ GEOvdbApply(const GEO_PrimVDB& vdb, OpT& op)
 
 /// @brief If the given primitive's grid resolves to one of the listed grid types,
 /// invoke the functor @a op on the resolved grid.
-/// @details If @a makeUnique is true, deep copy the grid's tree before invoking the functor.
 /// @return @c true if the functor was invoked, @c false otherwise
+/// @details If @a makeUnique is true, deep copy the grid's tree before
+/// invoking the functor if the tree is shared with other grids.
 template<typename GridTypeListT, typename OpT>
 inline bool
 GEOvdbApply(GEO_PrimVDB& vdb, OpT& op, bool makeUnique = true)
