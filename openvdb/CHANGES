@@ -3,6 +3,23 @@ OpenVDB Version History
 
 Version 6.1.1 - In development
 
+    Improvements:
+    - FindOpenVDB.cmake now correctly propagates CXX version requirements.
+    - Improved directory and file path lookups of some CMake commands in
+      the root CMakeLists.txt [Reported by Daniel Elliott]
+    - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState() now
+      in-place modify voxel values for improved performance.
+
+    Bug fixes:
+    - Fixed a bug in tools::computeScalarPotential() that could produce a
+      corrupt result due to invalid memory access. [Reported by Edwin Braun]
+
+    Python:
+    - Updated python module CMake to always produce a .so for the python plugin
+      on UNIX platforms.
+    - Python 3 support improvements to python/pyOpenVDBModule.cc
+      [Reported by yurivict]
+
     Houdini:
     - VDB Combine does not crash in Copy B if destination isn't a VDB.
 
