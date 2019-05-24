@@ -20,6 +20,8 @@ Version 6.1.1 - In development
     - Python 3 support improvements to python/pyOpenVDBModule.cc
       [Reported by yurivict]
 
+    Houdini:
+    - VDB Combine does not crash in Copy B if destination isn't a VDB.
 
 Version 6.1.0 - May 8, 2019
 
