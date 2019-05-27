@@ -14,7 +14,7 @@ cache: c:\tools\vcpkg\installed\
 
 before_build:
   - cd C:\tools\vcpkg
-  - vcpkg install zlib blosc openexr tbb cppunit
+  - vcpkg install zlib blosc openexr tbb cppunit jemalloc
   - vcpkg integrate install
 
   # - adjust the PATH so that the vdb_test executable picks up all of the dll's correctly
@@ -39,6 +39,7 @@ build_script:
     -DBLOSC_ROOT=C:\tools\vcpkg\installed\x64-windows \
     -DUSE_BLOSC=ON \
     -DCPPUNIT_ROOT=C:\tools\vcpkg\installed\x64-windows \
+    -DJEMALLOC_ROOT=C:\tools\vcpkg\installed\x64-windows \
     -DBOOST_ROOT=C:\Libraries\boost_1_67_0 \
     -DBOOST_LIBRARYDIR=C:\Libraries\boost_1_67_0\lib64-msvc-14.0 \
     ..
