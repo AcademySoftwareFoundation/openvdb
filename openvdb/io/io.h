@@ -123,6 +123,11 @@ public:
     const AuxDataMap& auxData() const;
     //@}
 
+    /// @private
+    uint32_t __test() const;
+    /// @private
+    void __setTest(uint32_t);
+
     /// Return a string describing this stream metadata.
     std::string str() const;
 

@@ -2659,9 +2659,32 @@ TestFile::testDelayedLoadMetadata()
     // have been treated as unknown and blindly copied over when read and re-written
     // using this library version resulting in out-of-sync metadata.
 
+    // By default, DelayedLoadMetadata is dropped from the grid during read so
+    // as not to be exposed to the user.
+
     { // read using current library version
         std::istringstream istr(ostr2.str(), std::ios_base::binary);
         io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    // To test the version mechanism, a stream metadata object is created with
+    // a non-zero test value and set on the input stream. This disables the
+    // behaviour where the DelayedLoadMetadata is dropped from the grid.
+
+    io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+    streamMetadata->__setTest(uint32_t(1));
+
+    { // read using current library version
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
 
         io::GridDescriptor gd2;
         GridBase::Ptr grid = gd2.read(istr);
@@ -2674,6 +2697,7 @@ TestFile::testDelayedLoadMetadata()
     { // read using library version of 5.0
         std::istringstream istr(ostr2.str(), std::ios_base::binary);
         io::setVersion(istr, VersionId(5,0), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
 
         io::GridDescriptor gd2;
         GridBase::Ptr grid = gd2.read(istr);
@@ -2686,6 +2710,7 @@ TestFile::testDelayedLoadMetadata()
     { // read using library version of 4.9
         std::istringstream istr(ostr2.str(), std::ios_base::binary);
         io::setVersion(istr, VersionId(4,9), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
 
         io::GridDescriptor gd2;
         GridBase::Ptr grid = gd2.read(istr);
@@ -2698,6 +2723,7 @@ TestFile::testDelayedLoadMetadata()
     { // read using library version of 6.0
         std::istringstream istr(ostr2.str(), std::ios_base::binary);
         io::setVersion(istr, VersionId(6,1), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
 
         io::GridDescriptor gd2;
         GridBase::Ptr grid = gd2.read(istr);

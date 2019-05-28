@@ -217,6 +217,7 @@ struct StreamMetadata::Impl
     uint64_t mLeaf = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
+    uint32_t mTest = 0; // for testing only
 }; // struct StreamMetadata
 
 
@@ -282,6 +283,7 @@ uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
 uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
+uint32_t        StreamMetadata::__test() const          { return mImpl->mTest; }
 
 StreamMetadata::AuxDataMap& StreamMetadata::auxData() { return mImpl->mAuxData; }
 const StreamMetadata::AuxDataMap& StreamMetadata::auxData() const { return mImpl->mAuxData; }
@@ -297,6 +299,7 @@ void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; 
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
 void StreamMetadata::setLeaf(uint64_t i)                { mImpl->mLeaf = i; }
+void StreamMetadata::__setTest(uint32_t t)              { mImpl->mTest = t; }
 
 std::string
 StreamMetadata::str() const
@@ -1177,6 +1180,15 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 
     // reset leaf value to zero
     streamMetadata->setLeaf(0);
+
+    // drop DelayedLoadMetadata from the grid as it is only useful for IO
+    // a stream metadata non-zero value disables this behaviour for testing
+
+    if (streamMetadata->__test() == uint32_t(0)) {
+        if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+            grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
+        }
+    }
 
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
         grid->readTransform(is);

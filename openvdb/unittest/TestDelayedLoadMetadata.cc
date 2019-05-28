@@ -180,4 +180,39 @@ TestDelayedLoadMetadata::test()
             CPPUNIT_ASSERT_EQUAL(metadata.getMask(i), newMetadata.getMask(i));
         }
     }
+
+    // when read as unknown metadata should be treated as temporary metadata
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 5
+    {
+        metadata.clear();
+        metadata.resizeMask(size_t(1));
+        metadata.setMask(0, DelayedLoadMetadata::MaskType(5));
+
+        std::stringstream ss(std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+
+        openvdb::MetaMap metamap;
+        metamap.insertMeta("delayload", metadata);
+
+        CPPUNIT_ASSERT_EQUAL(size_t(1), metamap.metaCount());
+
+        metamap.writeMeta(ss);
+
+        {
+            openvdb::MetaMap newMetamap;
+            newMetamap.readMeta(ss);
+
+            CPPUNIT_ASSERT_EQUAL(size_t(1), newMetamap.metaCount());
+        }
+
+        {
+            DelayedLoadMetadata::unregisterType();
+
+            openvdb::MetaMap newMetamap;
+            newMetamap.readMeta(ss);
+
+            CPPUNIT_ASSERT_EQUAL(size_t(0), newMetamap.metaCount());
+        }
+    }
+#endif
 }

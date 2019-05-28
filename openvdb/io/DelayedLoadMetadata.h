@@ -40,7 +40,7 @@ public:
     bool asBool() const override;
     Index32 size() const override;
 
-    static Name staticTypeName() { return "delayedload"; }
+    static Name staticTypeName() { return "__delayedload"; }
 
     static Metadata::Ptr createMetadata()
     {
