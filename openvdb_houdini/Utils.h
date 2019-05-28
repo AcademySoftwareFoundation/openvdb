@@ -340,35 +340,6 @@ using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
 using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
 
 
-namespace internal {
-
-// Functor for use with GEOvdbApply() to deep copy a grid's tree,
-// if it is shared with other grids, before invoking a user-supplied
-// functor on the grid
-/// @private
-template<typename OpT>
-class MakeUniqueOp
-{
-public:
-    explicit MakeUniqueOp(OpT& op): mOp(op) {}
-
-    template<typename GridT>
-    void operator()(GridT& grid)
-    {
-        auto treePtr = grid.baseTreePtr();
-        if (treePtr.use_count() > 2) { // grid + treePtr = 2
-            grid.setTree(treePtr->copy());
-        }
-        mOp(grid);
-    }
-
-private:
-    OpT& mOp;
-};
-
-} // namespace internal
-
-
 /// @brief If the given primitive's grid resolves to one of the listed grid types,
 /// invoke the functor @a op on the resolved grid.
 /// @return @c true if the functor was invoked, @c false otherwise
@@ -376,8 +347,8 @@ template<typename GridTypeListT, typename OpT>
 inline bool
 GEOvdbApply(const GEO_PrimVDB& vdb, OpT& op)
 {
-    if (vdb.hasGrid()) {
-        return vdb.getGrid().apply<GridTypeListT>(op);
+    if (auto gridPtr = vdb.getConstGridPtr()) {
+        return gridPtr->apply<GridTypeListT>(op);
     }
     return false;
 }
@@ -392,11 +363,20 @@ inline bool
 GEOvdbApply(GEO_PrimVDB& vdb, OpT& op, bool makeUnique = true)
 {
     if (vdb.hasGrid()) {
-        if (!makeUnique) {
-            return vdb.getGrid().apply<GridTypeListT>(op);
+        auto gridPtr = vdb.getGridPtr();
+        if (makeUnique) {
+            auto treePtr = gridPtr->baseTreePtr();
+            if (treePtr.use_count() > 2) { // grid + treePtr = 2
+                // If the grid resolves to one of the listed types and its tree
+                // is shared with other grids, replace the tree with a deep copy.
+                gridPtr->apply<GridTypeListT>([](Grid& baseGrid) {
+                    if (auto treePtr = baseGrid.constBaseTreePtr()) {
+                        baseGrid.setTree(treePtr->copy());
+                    }
+                });
+            }
         }
-        internal::MakeUniqueOp<OpT> uniqueOp(op);
-        return vdb.getGrid().apply<GridTypeListT>(uniqueOp);
+        return gridPtr->apply<GridTypeListT>(op);
     }
     return false;
 }
