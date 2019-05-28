@@ -15,6 +15,8 @@ Improvements:
   @vdblink::tree::LeafNode::modifyValueAndActiveState()
   LeafNode::modifyValueAndActiveState@endlink now in-place modify voxel values
   for improved performance.
+- Add CMake support for linking against Jemalloc and TBB malloc and enable
+  Jemalloc by default.
 
 @par
 Bug fixes:
