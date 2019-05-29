@@ -369,11 +369,8 @@ GEOvdbApply(GEO_PrimVDB& vdb, OpT& op, bool makeUnique = true)
             if (treePtr.use_count() > 2) { // grid + treePtr = 2
                 // If the grid resolves to one of the listed types and its tree
                 // is shared with other grids, replace the tree with a deep copy.
-                gridPtr->apply<GridTypeListT>([](Grid& baseGrid) {
-                    if (auto treePtr = baseGrid.constBaseTreePtr()) {
-                        baseGrid.setTree(treePtr->copy());
-                    }
-                });
+                gridPtr->apply<GridTypeListT>(
+                    [](Grid& baseGrid) { baseGrid.setTree(baseGrid.constBaseTree().copy()); });
             }
         }
         return gridPtr->apply<GridTypeListT>(op);
