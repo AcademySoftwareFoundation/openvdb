@@ -100,16 +100,6 @@ option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
 know it to be required.]=] ON)
-option(USE_JEMALLOC [=[
-Use Jemalloc while building openvdb components. If USE_JEMALLOC is OFF, CMake attempts to query the
-located openvdb build configuration to decide on Jemalloc support. You may set this to off to disable Jemalloc.
-Although not strictly required, it is strongly recommended to use a concurrent memory allocator.
-Note that you must choose between Jemalloc or TBB malloc, or otherwise disable them both.]=] ON)
-option(USE_TBBMALLOC [=[
-Use TBB malloc while building openvdb components. If USE_TBBMALLOC is OFF, CMake attempts to query the
-located openvdb build configuration to decide on TBB malloc support. You may set this to on to force TBB malloc
-to be used. Although not required, it is strongly recommended to use a concurrent memory allocator.
-Note that you must choose between Jemalloc or TBB malloc, or otherwise disable them both.]=] OFF)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -125,6 +115,15 @@ option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
+
+if(NOT CONCURRENT_MALLOC)
+  set(CONCURRENT_MALLOC Auto CACHE STRING
+    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
+    Although not required, it is strongly recommended to use a concurrent memory allocator.
+    Auto is the default and implies Tbbmalloc for Maya and Jemalloc for non-MAYA,
+    with a fallback of Tbbmalloc if unavailable." FORCE
+  )
+endif()
 
 ###### Deprecated options
 
@@ -162,12 +161,12 @@ mark_as_advanced(
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
   USE_MAYA
-  USE_JEMALLOC
   USE_LOG4CPLUS
   USE_SYSTEM_LIBRARY_PATHS
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  CONCURRENT_MALLOC
 )
 
 # Configure minimum version requirements
@@ -427,6 +426,16 @@ endif()
 
 if(USE_MAYA)
   include(OpenVDBMayaSetup)
+endif()
+
+# Configure malloc library. Use Tbbmalloc for Maya and Jemalloc for non-Maya.
+
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  if(USE_MAYA)
+    set(CONCURRENT_MALLOC "Tbbmalloc")
+  else()
+    set(CONCURRENT_MALLOC "Jemalloc")
+  endif()
 endif()
 
 #########################################################################

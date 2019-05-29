@@ -77,11 +77,7 @@ else()
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
-if(USE_TBBMALLOC)
-  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb tbbmalloc tbbmalloc_proxy)
-else()
-  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
-endif()
+find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
 find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 
 if(USE_LOG4CPLUS)
@@ -110,8 +106,14 @@ if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(USE_JEMALLOC)
-  find_package(Jemalloc REQUIRED)
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc)
+  if(NOT TARGET Jemalloc::jemalloc)
+    message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+      It is recommended to use Jemalloc for optimum performance."
+    )
+    find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc tbbmalloc_proxy)
+  endif()
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
@@ -155,11 +157,11 @@ if(UNIX)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
 endif()
 
-if(USE_JEMALLOC)
+if(TARGET Jemalloc::jemalloc)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Jemalloc::jemalloc)
 endif()
 
-if(USE_TBBMALLOC)
+if(TARGET TBB::tbbmalloc AND TARGET TBB::tbbmalloc_proxy)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
     TBB::tbbmalloc
     TBB::tbbmalloc_proxy
