@@ -308,7 +308,8 @@ bool isLogForwarding(OP_OpTypeId);
 ////////////////////////////////////////
 
 
-// Grid type lists, for use with openvdb::GridBase::apply()
+// Grid type lists, for use with GEO_PrimVDB::apply(), GEOvdbApply(),
+// or openvdb::GridBase::apply()
 
 using ScalarGridTypes = openvdb::TypeList<
     openvdb::BoolGrid,
