@@ -1,0 +1,5 @@
+pool:
+  vmImage: 'Ubuntu 16.04'
+steps:
+- script: echo Hello, world!
+  displayName: 'Hello World'

@@ -279,6 +279,8 @@ public:
     /// @see @vdblink::TypeList TypeList@endlink
     template<typename GridTypeListT, typename OpT> inline bool apply(OpT&) const;
     template<typename GridTypeListT, typename OpT> inline bool apply(OpT&);
+    template<typename GridTypeListT, typename OpT> inline bool apply(const OpT&) const;
+    template<typename GridTypeListT, typename OpT> inline bool apply(const OpT&);
     /// @}
 
     /// @name Metadata
@@ -1754,6 +1756,20 @@ inline bool
 GridBase::apply(OpT& op)
 {
     return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>::apply(*this, op);
+}
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(const OpT& op) const
+{
+    return internal::GridApplyImpl<const OpT, const GridBase, GridTypeListT>::apply(*this, op);
+}
+
+template<typename GridTypeListT, typename OpT>
+inline bool
+GridBase::apply(const OpT& op)
+{
+    return internal::GridApplyImpl<const OpT, GridBase, GridTypeListT>::apply(*this, op);
 }
 
 } // namespace OPENVDB_VERSION_NAME
