@@ -23,17 +23,17 @@
 /openvdb/*.h                                        @kmuseth @pcucka
 
 # OpenVDB Houdini - Default
-/openvdb_houdini/houdini/**                         @kmuseth @pcucka
+/openvdb_houdini/**                                 @kmuseth @pcucka
 
 # OpenVDB Houdini - VDB Primitive and SideFX Utils
-/openvdb_houdini/houdini/GEO_PrimVDB.*              @jmlait
-/openvdb_houdini/houdini/GU_PrimVDB.*               @jmlait
-/openvdb_houdini/houdini/GEO_VDBTranslator.*        @jmlait
-/openvdb_houdini/houdini/GT_GEOPrimCollectVDB.*     @jmlait
-/openvdb_houdini/houdini/SOP_VDBVerbUtils.*         @jmlait
-/openvdb_houdini/houdini/UT_VDBUtils.*              @jmlait
+/openvdb_houdini/GEO_PrimVDB.*                      @jmlait
+/openvdb_houdini/GU_PrimVDB.*                       @jmlait
+/openvdb_houdini/GEO_VDBTranslator.*                @jmlait
+/openvdb_houdini/GT_GEOPrimCollectVDB.*             @jmlait
+/openvdb_houdini/SOP_VDBVerbUtils.*                 @jmlait
+/openvdb_houdini/UT_VDBUtils.*                      @jmlait
 
 # OpenVDB Houdini - VDB Points
-/openvdb_houdini/houdini/PointUtils.*               @danrbailey @idclip
-/openvdb_houdini/houdini/*_OpenVDB_Points_*         @danrbailey @idclip
-/openvdb_houdini/houdini/GR_PrimVDBPoints.*         @danrbailey @idclip
+/openvdb_houdini/PointUtils.*                       @danrbailey @idclip
+/openvdb_houdini/*_OpenVDB_Points_*                 @danrbailey @idclip
+/openvdb_houdini/GR_PrimVDBPoints.*                 @danrbailey @idclip

@@ -38,8 +38,8 @@
 
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_UniquePtr.h>
+#include <UT/UT_Version.h>
 
 #include <memory>
 #include <stdexcept>
@@ -415,7 +415,7 @@ SOP_OpenVDB_Fill::Cache::cookVDBSop(OP_Context& context)
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
-            it->getGrid().apply<hvdb::VolumeGridTypes>(*fillOp);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, *fillOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

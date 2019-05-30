@@ -521,6 +521,65 @@ public:
     UniqueId        getTransformUniqueId() const
                         { return static_cast<UniqueId>(myTransformUniqueId.relaxedLoad()); }
 
+
+    /// @brief If this primitive's grid resolves to one of the listed grid types,
+    /// invoke the functor @a op on the resolved grid.
+    /// @return @c true if the functor was invoked, @c false otherwise
+    ///
+    /// @par Example:
+    /// @code
+    /// auto printOp = [](const openvdb::GridBase& grid) { grid.print(); };
+    /// const GEO_PrimVDB* prim = ...;
+    /// using RealGridTypes = openvdb::TypeList<openvdb::FloatGrid, openvdb::DoubleGrid>;
+    /// // Print info about the primitive's grid if it is a floating-point grid.
+    /// prim->apply<RealGridTypes>(printOp);
+    /// @endcode
+    template<typename GridTypeListT, typename OpT>
+    bool    apply(OpT& op) const
+                { return hasGrid() ? getConstGrid.apply<GridTypeListT>(op) : false; }
+
+    /// @brief If this primitive's grid resolves to one of the listed grid types,
+    /// invoke the functor @a op on the resolved grid.
+    /// @return @c true if the functor was invoked, @c false otherwise
+    /// @details If @a makeUnique is true, deep copy the grid's tree before
+    /// invoking the functor if the tree is shared with other grids.
+    ///
+    /// @par Example:
+    /// @code
+    /// auto fillOp = [](const auto& grid) { // C++14
+    ///     // Convert voxels in the given bounding box into background voxels.
+    ///     grid.fill(openvdb::CoordBBox(openvdb::Coord(0), openvdb::Coord(99)),
+    ///         grid.background(), /*active=*/false);
+    /// };
+    /// GEO_PrimVDB* prim = ...;
+    /// // Set background voxels in the primitive's grid if it is a floating-point grid.
+    /// using RealGridTypes = openvdb::TypeList<openvdb::FloatGrid, openvdb::DoubleGrid>;
+    /// prim->apply<RealGridTypes>(fillOp);
+    /// @endcode
+    template<typename GridTypeListT, typename OpT>
+    bool    apply(OpT& op, bool makeUnique = true)
+            {
+                if (hasGrid()) {
+                    auto& grid = myGridAccessor.getGrid(*this);
+                    if (makeUnique) {
+                        auto treePtr = grid.baseTreePtr();
+                        if (treePtr.use_count() > 2) { // grid + treePtr = 2
+                            // If the grid resolves to one of the listed types and its tree
+                            // is shared with other grids, replace the tree with a deep copy.
+                            grid.apply<GridTypeListT>([this](openvdb::GridBase& baseGrid) {
+                                baseGrid.setTree(baseGrid.constBaseTree().copy());
+                                this->incrTreeUniqueId();
+                            });
+                        }
+                    }
+                    if (grid.apply<GridTypeListT>(op)) {
+                        incrGridUniqueIds();
+                        return true;
+                    }
+                }
+                return false;
+            }
+
 protected:
     typedef SYS_AtomicCounter AtomicUniqueId; // 64-bit
 

@@ -524,6 +524,21 @@ TestGrid::testApply()
         CPPUNIT_ASSERT(floatCGrid->apply<AllowedGridTypes>(op));  CPPUNIT_ASSERT(op.isConst);
         CPPUNIT_ASSERT(doubleCGrid->apply<AllowedGridTypes>(op)); CPPUNIT_ASSERT(op.isConst);
     }
+    {
+        using AllowedGridTypes = TypeList<FloatGrid, DoubleGrid>;
+
+        // Verify that rvalue functors are supported.
+        int n = 0;
+        CPPUNIT_ASSERT(  !boolGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        CPPUNIT_ASSERT(   !intGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        CPPUNIT_ASSERT(  floatGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        CPPUNIT_ASSERT( doubleGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        CPPUNIT_ASSERT( !boolCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        CPPUNIT_ASSERT(  !intCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        CPPUNIT_ASSERT( floatCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        CPPUNIT_ASSERT(doubleCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        CPPUNIT_ASSERT_EQUAL(4, n);
+    }
 }
 
 // Copyright (c) DreamWorks Animation LLC

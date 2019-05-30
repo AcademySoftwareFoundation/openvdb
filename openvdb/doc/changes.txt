@@ -6,6 +6,42 @@
 @par
 <B>Version 6.1.1</B> - <I>In development</I>
 
+@par
+Improvements:
+- <TT>FindOpenVDB.cmake</TT> now correctly propagates @c CXX version
+  requirements.
+- Improved directory and file path lookups of some CMake commands in
+  the root <TT>CMakeLists.txt</TT>.
+  <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
+- @vdblink::tree::LeafNode::modifyValue() LeafNode::modifyValue@endlink and
+  @vdblink::tree::LeafNode::modifyValueAndActiveState()
+  LeafNode::modifyValueAndActiveState@endlink now modify voxel values
+  in place for improved performance.
+
+@par
+Bug fixes:
+- Fixed a bug in
+  @vdblink::tools::computeScalarPotential() computeScalarPotential@endlink
+  that could produce a corrupt result due to invalid memory access.
+  <I>[Reported&nbsp;by&nbsp;Edwin&nbsp;Braun]</I>
+
+@par
+Python:
+- CMake now always produces a <TT>.so</TT> for the Python module
+  on UNIX platforms.
+- Fixed a compile-time error when building the Python module for Python&nbsp;3.
+  <I>[Reported&nbsp;by&nbsp;yurivict]</I>
+
+@par
+Houdini:
+- Added <B>openvdb_houdini::GEOvdbApply</B>, which invokes a functor
+  on a VDB primitive if the resolved grid type is a member of
+  a given type list.
+- Fixed a regression in the Fill&nbsp;SOP that caused it to modify VDBs
+  in the input detail.
+- The Combine&nbsp;SOP no longer crashes in <B>Copy&nbsp;B</B> mode when the
+  destination is not a&nbsp;VDB.
+
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
 @par
