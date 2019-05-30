@@ -432,10 +432,10 @@ if(USE_MAYA)
   include(OpenVDBMayaSetup)
 endif()
 
-# Configure malloc library. Use Tbbmalloc for Maya and Jemalloc for non-Maya.
+# Configure malloc library. Use Tbbmalloc for Windows or Maya and Jemalloc otherwise.
 
 if(CONCURRENT_MALLOC STREQUAL "Auto")
-  if(USE_MAYA)
+  if(WIN32 OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
