@@ -116,13 +116,17 @@ option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
 
+set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
   set(CONCURRENT_MALLOC Auto CACHE STRING
     "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
     Although not required, it is strongly recommended to use a concurrent memory allocator.
-    Auto is the default and implies Tbbmalloc for Maya and Jemalloc for non-MAYA,
-    with a fallback of Tbbmalloc if unavailable." FORCE
+    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
+    in which case Tbbmalloc is used." FORCE
   )
+elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
+  message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
+  set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
 endif()
 
 ###### Deprecated options
