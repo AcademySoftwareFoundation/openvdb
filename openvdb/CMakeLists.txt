@@ -114,6 +114,8 @@ if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
     )
     find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc tbbmalloc_proxy)
   endif()
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc tbbmalloc_proxy)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
