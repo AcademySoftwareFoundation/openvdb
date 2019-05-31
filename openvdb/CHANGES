@@ -29,6 +29,8 @@ Version 6.1.1 - In development
       in the input detail.
     - The Combine SOP no longer crashes in Copy B mode when the destination
       is not a VDB.
+    - Introduced a position compression option to the Scatter SOP for VDB
+      Points and default to 16-bit fixed point.
 
 
 Version 6.1.0 - May 8, 2019
