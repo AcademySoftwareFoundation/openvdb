@@ -24,6 +24,12 @@ Bug fixes:
   @vdblink::tools::computeScalarPotential() computeScalarPotential@endlink
   that could produce a corrupt result due to invalid memory access.
   <I>[Reported&nbsp;by&nbsp;Edwin&nbsp;Braun]</I>
+- Partially reverted the
+  @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  tool&rsquo;s distance calculations to their pre-OpenVDB&nbsp;5.0 behavior
+  to address a bug in the
+  @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink tool
+  that caused generated spheres to sometimes extend outside the target volume.
 
 @par
 Python:

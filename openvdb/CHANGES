@@ -15,6 +15,10 @@ Version 6.1.1 - In development
     - Fixed a bug in tools::computeScalarPotential() that could produce
       a corrupt result due to invalid memory access.
       [Reported by Edwin Braun]
+    - Partially reverted tools::ClosestSurfacePoint's distance calculations
+      to their pre-OpenVDB 5.0 behavior to address a bug in the
+      fillWithSpheres() tool that caused generated spheres to sometimes
+      extend outside the target volume.
 
     Python:
     - CMake now always produces a .so for the Python module on UNIX platforms.
