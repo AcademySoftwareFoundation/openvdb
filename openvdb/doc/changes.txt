@@ -17,6 +17,8 @@ Improvements:
   @vdblink::tree::LeafNode::modifyValueAndActiveState()
   LeafNode::modifyValueAndActiveState@endlink now modify voxel values
   in place for improved performance.
+- Made a few improvements related to the use of std::inf and std::nan with
+  integer types to resolve Visual Studio compatibility issues.
 
 @par
 Bug fixes:
@@ -24,15 +26,6 @@ Bug fixes:
   @vdblink::tools::computeScalarPotential() computeScalarPotential@endlink
   that could produce a corrupt result due to invalid memory access.
   <I>[Reported&nbsp;by&nbsp;Edwin&nbsp;Braun]</I>
-- Fixed a bug in
-  @vdblink::math::Tuple::isInfinite() isInfinite@endlink isInfinite() and
-  @vdblink::math::Tuple::isNan() isNan@endlink isNan() methods of
-  @vdblink::math::Tuple math::Tuple@endlink and
-  @vdblink::math::Mat::isFinite() isFinite@endlink isFinite(),
-  @vdblink::math::Mat::isInfinite() isInfinite@endlink isInfinite() and
-  @vdblink::math::Mat::isNan() isNan@endlink isNan() methods of
-  @vdblink::math::Mat math::Mat@endlink when called using integer types that
-  led to compile-time errors on Windows.
 
 @par
 Python:
