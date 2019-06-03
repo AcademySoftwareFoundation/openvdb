@@ -432,7 +432,14 @@ if(USE_MAYA)
   include(OpenVDBMayaSetup)
 endif()
 
-# Configure malloc library. Use Tbbmalloc for Windows or Maya and Jemalloc otherwise.
+# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
+#   Jemalloc are thought to work, but haven't been tested.
+# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
+#   of injecting into the Windows runtime to replace the system allocator.
 
 if(CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
