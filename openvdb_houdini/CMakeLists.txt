@@ -75,8 +75,24 @@ option(OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
 Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
 older Houdini versions and will be removed in Houdini 18. ]=] OFF)
 
+# OPcustomize options
+option(OPENVDB_HOUDINI_OPCUSTOMIZE [=[
+Generate an OPcustomize script that ophides native or open-source SOPs using
+OpenVDB OpHide policies. ]=] OFF)
+
+# Default Policy options
+set(_OPENVDB_HOUDINI_DEFAULT_POLICY_OPTIONS 0 1 2)
+if(OPENVDB_HOUDINI_DEFAULT_POLICY)
+  if(NOT ${OPENVDB_HOUDINI_DEFAULT_POLICY} IN_LIST _OPENVDB_HOUDINI_DEFAULT_POLICY_OPTIONS)
+    message(WARNING "Unrecognized value for OPENVDB_HOUDINI_DEFAULT_POLICY, unsetting.")
+    unset(OPENVDB_HOUDINI_DEFAULT_POLICY)
+  endif()
+endif()
+
 mark_as_advanced(
   OPENVDB_HOUDINI_ENABLE_SESI_TAG
+  OPENVDB_HOUDINI_OPCUSTOMIZE
+  OPENVDB_HOUDINI_DEFAULT_POLICY
 )
 
 #########################################################################
@@ -213,6 +229,12 @@ set_target_properties(openvdb_houdini
     VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
 )
 
+# Introduce the compile-time flag if set and OPcustomize is not in use
+if(NOT OPENVDB_HOUDINI_OPCUSTOMIZE AND OPENVDB_HOUDINI_DEFAULT_POLICY)
+  target_compile_definitions(openvdb_houdini
+    PRIVATE  "-DOPENVDB_HOUDINI_DEFAULT_POLICY=${OPENVDB_HOUDINI_DEFAULT_POLICY}")
+endif()
+
 set(OPENVDB_DSO_NAMES
   GR_PrimVDBPoints
   SHOP_OpenVDB_Points
@@ -273,6 +295,8 @@ add_custom_target(openvdb_houdini_dsos
 
 message(STATUS "Configuring Houdini DSOs...")
 
+set(SOP_TARGET_FILES)
+
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
 
   add_library(${DSO_NAME} SHARED ${DSO_NAME}.cc)
@@ -323,6 +347,12 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
 
   add_dependencies(openvdb_houdini_dsos ${DSO_NAME})
 
+  # Append the target file to a list if the target contains "SOP_"
+  string(FIND "${DSO_NAME}" "SOP_" result)
+  if("${result}" EQUAL 0)
+    list(APPEND SOP_TARGET_FILES $<TARGET_FILE:${DSO_NAME}>)
+  endif()
+
 endforeach()
 
 # This is only required for the OpenVDB Write SOP which enables a blosc menu
@@ -332,6 +362,28 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   if(TARGET SOP_OpenVDB_Write)
     target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC")
   endif()
+endif()
+
+##########
+# OPcustomize
+##########
+
+if(OPENVDB_HOUDINI_OPCUSTOMIZE)
+  # the run-time environment variable OPENVDB_OPHIDE_POLICY takes precedence over
+  # the compile-time flag, so define this as the policy is not implemented at
+  # compile-time if OPcustomize is in use
+  if (OPENVDB_HOUDINI_DEFAULT_POLICY)
+    set(OPCUSTOMIZE_ENV "OPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_DEFAULT_POLICY}")
+  else()
+    set(OPCUSTOMIZE_ENV "")
+  endif()
+  add_custom_target(opcustomize ALL
+    COMMAND ${CMAKE_COMMAND} -E env ${OPCUSTOMIZE_ENV}
+      hython ${CMAKE_CURRENT_SOURCE_DIR}/vdbopcustomize.py ${SOP_TARGET_FILES}
+      > ${CMAKE_CURRENT_BINARY_DIR}/OPcustomize
+    DEPENDS openvdb_houdini_dsos
+    COMMENT "Generating OPcustomize script that ophides native or open-source SOPs" VERBATIM
+  )
 endif()
 
 ##########
@@ -372,3 +424,10 @@ install(FILES
   DW_OpenVDBRasterizePoints.cmd
   DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
 )
+
+if(OPENVDB_HOUDINI_OPCUSTOMIZE)
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/OPcustomize
+    DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}
+  )
+endif()
