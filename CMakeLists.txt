@@ -116,6 +116,19 @@ option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
 
+set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
+if(NOT CONCURRENT_MALLOC)
+  set(CONCURRENT_MALLOC Auto CACHE STRING
+    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
+    Although not required, it is strongly recommended to use a concurrent memory allocator.
+    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
+    in which case Tbbmalloc is used." FORCE
+  )
+elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
+  message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
+  set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
+endif()
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
@@ -157,6 +170,7 @@ mark_as_advanced(
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  CONCURRENT_MALLOC
 )
 
 # Configure minimum version requirements
@@ -233,6 +247,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindCppUnit.cmake
+    cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
@@ -415,6 +430,23 @@ endif()
 
 if(USE_MAYA)
   include(OpenVDBMayaSetup)
+endif()
+
+# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
+#   Jemalloc are thought to work, but haven't been tested.
+# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
+#   of injecting into the Windows runtime to replace the system allocator.
+
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  if(WIN32 OR APPLE OR USE_MAYA)
+    set(CONCURRENT_MALLOC "Tbbmalloc")
+  else()
+    set(CONCURRENT_MALLOC "Jemalloc")
+  endif()
 endif()
 
 #########################################################################

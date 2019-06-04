@@ -17,6 +17,7 @@ apt-get install -y pkg-config
 apt-get install -y libglu1-mesa-dev
 apt-get install -y libgl1-mesa-dev
 apt-get install -y libcppunit-dev
+apt-get install -y libjemalloc-dev
 apt-get install -y liblog4cplus-dev
 apt-get install -y libglfw3-dev
 apt-get install -y python-dev
