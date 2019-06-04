@@ -44,6 +44,7 @@
 
 #include "LevelSetTracker.h"
 #include "Interpolation.h"
+#include <openvdb/math/Stencils.h>
 #include <algorithm> // for std::max()
 #include <functional>
 #include <type_traits>
@@ -169,6 +170,14 @@ public:
         Filter f(this, mask); f.mean(width);
     }
 
+    /// @brief Apply one iteration of a sharpening filter to the level set.
+    /// @param width  width of the sharpening kernel in voxel units
+    /// @param mask   optional alpha mask
+    void sharpen(int width = 1, const MaskType* mask = nullptr)
+    {
+        Filter(this, mask).sharpen(width);
+    }
+
 private:
     // disallow copy construction and copy by assignment!
     LevelSetFilter(const LevelSetFilter&);// not implemented
@@ -196,11 +205,14 @@ private:
         void laplacian();
         void meanCurvature();
         void offset(ValueType value);
+        void sharpen(int width);
+
         void operator()(const LeafRange& r) const
         {
             if (mTask) mTask(const_cast<Filter*>(this), r);
             else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
         }
+
         void cook(bool swap)
         {
             const int n = mParent->getGrainSize();
@@ -239,6 +251,10 @@ private:
         void meanCurvatureImpl(const LeafRange&);
         void laplacianImpl(const LeafRange&);
         void offsetImpl(const LeafRange&, ValueType);
+
+        using SharpeningKernel = typename math::ConvolutionStencil<GridType>::KernelType;
+        static SharpeningKernel sharpeningKernel(int radius);
+        void sharpenImpl(const LeafRange&, const SharpeningKernel&);
 
         LevelSetFilter* mParent;
         const MaskType* mMask;
@@ -365,6 +381,69 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ValueType value)
         mParent->track();
     }
 
+    mParent->endInterrupter();
+}
+
+
+// Return a 3D sharpening kernel of the given radius.
+template<typename GridT, typename MaskT, typename InterruptT>
+auto LevelSetFilter<GridT, MaskT, InterruptT>::Filter::sharpeningKernel(int r) -> SharpeningKernel
+{
+    r = math::Abs(r);
+    const size_t
+        halfWidth = static_cast<size_t>(r),
+        width = 2 * halfWidth + 1;
+
+    // A standard deviation of 0.75 times the radius gives a reasonable falloff.
+    const double
+        sigma = 0.75 * r,
+        twoSigmaSquared = 2.0 * sigma * sigma;
+
+    using KernelValueType = typename SharpeningKernel::element;
+
+    SharpeningKernel kernel(boost::extents[width][width][width]);
+    double sum = 0.0;
+    math::Vec3<int> ijk(0, 0, 0);
+    int &i = ijk[0], &j = ijk[1], &k = ijk[2];
+    for (i = 0; i < int(width); ++i) {
+        for (j = 0; j < int(width); ++j) {
+            for (k = 0; k < int(width); ++k) {
+                const double d = math::Exp(-double((ijk - r).lengthSqr()) / twoSigmaSquared)
+                    / (M_PI * twoSigmaSquared);
+                kernel[i][j][k] = static_cast<KernelValueType>(d);
+                sum += d;
+            }
+        }
+    }
+    auto central = kernel[halfWidth][halfWidth][halfWidth];
+    kernel[halfWidth][halfWidth][halfWidth] = static_cast<KernelValueType>(-2.0 * sum);
+    sum = central - sum;
+
+    // Normalize the kernel.
+    for (size_t i = 0; i < width; ++i) {
+        for (size_t j = 0; j < width; ++j) {
+            for (size_t k = 0; k < width; ++k) {
+                kernel[i][j][k] = static_cast<KernelValueType>(kernel[i][j][k] / sum);
+            }
+        }
+    }
+
+    return kernel;
+}
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::sharpen(int width)
+{
+    if (width == 0) return;
+    const auto kernel = sharpeningKernel(width);
+
+    mParent->startInterrupter("Sharpening SDF");
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize() == 0);
+    mTask = std::bind(&Filter::sharpenImpl,
+        std::placeholders::_1, std::placeholders::_2, std::cref(kernel));
+    this->cook(true);
+    mParent->track();
     mParent->endInterrupter();
 }
 
@@ -525,6 +604,41 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
             ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 buffer[iter.pos()] = avg(iter.getCoord());
+            }
+        }
+    }
+}
+
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::sharpenImpl(
+    const LeafRange& range, const SharpeningKernel& kernel)
+{
+    mParent->checkInterrupter();
+
+    math::ConvolutionStencil<GridType> stencil(mParent->grid(), kernel);
+
+    if (mMask) {
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+            mParent->maxMask(), mParent->isMaskInverted());
+        for (LeafIterT leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                if (alpha(iter.getCoord(), a, b)) {
+                    stencil.moveTo(iter);
+                    const ValueType phi0 = *iter, phi1 = stencil.convolve();
+                    buffer[iter.pos()] = b * phi0 + a * phi1;
+                }
+            }
+        }
+    } else {
+        for (LeafIterT leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                stencil.moveTo(iter);
+                buffer[iter.pos()] = stencil.convolve();
             }
         }
     }

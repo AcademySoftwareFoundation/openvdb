@@ -81,10 +81,11 @@ enum OperatorType {
     OP_TYPE_RENORM = 0,
     OP_TYPE_RESHAPE,
     OP_TYPE_SMOOTH,
-    OP_TYPE_RESIZE
+    OP_TYPE_RESIZE,
+    OP_TYPE_SHARPEN
 };
 
-enum { NUM_OPERATOR_TYPES = OP_TYPE_RESIZE + 1 };
+enum { NUM_OPERATOR_TYPES = OP_TYPE_SHARPEN + 1 };
 
 
 // Add new items to the *end* of this list, and update NUM_FILTER_TYPES.
@@ -101,10 +102,11 @@ enum FilterType {
     FILTER_TYPE_CLOSE,
     FILTER_TYPE_TRACK,
     FILTER_TYPE_GAUSSIAN,
-    FILTER_TYPE_RESIZE
+    FILTER_TYPE_RESIZE,
+    FILTER_TYPE_SHARPEN
 };
 
-enum { NUM_FILTER_TYPES = FILTER_TYPE_RESIZE + 1 };
+enum { NUM_FILTER_TYPES = FILTER_TYPE_SHARPEN + 1 };
 
 
 std::string
@@ -121,6 +123,7 @@ filterTypeToString(FilterType filter)
         case FILTER_TYPE_OPEN:           ret = "open";                  break;
         case FILTER_TYPE_CLOSE:          ret = "close";                 break;
         case FILTER_TYPE_TRACK:          ret = "track";                 break;
+        case FILTER_TYPE_SHARPEN:        ret = "sharpen";               break;
 #ifndef SESI_OPENVDB
         case FILTER_TYPE_MEAN_VALUE:     ret = "mean value";            break;
         case FILTER_TYPE_MEDIAN_VALUE:   ret = "median value";          break;
@@ -141,19 +144,20 @@ filterTypeToMenuName(FilterType filter)
 {
     std::string ret;
     switch (filter) {
-        case FILTER_TYPE_NONE: ret           = "None";                  break;
-        case FILTER_TYPE_RENORMALIZE: ret    = "Renormalize";           break;
-        case FILTER_TYPE_RESIZE: ret         = "Resize Narrow Band";    break;
-        case FILTER_TYPE_MEAN_VALUE: ret     = "Mean Value";            break;
-        case FILTER_TYPE_GAUSSIAN: ret       = "Gaussian";              break;
-        case FILTER_TYPE_MEDIAN_VALUE: ret   = "Median Value";          break;
+        case FILTER_TYPE_NONE:           ret = "None";                  break;
+        case FILTER_TYPE_RENORMALIZE:    ret = "Renormalize";           break;
+        case FILTER_TYPE_RESIZE:         ret = "Resize Narrow Band";    break;
+        case FILTER_TYPE_MEAN_VALUE:     ret = "Mean Value";            break;
+        case FILTER_TYPE_GAUSSIAN:       ret = "Gaussian";              break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "Median Value";          break;
         case FILTER_TYPE_MEAN_CURVATURE: ret = "Mean Curvature Flow";   break;
         case FILTER_TYPE_LAPLACIAN_FLOW: ret = "Laplacian Flow";        break;
-        case FILTER_TYPE_DILATE: ret         = "Dilate";                break;
-        case FILTER_TYPE_ERODE: ret          = "Erode";                 break;
-        case FILTER_TYPE_OPEN: ret           = "Open";                  break;
-        case FILTER_TYPE_CLOSE: ret          = "Close";                 break;
-        case FILTER_TYPE_TRACK: ret          = "Track Narrow Band";     break;
+        case FILTER_TYPE_DILATE:         ret = "Dilate";                break;
+        case FILTER_TYPE_ERODE:          ret = "Erode";                 break;
+        case FILTER_TYPE_OPEN:           ret = "Open";                  break;
+        case FILTER_TYPE_CLOSE:          ret = "Close";                 break;
+        case FILTER_TYPE_TRACK:          ret = "Track Narrow Band";     break;
+        case FILTER_TYPE_SHARPEN:        ret = "Sharpen";               break;
     }
     return ret;
 }
@@ -192,6 +196,8 @@ stringToFilterType(const std::string& s)
         ret = FILTER_TYPE_CLOSE;
     } else if (str == filterTypeToString(FILTER_TYPE_TRACK)) {
         ret = FILTER_TYPE_TRACK;
+    } else if (str == filterTypeToString(FILTER_TYPE_SHARPEN)) {
+        ret = FILTER_TYPE_SHARPEN;
     }
 
     return ret;
@@ -344,6 +350,7 @@ public:
 
     static OP_Node* factoryRenormalize(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factorySmooth(OP_Network*, const char* name, OP_Operator*);
+    static OP_Node* factorySharpen(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factoryReshape(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factoryNarrowBand(OP_Network*, const char* name, OP_Operator*);
 
@@ -396,6 +403,10 @@ public:
 
         template<typename FilterT>
         void laplacian(const FilterParms&, FilterT&, BossT&, bool verbose,
+            const typename FilterT::MaskType* mask = nullptr);
+
+        template<typename FilterT>
+        void sharpen(const FilterParms&, FilterT&, BossT&, bool verbose,
             const typename FilterT::MaskType* mask = nullptr);
 
         template<typename FilterT>
@@ -456,14 +467,14 @@ newSopOperator(OP_OperatorTable* table)
                     " the operation is applied at full strength.  For intermediate mask values,"
                     " the strength varies linearly."));
 
-            std::vector<std::string> items;
-
-            buildFilterMenu(items, op);
-
-            parms.add(hutil::ParmFactory(PRM_STRING, "operation", "Operation")
-                .setDefault(items[0])
-                .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-                .setTooltip("The operation to be applied"));
+            if (OP_TYPE_SHARPEN != op) {
+                std::vector<std::string> items;
+                buildFilterMenu(items, op);
+                parms.add(hutil::ParmFactory(PRM_STRING, "operation", "Operation")
+                    .setDefault(items[0])
+                    .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+                    .setTooltip("The operation to be applied"));
+            }
         }
 
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "useworldspaceunits", "Use World Space Units")
@@ -682,6 +693,37 @@ this node ensures that the level set remains a valid signed distance field.\n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
 
+        } else if (OP_TYPE_SHARPEN == op) {
+
+            hvdb::OpenVDBOpFactory("VDB Sharpen SDF",
+                SOP_OpenVDB_Filter_Level_Set::factorySharpen, parms, *table)
+#ifndef SESI_OPENVDB
+                .setInternalName("DW_OpenVDBSharpenLevelSet")
+#endif
+                .addInput("Input with VDBs to process")
+                .addOptionalInput("Optional VDB Alpha Mask")
+                .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
+                .setDocumentation("\
+#icon: COMMON/openvdb\n\
+#tags: vdb\n\
+\n\
+\"\"\"Sharpen surface features of a level set represented by a VDB volume.\"\"\"\n\
+\n\
+@overview\n\
+\n\
+This node applies a sharpening operation to the surface defined by the zero crossing\n\
+of a signed distance field, ensuring that the result remains a valid SDF.\n\
+\n\
+@related\n\
+- [OpenVDB Filter|Node:sop/DW_OpenVDBFilter]\n\
+- [OpenVDB Smooth Level Set|Node:sop/DW_OpenVDBSmoothLevelSet]\n\
+- [OpenVDB Renormalize Level Set|Node:sop/DW_OpenVDBRenormalizeLevelSet]\n\
+\n\
+@examples\n\
+\n\
+See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
+and usage examples.\n");
+
         } else if (OP_TYPE_RESIZE == op) {
 
             hvdb::OpenVDBOpFactory("VDB Resize Narrow Band",
@@ -759,6 +801,13 @@ SOP_OpenVDB_Filter_Level_Set::factorySmooth(
 }
 
 OP_Node*
+SOP_OpenVDB_Filter_Level_Set::factorySharpen(
+    OP_Network* net, const char* name, OP_Operator* op)
+{
+    return new SOP_OpenVDB_Filter_Level_Set(net, name, op, OP_TYPE_SHARPEN);
+}
+
+OP_Node*
 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand(
     OP_Network* net, const char* name, OP_Operator* op)
 {
@@ -783,16 +832,21 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
     const bool smooth = mOpType == OP_TYPE_SMOOTH;
     const bool reshape = mOpType == OP_TYPE_RESHAPE;
     const bool resize = mOpType == OP_TYPE_RESIZE;
+    const bool sharpen = mOpType == OP_TYPE_SHARPEN;
 
     if (renorm || resize) {
         changed |= setVisibleState("invert", false);
         changed |= setVisibleState("minmask",false);
         changed |= setVisibleState("maxmask",false);
     } else {
-        const FilterType operation = stringToFilterType(evalStdString("operation", 0));
-        stencil = operation == FILTER_TYPE_MEAN_VALUE ||
-                  operation == FILTER_TYPE_GAUSSIAN   ||
-                  operation == FILTER_TYPE_MEDIAN_VALUE;
+        if (sharpen) {
+            stencil = true;
+        } else {
+            const FilterType operation = stringToFilterType(evalStdString("operation", 0));
+            stencil = operation == FILTER_TYPE_MEAN_VALUE ||
+                      operation == FILTER_TYPE_GAUSSIAN   ||
+                      operation == FILTER_TYPE_MEDIAN_VALUE;
+        }
         const bool hasMask = (this->nInputs() == 2);
         changed |= enableParm("mask", hasMask);
         const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
@@ -807,7 +861,7 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
     changed |= setVisibleState("halfwidth", resize && !worldUnits);
     changed |= setVisibleState("halfwidthworld", resize && worldUnits);
 
-    changed |= enableParm("iterations", smooth || renorm);
+    changed |= enableParm("iterations", smooth || renorm || sharpen);
     changed |= enableParm("radius", stencil && !worldUnits);
     changed |= enableParm("radiusworld", stencil && worldUnits);
 
@@ -934,6 +988,8 @@ SOP_OpenVDB_Filter_Level_Set::Cache::evalFilterParms(
         parms.mFilterType = FILTER_TYPE_RENORMALIZE;
     } else if (OP_TYPE_RESIZE == mOpType) {
         parms.mFilterType = FILTER_TYPE_RESIZE;
+    } else if (OP_TYPE_SHARPEN == mOpType) {
+        parms.mFilterType = FILTER_TYPE_SHARPEN;
     } else {
         parms.mFilterType = stringToFilterType(evalStdString("operation", now));
     }
@@ -1076,6 +1132,9 @@ SOP_OpenVDB_Filter_Level_Set::Cache::filterGrid(
         case FILTER_TYPE_LAPLACIAN_FLOW:
             laplacian(parms, filter, boss, verbose, maskGrid.get());
             break;
+        case FILTER_TYPE_SHARPEN:
+            sharpen(parms, filter, boss, verbose, maskGrid.get());
+            break;
         case FILTER_TYPE_TRACK:
             track(parms, filter, boss, verbose);
             break;
@@ -1171,6 +1230,34 @@ SOP_OpenVDB_Filter_Level_Set::Cache::gaussian(
         }
 
         filter.gaussian(radius, mask);
+    }
+}
+
+template<typename FilterT>
+void
+SOP_OpenVDB_Filter_Level_Set::Cache::sharpen(
+    const FilterParms& parms,
+    FilterT& filter,
+    BossT& boss,
+    bool verbose,
+    const typename FilterT::MaskType* mask)
+{
+    const double voxelScale = 1.0 / filter.grid().voxelSize()[0];
+
+    for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
+
+        int radius = parms.mStencilWidth;
+
+        if (parms.mWorldUnits) {
+            double voxelRadius = double(parms.mStencilWidthWorld) * voxelScale;
+            radius = std::max(1, int(voxelRadius));
+        }
+
+        if (verbose) {
+            std::cout << "Sharpening filter of radius " << radius << std::endl;
+        }
+
+        filter.sharpen(radius, mask);
     }
 }
 

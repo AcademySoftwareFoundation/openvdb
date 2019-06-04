@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <boost/multi_array.hpp>
 #include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
@@ -1700,6 +1701,119 @@ private:
     const int mHalfWidth;
 };// DenseStencil class
 
+
+//////////////////////////////////////////////////////////////////////
+
+
+/// @brief Dense stencil representing a convolution kernel
+/// @note The source grid is assumed to be unchanging.
+template<typename GridT, bool IsSafe = true>
+class ConvolutionStencil: public BaseStencil<ConvolutionStencil<GridT, IsSafe>, GridT, IsSafe>
+{
+public:
+    using SelfT = ConvolutionStencil<GridT, IsSafe>;
+    using BaseType = BaseStencil<SelfT, GridT, IsSafe>;
+    using GridType = GridT;
+    using ValueType = typename GridType::ValueType;
+    using KernelValueType = typename std::conditional<
+        std::is_floating_point<ValueType>::value, ValueType, double>::type;
+    using KernelType = typename boost::multi_array<KernelValueType, 3>;
+    using KernelCRefType = typename boost::const_multi_array_ref<KernelValueType, 3>;
+    using StencilRefType = typename boost::multi_array_ref<ValueType, 3>;
+
+
+    ConvolutionStencil(const GridType& grid, const KernelCRefType& kernel)
+        : BaseType(grid, static_cast<int>(kernel.num_elements()))
+        , mKernel(kernel)
+        , mKernelShape(mKernel.shape(), mKernel.shape() + 3)
+    {
+    }
+
+    /// @brief Populate the stencil buffer with the values of voxel (i, j, k) and its neighbors.
+    void moveTo(const Coord& ijk) { this->init(ijk); }
+
+    /// @brief Populate the stencil buffer with the values of the voxel to which
+    /// the given iterator points and the values of that voxel's neighbors.
+    template<typename IterType>
+    void moveTo(const IterType& iter) { this->init(iter.getCoord()); }
+
+    ValueType convolve() const
+    {
+        auto* kernelPtr = mKernel.origin();
+        auto sum = zeroVal<ValueType>();
+        for (size_t n = 0; n < mStencil.size(); ++n) {
+            /// @todo Suppress type conversion warnings (when ValueType is not float or double).
+            sum = static_cast<ValueType>(sum + (mStencil[n] * kernelPtr[n]));
+        }
+        return sum;
+    }
+
+private:
+    void setCenter(const Coord& ijk) { BaseType::mCenter = ijk; mInitialized = true; }
+
+    void init(const Coord& ijk)
+    {
+        const Coord shape(
+            static_cast<Int32>(mKernelShape[0]),
+            static_cast<Int32>(mKernelShape[1]),
+            static_cast<Int32>(mKernelShape[2]));
+        const Coord offset = shape >> 1;
+
+        if (mInitialized && (ijk == this->getCenterCoord().offsetBy(0, 0, 1))) {
+            // If the stencil buffer has been initialized and its new position differs
+            // from the old by +1 along the z axis (the common case for convolution),
+            // preserve the contents of the buffer and sample only the new z slice.
+            // (Note that BaseStencil::moveTo() sets mCenter before calling init(),
+            // inhibiting this optimization.)
+            /// @todo This optimization could be applied for any offset that leaves some
+            /// overlap between the old and new stencils, but the bookkeeping gets messy.
+
+            typename BaseType::BufferType newStencil(mStencil.size());
+            const StencilRefType oldStencil(mStencil.data(), mKernelShape);
+
+            int n = 0;
+            Coord p = ijk - offset;
+            p[2] += shape[2] - 1;
+            for (Int32 i = 0; i < shape[0]; ++i, ++p[0]) {
+                p[1] = ijk[1] - offset[1];
+                for (Int32 j = 0; j < shape[1]; ++j, ++p[1]) {
+                    // Copy values from the old stencil to the new stencil,
+                    // shifting them by one voxel.
+                    for (Int32 k = 1; k < shape[2]; ++k) {
+                        newStencil[n++] = oldStencil[i][j][k];
+                    }
+                    // Sample one new voxel value from the grid.
+                    newStencil[n++] = mCache.getValue(p);
+                }
+            }
+
+            mStencil.swap(newStencil);
+
+        } else {
+            // Populate the stencil by sampling the grid at every voxel.
+            int n = 0;
+            Coord p = ijk - offset;
+            for (Int32 i = 0; i < shape[0]; ++i, ++p[0]) {
+                p[1] = ijk[1] - offset[1];
+                for (Int32 j = 0; j < shape[1]; ++j, ++p[1]) {
+                    p[2] = ijk[2] - offset[2];
+                    for (Int32 k = 0; k < shape[2]; ++k, ++p[2]) {
+                        mStencil[n++] = mCache.getValue(p);
+                    }
+                }
+            }
+        }
+
+        this->setCenter(ijk);
+    }
+
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
+    using BaseType::mCache;
+    using BaseType::mStencil;
+    const KernelType mKernel;
+    const std::vector<size_t> mKernelShape;
+    bool mInitialized = false;
+}; // class ConvolutionStencil
 
 } // end math namespace
 } // namespace OPENVDB_VERSION_NAME
