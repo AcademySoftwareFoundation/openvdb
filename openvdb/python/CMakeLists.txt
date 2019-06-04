@@ -182,8 +182,15 @@ target_link_libraries(pyopenvdb
 )
 
 set_target_properties(pyopenvdb PROPERTIES
-  PREFIX ""
+  PREFIX ""  # no 'lib' prefix
 )
+
+if(UNIX)
+  # must be .so (not .dylib)
+  set_target_properties(pyopenvdb PROPERTIES
+    SUFFIX ".so"
+  )
+endif()
 
 if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets

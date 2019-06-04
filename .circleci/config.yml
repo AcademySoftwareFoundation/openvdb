@@ -69,6 +69,11 @@ _blosc:
     name: Install Blosc 1.5.0
     command: bash ci/install_blosc.sh 1.5.0
 
+_jemalloc:
+  jemalloc: &install_jemalloc
+    name: Install Jemalloc
+    command: bash ci/install_jemalloc.sh
+
 _houdini:
   houdini17_5: &install_houdini17_5
     name: Install Houdini 17.5
@@ -138,6 +143,7 @@ jobs:
       - run: *install_tbb_latest
       - run: *install_openexr_latest
       - run: *install_blosc_latest
+      - run: *install_jemalloc
       - run: *build_abi6
       - run: *test
 
@@ -151,6 +157,7 @@ jobs:
       - run: *install_tbb2018
       - run: *install_openexr2_3
       - run: *install_blosc1_5
+      - run: *install_jemalloc
       - run: *build_abi6
       - run: *test
 
@@ -164,6 +171,7 @@ jobs:
       - run: *install_tbb2018
       - run: *install_openexr2_3
       - run: *install_blosc1_5
+      - run: *install_jemalloc
       - run: *build_abi6_debug
 
   testabi6gcc:
@@ -176,6 +184,7 @@ jobs:
       - run: *install_tbb2018
       - run: *install_openexr2_3
       - run: *install_blosc1_5
+      - run: *install_jemalloc
       - run: *build_abi6_gcc
 
   testabi6noblosc:
@@ -187,6 +196,7 @@ jobs:
       - run: *install_boost1_66
       - run: *install_tbb2018
       - run: *install_openexr2_3
+      - run: *install_jemalloc
       - run: *build_abi6_no_blosc
 
   testabi5:
@@ -198,6 +208,7 @@ jobs:
       - run: *install_tbb2017
       - run: *install_openexr2_3
       - run: *install_blosc1_5
+      - run: *install_jemalloc
       - run: *build_abi5
       - run: *test
 
@@ -210,6 +221,7 @@ jobs:
       - run: *install_tbb4_4
       - run: *install_openexr2_3
       - run: *install_blosc1_5
+      - run: *install_jemalloc
       - run: *build_abi4
       - run: *test
 

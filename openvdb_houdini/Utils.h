@@ -308,7 +308,8 @@ bool isLogForwarding(OP_OpTypeId);
 ////////////////////////////////////////
 
 
-// Grid type lists, for use with openvdb::GridBase::apply()
+// Grid type lists, for use with GEO_PrimVDB::apply(), GEOvdbApply(),
+// or openvdb::GridBase::apply()
 
 using ScalarGridTypes = openvdb::TypeList<
     openvdb::BoolGrid,
@@ -338,6 +339,45 @@ using PointGridTypes = openvdb::TypeList<
 using VolumeGridTypes = ScalarGridTypes::Append<Vec3GridTypes>;
 
 using AllGridTypes = VolumeGridTypes::Append<PointGridTypes>;
+
+
+/// @brief If the given primitive's grid resolves to one of the listed grid types,
+/// invoke the functor @a op on the resolved grid.
+/// @return @c true if the functor was invoked, @c false otherwise
+template<typename GridTypeListT, typename OpT>
+inline bool
+GEOvdbApply(const GEO_PrimVDB& vdb, OpT& op)
+{
+    if (auto gridPtr = vdb.getConstGridPtr()) {
+        return gridPtr->apply<GridTypeListT>(op);
+    }
+    return false;
+}
+
+/// @brief If the given primitive's grid resolves to one of the listed grid types,
+/// invoke the functor @a op on the resolved grid.
+/// @return @c true if the functor was invoked, @c false otherwise
+/// @details If @a makeUnique is true, deep copy the grid's tree before
+/// invoking the functor if the tree is shared with other grids.
+template<typename GridTypeListT, typename OpT>
+inline bool
+GEOvdbApply(GEO_PrimVDB& vdb, OpT& op, bool makeUnique = true)
+{
+    if (vdb.hasGrid()) {
+        auto gridPtr = vdb.getGridPtr();
+        if (makeUnique) {
+            auto treePtr = gridPtr->baseTreePtr();
+            if (treePtr.use_count() > 2) { // grid + treePtr = 2
+                // If the grid resolves to one of the listed types and its tree
+                // is shared with other grids, replace the tree with a deep copy.
+                gridPtr->apply<GridTypeListT>(
+                    [](Grid& baseGrid) { baseGrid.setTree(baseGrid.constBaseTree().copy()); });
+            }
+        }
+        return gridPtr->apply<GridTypeListT>(op);
+    }
+    return false;
+}
 
 } // namespace openvdb_houdini
 

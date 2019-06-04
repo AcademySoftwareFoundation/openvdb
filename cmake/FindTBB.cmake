@@ -47,6 +47,8 @@ IMPORTED Targets
   The tbb library target.
 ``TBB::tbbmalloc``
   The tbbmalloc library target.
+``TBB::tbbmalloc_proxy``
+  The tbbmalloc_proxy library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -106,6 +108,7 @@ mark_as_advanced(
 set(_TBB_COMPONENT_LIST
   tbb
   tbbmalloc
+  tbbmalloc_proxy
 )
 
 if(TBB_FIND_COMPONENTS)
