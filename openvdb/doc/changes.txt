@@ -28,6 +28,14 @@ Bug fixes:
   <I>[Reported&nbsp;by&nbsp;Edwin&nbsp;Braun]</I>
 
 @par
+ABI changes:
+- ABI versions&nbsp;3 and older are now deprecated, and support for them will
+  be removed in a future release. Until then, define the macro
+  OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
+  option to ON) to suppress deprecation messages when compiling OpenVDB or
+  dependent code.
+
+@par
 Python:
 - CMake now always produces a <TT>.so</TT> for the Python module
   on UNIX platforms.
