@@ -457,11 +457,15 @@ public:
     template<typename ModifyOp>
     void modifyValue(Index offset, const ModifyOp& op)
     {
-        ValueType val = mBuffer[offset];
-        op(val);
-        mBuffer.setValue(offset, val);
-        mValueMask.setOn(offset);
+        mBuffer.loadValues();
+        if (!mBuffer.empty()) {
+            // in-place modify value
+            ValueType& val = const_cast<ValueType&>(mBuffer[offset]);
+            op(val);
+            mValueMask.setOn(offset);
+        }
     }
+
     /// @brief Apply a functor to the value of the voxel at the given coordinates
     /// and mark the voxel as active.
     template<typename ModifyOp>
@@ -474,12 +478,15 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
     {
-        const Index offset = this->coordToOffset(xyz);
-        bool state = mValueMask.isOn(offset);
-        ValueType val = mBuffer[offset];
-        op(val, state);
-        mBuffer.setValue(offset, val);
-        mValueMask.set(offset, state);
+        mBuffer.loadValues();
+        if (!mBuffer.empty()) {
+            const Index offset = this->coordToOffset(xyz);
+            bool state = mValueMask.isOn(offset);
+            // in-place modify value
+            ValueType& val = const_cast<ValueType&>(mBuffer[offset]);
+            op(val, state);
+            mValueMask.set(offset, state);
+        }
     }
 
     /// Mark all voxels as active but don't change their values.

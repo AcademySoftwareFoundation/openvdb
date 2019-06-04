@@ -223,7 +223,7 @@ struct SolveBoundaryOp
 
     }
 
-    const double& mVoxelSize;
+    const double mVoxelSize;
     const Vec3GridT& mVelGrid;
     const MaskT& mDomainGrid;
 }; // struct SolveBoundaryOp

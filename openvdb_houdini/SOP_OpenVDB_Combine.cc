@@ -807,7 +807,8 @@ SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
 
             // Remove primitives that were copied from input 0.
             for (GU_PrimVDB* vdb: vdbsToRemove) {
-                gdp->destroyPrimitive(*vdb, /*andPoints=*/true);
+                if (vdb)
+                    gdp->destroyPrimitive(*vdb, /*andPoints=*/true);
             }
         } // for each A group
 

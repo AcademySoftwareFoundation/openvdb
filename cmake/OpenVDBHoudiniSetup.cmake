@@ -74,6 +74,7 @@ overwrite user provided values.
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
 ``BLOSC_LIBRARYDIR``
+``JEMALLOC_LIBRARYDIR``
 
 Hints
 ^^^^^
@@ -269,6 +270,12 @@ if(NOT BLOSC_INCLUDEDIR)
 endif()
 if(NOT BLOSC_LIBRARYDIR)
   set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
+
+# Jemalloc
+
+if(NOT JEMALLOC_LIBRARYDIR)
+  set(JEMALLOC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
 endif()
 
 # OpenEXR
