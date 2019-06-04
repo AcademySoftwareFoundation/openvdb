@@ -10,6 +10,8 @@ Version 6.1.1 - In development
       [Reported by Daniel Elliott]
     - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState()
       now modify voxel values in place for improved performance.
+    - Add CMake support for linking against Jemalloc and TBB malloc and enable
+      Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
 
     Bug fixes:
     - Fixed a bug in tools::computeScalarPotential() that could produce
