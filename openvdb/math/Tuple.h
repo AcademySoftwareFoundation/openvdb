@@ -164,7 +164,7 @@ public:
     /// True if a Nan is present in this tuple
     bool isNan() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (math::isNan(mm[i])) return true;
+            if (math::isNaN(mm[i])) return true;
         }
         return false;
     }

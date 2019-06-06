@@ -363,12 +363,12 @@ isInfinite(const Type& x) { return std::isinf(static_cast<double>(x)); }
 
 /// Return @c true if @a x is a NaN (Not-A-Number) value.
 inline bool
-isNan(const float x) { return std::isnan(x); }
+isNaN(const float x) { return std::isnan(x); }
 
 /// Return @c true if @a x is a NaN (Not-A-Number) value.
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
-isNan(const Type& x) { return std::isnan(static_cast<double>(x)); }
+isNaN(const Type& x) { return std::isnan(static_cast<double>(x)); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within

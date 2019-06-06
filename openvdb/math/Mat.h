@@ -159,7 +159,7 @@ public:
     /// True if a Nan is present in this matrix
     bool isNan() const {
         for (unsigned i = 0; i < numElements(); ++i) {
-            if (math::isNan(mm[i])) return true;
+            if (math::isNaN(mm[i])) return true;
         }
         return false;
     }
