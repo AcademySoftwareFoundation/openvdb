@@ -18,6 +18,13 @@ Version 6.1.1 - In development
       a corrupt result due to invalid memory access.
       [Reported by Edwin Braun]
 
+    ABI changes:
+    - ABI versions 3 and older are now deprecated, and support for them will be
+      removed in a future release. Until then, define the macro
+      OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
+      option to ON) to suppress deprecation messages when compiling OpenVDB or
+      dependent code.
+
     Python:
     - CMake now always produces a .so for the Python module on UNIX platforms.
     - Fixed a compile-time error when building the Python module for Python 3.
