@@ -496,6 +496,10 @@ public:
     /// @throw std::invalid_argument if @a allocator is empty
     OpFactory& setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& allocator);
 
+    /// @brief Mark this node as hidden from the UI tab menu.
+    /// @details This is equivalent to using the hscript ophide method.
+    OpFactory& setInvisible();
+
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
         ParmList&, OP_OperatorTable&, OpFlavor);
