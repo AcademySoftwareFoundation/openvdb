@@ -500,6 +500,10 @@ public:
     /// @details This is equivalent to using the hscript ophide method.
     OpFactory& setInvisible();
 
+protected:
+    /// @brief Return the non-const operator table with which this factory is associated.
+    OP_OperatorTable& table();
+
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
         ParmList&, OP_OperatorTable&, OpFlavor);

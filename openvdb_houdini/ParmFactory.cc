@@ -1180,6 +1180,13 @@ OpFactory::table() const
 }
 
 
+OP_OperatorTable&
+OpFactory::table()
+{
+    return *mImpl->mTable;
+}
+
+
 OpFactory&
 OpFactory::addAlias(const std::string& english)
 {
