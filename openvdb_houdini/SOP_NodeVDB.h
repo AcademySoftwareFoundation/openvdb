@@ -65,9 +65,6 @@ public:
     /// Register the node
     ~OpenVDBOpFactory();
 
-    /// @brief Return the name of the equivalent native operator as shipped with Houdini.
-    /// @details An empty string indicates that there is no equivalent native operator.
-
     /// @brief Set the name of the equivalent native operator as shipped with Houdini.
     /// @details This is only needed where the native name policy doesn't provide
     /// the correct name. Pass an empty string to indicate that there is no
