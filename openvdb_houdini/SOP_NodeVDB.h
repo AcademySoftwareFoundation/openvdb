@@ -61,6 +61,22 @@ public:
     /// Construct an OpFactory that on destruction registers a new OpenVDB operator type.
     OpenVDBOpFactory(const std::string& english, OP_Constructor, houdini_utils::ParmList&,
         OP_OperatorTable&, houdini_utils::OpFactory::OpFlavor = SOP);
+
+    /// Register the node
+    ~OpenVDBOpFactory();
+
+    /// @brief Set the name of the parent operator.
+    /// @details This is typically the name of the operator shipped with Houdini and is
+    /// only needed where the parent name policy doesn't provide the correct name.
+    OpenVDBOpFactory& setParentName(const std::string& name);
+
+    /// @brief Mark the parent node as hidden from the UI tab menu.
+    /// @details This is equivalent to using the hscript ophide method.
+    OpenVDBOpFactory& setParentInvisible();
+
+private:
+    std::string mParentName;
+    bool mParentInvisible = false;
 };
 
 

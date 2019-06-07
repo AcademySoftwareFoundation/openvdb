@@ -634,6 +634,13 @@ public:
     {
         return factory.flavorString() + "_OpenVDB";
     }
+
+    /// @brief Return the name of the parent operator.
+    /// @note This is typically the name of the native operator if shipped with Houdini.
+    virtual std::string getParentName(const houdini_utils::OpFactory& factory)
+    {
+        return "";
+    }
 };
 
 
@@ -666,6 +673,11 @@ public:
     {
         return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
     }
+
+    std::string getParentName(const houdini_utils::OpFactory& factory) override
+    {
+        return this->getLowercaseName(this->getValidName(factory.english()));
+    }
 };
 
 
@@ -686,6 +698,36 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     houdini_utils::OpFactory::OpFlavor flavor):
     houdini_utils::OpFactory(OpenVDBOpPolicy(), english, ctor, parms, table, flavor)
 {
+    mParentName = OpenVDBOpPolicy().getParentName(*this);
+}
+
+
+OpenVDBOpFactory::~OpenVDBOpFactory()
+{
+    // hide the parent node if marked invisble
+    if (!mParentName.empty()) {
+        bool invisible = mParentInvisible;
+
+        if (invisible) {
+            this->table().addOpHidden(mParentName.c_str());
+        }
+    }
+}
+
+
+OpenVDBOpFactory&
+OpenVDBOpFactory::setParentName(const std::string& name)
+{
+    mParentName = name;
+    return *this;
+}
+
+
+OpenVDBOpFactory&
+OpenVDBOpFactory::setParentInvisible()
+{
+    mParentInvisible = true;
+    return *this;
 }
 
 } // namespace openvdb_houdini
