@@ -135,6 +135,7 @@ newSopOperator(OP_OperatorTable* table)
     // Register the SOP
     hvdb::OpenVDBOpFactory("VDB Sample Points",
         SOP_OpenVDB_Sample_Points::factory, parms, *table)
+        .setParentName("")
         .setObsoleteParms(obsoleteParms)
         .addInput("Points")
         .addInput("VDBs")

@@ -174,6 +174,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Write", SOP_OpenVDB_Write::factory, parms, *table)
+        .setParentName("")
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to be written to disk")
         .setDocumentation("\

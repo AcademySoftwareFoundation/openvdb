@@ -227,6 +227,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Register the SOP.
     hvdb::OpenVDBOpFactory("VDB Scatter", SOP_OpenVDB_Scatter::factory, parms, *table)
+        .setParentName("")
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs on which points will be scattered")
         .setVerb(SOP_NodeVerb::COOK_GENERIC, []() { return new SOP_OpenVDB_Scatter::Cache; })

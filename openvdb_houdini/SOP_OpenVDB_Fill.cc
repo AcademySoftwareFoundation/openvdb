@@ -153,6 +153,7 @@ newSopOperator(OP_OperatorTable* table)
 
 
     hvdb::OpenVDBOpFactory("VDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
+        .setParentName("")
         .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry")

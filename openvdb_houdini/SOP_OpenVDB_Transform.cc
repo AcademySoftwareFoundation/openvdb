@@ -125,6 +125,7 @@ newSopOperator(OP_OperatorTable* table)
             " for example, with the [OpenVDB Create|Node:sop/DW_OpenVDBCreate] node)."));
 
     hvdb::OpenVDBOpFactory("VDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
+        .setParentName("")
         .addInput("VDBs to transform")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Transform::Cache; })
         .setDocumentation("\

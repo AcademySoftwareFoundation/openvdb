@@ -77,6 +77,7 @@ newSopOperator(OP_OperatorTable* table)
             " (see [specifying volumes|/model/volumes#group])"));
 
     hvdb::OpenVDBOpFactory("VDB Densify", SOP_OpenVDB_Densify::factory, parms, *table)
+        .setParentName("")
         .addInput("VDBs to densify")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Densify::Cache; })
         .setDocumentation("\
