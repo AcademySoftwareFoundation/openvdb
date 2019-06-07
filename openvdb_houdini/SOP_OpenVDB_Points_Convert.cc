@@ -458,6 +458,7 @@ Unit Vector:\n\
 
     hvdb::OpenVDBOpFactory("VDB Points Convert",
         SOP_OpenVDB_Points_Convert::factory, parms, *table)
+        .setNativeName("convertvdbpoints")
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBPointsConvert")
 #endif

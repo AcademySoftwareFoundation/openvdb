@@ -286,9 +286,7 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Advect",
         SOP_OpenVDB_Advect::factory, parms, *table)
-#ifndef SESI_OPENVDB
-        .setParentName("vdbadvectsdf")
-#endif
+        .setNativeName("vdbadvectsdf")
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Advect")
         .addInput("Velocity VDB")

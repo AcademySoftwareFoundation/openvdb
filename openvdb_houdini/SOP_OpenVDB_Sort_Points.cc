@@ -146,7 +146,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Sort Points",
         SOP_OpenVDB_Sort_Points::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
         .addInput("points")
         .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Sort_Points::Cache; })
         .setDocumentation("\

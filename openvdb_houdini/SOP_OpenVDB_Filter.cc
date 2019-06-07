@@ -326,9 +326,7 @@ Offset:\n\
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
-#ifndef SESI_OPENVDB
-        .setParentName("vdbsmooth")
-#endif
+        .setNativeName("vdbsmooth")
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
         .addOptionalInput("Optional VDB Alpha Mask")

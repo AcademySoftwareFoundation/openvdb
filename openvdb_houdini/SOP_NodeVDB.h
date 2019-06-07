@@ -65,18 +65,22 @@ public:
     /// Register the node
     ~OpenVDBOpFactory();
 
-    /// @brief Set the name of the parent operator.
-    /// @details This is typically the name of the operator shipped with Houdini and is
-    /// only needed where the parent name policy doesn't provide the correct name.
-    OpenVDBOpFactory& setParentName(const std::string& name);
+    /// @brief Return the name of the equivalent native operator as shipped with Houdini.
+    /// @details An empty string indicates that there is no equivalent native operator.
 
-    /// @brief Mark the parent node as hidden from the UI tab menu.
+    /// @brief Set the name of the equivalent native operator as shipped with Houdini.
+    /// @details This is only needed where the native name policy doesn't provide
+    /// the correct name. Pass an empty string to indicate that there is no
+    /// equivalent native operator.
+    OpenVDBOpFactory& setNativeName(const std::string& name);
+
+    /// @brief Mark the native operator as hidden from the UI tab menu.
     /// @details This is equivalent to using the hscript ophide method.
-    OpenVDBOpFactory& setParentInvisible();
+    OpenVDBOpFactory& setNativeInvisible();
 
 private:
-    std::string mParentName;
-    bool mParentInvisible = false;
+    std::string mNativeName;
+    bool mNativeInvisible = false;
 };
 
 

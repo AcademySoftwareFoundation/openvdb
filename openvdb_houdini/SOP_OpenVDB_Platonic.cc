@@ -132,7 +132,7 @@ Signed Distance Field:\n\
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Platonic",
         SOP_OpenVDB_Platonic::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\

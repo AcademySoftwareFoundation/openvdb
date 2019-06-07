@@ -272,7 +272,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
     hvdb::OpenVDBOpFactory("VDB to Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBToPolygons")
 #endif

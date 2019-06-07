@@ -113,7 +113,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("VDB Points Delete",
         SOP_OpenVDB_Points_Delete::factory, parms, *table)
 #if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
-        .setParentName("")
+        .setNativeName("")
 #endif
         .addInput("VDB Points")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Points_Delete::Cache; })

@@ -265,7 +265,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Read", SOP_OpenVDB_Read::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
 #if OPENVDB_ABI_VERSION_NUMBER >= 3
         .addOptionalInput("Optional Bounding Geometry")
 #endif

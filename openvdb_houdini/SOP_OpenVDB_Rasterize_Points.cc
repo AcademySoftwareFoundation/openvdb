@@ -3181,7 +3181,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
         .setOperatorTable(VOP_TABLE_NAME)
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
         .addInput("Points to rasterize")

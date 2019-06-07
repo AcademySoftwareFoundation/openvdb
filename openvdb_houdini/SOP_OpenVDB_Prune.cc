@@ -111,7 +111,7 @@ newSopOperator(OP_OperatorTable* table)
             "by less than the specified threshold."));
 
     hvdb::OpenVDBOpFactory("VDB Prune", SOP_OpenVDB_Prune::factory, parms, *table)
-        .setParentName("")
+        .setNativeName("")
         .addInput("Grids to process")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Prune::Cache; })
         .setDocumentation("\
