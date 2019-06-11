@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-<!-- Copyright Contributors to the ODPi Egeria project. -->
+<!-- Copyright Contributors to the OpenVDB project. -->
 
 # OpenVDB Committers
 
