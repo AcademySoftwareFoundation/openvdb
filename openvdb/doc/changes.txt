@@ -21,6 +21,7 @@ Improvements:
   Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
 - Added math::isInfinite() and math::isNan() to resolve Visual Studio
   compatibility issues with integer types.
+- Minor performance improvements to moving and filtering VDB points.
 
 @par
 Bug fixes:
