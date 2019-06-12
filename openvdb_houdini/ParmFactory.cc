@@ -1064,6 +1064,7 @@ struct OpFactory::Impl
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
     OpFactoryVerb* mVerb = nullptr;
+    bool mInvisible = false;
 };
 
 
@@ -1089,6 +1090,12 @@ OpFactory::~OpFactory()
 
     if (!mImpl->mFirstName.empty()) {
         mImpl->mTable->setOpFirstName(mImpl->mName.c_str(), mImpl->mFirstName.c_str());
+    }
+
+    // hide node if marked as invisible
+
+    if (mImpl->mInvisible) {
+        mImpl->mTable->addOpHidden(mImpl->mName.c_str());
     }
 }
 
@@ -1168,6 +1175,13 @@ OpFactory::documentation() const
 
 const OP_OperatorTable&
 OpFactory::table() const
+{
+    return *mImpl->mTable;
+}
+
+
+OP_OperatorTable&
+OpFactory::table()
 {
     return *mImpl->mTable;
 }
@@ -1264,6 +1278,14 @@ OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& alloca
 
     mImpl->mVerb = new OpFactoryVerb{name(), cookMode, allocator, mImpl->mParms};
 
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::setInvisible()
+{
+    mImpl->mInvisible = true;
     return *this;
 }
 

@@ -626,6 +626,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
+        .setNativeName("")
         .addInput("VDB Grids")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Remap::Cache; })
         .setDocumentation("\

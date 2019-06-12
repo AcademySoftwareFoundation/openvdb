@@ -40,6 +40,10 @@ Version 6.1.1 - In development
       in the input detail.
     - The Combine SOP no longer crashes in Copy B mode when the destination
       is not a VDB.
+    - Added a houdini_utils::OpFactory::setInvisible() method to hide nodes
+      from tab menus.
+    - Added methods to store parent name and visibility of native SOPs to
+      @b openvdb_houdini::OpenVDBOpFactory.
 
 
 Version 6.1.0 - May 8, 2019

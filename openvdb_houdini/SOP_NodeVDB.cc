@@ -634,6 +634,13 @@ public:
     {
         return factory.flavorString() + "_OpenVDB";
     }
+
+    /// @brief Return the name of the equivalent native operator as shipped with Houdini.
+    /// @details An empty string indicates that there is no equivalent native operator.
+    virtual std::string getNativeName(const houdini_utils::OpFactory& factory)
+    {
+        return "";
+    }
 };
 
 
@@ -666,6 +673,11 @@ public:
     {
         return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
     }
+
+    std::string getNativeName(const houdini_utils::OpFactory& factory) override
+    {
+        return this->getLowercaseName(this->getValidName(factory.english()));
+    }
 };
 
 
@@ -686,6 +698,39 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     houdini_utils::OpFactory::OpFlavor flavor):
     houdini_utils::OpFactory(OpenVDBOpPolicy(), english, ctor, parms, table, flavor)
 {
+    mNativeName = OpenVDBOpPolicy().getNativeName(*this);
+}
+
+
+OpenVDBOpFactory::~OpenVDBOpFactory()
+{
+    // hide the native node if marked invisble
+    if (!mNativeName.empty()) {
+        bool invisible = mNativeInvisible;
+
+        if (invisible) {
+            this->table().addOpHidden(mNativeName.c_str());
+        }
+    }
+}
+
+
+OpenVDBOpFactory&
+OpenVDBOpFactory::setNativeName(const std::string& name)
+{
+    // SideFX nodes have no native equivalent.
+#ifndef SESI_OPENVDB
+    mNativeName = name;
+#endif
+    return *this;
+}
+
+
+OpenVDBOpFactory&
+OpenVDBOpFactory::setNativeInvisible()
+{
+    mNativeInvisible = true;
+    return *this;
 }
 
 } // namespace openvdb_houdini
