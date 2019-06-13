@@ -75,6 +75,11 @@ option(OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
 Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
 older Houdini versions and will be removed in Houdini 18. ]=] OFF)
 
+option(OPENVDB_HOUDINI_HIDE_NATIVE_SOPS [=[
+Enable the hiding of native VDB SOPs. For each ASWF SOP, this hides the equivalent
+native SOP that is shipped with Houdini to simplify the operator tab menu. If OFF,
+both native and ASWF SOPs will be displayed. This is the default behavior. ]=] OFF)
+
 mark_as_advanced(
   OPENVDB_HOUDINI_ENABLE_SESI_TAG
 )

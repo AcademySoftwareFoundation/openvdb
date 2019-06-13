@@ -708,6 +708,16 @@ OpenVDBOpFactory::~OpenVDBOpFactory()
     if (!mNativeName.empty()) {
         bool invisible = mNativeInvisible;
 
+#ifdef OPENVDB_HOUDINI_HIDE_NATIVE_SOPS
+        // hide the native nodes unless overridden
+        const char* envShowNativeStr = std::getenv("OPENVDB_SHOW_NATIVE_SOPS");
+        if (envShowNativeStr != nullptr && std::string(envShowNativeStr) != "0") {
+            invisible = false;
+        } else {
+            invisible = true;
+        }
+#endif
+
         if (invisible) {
             this->table().addOpHidden(mNativeName.c_str());
         }
