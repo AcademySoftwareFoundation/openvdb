@@ -1018,6 +1018,7 @@ struct OpFactory::Impl
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
         mFirstName = mPolicy->getFirstName(factory);
+        mTabSubMenuPath = mPolicy->getTabSubMenuPath(factory);
     }
 
     OP_OperatorDW* get()
@@ -1043,6 +1044,8 @@ struct OpFactory::Impl
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
+        if (!mTabSubMenuPath.empty()) op->setOpTabSubMenuPath(mTabSubMenuPath.c_str());
+
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
         if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
@@ -1053,7 +1056,7 @@ struct OpFactory::Impl
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
     std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
-    std::string mFirstName;
+    std::string mFirstName, mTabSubMenuPath;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
