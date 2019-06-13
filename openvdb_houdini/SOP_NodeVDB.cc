@@ -652,6 +652,11 @@ public:
     {
         return this->getLowercaseName(this->getValidName(english));
     }
+
+    std::string getTabSubMenuPath(const houdini_utils::OpFactory& factory) override
+    {
+        return "VDB";
+    }
 };
 
 
@@ -677,6 +682,11 @@ public:
     std::string getNativeName(const houdini_utils::OpFactory& factory) override
     {
         return this->getLowercaseName(this->getValidName(factory.english()));
+    }
+
+    std::string getTabSubMenuPath(const houdini_utils::OpFactory& factory) override
+    {
+        return "ASWF";
     }
 };
 
