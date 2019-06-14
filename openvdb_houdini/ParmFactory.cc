@@ -34,6 +34,8 @@
 #include "ParmFactory.h"
 
 #include <CH/CH_Manager.h>
+#include <CMD/CMD_Args.h>
+#include <CMD/CMD_Manager.h>
 #include <GOP/GOP_GroupParse.h>
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
@@ -644,12 +646,11 @@ ParmFactory&
 ParmFactory::setRange(const PRM_Range* r) { mImpl->range = r; return *this; }
 
 ParmFactory&
-ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
+ParmFactory::setSpareData(const SpareDataMap& items)
 {
-    using StringMap = std::map<std::string, std::string>;
     if (!items.empty()) {
         if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
-        for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
+        for (SpareDataMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
             mImpl->spareData->addTokenValue(i->first.c_str(), i->second.c_str());
         }
     }
@@ -941,8 +942,12 @@ public:
         return !mDoc.empty();
     }
 
+    const SpareDataMap& spareData() const { return mSpareData; }
+    SpareDataMap& spareData() { return mSpareData; }
+
 private:
     const std::string mHelpUrl, mDoc;
+    SpareDataMap mSpareData;
 };
 
 
@@ -1018,6 +1023,13 @@ struct OpFactory::Impl
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
         mFirstName = mPolicy->getFirstName(factory);
+
+        // Install an HScript command to retrieve spare data from operators.
+        if (auto* cmgr = CMD_Manager::getContext()) {
+            if (!cmgr->isCommandDefined(kSpareDataCmdName)) {
+                cmgr->installCommand(kSpareDataCmdName, "", cmdGetOperatorSpareData);
+            }
+        }
     }
 
     OP_OperatorDW* get()
@@ -1047,8 +1059,79 @@ struct OpFactory::Impl
 
         if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
 
+        op->spareData().insert(mSpareData.begin(), mSpareData.end());
+
         return op;
     }
+
+    // Callback to retrieve spare data from an OP_OperatorDW-derived operator
+    static void cmdGetOperatorSpareData(CMD_Args& args)
+    {
+        // The operator's network type ("Sop", "Dop", etc.)
+        const char* const networkType = args[1];
+        // The operator's name
+        const char* const opName = args[2];
+        // An optional spare data token
+        const char* const token = args[3];
+
+        if (!networkType || !opName) {
+            args.out() << kSpareDataCmdName << "\n\
+\n\
+    List spare data associated with an operator type.\n\
+\n\
+    USAGE\n\
+      " << kSpareDataCmdName << " <networktype> <opname> [<token>]\n\
+\n\
+    When the token is omitted, all (token, value) pairs\n\
+    associated with the operator type are displayed.\n\
+\n\
+    Currently, only operator types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
+\n\
+    EXAMPLES\n\
+      > " << kSpareDataCmdName << " Sop DW_OpenVDBConvert\n\
+        lists all spare data associated with the Convert VDB SOP\n\
+      > " << kSpareDataCmdName << " Sop DW_OpenVDBClip nativename\n\
+        displays the VDB Clip SOP's native name\n\
+\n";
+            return;
+        }
+
+        // Retrieve the operator table for the specified network type.
+        const OP_OperatorTable* table = nullptr;
+        {
+            OP_OperatorTableList opTables;
+            OP_OperatorTable::getAllOperatorTables(opTables);
+            for (const auto& t: opTables) {
+                if (t && (t->getName() == networkType)) {
+                    table = t;
+                    break;
+                }
+            }
+        }
+        if (table) {
+            if (const auto* op = table->getOperator(opName)) {
+                // Retrieve the operator's spare data map.
+                // (The map is empty for operators that don't support spare data.)
+                const auto& spare = getOperatorSpareData(*op);
+                if (token) {
+                    // If a token was provided and it exists in the map,
+                    // print the corresponding value.
+                    const auto it = spare.find(token);
+                    if (it != spare.end()) {
+                        args.out() << it->second << "\n";
+                    }
+                } else {
+                    // If no token was provided, print all of the operator's
+                    // (token, value) pairs.
+                    for (const auto& it: spare) {
+                        args.out() << it.first << " " << it.second << "\n";
+                    }
+                }
+            }
+        }
+    }
+
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
@@ -1065,6 +1148,9 @@ struct OpFactory::Impl
     std::vector<char*> mInputLabels, mOptInputLabels;
     OpFactoryVerb* mVerb = nullptr;
     bool mInvisible = false;
+    SpareDataMap mSpareData;
+
+    static constexpr auto* kSpareDataCmdName = "opsparedata";
 };
 
 
@@ -1180,13 +1266,6 @@ OpFactory::table() const
 }
 
 
-OP_OperatorTable&
-OpFactory::table()
-{
-    return *mImpl->mTable;
-}
-
-
 OpFactory&
 OpFactory::addAlias(const std::string& english)
 {
@@ -1287,6 +1366,39 @@ OpFactory::setInvisible()
 {
     mImpl->mInvisible = true;
     return *this;
+}
+
+
+OpFactory&
+OpFactory::addSpareData(const SpareDataMap& spare)
+{
+    mImpl->mSpareData.insert(spare.begin(), spare.end());
+    return *this;
+}
+
+
+////////////////////////////////////////
+
+
+const SpareDataMap&
+getOperatorSpareData(const OP_Operator& op)
+{
+    static const SpareDataMap sNoSpareData;
+    if (const auto* opdw = dynamic_cast<const OP_OperatorDW*>(&op)) {
+        return opdw->spareData();
+    }
+    return sNoSpareData;
+}
+
+void
+addOperatorSpareData(OP_Operator& op, SpareDataMap& spare)
+{
+    if (auto* opdw = dynamic_cast<OP_OperatorDW*>(&op)) {
+        opdw->spareData().insert(spare.begin(), spare.end());
+    } else {
+        throw std::runtime_error("spare data cannot be added to the \""
+            + op.getName().toStdString() + "\" operator");
+    }
 }
 
 
