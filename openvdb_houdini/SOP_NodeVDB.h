@@ -62,22 +62,10 @@ public:
     OpenVDBOpFactory(const std::string& english, OP_Constructor, houdini_utils::ParmList&,
         OP_OperatorTable&, houdini_utils::OpFactory::OpFlavor = SOP);
 
-    /// Register the node
-    ~OpenVDBOpFactory();
-
     /// @brief Set the name of the equivalent native operator as shipped with Houdini.
-    /// @details This is only needed where the native name policy doesn't provide
-    /// the correct name. Pass an empty string to indicate that there is no
-    /// equivalent native operator.
+    /// @details This is only needed where the native name policy doesn't provide the correct name.
+    /// Pass an empty string to indicate that there is no equivalent native operator.
     OpenVDBOpFactory& setNativeName(const std::string& name);
-
-    /// @brief Mark the native operator as hidden from the UI tab menu.
-    /// @details This is equivalent to using the hscript ophide method.
-    OpenVDBOpFactory& setNativeInvisible();
-
-private:
-    std::string mNativeName;
-    bool mNativeInvisible = false;
 };
 
 

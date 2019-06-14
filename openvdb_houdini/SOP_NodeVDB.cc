@@ -698,20 +698,7 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     houdini_utils::OpFactory::OpFlavor flavor):
     houdini_utils::OpFactory(OpenVDBOpPolicy(), english, ctor, parms, table, flavor)
 {
-    mNativeName = OpenVDBOpPolicy().getNativeName(*this);
-}
-
-
-OpenVDBOpFactory::~OpenVDBOpFactory()
-{
-    // hide the native node if marked invisble
-    if (!mNativeName.empty()) {
-        bool invisible = mNativeInvisible;
-
-        if (invisible) {
-            this->table().addOpHidden(mNativeName.c_str());
-        }
-    }
+    setNativeName(OpenVDBOpPolicy().getNativeName(*this));
 }
 
 
@@ -720,16 +707,8 @@ OpenVDBOpFactory::setNativeName(const std::string& name)
 {
     // SideFX nodes have no native equivalent.
 #ifndef SESI_OPENVDB
-    mNativeName = name;
+    addSpareData({{"nativename", name}});
 #endif
-    return *this;
-}
-
-
-OpenVDBOpFactory&
-OpenVDBOpFactory::setNativeInvisible()
-{
-    mNativeInvisible = true;
     return *this;
 }
 
