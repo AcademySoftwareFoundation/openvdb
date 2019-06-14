@@ -127,6 +127,17 @@ getSparePointer(const PRM_SpareData* spare, const char* token, const void* deflt
     return deflt;
 }
 
+
+// Copy elements from one spare data map to another,
+// overwriting any existing elements with the same keys.
+inline void
+mergeSpareData(SpareDataMap& dst, const SpareDataMap& src)
+{
+    for (const auto& it: src) {
+        dst[it.first] = it.second;
+    }
+}
+
 } // anonymous namespace
 
 
@@ -1058,7 +1069,7 @@ struct OpFactory::Impl
 
         if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
 
-        op->spareData().insert(mSpareData.begin(), mSpareData.end());
+        mergeSpareData(op->spareData(), mSpareData);
 
         return op;
     }
@@ -1123,6 +1134,7 @@ del nt, _spareData, _spareDataDict\n");
         const char* const token = args[3];
 
         if (!networkType || !opName) {
+            /// @todo Install this as a command.help file?
             args.out() << kSpareDataCmdName << "\n\
 \n\
     List spare data associated with an operator type.\n\
@@ -1482,7 +1494,7 @@ OpFactory::setInvisible()
 OpFactory&
 OpFactory::addSpareData(const SpareDataMap& spare)
 {
-    mImpl->mSpareData.insert(spare.begin(), spare.end());
+    mergeSpareData(mImpl->mSpareData, spare);
     return *this;
 }
 
@@ -1504,7 +1516,7 @@ void
 addOperatorSpareData(OP_Operator& op, SpareDataMap& spare)
 {
     if (auto* opdw = dynamic_cast<OP_OperatorDW*>(&op)) {
-        opdw->spareData().insert(spare.begin(), spare.end());
+        mergeSpareData(opdw->spareData(), spare);
     } else {
         throw std::runtime_error("spare data cannot be added to the \""
             + op.getName().toStdString() + "\" operator");
