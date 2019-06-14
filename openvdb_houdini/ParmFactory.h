@@ -92,7 +92,7 @@ const SpareDataMap& getOperatorSpareData(const OP_Operator&);
 /// @details For existing keys, the new value replaces the old one.
 /// @throw std::runtime_error if the given operator does not support spare data
 ///     (only operators created with OpFactory will have spare data)
-/// @sa @link getOperatorSpareData() addOperatorSpareData@endlink,
+/// @sa @link getOperatorSpareData() getOperatorSpareData@endlink,
 ///     @link OpFactory::addSpareData() OpFactory::addSpareData@endlink
 void addOperatorSpareData(OP_Operator&, const SpareDataMap&);
 

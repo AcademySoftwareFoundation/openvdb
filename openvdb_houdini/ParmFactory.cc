@@ -43,9 +43,13 @@
 #include <GA/GA_AIFSharedStringTuple.h>
 #include <GA/GA_Attribute.h>
 #include <GA/GA_AttributeRef.h>
+#include <HOM/HOM_Module.h>
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#include <PY/PY_CPythonAPI.h>
+#include <PY/PY_InterpreterAutoLock.h>
+#include <PY/PY_Python.h>
 #include <SOP/SOP_NodeParmsOptions.h>
 #include <UT/UT_IntArray.h>
 #include <UT/UT_WorkArgs.h>
@@ -1024,12 +1028,7 @@ struct OpFactory::Impl
         mHelpUrl = mPolicy->getHelpURL(factory);
         mFirstName = mPolicy->getFirstName(factory);
 
-        // Install an HScript command to retrieve spare data from operators.
-        if (auto* cmgr = CMD_Manager::getContext()) {
-            if (!cmgr->isCommandDefined(kSpareDataCmdName)) {
-                cmgr->installCommand(kSpareDataCmdName, "", cmdGetOperatorSpareData);
-            }
-        }
+        initScripting();
     }
 
     OP_OperatorDW* get()
@@ -1064,7 +1063,56 @@ struct OpFactory::Impl
         return op;
     }
 
-    // Callback to retrieve spare data from an OP_OperatorDW-derived operator
+    void initScripting()
+    {
+        // Install an HScript command to retrieve spare data from operators.
+        if (auto* cmgr = CMD_Manager::getContext()) {
+            if (!cmgr->isCommandDefined(kSpareDataCmdName)) {
+                cmgr->installCommand(kSpareDataCmdName, "", cmdGetOperatorSpareData);
+            }
+        }
+
+        // Install a Python command to retrieve spare data from operators.
+        static bool sDidInstallHOMModule = false;
+        if (!sDidInstallHOMModule) {
+            // Install a _dwhoudiniutils module with a NodeType_spareData() function.
+            static PY_PyMethodDef sMethods[] = {
+                {"NodeType_spareData", homGetOperatorSpareData, PY_METH_VARARGS(), ""},
+                { nullptr, nullptr, 0, nullptr }
+            };
+            {
+                PY_InterpreterAutoLock interpreterLock;
+                PY_Py_InitModule("_dwhoudiniutils", sMethods);
+                sDidInstallHOMModule = true;
+            }
+
+            // Add methods to the hou.NodeType class.
+            PYrunPythonStatementsAndExpectNoErrors("\
+def _spareData(self, name):\n\
+    '''\n\
+    spareData(name) -> str or None\n\n\
+    Return the spare data with the given name,\n\
+    or None if no data with that name exists.\n\
+    '''\n\
+    import _dwhoudiniutils\n\
+    return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name(), name)\n\
+\n\
+def _spareDataDict(self):\n\
+    '''\n\
+    spareDataDict() -> dict of str to str\n\n\
+    Return a dictionary of the spare data for this node type.\n\
+    '''\n\
+    import _dwhoudiniutils\n\
+    return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name())\n\
+\n\
+nt = __import__('hou').NodeType\n\
+nt.spareData = _spareData\n\
+nt.spareDataDict = _spareDataDict\n\
+del nt, _spareData, _spareDataDict\n");
+        }
+    }
+
+    // HScript callback to retrieve spare data from an OP_OperatorDW-derived operator
     static void cmdGetOperatorSpareData(CMD_Args& args)
     {
         // The operator's network type ("Sop", "Dop", etc.)
@@ -1130,6 +1178,68 @@ struct OpFactory::Impl
                 }
             }
         }
+    }
+
+    // Python callback to retrieve spare data from an OP_OperatorDW-derived operator
+    static PY_PyObject* homGetOperatorSpareData(PY_PyObject* self, PY_PyObject* args)
+    {
+        // The operator's network type ("Sop", "Dop", etc.)
+        const char* networkType = nullptr;
+        // The operator's name
+        const char* opName = nullptr;
+        // An optional spare data token
+        const char* token = nullptr;
+        if (!PY_PyArg_ParseTuple(args, "ss|s", &networkType, &opName, &token)) {
+            return nullptr;
+        }
+
+        if (!networkType || !opName) {
+            return PY_Py_None();
+        }
+
+        try {
+            HOM_AutoLock homLock;
+
+            // Retrieve the operator table for the specified network type.
+            const OP_OperatorTable* table = nullptr;
+            {
+                OP_OperatorTableList opTables;
+                OP_OperatorTable::getAllOperatorTables(opTables);
+                for (const auto& t: opTables) {
+                    if (t && (t->getName() == networkType)) {
+                        table = t;
+                        break;
+                    }
+                }
+            }
+            if (table) {
+                if (const auto* op = table->getOperator(opName)) {
+                    // Retrieve the operator's spare data map.
+                    // (The map is empty for operators that don't support spare data.)
+                    const auto& spare = getOperatorSpareData(*op);
+                    if (token) {
+                        // If a token was provided and it exists in the map,
+                        // return the corresponding value.
+                        const auto it = spare.find(token);
+                        if (it != spare.end()) {
+                            return PY_Py_BuildValue("s", it->second.c_str());
+                        }
+                    } else {
+                        // If no token was provided, return a dictionary
+                        // of all of the operator's (token, value) pairs.
+                        if (auto* dict = PY_Py_BuildValue("{}")) {
+                            for (const auto& it: spare) {
+                                PY_PyDict_SetItemString(dict, it.first.c_str(),
+                                    PY_Py_BuildValue("s", it.second.c_str()));
+                            }
+                            return dict;
+                        }
+                    }
+                }
+            }
+        } catch (HOM_Error& err) {
+        }
+        return PY_Py_None();
     }
 
 
