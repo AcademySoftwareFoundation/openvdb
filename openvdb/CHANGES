@@ -1,6 +1,201 @@
 OpenVDB Version History
 =======================
 
+Version 6.1.1 - In development
+
+    Improvements:
+    - FindOpenVDB.cmake now correctly propagates CXX version requirements.
+    - Improved directory and file path lookups of some CMake commands in
+      the root CMakeLists.txt
+      [Reported by Daniel Elliott]
+    - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState()
+      now modify voxel values in place for improved performance.
+    - Add CMake support for linking against Jemalloc and TBB malloc and enable
+      Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
+    - Added math::isInfinite() and math::isNan() to resolve Visual Studio
+      compatibility issues with integer types.
+
+    Bug fixes:
+    - Fixed a bug in tools::computeScalarPotential() that could produce
+      a corrupt result due to invalid memory access.
+      [Reported by Edwin Braun]
+
+    ABI changes:
+    - ABI versions 3 and older are now deprecated, and support for them will be
+      removed in a future release. Until then, define the macro
+      OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
+      option to ON) to suppress deprecation messages when compiling OpenVDB or
+      dependent code.
+
+    Python:
+    - CMake now always produces a .so for the Python module on UNIX platforms.
+    - Fixed a compile-time error when building the Python module for Python 3.
+      [Reported by yurivict]
+
+    Houdini:
+    - Added openvdb_houdini::GEOvdbApply(), which invokes a functor
+      on a VDB primitive if the resolved grid type is a member of
+      a given type list.
+    - Fixed a regression in the Fill SOP that caused it to modify VDBs
+      in the input detail.
+    - The Combine SOP no longer crashes in Copy B mode when the destination
+      is not a VDB.
+    - Added a houdini_utils::OpFactory::setInvisible() method to hide nodes
+      from tab menus.
+    - Added methods to store parent name and visibility of native SOPs to
+      @b openvdb_houdini::OpenVDBOpFactory.
+
+
+Version 6.1.0 - May 8, 2019
+
+      As of this release, the oldest supported Houdini version is 16.5.
+
+    New features:
+    - Added new QuatTraits, MatTraits and ValueTraits type traits to complement
+      VecTraits and added an IsSpecializationOf helper metafunction.
+    - Added support for Vec4s, Vec4d and Vec4i metadata.
+    - Added a generic TypeList class.
+    - Added GridBase::apply(), which invokes a functor on a grid
+      if the resolved grid type is a member of a given type list.
+    - Added util::printTime(), which outputs nicely formatted time information.
+    - Added a std::hash<Coord> template specialization.
+    - Added CoordBBox::moveMin() and CoordBBox::moveMax() to move a CoordBBox.
+
+    Improvements:
+    - util::CpuTimer now makes use of util::printTime() for nicer output,
+      and its API has been improved.
+    - Significantly improved the performance of point data grid string
+      attribute generation.
+    - AttributeArray::copy() and the copy assignment operator for
+      AttributeArrays are now thread-safe.
+    - The command-line tools (vdb_print, etc.) now include the library
+      ABI version in their -version output.
+    - Further improved the responsiveness of the mesh to volume converter
+      to interrupt requests.
+    - The CMake build system has been significantly improved to support a
+      wider range of build options and use cases. This includes better
+      dependency handling and status reporting, find module installation for
+      external use, more robust handling of different platform configurations
+      and the introduction of dependency and build documentation.
+
+    Bug fixes:
+    - Fixed a bug in tools::clip() that caused some grid metadata
+      to be discarded.
+    - Added a check to points::setGroup to compare the maximum index of the
+      provided PointIndexTree to the size of the membership vector.
+    - Fixed a race condition introduced in ABI 6 when moving points
+      in point data grids, due to non-const access to an AttributArray
+      triggering a copy-on-write.
+    - Fixed a bug that caused the mesh to volume converter to consume
+      unlimited memory when it encountered NaNs in vertex positions.
+    - Fixed a rounding error bug in point conversion when using
+      single-precision floating-point.
+    - Addressed some type conversion issues and other issues reported by GCC 6.
+    - Fixed a crash in tools::extractActiveVoxelSegmentMasks() when the first
+      leaf node had no active voxels.
+      [Reported by Rick Hankins]
+    - Fixed a bug in tools::segmentActiveVoxels() and tools::segmentSDF() where
+      inactive leaf nodes were only pruned when there was more than one segment.
+    - Fixed a crash in point moving when using group filters.
+    - Fixed a bug where the stride of existing attributes was being ignored
+      during copy-construction of an AttributeSet.
+    - Fixed a bug that caused AttributeArray equality operators to fail for
+      attributes with non-constant strides.
+
+    API changes:
+    - Moved the CopyConstness metafunction from TreeIterator.h to Types.h.
+
+    Houdini:
+    - The Points Convert SOP now reports NaN Positions as warnings when
+      converting from Houdini Points to VDB Points.
+    - Fixed a bug where the Points Convert SOP was incorrectly ignoring
+      point attributes with the same name as an existing point group.
+    - The Transform SOP now supports frustum transforms by applying the
+      transformation to the internal affine map.
+    - Changed the labels (but not the opnames) of several SOPs to match
+      the corresponding native Houdini SOPs.  The new labels are
+      Morph SDF, Project Non-Divergent, Rebuild SDF, Renormalize SDF,
+      Reshape SDF, Segment by Connectivity, Smooth SDF, Topology to SDF,
+      and Visualize Tree.
+    - Added a houdini_utils::OpPolicy::getFirstName() method to allow
+      OpPolicy subclasses to provide their own first name scheme.
+    - Added a houdini_utils::OpPolicy::getLabelName() method to allow
+      OpPolicy subclasses to provide their own label naming scheme
+      for tab menus.
+    - Added type lists for sets of commonly used grid types, including
+      ScalarGridTypes, Vec3GridTypes, AllGridTypes, etc.
+    - The Vector Merge SOP now copies metadata from the representative
+      scalar grid.
+    - Deprecated SOP_NodeVDB::duplicateSourceStealable(),
+      houdini_utils::getNodeChain() and houdini_utils::OP_EvalScope.
+
+    Python:
+    - Added limited support for point data grids, comprising I/O and
+      metadata functionality for now.
+    - Added support for Mat4s and Mat4d metadata, in the form of nested
+      Python lists (e.g., [[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1]]).
+
+
+Version 6.0.0 - December 18, 2018
+
+      Some changes in this release (see "ABI changes" below) alter
+      the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones built into Houdini
+      up to and including Houdini 17.  To preserve ABI compatibility,
+      when compiling OpenVDB or any dependent code define the macro
+      OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 3 for
+      Houdini 15, 15.5 and 16, 4 for Houdini 16.5 and 5 for Houdini 17.0
+
+    New features:
+    - Added support to the ParticlesToLevelSet tool for fast rasterization
+      of particles into boolean mask grids.
+    - Added convenience functions particlesToSdf(), particleTrailsToSdf(),
+      particlesToMask() and particleTrailsToMask() for common particle
+      rasterization use cases.
+    - Added batch copying of AttributeArray values that significantly
+      outperforms the older method that relied on a virtual function.
+
+    Improvements:
+    - Improved the responsiveness of the mesh to volume converter to interrupt
+      requests.
+    - Attempts to use a partially deserialized AttributeArray now errors.
+    - Updated point deletion to use faster batch copying for ABI=6+.
+    - Methods relating to in-memory Blosc compression for AttributeArrays now
+      do nothing and have been marked deprecated resulting in memory savings
+      for ABI=6+.
+
+    Bug fixes:
+    - Fixed various signed/unsigned casting issues to resolve compiler warnings
+      when moving points in point data grids.
+
+    ABI changes:
+    - Added new virtual functions to AttributeArray.
+    - Changed the order and size of member variables in AttributeArray
+      and TypedAttributeArray.
+
+    API changes:
+    - Removed a number of methods that were deprecated in version 5.0.0 or
+      earlier.
+    - Removed the experimental ValueAccessor::newSetValue method.
+    - Deprecated AttributeArray methods relating to in-memory
+      Blosc compression.
+
+    Houdini:
+    - The Convert and To Polygons SOPs now correctly transfer vertex
+      attributes when the output is a polygon soup.
+    - Added an option to the Visualize SOP to display leaf nodes as points.
+    - Renamed the Visualize SOP's "leafmode", "internalmode", "tilemode"
+      and "voxelmode" parameters to "leafstyle", "internalstyle", etc.
+      and converted them from ordinal to string-valued.
+    - Made various improvements to viewport rendering of point data grids.
+    - Added a ParmFactory::setInvisible() method to allow parameters
+      to be marked as hidden.  This is useful for multi-parms,
+      whose child parameters cannot be made obsolete.
+    - Removed the option to use in-memory Blosc compression from the Points
+      Convert SOP as this feature has now been deprecated.
+    - Made various small changes for Houdini 17 compatibility.
+
+
 Version 5.2.0 - August 13, 2018
 
     New features:
@@ -54,6 +249,8 @@ Version 5.2.0 - August 13, 2018
       [Reported by Doug Epps]
 
     Houdini:
+    - Added an option to the From Particles SOP to output an
+      interior mask grid.
     - Added options to the Metadata SOP to set the grid name
       and to propagate metadata to primitive attributes and vice-versa.
     - Modified GU_PrimVDB::convertVolumesToVDBs() to set the output VDBs'
@@ -650,14 +847,14 @@ Version 3.2.0 - August 10, 2016
     - Fixed bugs in tree::NodeUnion that could cause crashes.
     - Fixed memory leak in
       tools::mesh_to_volume_internal::ExpandNarrowband
-      [Reported by Kévin Dietrich]
+      [Reported by KÃ©vin Dietrich]
     - Fixed parameter type inconsistencies in math/Stencils.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich and Nick Avramoussis]
+      [Contributed by KÃ©vin Dietrich and Nick Avramoussis]
     - Fixed a bug in the VolumeToMesh tool that produced artifacts for
       adaptive surface extraction on clipped level sets.
       [Reported by Jeff Lait]
-    - Corrected empty grid background value in tools::meshToVolume().
+    - Corrected empty grid background value inÂ tools::meshToVolume().
       [Contributed by Jeff Lait]
     - Fixed a bug in tools::volumeToMesh that could produce NaNs.
       [Reported by Rick Hankins]
@@ -800,7 +997,7 @@ Version 3.1.0 - October 1, 2015
       rather than the square of the magnitude.
     - Fixed parameter type inconsistencies in math/Ray.h and
       tools/RayIntersector.h.
-      [Contributed by Kévin Dietrich]
+      [Contributed by KÃ©vin Dietrich]
     - Fixed incorrect handling of signed values in tools::clip()
       (and the Clip SOP).
 

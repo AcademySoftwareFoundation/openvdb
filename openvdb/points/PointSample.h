@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -482,6 +482,8 @@ inline void sampleGrid( size_t order,
                 pointDataSampler.template sample<SourceGridT, Vec3d>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<Vec3i>()) {
                 pointDataSampler.template sample<SourceGridT, Vec3i>(sourceGrid, targetIdx);
+            } else if (targetType == typeNameAsString<int8_t>()) {
+                pointDataSampler.template sample<SourceGridT, int8_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int16_t>()) {
                 pointDataSampler.template sample<SourceGridT, int16_t>(sourceGrid, targetIdx);
             } else if (targetType == typeNameAsString<int32_t>()) {
@@ -568,6 +570,6 @@ inline void quadraticSample(PointDataGridT& points,
 
 #endif // OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

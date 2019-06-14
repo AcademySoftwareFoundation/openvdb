@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
+#include <openvdb/tools/LevelSetUtil.h> // for sdfInteriorMask()
 #include <openvdb/tools/ParticlesToLevelSet.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
@@ -58,18 +59,22 @@ public:
     }
 
     CPPUNIT_TEST_SUITE(TestParticlesToLevelSet);
+    CPPUNIT_TEST(testBlindData);
     CPPUNIT_TEST(testMyParticleList);
     CPPUNIT_TEST(testRasterizeSpheres);
     CPPUNIT_TEST(testRasterizeSpheresAndId);
     CPPUNIT_TEST(testRasterizeTrails);
     CPPUNIT_TEST(testRasterizeTrailsAndId);
+    CPPUNIT_TEST(testMaskOutput);
     CPPUNIT_TEST_SUITE_END();
 
+    void testBlindData();
     void testMyParticleList();
     void testRasterizeSpheres();
     void testRasterizeSpheresAndId();
     void testRasterizeTrails();
     void testRasterizeTrailsAndId();
+    void testMaskOutput();
 };
 
 
@@ -150,6 +155,44 @@ public:
     // The method below is only required for attribute transfer
     void getAtt(size_t n, openvdb::Index32& att) const { att = openvdb::Index32(n); }
 };
+
+
+void
+TestParticlesToLevelSet::testBlindData()
+{
+    using BlindTypeIF = openvdb::tools::p2ls_internal::BlindData<openvdb::Index, float>;
+
+    BlindTypeIF value(openvdb::Index(8), 5.2f);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(8), value.visible());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(5.2f, value.blind());
+
+    BlindTypeIF value2(openvdb::Index(13), 1.6f);
+
+    { // test equality
+        // only visible portion needs to be equal
+        BlindTypeIF blind(openvdb::Index(13), 6.7f);
+        CPPUNIT_ASSERT(value2 == blind);
+    }
+
+    { // test addition of two blind types
+        BlindTypeIF blind = value + value2;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+13), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(0.0f, blind.blind()); // blind values are both dropped
+    }
+
+    { // test addition of blind type with visible type
+        BlindTypeIF blind = value + 3;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+
+    { // test addition of blind type with type that requires casting
+        // note that this will generate conversion warnings if not handled properly
+        BlindTypeIF blind = value + 3.7;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+}
 
 
 void
@@ -452,6 +495,117 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     //this->writeGrid(ls, "testRasterizeTrails");
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+
+void
+TestParticlesToLevelSet::testMaskOutput()
+{
+    using namespace openvdb;
+
+    using SdfGridType = FloatGrid;
+    using MaskGridType = MaskGrid;
+
+    MyParticleList pa;
+    const Vec3R vel(10, 5, 1);
+    pa.add(Vec3R(84.7252, 85.7946, 84.4266), 11.8569, vel);
+    pa.add(Vec3R(47.9977, 81.2169, 47.7665), 5.45313, vel);
+    pa.add(Vec3R(87.0087, 14.0351, 95.7155), 7.36483, vel);
+    pa.add(Vec3R(75.8616, 53.7373, 58.202),  14.4127, vel);
+    pa.add(Vec3R(14.9675, 32.4141, 13.5218), 4.33101, vel);
+    pa.add(Vec3R(96.9809, 9.92804, 90.2349), 12.2613, vel);
+    pa.add(Vec3R(63.4274, 3.84254, 32.5047), 12.1566, vel);
+    pa.add(Vec3R(62.351,  47.4698, 41.4369), 11.637,  vel);
+    pa.add(Vec3R(62.2846, 1.35716, 66.2527), 18.9914, vel);
+    pa.add(Vec3R(44.1711, 1.99877, 45.1159), 1.11429, vel);
+
+    {
+        // Test variable-radius particles.
+
+        // Rasterize into an SDF.
+        auto sdf = createLevelSet<SdfGridType>();
+        tools::particlesToSdf(pa, *sdf);
+
+        // Rasterize into a boolean mask.
+        auto mask = MaskGridType::create();
+        tools::particlesToMask(pa, *mask);
+
+        // Verify that the rasterized mask matches the interior of the SDF.
+        mask->tree().voxelizeActiveTiles();
+        auto interior = tools::sdfInteriorMask(*sdf);
+        CPPUNIT_ASSERT(interior);
+        interior->tree().voxelizeActiveTiles();
+        CPPUNIT_ASSERT_EQUAL(interior->activeVoxelCount(), mask->activeVoxelCount());
+        interior->topologyDifference(*mask);
+        CPPUNIT_ASSERT_EQUAL(0, int(interior->activeVoxelCount()));
+    }
+    {
+        // Test fixed-radius particles.
+
+        auto sdf = createLevelSet<SdfGridType>();
+        tools::particlesToSdf(pa, *sdf, /*radius=*/10.0);
+
+        auto mask = MaskGridType::create();
+        tools::particlesToMask(pa, *mask, /*radius=*/10.0);
+
+        mask->tree().voxelizeActiveTiles();
+        auto interior = tools::sdfInteriorMask(*sdf);
+        CPPUNIT_ASSERT(interior);
+        interior->tree().voxelizeActiveTiles();
+        CPPUNIT_ASSERT_EQUAL(interior->activeVoxelCount(), mask->activeVoxelCount());
+        interior->topologyDifference(*mask);
+        CPPUNIT_ASSERT_EQUAL(0, int(interior->activeVoxelCount()));
+    }
+    {
+        // Test particle trails.
+
+        auto sdf = createLevelSet<SdfGridType>();
+        tools::particleTrailsToSdf(pa, *sdf);
+
+        auto mask = MaskGridType::create();
+        tools::particleTrailsToMask(pa, *mask);
+
+        mask->tree().voxelizeActiveTiles();
+        auto interior = tools::sdfInteriorMask(*sdf);
+        CPPUNIT_ASSERT(interior);
+        interior->tree().voxelizeActiveTiles();
+        CPPUNIT_ASSERT_EQUAL(interior->activeVoxelCount(), mask->activeVoxelCount());
+        interior->topologyDifference(*mask);
+        CPPUNIT_ASSERT_EQUAL(0, int(interior->activeVoxelCount()));
+    }
+    {
+        // Test attribute transfer.
+
+        auto sdf = createLevelSet<SdfGridType>();
+        tools::ParticlesToLevelSet<SdfGridType, Index32> p2sdf(*sdf);
+        p2sdf.rasterizeSpheres(pa);
+        p2sdf.finalize(/*prune=*/true);
+        const auto sdfAttr = p2sdf.attributeGrid();
+        CPPUNIT_ASSERT(sdfAttr);
+
+        auto mask = MaskGridType::create();
+        tools::ParticlesToLevelSet<MaskGridType, Index32> p2mask(*mask);
+        p2mask.rasterizeSpheres(pa);
+        p2mask.finalize(/*prune=*/true);
+        const auto maskAttr = p2mask.attributeGrid();
+        CPPUNIT_ASSERT(maskAttr);
+
+        mask->tree().voxelizeActiveTiles();
+        auto interior = tools::sdfInteriorMask(*sdf);
+        CPPUNIT_ASSERT(interior);
+        interior->tree().voxelizeActiveTiles();
+        CPPUNIT_ASSERT_EQUAL(interior->activeVoxelCount(), mask->activeVoxelCount());
+        interior->topologyDifference(*mask);
+        CPPUNIT_ASSERT_EQUAL(0, int(interior->activeVoxelCount()));
+
+        // Verify that the mask- and SDF-generated attribute grids match.
+        auto sdfAcc = sdfAttr->getConstAccessor();
+        auto maskAcc = maskAttr->getConstAccessor();
+        for (auto it = interior->cbeginValueOn(); it; ++it) {
+            const auto& c = it.getCoord();
+            CPPUNIT_ASSERT_EQUAL(sdfAcc.getValue(c), maskAcc.getValue(c));
+        }
+    }
+}
+
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

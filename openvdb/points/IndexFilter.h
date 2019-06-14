@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -280,7 +280,7 @@ public:
                 mLeafMap[iter->origin()] = SeedCountPair(dist(generator), leafPoints);
                 break;
             }
-            totalPointsFloat += factor * iter->pointCount();
+            totalPointsFloat += factor * static_cast<float>(iter->pointCount());
             const auto leafPoints = static_cast<int>(math::Floor(totalPointsFloat));
             totalPointsFloat -= static_cast<float>(leafPoints);
             totalPoints += leafPoints;
@@ -608,6 +608,6 @@ struct FilterTraits<BinaryFilter<T0, T1, And>> {
 
 #endif // OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

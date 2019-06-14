@@ -3,41 +3,45 @@ Installing OpenVDB
 
 Requirements
 ------------
+
+See the dependencies documentation here -
+https://www.openvdb.org/documentation/doxygen/dependencies.html for more
+information.
+
 - A C++11-compatible compiler, such as
-  GNU GCC (gcc.gnu.org), version 4.8 or later,
+  GNU GCC (gcc.gnu.org), version 4.8.2 (with bugfix) or later,
   Clang (clang.llvm.org), version 3.8 or later,
   or Intel ICC (software.intel.com), version 15 or later
 
-- GNU gmake (www.gnu.org/software/make/), version 3.81 or later
+- GNU gmake (www.gnu.org/software/make/), version 4.1 or later
 
-- Boost (www.boost.org), version 1.53.0 or later; 1.57.0 or later
-  for the Python module
+- Boost (www.boost.org), version 1.61.0 or later
   (Linux: yum install boost-devel; OS X: port install boost +python27)
 
 - libz (zlib.net)
   (Linux: yum install zlib-devel)
 
 - OpenEXR (www.openexr.com), for the 16-bit float Half class in half.h
-  and for .exr file output in vdb_render
+  and for .exr file output in vdb_render, version 2.2.0 or later
 
 - Intel Threading Building Blocks (threadingbuildingblocks.org),
-  version 3.0 or later
+  version 4.4.6 or later
 
 Other compilers or versions might work but have not been tested.
 
 
 Optional:
 
-- Doxygen 1.8.11 or later (www.stack.nl/~dimitri/doxygen/), for documentation
+- Doxygen 1.8.13 or later (www.stack.nl/~dimitri/doxygen/), for documentation
 
-- CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
+- CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.13.0 or later
   (Linux: yum install cppunit-devel)
 
-- Houdini HDK (http://www.sidefx.com/get/download-houdini/), version 15.0
+- Houdini HDK (http://www.sidefx.com/get/download-houdini/), version 16.5
   or later
 
-- Blosc compression library (www.blosc.org), version 1.5.0 or later
-  (included in the Houdini HDK as of version 14.0)
+- Blosc compression library (www.blosc.org), version 1.5.0
+  (included in the Houdini HDK)
 
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
@@ -48,13 +52,13 @@ Optional:
 - log4cplus (log4cplus.sourceforge.net), version 1.1.2 or later,
   for error logging
 
-- GLFW 2.7 (www.glfw.org), for the OpenVDB viewer
+- GLFW 3.0 (www.glfw.org), for the OpenVDB viewer
 
 - OpenGL 3.2 or later, for the OpenVDB viewer
 
-- Python 2.5, 2.6 or 2.7, for the Python module
+- Python 2.7 or later, for the Python module
 
-- NumPy (www.numpy.org), for the Python module
+- NumPy (www.numpy.org), version 1.12.1 or later, for the Python module
 
 - Epydoc (http://epydoc.sourceforge.net/), version 3.0 or later,
   for Python module documentation
@@ -64,6 +68,13 @@ Other versions might work but have not been tested.
 
 Installation
 ------------
+
+This documentation is for building with GNU Make. It is strongly recommended to
+use CMake to build OpenVDB as the Makefiles will be removed in an upcoming
+release.
+See the build documentation here -
+https://www.openvdb.org/documentation/doxygen/build.html for more information.
+
 1.  Set values appropriate to your environment for the following variables
     at the top of the Makefile:
 
@@ -195,8 +206,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.5.2.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.5.2.0
+    openvdb/libopenvdb.so.6.1.0         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.6.1.0
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -242,8 +253,8 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.5.2
-            libopenvdb.so.5.2.0
+            libopenvdb.so.6.1
+            libopenvdb.so.6.1.0
 
         python/
             include/
@@ -252,7 +263,7 @@ Installation
             lib/
                 python$(PYTHON_VERSION)/
                     pyopenvdb.so
-                    pyopenvdb.so.5.2
+                    pyopenvdb.so.6.1
 
         share/
             doc/

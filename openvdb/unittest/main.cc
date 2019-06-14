@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -118,14 +118,12 @@ public:
     {
         if (!mFailed) {
             // Print elapsed time only for successful tests.
-            const auto msec = int(std::round(mTimer.delta()));
-            std::cout << " : OK (";
-            if (msec > 0) {
-                std::cout << msec;
+            const double msec = mTimer.milliseconds();
+            if (msec > 1.0) {
+              openvdb::util::printTime(std::cout, msec, " : OK (", ")", 4, 1, 0);
             } else {
-                std::cout << "<1";
+              std::cout << " : OK (<1ms)";
             }
-            std::cout << "ms)";
         }
         std::cout << std::endl;
     }
@@ -273,6 +271,6 @@ main(int argc, char *argv[])
     return run(argc, argv);
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

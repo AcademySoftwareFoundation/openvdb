@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -96,11 +96,16 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
 {
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
-        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        const AttributeArray* existingArray = attrSet.getConst(pos);
+        const bool constantStride = existingArray->hasConstantStride();
+        const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
+
+        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
+            stride, constantStride);
 
         // transfer hidden and transient flags
-        if (attrSet.getConst(pos)->isHidden())      array->setHidden(true);
-        if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
+        if (existingArray->isHidden())      array->setHidden(true);
+        if (existingArray->isTransient())   array->setTransient(true);
 
         mAttrs[pos] = array;
     }
@@ -1183,6 +1188,6 @@ AttributeSet::Descriptor::read(std::istream& is)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

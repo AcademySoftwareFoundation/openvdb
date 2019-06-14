@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,14 +51,18 @@ public:
 
     CPPUNIT_TEST_SUITE(TestPointConversion);
     CPPUNIT_TEST(testPointConversion);
+    CPPUNIT_TEST(testPointConversionNans);
     CPPUNIT_TEST(testStride);
     CPPUNIT_TEST(testComputeVoxelSize);
+    CPPUNIT_TEST(testPrecision);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testPointConversion();
+    void testPointConversionNans();
     void testStride();
     void testComputeVoxelSize();
+    void testPrecision();
 
 }; // class TestPointConversion
 
@@ -465,6 +469,154 @@ TestPointConversion::testPointConversion()
     }
 
     std::remove(filename.c_str());
+}
+
+
+////////////////////////////////////////
+
+
+void
+TestPointConversion::testPointConversionNans()
+{
+    // generate points
+
+    const size_t count(25);
+
+    AttributeWrapper<Vec3f> position(1);
+    AttributeWrapper<int> xyz(1);
+    AttributeWrapper<int> id(1);
+    AttributeWrapper<float> uniform(1);
+    AttributeWrapper<openvdb::Name> string(1);
+    GroupWrapper group;
+
+    genPoints(count, /*scale=*/ 1.0, /*stride=*/false,
+        position, xyz, id, uniform, string, group);
+
+    // set point numbers 0, 10, 20 and 24 to a nan position
+
+    const std::vector<int> nanIndices = { 0, 10, 20, 24 };
+
+    AttributeWrapper<Vec3f>::Handle positionHandle(position);
+    const Vec3f nanPos(std::nan("0"));
+    CPPUNIT_ASSERT(nanPos.isNan());
+    for (const int& idx : nanIndices) {
+        positionHandle.set(idx, /*stride*/0, nanPos);
+    }
+
+    CPPUNIT_ASSERT_EQUAL(count, position.size());
+    CPPUNIT_ASSERT_EQUAL(count, id.size());
+    CPPUNIT_ASSERT_EQUAL(count, uniform.size());
+    CPPUNIT_ASSERT_EQUAL(count, string.size());
+    CPPUNIT_ASSERT_EQUAL(count, group.size());
+
+    // convert point positions into a Point Data Grid
+
+    openvdb::math::Transform::Ptr transform =
+        openvdb::math::Transform::createLinearTransform(/*voxelsize*/1.0f);
+
+    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(position, *transform);
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, position, *transform);
+
+    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
+    PointDataTree& tree = pointDataGrid->tree();
+
+    // set expected point count to the total minus the number of nan positions
+    const size_t expected = count - nanIndices.size();
+    CPPUNIT_ASSERT_EQUAL(expected, static_cast<size_t>(pointCount(tree)));
+
+    // add id and populate
+
+    appendAttribute<int>(tree, "id");
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
+
+    // add uniform and populate
+
+    appendAttribute<float>(tree, "uniform");
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<float>>(tree, indexTree, "uniform", uniform);
+
+    // add string and populate
+
+    appendAttribute<Name>(tree, "string");
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<openvdb::Name>>(
+        tree, indexTree, "string", string);
+
+    // add group and set membership
+
+    appendGroup(tree, "test");
+    setGroup(tree, indexTree, group.buffer(), "test");
+
+    // create accessor and iterator for Point Data Tree
+
+    const auto leafCIter = tree.cbeginLeaf();
+
+    CPPUNIT_ASSERT_EQUAL(5, int(leafCIter->attributeSet().size()));
+
+    CPPUNIT_ASSERT(leafCIter->attributeSet().find("id") != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(leafCIter->attributeSet().find("uniform") != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(leafCIter->attributeSet().find("P") != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(leafCIter->attributeSet().find("string") != AttributeSet::INVALID_POS);
+
+    const auto idIndex = static_cast<Index>(leafCIter->attributeSet().find("id"));
+    const auto uniformIndex = static_cast<Index>(leafCIter->attributeSet().find("uniform"));
+    const auto stringIndex = static_cast<Index>(leafCIter->attributeSet().find("string"));
+    const AttributeSet::Descriptor::GroupIndex groupIndex =
+        leafCIter->attributeSet().groupIndex("test");
+
+    // convert back into linear point attribute data
+
+    AttributeWrapper<Vec3f> outputPosition(1);
+    AttributeWrapper<int> outputId(1);
+    AttributeWrapper<float> outputUniform(1);
+    AttributeWrapper<openvdb::Name> outputString(1);
+    GroupWrapper outputGroup;
+
+    outputPosition.resize(position.size());
+    outputId.resize(id.size());
+    outputUniform.resize(uniform.size());
+    outputString.resize(string.size());
+    outputGroup.resize(group.size());
+
+    std::vector<Index64> offsets;
+    pointOffsets(offsets, tree);
+
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, offsets, 0);
+    convertPointDataGridAttribute(outputId, tree, offsets, 0, idIndex, 1);
+    convertPointDataGridAttribute(outputUniform, tree, offsets, 0, uniformIndex, 1);
+    convertPointDataGridAttribute(outputString, tree, offsets, 0, stringIndex, 1);
+    convertPointDataGridGroup(outputGroup, tree, offsets, 0, groupIndex);
+
+    // pack and sort the new buffers based on id
+
+    std::vector<PointData> pointData(expected);
+
+    for (unsigned int i = 0; i < expected; i++) {
+        pointData[i].id = outputId.buffer()[i];
+        pointData[i].position = outputPosition.buffer()[i];
+        pointData[i].uniform = outputUniform.buffer()[i];
+        pointData[i].string = outputString.buffer()[i];
+        pointData[i].group = outputGroup.buffer()[i];
+    }
+
+    std::sort(pointData.begin(), pointData.end());
+
+    // compare old and new buffers, taking into account the nan position
+    // which should not have been converted
+
+    for (unsigned int i = 0; i < expected; ++i)
+    {
+        size_t iOffset = i;
+        for (const int& idx : nanIndices) {
+            if (int(iOffset) >= idx) iOffset += 1;
+        }
+
+        CPPUNIT_ASSERT_EQUAL(id.buffer()[iOffset], pointData[i].id);
+        CPPUNIT_ASSERT_EQUAL(group.buffer()[iOffset], pointData[i].group);
+        CPPUNIT_ASSERT_EQUAL(uniform.buffer()[iOffset], pointData[i].uniform);
+        CPPUNIT_ASSERT_EQUAL(string.buffer()[iOffset], pointData[i].string);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[iOffset].x(), pointData[i].position.x(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[iOffset].y(), pointData[i].position.y(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[iOffset].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
+    }
 }
 
 
@@ -976,6 +1128,184 @@ TestPointConversion::testComputeVoxelSize()
     }
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+void
+TestPointConversion::testPrecision()
+{
+    const double tolerance = math::Tolerance<float>::value();
+
+    { // test values far from origin
+        const double voxelSize = 0.5;
+        const float halfVoxelSize = 0.25f;
+        auto transform = math::Transform::createLinearTransform(voxelSize);
+
+        float onBorder = 1000.0f + halfVoxelSize; // can be represented exactly in floating-point
+        float beforeBorder = std::nextafterf(onBorder, /*to=*/0.0f);
+        float afterBorder = std::nextafterf(onBorder, /*to=*/2000.0f);
+
+        const Vec3f positionBefore(beforeBorder, afterBorder, onBorder);
+
+        std::vector<Vec3f> points{positionBefore};
+        PointAttributeVector<Vec3f> wrapper(points);
+        auto pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(
+            wrapper, *transform);
+
+        Vec3f positionAfterNull;
+        Vec3f positionAfterFixed16;
+
+        { // null codec
+            auto points = createPointDataGrid<NullCodec, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 2000);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 2001);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 2001); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterNull = Vec3f(transform->indexToWorld(positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.z(), positionBefore.z(), tolerance);
+        }
+
+        { // fixed 16-bit codec
+            auto points = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 2000);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 2001);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 2001); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterFixed16 = Vec3f(transform->indexToWorld(
+                positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.z(), positionBefore.z(), tolerance);
+        }
+
+        // at this precision null codec == fixed-point 16-bit codec
+
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.x(), positionAfterFixed16.x());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.y(), positionAfterFixed16.y());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.z(), positionAfterFixed16.z());
+    }
+
+    { // test values near to origin
+        const double voxelSize = 0.5;
+        const float halfVoxelSize = 0.25f;
+        auto transform = math::Transform::createLinearTransform(voxelSize);
+
+        float onBorder = 0.0f+halfVoxelSize;
+        float beforeBorder = std::nextafterf(onBorder, /*to=*/0.0f);
+        float afterBorder = std::nextafterf(onBorder, /*to=*/2000.0f);
+
+        const Vec3f positionBefore(beforeBorder, afterBorder, onBorder);
+
+        std::vector<Vec3f> points{positionBefore};
+        PointAttributeVector<Vec3f> wrapper(points);
+        auto pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(
+            wrapper, *transform);
+
+        Vec3f positionAfterNull;
+        Vec3f positionAfterFixed16;
+
+        { // null codec
+            auto points = createPointDataGrid<NullCodec, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 0);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 1);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 1); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterNull = Vec3f(transform->indexToWorld(positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.z(), positionBefore.z(), tolerance);
+        }
+
+        { // fixed 16-bit codec - at this precision, this codec results in lossy compression
+            auto points = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 0);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 1);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 1); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() == 0.5f); // before border is clamped to 0.5f
+            CPPUNIT_ASSERT(positionVoxelSpace.y() == -0.5f); // after border is clamped to -0.5f
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border is stored at -0.5f
+
+            positionAfterFixed16 = Vec3f(transform->indexToWorld(
+                positionVoxelSpace + ijk.asVec3d()));
+
+            // reduce tolerance to handle lack of precision
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.x(), positionBefore.x(), 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.y(), positionBefore.y(), 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.z(), positionBefore.z(), tolerance);
+        }
+
+        // only z matches precisely due to lossy compression
+
+        CPPUNIT_ASSERT(positionAfterNull.x() != positionAfterFixed16.x());
+        CPPUNIT_ASSERT(positionAfterNull.y() != positionAfterFixed16.y());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.z(), positionAfterFixed16.z());
+    }
+}
+
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

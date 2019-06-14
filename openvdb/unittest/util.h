@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -68,7 +68,9 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
                 const float dist = float((p-center).length() - radius);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 ValueT val = ValueT(zero + dist);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                 switch (mode) {
                 case SPHERE_DENSE:
                     acc.setValue(xyz, val);
@@ -129,30 +131,30 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
     const int n = int(std::sqrt(double(numPoints)));
     const double xScale = (2.0 * M_PI) / double(n);
     const double yScale = M_PI / double(n);
-    
+
     double x, y, theta, phi;
     openvdb::Vec3R pos;
-    
+
     points.reserve(n*n);
-    
+
     // loop over a [0 to n) x [0 to n) grid.
     for (int a = 0; a < n; ++a) {
         for (int b = 0; b < n; ++b) {
-            
+
             // jitter, move to random pos. inside the current cell
             x = double(a) + randNumber();
             y = double(b) + randNumber();
-            
+
             // remap to a lat/long map
             theta = y * yScale; // [0 to PI]
             phi   = x * xScale; // [0 to 2PI]
-            
+
             // convert to cartesian coordinates on a unit sphere.
             // spherical coordinate triplet (r=1, theta, phi)
             pos[0] = std::sin(theta)*std::cos(phi);
             pos[1] = std::sin(theta)*std::sin(phi);
             pos[2] = std::cos(theta);
-            
+
             points.push_back(pos);
         }
     }
@@ -164,6 +166,6 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
 
 #endif // OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

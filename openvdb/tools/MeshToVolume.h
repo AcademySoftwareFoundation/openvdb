@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -2036,7 +2036,8 @@ private:
         enum { POLYGON_LIMIT = 1000 };
 
         SubTask(const Triangle& prim, DataTable& dataTable,
-            int subdivisionCount, size_t polygonCount, Interrupter* interrupter)
+            int subdivisionCount, size_t polygonCount,
+            Interrupter* interrupter = nullptr)
             : mLocalDataTable(&dataTable)
             , mPrim(prim)
             , mSubdivisionCount(subdivisionCount)
@@ -2054,15 +2055,15 @@ private:
 
                 voxelizeTriangle(mPrim, *dataPtr, mInterrupter);
 
-            } else {
+            } else if (!(mInterrupter && mInterrupter->wasInterrupted())) {
                 spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount, mInterrupter);
             }
         }
 
-        DataTable * const mLocalDataTable;
-        Triangle    const mPrim;
-        int         const mSubdivisionCount;
-        size_t      const mPolygonCount;
+        DataTable   * const mLocalDataTable;
+        Triangle      const mPrim;
+        int           const mSubdivisionCount;
+        size_t        const mPolygonCount;
         Interrupter * const mInterrupter;
     }; // struct SubTask
 
@@ -2094,7 +2095,10 @@ private:
     }
 
     static void spawnTasks(
-        const Triangle& mainPrim, DataTable& dataTable, int subdivisionCount, size_t polygonCount,
+        const Triangle& mainPrim,
+        DataTable& dataTable,
+        int subdivisionCount,
+        size_t polygonCount,
         Interrupter* const interrupter)
     {
         subdivisionCount -= 1;
@@ -4222,6 +4226,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -298,14 +298,6 @@ public:
     {
         LockT lock(mMutex);
         mCache.setValueOnly(xyz, value);
-    }
-
-    /// Set the value of the voxel at the given coordinates and mark the voxel
-    /// as active.  [Experimental]
-    void newSetValue(const Coord& xyz, const ValueType& value)
-    {
-        LockT lock(mMutex);
-        mCache.newSetValue(xyz, value);
     }
 
     /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
@@ -2668,6 +2660,6 @@ private:
 
 #endif // OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

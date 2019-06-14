@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -53,33 +53,9 @@
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (in particular, hcustom and doxygen)
 #                       in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
-# libConfig allows us to specify a single variable for whether we build
-# debug/release and shared/static
-ifdef libConfig
-  ifeq (Debug,$(strip $(libConfig)))
-    debug   := yes
-    shared  := yes
-  endif
-  ifeq (DebugStatic,$(strip $(libConfig)))
-    debug   := yes
-    shared  := no
-  endif
-  ifeq (Release,$(strip $(libConfig)))
-    debug   := no
-    shared  := yes
-  endif
-  ifeq (ReleaseStatic,$(strip $(libConfig)))
-    debug   := no
-    shared  := no
-  endif
-  ifdef WINDOWS_NT
-    ifeq (yes,$(strip $(debug)))
-      debug := full
-    endif
-  endif
-  $(info === Building $(libConfig): debug=$(debug) shared=$(shared) ===)
-endif
 
 #
 # The following variables must be defined, either here or on the command line
@@ -97,102 +73,42 @@ endif
 ifeq (,$(HFS))
 $(warning Warning: $$(HFS) is not set; did you source houdini_setup?)
 endif
-ifdef WINDOWS_NT
-HDSO := $(HFS)/custom/houdini/dsolib
-endif
+
 
 # The directory into which to install libraries and header files
 # (it's recommended that this match the DESTDIR in the OpenVDB
 # library makefile)
-DESTDIR := $(prefix)
-include ../openvdb/platform.mk
+DESTDIR := /tmp/OpenVDB
 
 # The directory into which to install libraries (e.g., for Linux multiarch support)
 DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The directory into which to install Houdini SOPs
-HOUDINI_DESTDIR := ./dso
-ifeq (,$(prefix))
-  $(warning === WARNING === No prefix set)
-endif
-LOCAL_INCLUDE	:= $(prefix)/include
-LOCAL_LIB	:= $(prefix)/lib
+HOUDINI_DESTDIR := $(HIH)/dso
 
 # The parent directory of the openvdb/ header directory
-OPENVDB_INCL_DIR := $(LOCAL_INCLUDE)
+OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(LOCAL_LIB)
-ifdef WINDOWS_NT
-  ifneq (full,$(strip $(debug)))
-    ifeq (no,$(strip $(shared)))
-      OPENVDB_LIB := openvdb_sesi.lib
-    else
-      OPENVDB_LIB := openvdb_sesi.lib
-    endif
-  else
-    ifeq (no,$(strip $(shared)))
-      OPENVDB_LIB := openvdb_sesi_d.lib
-    else
-      OPENVDB_LIB := openvdb_sesi_d.lib
-    endif
-  endif
-else
-  OPENVDB_LIB := -lopenvdb_sesi
-endif
+OPENVDB_LIB_DIR := $(DESTDIR_LIB_DIR)
+OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
-BOOST_INCL_DIR := $(LOCAL_INCLUDE)
+BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
-BOOST_LIB_DIR := $(LOCAL_LIB)
-ifdef WINDOWS_NT
-  BOOST_LIB :=
-else
-  BOOST_LIB := -lboost_iostreams -lboost_system
-endif
+BOOST_LIB_DIR := $(HDSO)
+BOOST_LIB := -lboost_iostreams -lboost_system
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
 ILMBASE_INCL_DIR := $(HT)/include
 # The directory containing libHalf
 ILMBASE_LIB_DIR := $(HDSO)
-ifdef WINDOWS_NT
-  ifneq (full,$(strip $(debug)))
-    ifeq (no,$(strip $(shared)))
-      HALF_LIB := libHalf.lib
-    else
-      HALF_LIB := Half.lib
-    endif
-  else
-    ifeq (no,$(strip $(shared)))
-      HALF_LIB := libHalf_d.lib
-    else
-      HALF_LIB := Half_d.lib
-    endif
-  endif
-else
-  HALF_LIB := -lHalf
-endif
+HALF_LIB := -lHalf
 
 # The parent directory of the tbb/ header directory
 TBB_INCL_DIR := $(HT)/include
 # The directory containing libtbb
 TBB_LIB_DIR := $(HDSO)
-ifdef WINDOWS_NT
-  ifneq (full,$(strip $(debug)))
-    ifeq (no,$(strip $(shared)))
-      TBB_LIB := libtbb.lib
-    else
-      TBB_LIB := tbb.lib
-    endif
-  else
-    ifeq (no,$(strip $(shared)))
-      TBB_LIB := libtbb_debug.lib
-    else
-      TBB_LIB := tbb_debug.lib
-    endif
-  endif
-else
-  TBB_LIB := -ltbb
-endif
+TBB_LIB := -ltbb
 
 # The parent directory of the log4cplus/ header directory
 # (leave blank if log4cplus is unavailable)
@@ -213,6 +129,11 @@ SHELL = /bin/bash
 
 ifneq (,$(INSTALL_DIR))
     $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+endif
+
+# Error if Houdini version is lower than minimum supported version
+ifeq (1,$(shell expr "$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)" "<" "16.5"))
+    $(error Error: Unsupported Houdini Version: $(HOUDINI_VERSION))
 endif
 
 # Determine the platform.
@@ -246,35 +167,12 @@ endif
 HCUSTOM_EXTRA_CFLAGS := -DIGNORE_HDK_DEPRECATIONS
 HCUSTOM_EXTRA_LDFLAGS :=
 
-ifeq (full,$(strip $(debug)))
-  OPTIMIZE := $(DEBUG_FLAGS)
-  ifdef WINDOWS_NT
-    HCUSTOM_FLAGS += -G
-    LDFLAGS += -DEBUG
-  else
+ifeq (yes,$(strip $(debug)))
+    OPTIMIZE := -g
     HCUSTOM_FLAGS += -g
-  endif
 else
-  ifeq (yes,$(strip $(debug)))
-    OPTIMIZE := $(DEBUG_FLAGS)
-    HCUSTOM_FLAGS += -g
-    ifdef WINDOWS_NT
-      LDFLAGS += -DEBUG
-    endif
-  else
-    OPTIMIZE := $(OPTIMIZE_FLAGS)
-  endif
+    OPTIMIZE := -O3 -DNDEBUG
 endif
-ifeq (,$(strip $(debug)))
-  debug := no
-endif
-ifneq (no,$(strip $(debug)))
-STATICLIB_SUFFIX := $(addprefix _d,$(STATICLIB_SUFFIX))
-SHAREDLIB_SUFFIX := $(addprefix _d,$(SHAREDLIB_SUFFIX))
-IMPORTLIB_SUFFIX := $(addprefix _d,$(IMPORTLIB_SUFFIX))
-endif
-
-HCUSTOM := $(HB)/hcustom $(HCUSTOM_FLAGS)
 
 ifeq (yes,$(strip $(verbose)))
     QUIET :=
@@ -313,21 +211,49 @@ ifdef MBSD
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        WARNING_FLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        WARNING_FLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
+    CXXFLAGS += $(WARNING_FLAGS)
+    HCUSTOM_EXTRA_CFLAGS += $(WARNING_FLAGS)
+endif
+
 ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
     HOUDINI_CXXFLAGS := $(shell hcustom -c)
     HOUDINI_LDFLAGS := $(shell hcustom -m)
 endif
 
-HCUSTOM_LIBS := \
-    -L $(ILMBASE_LIB_DIR) $(HALF_LIB) \
-    -L $(TBB_LIB_DIR) $(TBB_LIB) \
-    -L $(BOOST_LIB_DIR) $(BOOST_LIB) \
-    -L $(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
+LIBS := \
+    -ldl -lm -lz \
+    -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
+    -L$(TBB_LIB_DIR) $(TBB_LIB) \
+    -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
 LIBS_RPATH := \
-    -Wl,-rpath,$(ILMBASE_LIB_DIR) $(LDDIROPT)$(ILMBASE_LIB_DIR) $(HALF_LIB) \
-    -Wl,-rpath,$(TBB_LIB_DIR) $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
-    -Wl,-rpath,$(OPENVDB_LIB_DIR) $(LDDIROPT)$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
+    -ldl -lm -lz \
+    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
+    -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
 ifeq (yes,$(has_log4cplus))
@@ -340,100 +266,95 @@ ifdef LINUX
 endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
-    houdini/AttributeTransferUtil.h \
-    houdini/GeometryUtil.h \
-    houdini/GEO_PrimVDB.h \
-    houdini/GT_GEOPrimCollectVDB.h \
-    houdini/GU_PrimVDB.h \
-    houdini/GU_VDBPointTools.h \
-    houdini/OP_NodeChain.h \
-    houdini/geometry.h \
-    houdini/ParmFactory.h \
-    houdini/PointUtils.h \
-    houdini/SOP_NodeVDB.h \
-    houdini/SOP_VDBVerbUtils.h \
-    houdini/UT_VDBTools.h \
-    houdini/UT_VDBUtils.h \
-    houdini/Utils.h \
+    AttributeTransferUtil.h \
+    GeometryUtil.h \
+    GEO_PrimVDB.h \
+    GT_GEOPrimCollectVDB.h \
+    GU_PrimVDB.h \
+    GU_VDBPointTools.h \
+    OP_NodeChain.h \
+    geometry.h \
+    ParmFactory.h \
+    PointUtils.h \
+    SOP_NodeVDB.h \
+    SOP_VDBVerbUtils.h \
+    UT_VDBTools.h \
+    UT_VDBUtils.h \
+    Utils.h \
 #
 LIBHOUDINI_SRC_NAMES := \
-    houdini/GeometryUtil.cc \
-    houdini/GEO_PrimVDB.cc \
-    houdini/GEO_VDBTranslator.cc \
-    houdini/GT_GEOPrimCollectVDB.cc \
-    houdini/GU_PrimVDB.cc \
-    houdini/GU_VDBPointTools.cc \
-    houdini/geometry.cc \
-    houdini/ParmFactory.cc \
-    houdini/PointUtils.cc \
-    houdini/SOP_NodeVDB.cc \
-    houdini/UT_VDBUtils.cc \
-    houdini/Utils.cc \
+    GeometryUtil.cc \
+    GEO_PrimVDB.cc \
+    GEO_VDBTranslator.cc \
+    GT_GEOPrimCollectVDB.cc \
+    GU_PrimVDB.cc \
+    GU_VDBPointTools.cc \
+    geometry.cc \
+    ParmFactory.cc \
+    PointUtils.cc \
+    SOP_NodeVDB.cc \
+    UT_VDBUtils.cc \
+    Utils.cc \
 #
 # Note that creation script names coincide with operator names,
 # not (necessarily) with SOP names.
 HOUDINI_SOP_SCRIPT_NAMES := \
-    houdini/DW_OpenVDBRasterizePoints.cmd \
+    DW_OpenVDBRasterizePoints.cmd \
 #
 HOUDINI_SOP_SRC_NAMES := \
-    houdini/GR_PrimVDBPoints.cc \
-    houdini/SHOP_OpenVDB_Points.cc \
-    houdini/SOP_OpenVDB_Advect.cc \
-    houdini/SOP_OpenVDB_Advect_Points.cc \
-    houdini/SOP_OpenVDB_Analysis.cc \
-    houdini/SOP_OpenVDB_Clip.cc \
-    houdini/SOP_OpenVDB_Combine.cc \
-    houdini/SOP_OpenVDB_Convert.cc \
-    houdini/SOP_OpenVDB_Create.cc \
-    houdini/SOP_OpenVDB_Densify.cc \
-    houdini/SOP_OpenVDB_Diagnostics.cc \
-    houdini/SOP_OpenVDB_Fill.cc \
-    houdini/SOP_OpenVDB_Filter.cc \
-    houdini/SOP_OpenVDB_Filter_Level_Set.cc \
-    houdini/SOP_OpenVDB_Fracture.cc \
-    houdini/SOP_OpenVDB_From_Particles.cc \
-    houdini/SOP_OpenVDB_From_Polygons.cc \
-    houdini/SOP_OpenVDB_LOD.cc \
-    houdini/SOP_OpenVDB_Metadata.cc \
-    houdini/SOP_OpenVDB_Morph_Level_Set.cc \
-    houdini/SOP_OpenVDB_Noise.cc \
-    houdini/SOP_OpenVDB_Occlusion_Mask.cc \
-    houdini/SOP_OpenVDB_Platonic.cc \
-    houdini/SOP_OpenVDB_Points_Convert.cc \
-    houdini/SOP_OpenVDB_Points_Delete.cc \
-    houdini/SOP_OpenVDB_Points_Group.cc \
-    houdini/SOP_OpenVDB_Potential_Flow.cc \
-    houdini/SOP_OpenVDB_Prune.cc \
-    houdini/SOP_OpenVDB_Rasterize_Points.cc \
-    houdini/SOP_OpenVDB_Ray.cc \
-    houdini/SOP_OpenVDB_Read.cc \
-    houdini/SOP_OpenVDB_Rebuild_Level_Set.cc \
-    houdini/SOP_OpenVDB_Remap.cc \
-    houdini/SOP_OpenVDB_Remove_Divergence.cc \
-    houdini/SOP_OpenVDB_Resample.cc \
-    houdini/SOP_OpenVDB_Sample_Points.cc \
-    houdini/SOP_OpenVDB_Sort_Points.cc \
-    houdini/SOP_OpenVDB_Scatter.cc \
-    houdini/SOP_OpenVDB_Segment.cc \
-    houdini/SOP_OpenVDB_To_Polygons.cc \
-    houdini/SOP_OpenVDB_To_Spheres.cc \
-    houdini/SOP_OpenVDB_Topology_To_Level_Set.cc \
-    houdini/SOP_OpenVDB_Transform.cc \
-    houdini/SOP_OpenVDB_Vector_Merge.cc \
-    houdini/SOP_OpenVDB_Vector_Split.cc \
-    houdini/SOP_OpenVDB_Visualize.cc \
-    houdini/SOP_OpenVDB_Write.cc \
+    GR_PrimVDBPoints.cc \
+    SHOP_OpenVDB_Points.cc \
+    SOP_OpenVDB_Advect.cc \
+    SOP_OpenVDB_Advect_Points.cc \
+    SOP_OpenVDB_Analysis.cc \
+    SOP_OpenVDB_Clip.cc \
+    SOP_OpenVDB_Combine.cc \
+    SOP_OpenVDB_Convert.cc \
+    SOP_OpenVDB_Create.cc \
+    SOP_OpenVDB_Densify.cc \
+    SOP_OpenVDB_Diagnostics.cc \
+    SOP_OpenVDB_Fill.cc \
+    SOP_OpenVDB_Filter.cc \
+    SOP_OpenVDB_Filter_Level_Set.cc \
+    SOP_OpenVDB_Fracture.cc \
+    SOP_OpenVDB_From_Particles.cc \
+    SOP_OpenVDB_From_Polygons.cc \
+    SOP_OpenVDB_LOD.cc \
+    SOP_OpenVDB_Metadata.cc \
+    SOP_OpenVDB_Morph_Level_Set.cc \
+    SOP_OpenVDB_Noise.cc \
+    SOP_OpenVDB_Occlusion_Mask.cc \
+    SOP_OpenVDB_Platonic.cc \
+    SOP_OpenVDB_Points_Convert.cc \
+    SOP_OpenVDB_Points_Delete.cc \
+    SOP_OpenVDB_Points_Group.cc \
+    SOP_OpenVDB_Potential_Flow.cc \
+    SOP_OpenVDB_Prune.cc \
+    SOP_OpenVDB_Rasterize_Points.cc \
+    SOP_OpenVDB_Ray.cc \
+    SOP_OpenVDB_Read.cc \
+    SOP_OpenVDB_Rebuild_Level_Set.cc \
+    SOP_OpenVDB_Remap.cc \
+    SOP_OpenVDB_Remove_Divergence.cc \
+    SOP_OpenVDB_Resample.cc \
+    SOP_OpenVDB_Sample_Points.cc \
+    SOP_OpenVDB_Sort_Points.cc \
+    SOP_OpenVDB_Scatter.cc \
+    SOP_OpenVDB_Segment.cc \
+    SOP_OpenVDB_To_Polygons.cc \
+    SOP_OpenVDB_To_Spheres.cc \
+    SOP_OpenVDB_Topology_To_Level_Set.cc \
+    SOP_OpenVDB_Transform.cc \
+    SOP_OpenVDB_Vector_Merge.cc \
+    SOP_OpenVDB_Vector_Split.cc \
+    SOP_OpenVDB_Visualize.cc \
+    SOP_OpenVDB_Write.cc \
 #
 MANTRA_VRAY_SRC_NAMES := \
-    houdini/VRAY_OpenVDB_Points.cc \
+    VRAY_OpenVDB_Points.cc \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
 MANTRA_VRAY_NAMES := $(basename $(notdir $(MANTRA_VRAY_SRC_NAMES)))
-
-# Replace filenames of the form "houdini/<name>.cc" with
-# "$(DWA_HOUDINI_SOP_SRC_DIR)/<name>/<name>.cc"
-DWA_HOUDINI_FILES += $(addprefix $(DWA_HOUDINI_SOP_SRC_DIR)/,\
-    $(join $(HOUDINI_SOP_NAMES),$(patsubst houdini/%,/%,$(HOUDINI_SOP_SRC_NAMES))))
 
 ALL_INCLUDE_FILES := \
     $(LIBHOUDINI_INCLUDE_NAMES) \
@@ -450,10 +371,10 @@ ALL_SRC_FILES := $(HOUDINI_SRC_FILES) $(MANTRA_SRC_FILES)
 LIBHOUDINI_OBJ_NAMES := $(LIBHOUDINI_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
-    $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=$(SHAREDLIB_SUFFIX))))
+    $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
 MANTRA_VRAY_OBJ_NAMES := $(MANTRA_VRAY_SRC_NAMES:.cc=.o)
 MANTRA_VRAY_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/mantra/,\
-    $(notdir $(MANTRA_VRAY_SRC_NAMES:.cc=$(SHAREDLIB_SUFFIX))))
+    $(notdir $(MANTRA_VRAY_SRC_NAMES:.cc=.so)))
 
 LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
     $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
@@ -464,30 +385,19 @@ LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER ' \
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
 
-LIBHOUDINI_NAME=openvdb_houdini_sesi
-LIBHOUDINI_STATIC := $(STATICLIB_PREFIX)$(LIBHOUDINI_NAME)$(STATICLIB_SUFFIX)
-LIBHOUDINI_SHARED := $(SHAREDLIB_PREFIX)$(LIBHOUDINI_NAME)$(SHAREDLIB_SUFFIX)
-LIBHOUDINI_SHARED_VERSIONED := $(LIBHOUDINI_SHARED).$(LIB_VERSION)
-LIBHOUDINI_IMPORT := $(IMPORTLIB_PREFIX)$(LIBHOUDINI_NAME)$(IMPORTLIB_SUFFIX)
+LIBHOUDINI_NAME=libopenvdb_houdini
+LIBHOUDINI_STATIC := $(LIBHOUDINI_NAME).a
+LIBHOUDINI_SHARED := $(LIBHOUDINI_NAME).so.$(LIB_VERSION)
 
 ifeq (no,$(strip $(shared)))
     LIBHOUDINI := $(LIBHOUDINI_STATIC)
-    LIBHOUDINI_IMPORT := $(LIBHOUDINI_STATIC)
-else ifdef WINDOWS_NT
-    LIBHOUDINI := $(LIBHOUDINI_SHARED)
 else
-    LIBHOUDINI := $(LIBHOUDINI_SHARED_VERSIONED)
-
+    LIBHOUDINI := $(LIBHOUDINI_SHARED)
     # Encode the path to libopenvdb.so into plugins, and because some
     # plugins might depend on Houdini libraries that are not linked into
     # hython (among other tools), encode the Houdini library path as well.
     HCUSTOM_EXTRA_LDFLAGS += -Wl,-rpath,$(OPENVDB_LIB_DIR) -Wl,-rpath,$(HDSO)
 endif # shared
-
-ifdef WINDOWS_NT
-    LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(HCUSTOM_LIBS))
-endif
-
 
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
@@ -510,10 +420,9 @@ DEPEND := houdini_deps
 list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 1,3,$(?F)))
 
 ALL_TARGETS := \
-    $(LIBHOUDINI_STATIC) \
     $(LIBHOUDINI) \
-    $(LIBHOUDINI_IMPORT) \
     $(DEPEND) \
+    $(LIBHOUDINI_NAME).so \
 #
 
 .SUFFIXES: .o .cc
@@ -521,46 +430,43 @@ ALL_TARGETS := \
 .PHONY: all clean depend header_test houdinisops mantradsos houdinilib install_lib install
 
 .cc.o:
-	$(call CompileCXX)
+	@echo "Building $@ because of $(call list_deps)"
+	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
 all: depend houdinilib houdinisops mantradsos
 
-# Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
+# Create an openvdb_houdini/ symlink to this directory, to mirror the DWA directory structure.
 openvdb_houdini:
-	$(LN) houdini openvdb_houdini
+	ln -f -s . openvdb_houdini
 openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
 
-# Create a houdini_utils/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
+# Create a houdini_utils/ symlink to this directory, to mirror the DWA directory structure.
 houdini_utils:
-	$(LN) houdini houdini_utils
+	ln -f -s . houdini_utils
 houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
 
 $(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
 
 $(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
-	$(call CompileCXX,-DOPENVDB_HOUDINI_PRIVATE $(HOUDINI_CXXFLAGS))
+	@echo "Building $@ because of $(call list_deps)"
+	$(CXX) -c $(CXXFLAGS) $(HOUDINI_CXXFLAGS) \
+	    -isystem $(HOUDINI_INCL_DIR) -fPIC -o $@ $<
 
 $(LIBHOUDINI_STATIC): $(LIBHOUDINI_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
-	$(AR) $(ARFLAGS) $(AROUTPUT)$@ $^
+	$(AR) cr $@ $^
 
-$(LIBHOUDINI_SHARED_VERSIONED): $(LIBHOUDINI_OBJ_NAMES)
-	$(call BuildSharedLibrary,$(HOUDINI_LDFLAGS) $(LIBS_RPATH))
-
-ifdef WINDOWS_NT
 $(LIBHOUDINI_SHARED): $(LIBHOUDINI_OBJ_NAMES)
-	$(call BuildSharedLibrary,$(HOUDINI_LDFLAGS) $(LIBS_RPATH))
-else
-$(LIBHOUDINI_SHARED): $(LIBHOUDINI_SHARED_VERSIONED)
+	@echo "Building $@ because of $(call list_deps)"
+	$(CXX) $(CXXFLAGS) $(HOUDINI_LDFLAGS) -shared -o $@ $^ $(LIBS_RPATH)
+
+$(LIBHOUDINI_NAME).so: $(LIBHOUDINI_SHARED)
 	@# hcustom expects a library named "libname.so", not "libname.so.1.0".
-	$(LN) $< $@
-endif
+	ln -f -s $< $@
 
 houdinilib: $(LIBHOUDINI)
 ifneq (no,$(strip $(shared)))
-houdinilib: $(LIBHOUDINI_SHARED)
+houdinilib: $(LIBHOUDINI_NAME).so
 endif
 
 # hcustom (see below) outputs both a .o and a .so file.
@@ -568,29 +474,21 @@ endif
 $(HOUDINI_SOP_OBJ_NAMES): $(LIBHOUDINI)
 $(MANTRA_VRAY_OBJ_NAMES): $(LIBHOUDINI)
 
-ifndef WINDOWS_NT
-HCUSTOM_LIBDEPS := -L . -l $(LIBHOUDINI_NAME) -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB)
-else
-HCUSTOM_LIBDEPS := -L . -l $(LIBHOUDINI_IMPORT) -L $(OPENVDB_LIB_DIR) -l $(OPENVDB_LIB)
-endif
-
-ifdef LINUX
-houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
-houdini/VRAY_OpenVDB_Points.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniRAY
-endif
+GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
+VRAY_OpenVDB_Points.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniRAY
 
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HOUDINI_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	    -L. -lopenvdb_houdini_sesi -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HOUDINI_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	    -L. -lopenvdb_houdini_sesi -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
 ifeq (no,$(strip $(shared)))
@@ -599,26 +497,26 @@ $(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/mantra/$(@:.o=.so) because of $(call list_deps)"
 	@mkdir -p $(HOUDINI_DESTDIR)/mantra
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	    -L. -lopenvdb_houdini_sesi -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	@mkdir -p $(HOUDINI_DESTDIR)/mantra
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	    -L. -lopenvdb_houdini_sesi -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
-$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
-$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
+$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: %.o
+$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: %.o
 
-houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_OpenVDB.svg
+houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/config/Icons" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/config/Icons; \
 	    echo "Created $(HOUDINI_USER_PREF_DIR)/config/Icons/"; \
 	fi
-	cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	cp -f SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/scripts/sop" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/scripts/sop; \
@@ -638,42 +536,21 @@ install: houdinilib houdinisops mantradsos
 	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
 	@# Move headers from openvdb_houdini/ to houdini_utils/.
 	mv -f $(DESTDIR)/include/openvdb_houdini/geometry.h \
-            $(DESTDIR)/include/openvdb_houdini/ParmFactory.h \
+        $(DESTDIR)/include/openvdb_houdini/ParmFactory.h \
 	    $(DESTDIR)/include/openvdb_houdini/OP_NodeChain.h \
 	    $(DESTDIR)/include/houdini_utils/
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBHOUDINI) $(LIBHOUDINI_IMPORT) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR_LIB_DIR)
+	@echo "Created $(DESTDIR_LIB_DIR)"
+	cp -f $(LIBHOUDINI) $(DESTDIR_LIB_DIR)
+	pushd $(DESTDIR_LIB_DIR) > /dev/null; \
 	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
-	        $(LN) $(LIBHOUDINI_SHARED_VERSIONED) $(LIBHOUDINI_SHARED); fi; \
+	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_houdini to $(DESTDIR_LIB_DIR)"
 
 install: install_lib houdinisops
-
-ifdef WINDOWS_NT
-HFS_DSOLIB := $(HFS)/bin
-else
-HFS_DSOLIB := $(HFS)/dsolib
-endif
-
-# Directly installs into $HFS for development builds
-hfsinstall: $(LIBHOUDINI_SHARED) $(HOUDINI_SOP_SO_NAMES)
-	   /bin/cp $(basename $(LIBHOUDINI_SHARED)).* $(HFS_DSOLIB) \
-	&& /bin/cp $(addprefix $(HOUDINI_DESTDIR)/, \
-			$(addsuffix .*,$(HOUDINI_SOP_NAMES))) \
-		   $(HFS)/houdini/dso \
-	$(NULL)
-hfsclean:
-	   $(RM) $(HFS)/houdini/dso/$(basename $(LIBHOUDINI_SHARED)).* \
-	&& $(RM) $(HFS)/houdini/dso/SOP_* \
-	$(NULL)
-
-
-DEPFILES = $(call DepFromSrc,$(ALL_SRC_FILES))
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
@@ -703,17 +580,16 @@ clean:
 	$(RM) $(LIBHOUDINI_STATIC)
 	$(RM) $(LIBHOUDINI_SHARED)
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
-	$(RM) $(LIBHOUDINI_NAME).def
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_USER_PREF_DIR)/config/Icons/SOP_OpenVDB.svg
 	$(RM) $(addprefix $(HOUDINI_USER_PREF_DIR)/scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
-ifneq ($(DEPFILES),)
--include $(DEPFILES)
+ifneq (,$(strip $(wildcard $(DEPEND))))
+    include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -91,9 +91,9 @@
 /// @}
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 5
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.
@@ -110,6 +110,17 @@
         #define OPENVDB_ABI_VERSION_NUMBER 3
     #else
         #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
+    #endif
+#endif
+
+// If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue a message
+// directive. Note that an error is also set in openvdb.cc which enforces stricter
+// behavior during compilation of the library. Both can be optionally suppressed
+// by defining OPENVDB_USE_DEPRECATED_ABI.
+#ifndef OPENVDB_USE_DEPRECATED_ABI
+    #if OPENVDB_ABI_VERSION_NUMBER <= 3
+        PRAGMA(message("NOTE: ABI <= 3 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
+            "to suppress this message"))
     #endif
 #endif
 
@@ -253,6 +264,6 @@ struct VersionId {
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

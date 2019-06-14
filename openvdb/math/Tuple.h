@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -164,7 +164,7 @@ public:
     /// True if a Nan is present in this tuple
     bool isNan() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (std::isnan(mm[i])) return true;
+            if (math::isNan(mm[i])) return true;
         }
         return false;
     }
@@ -172,7 +172,7 @@ public:
     /// True if an Inf is present in this tuple
     bool isInfinite() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (std::isinf(mm[i])) return true;
+            if (math::isInfinite(mm[i])) return true;
         }
         return false;
     }
@@ -271,6 +271,6 @@ std::ostream& operator<<(std::ostream& ostr, const Tuple<SIZE, T>& classname)
 
 #endif // OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

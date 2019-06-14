@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -223,7 +223,7 @@ struct SolveBoundaryOp
 
     }
 
-    const double& mVoxelSize;
+    const double mVoxelSize;
     const Vec3GridT& mVelGrid;
     const MaskT& mDomainGrid;
 }; // struct SolveBoundaryOp
@@ -421,6 +421,6 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 
 #endif // OPENVDB_TOOLS_POTENTIAL_FLOW_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
