@@ -1083,7 +1083,7 @@ struct OpFactory::Impl
             }
         }
 
-        // Install a Python command to retrieve spare data from operators.
+        // Install Python functions to retrieve spare data from operators.
         static bool sDidInstallHOMModule = false;
         if (!sDidInstallHOMModule) {
             // Install a _dwhoudiniutils module with a NodeType_spareData() function.
@@ -1101,17 +1101,25 @@ struct OpFactory::Impl
             PYrunPythonStatementsAndExpectNoErrors("\
 def _spareData(self, name):\n\
     '''\n\
-    spareData(name) -> str or None\n\n\
-    Return the spare data with the given name,\n\
-    or None if no data with that name exists.\n\
+    spareData(name) -> str or None\n\
+    \n\
+    Return the spare data with the given name, or None\n\
+    if no data with that name is defined for this node type.\n\
+    \n\
+    Currently, only node types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
     '''\n\
     import _dwhoudiniutils\n\
     return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name(), name)\n\
 \n\
 def _spareDataDict(self):\n\
     '''\n\
-    spareDataDict() -> dict of str to str\n\n\
+    spareDataDict() -> dict of str to str\n\
+    \n\
     Return a dictionary of the spare data for this node type.\n\
+    \n\
+    Currently, only node types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
     '''\n\
     import _dwhoudiniutils\n\
     return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name())\n\

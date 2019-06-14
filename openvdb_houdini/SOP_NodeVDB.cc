@@ -637,7 +637,7 @@ public:
 
     /// @brief Return the name of the equivalent native operator as shipped with Houdini.
     /// @details An empty string indicates that there is no equivalent native operator.
-    virtual std::string getNativeName(const houdini_utils::OpFactory& factory)
+    virtual std::string getNativeName(const houdini_utils::OpFactory&)
     {
         return "";
     }
