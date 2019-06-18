@@ -65,6 +65,16 @@ getAttributeRegistry()
 
 ////////////////////////////////////////
 
+// AttributeArray::ScopedRegistryLock implementation
+
+AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
+    : lock(getAttributeRegistry()->mMutex)
+{
+}
+
+
+////////////////////////////////////////
+
 // AttributeArray implementation
 
 

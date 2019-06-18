@@ -141,6 +141,14 @@ public:
         WRITEPAGED = 0x8            /// data is written out in pages
     };
 
+    // Scoped Lock wrapper class that locks the AttributeArray registry mutex
+    class ScopedRegistryLock
+    {
+        tbb::spin_mutex::scoped_lock lock;
+    public:
+        ScopedRegistryLock();
+    }; // class ScopedRegistryLock
+
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
