@@ -371,6 +371,7 @@ install(FILES
 install(FILES
   DW_OpenVDBRasterizePoints.cmd
   DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
+)
 
 install(FILES
   pythonrc.py
