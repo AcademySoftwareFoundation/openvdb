@@ -254,11 +254,14 @@ public:
     virtual size_t memUsage() const = 0;
 
     /// Create a new attribute array of the given (registered) type, length and stride.
-    static Ptr create(const NamePair& type, Index length, Index stride = 1, bool constantStride = true);
+    /// @details If @a lock is non-null, the AttributeArray registry mutex
+    /// has already been locked
+    static Ptr create(const NamePair& type, Index length, Index stride = 1,
+        bool constantStride = true, const ScopedRegistryLock* lock = nullptr);
     /// Return @c true if the given attribute type name is registered.
-    static bool isRegistered(const NamePair& type);
+    static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
     /// Clear the attribute type registry.
-    static void clearRegistry();
+    static void clearRegistry(const ScopedRegistryLock* lock = nullptr);
 
     /// Return the name of this attribute's type.
     virtual const NamePair& type() const = 0;
@@ -424,9 +427,11 @@ protected:
     virtual AccessorBasePtr getAccessor() const = 0;
 
     /// Register a attribute type along with a factory function.
-    static void registerType(const NamePair& type, FactoryMethod);
+    static void registerType(const NamePair& type, FactoryMethod,
+        const ScopedRegistryLock* lock = nullptr);
     /// Remove a attribute type from the registry.
-    static void unregisterType(const NamePair& type);
+    static void unregisterType(const NamePair& type,
+        const ScopedRegistryLock* lock = nullptr);
 
 #if OPENVDB_ABI_VERSION_NUMBER < 6
 
