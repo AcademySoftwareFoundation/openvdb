@@ -510,13 +510,19 @@ endif
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: %.o
 $(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: %.o
 
-houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg
+houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg pythonrc.py
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/config/Icons" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/config/Icons; \
 	    echo "Created $(HOUDINI_USER_PREF_DIR)/config/Icons/"; \
 	fi
 	cp -f SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/python2.7libs" ]; \
+	then \
+	    mkdir -p $(HOUDINI_USER_PREF_DIR)/python2.7libs; \
+	    echo "Created $(HOUDINI_USER_PREF_DIR)/python2.7libs/"; \
+	fi
+	cp -f pythonrc.py $(HOUDINI_USER_PREF_DIR)/python2.7libs/; \
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/scripts/sop" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/scripts/sop; \
@@ -583,6 +589,7 @@ clean:
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_USER_PREF_DIR)/config/Icons/SOP_OpenVDB.svg
+	$(RM) $(HOUDINI_USER_PREF_DIR)/python2.7libs/pythonrc.py
 	$(RM) $(addprefix $(HOUDINI_USER_PREF_DIR)/scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
