@@ -52,35 +52,12 @@ struct LockedAttributeRegistry
     AttributeFactoryMap mMap;
 };
 
-
-// Declare this at file scope to ensure thread-safe initialization.
-tbb::spin_mutex sInitAttributeRegistryMutex;
-
-
 // Global function for accessing the registry
 LockedAttributeRegistry*
 getAttributeRegistry()
 {
-    tbb::spin_mutex::scoped_lock lock(sInitAttributeRegistryMutex);
-
-    static LockedAttributeRegistry* registry = nullptr;
-
-    if (registry == nullptr) {
-
-#ifdef __ICC
-// Disable ICC "assignment to statically allocated variable" warning.
-__pragma(warning(disable:1711))
-#endif
-        // This assignment is mutex-protected and therefore thread-safe.
-        registry = new LockedAttributeRegistry();
-
-#ifdef __ICC
-__pragma(warning(default:1711))
-#endif
-
-    }
-
-    return registry;
+    static LockedAttributeRegistry registry;
+    return &registry;
 }
 
 } // unnamed namespace
