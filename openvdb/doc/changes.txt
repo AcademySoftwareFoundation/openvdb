@@ -61,8 +61,9 @@ Houdini:
   destination is not a&nbsp;VDB.
 - Added a @b houdini_utils::OpFactory::setInvisible method to hide nodes
   from tab menus.
-- Added methods to store parent name and visibility of native SOPs to
-  @b openvdb_houdini::OpenVDBOpFactory.
+- Added a <TT>pythonrc.py</TT> startup script to set the tab menu visibility
+  of nodes and their native Houdini equivalents, based on an
+  <TT>OPENVDB_OPHIDE_POLICY</TT> environment variable.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
