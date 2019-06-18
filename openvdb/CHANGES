@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 6.1.1 - In development
+Version 6.2.0 - In development
 
     Improvements:
     - FindOpenVDB.cmake now correctly propagates CXX version requirements.
@@ -27,6 +27,9 @@ Version 6.1.1 - In development
       OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
       option to ON) to suppress deprecation messages when compiling OpenVDB or
       dependent code.
+
+    API changes:
+    - Changed a type alias in points::RandomLeafFilter.
 
     Python:
     - CMake now always produces a .so for the Python module on UNIX platforms.
