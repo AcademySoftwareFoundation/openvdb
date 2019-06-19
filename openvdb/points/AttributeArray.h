@@ -142,7 +142,7 @@ public:
     };
 
     // Scoped Lock wrapper class that locks the AttributeArray registry mutex
-    class ScopedRegistryLock
+    class OPENVDB_API ScopedRegistryLock
     {
         tbb::spin_mutex::scoped_lock lock;
     public:
