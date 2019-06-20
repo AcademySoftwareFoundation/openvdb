@@ -56,7 +56,7 @@ Clang          | 3.8     | Latest      | C++ 11 Compiler: A C language family fr
 Intel ICC      | 15      | Latest      | C++ 11 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
 IlmBase        | 2.2     | 2.2         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
-TBB            | 4.4     | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
+TBB            | 4.4.6   | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
 Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread                     | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
