@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v6_1_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 6.1.1</B> - <I>In development</I>
+<B>Version 6.2.0</B> - <I>In development</I>
 
 @par
 Improvements:
@@ -21,6 +21,7 @@ Improvements:
   Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
 - Added math::isInfinite() and math::isNan() to resolve Visual Studio
   compatibility issues with integer types.
+- Minor performance improvements to moving and filtering VDB points.
 
 @par
 Bug fixes:
@@ -43,6 +44,11 @@ ABI changes:
   OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
   option to ON) to suppress deprecation messages when compiling OpenVDB or
   dependent code.
+
+@par
+API changes:
+- Changed a type alias in
+  @vdblink::points::RandomLeafFilter RandomLeafFilter@endlink.
 
 @par
 Python:
