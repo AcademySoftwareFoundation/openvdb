@@ -23,6 +23,7 @@ Version 6.1.1 - In development
       to their pre-OpenVDB 5.0 behavior to address a bug in the
       fillWithSpheres() tool that caused generated spheres to sometimes
       extend outside the target volume.
+    - CMake now correctly sets rpaths for the unit test binary.
 
     ABI changes:
     - ABI versions 3 and older are now deprecated, and support for them will be

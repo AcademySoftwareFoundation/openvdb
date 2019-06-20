@@ -34,6 +34,7 @@ Bug fixes:
   to address a bug in the
   @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink tool
   that caused generated spheres to sometimes extend outside the target volume.
+- CMake now correctly sets rpaths for the unit test binary.
 
 @par
 ABI changes:
