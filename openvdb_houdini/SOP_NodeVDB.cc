@@ -686,7 +686,7 @@ public:
 
     std::string getTabSubMenuPath(const houdini_utils::OpFactory& factory) override
     {
-        return "ASWF";
+        return "VDB/ASWF";
     }
 };
 

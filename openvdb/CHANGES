@@ -46,7 +46,7 @@ Version 6.1.1 - In development
       @b openvdb_houdini::OpenVDBOpFactory.
     - Added a houdini_utils::OpPolicy::getTabSubMenuPath() method to allow
       OpPolicy subclasses to provide their own tab sub-menu path.
-    - OpenVDB SOPs are now displayed in the ASWF tab sub-menu.
+    - OpenVDB SOPs are now displayed in the ASWF tab sub-menu nested under VDB.
 
 
 Version 6.1.0 - May 8, 2019
