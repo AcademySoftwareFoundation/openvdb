@@ -52,7 +52,7 @@ Optional:
 - log4cplus (log4cplus.sourceforge.net), version 1.1.2 or later,
   for error logging
 
-- GLFW 3.0 (www.glfw.org), for the OpenVDB viewer
+- GLFW 3.1 (www.glfw.org), for the OpenVDB viewer
 
 - OpenGL 3.2 or later, for the OpenVDB viewer
 
