@@ -15,6 +15,8 @@ Version 6.2.0 - In development
     - Added math::isInfinite() and math::isNan() to resolve Visual Studio
       compatibility issues with integer types.
     - Minor performance improvements to moving and filtering VDB points.
+    - Increase minimum supported version of GLFW to 3.1 and improve CMake
+      support for GLFW versions >= 3.1.
 
     Bug fixes:
     - Fixed a bug in tools::computeScalarPotential() that could produce
