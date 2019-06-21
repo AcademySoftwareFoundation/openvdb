@@ -1,6 +1,7 @@
 **Security and OpenVDB**
 
-The OpenVDB project takes security very seriously.
+The OpenVDB Technical Steering Committee (TSC) takes security very
+seriously.
 
 OpenVDB was not originally built as an outward-facing library.
 Users should exercise caution when working with untrusted data.
@@ -43,10 +44,10 @@ security issue if some file causes arbitrary code execution.
 
 ***Runtime Library Expectations***
 
-We consider the library to run with the same privilage as the linked
+We consider the library to run with the same privilege as the linked
 code.  As such, we do not guarantee any safety against malformed
 arguments.   Provided functions are called with well-formed
-parameters, we expect the same set of behaviours as with file
+parameters, we expect the same set of behaviors as with file
 loading.
 
 It is a bug if calling a function with well-formed arguments causes
@@ -72,9 +73,9 @@ copy known and trusted metadata fields.
 
 When voxels are marked inactive in the grid, they are not cleared
 to the background value.  If you rely on the data being deleted, you
-should set it as well as setting it inactive.  In addition, calling
-pruneInactive will free deactivated tiles.  This is particularly
-important when passing a VDB to another process.
+should overwrite the voxel's values as well as deactivating them.
+In addition, calling pruneInactive will free deactivated tiles.  This
+is particularly important when passing a VDB to another process.
 
 ****Topology****
 
