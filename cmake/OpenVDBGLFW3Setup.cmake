@@ -89,18 +89,33 @@ if(PC_glfw3_FOUND)
   endforeach()
 endif()
 
+list(APPEND _GLFW3_ROOT_SEARCH_DIR ${SYSTEM_LIBRARY_PATHS})
+
+set(_GLFW3_PATH_SUFFIXES "lib/cmake/glfw3" "cmake/glfw3" "glfw3")
+
+# GLFW 3.1 installs CMake modules into glfw instead of glfw3
+list(APPEND _GLFW3_PATH_SUFFIXES "lib/cmake/glfw" "cmake/glfw" "glfw")
+
 find_path(GLFW3_CMAKE_LOCATION glfw3Config.cmake
   NO_DEFAULT_PATH
   PATHS ${_GLFW3_ROOT_SEARCH_DIR}
-  PATH_SUFFIXES lib/cmake/glfw3 cmake/glfw3 glfw3
+  PATH_SUFFIXES ${_GLFW3_PATH_SUFFIXES}
 )
+
+if(GLFW3_CMAKE_LOCATION)
+  if(EXISTS "${GLFW3_CMAKE_LOCATION}/glfw3Targets.cmake")
+    include("${GLFW3_CMAKE_LOCATION}/glfw3Targets.cmake")
+  elseif(EXISTS "${GLFW3_CMAKE_LOCATION}/glfwTargets.cmake")
+    include("${GLFW3_CMAKE_LOCATION}/glfwTargets.cmake")
+  endif()
+endif()
 
 if(GLFW3_CMAKE_LOCATION)
   list(APPEND CMAKE_PREFIX_PATH "${GLFW3_CMAKE_LOCATION}")
 endif()
 
 set(glfw3_FIND_VERSION ${MINIMUM_GLFW_VERSION})
-find_package(glfw3 ${MINIMUM_GLFW_VERSION} REQUIRED)
+find_package(glfw3 ${MINIMUM_GLFW_VERSION} CONFIG REQUIRED)
 
 find_package(PackageHandleStandardArgs)
 find_package_handle_standard_args(glfw3
