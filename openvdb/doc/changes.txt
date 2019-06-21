@@ -70,6 +70,9 @@ Houdini:
   from tab menus.
 - Added methods to store parent name and visibility of native SOPs to
   @b openvdb_houdini::OpenVDBOpFactory.
+- Added a houdini_utils::OpPolicy::getTabSubMenuPath() method to allow
+  OpPolicy subclasses to provide their own tab sub-menu path.
+- OpenVDB SOPs are now displayed in the ASWF tab sub-menu nested under VDB.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
