@@ -59,6 +59,7 @@ Python:
 
 @par
 Houdini:
+- Added API documentation and examples.
 - Added @hvdblink{GEOvdbApply,GEOvdbApply}, which invokes a functor
   on a VDB primitive if the resolved grid type is a member of
   a given type list.
