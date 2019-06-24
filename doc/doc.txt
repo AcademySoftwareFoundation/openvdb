@@ -41,6 +41,10 @@ See @subpage points "OpenVDB Points" to store point data using @b OpenVDB.
 See @subpage python "Using OpenVDB in Python" to get started with the
 @b OpenVDB Python module.
 
+@if OPENVDB_HOUDINI
+See the @subpage houdini "Houdini Cookbook" for help on implementing Houdini nodes.
+@endif
+
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".
 

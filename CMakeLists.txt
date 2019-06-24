@@ -276,19 +276,25 @@ if(OPENVDB_BUILD_DOCS)
   endif()
 
   # @todo use cmake doxygen functions available from cmake 3.9
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/doxygen-config DOXYGEN_CONFIG_CONTENT)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen-config DOXYGEN_CONFIG_CONTENT)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
+  if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+    file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen-config-houdini DOXYGEN_CONFIG_CONTENT)
+    file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
+  endif()
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
     "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
   )
 
   add_custom_target(doc ALL
     COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/openvdb
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Generating API documentation with Doxygen" VERBATIM
   )
 
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION docs)
+  # Suppress "Installing..." messages for all but one of the hundreds of generated files.
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html/index.html DESTINATION doc/html)
+  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION doc MESSAGE_NEVER)
 endif()
 
 # Early exit if there's nothing to build
