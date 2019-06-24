@@ -25,6 +25,8 @@ Improvements:
 
 @par
 Bug fixes:
+- Fixed a bug in @vdblink::util::PagedArray PagedArray@endlink that could 
+  produce a crash due to a race condution.
 - Fixed a bug in
   @vdblink::tools::computeScalarPotential() computeScalarPotential@endlink
   that could produce a corrupt result due to invalid memory access.
