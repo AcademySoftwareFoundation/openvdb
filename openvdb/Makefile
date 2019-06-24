@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -289,6 +289,7 @@ ifeq (yes,$(strip $(strict)))
     USING_GCC=$(shell ${CXX} --version | grep GCC)
     ifneq (,$(USING_CLANG))
         CXXFLAGS += \
+            -Werror \
             -Wall \
             -Wextra \
             -Wconversion \
@@ -296,6 +297,7 @@ ifeq (yes,$(strip $(strict)))
         #
     else ifneq (,$(USING_GCC))
         CXXFLAGS += \
+            -Werror \
             -Wall \
             -Wextra \
             -pedantic \
@@ -629,9 +631,10 @@ CMD_INCLUDE_NAMES := \
 #
 
 CMD_SRC_NAMES := \
-    cmd/openvdb_print/main.cc \
-    cmd/openvdb_render/main.cc \
-    cmd/openvdb_view/main.cc \
+    cmd/openvdb_lod.cc \
+    cmd/openvdb_print.cc \
+    cmd/openvdb_render.cc \
+    cmd/openvdb_view.cc \
 #
 
 
@@ -822,21 +825,21 @@ pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
 
-vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod/main.cc
+vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
+vdb_print: $(LIBOPENVDB) cmd/openvdb_print.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
+vdb_render: $(LIBOPENVDB) cmd/openvdb_render.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render.cc -I . \
 	    -isystem $(EXR_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) \
 	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
 	    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(ILMBASE_LIB) \
@@ -859,9 +862,9 @@ $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1 -fPIC -o $@ $<
 
-vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
+vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view.cc $(LIBVIEWER_OBJ_NAMES) \
 	    -I . $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB)
@@ -1060,6 +1063,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

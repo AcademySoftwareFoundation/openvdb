@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -68,7 +68,9 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
                 const float dist = float((p-center).length() - radius);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 ValueT val = ValueT(zero + dist);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                 switch (mode) {
                 case SPHERE_DENSE:
                     acc.setValue(xyz, val);
@@ -164,6 +166,6 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
 
 #endif // OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

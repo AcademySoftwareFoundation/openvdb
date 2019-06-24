@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -124,13 +124,11 @@ printTime(std::ostream& os, double milliseconds,
     ostr << head;
     ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
 
-    double msec = milliseconds;
-    if (msec >= 1000.0) {// avoid unnecessary overhead
-      const uint32_t seconds = static_cast<uint32_t>(msec / 1000.0) % 60 ;
-      const uint32_t minutes = static_cast<uint32_t>(msec / (1000.0*60)) % 60;
-      const uint32_t hours   = static_cast<uint32_t>(msec / (1000.0*60*60)) % 24;
-      const uint32_t days    = static_cast<uint32_t>(msec / (1000.0*60*60*24));
-      msec -= (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
+    if (milliseconds >= 1000.0) {// one second or longer
+      const uint32_t seconds = static_cast<uint32_t>(milliseconds / 1000.0) % 60 ;
+      const uint32_t minutes = static_cast<uint32_t>(milliseconds / (1000.0*60)) % 60;
+      const uint32_t hours   = static_cast<uint32_t>(milliseconds / (1000.0*60*60)) % 24;
+      const uint32_t days    = static_cast<uint32_t>(milliseconds / (1000.0*60*60*24));
       if (days>0) {
         ostr << days << (verbose==0 ? "d " : days>1 ? " days, " : " day, ");
         group = 4;
@@ -144,12 +142,27 @@ printTime(std::ostream& os, double milliseconds,
         if (!group) group = 2;
       }
       if (seconds>0) {
-        ostr << seconds << (verbose==0 ? "s " : seconds>1 ? " seconds and " : " second and ");
-        if (!group) group = 1;
+        if (verbose) {
+          ostr << seconds << (seconds>1 ? " seconds and " : " second and ");
+          const double msec = milliseconds - (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
+          ostr << std::setw(width) << msec << " milliseconds (" << milliseconds << "ms)";
+        } else {
+          const double sec = milliseconds/1000.0 - (minutes + (hours + days * 24) * 60) * 60;
+          ostr << std::setw(width) << sec << "s";
+        }
+      } else {// zero seconds
+        const double msec = milliseconds - (minutes + (hours + days * 24) * 60) * 60 * 1000.0;
+        if (verbose) {
+          ostr << std::setw(width) << msec << " milliseconds (" << milliseconds << "ms)";
+        } else {
+          ostr << std::setw(width) << msec << "ms";
+        }
       }
+      if (!group) group = 1;
+    } else {// less than a second
+      ostr << std::setw(width) << milliseconds << (verbose ? " milliseconds" : "ms");
     }
-    ostr << std::setw(width) << msec << (verbose ? " milliseconds" : "ms");
-    if (verbose && group) ostr << " (" << milliseconds << "ms)";
+
     ostr << tail;
 
     os << ostr.str();
@@ -161,6 +174,6 @@ printTime(std::ostream& os, double milliseconds,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

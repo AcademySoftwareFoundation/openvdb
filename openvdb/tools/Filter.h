@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -238,7 +238,10 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
     ValueType sum = zeroVal<ValueType>();
     Int32 &i = xyz[Axis], j = i + width;
     for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
-    return static_cast<ValueType>(sum * frac);
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    ValueType value = static_cast<ValueType>(sum * frac);
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    return value;
 }
 
 
@@ -370,7 +373,10 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
                 if (alpha(xyz, a, b)) {
-                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*avg(xyz)));
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                    const ValueType value(b*(*iter) + a*avg(xyz));
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                    buffer.setValue(iter.pos(), value);
                 }
             }
         }
@@ -400,7 +406,10 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*stencil.median()));
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                    ValueType value(b*(*iter) + a*stencil.median());
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                    buffer.setValue(iter.pos(), value);
                 }
             }
         }
@@ -427,7 +436,12 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) iter.setValue(ValueType(*iter + a*offset));
+                if (alpha(iter.getCoord(), a, b)) {
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                    ValueType value(*iter + a*offset);
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                    iter.setValue(value);
+                }
             }
         }
     } else {
@@ -457,6 +471,6 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 
 #endif // OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

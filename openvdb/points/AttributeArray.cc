@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -193,8 +193,8 @@ AttributeArray::operator==(const AttributeArray& other) const
     this->loadData();
     other.loadData();
 
-    if(this->mSerializationFlags != other.mSerializationFlags ||
-       this->mFlags != other.mFlags) return false;
+    if (this->mUsePagedRead != other.mUsePagedRead ||
+        this->mFlags != other.mFlags) return false;
     return this->isEqual(other);
 }
 
@@ -202,6 +202,6 @@ AttributeArray::operator==(const AttributeArray& other) const
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

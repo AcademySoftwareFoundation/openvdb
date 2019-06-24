@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -88,12 +88,12 @@ printNumber(std::ostream& os, uint64_t number,
 /// @param width          a fixed width for the numeric text
 /// @param precision      the number of digits after the decimal point
 /// @param verbose        verbose level, 0 is compact format and 1 is long format
-/// @return 0, 1, 2, 3 or 4, denoting the order of magnitude of the time.
+/// @return 0, 1, 2, 3, or 4 denoting the order of magnitude of the time.
 OPENVDB_API int
 printTime(std::ostream& os, double milliseconds,
     const std::string& head = "",
     const std::string& tail = "\n",
-    int width = 4, int precision = 1, int verbose = 1);
+    int width = 4, int precision = 1, int verbose = 0);
 
 
 ////////////////////////////////////////
@@ -150,6 +150,6 @@ FormattedInt<IntT> formattedInt(IntT n) { return FormattedInt<IntT>(n); }
 
 #endif // OPENVDB_UTIL_FORMATS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

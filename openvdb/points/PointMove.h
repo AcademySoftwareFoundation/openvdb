@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -175,7 +175,6 @@ private:
     friend class ::TestPointMove;
 
     Cache& mCache;
-    LeafVecT mLocalLeafVec;
     const LeafVecT* mLeafVec = nullptr;
     const LeafMapT* mLeafMap = nullptr;
 }; // class CachedDeformer
@@ -199,7 +198,7 @@ using LocalPointIndexMap = std::vector<IndexPairArray>;
 
 using LeafIndexArray = std::vector<LeafIndex>;
 using LeafOffsetArray = std::vector<LeafIndexArray>;
-using LeafMap = std::map<Coord, LeafIndex>;
+using LeafMap = std::unordered_map<Coord, LeafIndex>;
 
 
 template <typename DeformerT, typename TreeT, typename FilterT>
@@ -1155,10 +1154,6 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
 
         DeformerT newDeformer(deformer);
 
-        // if more than half the number of total points are evaluated by the filter, prefer
-        // accessing the data from a vector instead of a hash map for faster performance
-        const Index64 vectorThreshold = totalPointCount / 2;
-
         newDeformer.reset(leaf, idx);
 
         auto handle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
@@ -1166,10 +1161,10 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
         auto& cache = leafs[idx];
         cache.clear();
 
-        // only insert into a vector directly if the filter evaluates all points and the
-        // number of active points is greater than the vector threshold
+        // only insert into a vector directly if the filter evaluates all points
+        // and all points are stored in active voxels
         const bool useVector = filter.state() == index::ALL &&
-            (leaf.isDense() || (leaf.onPointCount() > vectorThreshold));
+            (leaf.isDense() || (leaf.onPointCount() == leaf.pointCount()));
         if (useVector) {
             cache.vecData.resize(totalPointCount);
         }
@@ -1202,16 +1197,6 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
             }
         }
 
-        // after insertion, move the data into a vector if the threshold is reached
-
-        if (!useVector && cache.mapData.size() > vectorThreshold) {
-            cache.vecData.resize(totalPointCount);
-            for (const auto& it : cache.mapData) {
-                cache.vecData[it.first] = it.second;
-            }
-            cache.mapData.clear();
-        }
-
         // store the total number of points to allow use of an expanded vector on access
 
         if (!cache.mapData.empty()) {
@@ -1236,26 +1221,8 @@ void CachedDeformer<T>::reset(const LeafT& /*leaf*/, size_t idx)
     }
     auto& cache = mCache.leafs[idx];
     if (!cache.mapData.empty()) {
-        // expand into a local vector if there are greater than 16 values in the hash map
-        // and the expanded vector would contain fewer values than 256 times those in the
-        // hash map, this trades a little extra storage for faster random access performance
-        if (cache.mapData.size() > 16 &&
-            cache.totalSize < (cache.mapData.size() * 256)) {
-            if (cache.totalSize < cache.mapData.size()) {
-                throw ValueError("Cache total size is not valid.");
-            }
-            mLocalLeafVec.resize(cache.totalSize);
-            for (const auto& it : cache.mapData) {
-                assert(it.first < cache.totalSize);
-                mLocalLeafVec[it.first] = it.second;
-            }
-            mLeafVec = &mLocalLeafVec;
-            mLeafMap = nullptr;
-        }
-        else {
-            mLeafMap = &cache.mapData;
-            mLeafVec = nullptr;
-        }
+        mLeafMap = &cache.mapData;
+        mLeafVec = nullptr;
     }
     else {
         mLeafVec = &cache.vecData;
@@ -1291,6 +1258,6 @@ void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
 
 #endif // OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

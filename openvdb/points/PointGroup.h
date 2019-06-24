@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -854,7 +854,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
     using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
-    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
+    const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -872,6 +872,6 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
 
 #endif // OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

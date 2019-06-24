@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -947,7 +947,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 {
     const BaseShader& shader = *mShader;
     Vec3Type xyz, nml;
-    const float frac = 1.0f / (1.0f + mSubPixels);
+    const float frac = 1.0f / (1.0f + float(mSubPixels));
     for (size_t j=range.begin(), n=0, je = range.end(); j<je; ++j) {
         for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
             Film::RGBA& bg = mCamera->pixel(i,j);
@@ -1120,6 +1120,6 @@ operator()(const tbb::blocked_range<size_t>& range) const
 
 #endif // OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,7 +43,6 @@
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include "TreeIterator.h" // for CopyConstness
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -849,6 +848,6 @@ struct LeafManagerImpl<LeafManager<const TreeT> >
 
 #endif // OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

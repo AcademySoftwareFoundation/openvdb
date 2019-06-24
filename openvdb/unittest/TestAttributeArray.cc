@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -852,16 +852,7 @@ TestAttributeArray::testAttributeArray()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrB.read(istr);
 
-        CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
-        CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
-        CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
-        CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
-
-        for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-        }
+        CPPUNIT_ASSERT(attrA == attrB);
 
         AttributeArrayI attrC(count, 3);
         attrC.setTransient(true);
@@ -869,12 +860,12 @@ TestAttributeArray::testAttributeArray()
         std::ostringstream ostrC(std::ios_base::binary);
         attrC.write(ostrC);
 
-        CPPUNIT_ASSERT_EQUAL(size_t(0), ostrC.str().size());
+        CPPUNIT_ASSERT(ostrC.str().empty());
 
         std::ostringstream ostrD(std::ios_base::binary);
         attrC.write(ostrD, /*transient=*/true);
 
-        CPPUNIT_ASSERT(ostrD.str().size() != size_t(0));
+        CPPUNIT_ASSERT(!ostrD.str().empty());
     }
 
     // Registry
@@ -1418,6 +1409,25 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT(!handle.hasConstantStride());
         CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
         CPPUNIT_ASSERT_EQUAL(array->dataSize(), handle.size());
+    }
+
+    { // IO
+        const Index count = 50, total = 100;
+        AttributeArrayI attrA(count, total, /*constantStride=*/false);
+
+        for (unsigned i = 0; i < unsigned(total); ++i) {
+            attrA.set(i, int(i));
+        }
+
+        std::ostringstream ostr(std::ios_base::binary);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+        attrA.write(ostr);
+
+        AttributeArrayI attrB;
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrB.read(istr);
+
+        CPPUNIT_ASSERT(attrA == attrB);
     }
 }
 
@@ -2469,6 +2479,6 @@ TestAttributeArray::testProfile()
     }
 }
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

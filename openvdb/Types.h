@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -337,6 +337,167 @@ struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::val
 ////////////////////////////////////////
 
 
+/// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
+/// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
+/// @details For example,
+/// - CopyConstness<int, int>::Type is @c int
+/// - CopyConstness<int, const int>::Type is @c int
+/// - CopyConstness<const int, int>::Type is <tt>const int</tt>
+/// - CopyConstness<const int, const int>::Type is <tt>const int</tt>
+template<typename FromType, typename ToType> struct CopyConstness {
+    using Type = typename std::remove_const<ToType>::type;
+};
+
+/// @cond OPENVDB_TYPES_INTERNAL
+template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
+    using Type = const ToType;
+};
+/// @endcond
+
+
+////////////////////////////////////////
+
+
+/// @cond OPENVDB_TYPES_INTERNAL
+
+template<typename... Ts> struct TypeList; // forward declaration
+
+namespace internal {
+
+// Implementation details of TypeList
+
+template<typename ListT, typename... Ts> struct TSAppendImpl;
+
+// Append zero or more types.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, OtherTs...> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+// Append another TypeList's members.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, TypeList<OtherTs...>> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+
+// Remove all occurrences of type T.
+template<typename ListT, typename T> struct TSEraseImpl;
+
+// TypeList<>::Erase<int> = TypeList<>
+template<typename T>
+struct TSEraseImpl<TypeList<>, T> { using type = TypeList<>; };
+
+// TypeList<int, char, ...>::Erase<int> = TypeList<char, ...>::Erase<int>
+template<typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T, Ts...>, T> {
+    using type = typename TSEraseImpl<TypeList<Ts...>, T>::type;
+};
+
+// TypeList<float, int, char...>::Erase<int> =
+//     TypeList<float>::Append<TypeList<int, char...>::Erase<int>>
+template<typename T2, typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T2, Ts...>, T> {
+    using type = typename TSAppendImpl<TypeList<T2>,
+        typename TSEraseImpl<TypeList<Ts...>, T>::type>::type;
+};
+
+
+template<typename ListT, typename... Ts> struct TSRemoveImpl;
+
+template<typename ListT>
+struct TSRemoveImpl<ListT> { using type = ListT; };
+
+// Remove one or more types.
+template<typename ListT, typename T, typename... Ts>
+struct TSRemoveImpl<ListT, T, Ts...> {
+    using type = typename TSRemoveImpl<typename TSEraseImpl<ListT, T>::type, Ts...>::type;
+};
+
+// Remove the members of another TypeList.
+template<typename ListT, typename... Ts>
+struct TSRemoveImpl<ListT, TypeList<Ts...>> {
+    using type = typename TSRemoveImpl<ListT, Ts...>::type;
+};
+
+
+template<typename OpT> inline void TSForEachImpl(OpT) {}
+template<typename OpT, typename T, typename... Ts>
+inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
+
+} // namespace internal
+
+/// @endcond
+
+
+/// @brief A list of types (not necessarily unique)
+/// @details Example:
+/// @code
+/// using MyTypes = openvdb::TypeList<int, float, int, double, float>;
+/// @endcode
+template<typename... Ts>
+struct TypeList
+{
+    /// The type of this list
+    using Self = TypeList;
+
+    /// @brief Append types, or the members of another TypeList, to this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = openvdb::TypeList<float, double>;
+    ///     using NumericTypes = IntTypes::Append<RealTypes>;
+    /// }
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16>::Append<Int32, Int64>;
+    ///     using NumericTypes = IntTypes::Append<float>::Append<double>;
+    /// }
+    /// @endcode
+    template<typename... TypesToAppend>
+    using Append = typename internal::TSAppendImpl<Self, TypesToAppend...>::type;
+
+    /// @brief Remove all occurrences of one or more types, or the members of
+    /// another TypeList, from this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using NumericTypes = openvdb::TypeList<float, double, Int16, Int32, Int64>;
+    ///     using LongTypes = openvdb::TypeList<Int64, double>;
+    ///     using ShortTypes = NumericTypes::Remove<LongTypes>; // float, Int16, Int32
+    /// }
+    /// @endcode
+    template<typename... TypesToRemove>
+    using Remove = typename internal::TSRemoveImpl<Self, TypesToRemove...>::type;
+
+    /// @brief Invoke a templated, unary functor on a value of each type in this list.
+    /// @details Example:
+    /// @code
+    /// #include <typeinfo>
+    ///
+    /// template<typename ListT>
+    /// void printTypeList()
+    /// {
+    ///     std::string sep;
+    ///     auto op = [&](auto x) {  // C++14
+    ///         std::cout << sep << typeid(decltype(x)).name(); sep = ", "; };
+    ///     ListT::foreach(op);
+    /// }
+    ///
+    /// using MyTypes = openvdb::TypeList<int, float, double>;
+    /// printTypeList<MyTypes>(); // "i, f, d" (exact output is compiler-dependent)
+    /// @endcode
+    ///
+    /// @note The functor object is passed by value.  Wrap it with @c std::ref
+    /// to use the same object for each type.
+    template<typename OpT>
+    static void foreach(OpT op) { internal::TSForEachImpl<OpT, Ts...>(op); }
+};
+
+
+////////////////////////////////////////
+
+
 // Add new items to the *end* of this list, and update NUM_GRID_CLASSES.
 enum GridClass {
     GRID_UNKNOWN = 0,
@@ -576,7 +737,8 @@ struct SwappedCombineOp
 /// <dt><b>CP_COPY</b>
 /// <dd>Create a deep copy of the member.
 /// </dl>
-enum CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
+/// @deprecated ABI versions older than 4 are deprecated.
+enum OPENVDB_DEPRECATED CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
 #endif
 
 
@@ -645,6 +807,6 @@ class PartialCreate {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

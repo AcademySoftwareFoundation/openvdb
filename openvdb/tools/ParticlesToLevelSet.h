@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -926,7 +926,6 @@ public:
     bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; }
     bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; }
     BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); }
-    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); }
     BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); }
     BlindData operator-() const { return BlindData(-mVisible, mBlind); }
 
@@ -950,6 +949,15 @@ template<typename VisibleT, typename BlindT>
 inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 {
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
+}
+
+/// @private
+// Required to support the (zeroVal<BlindData>() + val) idiom.
+template<typename VisibleT, typename BlindT, typename T>
+inline BlindData<VisibleT, BlindT>
+operator+(const BlindData<VisibleT, BlindT>& x, const T& rhs)
+{
+    return BlindData<VisibleT, BlindT>(x.visible() + static_cast<VisibleT>(rhs), x.blind());
 }
 
 } // namespace p2ls_internal
@@ -1050,6 +1058,6 @@ particleTrailsToMask(const ParticleListT& plist, GridT& grid, Real delta, Interr
 
 #endif // OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

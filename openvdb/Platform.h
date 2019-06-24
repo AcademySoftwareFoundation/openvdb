@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -192,6 +192,39 @@
 #endif
 
 
+/// @brief Bracket code with OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN/_END,
+/// to inhibit warnings about type conversion.
+/// @note Use this sparingly.  Use static casts and explicit type conversion if at all possible.
+/// @details Example:
+/// @code
+/// float value = 0.1f;
+/// OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+/// int valueAsInt = value;
+/// OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+/// @endcode
+#if defined __INTEL_COMPILER
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+#elif defined __GNUC__
+    // -Wfloat-conversion was only introduced in GCC 4.9
+    #if OPENVDB_CHECK_GCC(4, 9)
+        #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
+            _Pragma("GCC diagnostic push") \
+            _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
+            _Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"")
+    #else
+        #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
+            _Pragma("GCC diagnostic push") \
+            _Pragma("GCC diagnostic ignored \"-Wconversion\"")
+    #endif
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END \
+        _Pragma("GCC diagnostic pop")
+#else
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+#endif
+
+
 #ifdef _MSC_VER
     /// Visual C++ does not have constants like M_PI unless this is defined.
     /// @note This is needed even though the core library is built with this but
@@ -265,6 +298,6 @@ using boost::uint64_t;
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

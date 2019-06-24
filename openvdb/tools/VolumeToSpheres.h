@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -279,7 +279,7 @@ LeafOp<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = std::sqrt(maxDist);
+        sphere[3] = maxDist * 2.0; // padded radius
     }
 }
 
@@ -351,8 +351,9 @@ NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
             pos[0] = mLeafBoundingSpheres[i][0];
             pos[1] = mLeafBoundingSpheres[i][1];
             pos[2] = mLeafBoundingSpheres[i][2];
+            const auto radiusSqr = mLeafBoundingSpheres[i][3];
 
-            double tmpDist = (pos - avg).length() + mLeafBoundingSpheres[i][3];
+            double tmpDist = (pos - avg).lengthSqr() + radiusSqr;
             if (tmpDist > maxDist) maxDist = tmpDist;
         }
 
@@ -361,7 +362,7 @@ NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = maxDist;
+        sphere[3] = maxDist * 2.0; // padded radius
     }
 }
 
@@ -493,9 +494,9 @@ ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) co
         center[0] = mLeafBoundingSpheres[i][0];
         center[1] = mLeafBoundingSpheres[i][1];
         center[2] = mLeafBoundingSpheres[i][2];
-        const auto radius = mLeafBoundingSpheres[i][3];
+        const auto radiusSqr = mLeafBoundingSpheres[i][3];
 
-        distToLeaf = float(std::max(0.0, (pos - center).length() - radius));
+        distToLeaf = float(std::max(0.0, (pos - center).lengthSqr() - radiusSqr));
 
         if (distToLeaf < minDist) {
             minDist = distToLeaf;
@@ -535,9 +536,9 @@ ClosestPointDist<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& ran
             center[0] = mNodeBoundingSpheres[i][0];
             center[1] = mNodeBoundingSpheres[i][1];
             center[2] = mNodeBoundingSpheres[i][2];
-            const auto radius = mNodeBoundingSpheres[i][3];
+            const auto radiusSqr = mNodeBoundingSpheres[i][3];
 
-            distToNode = float(std::max(0.0, (pos - center).length() - radius));
+            distToNode = float(std::max(0.0, (pos - center).lengthSqr() - radiusSqr));
 
             if (distToNode < minDist) {
                 minDist = distToNode;
@@ -1056,6 +1057,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

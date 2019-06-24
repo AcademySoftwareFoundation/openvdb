@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -496,9 +496,13 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
         // If the output grid is a level set, resample the input grid to have the output grid's
         // background value.  Otherwise, preserve the input grid's background value.
         using ValueT = typename GridType::ValueType;
-        const ValueT halfWidth = ((outGrid.getGridClass() == openvdb::GRID_LEVEL_SET)
+        const bool outIsLevelSet = outGrid.getGridClass() == openvdb::GRID_LEVEL_SET;
+
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const ValueT halfWidth = outIsLevelSet
             ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
-            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0])));
+            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0]));
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
         typename GridType::Ptr tempGrid;
         try {
@@ -1038,6 +1042,6 @@ GridResampler::transformBBox(
 
 #endif // OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

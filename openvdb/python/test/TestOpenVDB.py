@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -162,8 +162,15 @@ class TestOpenVDB(unittest.TestCase):
 
         self.assertEqual(grid.metadata, {})
 
-        meta = dict(name='test', saveFloatAsHalf=True,
-            xyz=(-1, 0, 1), xyzw=(1.0, 2.25, 3.5, 4.0), intval=42, floatval=1.25)
+        meta = {
+            'name':     'test',
+            'xyz':      (-1, 0, 1),
+            'xyzw':     (1.0, 2.25, 3.5, 4.0),
+            'intval':   42,
+            'floatval': 1.25,
+            'mat4val':  [[1]*4]*4,
+            'saveFloatAsHalf': True,
+        }
         grid.metadata = meta
         self.assertEqual(grid.metadata, meta)
 
@@ -798,6 +805,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2019 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

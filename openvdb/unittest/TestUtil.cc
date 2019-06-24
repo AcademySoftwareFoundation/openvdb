@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -152,7 +152,7 @@ TestUtil::testFormats()
       CPPUNIT_ASSERT_EQUAL(4, openvdb::util::printTime(ostr2, mseconds, "Completed in ", "", width, precision, verbose ));
       ostr1 << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
       ostr1 << "Completed in " << days << "d " << hours << "h " << minutes << "m "
-            << seconds << "s " << std::setw(width) << milliseconds << "ms";
+            << std::setw(width) << (seconds + milliseconds/1000.0) << "s";
       //std::cerr << ostr2.str() << std::endl;
       CPPUNIT_ASSERT_EQUAL(ostr1.str(), ostr2.str());
     }
@@ -648,6 +648,6 @@ TestUtil::testPagedArray()
     }
 }
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

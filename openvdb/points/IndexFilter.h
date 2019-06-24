@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -79,6 +79,7 @@
 
 #include <random> // std::mt19937
 #include <numeric> // std::iota
+#include <unordered_map>
 
 
 class TestIndexFilter;
@@ -255,7 +256,7 @@ class RandomLeafFilter
 {
 public:
     using SeedCountPair = std::pair<Index, Index>;
-    using LeafMap       = std::map<openvdb::Coord, SeedCountPair>;
+    using LeafMap       = std::unordered_map<openvdb::Coord, SeedCountPair>;
 
     RandomLeafFilter(   const PointDataTreeT& tree,
                         const Index64 targetPoints,
@@ -280,7 +281,7 @@ public:
                 mLeafMap[iter->origin()] = SeedCountPair(dist(generator), leafPoints);
                 break;
             }
-            totalPointsFloat += factor * iter->pointCount();
+            totalPointsFloat += factor * static_cast<float>(iter->pointCount());
             const auto leafPoints = static_cast<int>(math::Floor(totalPointsFloat));
             totalPointsFloat -= static_cast<float>(leafPoints);
             totalPoints += leafPoints;
@@ -608,6 +609,6 @@ struct FilterTraits<BinaryFilter<T0, T1, And>> {
 
 #endif // OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
