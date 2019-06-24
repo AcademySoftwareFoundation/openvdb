@@ -73,15 +73,10 @@ namespace util {
 ///          elements (when multiple instances are used).
 ///
 /// @details This data structure employes contiguous pages of elements
-///          (like a std::deque) which avoids moving data when the
+///          (a std::deque) which avoids moving data when the
 ///          capacity is out-grown and new pages are allocated. The
 ///          size of the pages can be controlled with the Log2PageSize
 ///          template parameter (defaults to 1024 elements of type ValueT).
-///          The TableT template parameter is used to define the data
-///          structure for the page table. The default, std::deque,
-///          allows mutiple threads to call operator[] as long as only one 
-///          thread calls push_back (which is not the case for std::vector
-///          so don't use this template type!).
 ///
 /// There are three fundamentally different ways to insert elements to
 /// this container - each with different advanteges and disadvanteges.
@@ -184,27 +179,21 @@ namespace util {
 /// involve multi-threading of dynamically growing linear arrays that
 /// require fast random access.
 
-template<typename ValueT,
-         size_t Log2PageSize = 10UL,
-         template<typename ...> class TableT = std::deque>// must allow mutiple threads to call operator[] as long as only one thread calls push_back
+template<typename ValueT, size_t Log2PageSize = 10UL>
 class PagedArray
 {
 private:
     class Page;
 
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700
-    // Workaround for ICC 15/16 "too few arguments to template" bug (fixed in ICC 17)
-    using PageTableT = TableT<Page*, std::allocator<Page*>>;
-#else
-    using PageTableT = TableT<Page*>;
-#endif
+    // must allow mutiple threads to call operator[] as long as only one thread calls push_back
+    using PageTableT = std::deque<Page*>;
 
 public:
     using ValueType = ValueT;
     using Ptr       = SharedPtr<PagedArray>;
 
     /// @brief Default constructor
-    PagedArray() = default;
+    PagedArray() : mCapacity{0} { mSize = 0; }
 
     /// @brief Destructor removed all allocated pages
     ~PagedArray() { this->clear(); }
@@ -239,7 +228,7 @@ public:
     /// @param value value to be added to this PagedArray
     ///
     /// @details Constant time complexity. May allocate a new page.
-    inline size_t push_back(const ValueType& value)
+    size_t push_back(const ValueType& value)
     {
         const size_t index = mSize.fetch_and_increment();
         if (index >= mCapacity) this->grow(index);
@@ -254,7 +243,7 @@ public:
     /// @note For best performance consider using the ValueBuffer!
     ///
     /// @warning Not thread-safe!
-    inline size_t push_back_unsafe(const ValueType& value)
+    size_t push_back_unsafe(const ValueType& value)
     {
         const size_t index = mSize.fetch_and_increment();
         if (index >= mCapacity) {
@@ -277,7 +266,7 @@ public:
     /// @note This random access has constant time complexity.
     ///
     /// @warning It is assumed that the i'th element is already allocated!
-    inline ValueType& operator[](size_t i)
+    ValueType& operator[](size_t i)
     {
         assert(i<mCapacity);
         return (*mPageTable[i>>Log2PageSize])[i];
@@ -290,7 +279,7 @@ public:
     /// @note This random access has constant time complexity.
     ///
     /// @warning It is assumed that the i'th element is already allocated!
-    inline const ValueType& operator[](size_t i) const
+    const ValueType& operator[](size_t i) const
     {
         assert(i<mCapacity);
         return (*mPageTable[i>>Log2PageSize])[i];
@@ -301,7 +290,7 @@ public:
     /// @param v value to be filled in all the existing pages of this PagedArray.
     ///
     /// @note Multi-threaded
-    inline void fill(const ValueType& v)
+    void fill(const ValueType& v)
     {
         auto op = [&](const tbb::blocked_range<size_t>& r){
             for(size_t i=r.begin(); i!=r.end(); ++i) mPageTable[i]->fill(v);
@@ -333,7 +322,7 @@ public:
         }
         return true;
     }
-    inline void copy(ValueType *p) const { this->copy(p, mSize); }
+    void copy(ValueType *p) const { this->copy(p, mSize); }
 
     /// @brief Resize this array to the specified size.
     ///
@@ -349,7 +338,7 @@ public:
     /// (especially for the ValueBuffer) from having to deal with empty pages.
     ///
     /// @warning Not thread-safe!
-    inline void resize(size_t size)
+    void resize(size_t size)
     {
         mSize = size;
         if (size > mCapacity) {
@@ -381,18 +370,18 @@ public:
     }
 
     /// @brief Return the number of elements in this array.
-    inline size_t size() const { return mSize; }
+    size_t size() const { return mSize; }
 
     /// @brief Return the maximum number of elements that this array
     /// can contain without allocating more memory pages.
-    inline size_t capacity() const { return mCapacity; }
+    size_t capacity() const { return mCapacity; }
 
     /// @brief Return the number of additional elements that can be
     /// added to this array without allocating more memory pages.
-    inline size_t freeCount() const { return mCapacity - mSize; }
+    size_t freeCount() const { return mCapacity - mSize; }
 
     /// @brief Return the number of allocated memory pages.
-    inline size_t pageCount() const { return mPageTable.size(); }
+    size_t pageCount() const { return mPageTable.size(); }
 
     /// @brief Return the number of elements per memory page.
     static size_t pageSize() { return Page::Size; }
@@ -401,13 +390,13 @@ public:
     static size_t log2PageSize() { return Log2PageSize; }
 
     /// @brief Return the memory footprint of this array in bytes.
-    inline size_t memUsage() const
+    size_t memUsage() const
     {
         return sizeof(*this) + mPageTable.size() * Page::memUsage();
     }
 
     /// @brief Return true if the container contains no elements.
-    inline bool isEmpty() const { return mSize == 0; }
+    bool isEmpty() const { return mSize == 0; }
 
     /// @brief Return true if the page table is partially full, i.e. the
     ///        last non-empty page contains less than pageSize() elements.
@@ -415,12 +404,12 @@ public:
     /// @details When the page table is partially full calling merge()
     ///          or using a ValueBuffer will rearrange the ordering of
     ///          existing elements.
-    inline bool isPartiallyFull() const { return (mSize & Page::Mask) > 0; }
+    bool isPartiallyFull() const { return (mSize & Page::Mask) > 0; }
 
     /// @brief  Removes all elements from the array and delete all pages.
     ///
     /// @warning Not thread-safe!
-    inline void clear()
+    void clear()
     {
         for (size_t i=0, n=mPageTable.size(); i<n; ++i) delete mPageTable[i];
         PageTableT().swap(mPageTable);
@@ -429,19 +418,19 @@ public:
     }
 
     /// @brief Return a non-const iterator pointing to the first element
-    inline Iterator begin() { return Iterator(*this, 0); }
+    Iterator begin() { return Iterator(*this, 0); }
 
     /// @brief Return a non-const iterator pointing to the
     /// past-the-last element.
     ///
     /// @warning Iterator does not point to a valid element and should not
     /// be dereferenced!
-    inline Iterator end() { return Iterator(*this, mSize); }
+    Iterator end() { return Iterator(*this, mSize); }
 
     //@{
     /// @brief Return a const iterator pointing to the first element
-    inline ConstIterator cbegin() const { return ConstIterator(*this, 0); }
-    inline ConstIterator begin() const { return ConstIterator(*this, 0); }
+    ConstIterator cbegin() const { return ConstIterator(*this, 0); }
+    ConstIterator begin() const { return ConstIterator(*this, 0); }
     //@}
 
     //@{
@@ -450,15 +439,15 @@ public:
     ///
     /// @warning Iterator does not point to a valid element and should not
     /// be dereferenced!
-    inline ConstIterator cend() const { return ConstIterator(*this, mSize); }
-    inline ConstIterator end() const { return ConstIterator(*this, mSize); }
+    ConstIterator cend() const { return ConstIterator(*this, mSize); }
+    ConstIterator end() const { return ConstIterator(*this, mSize); }
     //@}
 
     /// @brief Parallel sort of all the elements in ascending order.
-    inline void sort() { tbb::parallel_sort(this->begin(), this->end(), std::less<ValueT>() ); }
+    void sort() { tbb::parallel_sort(this->begin(), this->end(), std::less<ValueT>() ); }
 
     /// @brief Parallel sort of all the elements in descending order.
-    inline void invSort() { tbb::parallel_sort(this->begin(), this->end(), std::greater<ValueT>()); }
+    void invSort() { tbb::parallel_sort(this->begin(), this->end(), std::greater<ValueT>()); }
 
     //@{
     /// @brief Parallel sort of all the elements based on a custom
@@ -515,15 +504,15 @@ private:
         }
     }
     PageTableT mPageTable;//holds points to allocated pages
-    tbb::atomic<size_t> mSize{0};// current number of elements in array
-    size_t mCapacity{0};//capacity of array given the current page count
+    tbb::atomic<size_t> mSize;// current number of elements in array
+    size_t mCapacity;//capacity of array given the current page count
     tbb::spin_mutex mGrowthMutex;//Mutex-lock required to grow pages
 }; // Public class PagedArray
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::shrink_to_fit()
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::shrink_to_fit()
 {
     if (mPageTable.size() > (mSize >> Log2PageSize) + 1) {
         tbb::spin_mutex::scoped_lock lock(mGrowthMutex);
@@ -536,8 +525,8 @@ void PagedArray<ValueT, Log2PageSize, TableT>::shrink_to_fit()
     }
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize,TableT >::merge(PagedArray& other)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::merge(PagedArray& other)
 {
     if (&other != this && !other.isEmpty()) {
         tbb::spin_mutex::scoped_lock lock(mGrowthMutex);
@@ -561,8 +550,8 @@ void PagedArray<ValueT, Log2PageSize,TableT >::merge(PagedArray& other)
     }
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::add_full(Page*& page, size_t size)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::add_full(Page*& page, size_t size)
 {
     assert(size == Page::Size);//page must be full
     if (mSize & Page::Mask) {//page-table is partially full
@@ -575,8 +564,8 @@ void PagedArray<ValueT, Log2PageSize, TableT>::add_full(Page*& page, size_t size
     page       = nullptr;
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::add_partially_full(Page*& page, size_t size)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::add_partially_full(Page*& page, size_t size)
 {
     assert(size > 0 && size < Page::Size);//page must be partially full
     if (size_t m = mSize & Page::Mask) {//page table is also partially full
@@ -599,12 +588,12 @@ void PagedArray<ValueT, Log2PageSize, TableT>::add_partially_full(Page*& page, s
 ////////////////////////////////////////////////////////////////////////////////
 
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 ValueBuffer
 {
 public:
-    using PagedArrayType = PagedArray<ValueT, Log2PageSize, TableT>;
+    using PagedArrayType = PagedArray<ValueT, Log2PageSize>;
     /// @brief Constructor from a PageArray
     ValueBuffer(PagedArray& parent) : mParent(&parent), mPage(new Page()), mSize(0) {}
     /// @warning This copy-constructor is shallow in the sense that no
@@ -647,8 +636,8 @@ private:
 
 // Const std-compliant iterator
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 ConstIterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
@@ -698,8 +687,8 @@ private:
 
 // Non-const std-compliant iterator
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 Iterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
@@ -748,8 +737,8 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 // Private member-class of PagedArray implementing a memory page
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 Page
 {
 public:
