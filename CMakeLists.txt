@@ -318,17 +318,21 @@ if(OPENVDB_BUILD_DOCS)
       list(GET HOUDINI_VERSION_COMPONENTS 0 HVERS_MAJOR)
       list(GET HOUDINI_VERSION_COMPONENTS 1 HVERS_MINOR)
       list(GET HOUDINI_VERSION_COMPONENTS 2 HVERS_PATCH)
-      math(EXPR HVERS_INT "(((${HVERS_MAJOR} << 8) + ${HVERS_MINOR}) << 16) + ${HVERS_PATCH}")
-      # Append Houdini version number macros to the Doxygen config file so that
-      # the generated documentation reflects the API for that version
-      # (i.e, taking into account any conditionally compiled blocks).
-      set(DOXYGEN_CONFIG_CONTENT
-        "PREDEFINED += UT_MAJOR_VERSION_INT=${HVERS_MAJOR}\n"
-        "PREDEFINED += UT_MINOR_VERSION_INT=${HVERS_MINOR}\n"
-        "PREDEFINED += UT_VERSION_INT=${HVERS_INT}\n\n")
-      file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-          ${DOXYGEN_CONFIG_CONTENT})
+    else()
+      set(HVERS_MAJOR 127)  # CMake treats (255 << 24) as a negative number
+      set(HVERS_MINOR 0)
+      set(HVERS_PATCH 0)
     endif()
+    math(EXPR HVERS_INT "(((${HVERS_MAJOR} << 8) + ${HVERS_MINOR}) << 16) + ${HVERS_PATCH}")
+    # Append Houdini version number macros to the Doxygen config file so that
+    # the generated documentation reflects the API for that version
+    # (i.e, taking into account any conditionally compiled blocks).
+    set(DOXYGEN_CONFIG_CONTENT
+      "PREDEFINED += UT_MAJOR_VERSION_INT=${HVERS_MAJOR}\n"
+      "PREDEFINED += UT_MINOR_VERSION_INT=${HVERS_MINOR}\n"
+      "PREDEFINED += UT_VERSION_INT=${HVERS_INT}\n\n")
+    file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
+        ${DOXYGEN_CONFIG_CONTENT})
   endif()
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
     "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
