@@ -263,6 +263,36 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
 endif()
 
+# Configure DCC installation if necessary
+
+if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+  set(USE_HOUDINI ON)
+endif()
+
+if(OPENVDB_BUILD_MAYA_PLUGIN)
+  set(USE_MAYA ON)
+endif()
+
+if(USE_MAYA AND USE_HOUDINI)
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met."
+  )
+endif()
+
+# Configure component dependencies by loading the Houdini/Maya setup
+# scripts. These also find the Houdini/Maya installations
+
+if(USE_HOUDINI)
+  include(OpenVDBHoudiniSetup)
+endif()
+
+if(USE_MAYA)
+  include(OpenVDBMayaSetup)
+endif()
+
 # Add the doxygen command if required - do this here so we guarantee not to error on
 # unrelated build issues
 
@@ -279,8 +309,26 @@ if(OPENVDB_BUILD_DOCS)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen-config DOXYGEN_CONFIG_CONTENT)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
   if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+    # Append Houdini-specific settings to the Doxygen config file.
     file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxygen-config-houdini DOXYGEN_CONFIG_CONTENT)
     file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
+    if(Houdini_VERSION)
+      # Extract the components of the Houdini version number into a list.
+      string(REPLACE "." ";" HOUDINI_VERSION_COMPONENTS ${Houdini_VERSION})
+      list(GET HOUDINI_VERSION_COMPONENTS 0 HVERS_MAJOR)
+      list(GET HOUDINI_VERSION_COMPONENTS 1 HVERS_MINOR)
+      list(GET HOUDINI_VERSION_COMPONENTS 2 HVERS_PATCH)
+      math(EXPR HVERS_INT "(((${HVERS_MAJOR} << 8) + ${HVERS_MINOR}) << 16) + ${HVERS_PATCH}")
+      # Append Houdini version number macros to the Doxygen config file so that
+      # the generated documentation reflects the API for that version
+      # (i.e, taking into account any conditionally compiled blocks).
+      set(DOXYGEN_CONFIG_CONTENT
+        "PREDEFINED += UT_MAJOR_VERSION_INT=${HVERS_MAJOR}\n"
+        "PREDEFINED += UT_MINOR_VERSION_INT=${HVERS_MINOR}\n"
+        "PREDEFINED += UT_VERSION_INT=${HVERS_INT}\n\n")
+      file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
+          ${DOXYGEN_CONFIG_CONTENT})
+    endif()
   endif()
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
     "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
@@ -407,38 +455,6 @@ if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
   message(WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 unset(HAS_AVAILABLE_WARNINGS)
-
-##########################################################################
-
-# Configure DCC installation if necessary
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  set(USE_HOUDINI ON)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  set(USE_MAYA ON)
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
-endif()
-
-# Configure component dependencies by loading the Houdini/Maya setup
-# scripts. These also find the Houdini/Maya installations
-
-if(USE_HOUDINI)
-  include(OpenVDBHoudiniSetup)
-endif()
-
-if(USE_MAYA)
-  include(OpenVDBMayaSetup)
-endif()
 
 # Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
 # * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
