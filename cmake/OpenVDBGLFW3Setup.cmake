@@ -135,6 +135,10 @@ if(UNIX)
     SET
   )
   if (NOT glfw3_HAS_INTERFACE_LINK_LIBRARIES)
+    message(WARNING "GLFW does not have the INTERFACE_LINK_LIBRARIES property "
+      "set, so hard-coding to expect a dependency on X11. To use a different "
+      "library dependency, consider upgrading to GLFW 3.2+ where this "
+      "property is set by the CMake find package module for GLFW.")
     find_package(X11 REQUIRED)
     set_property(TARGET glfw
       PROPERTY INTERFACE_LINK_LIBRARIES
