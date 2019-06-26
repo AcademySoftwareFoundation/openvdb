@@ -418,7 +418,6 @@ inline void dropAttributes( PointDataTreeT& tree,
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
         [&](typename PointDataTree::LeafNodeType& leaf, size_t /*idx*/) {
-
             auto expected = leaf.attributeSet().descriptorPtr();
             leaf.dropAttributes(indices, *expected, newDescriptor);
         }, /*threaded=*/true
