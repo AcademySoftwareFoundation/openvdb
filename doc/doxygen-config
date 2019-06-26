@@ -40,13 +40,37 @@ PROJECT_NAME           = "OpenVDB"
 
 PROJECT_NUMBER         = 6.2.0
 
-ALIASES += vdbnamespace="openvdb::v6_2"
-PREDEFINED = OPENVDB_VERSION_NAME=v6_2
-PREDEFINED += OPENVDB_ABI_VERSION_NUMBER=6
+PREDEFINED             = OPENVDB_VERSION_NAME=v6_2
+PREDEFINED            += OPENVDB_ABI_VERSION_NUMBER=6
 
-PREDEFINED += __declspec(x):= __attribute__(x):=
-PREDEFINED += OPENVDB_STATIC_SPECIALIZATION=""
-PREDEFINED += OPENVDB_USE_LOG4CPLUS=
+ALIASES               += ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)" \
+                         xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)" \
+                         const="<tt>const</tt>"
+ALIASES               += "vdbnamespace=openvdb::v6_2" \
+                         "hunamespace=houdini_utils" \
+                         "hvdbnamespace=openvdb_houdini"
+# Use this command to create a link to an OpenVDB class, function, etc.
+# Usage is "@vdblink{<symbol>,<text>}", where <symbol> is a fully namespace-
+# qualified symbol minus the openvdb and version number namespace components
+# and <text> is the text of the link.
+# Example: @vdblink{tree::RootNode,root node}
+ALIASES               += vdblink{2}="@link @vdbnamespace::\1 \2@endlink"
+# Deprecated; use the two-argument overload defined above.
+ALIASES               += vdblink="@link @vdbnamespace" \
+# Use these commands to create links to OpenVDB Houdini symbols.
+# Usage is "@hulink{<symbol>,<text>}", where <symbol> is the name of
+# a symbol in the houdini_utils namespace and <text> is the text of the link
+# (and likewise for @hvdblink).
+# Example: @hulink{ParmFactory::setDefault(),setDefault}
+# These stub implementations are used when Houdini support is disabled;
+# see doxygen-config-houdini for the full implementations.
+ALIASES               += hulink{2}="<B>\2</B>" \
+                         hvdblink{2}="<B>\2</B>"
+
+PREDEFINED            += __declspec(x):= __attribute__(x):=
+PREDEFINED            += OPENVDB_STATIC_SPECIALIZATION=""
+PREDEFINED            += OPENVDB_USE_LOG4CPLUS=
+
 #EXPAND_AS_DEFINED = \
 #    OPENVDB_API \
 #    OPENVDB_HOUDINI_API \
@@ -54,6 +78,28 @@ PREDEFINED += OPENVDB_USE_LOG4CPLUS=
 #    OPENVDB_IMPORT \
 #    OPENVDB_DEPRECATED \
 #    OPENVDB_STATIC_SPECIALIZATION
+
+IMAGE_PATH             = doc/img
+
+INPUT                  = openvdb \
+                         openvdb/io \
+                         openvdb/math \
+                         openvdb/points \
+                         openvdb/python/pyopenvdb.h \
+                         openvdb/tools \
+                         openvdb/tree \
+                         openvdb/util \
+                         doc/build.txt \
+                         doc/changes.txt \
+                         doc/codingstyle.txt \
+                         doc/dependencies.txt \
+                         doc/doc.txt \
+                         doc/examplecode.txt \
+                         doc/faq.txt \
+                         doc/math.txt \
+                         doc/points.txt \
+                         doc/python.txt
+
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -242,16 +288,8 @@ TAB_SIZE               = 4
 # documentation, which will result in a user-defined paragraph with heading
 # "Side Effects:". You can put \n's in the value part of an alias to insert
 # newlines.
-
-ALIASES += ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)"
-ALIASES += xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)"
-ALIASES += const="<tt>const</tt>"
-# Use this command to create a link to an OpenVDB class, function, etc.
-# Usage is "@vdblink::<symbol> <text>@endlink", where <symbol> is a fully
-# namespace-qualified symbol minus the openvdb and version number namespaces
-# and <text> is the text of the link.
-# Example: @vdblink::tree::RootNode root node@endlink
-ALIASES += vdblink="@link @vdbnamespace"
+#
+#ALIASES                =
 
 # This tag can be used to specify a number of word-keyword mappings (TCL only).
 # A mapping has the form "name=value". For example adding "class=itcl::class"
@@ -775,26 +813,8 @@ WARN_LOGFILE           =
 # directories like /usr/src/myproject. Separate the files or directories with
 # spaces.
 # Note: If this tag is empty the current directory is searched.
-
-INPUT                  = . \
-                         io \
-                         math \
-                         points \
-                         python/pyopenvdb.h \
-                         tools \
-                         tree \
-                         util \
-                         doc/doc.txt \
-                         doc/build.txt \
-                         doc/dependencies.txt \
-                         doc/faq.txt \
-                         doc/math.txt \
-                         doc/changes.txt \
-                         doc/codingstyle.txt \
-                         doc/api_0_98_0.txt \
-                         doc/examplecode.txt \
-                         doc/points.txt \
-                         doc/python.txt
+#
+#INPUT                  =
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -881,8 +901,8 @@ EXAMPLE_RECURSIVE      = NO
 # The IMAGE_PATH tag can be used to specify one or more files or directories
 # that contain images that are to be included in the documentation (see the
 # \image command).
-
-IMAGE_PATH             =
+#
+#IMAGE_PATH             =
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program
