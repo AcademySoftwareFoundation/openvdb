@@ -95,6 +95,12 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
         const AttributeArray* existingArray = attrSet.getConst(pos);
@@ -118,6 +124,12 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
         mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
