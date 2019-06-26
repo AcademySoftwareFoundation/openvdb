@@ -17,10 +17,9 @@ Version 6.2.0 - In development
     - Minor performance improvements to moving and filtering VDB points.
 
     Bug fixes:
-    - Fixed a (rare) crash in util::PagedArray caused by the fact that std::vector
-      (unlike std::deque) does not allow mutiple threads to call operator[] while one thread
-      calls push_back. The last template argument of PageArray is now elimited
-      and PageTableT is set to std::deque.
+    - Replaced std::vector with std::deque as the underlying container
+      for util::PagedArray, to address a rare crash when reading
+      from multiple threads while writing from another thread.
     - Fixed a bug in tools::computeScalarPotential() that could produce
       a corrupt result due to invalid memory access.
       [Reported by Edwin Braun]
@@ -39,6 +38,8 @@ Version 6.2.0 - In development
 
     API changes:
     - Changed a type alias in points::RandomLeafFilter.
+    - Removed the TableT template argument from util::PagedArray.
+      The table type is now hardcoded to std::deque.
 
     Python:
     - CMake now always produces a .so for the Python module on UNIX platforms.

@@ -26,11 +26,9 @@ Improvements:
 
 @par
 Bug fixes:
-- Fixed a (rare) crash in @vdblink::util::PagedArray PagedArray@endlink caused
-  by the fact that std::vector (unlike std::deque) does not allow mutiple threads
-  to call operator[] while one thread calls push_back. The last template argument
-  of @vdblink::util::PagedArray PagedArray@endlink is now elimited and PageTableT
-  is set to std::deque.
+- Replaced @b std::vector with @b std::deque as the underlying container
+  for @vdblink{util::PagedArray,PagedArray}, to address a rare crash
+  when reading from multiple threads while writing from another thread.
 - Fixed a bug in
   @vdblink{tools::computeScalarPotential(),computeScalarPotential}
   that could produce a corrupt result due to invalid memory access.
@@ -54,6 +52,9 @@ ABI changes:
 @par
 API changes:
 - Changed a type alias in @vdblink{points::RandomLeafFilter,RandomLeafFilter}.
+- Removed the @b TableT template argument from
+  @vdblink{util::PagedArray,PagedArray}.
+  The table type is now hardcoded to <B>std::deque</B>.
 
 @par
 Python:
