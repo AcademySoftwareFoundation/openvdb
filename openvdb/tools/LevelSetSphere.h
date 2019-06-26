@@ -74,7 +74,7 @@ namespace tools {
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
 createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize,
-                     float halfWidth = float(LEVEL_SET_HALF_WIDTH), 
+                     float halfWidth = float(LEVEL_SET_HALF_WIDTH),
                      InterruptT* interrupt = nullptr, bool threaded = true);
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -169,9 +169,9 @@ private:
         typename GridT::Accessor accessor = mGrid->getAccessor();
 
         if (mInterrupt) mInterrupt->start("Generating level set of sphere");
-     
+
         tbb::enumerable_thread_specific<TreeT> pool(mGrid->tree());
-        
+
         auto kernel = [&](const tbb::blocked_range<int>& r) {
             openvdb::Coord ijk;
             int &i = ijk[0], &j = ijk[1], &k = ijk[2], m=1;
@@ -197,7 +197,7 @@ private:
                 }//end loop over j
             }//end loop over i
         };// kernel
-        
+
         if (threaded) {
             tbb::parallel_for(tbb::blocked_range<int>(imin, imax, 128), kernel);
             using RangeT = tbb::blocked_range<typename tbb::enumerable_thread_specific<TreeT>::iterator>;
@@ -211,12 +211,12 @@ private:
                 void join(Op &other) { this->merge(*(other.mTree)); }
                 void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
             } op( mGrid->tree() );
-            tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);                 
+            tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
         } else {
             kernel(tbb::blocked_range<int>(imin, imax));//serial
             mGrid->tree().merge(*pool.begin(), openvdb::MERGE_ACTIVE_STATES);
         }
-        
+
         // Define consistent signed distances outside the narrow-band
         tools::signedFloodFill(mGrid->tree(), threaded);
 
