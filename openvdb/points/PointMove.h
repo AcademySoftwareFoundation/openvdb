@@ -198,7 +198,7 @@ using LocalPointIndexMap = std::vector<IndexPairArray>;
 
 using LeafIndexArray = std::vector<LeafIndex>;
 using LeafOffsetArray = std::vector<LeafIndexArray>;
-using LeafMap = std::map<Coord, LeafIndex>;
+using LeafMap = std::unordered_map<Coord, LeafIndex>;
 
 
 template <typename DeformerT, typename TreeT, typename FilterT>

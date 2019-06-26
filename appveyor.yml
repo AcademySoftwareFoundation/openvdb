@@ -27,7 +27,7 @@ build_script:
   - cmake \
     -G"Visual Studio 15 2017 Win64" \
     -DCMAKE_CONFIGURATION_TYPES=%CONFIGURATION% \
-    -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%\install \
+    -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%\cmake_install \
     -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake \
     -DOPENVDB_ABI_VERSION_NUMBER=6 \
     -DOPENVDB_BUILD_BINARIES=OFF \

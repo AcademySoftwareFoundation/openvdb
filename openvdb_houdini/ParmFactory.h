@@ -80,6 +80,22 @@ namespace houdini_utils {
 
 class ParmFactory;
 
+using SpareDataMap = std::map<std::string, std::string>;
+
+/// @brief Return the spare data associated with the given operator.
+/// @details Only operators created with OpFactory will have spare data.
+/// @sa @link addOperatorSpareData() addOperatorSpareData@endlink,
+///     @link OpFactory::addSpareData() OpFactory::addSpareData@endlink
+const SpareDataMap& getOperatorSpareData(const OP_Operator&);
+
+/// @brief Specify (@e key, @e value) pairs of spare data for the given operator.
+/// @details For existing keys, the new value replaces the old one.
+/// @throw std::runtime_error if the given operator does not support spare data
+///     (only operators created with OpFactory will have spare data)
+/// @sa @link getOperatorSpareData() getOperatorSpareData@endlink,
+///     @link OpFactory::addSpareData() OpFactory::addSpareData@endlink
+void addOperatorSpareData(OP_Operator&, const SpareDataMap&);
+
 
 /// @brief Parameter template list that is always terminated.
 class OPENVDB_HOUDINI_API ParmList
@@ -320,7 +336,7 @@ public:
     ParmFactory& setRange(const PRM_Range*);
 
     /// Specify (@e key, @e value) pairs of spare data for this parameter.
-    ParmFactory& setSpareData(const std::map<std::string, std::string>&);
+    ParmFactory& setSpareData(const SpareDataMap&);
     /// Specify spare data for this parameter.
     ParmFactory& setSpareData(const PRM_SpareData*);
 
@@ -500,9 +516,12 @@ public:
     /// @details This is equivalent to using the hscript ophide method.
     OpFactory& setInvisible();
 
-protected:
-    /// @brief Return the non-const operator table with which this factory is associated.
-    OP_OperatorTable& table();
+    /// @brief Specify (@e key, @e value) pairs of spare data for this operator.
+    /// @details If a key already exists, its corresponding value will be
+    /// overwritten with the new value.
+    /// @sa @link addOperatorSpareData() addOperatorSpareData@endlink,
+    ///     @link getOperatorSpareData() getOperatorSpareData@endlink
+    OpFactory& addSpareData(const SpareDataMap&);
 
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
@@ -548,9 +567,13 @@ public:
     /// factory.@link OpFactory::english() english()@endlink.
     virtual std::string getLabelName(const OpFactory&);
 
-    /// @brief Return the inital default name of the op.
+    /// @brief Return the inital default name of the operator.
     /// @note An empty first name will disable, reverting to the usual rules.
     virtual std::string getFirstName(const OpFactory&) { return ""; }
+
+    /// @brief Return the tab sub-menu path of the op.
+    /// @note An empty path will disable, reverting to the usual rules.
+    virtual std::string getTabSubMenuPath(const OpFactory&) { return ""; }
 };
 
 
