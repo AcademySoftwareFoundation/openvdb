@@ -65,7 +65,7 @@ namespace tools {
 /// @param voxelSize    voxel size in world units
 /// @param halfWidth    half the width of the narrow band, in voxel units
 /// @param interrupt    a pointer adhering to the util::NullInterrupter interface
-/// @param threaded     if true multi-threading is enabled
+/// @param threaded     if true multi-threading is enabled (true by default)
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
 /// @note The leapfrog algorithm employed in this method is best suited
@@ -84,7 +84,7 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 /// @param center       center of the sphere in world units
 /// @param voxelSize    voxel size in world units
 /// @param halfWidth    half the width of the narrow band, in voxel units
-/// @param threaded     if true multi-threading is enabled
+/// @param threaded     if true multi-threading is enabled (true by default)
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
 /// @note The leapfrog algorithm employed in this method is best suited
@@ -137,6 +137,7 @@ public:
     ///
     /// @param voxelSize  Size of voxels in world units
     /// @param halfWidth  Half-width of narrow-band in voxel units
+    /// @param threaded   If true multi-threading is enabled (true by default)
     typename GridT::Ptr getLevelSet(ValueT voxelSize, ValueT halfWidth, bool threaded = true)
     {
         mGrid = createLevelSet<GridT>(voxelSize, halfWidth);
