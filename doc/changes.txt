@@ -26,6 +26,11 @@ Improvements:
 
 @par
 Bug fixes:
+- Fixed a (rare) crash in @vdblink::util::PagedArray PagedArray@endlink caused
+  by the fact that std::vector (unlike std::deque) does not allow mutiple threads
+  to call operator[] while one thread calls push_back. The last template argument
+  of @vdblink::util::PagedArray PagedArray@endlink is now elimited and PageTableT
+  is set to std::deque.
 - Fixed a bug in
   @vdblink{tools::computeScalarPotential(),computeScalarPotential}
   that could produce a corrupt result due to invalid memory access.
