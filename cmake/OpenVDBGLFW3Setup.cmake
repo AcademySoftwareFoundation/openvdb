@@ -115,7 +115,7 @@ if(GLFW3_CMAKE_LOCATION)
 endif()
 
 set(glfw3_FIND_VERSION ${MINIMUM_GLFW_VERSION})
-find_package(glfw3 ${MINIMUM_GLFW_VERSION} CONFIG REQUIRED)
+find_package(glfw3 ${MINIMUM_GLFW_VERSION} REQUIRED)
 
 find_package(PackageHandleStandardArgs)
 find_package_handle_standard_args(glfw3
