@@ -73,11 +73,17 @@ Houdini:
   destination is not a&nbsp;VDB.
 - Added a @b houdini_utils::OpFactory::setInvisible method to hide nodes
   from tab menus.
-- Added methods to store parent name and visibility of native SOPs to
-  @b openvdb_houdini::OpenVDBOpFactory.
-- Added a houdini_utils::OpPolicy::getTabSubMenuPath() method to allow
-  OpPolicy subclasses to provide their own tab sub-menu path.
-- OpenVDB SOPs are now displayed in the ASWF tab sub-menu nested under VDB.
+- Added a @b houdini_utils::OpFactory::addSpareData method
+  and @b addOperatorSpareData and @b getOperatorSpareData functions
+  to manage spare data associated with operator types.
+- Added an @c opsparedata HScript command and @c hou.NodeType.spareData
+  and @c hou.NodeType.spareDataDict methods to retrieve spare data
+  associated with operator types.
+- Added an @b OpenVDBOpFactory::setNativeName method to pair OpenVDB nodes
+  with their native Houdini equivalents.
+- Added an @b OpPolicy::getTabSubMenuPath method to allow @b OpPolicy
+  subclasses to provide their own tab sub-menu path.
+- OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
