@@ -44,17 +44,11 @@ option(OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF)
 option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF)
 option(OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF)
 
-option(USE_X11 "Build vdb_view using X11 if on Linux" ON)
-
 #########################################################################
 
 message(STATUS "----------------------------------------------------")
 message(STATUS "----------- Configuring OpenVDBBinaries ------------")
 message(STATUS "----------------------------------------------------")
-
-##########################################################################
-
-mark_as_advanced(USE_X11)
 
 ##########################################################################
 
@@ -205,20 +199,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
     find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
     find_package(OpenGL REQUIRED)
 
-    set(OPENVDB_X11_LIBS "")
-    if(UNIX AND USE_X11)
-      find_package(X11 REQUIRED)
-      list(APPEND OPENVDB_X11_LIBS
-        ${X11_Xrandr_LIB}
-        ${X11_Xxf86vm_LIB}
-        ${X11_Xcursor_LIB}
-        ${X11_Xinerama_LIB}
-        ${X11_Xi_LIB}
-        ${X11_LIBRARIES}
-        ${CMAKE_DL_LIBS}
-      )
-    endif()
-
     # wraps find_package(glfw3) and sets the glfw target
     include(OpenVDBGLFW3Setup)
 
@@ -243,7 +223,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
       OpenGL::GL
       OpenGL::GLU
       glfw
-      ${OPENVDB_X11_LIBS}
     )
 
     target_compile_definitions(vdb_view PRIVATE
