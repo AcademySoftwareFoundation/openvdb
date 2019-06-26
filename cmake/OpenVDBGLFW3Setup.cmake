@@ -124,3 +124,27 @@ find_package_handle_standard_args(glfw3
 )
 
 unset(glfw3_FIND_VERSION)
+
+# GLFW 3.1 does not export INTERFACE_LINK_LIBRARIES so detect this
+# and set the property ourselves
+# @todo investigate how this might apply for Mac OSX
+if(UNIX)
+  get_property(glfw3_HAS_INTERFACE_LINK_LIBRARIES
+    TARGET glfw
+    PROPERTY INTERFACE_LINK_LIBRARIES
+    SET
+  )
+  if (NOT glfw3_HAS_INTERFACE_LINK_LIBRARIES)
+    find_package(X11 REQUIRED)
+    set_property(TARGET glfw
+      PROPERTY INTERFACE_LINK_LIBRARIES
+      ${X11_Xrandr_LIB}
+      ${X11_Xxf86vm_LIB}
+      ${X11_Xcursor_LIB}
+      ${X11_Xinerama_LIB}
+      ${X11_Xi_LIB}
+      ${X11_LIBRARIES}
+      ${CMAKE_DL_LIBS}
+    )
+  endif()
+endif()
