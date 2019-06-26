@@ -73,13 +73,21 @@ Houdini:
   in the input detail.
 - The Combine&nbsp;SOP no longer crashes in <B>Copy&nbsp;B</B> mode when the
   destination is not a&nbsp;VDB.
+- Added an @hulink{OpFactory::addSpareData(),OpFactory::addSpareData} method
+  and @hulink{addOperatorSpareData(),addOperatorSpareData} and
+  @hulink{getOperatorSpareData(),getOperatorSpareData} functions
+  to manage spare data associated with operator types.
+- Added an @c opsparedata HScript command and @c hou.NodeType.spareData
+  and @c hou.NodeType.spareDataDict methods to retrieve spare data
+  associated with operator types.
 - Added an @hulink{OpFactory::setInvisible(),OpFactory::setInvisible} method
   to hide nodes from tab menus.
-- Added methods to store parent name and visibility of native SOPs to
-  @hulink{OpFactory,OpFactory}.
+- Added an
+  @hvdblink{OpenVDBOpFactory::setNativeName(),OpenVDBOpFactory::setNativeName}
+  method to pair OpenVDB nodes with their native Houdini equivalents.
 - Added an @hulink{OpPolicy::getTabSubMenuPath(),OpPolicy::getTabSubMenuPath}
   method to allow @b OpPolicy subclasses to provide their own tab sub-menu path.
-- OpenVDB SOPs are now displayed in the ASWF tab sub-menu nested under VDB.
+- OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
