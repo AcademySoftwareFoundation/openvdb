@@ -99,3 +99,7 @@ room for information hiding in the off-band voxels.  Conversion to
 polygon and reconstruction from the polygonal mesh should eliminate
 those channels.
 
+Most VDB algorithms ignore inactive values.  Hidden data stored in
+inactive voxels may thus be preserved by the VDB tools, even for
+non-SDF grids.  tools::changeBackground can be run to clear all inactive
+voxels, and tools::pruneInactive to ensure minimal topology.
