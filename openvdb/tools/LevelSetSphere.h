@@ -187,7 +187,7 @@ private:
                     const auto x2y2 = math::Pow2(j - c[1]) + x2;
                     for (k = kmin; k <= kmax; k += m) {
                         m = 1;
-                        /// Distance in voxel units to sphere
+                        // Distance in voxel units to sphere
                         const auto v = math::Sqrt(x2y2 + math::Pow2(k-c[2]))-r0;
                         const auto d = math::Abs(v);
                         if (d < w) { // inside narrow band
@@ -201,6 +201,10 @@ private:
         };// kernel
 
         if (threaded) {
+            // The code blow is making use of a TLS container to minimize the number of concurrent trees
+            // initially populated by tbb::parallel_for and subsequently merged by tbb::parallel_reduce.
+            // Experiments have demonstrated this approach to outperform others, including serial reduction
+            // and a custom concurrent reduction implementation.
             tbb::parallel_for(tbb::blocked_range<int>(imin, imax, 128), kernel);
             using RangeT = tbb::blocked_range<typename tbb::enumerable_thread_specific<TreeT>::iterator>;
             struct Op {
@@ -210,8 +214,9 @@ private:
                 Op(const Op& other, tbb::split) : mDelete(true), mTree(new TreeT(other.mTree->background())) {}
                 ~Op() { if (mDelete) delete mTree; }
                 void operator()(RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
-                void join(Op &other) { this->merge(*(other.mTree)); }
-                void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
+                void join(Op &other) { mTree->merge(*(other.mTree), openvdb::MERGE_ACTIVE_STATES); }
+                //void join(Op &other) { this->merge(*(other.mTree)); }
+                //void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
             } op( mGrid->tree() );
             tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
         } else {
