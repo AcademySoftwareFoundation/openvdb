@@ -15,6 +15,8 @@ Version 6.2.0 - In development
     - Added math::isInfinite() and math::isNan() to resolve Visual Studio
       compatibility issues with integer types.
     - Minor performance improvements to moving and filtering VDB points.
+    - Improved performance related to a mutex contention when appending
+      multiple AttributeArrays in parallel through various point operations.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
@@ -28,6 +30,8 @@ Version 6.2.0 - In development
       fillWithSpheres() tool that caused generated spheres to sometimes
       extend outside the target volume.
     - CMake now correctly sets rpaths for the unit test binary.
+    - Fixed a memory leak in a static variable pointer.
+      [Contributed by Autodesk]
 
     ABI changes:
     - ABI versions 3 and older are now deprecated, and support for them will be
