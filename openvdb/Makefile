@@ -598,9 +598,17 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVolumeToSpheres.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/points.txt doc/python.txt
-DOC_INDEX := doc/html/index.html
-DOC_PDF := doc/latex/refman.pdf
+DOC_FILES := \
+    ../doc/changes.txt \
+    ../doc/codingstyle.txt \
+    ../doc/doc.txt \
+    ../doc/examplecode.txt \
+    ../doc/faq.txt \
+    ../doc/math.txt \
+    ../doc/points.txt \
+    ../doc/python.txt
+DOC_INDEX := ../doc/html/index.html
+DOC_PDF := ../doc/latex/refman.pdf
 
 LIBVIEWER_INCLUDE_NAMES := \
     viewer/Camera.h \
@@ -804,16 +812,20 @@ $(LIBOPENVDB_STATIC): $(OBJ_NAMES)
 endif # shared
 
 
-$(DOC_INDEX): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
+$(DOC_INDEX): ../doc/doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
 	@echo "Generating documentation because of $(list_deps)"
-	echo 'OUTPUT_DIRECTORY=./doc' | cat doxygen-config - | $(DOXYGEN) - $(QUIET)
+	pushd ..; \
+	echo 'OUTPUT_DIRECTORY=./doc' | cat ./doc/doxygen-config - | $(DOXYGEN) - $(QUIET); \
+	popd > /dev/null
 
-$(DOC_PDF): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
+$(DOC_PDF): ../doc/doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
 	@echo "Generating documentation because of $(list_deps)"
+	pushd ..; \
 	echo -e 'OUTPUT_DIRECTORY=./doc\nGENERATE_LATEX=YES\nGENERATE_HTML=NO' \
-	    | cat doxygen-config - | $(DOXYGEN) - $(QUIET) \
+	    | cat ./doc/doxygen-config - | $(DOXYGEN) - $(QUIET) \
 	    && cd ./doc/latex && make refman.pdf $(QUIET) \
-	    && echo 'Created doc/latex/refman.pdf'
+	    && echo 'Created doc/latex/refman.pdf'; \
+	popd > /dev/null
 
 ifneq (,$(strip $(DOXYGEN)))
 doc: $(DOC_INDEX)
@@ -888,7 +900,7 @@ ifeq (yes,$(has_python))
 ifneq (,$(strip $(EPYDOC)))
 pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	@echo "Generating Python module documentation because of $(list_deps)"
-	pydocdir=doc/html/python; \
+	pydocdir=../doc/html/python; \
 	mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
 	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
@@ -1000,11 +1012,11 @@ install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	    echo "Copied vdb_view to $(DESTDIR)/bin/"; \
 	fi
 	@#
-	if [ -d doc/html ]; \
+	if [ -d ../doc/html ]; \
 	then \
 	    mkdir -p $(DESTDIR)/share/doc/openvdb; \
 	    echo "Created $(DESTDIR)/share/doc/openvdb/"; \
-	    cp -r -f doc/html $(DESTDIR)/share/doc/openvdb; \
+	    cp -r -f ../doc/html $(DESTDIR)/share/doc/openvdb; \
 	    echo "Copied documentation to $(DESTDIR)/share/doc/openvdb/"; \
 	fi
 
@@ -1057,7 +1069,7 @@ clean:
 	$(RM) $(LIBVIEWER_OBJ_NAMES)
 	$(RM) $(PYTHON_OBJ_NAMES)
 	$(RM) $(UNITTEST_OBJ_NAMES)
-	$(RM) -r ./doc/html ./doc/latex
+	$(RM) -r ../doc/html ../doc/latex
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
