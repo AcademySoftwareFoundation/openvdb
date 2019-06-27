@@ -112,8 +112,9 @@ template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetSphere
 {
 public:
+    using TreeT  = typename GridT::TreeType;
     using ValueT = typename GridT::ValueType;
-    using Vec3T = typename math::Vec3<ValueT>;
+    using Vec3T  = typename math::Vec3<ValueT>;
     static_assert(std::is_floating_point<ValueT>::value,
         "level set grids must have scalar, floating-point value types");
 
