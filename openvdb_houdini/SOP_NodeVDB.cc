@@ -739,7 +739,7 @@ OpenVDBOpFactory::~OpenVDBOpFactory()
                 this->setInvisible();
             } else if (opHidePolicyStr == "native") {
                 // mark the native equivalent SOP to be hidden
-                this->addInvisibleName(mNativeName);
+                this->table().addOpHidden(mNativeName.c_str());
             }
         }
 

@@ -1281,7 +1281,6 @@ del nt, _spareData, _spareDataDict\n");
     std::vector<char*> mInputLabels, mOptInputLabels;
     OpFactoryVerb* mVerb = nullptr;
     bool mInvisible = false;
-    std::vector<std::string> mInvisibleNames;
     SpareDataMap mSpareData;
 
     static constexpr auto* kSpareDataCmdName = "opsparedata";
@@ -1316,12 +1315,6 @@ OpFactory::~OpFactory()
 
     if (mImpl->mInvisible) {
         mImpl->mTable->addOpHidden(mImpl->mName.c_str());
-    }
-
-    // hide other nodes in invisible name list
-
-    for (const auto& name : mImpl->mInvisibleNames) {
-        mImpl->mTable->addOpHidden(name.c_str());
     }
 }
 
@@ -1401,6 +1394,13 @@ OpFactory::documentation() const
 
 const OP_OperatorTable&
 OpFactory::table() const
+{
+    return *mImpl->mTable;
+}
+
+
+OP_OperatorTable&
+OpFactory::table()
 {
     return *mImpl->mTable;
 }
@@ -1505,14 +1505,6 @@ OpFactory&
 OpFactory::setInvisible()
 {
     mImpl->mInvisible = true;
-    return *this;
-}
-
-
-OpFactory&
-OpFactory::addInvisibleName(const std::string& name)
-{
-    mImpl->mInvisibleNames.push_back(name);
     return *this;
 }
 

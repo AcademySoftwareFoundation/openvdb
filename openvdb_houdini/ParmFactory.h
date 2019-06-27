@@ -516,16 +516,17 @@ public:
     /// @details This is equivalent to using the hscript ophide method.
     OpFactory& setInvisible();
 
-    /// @brief Mark another node as hidden from the UI tab menu.
-    /// @details This is equivalent to using the hscript ophide method.
-    OpFactory& addInvisibleName(const std::string& name);
-
     /// @brief Specify (@e key, @e value) pairs of spare data for this operator.
     /// @details If a key already exists, its corresponding value will be
     /// overwritten with the new value.
     /// @sa @link addOperatorSpareData() addOperatorSpareData@endlink,
     ///     @link getOperatorSpareData() getOperatorSpareData@endlink
     OpFactory& addSpareData(const SpareDataMap&);
+
+protected:
+    /// @brief Return the operator table with which this factory is associated.
+    /// @details This accessor is mainly for use by derived OpFactory classes.
+    OP_OperatorTable& table();
 
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
