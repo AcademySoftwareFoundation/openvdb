@@ -23,6 +23,9 @@ Improvements:
   @vdblink{math::isNan(),math::isNan} to resolve Visual&nbsp;Studio
   compatibility issues with integer types.
 - Minor performance improvements to moving and filtering VDB points.
+- Improved performance related to a mutex contention when appending
+  multiple @vdblink::points::AttributeArray AttributeArrays@endlink in parallel
+  through various point operations.
 - Increase minimum supported version of GLFW to 3.1 and improve CMake support
   for GLFW versions >= 3.1.
 
@@ -42,6 +45,8 @@ Bug fixes:
   @vdblink{tools::fillWithSpheres(),fillWithSpheres} tool
   that caused generated spheres to sometimes extend outside the target volume.
 - CMake now correctly sets rpaths for the unit test binary.
+- Fixed a memory leak in a static variable pointer.
+  <I>[Contributed&nbsp;by&nbsp;Autodesk]</I>
 
 @par
 ABI changes:

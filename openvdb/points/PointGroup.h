@@ -452,13 +452,9 @@ inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void appendGroup(PointDataTree& tree, const Name& group)
+template <typename PointDataTreeT>
+inline void appendGroup(PointDataTreeT& tree, const Name& group)
 {
-    using Descriptor = AttributeSet::Descriptor;
-    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
-
-    using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
 
     if (group.empty()) {
@@ -470,7 +466,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
-    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
+    auto descriptor = attributeSet.descriptorPtr();
     GroupInfo groupInfo(attributeSet);
 
     // don't add if group already exists
@@ -488,14 +484,17 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         const Name groupName = descriptor->uniqueName("__group");
 
         descriptor = descriptor->duplicateAppend(groupName, GroupAttributeArray::attributeType());
-
         const size_t pos = descriptor->find(groupName);
 
         // insert new group attribute
 
-        AppendAttributeOp<PointDataTree> append(descriptor, pos);
-        LeafManagerT leafManager(tree);
-        tbb::parallel_for(leafManager.leafRange(), append);
+        tree::LeafManager<PointDataTreeT> leafManager(tree);
+        leafManager.foreach(
+            [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
+                auto expected = leaf.attributeSet().descriptorPtr();
+                leaf.appendAttribute(*expected, descriptor, pos);
+            }, /*threaded=*/true
+        );
     }
     else {
         // make the descriptor unique before we modify the group map
