@@ -711,13 +711,48 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     setNativeName(OpenVDBOpPolicy().getNativeName(*this));
 }
 
+OpenVDBOpFactory::~OpenVDBOpFactory()
+{
+    if (!mNativeName.empty()) {
+
+        // environment variable takes precedence over compiler flag
+
+        const char* opHidePolicy = std::getenv("OPENVDB_OPHIDE_POLICY");
+
+#ifdef OPENVDB_OPHIDE_POLICY
+        if (opHidePolicy == nullptr) {
+            opHidePolicy = OPENVDB_PREPROC_STRINGIFY(OPENVDB_OPHIDE_POLICY);
+        }
+#endif
+
+        if (opHidePolicy != nullptr) {
+            std::string opHidePolicyStr(opHidePolicy);
+
+            // to lower-case
+
+            std::transform(opHidePolicyStr.begin(), opHidePolicyStr.end(),
+                opHidePolicyStr.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            if (opHidePolicyStr == "aswf") {
+                // set this SOP to be hidden (if a native equivalent exists)
+                this->setInvisible();
+            } else if (opHidePolicyStr == "native") {
+                // mark the native equivalent SOP to be hidden
+                this->addInvisibleName(mNativeName);
+            }
+        }
+
+        addSpareData({{"nativename", mNativeName}});
+    }
+}
 
 OpenVDBOpFactory&
 OpenVDBOpFactory::setNativeName(const std::string& name)
 {
     // SideFX nodes have no native equivalent.
 #ifndef SESI_OPENVDB
-    addSpareData({{"nativename", name}});
+    mNativeName = name;
 #endif
     return *this;
 }

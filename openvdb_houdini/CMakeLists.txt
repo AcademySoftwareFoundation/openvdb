@@ -80,6 +80,24 @@ Enable the hiding of native VDB SOPs. For each ASWF SOP, this hides the equivale
 native SOP that is shipped with Houdini to simplify the operator tab menu. If OFF,
 both native and ASWF SOPs will be displayed. This is the default behavior. ]=] OFF)
 
+set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
+if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
+  set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING
+    "Choose an ophide policy, options are: none aswf native. If
+    OPENVDB_HOUDINI_OPHIDE_POLICY is set to 'aswf', hide AWSF SOPs for which a
+    native Houdini equivalent exists. If $OPENVDB_OPHIDE_POLICY is set to
+    'native', hide native Houdini SOPs for which an ASWF equivalent exists.
+    Otherwise show both SOPs (the default). Note that the environment variable
+    OPENVDB_OPHIDE_POLICY can be used to override this flag at runtime." FORCE
+  )
+else()
+  string(TOLOWER ${OPENVDB_HOUDINI_OPHIDE_POLICY} OPENVDB_HOUDINI_OPHIDE_POLICY)
+  if (NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} IN_LIST _OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS)
+    message(WARNING "Unrecognized value for OPENVDB_HOUDINI_OPHIDE_POLICY, using none instead.")
+    set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING FORCE)
+  endif()
+endif()
+
 mark_as_advanced(
   OPENVDB_HOUDINI_ENABLE_SESI_TAG
 )
@@ -217,6 +235,11 @@ set_target_properties(openvdb_houdini
     SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
     VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
 )
+
+if (OPENVDB_HOUDINI_OPHIDE_POLICY AND NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} STREQUAL "none")
+  target_compile_definitions(openvdb_houdini PRIVATE
+    "-DOPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_OPHIDE_POLICY}")
+endif()
 
 set(OPENVDB_DSO_NAMES
   GR_PrimVDBPoints

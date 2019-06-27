@@ -516,6 +516,10 @@ public:
     /// @details This is equivalent to using the hscript ophide method.
     OpFactory& setInvisible();
 
+    /// @brief Mark another node as hidden from the UI tab menu.
+    /// @details This is equivalent to using the hscript ophide method.
+    OpFactory& addInvisibleName(const std::string& name);
+
     /// @brief Specify (@e key, @e value) pairs of spare data for this operator.
     /// @details If a key already exists, its corresponding value will be
     /// overwritten with the new value.
