@@ -218,9 +218,6 @@ private:
                 void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
             } op( mGrid->tree() );
             tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
-            //for (auto &tree : pool) mGrid->tree().merge(tree, openvdb::MERGE_ACTIVE_STATES);
-            //auto t = pool.combine();
-
         } else {
             kernel(tbb::blocked_range<int>(imin, imax));//serial
             mGrid->tree().merge(*pool.begin(), openvdb::MERGE_ACTIVE_STATES);
