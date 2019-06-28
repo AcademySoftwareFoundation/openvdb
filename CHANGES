@@ -17,6 +17,8 @@ Version 6.2.0 - In development
     - Minor performance improvements to moving and filtering VDB points.
     - Improved performance related to a mutex contention when appending
       multiple AttributeArrays in parallel through various point operations.
+    - Increase minimum supported version of GLFW to 3.1 and improve CMake
+      support for GLFW versions >= 3.1.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container

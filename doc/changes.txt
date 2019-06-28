@@ -26,6 +26,8 @@ Improvements:
 - Improved performance related to a mutex contention when appending
   multiple @vdblink::points::AttributeArray AttributeArrays@endlink in parallel
   through various point operations.
+- Increase minimum supported version of GLFW to 3.1 and improve CMake support
+  for GLFW versions >= 3.1.
 
 @par
 Bug fixes:
