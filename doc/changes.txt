@@ -8,21 +8,26 @@
 
 @par
 Improvements:
-- <TT>FindOpenVDB.cmake</TT> now correctly propagates @c CXX version
-  requirements.
-- Improved directory and file path lookups of some CMake commands in
-  the root <TT>CMakeLists.txt</TT>.
-  <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
 - @vdblink{tree::LeafNode::modifyValue(),LeafNode::modifyValue} and
   @vdblink{tree::LeafNode::modifyValueAndActiveState(),
   LeafNode::modifyValueAndActiveState} now modify voxel values
   in place for improved performance.
-- Add CMake support for linking against Jemalloc and TBB malloc and enable
-  Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
 - Added @vdblink{math::isInfinite(),math::isInfinite} and
   @vdblink{math::isNan(),math::isNan} to resolve Visual&nbsp;Studio
   compatibility issues with integer types.
-- Minor performance improvements to moving and filtering VDB points.
+- Made minor performance improvements to moving and filtering VDB points.
+- Improved performance related to a mutex contention when appending
+  multiple @vdblink{points::AttributeArray,AttributeArray}<I></I>s
+  in parallel through various point operations.
+- Improved directory and file path lookups of some CMake commands in
+  the root <TT>CMakeLists.txt</TT>.
+  <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
+- Improved CMake support for GLFW versions 3.1 and later.
+- <TT>FindOpenVDB.cmake</TT> now correctly propagates @c CXX version
+  requirements.
+- Added CMake support for linking against Jemalloc and TBB&nbsp;malloc
+  and enabled Jemalloc by default for Linux and non-Maya builds
+  and TBB&nbsp;malloc for all other builds.
 
 @par
 Bug fixes:
@@ -40,6 +45,8 @@ Bug fixes:
   @vdblink{tools::fillWithSpheres(),fillWithSpheres} tool
   that caused generated spheres to sometimes extend outside the target volume.
 - CMake now correctly sets rpaths for the unit test binary.
+- Fixed a memory leak in a static variable pointer.
+  <I>[Contributed&nbsp;by&nbsp;Autodesk]</I>
 
 @par
 ABI changes:
@@ -55,6 +62,7 @@ API changes:
 - Removed the @b TableT template argument from
   @vdblink{util::PagedArray,PagedArray}.
   The table type is now hardcoded to <B>std::deque</B>.
+- The minimum supported version of GLFW is now&nbsp;3.1.
 
 @par
 Python:
