@@ -29,6 +29,8 @@ Improvements:
 - Significantly improve performance of
   @vdblink::tools::createLevelSetSphere createLevelSetSphere@endlink due to
   multithreading.
+- Increase minimum supported version of GLFW to 3.1 and improve CMake support
+  for GLFW versions >= 3.1.
 
 @par
 Bug fixes:

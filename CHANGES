@@ -19,6 +19,8 @@ Version 6.2.0 - In development
       multiple AttributeArrays in parallel through various point operations.
     - Significantly improve performance of createLevelSetSphere due to
       multithreading.
+    - Increase minimum supported version of GLFW to 3.1 and improve CMake
+      support for GLFW versions >= 3.1.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
