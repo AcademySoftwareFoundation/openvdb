@@ -214,9 +214,8 @@ private:
                 Op(const Op& other, tbb::split) : mDelete(true), mTree(new TreeT(other.mTree->background())) {}
                 ~Op() { if (mDelete) delete mTree; }
                 void operator()(RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
-                void join(Op &other) { mTree->merge(*(other.mTree), openvdb::MERGE_ACTIVE_STATES); }
-                //void join(Op &other) { this->merge(*(other.mTree)); }
-                //void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
+                void join(Op &other) { this->merge(*(other.mTree)); }
+                void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
             } op( mGrid->tree() );
             tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
         } else {
