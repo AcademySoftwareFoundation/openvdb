@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 HOUDINI_MAJOR="$1"
+HOUPASS="$2"
 
 # install houdini pre-requisites
 apt-get install -y libxi-dev
@@ -12,7 +13,7 @@ apt-get install -y python-mechanize
 
 export PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/dist-packages
 # download and unpack latest houdini headers and libraries from daily-builds
-python ci/download_houdini.py $HOUDINI_MAJOR
+python ci/download_houdini.py $HOUDINI_MAJOR $HOUPASS
 
 tar -xzf hou.tar.gz
 ln -s houdini* hou

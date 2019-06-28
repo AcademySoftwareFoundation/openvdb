@@ -77,13 +77,13 @@ _jemalloc:
 _houdini:
   houdini17_5: &install_houdini17_5
     name: Install Houdini 17.5
-    command: bash ci/install_houdini.sh 17.5
+    command: bash ci/install_houdini.sh 17.5 ${HOUPASS}
   houdini17_0: &install_houdini17_0
     name: Install Houdini 17.0
-    command: bash ci/install_houdini.sh 17.0
+    command: bash ci/install_houdini.sh 17.0 ${HOUPASS}
   houdini16_5: &install_houdini16_5
     name: Install Houdini 16.5
-    command: bash ci/install_houdini.sh 16.5
+    command: bash ci/install_houdini.sh 16.5 ${HOUPASS}
 
 # Build and Test Aliases
 
