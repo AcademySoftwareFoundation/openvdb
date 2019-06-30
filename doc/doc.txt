@@ -12,9 +12,11 @@ for common tasks such as filtering, CSG, compositing, sampling and
 voxelization from other geometric representations. The technical details
 of VDB are described in the paper <A href="http://www.museth.org/Ken/Publications.html">&ldquo;VDB:&nbsp;High-Resolution Sparse Volumes with Dynamic Topology&rdquo;</A>.
 
-@b OpenVDB is maintained by
-<A HREF="http://www.dreamworksanimation.com">DreamWorks Animation</A>
-and was developed primarily by
+@b OpenVDB is maintained by the
+<A HREF="https://www.aswf.io/">Academy Software Foundation&nbsp;(ASWF)</A>.
+It was originally developed at
+<A HREF="https://www.dreamworksanimation.com/">DreamWorks Animation</A>,
+primarily by
 - Ken Museth
 - Peter Cucka
 - Mihai Ald&eacute;n
@@ -40,6 +42,10 @@ See @subpage points "OpenVDB Points" to store point data using @b OpenVDB.
 
 See @subpage python "Using OpenVDB in Python" to get started with the
 @b OpenVDB Python module.
+
+@if OPENVDB_HOUDINI
+See the @subpage houdini "Houdini Cookbook" for help on implementing Houdini nodes.
+@endif
 
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".

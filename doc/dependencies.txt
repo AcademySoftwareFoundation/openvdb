@@ -56,7 +56,7 @@ Clang          | 3.8     | Latest      | C++ 11 Compiler: A C language family fr
 Intel ICC      | 15      | Latest      | C++ 11 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
 IlmBase        | 2.2     | 2.2         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
-TBB            | 4.4     | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
+TBB            | 4.4.6   | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
 Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread                     | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
@@ -64,7 +64,7 @@ NumPy          | 1.9.2   | 1.9.2       | Scientific computing with Python       
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5*    | 1.5*        | Recommended dependency for improved disk compression              | N       | N**      | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
-GLFW           | 3.0     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
+GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 

@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v6_1_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 6.1.1</B> - <I>In development</I>
+<B>Version 6.2.0</B> - <I>In development</I>
 
 @par
 Improvements:
@@ -13,27 +13,43 @@ Improvements:
 - Improved directory and file path lookups of some CMake commands in
   the root <TT>CMakeLists.txt</TT>.
   <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
-- @vdblink::tree::LeafNode::modifyValue() LeafNode::modifyValue@endlink and
-  @vdblink::tree::LeafNode::modifyValueAndActiveState()
-  LeafNode::modifyValueAndActiveState@endlink now modify voxel values
+- @vdblink{tree::LeafNode::modifyValue(),LeafNode::modifyValue} and
+  @vdblink{tree::LeafNode::modifyValueAndActiveState(),
+  LeafNode::modifyValueAndActiveState} now modify voxel values
   in place for improved performance.
 - Add CMake support for linking against Jemalloc and TBB malloc and enable
   Jemalloc by default for Linux and non-Maya, otherwise use TBB malloc.
-- Added math::isInfinite() and math::isNan() to resolve Visual Studio
+- Added @vdblink{math::isInfinite(),math::isInfinite} and
+  @vdblink{math::isNan(),math::isNan} to resolve Visual&nbsp;Studio
   compatibility issues with integer types.
+- Minor performance improvements to moving and filtering VDB points.
+- Improved performance related to a mutex contention when appending
+  multiple @vdblink::points::AttributeArray AttributeArrays@endlink in parallel
+  through various point operations.
+- Significantly improve performance of
+  @vdblink::tools::createLevelSetSphere createLevelSetSphere@endlink due to
+  multithreading.
+- Increase minimum supported version of GLFW to 3.1 and improve CMake support
+  for GLFW versions >= 3.1.
 
 @par
 Bug fixes:
+- Replaced @b std::vector with @b std::deque as the underlying container
+  for @vdblink{util::PagedArray,PagedArray}, to address a rare crash
+  when reading from multiple threads while writing from another thread.
 - Fixed a bug in
-  @vdblink::tools::computeScalarPotential() computeScalarPotential@endlink
+  @vdblink{tools::computeScalarPotential(),computeScalarPotential}
   that could produce a corrupt result due to invalid memory access.
   <I>[Reported&nbsp;by&nbsp;Edwin&nbsp;Braun]</I>
 - Partially reverted the
-  @vdblink::tools::ClosestSurfacePoint ClosestSurfacePoint@endlink
+  @vdblink{tools::ClosestSurfacePoint,ClosestSurfacePoint}
   tool&rsquo;s distance calculations to their pre-OpenVDB&nbsp;5.0 behavior
   to address a bug in the
-  @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink tool
+  @vdblink{tools::fillWithSpheres(),fillWithSpheres} tool
   that caused generated spheres to sometimes extend outside the target volume.
+- CMake now correctly sets rpaths for the unit test binary.
+- Fixed a memory leak in a static variable pointer.
+  <I>[Contributed&nbsp;by&nbsp;Autodesk]</I>
 
 @par
 ABI changes:
@@ -44,6 +60,13 @@ ABI changes:
   dependent code.
 
 @par
+API changes:
+- Changed a type alias in @vdblink{points::RandomLeafFilter,RandomLeafFilter}.
+- Removed the @b TableT template argument from
+  @vdblink{util::PagedArray,PagedArray}.
+  The table type is now hardcoded to <B>std::deque</B>.
+
+@par
 Python:
 - CMake now always produces a <TT>.so</TT> for the Python module
   on UNIX platforms.
@@ -52,17 +75,29 @@ Python:
 
 @par
 Houdini:
-- Added <B>openvdb_houdini::GEOvdbApply</B>, which invokes a functor
+- Added API documentation and examples.
+- Added @hvdblink{GEOvdbApply,GEOvdbApply}, which invokes a functor
   on a VDB primitive if the resolved grid type is a member of
   a given type list.
 - Fixed a regression in the Fill&nbsp;SOP that caused it to modify VDBs
   in the input detail.
 - The Combine&nbsp;SOP no longer crashes in <B>Copy&nbsp;B</B> mode when the
   destination is not a&nbsp;VDB.
-- Added a @b houdini_utils::OpFactory::setInvisible method to hide nodes
-  from tab menus.
-- Added methods to store parent name and visibility of native SOPs to
-  @b openvdb_houdini::OpenVDBOpFactory.
+- Added an @hulink{OpFactory::addSpareData(),OpFactory::addSpareData} method
+  and @hulink{addOperatorSpareData(),addOperatorSpareData} and
+  @hulink{getOperatorSpareData(),getOperatorSpareData} functions
+  to manage spare data associated with operator types.
+- Added an @c opsparedata HScript command and @c hou.NodeType.spareData
+  and @c hou.NodeType.spareDataDict methods to retrieve spare data
+  associated with operator types.
+- Added an @hulink{OpFactory::setInvisible(),OpFactory::setInvisible} method
+  to hide nodes from tab menus.
+- Added an
+  @hvdblink{OpenVDBOpFactory::setNativeName(),OpenVDBOpFactory::setNativeName}
+  method to pair OpenVDB nodes with their native Houdini equivalents.
+- Added an @hulink{OpPolicy::getTabSubMenuPath(),OpPolicy::getTabSubMenuPath}
+  method to allow @b OpPolicy subclasses to provide their own tab sub-menu path.
+- OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
@@ -2482,8 +2517,7 @@ API changes:
   @vdblink::math::Transform Transform@endlink objects (and
   @vdblink::Grid Grid@endlink objects in the context of Houdini SOPs)
   are now passed and accessed primarily by reference rather than by
-  shared pointer.  See @subpage api_0_98_0 "Porting to OpenVDB 0.98.0"
-  for details about this important API change.
+  shared pointer.
   <I>[Contributed by SESI]</I>
 - Reimplemented @vdblink::math::CoordBBox CoordBBox@endlink to address several
   off-by-one bugs related to bounding box dimensions.
