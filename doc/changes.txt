@@ -31,6 +31,8 @@ Improvements:
   multithreading.
 - Increase minimum supported version of GLFW to 3.1 and improve CMake support
   for GLFW versions >= 3.1.
+- Add a USE_COLORED_OUTPUT option to CMake to add the compiler flag to color
+  the compiler output.
 
 @par
 Bug fixes:
