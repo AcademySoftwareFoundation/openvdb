@@ -85,6 +85,7 @@ option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
+option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
 CMAKE_DEPENDENT_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -323,14 +324,35 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration - default to Release if none is set
+# Build type configuration - default to Release if none is set unless
+# code coverage is in use, in which case override to Debug
 
-if(NOT CMAKE_BUILD_TYPE)
+if (OPENVDB_CODE_COVERAGE)
+  message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
+    "to Debug.")
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING
+    "Code coverage requires debug mode." FORCE
+  )
+elseif(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING
     "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
   )
 endif()
 message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+
+# Code coverage configuration
+
+if(OPENVDB_CODE_COVERAGE)
+  # set gcov compile and link flags
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+
+  # use .gcno extension instead of .cc.gcno
+  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
+endif()
+
+# System path configuration
 
 if(USE_SYSTEM_LIBRARY_PATHS)
   set(SYSTEM_LIBRARY_PATHS
