@@ -31,6 +31,7 @@ Improvements:
   multithreading.
 - Increase minimum supported version of GLFW to 3.1 and improve CMake support
   for GLFW versions >= 3.1.
+- Add an OPENVDB_CODE_COVERAGE option to CMake.
 
 @par
 Bug fixes:
