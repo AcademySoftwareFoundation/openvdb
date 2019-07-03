@@ -32,6 +32,7 @@
 #define OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/util/logging.h> // OPENVDB_LOG_ERROR
 #include <exception>
 #include <sstream>
 #include <string>
@@ -52,7 +53,11 @@ public:
 
     const char* what() const noexcept override
     {
-        try { return mMessage.c_str(); } catch (...) {}
+        try {
+            return mMessage.c_str();
+        } catch (...) {
+            OPENVDB_LOG_ERROR("Unexpected exception thrown in io::Exception::what().");
+        }
         return nullptr;
     }
 
@@ -63,7 +68,9 @@ protected:
         try {
             if (eType) mMessage = eType;
             if (msg) mMessage += ": " + (*msg);
-        } catch (...) {}
+        } catch (...) {
+            OPENVDB_LOG_ERROR("Unexpected exception thrown in io::Exception constructor.");
+        }
     }
 
 private:

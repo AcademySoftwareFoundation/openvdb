@@ -153,7 +153,10 @@ Metadata::operator==(const Metadata& other) const
         this->writeValue(bytes);
         other.writeValue(otherBytes);
         return (bytes.str() == otherBytes.str());
-    } catch (Exception&) {}
+    } catch (Exception&) {
+        OPENVDB_LOG_INFO(
+            "Ignoring exception thrown in Metadata::operator==().");
+    }
     return false;
 }
 

@@ -102,6 +102,8 @@ public:
                 OPENVDB_LOG_ERROR(msg);
             }
         } catch (...) {
+            OPENVDB_LOG_ERROR(
+                "Unexpected exception thrown in io::OutputTask::execute().");
         }
         this->notify(status);
         return nullptr; // no successor to this task

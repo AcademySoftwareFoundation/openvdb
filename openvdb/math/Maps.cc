@@ -232,7 +232,8 @@ approxInverse(const Mat4d& mat4d)
         try {
             return mat4d.inverse();
         } catch (ArithmeticError& ) {
-            // Mat4 code couldn't invert.
+            OPENVDB_LOG_INFO(
+                "Mat4 couldn't be inverted in approxInverse(const Mat4d&)");
         }
     }
 
