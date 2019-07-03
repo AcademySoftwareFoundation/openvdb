@@ -90,10 +90,17 @@ AttributeSet::AttributeSet()
 }
 
 
-AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
+AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
         const AttributeArray* existingArray = attrSet.getConst(pos);
@@ -101,7 +108,7 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
         const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
 
         AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
-            stride, constantStride);
+            stride, constantStride, lock);
 
         // transfer hidden and transient flags
         if (existingArray->isHidden())      array->setHidden(true);
@@ -112,13 +119,21 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
 }
 
 
-AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength)
+AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
+            /*stride=*/1, /*constantStride=*/true, lock);
     }
 }
 
@@ -291,7 +306,8 @@ AttributeSet::appendAttribute(  const Name& name,
 
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
-                                const size_t pos, const Index strideOrTotalSize, const bool constantStride)
+                                const size_t pos, const Index strideOrTotalSize, const bool constantStride,
+                                const AttributeArray::ScopedRegistryLock* lock)
 {
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
@@ -312,7 +328,8 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 
     // append the new array
 
-    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, strideOrTotalSize, constantStride);
+    AttributeArray::Ptr array = AttributeArray::create(
+        type, arrayLength, strideOrTotalSize, constantStride, lock);
 
     // if successful, update Descriptor and append the created array
 

@@ -197,7 +197,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_NUMPY_VERSION 1.9.2)
 
   set(MINIMUM_CPPUNIT_VERSION 1.10)
-  set(MINIMUM_GLFW_VERSION 3.0)
+  set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
   set(MINIMUM_HOUDINI_VERSION 16.5)
 
@@ -263,32 +263,29 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
 endif()
 
-# Add the doxygen command if required - do this here so we guarantee not to error on
-# unrelated build issues
+# Configure DCC installation if necessary
+
+if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+  set(USE_HOUDINI ON)
+endif()
+
+if(OPENVDB_BUILD_MAYA_PLUGIN)
+  set(USE_MAYA ON)
+endif()
+
+# Configure component dependencies by loading the Houdini/Maya setup
+# scripts. These also find the Houdini/Maya installations
+
+if(USE_HOUDINI)
+  include(OpenVDBHoudiniSetup)
+endif()
+
+if(USE_MAYA)
+  include(OpenVDBMayaSetup)
+endif()
 
 if(OPENVDB_BUILD_DOCS)
-  find_package(Doxygen REQUIRED)
-  if(DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION)
-    message(WARNING "The doxygen-config doxyfile has been generated with version "
-      "\"${MINIMUM_DOXYGEN_VERSION}\". Found Doxygen version \"${DOXYGEN_VERSION}\". "
-      "Documentation may contain errors."
-    )
-  endif()
-
-  # @todo use cmake doxygen functions available from cmake 3.9
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/doxygen-config DOXYGEN_CONFIG_CONTENT)
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
-  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
-  )
-
-  add_custom_target(doc ALL
-    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/openvdb
-    COMMENT "Generating API documentation with Doxygen" VERBATIM
-  )
-
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION docs)
+  add_subdirectory(doc)
 endif()
 
 # Early exit if there's nothing to build
@@ -302,6 +299,15 @@ if(NOT (
     OPENVDB_BUILD_MAYA_PLUGIN)
   )
   return()
+endif()
+
+if(USE_MAYA AND USE_HOUDINI)
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met."
+  )
 endif()
 
 #########################################################################
@@ -401,38 +407,6 @@ if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
   message(WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
 unset(HAS_AVAILABLE_WARNINGS)
-
-##########################################################################
-
-# Configure DCC installation if necessary
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  set(USE_HOUDINI ON)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  set(USE_MAYA ON)
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
-endif()
-
-# Configure component dependencies by loading the Houdini/Maya setup
-# scripts. These also find the Houdini/Maya installations
-
-if(USE_HOUDINI)
-  include(OpenVDBHoudiniSetup)
-endif()
-
-if(USE_MAYA)
-  include(OpenVDBMayaSetup)
-endif()
 
 # Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
 # * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:

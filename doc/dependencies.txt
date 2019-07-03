@@ -64,7 +64,7 @@ NumPy          | 1.9.2   | 1.9.2       | Scientific computing with Python       
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5*    | 1.5*        | Recommended dependency for improved disk compression              | N       | N**      | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
-GLFW           | 3.0     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
+GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 

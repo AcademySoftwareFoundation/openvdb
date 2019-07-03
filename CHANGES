@@ -15,12 +15,17 @@ Version 6.2.0 - In development
     - Added math::isInfinite() and math::isNan() to resolve Visual Studio
       compatibility issues with integer types.
     - Minor performance improvements to moving and filtering VDB points.
+    - Improved performance related to a mutex contention when appending
+      multiple AttributeArrays in parallel through various point operations.
+    - Significantly improve performance of createLevelSetSphere due to
+      multithreading.
+    - Increase minimum supported version of GLFW to 3.1 and improve CMake
+      support for GLFW versions >= 3.1.
 
     Bug fixes:
-    - Fixed a (rare) crash in util::PagedArray caused by the fact that std::vector
-      (unlike std::deque) does not allow mutiple threads to call operator[] while one thread
-      calls push_back. The last template argument of PageArray is now elimited
-      and PageTableT is set to std::deque.
+    - Replaced std::vector with std::deque as the underlying container
+      for util::PagedArray, to address a rare crash when reading
+      from multiple threads while writing from another thread.
     - Fixed a bug in tools::computeScalarPotential() that could produce
       a corrupt result due to invalid memory access.
       [Reported by Edwin Braun]
@@ -29,6 +34,8 @@ Version 6.2.0 - In development
       fillWithSpheres() tool that caused generated spheres to sometimes
       extend outside the target volume.
     - CMake now correctly sets rpaths for the unit test binary.
+    - Fixed a memory leak in a static variable pointer.
+      [Contributed by Autodesk]
 
     ABI changes:
     - ABI versions 3 and older are now deprecated, and support for them will be
@@ -39,6 +46,8 @@ Version 6.2.0 - In development
 
     API changes:
     - Changed a type alias in points::RandomLeafFilter.
+    - Removed the TableT template argument from util::PagedArray.
+      The table type is now hardcoded to std::deque.
 
     Python:
     - CMake now always produces a .so for the Python module on UNIX platforms.
@@ -46,6 +55,7 @@ Version 6.2.0 - In development
       [Reported by yurivict]
 
     Houdini:
+    - Added API documentation and examples.
     - Added openvdb_houdini::GEOvdbApply(), which invokes a functor
       on a VDB primitive if the resolved grid type is a member of
       a given type list.
@@ -53,13 +63,19 @@ Version 6.2.0 - In development
       in the input detail.
     - The Combine SOP no longer crashes in Copy B mode when the destination
       is not a VDB.
+    - Added a houdini_utils::OpFactory::addSpareData() method
+      and addOperatorSpareData() and getOperatorSpareData() functions
+      to manage spare data associated with operator types.
+    - Added an opsparedata HScript command and hou.NodeType.spareData()
+      and hou.NodeType.spareDataDict() methods to retrieve spare data
+      associated with operator types.
     - Added a houdini_utils::OpFactory::setInvisible() method to hide nodes
       from tab menus.
-    - Added methods to store parent name and visibility of native SOPs to
-      @b openvdb_houdini::OpenVDBOpFactory.
+    - Added an OpenVDBOpFactory::setNativeName() method to pair OpenVDB nodes
+      with their native Houdini equivalents.
     - Added a houdini_utils::OpPolicy::getTabSubMenuPath() method to allow
       OpPolicy subclasses to provide their own tab sub-menu path.
-    - OpenVDB SOPs are now displayed in the ASWF tab sub-menu nested under VDB.
+    - OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
 
 
 Version 6.1.0 - May 8, 2019
