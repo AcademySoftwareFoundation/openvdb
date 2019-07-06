@@ -5,11 +5,7 @@ set -e
 HOUDINI_MAJOR="$1"
 HOUPASS="$2"
 
-# install houdini pre-requisites
-apt-get install -y libxi-dev
-apt-get install -y csh
-apt-get install -y default-jre
-apt-get install -y python-mechanize
+pip install --user mechanize
 
 export PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/dist-packages
 # download and unpack latest houdini headers and libraries from daily-builds
