@@ -21,6 +21,8 @@ Version 6.2.0 - In development
       multithreading.
     - Increase minimum supported version of GLFW to 3.1 and improve CMake
       support for GLFW versions >= 3.1.
+    - Add a USE_COLORED_OUTPUT option to CMake to add the compiler flag to
+      color the compiler output.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
