@@ -50,7 +50,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace util {
 
-/// Output a byte count with the correct binary suffix (KB, MB, GB or TB).
+/// @brief Output a byte count with the correct binary suffix (KB, MB, GB or TB).
+///
 /// @param os         the output stream
 /// @param bytes      the byte count to be output
 /// @param head       a string to be output before the numeric text
@@ -58,6 +59,7 @@ namespace util {
 /// @param exact      if true, also output the unmodified count, e.g., "4.6 KB (4620 Bytes)"
 /// @param width      a fixed width for the numeric text
 /// @param precision  the number of digits after the decimal point
+///
 /// @return 0, 1, 2, 3 or 4, denoting the order of magnitude of the count.
 OPENVDB_API int
 printBytes(std::ostream& os, uint64_t bytes,
@@ -65,7 +67,8 @@ printBytes(std::ostream& os, uint64_t bytes,
     const std::string& tail = "\n",
     bool exact = false, int width = 8, int precision = 3);
 
-/// Output a number with the correct SI suffix (thousand, million, billion or trillion)
+/// @brief Output a number with the correct SI suffix (thousand, million, billion or trillion)
+///
 /// @param os         the output stream
 /// @param number     the number to be output
 /// @param head       a string to be output before the numeric text
@@ -73,6 +76,7 @@ printBytes(std::ostream& os, uint64_t bytes,
 /// @param exact      if true, also output the unmodified count, e.g., "4.6 Thousand (4620)"
 /// @param width      a fixed width for the numeric text
 /// @param precision  the number of digits after the decimal point
+///
 /// @return 0, 1, 2, 3 or 4, denoting the order of magnitude of the number.
 OPENVDB_API int
 printNumber(std::ostream& os, uint64_t number,
@@ -80,7 +84,8 @@ printNumber(std::ostream& os, uint64_t number,
     const std::string& tail = "\n",
     bool exact = true, int width = 8, int precision = 3);
 
-/// Output a time in milliseconds with the correct suffix (days, hours, minutes, seconds and milliseconds)
+/// @brief Output a time in milliseconds with the correct suffix (days, hours, minutes, seconds and milliseconds)
+///
 /// @param os             the output stream
 /// @param milliseconds   the time to be output
 /// @param head           a string to be output before the time
@@ -88,6 +93,7 @@ printNumber(std::ostream& os, uint64_t number,
 /// @param width          a fixed width for the numeric text
 /// @param precision      the number of digits after the decimal point
 /// @param verbose        verbose level, 0 is compact format and 1 is long format
+///
 /// @return 0, 1, 2, 3, or 4 denoting the order of magnitude of the time.
 OPENVDB_API int
 printTime(std::ostream& os, double milliseconds,
