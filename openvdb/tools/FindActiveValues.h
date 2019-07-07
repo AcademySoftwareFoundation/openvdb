@@ -114,7 +114,7 @@ public:
     ~FindActiveValues();
 
     /// @brief Initiate this class with a new (or modified) tree.
-    void init(const TreeT& tree);
+    void update(const TreeT& tree);
 
     /// @brief Returns true if the specified bounding box intersects any active values.
     ///
@@ -139,7 +139,7 @@ private:
     void clear();
 
     // builds internal data structures
-    void setup(const TreeT &tree);
+    void init(const TreeT &tree);
 
     template<typename NodeT>
     typename NodeT::NodeMaskType getBBoxMask(const CoordBBox &bbox, const NodeT* node) const;
@@ -174,7 +174,7 @@ private:
 template<typename TreeT>
 FindActiveValues<TreeT>::FindActiveValues(const TreeT& tree) : mAcc(tree), mRootTiles(), mRootNodes()
 {
-    this->setup(tree);
+    this->init(tree);
 }
 
 template<typename TreeT>
@@ -184,11 +184,11 @@ FindActiveValues<TreeT>::~FindActiveValues()
 }
 
 template<typename TreeT>
-void FindActiveValues<TreeT>::init(const TreeT& tree)
+void FindActiveValues<TreeT>::update(const TreeT& tree)
 {
     this->clear();
     mAcc = AccT(tree);
-    this->setup(tree);
+    this->init(tree);
 }
 
 template<typename TreeT>
@@ -199,7 +199,7 @@ void FindActiveValues<TreeT>::clear()
 }
 
 template<typename TreeT>
-void FindActiveValues<TreeT>::setup(const TreeT& tree)
+void FindActiveValues<TreeT>::init(const TreeT& tree)
 {
     for (auto i = tree.root().cbeginChildOn(); i; ++i) {
         mRootNodes.emplace_back(i.getCoord(), &*i);
