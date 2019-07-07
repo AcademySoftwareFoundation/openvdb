@@ -31,7 +31,7 @@
 /// @file FindActiveValues.h
 ///
 /// @brief Finds the active values in a tree which intersects a bounding box.
-///        Two methods are provided, one that count the number of active values
+///        Two methods are provided, one that counts the number of active values
 ///        and one that simply tests if any active values intersect the bbox.
 ///
 /// @warning For repeated calls to the free-standing functions defined below
