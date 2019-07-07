@@ -105,12 +105,12 @@ TestFindActiveValues::testSphere1()
     unittest_util::makeSphere<openvdb::FloatGrid>(
         openvdb::Coord(dim), center, radius, *grid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
 
-    const int c = 0.5f/voxel_size;
+    const int c = int(0.5f/voxel_size);
     const openvdb::CoordBBox a(openvdb::Coord(c), openvdb::Coord(c+ 8));
     CPPUNIT_ASSERT(!tree.isValueOn(openvdb::Coord(c)));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, a));
 
-    const openvdb::Coord d(c + radius/voxel_size, c, c);
+    const openvdb::Coord d(c + int(radius/voxel_size), c, c);
     CPPUNIT_ASSERT(tree.isValueOn(d));
     const auto b = openvdb::CoordBBox::createCube(d, 4);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, b));
@@ -137,7 +137,7 @@ TestFindActiveValues::testSphere2()
         //timer.stop();
     }
     {//test on sphere
-        const openvdb::Coord d(radius/voxelSize, 0, 0);
+        const openvdb::Coord d(int(radius/voxelSize), 0, 0);
         CPPUNIT_ASSERT(tree.isValueOn(d));
         const auto bbox = openvdb::CoordBBox::createCube(d, 4);
         //openvdb::util::CpuTimer timer("\non sphere");
@@ -163,7 +163,7 @@ TestFindActiveValues::testSphere2()
         }
         //const double t = timer.stop();
         //std::cerr << "Inscribed bbox = " << bbox << std::endl;
-        const int n = openvdb::math::Sqrt(openvdb::math::Pow2(radius-halfWidth*voxelSize)/3.0f)/voxelSize + 1;
+        const int n = int(openvdb::math::Sqrt(openvdb::math::Pow2(radius-halfWidth*voxelSize)/3.0f)/voxelSize) + 1;
         //std::cerr << "n=" << n << std::endl;
         CPPUNIT_ASSERT( bbox.max() == openvdb::Coord( n));
         CPPUNIT_ASSERT( bbox.min() == openvdb::Coord(-n));
@@ -179,7 +179,7 @@ TestFindActiveValues::testSphere2()
         }
         //const double t = timer.stop();
         //std::cerr << "Inscribed bbox = " << bbox << std::endl;
-        const int n = openvdb::math::Sqrt(openvdb::math::Pow2(radius-halfWidth*voxelSize)/3.0f)/voxelSize + 1;
+        const int n = int(openvdb::math::Sqrt(openvdb::math::Pow2(radius-halfWidth*voxelSize)/3.0f)/voxelSize) + 1;
         //std::cerr << "n=" << n << std::endl;
         //openvdb::util::printTime(std::cerr, t/count, "time per lookup ", "\n", true, 4, 3);
         CPPUNIT_ASSERT( bbox.max() == openvdb::Coord( n));
