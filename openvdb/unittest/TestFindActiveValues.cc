@@ -259,7 +259,7 @@ TestFindActiveValues::testBenchmarks()
 {
     {//benchmark test against active tiles in a sparsely filled box
       using namespace openvdb;
-      const int half_dim = 256, bbox_size = 1;
+      const int half_dim = 512, bbox_size = 6;
       const CoordBBox bbox(Coord(-half_dim), Coord(half_dim));
       FloatTree tree;
       tree.sparseFill(bbox, 1.0f, true);
@@ -272,7 +272,7 @@ TestFindActiveValues::testBenchmarks()
           //t = std::max(t, timer.restart());
           if (!test) break;
       }
-      //std::cout << "*The slowest sparse test " << t << " milliseconds\n";
+      //std::cout << "\n*The slowest sparse test " << t << " milliseconds\n";
       CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
     }
     {//benchmark test against active voxels in a densely filled box
@@ -296,10 +296,10 @@ TestFindActiveValues::testBenchmarks()
     {//benchmark test against active voxels in a densely filled box
       using namespace openvdb;
       FloatTree tree;
-      tree.denseFill(CoordBBox::createCube(Coord(0), 7), 1.0f, true);
+      tree.denseFill(CoordBBox::createCube(Coord(0), 256), 1.0f, true);
       tools::FindActiveValues<FloatTree> op(tree);
       //openvdb::util::CpuTimer timer("new test");
-      CPPUNIT_ASSERT(op.none(CoordBBox::createCube(Coord(7), 1)));
+      CPPUNIT_ASSERT(op.none(CoordBBox::createCube(Coord(256), 1)));
       //timer.stop();
     }
 }

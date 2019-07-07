@@ -8,10 +8,6 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -339,23 +335,54 @@ template<typename NodeT>
 Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox) const
 {
     Index64 count = 0;
-    // Generate a bit mask of the bbox coverage
-    auto mask = this->getBBoxMask(bbox, node);
 
-    // Check child nodes
-    const auto tmp = mask & node->getChildMask();// prune the child mask with the bbox mask
+    // Generate a bit masks
+    auto mask = this->getBBoxMask(bbox, node);
+    const auto childMask = mask & node->getChildMask();// prune the child mask with the bbox mask
+    mask &= node->getValueMask();// prune active tile mask with the bbox mask
     const auto* table = node->getTable();
-    for (auto i = tmp.beginOn(); i; ++i) {
+#if 0
+    // Check child nodes
+    for (auto i = childMask.beginOn(); i; ++i) {
         count += this->count(table[i.pos()].getChild(), bbox);
     }
-
     // Check active tiles
-    mask &= node->getValueMask();// prune active the tile mask with the bbox mask
     for (auto i = mask.beginOn(); i; ++i) {
         auto b = CoordBBox::createCube(node->offsetToGlobalCoord(i.pos()), NodeT::ChildNodeType::DIM);
         b.intersect(bbox);
         count += b.volume();
     }
+#else
+    {// Check child nodes
+        using ChildT = typename NodeT::ChildNodeType;
+        using RangeT = tbb::blocked_range<typename std::vector<const ChildT*>::iterator>;
+        std::vector<const ChildT*> childNodes(childMask.countOn());
+        int j=0;
+        for (auto i = childMask.beginOn(); i; ++i, ++j) childNodes[j] = table[i.pos()].getChild();
+        count += tbb::parallel_reduce( RangeT(childNodes.begin(), childNodes.end()), 0,
+            [&](const RangeT& r, Index64 sum)->Index64 {
+                for ( auto i = r.begin(); i != r.end(); ++i ) sum += this->count(*i, bbox);
+                return sum;
+            }, []( Index64 a, Index64 b )->Index64 { return a+b; }
+        );
+    }
+    {// Check active tiles
+        std::vector<Coord> coords(mask.countOn());
+        using RangeT = tbb::blocked_range<typename std::vector<Coord>::iterator>;
+        int j=0;
+        for (auto i = mask.beginOn(); i; ++i, ++j) coords[j] = node->offsetToGlobalCoord(i.pos());
+        count += tbb::parallel_reduce( RangeT(coords.begin(), coords.end()), 0,
+            [&bbox](const RangeT& r, Index64 sum)->Index64 {
+                for ( auto i = r.begin(); i != r.end(); ++i ) {
+                    auto b = CoordBBox::createCube(*i, NodeT::ChildNodeType::DIM);
+                    b.intersect(bbox);
+                    sum += b.volume();
+                }
+                return sum;
+            }, []( Index64 a, Index64 b )->Index64 { return a+b; }
+        );
+    }
+#endif
     return count;
 }
 
