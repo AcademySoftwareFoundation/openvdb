@@ -116,26 +116,30 @@ public:
     /// @brief Initiate this class with a new (or modified) tree.
     void init(const TreeT& tree);
 
-    void clear();
-
-    /// @brief Returns true if the specified bounding box intersects any active values
+    /// @brief Returns true if the specified bounding box intersects any active values.
     ///
     /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especailly
     ///          small bounding boxes, but at the cost of none-thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
     bool any(const CoordBBox &bbox, bool useAccessor = false) const;
 
-    /// @brief Returns true if the specified bounding box doens not intersect any active values
+    /// @brief Returns true if the specified bounding box doens not intersect any active values.
     ///
     /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especailly
     ///          small bounding boxes, but at the cost of none-thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
-    inline bool none(const CoordBBox &bbox, bool useAccessor = false) const { return !this->any(bbox, useAccessor); }
+    bool none(const CoordBBox &bbox, bool useAccessor = false) const { return !this->any(bbox, useAccessor); }
 
-    /// @brief Returns the number of active voxels intersected by the specified bounding box intersects
+    /// @brief Returns the number of active voxels intersected by the specified bounding box.
     Index64 count(const CoordBBox &bbox) const;
 
 private:
+
+    // Cleans up internal data structures
+    void clear();
+
+    // builds internal data structures
+    void setup(const TreeT &tree);
 
     template<typename NodeT>
     typename NodeT::NodeMaskType getBBoxMask(const CoordBBox &bbox, const NodeT* node) const;
@@ -154,16 +158,14 @@ private:
     template<typename NodeT>
     Index64 count(const NodeT* node, const CoordBBox &bbox) const;
 
-    void setup(const TreeT &tree);
-
     using AccT = tree::ValueAccessor<const TreeT, false/* IsSafe */>;
     using RootChildT = typename TreeT::RootNodeType::ChildNodeType;
 
     struct NodePairT;
 
-    const AccT mAcc;
-    std::vector<CoordBBox> mRootTiles;//faster to cache than to go through the std::map in the RootNode!
-    std::vector<NodePairT> mRootNodes;
+    AccT mAcc;
+    std::vector<CoordBBox> mRootTiles;// cache bbox of child nodes (faster to cache than access RootNode)
+    std::vector<NodePairT> mRootNodes;// cache bbox of acive tiles (faster to cache than access RootNode)
 
 };// FindActiveValues class
 

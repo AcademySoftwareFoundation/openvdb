@@ -196,8 +196,9 @@ TestFindActiveValues::testSparseBox()
       openvdb::FloatTree tree;
       CPPUNIT_ASSERT(tree.activeTileCount() == 0);
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
-      tree.sparseFill(bbox, 1.0f, true);
       openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
+      tree.sparseFill(bbox, 1.0f, true);
+      op.init(tree);//tree was modified to op needs to be initiated again
       CPPUNIT_ASSERT(tree.activeTileCount() > 0);
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
       for (int i=1; i<half_dim; ++i) {
