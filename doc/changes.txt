@@ -7,6 +7,11 @@
 <B>Version 6.2.0</B> - <I>In development</I>
 
 @par
+New features:
+- Added @vdblink{tools::FindActiveValues} that finds (and optioanlly
+  counts) the active values in a tree which intersects a bounding box.
+
+@par
 Improvements:
 - <TT>FindOpenVDB.cmake</TT> now correctly propagates @c CXX version
   requirements.
