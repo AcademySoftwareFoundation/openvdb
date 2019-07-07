@@ -8,8 +8,9 @@
 
 @par
 New features:
-- Added @vdblink{tools::FindActiveValues} that finds (and optionally
-  counts) the active values in a tree which intersects a bounding box.
+- Added @vdblink{tools::FindActiveValues, tools::FindActiveValues} that
+  finds (and optionally counts) the active values in a tree which
+  intersects a bounding box.
 
 @par
 Improvements:
