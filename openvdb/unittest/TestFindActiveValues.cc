@@ -191,33 +191,33 @@ void
 TestFindActiveValues::testSparseBox()
 {
     {//test active tiles in a sparsely filled box
-      const int half_dim = 256;
-      const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim));
-      openvdb::FloatTree tree;
-      CPPUNIT_ASSERT(tree.activeTileCount() == 0);
-      CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
-      openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
-      tree.sparseFill(bbox, 1.0f, true);
-      op.update(tree);//tree was modified to op needs to be updated
-      CPPUNIT_ASSERT(tree.activeTileCount() > 0);
-      CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
-      for (int i=1; i<half_dim; ++i) {
-          CPPUNIT_ASSERT(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
-      }
-      CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
+        const int half_dim = 256;
+        const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim));
+        openvdb::FloatTree tree;
+        CPPUNIT_ASSERT(tree.activeTileCount() == 0);
+        CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
+        openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
+        tree.sparseFill(bbox, 1.0f, true);
+        op.update(tree);//tree was modified to op needs to be updated
+        CPPUNIT_ASSERT(tree.activeTileCount() > 0);
+        CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
+        for (int i=1; i<half_dim; ++i) {
+            CPPUNIT_ASSERT(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+        }
+        CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
 
-      auto bbox2 = openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), 1);
-      //double t = 0.0;
-      //openvdb::util::CpuTimer timer;
-      for (bool test = true; test; ) {
-          //timer.restart();
-          test = op.any(bbox2);
-          //t = std::max(t, timer.restart());
-          if (test) bbox2.translate(openvdb::Coord(1));
-      }
-      //std::cerr << "bbox = " << bbox2 << std::endl;
-      //openvdb::util::printTime(std::cout, t, "The slowest sparse test ", "\n", true, 4, 3);
-      CPPUNIT_ASSERT(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
+        auto bbox2 = openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), 1);
+        //double t = 0.0;
+        //openvdb::util::CpuTimer timer;
+        for (bool test = true; test; ) {
+            //timer.restart();
+            test = op.any(bbox2);
+            //t = std::max(t, timer.restart());
+            if (test) bbox2.translate(openvdb::Coord(1));
+        }
+        //std::cerr << "bbox = " << bbox2 << std::endl;
+        //openvdb::util::printTime(std::cout, t, "The slowest sparse test ", "\n", true, 4, 3);
+        CPPUNIT_ASSERT(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
     }
 }
 

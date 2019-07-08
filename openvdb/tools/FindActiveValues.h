@@ -341,18 +341,7 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
     const auto childMask = mask & node->getChildMask();// prune the child mask with the bbox mask
     mask &= node->getValueMask();// prune active tile mask with the bbox mask
     const auto* table = node->getTable();
-#if 0
-    // Check child nodes
-    for (auto i = childMask.beginOn(); i; ++i) {
-        count += this->count(table[i.pos()].getChild(), bbox);
-    }
-    // Check active tiles
-    for (auto i = mask.beginOn(); i; ++i) {
-        auto b = CoordBBox::createCube(node->offsetToGlobalCoord(i.pos()), NodeT::ChildNodeType::DIM);
-        b.intersect(bbox);
-        count += b.volume();
-    }
-#else
+
     {// Check child nodes
         using ChildT = typename NodeT::ChildNodeType;
         using RangeT = tbb::blocked_range<typename std::vector<const ChildT*>::iterator>;
@@ -366,6 +355,7 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
             }, []( Index64 a, Index64 b )->Index64 { return a+b; }
         );
     }
+
     {// Check active tiles
         std::vector<Coord> coords(mask.countOn());
         using RangeT = tbb::blocked_range<typename std::vector<Coord>::iterator>;
@@ -382,7 +372,7 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
             }, []( Index64 a, Index64 b )->Index64 { return a+b; }
         );
     }
-#endif
+
     return count;
 }
 
