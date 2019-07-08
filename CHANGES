@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 6.2.0 - In development
 
+    New Features:
+    - Added tools::FindActiveValues that finds (and optionally counts)
+      the active values in a tree which intersects a bounding box.
+
     Improvements:
     - FindOpenVDB.cmake now correctly propagates CXX version requirements.
     - Improved directory and file path lookups of some CMake commands in
