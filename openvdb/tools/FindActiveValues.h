@@ -55,7 +55,7 @@ namespace tools {
 ///
 /// @warning For repeated calls to this method consider instead creating an instance of
 ///          FindActiveValues and then repeatedly call any(). This assumes the tree
-///          to be constant between calls but is sightly faster.
+///          to be constant between calls but is slightly faster.
 ///
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
@@ -68,7 +68,7 @@ anyActiveValues(const TreeT& tree, const CoordBBox &bbox);
 ///
 /// @warning For repeated calls to this method consider instead creating an instance of
 ///          FindActiveValues and then repeatedly call none(). This assumes the tree
-///          to be constant between calls but is sightly faster.
+///          to be constant between calls but is slightly faster.
 ///
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
@@ -81,7 +81,7 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox);
 ///
 /// @warning For repeated calls to this method consider instead creating an instance of
 ///          FindActiveValues and then repeatedly call count(). This assumes the tree
-///          to be constant between calls but is sightly faster.
+///          to be constant between calls but is slightly faster.
 ///
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
@@ -114,15 +114,15 @@ public:
 
     /// @brief Returns true if the specified bounding box intersects any active values.
     ///
-    /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especailly
-    ///          small bounding boxes, but at the cost of none-thread-safety. So if multiple threads are
+    /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especially
+    ///          small bounding boxes, but at the cost of no thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
     bool any(const CoordBBox &bbox, bool useAccessor = false) const;
 
-    /// @brief Returns true if the specified bounding box doens not intersect any active values.
+    /// @brief Returns true if the specified bounding box does not intersect any active values.
     ///
-    /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especailly
-    ///          small bounding boxes, but at the cost of none-thread-safety. So if multiple threads are
+    /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especially
+    ///          small bounding boxes, but at the cost of no thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
     bool none(const CoordBBox &bbox, bool useAccessor = false) const { return !this->any(bbox, useAccessor); }
 
