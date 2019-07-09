@@ -58,6 +58,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-base:2018
     timeoutInMinutes: 0
+    condition: variables['HOUPASS']
     steps:
     - bash: ci/install_houdini.sh 17.5 ${HOUPASS}
     - bash: ci/build_houdini.sh clang++ Release ON
@@ -68,6 +69,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-base:2018
     timeoutInMinutes: 0
+    condition: variables['HOUPASS']
     steps:
     - bash: ci/install_houdini.sh 17.0 ${HOUPASS}
     - bash: ci/build_houdini.sh clang++ Release OFF
@@ -78,6 +80,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-base:2018
     timeoutInMinutes: 0
+    condition: variables['HOUPASS']
     steps:
     - bash: ci/install_houdini.sh 16.5 ${HOUPASS}
     - bash: ci/build_houdini.sh clang++ Release OFF
@@ -98,6 +101,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-base:2018
     timeoutInMinutes: 0
+    condition: variables['HOUPASS']
     steps:
     - bash: ci/install_houdini.sh 17.5 ${HOUPASS}
     - bash: ci/build_houdini.sh g++ Release OFF
@@ -108,6 +112,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-base:2018
     timeoutInMinutes: 0
+    condition: variables['HOUPASS']
     steps:
     - bash: ci/install_houdini.sh 17.5 ${HOUPASS}
     - bash: ci/build_houdini.sh clang++ Debug OFF
