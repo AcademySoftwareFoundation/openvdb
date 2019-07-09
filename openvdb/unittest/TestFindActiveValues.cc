@@ -8,10 +8,6 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -152,7 +148,7 @@ TestFindActiveValues::testSphere2()
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
         CPPUNIT_ASSERT(op.count(bbox) == tree.activeVoxelCount());
     }
-    {// find largest instribed cube in index space containing NO active values
+    {// find largest inscribed cube in index space containing NO active values
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (class)");
@@ -169,7 +165,7 @@ TestFindActiveValues::testSphere2()
         CPPUNIT_ASSERT( bbox.min() == openvdb::Coord(-n));
         //openvdb::util::printTime(std::cerr, t/count, "time per lookup ", "\n", true, 4, 3);
     }
-    {// find largest instribed cube in index space containing NO active values
+    {// find largest inscribed cube in index space containing NO active values
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (func)");
         int count = 0;
@@ -198,7 +194,7 @@ TestFindActiveValues::testSparseBox()
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
         tree.sparseFill(bbox, 1.0f, true);
-        op.update(tree);//tree was modified to op needs to be updated
+        op.update(tree);//tree was modified so op needs to be updated
         CPPUNIT_ASSERT(tree.activeTileCount() > 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
         for (int i=1; i<half_dim; ++i) {
