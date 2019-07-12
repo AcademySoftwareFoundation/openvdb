@@ -95,6 +95,7 @@ set(UNITTEST_SOURCE_FILES
   TestDoubleMetadata.cc
   TestExceptions.cc
   TestFile.cc
+  TestFindActiveValues.cc
   TestFloatMetadata.cc
   TestGradient.cc
   TestGrid.cc

@@ -12,6 +12,7 @@ import exceptions
 
 # this argument is for the major.minor version of Houdini to download (such as 15.0, 15.5, 16.0)
 version = sys.argv[1]
+password = sys.argv[2]
 
 if not re.match('[0-9][0-9]\.[0-9]$', version):
     raise IOError('Invalid Houdini Version "%s", expecting in the form "major.minor" such as "16.0"' % version)
@@ -23,7 +24,7 @@ br.set_handle_robots(False)
 br.open('https://www.sidefx.com/login/?next=/download/daily-builds')
 br.select_form(nr=0)
 br.form['username'] = 'openvdb'
-br.form['password'] = 'L3_M2f2W'
+br.form['password'] = password
 br.submit()
 
 # retrieve download id
