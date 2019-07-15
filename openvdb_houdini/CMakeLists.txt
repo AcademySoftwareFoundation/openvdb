@@ -104,6 +104,9 @@ set(OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
 
 message(STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}")
 
+set(OPENVDB_HOUDINI_PYTHONRC_DIR ${HOUDINI_INSTALL_LOCATION}/python2.7libs
+    CACHE PATH "Install path for the OpenVDB Houdini startup script")
+
 #########################################################################
 
 # Collect and configure lib dependencies
@@ -372,3 +375,10 @@ install(FILES
   DW_OpenVDBRasterizePoints.cmd
   DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
 )
+
+if(OPENVDB_INSTALL_HOUDINI_PYTHONRC)
+  install(FILES
+    pythonrc.py
+    DESTINATION ${OPENVDB_HOUDINI_PYTHONRC_DIR}
+  )
+endif()
