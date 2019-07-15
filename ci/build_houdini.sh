@@ -28,4 +28,3 @@ if [ "$COMPILER" = "clang++" ]; then
 else
     make
 fi
-make install

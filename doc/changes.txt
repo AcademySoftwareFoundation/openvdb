@@ -7,6 +7,11 @@
 <B>Version 6.2.0</B> - <I>In development</I>
 
 @par
+New features:
+- Added @vdblink{tools::FindActiveValues,FindActiveValues}, which counts
+  the active values in a tree that intersect a given bounding box.
+
+@par
 Improvements:
 - @vdblink{tree::LeafNode::modifyValue(),LeafNode::modifyValue} and
   @vdblink{tree::LeafNode::modifyValueAndActiveState(),
@@ -19,6 +24,9 @@ Improvements:
 - Improved performance related to a mutex contention when appending
   multiple @vdblink{points::AttributeArray,AttributeArray}<I></I>s
   in parallel through various point operations.
+- Significantly improved the performance of
+  @vdblink::tools::createLevelSetSphere() createLevelSetSphere@endlink
+  using threading.
 - Improved directory and file path lookups of some CMake commands in
   the root <TT>CMakeLists.txt</TT>.
   <I>[Reported&nbsp;by&nbsp;Daniel&nbsp;Elliott]</I>
@@ -28,6 +36,8 @@ Improvements:
 - Added CMake support for linking against Jemalloc and TBB&nbsp;malloc
   and enabled Jemalloc by default for Linux and non-Maya builds
   and TBB&nbsp;malloc for all other builds.
+- Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
+  in color.
 
 @par
 Bug fixes:

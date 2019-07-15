@@ -118,6 +118,7 @@ option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -175,6 +176,7 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   OPENVDB_USE_DEPRECATED_ABI
   CONCURRENT_MALLOC
+  USE_COLORED_OUTPUT
 )
 
 # Configure minimum version requirements
@@ -373,6 +375,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
       -Wno-sign-conversion
     )
   endif()
+  if(USE_COLORED_OUTPUT)
+    message(STATUS "Enabling colored compiler output")
+    add_compile_options(-fcolor-diagnostics)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_GCC_VERSION)
     message(FATAL_ERROR "Insufficient g++ version. Minimum required is "
@@ -393,6 +399,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       -Wdisabled-optimization
       -Woverloaded-virtual
     )
+  endif()
+  if(USE_COLORED_OUTPUT)
+    message(STATUS "Enabling colored compiler output")
+    add_compile_options(-fdiagnostics-color=always)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION})

@@ -404,6 +404,7 @@ INCLUDE_NAMES := \
     tools/DenseSparseTools.h \
     tools/Diagnostics.h \
     tools/Filter.h \
+    tools/FindActiveValues.h \
     tools/GridOperators.h \
     tools/GridTransformer.h \
     tools/Interpolation.h \
@@ -517,6 +518,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestDoubleMetadata.cc \
     unittest/TestExceptions.cc \
     unittest/TestFile.cc \
+    unittest/TestFindActiveValues.cc \
     unittest/TestFloatMetadata.cc \
     unittest/TestGradient.cc \
     unittest/TestGrid.cc \
