@@ -38,6 +38,7 @@ Improvements:
   and TBB&nbsp;malloc for all other builds.
 - Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
   in color.
+- Add an OPENVDB_CODE_COVERAGE option to CMake.
 
 @par
 Bug fixes:

@@ -27,6 +27,7 @@ Version 6.2.0 - In development
       and TBB malloc for all other builds.
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
+    - Add an OPENVDB_CODE_COVERAGE option to CMake.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
