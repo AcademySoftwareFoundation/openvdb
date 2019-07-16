@@ -292,6 +292,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/DenseSparseTools.h
   tools/Diagnostics.h
   tools/Filter.h
+  tools/FindActiveValues.h
   tools/GridOperators.h
   tools/GridTransformer.h
   tools/Interpolation.h
