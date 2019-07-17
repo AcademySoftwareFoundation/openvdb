@@ -29,12 +29,9 @@
 ///////////////////////////////////////////////////////////////////////////
 
 /*
- * PROPRIETARY INFORMATION.  This software is proprietary to
- * Side Effects Software Inc., and is not to be reproduced,
- * transmitted, or disclosed in any way without written permission.
+ * Copyright (c) Side Effects Software Inc.
  *
  * Produced by:
- *      Adrian Saldanha
  *      Side Effects Software Inc
  *      477 Richmond Street West
  *      Toronto, Ontario
