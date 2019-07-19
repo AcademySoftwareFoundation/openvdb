@@ -82,9 +82,12 @@ option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
+option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
+the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
+option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
 CMAKE_DEPENDENT_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -115,6 +118,21 @@ option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
+option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
+
+set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
+if(NOT CONCURRENT_MALLOC)
+  set(CONCURRENT_MALLOC Auto CACHE STRING
+    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
+    Although not required, it is strongly recommended to use a concurrent memory allocator.
+    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
+    in which case Tbbmalloc is used." FORCE
+  )
+elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
+  message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
+  set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
+endif()
 
 ###### Deprecated options
 
@@ -157,6 +175,9 @@ mark_as_advanced(
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  OPENVDB_USE_DEPRECATED_ABI
+  CONCURRENT_MALLOC
+  USE_COLORED_OUTPUT
 )
 
 # Configure minimum version requirements
@@ -181,7 +202,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_NUMPY_VERSION 1.9.2)
 
   set(MINIMUM_CPPUNIT_VERSION 1.10)
-  set(MINIMUM_GLFW_VERSION 3.0)
+  set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
   set(MINIMUM_HOUDINI_VERSION 16.5)
 
@@ -233,6 +254,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindCppUnit.cmake
+    cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
@@ -246,32 +268,29 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
 endif()
 
-# Add the doxygen command if required - do this here so we guarantee not to error on
-# unrelated build issues
+# Configure DCC installation if necessary
+
+if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+  set(USE_HOUDINI ON)
+endif()
+
+if(OPENVDB_BUILD_MAYA_PLUGIN)
+  set(USE_MAYA ON)
+endif()
+
+# Configure component dependencies by loading the Houdini/Maya setup
+# scripts. These also find the Houdini/Maya installations
+
+if(USE_HOUDINI)
+  include(OpenVDBHoudiniSetup)
+endif()
+
+if(USE_MAYA)
+  include(OpenVDBMayaSetup)
+endif()
 
 if(OPENVDB_BUILD_DOCS)
-  find_package(Doxygen REQUIRED)
-  if(DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION)
-    message(WARNING "The doxygen-config doxyfile has been generated with version "
-      "\"${MINIMUM_DOXYGEN_VERSION}\". Found Doxygen version \"${DOXYGEN_VERSION}\". "
-      "Documentation may contain errors."
-    )
-  endif()
-
-  # @todo use cmake doxygen functions available from cmake 3.9
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/doxygen-config DOXYGEN_CONFIG_CONTENT)
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
-  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
-  )
-
-  add_custom_target(doc ALL
-    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/openvdb
-    COMMENT "Generating API documentation with Doxygen" VERBATIM
-  )
-
-  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION docs)
+  add_subdirectory(doc)
 endif()
 
 # Early exit if there's nothing to build
@@ -287,6 +306,15 @@ if(NOT (
   return()
 endif()
 
+if(USE_MAYA AND USE_HOUDINI)
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met."
+  )
+endif()
+
 #########################################################################
 
 # ccache setup
@@ -300,14 +328,35 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration - default to Release if none is set
+# Build type configuration - default to Release if none is set unless
+# code coverage is in use, in which case override to Debug
 
-if(NOT CMAKE_BUILD_TYPE)
+if (OPENVDB_CODE_COVERAGE)
+  message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
+    "to Debug.")
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING
+    "Code coverage requires debug mode." FORCE
+  )
+elseif(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING
     "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
   )
 endif()
 message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+
+# Code coverage configuration
+
+if(OPENVDB_CODE_COVERAGE)
+  # set gcov compile and link flags
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+
+  # use .gcno extension instead of .cc.gcno
+  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
+endif()
+
+# System path configuration
 
 if(USE_SYSTEM_LIBRARY_PATHS)
   set(SYSTEM_LIBRARY_PATHS
@@ -348,6 +397,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
       -Wno-sign-conversion
     )
   endif()
+  if(USE_COLORED_OUTPUT)
+    message(STATUS "Enabling colored compiler output")
+    add_compile_options(-fcolor-diagnostics)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_GCC_VERSION)
     message(FATAL_ERROR "Insufficient g++ version. Minimum required is "
@@ -369,6 +422,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       -Woverloaded-virtual
     )
   endif()
+  if(USE_COLORED_OUTPUT)
+    message(STATUS "Enabling colored compiler output")
+    add_compile_options(-fdiagnostics-color=always)
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION})
     message(FATAL_ERROR "Insufficient ICC version. Minimum required is "
@@ -385,36 +442,21 @@ if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
 endif()
 unset(HAS_AVAILABLE_WARNINGS)
 
-##########################################################################
+# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
+#   Jemalloc are thought to work, but haven't been tested.
+# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
+#   of injecting into the Windows runtime to replace the system allocator.
 
-# Configure DCC installation if necessary
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  set(USE_HOUDINI ON)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  set(USE_MAYA ON)
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
-endif()
-
-# Configure component dependencies by loading the Houdini/Maya setup
-# scripts. These also find the Houdini/Maya installations
-
-if(USE_HOUDINI)
-  include(OpenVDBHoudiniSetup)
-endif()
-
-if(USE_MAYA)
-  include(OpenVDBMayaSetup)
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  if(WIN32 OR APPLE OR USE_MAYA)
+    set(CONCURRENT_MALLOC "Tbbmalloc")
+  else()
+    set(CONCURRENT_MALLOC "Jemalloc")
+  endif()
 endif()
 
 #########################################################################
@@ -467,8 +509,15 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
 endif()
 
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
-  message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-    "deprecated and will soon be removed.")
+  if(OPENVDB_USE_DEPRECATED_ABI)
+    message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+      "deprecated and will soon be removed.")
+  else()
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+      "deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+  endif()
+  # global target definition
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it

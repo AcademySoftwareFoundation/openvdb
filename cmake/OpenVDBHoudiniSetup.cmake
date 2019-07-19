@@ -74,6 +74,7 @@ overwrite user provided values.
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
 ``BLOSC_LIBRARYDIR``
+``JEMALLOC_LIBRARYDIR``
 
 Hints
 ^^^^^
@@ -196,18 +197,21 @@ if(APPLE)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
     ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
+    ${_HOUDINI_LIB_DIR}/libhboost_thread.dylib
   )
 else()
   set(_HOUDINI_LIB_DIR dsolib)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
     ${_HOUDINI_LIB_DIR}/libhboost_regex.so
+    ${_HOUDINI_LIB_DIR}/libhboost_thread.so
   )
 endif()
 
 list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
   HoudiniRAY
   hboost_regex
+  hboost_thread
 )
 
 # Additionally link extra deps
@@ -269,6 +273,12 @@ if(NOT BLOSC_INCLUDEDIR)
 endif()
 if(NOT BLOSC_LIBRARYDIR)
   set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
+
+# Jemalloc
+
+if(NOT JEMALLOC_LIBRARYDIR)
+  set(JEMALLOC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
 endif()
 
 # OpenEXR

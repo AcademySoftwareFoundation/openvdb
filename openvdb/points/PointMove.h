@@ -198,7 +198,7 @@ using LocalPointIndexMap = std::vector<IndexPairArray>;
 
 using LeafIndexArray = std::vector<LeafIndex>;
 using LeafOffsetArray = std::vector<LeafIndexArray>;
-using LeafMap = std::map<Coord, LeafIndex>;
+using LeafMap = std::unordered_map<Coord, LeafIndex>;
 
 
 template <typename DeformerT, typename TreeT, typename FilterT>
@@ -984,6 +984,10 @@ inline void movePoints( PointDataGridT& points,
             targetLeafMap.insert({leaf->origin(), LeafIndex(static_cast<LeafIndex>(leaf.pos()))});
         }
 
+         // acquire registry lock to avoid locking when appending attributes in parallel
+
+        AttributeArray::ScopedRegistryLock lock;
+
         // perform four independent per-leaf operations in parallel
         targetLeafManager.foreach(
             [&](LeafT& leaf, size_t idx) {
@@ -993,7 +997,8 @@ inline void movePoints( PointDataGridT& points,
                     buffer[i] = buffer[i-1] + buffer[i];
                 }
                 // replace attribute set with a copy of the existing one
-                leaf.replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf.getLastValue()),
+                leaf.replaceAttributeSet(
+                    new AttributeSet(existingAttributeSet, leaf.getLastValue(), &lock),
                     /*allowMismatchingDescriptors=*/true);
                 // store the index of the source leaf in a corresponding target leaf array
                 const auto it = sourceLeafMap.find(leaf.origin());

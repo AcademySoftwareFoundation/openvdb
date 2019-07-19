@@ -164,7 +164,7 @@ public:
     /// True if a Nan is present in this tuple
     bool isNan() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (std::isnan(mm[i])) return true;
+            if (math::isNan(mm[i])) return true;
         }
         return false;
     }
@@ -172,7 +172,7 @@ public:
     /// True if an Inf is present in this tuple
     bool isInfinite() const {
         for (int i = 0; i < SIZE; ++i) {
-            if (std::isinf(mm[i])) return true;
+            if (math::isInfinite(mm[i])) return true;
         }
         return false;
     }

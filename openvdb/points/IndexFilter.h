@@ -79,6 +79,7 @@
 
 #include <random> // std::mt19937
 #include <numeric> // std::iota
+#include <unordered_map>
 
 
 class TestIndexFilter;
@@ -255,7 +256,7 @@ class RandomLeafFilter
 {
 public:
     using SeedCountPair = std::pair<Index, Index>;
-    using LeafMap       = std::map<openvdb::Coord, SeedCountPair>;
+    using LeafMap       = std::unordered_map<openvdb::Coord, SeedCountPair>;
 
     RandomLeafFilter(   const PointDataTreeT& tree,
                         const Index64 targetPoints,

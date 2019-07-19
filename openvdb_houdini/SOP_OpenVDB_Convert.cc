@@ -408,6 +408,7 @@ Polygon Soup:\n\
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Convert",
         SOP_OpenVDB_Convert::factory, parms, *table)
+        .setNativeName("convertvdb")
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBConvert")
 #endif

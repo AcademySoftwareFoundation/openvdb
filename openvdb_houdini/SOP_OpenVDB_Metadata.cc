@@ -172,6 +172,7 @@ Other:\n\
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
+        .setNativeName("")
         .addInput("Input with VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Metadata::Cache; })
         .setDocumentation("\

@@ -157,6 +157,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Rebuild SDF",
         SOP_OpenVDB_Rebuild_Level_Set::factory, parms, *table)
+        .setNativeName("")
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBRebuildLevelSet")
 #endif
