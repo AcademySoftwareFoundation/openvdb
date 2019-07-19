@@ -62,8 +62,6 @@ public:
     OpenVDBOpFactory(const std::string& english, OP_Constructor, houdini_utils::ParmList&,
         OP_OperatorTable&, houdini_utils::OpFactory::OpFlavor = SOP);
 
-    virtual ~OpenVDBOpFactory();
-
     /// @brief Set the name of the equivalent native operator as shipped with Houdini.
     /// @details This is only needed where the native name policy doesn't provide the correct name.
     /// Pass an empty string to indicate that there is no equivalent native operator.

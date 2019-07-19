@@ -711,10 +711,24 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     setNativeName(OpenVDBOpPolicy().getNativeName(*this));
 }
 
-OpenVDBOpFactory::~OpenVDBOpFactory()
+OpenVDBOpFactory&
+OpenVDBOpFactory::setNativeName(const std::string& name)
 {
-    if (!mNativeName.empty()) {
+    // SideFX nodes have no native equivalent.
+#ifndef SESI_OPENVDB
+    addSpareData({{"nativename", name}});
 
+    // if native name was previously defined and is present
+    // in the hidden table then remove it regardless of policy
+
+    if (!mNativeName.empty() &&
+        this->table().isOpHidden(mNativeName.c_str())) {
+        this->table().delOpHidden(mNativeName.c_str());
+    }
+
+    mNativeName = name;
+
+    if (!name.empty()) {
         // environment variable takes precedence over compiler flag
 
         const char* opHidePolicy = std::getenv("OPENVDB_OPHIDE_POLICY");
@@ -739,20 +753,10 @@ OpenVDBOpFactory::~OpenVDBOpFactory()
                 this->setInvisible();
             } else if (opHidePolicyStr == "native") {
                 // mark the native equivalent SOP to be hidden
-                this->table().addOpHidden(mNativeName.c_str());
+                this->table().addOpHidden(name.c_str());
             }
         }
-
-        addSpareData({{"nativename", mNativeName}});
     }
-}
-
-OpenVDBOpFactory&
-OpenVDBOpFactory::setNativeName(const std::string& name)
-{
-    // SideFX nodes have no native equivalent.
-#ifndef SESI_OPENVDB
-    mNativeName = name;
 #endif
     return *this;
 }
