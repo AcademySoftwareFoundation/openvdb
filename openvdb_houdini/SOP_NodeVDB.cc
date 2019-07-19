@@ -53,6 +53,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex> // std::call_once
 #include <sstream>
 #include <stdexcept>
 
