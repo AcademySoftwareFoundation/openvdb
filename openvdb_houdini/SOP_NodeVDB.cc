@@ -49,6 +49,7 @@
 #include <UT/UT_SharedPtr.h>
 #include <tbb/mutex.h>
 #include <algorithm>
+#include <cctype> // std::tolower
 #include <iostream>
 #include <map>
 #include <memory>
@@ -80,6 +81,44 @@
 /// called by sop.mako.
 ///
 //#define OPENVDB_CUSTOM_MAKO
+
+
+namespace {
+
+const std::string&
+getOpHidePolicy()
+{
+    static std::string sOpHidePolicy;
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
+        const char* opHidePolicy = std::getenv("OPENVDB_OPHIDE_POLICY");
+
+#ifdef OPENVDB_OPHIDE_POLICY
+        if (opHidePolicy == nullptr) {
+            opHidePolicy = OPENVDB_PREPROC_STRINGIFY(OPENVDB_OPHIDE_POLICY);
+        }
+#endif
+
+        if (opHidePolicy != nullptr) {
+            std::string opHidePolicyStr(opHidePolicy);
+
+            // to lower-case
+
+            std::transform(opHidePolicyStr.begin(), opHidePolicyStr.end(),
+                opHidePolicyStr.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            sOpHidePolicy = opHidePolicy;
+        } else {
+            sOpHidePolicy = "";
+        }
+    });
+
+    return sOpHidePolicy;
+}
+
+} // anonymous namespace
 
 
 namespace openvdb_houdini {
@@ -729,32 +768,15 @@ OpenVDBOpFactory::setNativeName(const std::string& name)
     mNativeName = name;
 
     if (!name.empty()) {
-        // environment variable takes precedence over compiler flag
 
-        const char* opHidePolicy = std::getenv("OPENVDB_OPHIDE_POLICY");
+        const std::string& opHidePolicy = getOpHidePolicy();
 
-#ifdef OPENVDB_OPHIDE_POLICY
-        if (opHidePolicy == nullptr) {
-            opHidePolicy = OPENVDB_PREPROC_STRINGIFY(OPENVDB_OPHIDE_POLICY);
-        }
-#endif
-
-        if (opHidePolicy != nullptr) {
-            std::string opHidePolicyStr(opHidePolicy);
-
-            // to lower-case
-
-            std::transform(opHidePolicyStr.begin(), opHidePolicyStr.end(),
-                opHidePolicyStr.begin(),
-                [](unsigned char c) { return std::tolower(c); });
-
-            if (opHidePolicyStr == "aswf") {
-                // set this SOP to be hidden (if a native equivalent exists)
-                this->setInvisible();
-            } else if (opHidePolicyStr == "native") {
-                // mark the native equivalent SOP to be hidden
-                this->table().addOpHidden(name.c_str());
-            }
+        if (opHidePolicy == "aswf") {
+            // set this SOP to be hidden (if a native equivalent exists)
+            this->setInvisible();
+        } else if (opHidePolicy == "native") {
+            // mark the native equivalent SOP to be hidden
+            this->table().addOpHidden(name.c_str());
         }
     }
 #endif
