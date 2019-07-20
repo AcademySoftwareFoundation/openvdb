@@ -79,7 +79,7 @@ zipToStreamSize(const char* data, size_t numBytes)
     if (status == Z_OK && numZippedBytes < numBytes) {
         return size_t(numZippedBytes);
     } else {
-        return size_t(0);
+        return size_t(numBytes);
     }
 }
 
@@ -205,7 +205,7 @@ bloscToStreamSize(const char* data, size_t valSize, size_t numVals)
     outBytes = bloscCompress(inBytes, data, compressedData.get(), outBytes);
 
     if (outBytes <= 0) {
-        return size_t(0);
+        return size_t(inBytes);
     }
 
     return size_t(outBytes);
