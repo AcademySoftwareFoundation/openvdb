@@ -2228,7 +2228,12 @@ TestFile::testCompression()
     // Write the grids out with various combinations of compression options
     // and verify that they can be read back successfully.
     // See io/Compression.h for the flag values.
+
+#ifdef OPENVDB_USE_BLOSC
     std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+#else
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+#endif
     for (uint32_t flags : validFlags) {
 
         if (flags != io::COMPRESS_NONE) {
