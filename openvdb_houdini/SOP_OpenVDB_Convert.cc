@@ -406,9 +406,8 @@ Polygon Soup:\n\
     obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("VDB Convert",
+    hvdb::OpenVDBOpFactory("Convert VDB",
         SOP_OpenVDB_Convert::factory, parms, *table)
-        .setNativeName("convertvdb")
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBConvert")
 #endif

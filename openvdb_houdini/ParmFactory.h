@@ -523,6 +523,11 @@ public:
     ///     @link getOperatorSpareData() getOperatorSpareData@endlink
     OpFactory& addSpareData(const SpareDataMap&);
 
+protected:
+    /// @brief Return the operator table with which this factory is associated.
+    /// @details This accessor is mainly for use by derived OpFactory classes.
+    OP_OperatorTable& table();
+
 private:
     void init(OpPolicyPtr, const std::string& english, OP_Constructor,
         ParmList&, OP_OperatorTable&, OpFlavor);

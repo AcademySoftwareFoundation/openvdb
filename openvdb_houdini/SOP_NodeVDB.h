@@ -66,6 +66,9 @@ public:
     /// @details This is only needed where the native name policy doesn't provide the correct name.
     /// Pass an empty string to indicate that there is no equivalent native operator.
     OpenVDBOpFactory& setNativeName(const std::string& name);
+
+private:
+    std::string mNativeName;
 };
 
 
