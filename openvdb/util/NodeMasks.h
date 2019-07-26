@@ -43,23 +43,32 @@
 #include <openvdb/Types.h>
 //#include <boost/mpl/if.hpp>
 //#include <strings.h> // for ffs
-
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace util {
 
+#ifdef _MSC_VER
+    // Compiling with vc++
+#include "NodeMasksMSVC.h"
+#elif defined(__GNUC__) || defined(__clang__)
+    // Compiling with clang or gcc
+#include "NodeMasksGccClang.h"
+#else
+    // Compiling with something else (Intel?), using old software-based routines.
+    // Software routines take many instructions to execute, some of them even access RAM for lookup tables.
+    // Hardware instructions are faster.
+
 /// Return the number of on bits in the given 8-bit value.
 inline Index32
 CountOn(Byte v)
 {
-    // Simple LUT:
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
     /// @todo Move this table and others into, say, Util.cc
-    const Byte numBits[256] = {
+    static const Byte numBits[256] = {
 #define COUNTONB2(n)  n,            n+1,            n+1,            n+2
 #define COUNTONB4(n)  COUNTONB2(n), COUNTONB2(n+1), COUNTONB2(n+1), COUNTONB2(n+2)
 #define COUNTONB6(n)  COUNTONB4(n), COUNTONB4(n+1), COUNTONB4(n+1), COUNTONB4(n+2)
@@ -79,9 +88,6 @@ CountOn(Byte v)
     //return (v * UINT64_C(0x200040008001) & UINT64_C(0x111111111111111)) % 0xF;
 }
 
-/// Return the number of off bits in the given 8-bit value.
-inline Index32 CountOff(Byte v) { return CountOn(static_cast<Byte>(~v)); }
-
 /// Return the number of on bits in the given 32-bit value.
 inline Index32
 CountOn(Index32 v)
@@ -90,9 +96,6 @@ CountOn(Index32 v)
     v = (v & 0x33333333U) + ((v >> 2) & 0x33333333U);
     return (((v + (v >> 4)) & 0xF0F0F0FU) * 0x1010101U) >> 24;
 }
-
-/// Return the number of off bits in the given 32-bit value.
-inline Index32 CountOff(Index32 v) { return CountOn(~v); }
 
 /// Return the number of on bits in the given 64-bit value.
 inline Index32
@@ -104,18 +107,12 @@ CountOn(Index64 v)
         (((v + (v >> 4)) & UINT64_C(0xF0F0F0F0F0F0F0F)) * UINT64_C(0x101010101010101)) >> 56);
 }
 
-/// Return the number of off bits in the given 64-bit value.
-inline Index32 CountOff(Index64 v) { return CountOn(~v); }
-
 /// Return the least significant on bit of the given 8-bit value.
 inline Index32
 FindLowestOn(Byte v)
 {
     assert(v);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[8] = {0, 1, 6, 2, 7, 5, 4, 3};
+    static const Byte DeBruijn[8] = {0, 1, 6, 2, 7, 5, 4, 3};
     return DeBruijn[Byte((v & -v) * 0x1DU) >> 5];
 }
 
@@ -124,22 +121,57 @@ inline Index32
 FindLowestOn(Index32 v)
 {
     assert(v);
-    //return ffs(v);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[32] = {
+    static const Byte DeBruijn[32] = {
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
     return DeBruijn[Index32((v & -v) * 0x077CB531U) >> 27];
 }
 
+/// Return the most significant on bit of the given 32-bit value.
+inline Index32
+FindHighestOn(Index32 v)
+{
+    static const Byte DeBruijn[32] = {
+        0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
+        8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
+    };
+    v |= v >> 1; // first round down to one less than a power of 2
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    return DeBruijn[Index32(v * 0x07C4ACDDU) >> 27];
+}
+#endif
+
+/// Return the number of off bits in the given 8-bit value.
+inline Index32 CountOff(Byte v) { return CountOn(static_cast<Byte>(~v)); }
+
+/// Return the number of off bits in the given 32-bit value.
+inline Index32 CountOff(Index32 v) { return CountOn(~v); }
+
+/// Return the number of off bits in the given 64-bit value.
+inline Index32 CountOff(Index64 v) { return CountOn(~v); }
+
 /// Return the least significant on bit of the given 64-bit value.
 inline Index32
 FindLowestOn(Index64 v)
 {
     assert(v);
+#if defined(_MSC_VER) && defined(_M_X64)
+    // vc++, 64 bit build
+    unsigned long index;
+    _BitScanForward64(&index, v);
+    return index;
+#elif ( defined(__GNUC__) || defined(__clang__) ) && defined(__x86_64__)
+    // gcc or clang, 64 bit build
+    return static_cast<Index32>( __builtin_ctzll( v ) );
+#else    // Other compiler or 32 bit build
+    // Fallback to software implementation because it's slightly faster for this case.
+    // Here's some measures by chess engine developers, they do a lot of bitwise math on 64-bit integers, as the board has 64 cells:
+    // https://github.com/official-stockfish/Stockfish/pull/618/commits/f53c531d0e997b514a5cc5d8536c5e21960e0175
+
     //return ffsll(v);
 #ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
     static
@@ -151,27 +183,8 @@ FindLowestOn(Index64 v)
         51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
     };
     return DeBruijn[Index64((v & -v) * UINT64_C(0x022FDD63CC95386D)) >> 58];
+#endif    // Other compiler or 32 bit build
 }
-
-/// Return the most significant on bit of the given 32-bit value.
-inline Index32
-FindHighestOn(Index32 v)
-{
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[32] = {
-        0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
-        8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
-    };
-    v |= v >> 1; // first round down to one less than a power of 2
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    return DeBruijn[Index32(v * 0x07C4ACDDU) >> 27];
-}
-
 
 ////////////////////////////////////////
 
