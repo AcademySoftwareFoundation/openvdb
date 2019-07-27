@@ -2725,9 +2725,22 @@ TestFile::testDelayedLoadMetadata()
         CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
-    { // read using library version of 6.0
+    { // read using library version of 6.1
         std::istringstream istr(ostr2.str(), std::ios_base::binary);
         io::setVersion(istr, VersionId(6,1), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 6.2
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(6,2), file.fileVersion());
         io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
 
         io::GridDescriptor gd2;
