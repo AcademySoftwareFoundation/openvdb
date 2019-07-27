@@ -1162,7 +1162,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     //    StringMetadata(compressionToString(c)));
 
     const VersionId version = getLibraryVersion(is);
-    if (version.first < 6 || (version.first == 6 && version.second == 0)) {
+    if (version.first < 6 || (version.first == 6 && version.second <= 1)) {
         // If delay load metadata exists, but the file format version does not support
         // delay load metadata, this likely means the original grid was read and then
         // written using a prior version of OpenVDB and ABI>=5 where unknown metadata
