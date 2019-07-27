@@ -10,6 +10,9 @@
 New features:
 - Added @vdblink{tools::FindActiveValues,FindActiveValues}, which counts
   the active values in a tree that intersect a given bounding box.
+- Added @vdblink{io::DelayedLoadMetadata,DelayedLoadMetadata}, which stores
+  mask offsets and compression sizes on write to accelerate delayed load
+  reading.
 
 @par
 Improvements:

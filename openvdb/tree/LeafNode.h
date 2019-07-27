@@ -1446,6 +1446,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             }
         }
     }
+
+    // increment the leaf number
+    if (meta)   meta->setLeaf(meta->leaf() + 1);
 }
 
 

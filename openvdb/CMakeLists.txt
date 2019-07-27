@@ -191,6 +191,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
   io/Compression.cc
+  io/DelayedLoadMetadata.cc
   io/File.cc
   io/GridDescriptor.cc
   io/Queue.cc
@@ -229,6 +230,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
 set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/Archive.h
   io/Compression.h
+  io/DelayedLoadMetadata.h
   io/File.h
   io/GridDescriptor.h
   io/io.h

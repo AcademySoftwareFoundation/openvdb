@@ -95,11 +95,16 @@ public:
     bool seekable() const;
     void setSeekable(bool);
 
+    bool delayedLoadMeta() const;
+
     bool countingPasses() const;
     void setCountingPasses(bool);
 
     uint32_t pass() const;
     void setPass(uint32_t);
+
+    uint64_t leaf() const;
+    void setLeaf(uint64_t);
 
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid
@@ -117,6 +122,11 @@ public:
     AuxDataMap& auxData();
     const AuxDataMap& auxData() const;
     //@}
+
+    /// @private
+    uint32_t __test() const;
+    /// @private
+    void __setTest(uint32_t);
 
     /// Return a string describing this stream metadata.
     std::string str() const;
