@@ -6,6 +6,8 @@ Version 6.2.0 - In development
     New features:
     - Added tools::FindActiveValues, which counts the active values
       in a tree that intersect a given bounding box.
+    - Added io::DelayedLoadMetadata, which stores mask offsets and compression
+      sizes on write to accelerate delayed load reading.
 
     Improvements:
     - LeafNode::modifyValue() and LeafNode::modifyValueAndActiveState()
