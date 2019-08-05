@@ -61,6 +61,7 @@ enum Operation {
     OP_MEAN = 0,
     OP_GAUSS,
     OP_MEDIAN,
+    OP_SHARPEN,
 #ifndef SESI_OPENVDB
     OP_OFFSET,
 #endif
@@ -72,11 +73,12 @@ intToOp(int i)
 {
     switch (i) {
 #ifndef SESI_OPENVDB
-        case OP_OFFSET: return OP_OFFSET;
+        case OP_OFFSET:  return OP_OFFSET;
 #endif
-        case OP_MEAN:   return OP_MEAN;
-        case OP_GAUSS:  return OP_GAUSS;
-        case OP_MEDIAN: return OP_MEDIAN;
+        case OP_MEAN:    return OP_MEAN;
+        case OP_GAUSS:   return OP_GAUSS;
+        case OP_MEDIAN:  return OP_MEDIAN;
+        case OP_SHARPEN: return OP_SHARPEN;
         case NUM_OPERATIONS: break;
     }
     throw std::runtime_error{"unknown operation (" + std::to_string(i) + ")"};
@@ -86,11 +88,12 @@ intToOp(int i)
 inline Operation
 stringToOp(const std::string& s)
 {
-    if (s == "mean")   return OP_MEAN;
-    if (s == "gauss")  return OP_GAUSS;
-    if (s == "median") return OP_MEDIAN;
+    if (s == "mean")    return OP_MEAN;
+    if (s == "gauss")   return OP_GAUSS;
+    if (s == "median")  return OP_MEDIAN;
+    if (s == "sharpen") return OP_SHARPEN;
 #ifndef SESI_OPENVDB
-    if (s == "offset") return OP_OFFSET;
+    if (s == "offset")  return OP_OFFSET;
 #endif
     throw std::runtime_error{"unknown operation \"" + s + "\""};
 }
@@ -101,11 +104,12 @@ opToString(Operation op)
 {
     switch (op) {
 #ifndef SESI_OPENVDB
-        case OP_OFFSET: return "offset";
+        case OP_OFFSET:  return "offset";
 #endif
-        case OP_MEAN:   return "mean";
-        case OP_GAUSS:  return "gauss";
-        case OP_MEDIAN: return "median";
+        case OP_MEAN:    return "mean";
+        case OP_GAUSS:   return "gauss";
+        case OP_MEDIAN:  return "median";
+        case OP_SHARPEN: return "sharpen";
         case NUM_OPERATIONS: break;
     }
     throw std::runtime_error{"unknown operation (" + std::to_string(int(op)) + ")"};
@@ -117,11 +121,12 @@ opToMenuName(Operation op)
 {
     switch (op) {
 #ifndef SESI_OPENVDB
-        case OP_OFFSET: return "Offset";
+        case OP_OFFSET:  return "Offset";
 #endif
-        case OP_MEAN:   return "Mean Value";
-        case OP_GAUSS:  return "Gaussian";
-        case OP_MEDIAN: return "Median Value";
+        case OP_MEAN:    return "Mean Value";
+        case OP_GAUSS:   return "Gaussian";
+        case OP_MEDIAN:  return "Median Value";
+        case OP_SHARPEN: return "Sharpen";
         case NUM_OPERATIONS: break;
     }
     throw std::runtime_error{"unknown operation (" + std::to_string(int(op)) + ")"};
@@ -258,6 +263,10 @@ Median Value:\n\
     Set the value of each active voxel to the median value over\n\
     the voxel's neighborhood.\n\n\
     This is useful for suppressing outlier values.\n\
+Sharpen:\n\
+    Set the value of each active voxel to a weighted sum over\n\
+    the voxel's neighborhood, where the weights are chosen so as to\n\
+    enhance high-frequency content.\n\
 Offset:\n\
     Add a given offset to each active voxel's value.\n\
 "));
@@ -338,10 +347,11 @@ Offset:\n\
 \n\
 @overview\n\
 \n\
-This node assigns to each active voxel in a VDB volume a value,\n\
-such as the mean or median, that is representative of the voxel's neighborhood,\n\
-where the neighborhood is a cube centered on the voxel.\n\
-This has the effect of reducing high-frequency content and suppressing noise.\n\
+This node assigns to each active voxel in a VDB volume a value that is\n\
+representative of the voxel's neighborhood, where the neighborhood is\n\
+a cube centered on the voxel.\n\
+This has the effect of either reducing or enhancing high-frequency content,\n\
+depending on the choice of the representative value.\n\
 \n\
 If the optional scalar mask volume is provided, the output value of\n\
 each voxel is a linear blend between its input value and the neighborhood value.\n\
@@ -398,7 +408,7 @@ SOP_OpenVDB_Filter::updateParmsFlags()
 
     // Disable and hide unused parameters.
     if (gotOp) {
-        bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN);
+        bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN || op == OP_SHARPEN);
         changed |= enableParm("iterations", enable);
         changed |= enableParm("radius", enable);
         changed |= enableParm("worldradius", enable);
@@ -447,6 +457,16 @@ struct SOP_OpenVDB_Filter::FilterOp
                 radius = std::max(1, int(voxelRadius));
             }
 
+            const auto printInfo = [&](const std::string& name) {
+#ifndef SESI_OPENVDB
+                if (parms.verbose) {
+                    std::cout << "Applying " << parms.iterations << " iteration"
+                        << (parms.iterations == 1 ? "" : "s") << " of "
+                        << name << " with a radius of " << radius << std::endl;
+                }
+#endif
+            };
+
             filter.setMaskRange(parms.minMask, parms.maxMask);
             filter.invertMask(parms.invertMask);
 
@@ -461,33 +481,23 @@ struct SOP_OpenVDB_Filter::FilterOp
                 break;
 #endif
             case OP_MEAN:
-#ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of mean value"
-                        " filtering with a radius of " << radius << std::endl;
-                }
-#endif
+                printInfo("mean filtering");
                 filter.mean(radius, parms.iterations, parms.mask);
                 break;
 
             case OP_GAUSS:
-#ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of gaussian"
-                        " filtering with a radius of " <<radius << std::endl;
-                }
-#endif
+                printInfo("Gaussian filtering");
                 filter.gaussian(radius, parms.iterations, parms.mask);
                 break;
 
             case OP_MEDIAN:
-#ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of median value"
-                        " filtering with a radius of " << radius << std::endl;
-                }
-#endif
+                printInfo("median filtering");
                 filter.median(radius, parms.iterations, parms.mask);
+                break;
+
+            case OP_SHARPEN:
+                printInfo("sharpening");
+                filter.sharpen(radius, parms.iterations, parms.mask);
                 break;
 
             case NUM_OPERATIONS:

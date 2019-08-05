@@ -41,7 +41,9 @@
 #define OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
 #include <algorithm>
+#include <type_traits>
 #include <vector>
+#include <boost/container/vector.hpp>
 #include <boost/multi_array.hpp>
 #include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
@@ -61,12 +63,13 @@ template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
 public:
-    typedef GridT                                       GridType;
-    typedef typename GridT::TreeType                    TreeType;
-    typedef typename GridT::ValueType                   ValueType;
-    typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
-    typedef std::vector<ValueType>                      BufferType;
-    typedef typename BufferType::iterator               IterType;
+    using GridType = GridT;
+    using TreeType = typename GridT::TreeType;
+    using ValueType = typename GridT::ValueType;
+    using AccessorType = tree::ValueAccessor<const TreeType, IsSafe>;
+    // Use boost::container::vector instead of std::vector,
+    // because std::vector<bool> doesn't provide a data() method.
+    using BufferType = boost::container::vector<ValueType>;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -81,7 +84,7 @@ public:
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
-    /// @param ijk Index coordinates of stnecil center
+    /// @param ijk Index coordinates of stencil center
     /// @param centerValue Value of the center element of the stencil
     inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {
@@ -166,14 +169,14 @@ public:
     /// @brief Return the smallest value in the stencil buffer.
     inline ValueType min() const
     {
-        IterType iter = std::min_element(mStencil.begin(), mStencil.end());
+        const auto iter = std::min_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
     /// @brief Return the largest value in the stencil buffer.
     inline ValueType max() const
     {
-        IterType iter = std::max_element(mStencil.begin(), mStencil.end());
+        const auto iter = std::max_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
@@ -1705,6 +1708,12 @@ private:
 //////////////////////////////////////////////////////////////////////
 
 
+/// Three-dimensional array with which to specify the kernel for a ConvolutionStencil
+template<typename ValueT>
+using ConvolutionKernel = typename boost::multi_array<
+    typename std::conditional<std::is_floating_point<ValueT>::value, ValueT, double>::type, 3>;
+
+
 /// @brief Dense stencil representing a convolution kernel
 /// @note The source grid is assumed to be unchanging.
 template<typename GridT, bool IsSafe = true>
@@ -1715,11 +1724,10 @@ public:
     using BaseType = BaseStencil<SelfT, GridT, IsSafe>;
     using GridType = GridT;
     using ValueType = typename GridType::ValueType;
-    using KernelValueType = typename std::conditional<
-        std::is_floating_point<ValueType>::value, ValueType, double>::type;
-    using KernelType = typename boost::multi_array<KernelValueType, 3>;
-    using KernelCRefType = typename boost::const_multi_array_ref<KernelValueType, 3>;
-    using StencilRefType = typename boost::multi_array_ref<ValueType, 3>;
+    using KernelType = ConvolutionKernel<ValueType>;
+    using KernelValueType = typename KernelType::element;
+    using KernelCRefType = boost::const_multi_array_ref<KernelValueType, 3>;
+    using StencilRefType = boost::multi_array_ref<ValueType, 3>;
 
 
     ConvolutionStencil(const GridType& grid, const KernelCRefType& kernel)
@@ -1742,8 +1750,9 @@ public:
         auto* kernelPtr = mKernel.origin();
         auto sum = zeroVal<ValueType>();
         for (size_t n = 0; n < mStencil.size(); ++n) {
-            /// @todo Suppress type conversion warnings (when ValueType is not float or double).
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
             sum = static_cast<ValueType>(sum + (mStencil[n] * kernelPtr[n]));
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         }
         return sum;
     }
@@ -1814,6 +1823,58 @@ private:
     const std::vector<size_t> mKernelShape;
     bool mInitialized = false;
 }; // class ConvolutionStencil
+
+
+////////////////////////////////////////
+
+
+/// Return a 3D sharpening kernel of the given radius, for use with ConvolutionStencil.
+template<typename ValueType>
+ConvolutionKernel<ValueType>
+sharpeningKernel(int r)
+{
+    using KernelType = ConvolutionKernel<ValueType>;
+    using KernelValueType = typename KernelType::element;
+
+    r = Abs(r);
+    const size_t
+        halfWidth = static_cast<size_t>(r),
+        width = 2 * halfWidth + 1;
+
+    // A standard deviation of 0.75 times the radius gives a reasonable falloff.
+    const double
+        sigma = 0.75 * r,
+        twoSigmaSquared = 2.0 * sigma * sigma;
+
+    KernelType kernel(boost::extents[width][width][width]);
+    double sum = 0.0;
+    Vec3<int> ijk(0, 0, 0);
+    int &i = ijk[0], &j = ijk[1], &k = ijk[2];
+    for (i = 0; i < int(width); ++i) {
+        for (j = 0; j < int(width); ++j) {
+            for (k = 0; k < int(width); ++k) {
+                const double d = Exp(-double((ijk - r).lengthSqr()) / twoSigmaSquared)
+                    / (M_PI * twoSigmaSquared);
+                kernel[i][j][k] = static_cast<KernelValueType>(d);
+                sum += d;
+            }
+        }
+    }
+    auto central = kernel[halfWidth][halfWidth][halfWidth];
+    kernel[halfWidth][halfWidth][halfWidth] = static_cast<KernelValueType>(-2.0 * sum);
+    sum = central - sum;
+
+    // Normalize the kernel.
+    for (size_t i = 0; i < width; ++i) {
+        for (size_t j = 0; j < width; ++j) {
+            for (size_t k = 0; k < width; ++k) {
+                kernel[i][j][k] = static_cast<KernelValueType>(kernel[i][j][k] / sum);
+            }
+        }
+    }
+
+    return kernel;
+}
 
 } // end math namespace
 } // namespace OPENVDB_VERSION_NAME

@@ -58,6 +58,9 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+/// @todo Add convenience functions.
+
+
 /// @brief Volume filtering (e.g., diffusion) with optional alpha masking
 ///
 /// @note Only the values in the grid are changed, not its topology!
@@ -164,6 +167,12 @@ public:
     /// @param mask Optional alpha mask.
     void median(int width = 1, int iterations = 1, const MaskType* mask = nullptr);
 
+    /// @brief Apply a sharpening filter to the grid.
+    /// @param width       the width of the sharpening filter is 2<i>width</i>+1 voxels
+    /// @param iterations  the number of times to apply the filter
+    /// @param mask        an optional alpha mask
+    void sharpen(int width = 1, int iterations = 1, const MaskType* mask = nullptr);
+
     /// Offsets (i.e. adds) a constant value to all active voxels.
     /// @param offset Offset in the same units as the grid.
     /// @param mask Optional alpha mask.
@@ -205,7 +214,9 @@ private:
     void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
     void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
     void doMedian(const RangeType&, int);
+    void doSharpen(const RangeType&, const math::ConvolutionKernel<ValueType>&);
     void doOffset(const RangeType&, ValueType);
+
     /// @return true if the process was interrupted
     bool wasInterrupted();
 
@@ -324,6 +335,26 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
+Filter<GridT, MaskT, InterruptT>::sharpen(int width, int iterations, const MaskType* mask)
+{
+    if ((width == 0) || (iterations == 0)) return;
+
+    mMask = mask;
+    const auto kernel = math::sharpeningKernel<ValueType>(width);
+
+    if (mInterrupter) mInterrupter->start("Applying sharpening filter");
+
+    LeafManagerType leafMgr(mGrid->tree(), 1, mGrainSize == 0);
+
+    mTask = std::bind(&Filter::doSharpen, std::placeholders::_1, std::placeholders::_2, kernel);
+    for (int i = 0; i < iterations && !this->wasInterrupted(); ++i) this->cook(leafMgr);
+
+    if (mInterrupter) mInterrupter->end();
+}
+
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
 Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 {
     mMask = mask;
@@ -419,6 +450,42 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
                 buffer.setValue(iter.pos(), stencil.median());
+            }
+        }
+    }
+}
+
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+Filter<GridT, MaskT, InterruptT>::doSharpen(const RangeType& range,
+    const math::ConvolutionKernel<ValueType>& kernel)
+{
+    this->wasInterrupted();
+
+    math::ConvolutionStencil<GridType> stencil(*mGrid, kernel);
+
+    if (mMask) {
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            BufferT& buffer = leafIter.buffer(1);
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                if (alpha(iter.getCoord(), a, b)) {
+                    stencil.moveTo(iter);
+                    const ValueType phi0 = *iter, phi1 = stencil.convolve();
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                    buffer.setValue(iter.pos(), b * phi0 + a * phi1);
+                    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                }
+            }
+        }
+    } else {
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            BufferT& buffer = leafIter.buffer(1);
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                stencil.moveTo(iter);
+                buffer.setValue(iter.pos(), stencil.convolve());
             }
         }
     }
