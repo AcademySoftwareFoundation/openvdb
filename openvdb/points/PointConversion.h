@@ -670,6 +670,10 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
     const size_t positionIndex = descriptor->find("P");
     assert(positionIndex != AttributeSet::INVALID_POS);
 
+    // acquire registry lock to avoid locking when appending attributes in parallel
+
+    AttributeArray::ScopedRegistryLock lock;
+
     // populate position attribute
 
     LeafManagerT leafManager(*treePtr);
@@ -684,7 +688,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
             // initialise the attribute storage
 
             Index pointCount(static_cast<Index>(pointIndexLeaf->indices().size()));
-            leaf.initializeAttributes(descriptor, pointCount);
+            leaf.initializeAttributes(descriptor, pointCount, &lock);
 
             // create write handle for position
 

@@ -89,11 +89,26 @@ if(PC_glfw3_FOUND)
   endforeach()
 endif()
 
+list(APPEND _GLFW3_ROOT_SEARCH_DIR ${SYSTEM_LIBRARY_PATHS})
+
+set(_GLFW3_PATH_SUFFIXES "lib/cmake/glfw3" "cmake/glfw3" "glfw3")
+
+# GLFW 3.1 installs CMake modules into glfw instead of glfw3
+list(APPEND _GLFW3_PATH_SUFFIXES "lib/cmake/glfw" "cmake/glfw" "glfw")
+
 find_path(GLFW3_CMAKE_LOCATION glfw3Config.cmake
   NO_DEFAULT_PATH
   PATHS ${_GLFW3_ROOT_SEARCH_DIR}
-  PATH_SUFFIXES lib/cmake/glfw3 cmake/glfw3 glfw3
+  PATH_SUFFIXES ${_GLFW3_PATH_SUFFIXES}
 )
+
+if(GLFW3_CMAKE_LOCATION)
+  if(EXISTS "${GLFW3_CMAKE_LOCATION}/glfw3Targets.cmake")
+    include("${GLFW3_CMAKE_LOCATION}/glfw3Targets.cmake")
+  elseif(EXISTS "${GLFW3_CMAKE_LOCATION}/glfwTargets.cmake")
+    include("${GLFW3_CMAKE_LOCATION}/glfwTargets.cmake")
+  endif()
+endif()
 
 if(GLFW3_CMAKE_LOCATION)
   list(APPEND CMAKE_PREFIX_PATH "${GLFW3_CMAKE_LOCATION}")
@@ -109,3 +124,31 @@ find_package_handle_standard_args(glfw3
 )
 
 unset(glfw3_FIND_VERSION)
+
+# GLFW 3.1 does not export INTERFACE_LINK_LIBRARIES so detect this
+# and set the property ourselves
+# @todo investigate how this might apply for Mac OSX
+if(UNIX)
+  get_property(glfw3_HAS_INTERFACE_LINK_LIBRARIES
+    TARGET glfw
+    PROPERTY INTERFACE_LINK_LIBRARIES
+    SET
+  )
+  if (NOT glfw3_HAS_INTERFACE_LINK_LIBRARIES)
+    message(WARNING "GLFW does not have the INTERFACE_LINK_LIBRARIES property "
+      "set, so hard-coding to expect a dependency on X11. To use a different "
+      "library dependency, consider upgrading to GLFW 3.2+ where this "
+      "property is set by the CMake find package module for GLFW.")
+    find_package(X11 REQUIRED)
+    set_property(TARGET glfw
+      PROPERTY INTERFACE_LINK_LIBRARIES
+      ${X11_Xrandr_LIB}
+      ${X11_Xxf86vm_LIB}
+      ${X11_Xcursor_LIB}
+      ${X11_Xinerama_LIB}
+      ${X11_Xi_LIB}
+      ${X11_LIBRARIES}
+      ${CMAKE_DL_LIBS}
+    )
+  endif()
+endif()

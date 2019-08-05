@@ -377,6 +377,7 @@ public:
     static const char* const META_FILE_COMPRESSION;
     static const char* const META_FILE_MEM_BYTES;
     static const char* const META_FILE_VOXEL_COUNT;
+    static const char* const META_FILE_DELAYED_LOAD;
 
 
     /// @name Statistics

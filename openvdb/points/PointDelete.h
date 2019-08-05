@@ -127,8 +127,10 @@ struct DeleteByFilterOp
     using LeafNodeT = typename PointDataTreeT::LeafNodeType;
     using ValueType = typename LeafNodeT::ValueType;
 
-    DeleteByFilterOp(const FilterT& filter)
-        : mFilter(filter) { }
+    DeleteByFilterOp(const FilterT& filter,
+                     const AttributeArray::ScopedRegistryLock* lock)
+        : mFilter(filter)
+        , mLock(lock) { }
 
     void operator()(const LeafRangeT& range) const
     {
@@ -139,7 +141,7 @@ struct DeleteByFilterOp
 
             // if all points are being deleted, clear the leaf attributes
             if (newSize == 0) {
-                leaf->clearAttributes();
+                leaf->clearAttributes(/*updateValueMask=*/true, mLock);
                 continue;
             }
 
@@ -150,7 +152,7 @@ struct DeleteByFilterOp
 
             const AttributeSet& existingAttributeSet = leaf->attributeSet();
             AttributeSet* newAttributeSet = new AttributeSet(
-                existingAttributeSet, static_cast<Index>(newSize));
+                existingAttributeSet, static_cast<Index>(newSize), mLock);
             const size_t attributeSetSize = existingAttributeSet.size();
 
             // cache the attribute arrays for efficiency
@@ -220,6 +222,7 @@ struct DeleteByFilterOp
 
 private:
     const FilterT& mFilter;
+    const AttributeArray::ScopedRegistryLock* mLock;
 }; // struct DeleteByFilterOp
 
 } // namespace point_delete_internal
@@ -262,9 +265,15 @@ inline void deleteFromGroups(PointDataTreeT& pointTree,
         filter.reset(new MultiGroupFilter(empty, groups, leafIter->attributeSet()));
     }
 
-    tree::LeafManager<PointDataTreeT> leafManager(pointTree);
-    point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(*filter);
-    tbb::parallel_for(leafManager.leafRange(), deleteOp);
+    { // acquire registry lock to avoid locking when appending attributes in parallel
+
+        AttributeArray::ScopedRegistryLock lock;
+
+        tree::LeafManager<PointDataTreeT> leafManager(pointTree);
+        point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(
+            *filter, &lock);
+        tbb::parallel_for(leafManager.leafRange(), deleteOp);
+    }
 
     // remove empty leaf nodes
 

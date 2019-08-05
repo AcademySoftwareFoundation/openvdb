@@ -74,8 +74,8 @@
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.
@@ -102,7 +102,7 @@
 #ifndef OPENVDB_USE_DEPRECATED_ABI
     #if OPENVDB_ABI_VERSION_NUMBER <= 3
         PRAGMA(message("NOTE: ABI <= 3 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
-            "to suppress this message")
+            "to suppress this message"))
     #endif
 #endif
 

@@ -29,6 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "openvdb.h"
+#include "io/DelayedLoadMetadata.h"
 //#ifdef OPENVDB_ENABLE_POINTS
 #include "points/PointDataGrid.h"
 //#endif
@@ -123,6 +124,9 @@ initialize()
 //#ifdef OPENVDB_ENABLE_POINTS
     points::internal::initialize();
 //#endif
+
+    // Register delay load metadata
+    io::DelayedLoadMetadata::registerType();
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();

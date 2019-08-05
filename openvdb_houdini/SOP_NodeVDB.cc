@@ -49,9 +49,11 @@
 #include <UT/UT_SharedPtr.h>
 #include <tbb/mutex.h>
 #include <algorithm>
+#include <cctype> // std::tolower
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex> // std::call_once
 #include <sstream>
 #include <stdexcept>
 
@@ -80,6 +82,44 @@
 /// called by sop.mako.
 ///
 //#define OPENVDB_CUSTOM_MAKO
+
+
+namespace {
+
+const std::string&
+getOpHidePolicy()
+{
+    static std::string sOpHidePolicy;
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
+        const char* opHidePolicy = std::getenv("OPENVDB_OPHIDE_POLICY");
+
+#ifdef OPENVDB_OPHIDE_POLICY
+        if (opHidePolicy == nullptr) {
+            opHidePolicy = OPENVDB_PREPROC_STRINGIFY(OPENVDB_OPHIDE_POLICY);
+        }
+#endif
+
+        if (opHidePolicy != nullptr) {
+            std::string opHidePolicyStr(opHidePolicy);
+
+            // to lower-case
+
+            std::transform(opHidePolicyStr.begin(), opHidePolicyStr.end(),
+                opHidePolicyStr.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+
+            sOpHidePolicy = opHidePolicy;
+        } else {
+            sOpHidePolicy = "";
+        }
+    });
+
+    return sOpHidePolicy;
+}
+
+} // anonymous namespace
 
 
 namespace openvdb_houdini {
@@ -634,6 +674,13 @@ public:
     {
         return factory.flavorString() + "_OpenVDB";
     }
+
+    /// @brief Return the name of the equivalent native operator as shipped with Houdini.
+    /// @details An empty string indicates that there is no equivalent native operator.
+    virtual std::string getNativeName(const houdini_utils::OpFactory&)
+    {
+        return "";
+    }
 };
 
 
@@ -644,6 +691,11 @@ public:
     std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
     {
         return this->getLowercaseName(this->getValidName(english));
+    }
+
+    std::string getTabSubMenuPath(const houdini_utils::OpFactory&) override
+    {
+        return "VDB";
     }
 };
 
@@ -659,12 +711,22 @@ public:
 
     std::string getLabelName(const houdini_utils::OpFactory& factory) override
     {
-        return "Open" + factory.english();
+        return factory.english();
     }
 
     std::string getFirstName(const houdini_utils::OpFactory& factory) override
     {
         return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
+    }
+
+    std::string getNativeName(const houdini_utils::OpFactory& factory) override
+    {
+        return this->getLowercaseName(this->getValidName(factory.english()));
+    }
+
+    std::string getTabSubMenuPath(const houdini_utils::OpFactory&) override
+    {
+        return "VDB/ASWF";
     }
 };
 
@@ -686,6 +748,40 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     houdini_utils::OpFactory::OpFlavor flavor):
     houdini_utils::OpFactory(OpenVDBOpPolicy(), english, ctor, parms, table, flavor)
 {
+    setNativeName(OpenVDBOpPolicy().getNativeName(*this));
+}
+
+OpenVDBOpFactory&
+OpenVDBOpFactory::setNativeName(const std::string& name)
+{
+    // SideFX nodes have no native equivalent.
+#ifndef SESI_OPENVDB
+    addSpareData({{"nativename", name}});
+
+    // if native name was previously defined and is present
+    // in the hidden table then remove it regardless of policy
+
+    if (!mNativeName.empty() &&
+        this->table().isOpHidden(mNativeName.c_str())) {
+        this->table().delOpHidden(mNativeName.c_str());
+    }
+
+    mNativeName = name;
+
+    if (!name.empty()) {
+
+        const std::string& opHidePolicy = getOpHidePolicy();
+
+        if (opHidePolicy == "aswf") {
+            // set this SOP to be hidden (if a native equivalent exists)
+            this->setInvisible();
+        } else if (opHidePolicy == "native") {
+            // mark the native equivalent SOP to be hidden
+            this->table().addOpHidden(name.c_str());
+        }
+    }
+#endif
+    return *this;
 }
 
 } // namespace openvdb_houdini

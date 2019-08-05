@@ -86,6 +86,10 @@ DESTDIR_LIB_DIR := $(DESTDIR)/lib
 # The directory into which to install Houdini SOPs
 HOUDINI_DESTDIR := $(HIH)/dso
 
+# The directory into which to install the Houdini startup script
+# (leave blank to not install the script)
+HOUDINI_PYTHONRC_DESTDIR := $(HOUDINI_DESTDIR)/python2.7libs
+
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
@@ -510,13 +514,22 @@ endif
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: %.o
 $(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: %.o
 
-houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg
+houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg pythonrc.py
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/config/Icons" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/config/Icons; \
 	    echo "Created $(HOUDINI_USER_PREF_DIR)/config/Icons/"; \
 	fi
 	cp -f SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	if [ -n "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	then \
+	    if [ ! -d "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	    then \
+	        mkdir -p $(HOUDINI_PYTHONRC_DESTDIR); \
+	        echo "Created $(HOUDINI_PYTHONRC_DESTDIR)/"; \
+	    fi; \
+	    cp -f pythonrc.py $(HOUDINI_PYTHONRC_DESTDIR)/; \
+	fi
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/scripts/sop" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/scripts/sop; \
@@ -583,6 +596,10 @@ clean:
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_USER_PREF_DIR)/config/Icons/SOP_OpenVDB.svg
+	if [ -n "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	then \
+	    $(RM) $(HOUDINI_PYTHONRC_DESTDIR)/pythonrc.py; \
+	fi
 	$(RM) $(addprefix $(HOUDINI_USER_PREF_DIR)/scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
