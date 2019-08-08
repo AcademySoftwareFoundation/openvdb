@@ -2553,7 +2553,7 @@ exportGrid()
         // Register the GridPtr-to-Python object converter explicitly
         // if it is not already implicitly registered.
         try {
-            py::object testObj(GridPtr());
+            py::object testObj{GridPtr()};
         } catch (py::error_already_set& e) {
             PyErr_Clear();
             py::register_ptr_to_python<GridPtr>();
