@@ -60,18 +60,20 @@ message(STATUS "----------------------------------------------------" )
 
 if(NOT OPENVDB_MAYA_INSTALL_PREFIX)
   if(OPENVDB_MAYA_SUBDIR)
-    set(MAYA_INSTALL_LOCATION
-      ${CMAKE_INSTALL_PREFIX}/maya/${Maya_VERSION}
-    )
+    set(MAYA_INSTALL_LOCATION maya/${Maya_VERSION})
   else()
-    set(MAYA_INSTALL_LOCATION
-      ${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}
-    )
+    set(MAYA_INSTALL_LOCATION maya${Maya_VERSION})
   endif()
 endif()
 
 set(OPENVDB_MAYA_INSTALL_PREFIX ${MAYA_INSTALL_LOCATION}
   CACHE PATH "Base install path for OpenVDB Maya libraries and headers."
+)
+set(OPENVDB_MAYA_PLUGINS ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
+  CACHE PATH "Install path for OpenVDB Maya plugins"
+)
+set(OPENVDB_MAYA_SCRIPTS ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
+  CACHE PATH "Install path for OpenVDB Maya scripts"
 )
 
 message(STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}")
@@ -161,7 +163,7 @@ set_target_properties(openvdb_maya
 if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
@@ -175,16 +177,12 @@ endif()
 
 #########################################################################
 
-install(TARGETS
-  openvdb_maya
-  DESTINATION
-  ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
+install(TARGETS openvdb_maya
+  DESTINATION ${OPENVDB_MAYA_PLUGINS}
 )
 
-install(FILES
-  ${OPENVDB_MAYA_MODULE_MEL_FILES}
-  DESTINATION
-  ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
+install(FILES ${OPENVDB_MAYA_MODULE_MEL_FILES}
+  DESTINATION ${OPENVDB_MAYA_SCRIPTS}
 )
 
 if(OPENVDB_MAYA_INSTALL_MOD)
