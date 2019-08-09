@@ -186,8 +186,10 @@ install(FILES ${OPENVDB_MAYA_MODULE_MEL_FILES}
 )
 
 if(OPENVDB_MAYA_INSTALL_MOD)
-  install(CODE
-    "FILE (WRITE ${OPENVDB_MAYA_INSTALL_PREFIX}/openvdb.mod \"+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n\")"
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb.mod
+    "+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb.mod
+    DESTINATION ${OPENVDB_MAYA_INSTALL_PREFIX}
     COMPONENT Runtime
   )
 endif()
