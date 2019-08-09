@@ -71,6 +71,7 @@ project(OpenVDB)
 ###### OpenVDB Build/Component Options
 
 include(CMakeDependentOption)
+include(GNUInstallDirs)
 
 # todo SSE/AVX instruction options
 # todo epydoc and pdflatex
@@ -328,7 +329,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure DCC installation if necessary
