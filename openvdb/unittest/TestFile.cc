@@ -189,6 +189,8 @@ TestFile::testWriteGrid()
     using TreeType = Int32Tree;
     using GridType = Grid<TreeType>;
 
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
+
     File file("something.vdb2");
 
     std::ostringstream ostr(std::ios_base::binary);
@@ -316,6 +318,8 @@ TestFile::testWriteMultipleGrids()
 
     using TreeType = Int32Tree;
     using GridType = Grid<TreeType>;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     File file("something.vdb2");
 
@@ -984,6 +988,8 @@ TestFile::testEmptyGridIO()
     using namespace openvdb::io;
 
     using GridType = Int32Grid;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     const char* filename = "something.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);

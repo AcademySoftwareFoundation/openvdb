@@ -118,11 +118,12 @@ public:
     {
         if (!mFailed) {
             // Print elapsed time only for successful tests.
-            const double msec = mTimer.milliseconds();
+            const double msec = std::round(mTimer.milliseconds());
             if (msec > 1.0) {
-              openvdb::util::printTime(std::cout, msec, " : OK (", ")", 4, 1, 0);
+                openvdb::util::printTime(std::cout, msec, " : OK (", ")",
+                    /*width=*/0, /*precision=*/(msec > 1000.0 ? 1 : 0), /*verbose=*/0);
             } else {
-              std::cout << " : OK (<1ms)";
+                std::cout << " : OK (<1ms)";
             }
         }
         std::cout << std::endl;
