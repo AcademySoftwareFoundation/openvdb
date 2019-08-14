@@ -749,6 +749,12 @@ OpenVDBOpFactory::OpenVDBOpFactory(
     houdini_utils::OpFactory(OpenVDBOpPolicy(), english, ctor, parms, table, flavor)
 {
     setNativeName(OpenVDBOpPolicy().getNativeName(*this));
+
+    // store the packed integer library number as the operator version,
+    // which if defined is returned by OP_OperatorDW::getVersion().
+    // note that this differs from the Houdini default which is X.Y.Z.W
+    addSpareData({{"operatorversion",
+        std::to_string(openvdb::OPENVDB_LIBRARY_VERSION)}});
 }
 
 OpenVDBOpFactory&
