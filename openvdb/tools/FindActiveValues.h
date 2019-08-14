@@ -45,6 +45,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/ValueAccessor.h>
 
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_reduce.h>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
