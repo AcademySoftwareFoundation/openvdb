@@ -709,10 +709,10 @@ struct OrderSegmentsOp
     using IndexArray = boost::scoped_array<PointIndexType>;
     using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
-    OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offestSegments,
+    OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offsetSegments,
         IndexArray* pageOffsetArrays, Index binVolume)
         : mIndexSegments(indexSegments)
-        , mOffsetSegments(offestSegments)
+        , mOffsetSegments(offsetSegments)
         , mPageOffsetArrays(pageOffsetArrays)
         , mBinVolume(binVolume)
     {
@@ -871,10 +871,10 @@ inline void partition(
     size_t numSegments = 0;
 
     boost::scoped_array<typename Array<PointIndexType>::Ptr> indexSegments;
-    boost::scoped_array<typename Array<PointIndexType>::Ptr> offestSegments;
+    boost::scoped_array<typename Array<PointIndexType>::Ptr> offsetSegments;
 
     binAndSegment<PointIndexType, VoxelOffsetType, PointArray>(points, xform,
-        indexSegments, offestSegments, numSegments, binLog2Dim, bucketLog2Dim,
+        indexSegments, offsetSegments, numSegments, binLog2Dim, bucketLog2Dim,
             voxelOffsets.get(), cellCenteredTransform);
 
     const tbb::blocked_range<size_t> segmentRange(0, numSegments);
@@ -885,7 +885,7 @@ inline void partition(
     const Index binVolume = 1u << (3u * binLog2Dim);
 
     tbb::parallel_for(segmentRange, OrderSegmentsOp<PointIndexType>
-        (indexSegments.get(), offestSegments.get(), pageOffsetArrays.get(), binVolume));
+        (indexSegments.get(), offsetSegments.get(), pageOffsetArrays.get(), binVolume));
 
     indexSegments.reset();
 
@@ -918,11 +918,11 @@ inline void partition(
     PointIndexType* index = pointIndices.get();
     for (size_t n = 0; n < numSegments; ++n) {
         indexArray.push_back(index);
-        index += offestSegments[n]->size();
+        index += offsetSegments[n]->size();
     }
 
     tbb::parallel_for(segmentRange,
-        MoveSegmentDataOp<PointIndexType>(indexArray, offestSegments.get()));
+        MoveSegmentDataOp<PointIndexType>(indexArray, offsetSegments.get()));
 }
 
 
