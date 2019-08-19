@@ -22,7 +22,6 @@
 #include <openvdb/math/Transform.h>
 
 #include <boost/integer.hpp> // boost::int_t<N>::least
-#include <boost/scoped_array.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -86,7 +85,7 @@ public:
 
     using IndexType = PointIndexType;
     using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
-    using VoxelOffsetArray = boost::scoped_array<VoxelOffsetType>;
+    using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
 
     class IndexIterator;
 
@@ -161,11 +160,11 @@ private:
     PointPartitioner(const PointPartitioner&);
     PointPartitioner& operator=(const PointPartitioner&);
 
-    boost::scoped_array<IndexType>  mPointIndices;
+    std::unique_ptr<IndexType[]>    mPointIndices;
     VoxelOffsetArray                mVoxelOffsets;
 
-    boost::scoped_array<IndexType>  mPageOffsets;
-    boost::scoped_array<Coord>      mPageCoordinates;
+    std::unique_ptr<IndexType[]>    mPageOffsets;
+    std::unique_ptr<Coord[]>        mPageCoordinates;
     IndexType mPageCount;
     bool      mUsingCellCenteredTransform;
 }; // class PointPartitioner
@@ -273,8 +272,8 @@ template<typename PointIndexType, Index BucketLog2Dim>
 struct VoxelOrderOp
 {
     using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
-    using VoxelOffsetArray = boost::scoped_array<VoxelOffsetType>;
-    using IndexArray = boost::scoped_array<PointIndexType>;
+    using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
+    using IndexArray = std::unique_ptr<PointIndexType[]>;
 
     VoxelOrderOp(IndexArray& indices, const IndexArray& pages,const VoxelOffsetArray& offsets)
         : mIndices(indices.get())
@@ -293,9 +292,9 @@ struct VoxelOrderOp
         const PointIndexType voxelCount = 1 << (3 * BucketLog2Dim);
 
         // allocate histogram buffers
-        boost::scoped_array<VoxelOffsetType> offsets(new VoxelOffsetType[pointCount]);
-        boost::scoped_array<PointIndexType> sortedIndices(new PointIndexType[pointCount]);
-        boost::scoped_array<PointIndexType> histogram(new PointIndexType[voxelCount]);
+        std::unique_ptr<VoxelOffsetType[]> offsets(new VoxelOffsetType[pointCount]);
+        std::unique_ptr<PointIndexType[]> sortedIndices(new PointIndexType[pointCount]);
+        std::unique_ptr<PointIndexType[]> histogram(new PointIndexType[voxelCount]);
 
         for (size_t n(range.begin()), N(range.end()); n != N; ++n) {
 
@@ -345,7 +344,7 @@ struct VoxelOrderOp
 template<typename T>
 struct Array
 {
-    using Ptr = SharedPtr<Array>;
+    using Ptr = std::unique_ptr<Array>;
 
     Array(size_t size) : mSize(size), mData(new T[size]) { }
 
@@ -358,7 +357,7 @@ struct Array
 
 private:
     size_t                  mSize;
-    boost::scoped_array<T>  mData;
+    std::unique_ptr<T[]>    mData;
 }; // struct Array
 
 
@@ -410,13 +409,13 @@ template<typename PointIndexType>
 struct MergeBinsOp
 {
     using Segment = Array<PointIndexType>;
-    using SegmentPtr = typename Segment::Ptr;
+    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
 
     using IndexPair = std::pair<PointIndexType, PointIndexType>;
     using IndexPairList = std::deque<IndexPair>;
-    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListPtr = std::shared_ptr<IndexPairList>;
     using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
-    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
+    using IndexPairListMapPtr = std::shared_ptr<IndexPairListMap>;
 
     MergeBinsOp(IndexPairListMapPtr* bins,
         SegmentPtr* indexSegments,
@@ -534,9 +533,9 @@ struct BinPointIndicesOp
     using PosType = typename PointArray::PosType;
     using IndexPair = std::pair<PointIndexType, PointIndexType>;
     using IndexPairList = std::deque<IndexPair>;
-    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListPtr = std::shared_ptr<IndexPairList>;
     using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
-    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
+    using IndexPairListMapPtr = std::shared_ptr<IndexPairListMap>;
 
     BinPointIndicesOp(IndexPairListMapPtr* data,
         const PointArray& points,
@@ -651,8 +650,8 @@ struct BinPointIndicesOp
 template<typename PointIndexType>
 struct OrderSegmentsOp
 {
-    using IndexArray = boost::scoped_array<PointIndexType>;
-    using SegmentPtr = typename Array<PointIndexType>::Ptr;
+    using IndexArray = std::unique_ptr<PointIndexType[]>;
+    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
 
     OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offsetSegments,
         IndexArray* pageOffsetArrays, IndexArray* pageIndexArrays, Index binVolume)
@@ -675,7 +674,6 @@ struct OrderSegmentsOp
         }
 
         IndexArray bucketIndices(new PointIndexType[maxSegmentSize]);
-
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -746,8 +744,8 @@ template<typename PointIndexType, typename VoxelOffsetType, typename PointArray>
 inline void binAndSegment(
     const PointArray& points,
     const math::Transform& xform,
-    boost::scoped_array<typename Array<PointIndexType>::Ptr>& indexSegments,
-    boost::scoped_array<typename Array<PointIndexType>::Ptr>& offsetSegments,
+    std::unique_ptr<typename Array<PointIndexType>::Ptr[]>& indexSegments,
+    std::unique_ptr<typename Array<PointIndexType>::Ptr[]>& offsetSegments,
     std::vector<Coord>& coords,
     const Index binLog2Dim,
     const Index bucketLog2Dim,
@@ -756,15 +754,15 @@ inline void binAndSegment(
 {
     using IndexPair = std::pair<PointIndexType, PointIndexType>;
     using IndexPairList = std::deque<IndexPair>;
-    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListPtr = std::shared_ptr<IndexPairList>;
     using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
-    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
+    using IndexPairListMapPtr = std::shared_ptr<IndexPairListMap>;
 
     size_t numTasks = 1, numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
     if (points.size() > (numThreads * 2)) numTasks = numThreads * 2;
     else if (points.size() > numThreads) numTasks = numThreads;
 
-    boost::scoped_array<IndexPairListMapPtr> bins(new IndexPairListMapPtr[numTasks]);
+    std::unique_ptr<IndexPairListMapPtr[]> bins(new IndexPairListMapPtr[numTasks]);
 
     using BinOp = BinPointIndicesOp<PointArray, PointIndexType, VoxelOffsetType>;
 
@@ -786,7 +784,7 @@ inline void binAndSegment(
 
     size_t segmentCount = coords.size();
 
-    using SegmentPtr = typename Array<PointIndexType>::Ptr;
+    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
 
     indexSegments.reset(new SegmentPtr[segmentCount]);
     offsetSegments.reset(new SegmentPtr[segmentCount]);
@@ -803,14 +801,16 @@ inline void partition(
     const PointArray& points,
     const math::Transform& xform,
     const Index bucketLog2Dim,
-    boost::scoped_array<PointIndexType>& pointIndices,
-    boost::scoped_array<PointIndexType>& pageOffsets,
-    boost::scoped_array<Coord>& pageCoordinates,
+    std::unique_ptr<PointIndexType[]>& pointIndices,
+    std::unique_ptr<PointIndexType[]>& pageOffsets,
+    std::unique_ptr<Coord[]>& pageCoordinates,
     PointIndexType& pageCount,
-    boost::scoped_array<VoxelOffsetType>& voxelOffsets,
+    std::unique_ptr<VoxelOffsetType[]>& voxelOffsets,
     bool recordVoxelOffsets,
     bool cellCenteredTransform)
 {
+    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
+
     if (recordVoxelOffsets) voxelOffsets.reset(new VoxelOffsetType[points.size()]);
     else  voxelOffsets.reset();
 
@@ -822,8 +822,8 @@ inline void partition(
 
     std::vector<Coord> segmentCoords;
 
-    boost::scoped_array<typename Array<PointIndexType>::Ptr> indexSegments;
-    boost::scoped_array<typename Array<PointIndexType>::Ptr> offsetSegments;
+    std::unique_ptr<SegmentPtr[]> indexSegments;
+    std::unique_ptr<SegmentPtr[]> offsetSegments;
 
     binAndSegment<PointIndexType, VoxelOffsetType, PointArray>(points, xform,
         indexSegments, offsetSegments, segmentCoords, binLog2Dim, bucketLog2Dim,
@@ -833,9 +833,9 @@ inline void partition(
 
     const tbb::blocked_range<size_t> segmentRange(0, numSegments);
 
-    using IndexArray = boost::scoped_array<PointIndexType>;
-    boost::scoped_array<IndexArray> pageOffsetArrays(new IndexArray[numSegments]);
-    boost::scoped_array<IndexArray> pageIndexArrays(new IndexArray[numSegments]);
+    using IndexArray = std::unique_ptr<PointIndexType[]>;
+    std::unique_ptr<IndexArray[]> pageOffsetArrays(new IndexArray[numSegments]);
+    std::unique_ptr<IndexArray[]> pageIndexArrays(new IndexArray[numSegments]);
 
     const Index binVolume = 1u << (3u * binLog2Dim);
 
