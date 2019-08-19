@@ -755,12 +755,12 @@ struct OrderSegmentsOp
             pageOffsets[0] = nonemptyBucketCount + 1; // stores array size in first element
 
             // Compute bucket counter prefix sum
-            PointIndexType count = 0, idx = 1;
+            PointIndexType count = 0, idx = 0;
             for (size_t i = 0; i < bucketCountersSize; ++i) {
                 if (bucketCounters[i] != 0) {
-                    pageOffsets[idx] = bucketCounters[i];
+                    pageOffsets[idx+1] = bucketCounters[i];
                     bucketCounters[i] = count;
-                    count += pageOffsets[idx];
+                    count += pageOffsets[idx+1];
                     ++idx;
                 }
             }
