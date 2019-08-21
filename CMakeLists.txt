@@ -113,7 +113,10 @@ openvdb build configuration to decide on OpenEXR support. You may set this to on
 know it to be required.]=] OFF)
 CMAKE_DEPENDENT_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON)
+option(USE_SYSTEM_LIBRARY_PATHS [=[
+Prioritise CMakes default system library/installation paths when attempting to locate dependencies. When disabled,
+only explicitly provided paths will be searched. Note the list variable SYSTEM_LIBRARY_PATHS can be populated with
+paths to use as fallbacks when calling any find_xxx() commands.]=] ON)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
@@ -356,19 +359,11 @@ if(OPENVDB_CODE_COVERAGE)
   set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
 endif()
 
-# System path configuration
+# System path configuration - sets USE_CMAKE_DEFAULT_PATH to NO_DEFAULT_PATH
+# which should be passed to all find_xxx() commands
 
-if(USE_SYSTEM_LIBRARY_PATHS)
-  set(SYSTEM_LIBRARY_PATHS
-    ~/Library/Frameworks
-    /Library/Frameworks
-    /usr/local
-    /usr
-    /sw  # Fink
-    /opt/local  # DarwinPorts
-    /opt/csw  # Blastwave
-    /opt
-  )
+if(NOT USE_SYSTEM_LIBRARY_PATHS)
+  set(USE_CMAKE_DEFAULT_PATH NO_DEFAULT_PATH)
 endif()
 
 #########################################################################

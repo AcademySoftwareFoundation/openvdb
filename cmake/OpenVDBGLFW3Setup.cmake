@@ -97,7 +97,7 @@ set(_GLFW3_PATH_SUFFIXES "lib/cmake/glfw3" "cmake/glfw3" "glfw3")
 list(APPEND _GLFW3_PATH_SUFFIXES "lib/cmake/glfw" "cmake/glfw" "glfw")
 
 find_path(GLFW3_CMAKE_LOCATION glfw3Config.cmake
-  NO_DEFAULT_PATH
+  ${USE_CMAKE_DEFAULT_PATH}
   PATHS ${_GLFW3_ROOT_SEARCH_DIR}
   PATH_SUFFIXES ${_GLFW3_PATH_SUFFIXES}
 )

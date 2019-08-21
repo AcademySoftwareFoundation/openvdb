@@ -92,7 +92,7 @@ endif()
 # ------------------------------------------------------------------------
 
 find_path(Maya_INCLUDE_DIR maya/MTypes.h
-  NO_DEFAULT_PATH
+  ${USE_CMAKE_DEFAULT_PATH}
   PATHS ${_MAYA_ROOT_SEARCH_DIR}
   PATH_SUFFIXES include
 )
@@ -139,7 +139,7 @@ set(Maya_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${_MAYA_COMPONENT_LIST})
   find_library(Maya_${COMPONENT}_LIBRARY ${COMPONENT}
-    NO_DEFAULT_PATH
+    ${USE_CMAKE_DEFAULT_PATH}
     PATHS ${Maya_LIBRARY_DIR}
   )
   list(APPEND Maya_LIB_COMPONENTS ${Maya_${COMPONENT}_LIBRARY})
