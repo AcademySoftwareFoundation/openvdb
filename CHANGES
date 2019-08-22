@@ -30,6 +30,8 @@ Version 6.2.0 - In development
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
     - Add an OPENVDB_CODE_COVERAGE option to CMake.
+    - The minimum ABI for OpenVDB is now always enforced through CMake
+      separately to other minimum dependency version variables.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
@@ -63,6 +65,9 @@ Version 6.2.0 - In development
     - CMake now always produces a .so for the Python module on UNIX platforms.
     - Fixed a compile-time error when building the Python module for Python 3.
       [Reported by yurivict]
+    - Removed the requirement of CMake 3.14 for NumPy usage.
+    - Added support for Boost >= 1.65 when building the python module with
+      NumPy support through CMake.
 
     Houdini:
     - Added API documentation and examples.
