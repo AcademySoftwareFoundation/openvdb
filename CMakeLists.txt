@@ -181,11 +181,15 @@ mark_as_advanced(
   USE_COLORED_OUTPUT
 )
 
-# Configure minimum version requirements
+# Configure minimum version requirements - some are treated specially and fall
+# outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5. Previous versions are incompatible.
 set(MINIMUM_BLOSC_VERSION 1.5)
+# @note  ABI always enforced so the correct deprecation messages are available.
+# OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
+set(MINIMUM_OPENVDB_ABI_VERSION 4)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2017 of the VFX platform where avaiable
@@ -209,7 +213,6 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
-  set(MINIMUM_OPENVDB_ABI_VERSION 4)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
