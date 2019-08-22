@@ -62,22 +62,21 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-# NumPy requires CMake 3.14
-if(USE_NUMPY AND (${CMAKE_VERSION} VERSION_LESS 3.14))
-  message(FATAL_ERROR "No CMake support for FindPackage ( NumPy) currently "
-    "available for OpenVDB. Requires CMake 3.14."
-  )
-endif()
-
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_INCLUDES)
 
-# If CMake is < 3.12, use the old style python search and alias the variables
+# Configure Python and Numpy. Note that:
+#  - find_package(Python Interpreter Development) requires CMake >= 3.12
+#  - find_package(Python NumPy) requires CMake >= 3.14
+# To ensure consistent versions between components Interpreter, Compiler,
+# Development and NumPy, specify all components at the same time when using
+# FindPython
 # Note that the Interpreter component is only required for the python test
 if(${CMAKE_VERSION} VERSION_LESS 3.12)
   find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
   find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
 
+  # Alias variables to newer names
   set(Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
   set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
   set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
@@ -85,10 +84,20 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
   get_filename_component(Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY)
 
   list(APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR})
+  if(USE_NUMPY)
+    # Note: This uses our custom backport in cmake/backports
+    find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
+    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
+  endif()
+elseif(${CMAKE_VERSION} VERSION_LESS 3.14)
+  find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development)
+  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
+  if(USE_NUMPY)
+    # Note: This uses our custom backport in cmake/backports
+    find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
+    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
+  endif()
 else()
-  # To ensure consistent versions between components Interpreter, Compiler,
-  # Development and NumPy, specify all components at the same time when using
-  # FindPython
   if(USE_NUMPY)
     find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy)
     if(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
@@ -108,7 +117,6 @@ else()
   list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
 endif()
 
-
 # Boost python handling - try and find both python and pythonXx (version suffixed).
 # Prioritize the version suffixed library, failing if neither exist.
 
@@ -117,17 +125,17 @@ find_package(Boost ${MINIMUM_BOOST_VERSION}
 )
 
 if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  set(BOOST_PYTHON_LIB "python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
   message(STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
 else()
   find_package(Boost ${MINIMUM_BOOST_VERSION}
     QUIET COMPONENTS python
   )
   if(TARGET Boost::python)
-    set(BOOST_PYTHON_LIB "python")
     message(STATUS "Found non-suffixed boost_python, assuming to be python version "
       "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
     )
+    list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
   else()
     message(FATAL_ERROR "Unable to find boost_python or "
       "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}."
@@ -135,9 +143,40 @@ else()
   endif()
 endif()
 
+# If boost >= 1.65, find the required numpy boost component and link that in.
+# Use the same system as above, first trying without the suffix, then with.
+# @todo  Add checks to verify numpy version requirements with boost_numpy?
+
+if(USE_NUMPY AND (
+  (${Boost_VERSION} VERSION_EQUAL 1.65) OR
+  (${Boost_VERSION} VERSION_GREATER 1.65)))
+
+  find_package(Boost ${MINIMUM_BOOST_VERSION}
+    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+  )
+
+  if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  else()
+    find_package(Boost ${MINIMUM_BOOST_VERSION}
+      QUIET COMPONENTS numpy
+    )
+    if(TARGET Boost::numpy)
+      message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
+      )
+      list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
+    else()
+      message(FATAL_ERROR "Unable to find boost_numpy or "
+        "boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}."
+      )
+    endif()
+  endif()
+endif()
+
 set(OPENVDB_PYTHON_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  Boost::${BOOST_PYTHON_LIB}
   ${OPENVDB_PYTHON_DEPS}
 )
 
@@ -231,6 +270,6 @@ install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION include/openvdb/python)
 # pytest
 
 add_test(pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py)
-set_tests_properties(pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}")
+set_tests_properties(pytest PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}")
 
 

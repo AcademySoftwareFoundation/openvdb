@@ -246,8 +246,10 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
+#  FindOpenGL.cmake is needed if CMake < 3.8
+#  FindNumPy.cmake is needed if CMake < 3.14
 
-if(${CMAKE_VERSION} VERSION_LESS 3.8)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
 endif()
 
