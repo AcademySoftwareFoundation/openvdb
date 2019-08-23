@@ -329,3 +329,50 @@ else()
   # Anticipated ABI version for H18
   set(OPENVDB_HOUDINI_ABI 6)
 endif()
+
+# ------------------------------------------------------------------------
+#  Configure GCC CXX11 ABI
+# ------------------------------------------------------------------------
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if((CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 5.1) OR
+     (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1))
+    message(STATUS "GCC >= 5.1 detected. Configuring GCC CXX11 ABI for Houdini compatibility...")
+
+    execute_process(COMMAND echo "#include" " " "<string>"
+      COMMAND g++ "-x" "c++" "-E" "-dM" "-"
+      COMMAND grep "-F" "_GLIBCXX_USE_CXX11_ABI"
+      TIMEOUT 10
+      RESULT_VARIABLE QUERIED_GCC_CXX11_ABI_SUCCESS
+      OUTPUT_VARIABLE _GCC_CXX11_ABI)
+
+    set(GLIBCXX_USE_CXX11_ABI -1)
+    if(NOT QUERIED_GCC_CXX11_ABI_SUCCESS)
+      string(FIND ${_GCC_CXX11_ABI} "0" GCC_OLD_CXX11_ABI)
+      string(FIND ${_GCC_CXX11_ABI} "1" GCC_NEW_CXX11_ABI)
+      if(NOT (${GCC_OLD_CXX11_ABI} EQUAL -1))
+        set(GLIBCXX_USE_CXX11_ABI 0)
+      endif()
+      if(NOT (${GCC_NEW_CXX11_ABI} EQUAL -1))
+        set(GLIBCXX_USE_CXX11_ABI 1)
+      endif()
+    endif()
+
+    if(${GLIBCXX_USE_CXX11_ABI} EQUAL 0)
+      message(STATUS "  Newer GCC CXX11 ABI already disabled - compatible for Houdini")
+    elseif(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
+      message(WARNING "GCC has been built with newer CXX11 ABI automatically enabled. "
+        "Disabling for all OpenVDB components for Houdini compatibility. Make sure all "
+        "dependencies have been build with older GCC ABI. "
+        "See https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
+        "https://vfxplatform.com/#footnote-gcc6 for more information.")
+    else()
+      message(WARNING "Unable to determine the current ABI configuration of GCC CXX11."
+        " Disabling for all OpenVDB components for Houdini compatibility. Make sure all "
+        "dependencies have been build with older GCC ABI. "
+        "See https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
+        "https://vfxplatform.com/#footnote-gcc6 for more information.")
+    endif()
+    add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+  endif()
+endif()
