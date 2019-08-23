@@ -65,6 +65,23 @@ endif()
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_INCLUDES)
 
+# Small function with mimics basic output (bar components) of
+# FindPackageHandleStandardArgs. This is required as we want to ensure
+# the minimum python version is MINIMUM_PYTHON_VERSION - however this cannot
+# be provided to find_package(Python) with differing major versions. e.g.
+# calls to find_package(Python 2.7) fails if python3 is found on the system.
+function(OPENVDB_CHECK_PYTHON_VERSION _PY_VERSION _PY_PATH)
+  if(_PY_VERSION VERSION_LESS MINIMUM_PYTHON_VERSION)
+    message(FATAL_ERROR "Could NOT find Python: Found unsuitable version \"${_PY_VERSION}\""
+      "but required is at least \"${MINIMUM_PYTHON_VERSION}\" (found ${_PY_PATH})"
+    )
+  else()
+    message(STATUS "Found Python: ${_PY_PATH}) (found suitable version \"${_PY_VERSION}\", "
+      "minimum required is \"${MINIMUM_PYTHON_VERSION}\")"
+    )
+  endif()
+endfunction()
+
 # Configure Python and Numpy. Note that:
 #  - find_package(Python Interpreter Development) requires CMake >= 3.12
 #  - find_package(Python NumPy) requires CMake >= 3.14
@@ -73,10 +90,12 @@ set(OPENVDB_PYTHON_INCLUDES)
 # FindPython
 # Note that the Interpreter component is only required for the python test
 if(${CMAKE_VERSION} VERSION_LESS 3.12)
-  find_package(PythonInterp ${MINIMUM_PYTHON_VERSION} REQUIRED)
-  find_package(PythonLibs ${MINIMUM_PYTHON_VERSION} REQUIRED)
+  # CMake < 3.12
+  find_package(PythonInterp REQUIRED)
+  find_package(PythonLibs REQUIRED)
 
   # Alias variables to newer names
+  set(Python_VERSION ${PYTHON_VERSION_STRING})
   set(Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
   set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
   set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
@@ -84,68 +103,85 @@ if(${CMAKE_VERSION} VERSION_LESS 3.12)
   get_filename_component(Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY)
 
   list(APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR})
+
+  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_EXECUTABLE})
+
   if(USE_NUMPY)
     # Note: This uses our custom backport in cmake/backports
     find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
     list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
   endif()
 elseif(${CMAKE_VERSION} VERSION_LESS 3.14)
-  find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development)
+  # CMake < 3.14
+  find_package(Python QUIET COMPONENTS Interpreter Development)
+  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_EXECUTABLE})
   list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
+
   if(USE_NUMPY)
     # Note: This uses our custom backport in cmake/backports
     find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
     list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
   endif()
 else()
+  # CMake >= 3.14
   if(USE_NUMPY)
-    find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development NumPy)
-    if(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
+    find_package(Python QUIET REQUIRED COMPONENTS Interpreter Development NumPy)
+  else()
+    find_package(Python QUIET REQUIRED COMPONENTS Interpreter Development)
+  endif()
+
+  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_EXECUTABLE})
+  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
+
+  # Check NumPy version
+  if(USE_NUMPY AND (Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION))
       message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
         "\"${MINIMUM_NUMPY_VERSION}\")"
       )
-    else()
-      message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
-        "version \"${Python_NumPy_VERSION}\", minimum required is "
-        "\"${MINIMUM_NUMPY_VERSION}\")"
-      )
-    endif()
+  elseif(USE_NUMPY)
+    message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
+      "version \"${Python_NumPy_VERSION}\", minimum required is "
+      "\"${MINIMUM_NUMPY_VERSION}\")"
+    )
     list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-  else()
-    find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Interpreter Development)
   endif()
-  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
 endif()
 
-# Boost python handling - try and find both python and pythonXx (version suffixed).
-# Prioritize the version suffixed library, failing if neither exist.
+# Boost python handling. Try to find the following named boost python libraries:
+# - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+# - boost_python{Python_VERSION_MAJOR}
+# - boost_python
+# Prioritize the version suffixed library, failing if none exist.
 
 find_package(Boost ${MINIMUM_BOOST_VERSION}
   QUIET COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+)
+find_package(Boost ${MINIMUM_BOOST_VERSION}
+  QUIET COMPONENTS python${Python_VERSION_MAJOR}
+)
+find_package(Boost ${MINIMUM_BOOST_VERSION}
+  QUIET COMPONENTS python
 )
 
 if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
   message(STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
   list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-else()
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS python
+elseif(TARGET Boost::python${Python_VERSION_MAJOR})
+  message(STATUS "Found boost_python${Python_VERSION_MAJOR}")
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR})
+elseif(TARGET Boost::python)
+  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+    "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
   )
-  if(TARGET Boost::python)
-    message(STATUS "Found non-suffixed boost_python, assuming to be python version "
-      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-    )
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
-  else()
-    message(FATAL_ERROR "Unable to find boost_python or "
-      "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}."
-    )
-  endif()
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
+else()
+  message(FATAL_ERROR "Unable to find boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
+    "boost_python${Python_VERSION_MAJOR} or boost_python."
+  )
 endif()
 
 # If boost >= 1.65, find the required numpy boost component and link that in.
 # Use the same system as above, first trying without the suffix, then with.
-# @todo  Add checks to verify numpy version requirements with boost_numpy?
 
 if(USE_NUMPY AND (
   (${Boost_VERSION} VERSION_EQUAL 1.65) OR
@@ -154,24 +190,28 @@ if(USE_NUMPY AND (
   find_package(Boost ${MINIMUM_BOOST_VERSION}
     QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
   )
+  find_package(Boost ${MINIMUM_BOOST_VERSION}
+    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}
+  )
+  find_package(Boost ${MINIMUM_BOOST_VERSION}
+    QUIET COMPONENTS numpy
+  )
 
   if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
     message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
     list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  else()
-    find_package(Boost ${MINIMUM_BOOST_VERSION}
-      QUIET COMPONENTS numpy
+  elseif(TARGET Boost::numpy${Python_VERSION_MAJOR})
+    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}")
+    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR})
+  elseif(TARGET Boost::numpy)
+    message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
     )
-    if(TARGET Boost::numpy)
-      message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
-        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-      )
-      list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
-    else()
-      message(FATAL_ERROR "Unable to find boost_numpy or "
-        "boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}."
-      )
-    endif()
+    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
+  else()
+    message(FATAL_ERROR "Unable to find boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
+      "boost_numpy${Python_VERSION_MAJOR} or boost_numpy."
+    )
   endif()
 endif()
 
