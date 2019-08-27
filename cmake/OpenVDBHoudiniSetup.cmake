@@ -339,8 +339,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
      (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1))
     message(STATUS "GCC >= 5.1 detected. Configuring GCC CXX11 ABI for Houdini compatibility...")
 
-    execute_process(COMMAND echo "#include" " " "<string>"
-      COMMAND g++ "-x" "c++" "-E" "-dM" "-"
+    execute_process(COMMAND echo "#include <string>"
+      COMMAND ${CMAKE_CXX_COMPILER} "-x" "c++" "-E" "-dM" "-"
       COMMAND grep "-F" "_GLIBCXX_USE_CXX11_ABI"
       TIMEOUT 10
       RESULT_VARIABLE QUERIED_GCC_CXX11_ABI_SUCCESS
@@ -363,13 +363,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     elseif(${GLIBCXX_USE_CXX11_ABI} EQUAL 1)
       message(WARNING "GCC has been built with newer CXX11 ABI automatically enabled. "
         "Disabling for all OpenVDB components for Houdini compatibility. Make sure all "
-        "dependencies have been build with older GCC ABI. "
+        "dependencies have been built with the older GCC ABI. "
         "See https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
         "https://vfxplatform.com/#footnote-gcc6 for more information.")
     else()
       message(WARNING "Unable to determine the current ABI configuration of GCC CXX11."
         " Disabling for all OpenVDB components for Houdini compatibility. Make sure all "
-        "dependencies have been build with older GCC ABI. "
+        "dependencies have been built with the older GCC ABI. "
         "See https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
         "https://vfxplatform.com/#footnote-gcc6 for more information.")
     endif()
