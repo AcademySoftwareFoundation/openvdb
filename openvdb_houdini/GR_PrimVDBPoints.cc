@@ -146,7 +146,7 @@ public:
     /// always returning true will effectively disable frustum culling.
     bool inViewFrustum(const UT_Matrix4D &objviewproj
 #if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-		       , const UT_BoundingBoxD *bbox
+                       , const UT_BoundingBoxD *bbox
 #endif
                        ) override;
 
@@ -782,7 +782,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
 bool
 GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj
 #if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-				, const UT_BoundingBoxD *passed_bbox
+                                , const UT_BoundingBoxD *passed_bbox
 #endif
                                 )
 {
@@ -790,7 +790,7 @@ GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj
                                 mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
 #if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
     return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox :bbox,
-				   objviewproj);
+                                   objviewproj);
 #else
     return GR_Utils::inViewFrustum(bbox, objviewproj);
 #endif
