@@ -144,7 +144,11 @@ public:
 
     /// return true if the primitive is in or overlaps the view frustum.
     /// always returning true will effectively disable frustum culling.
-    bool inViewFrustum(const UT_Matrix4D &objviewproj) override;
+    bool inViewFrustum(const UT_Matrix4D &objviewproj
+#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
+                       , const UT_BoundingBoxD *bbox
+#endif
+                       ) override;
 
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
@@ -776,11 +780,20 @@ GR_PrimVDBPoints::update(RE_Render *r,
 }
 
 bool
-GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj)
+GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj
+#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
+                                , const UT_BoundingBoxD *passed_bbox
+#endif
+                                )
 {
     const UT_BoundingBoxD bbox( mBbox.min().x(), mBbox.min().y(), mBbox.min().z(),
                                 mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
+#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
+    return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox :bbox,
+                                   objviewproj);
+#else
     return GR_Utils::inViewFrustum(bbox, objviewproj);
+#endif
 }
 
 bool
