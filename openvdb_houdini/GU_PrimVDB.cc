@@ -2077,15 +2077,11 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
         const GA_AIFTuple* tuple = attrib->getAIFTuple();
         const int entries = attrib->getTupleSize();
 
-        if (!tuple)
-        {
-            // Only support tuple-style attributes.
-            continue;
-        }
-
         switch (attrib->getStorageClass()) {
 
         case GA_STORECLASS_INT:
+            if (!tuple)
+                continue;
             switch (entries) {
             case 1:
                 meta_map.removeMeta(name);
@@ -2141,6 +2137,8 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
             break;
 
         case GA_STORECLASS_FLOAT:
+            if (!tuple)
+                continue;
             switch (entries) {
             case 1:
                 meta_map.removeMeta(name);
@@ -2189,9 +2187,9 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
             }
             break;
 
-        case GA_STORECLASS_STRING:
-            if (entries == 1) {
-                GA_ROHandleS handle(attrib);
+        case GA_STORECLASS_STRING: {
+            GA_ROHandleS handle(attrib);
+            if (entries == 1 && handle.isValid()) {
                 meta_map.removeMeta(name);
                 const char* str = handle.get(element);
                 if (!str) str = "";
@@ -2203,6 +2201,7 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
                 //    << it.name() << "\" (string tuples are not supported)";
             }
             break;
+        }
 
         case GA_STORECLASS_INVALID: break;
         case GA_STORECLASS_OTHER: break;
