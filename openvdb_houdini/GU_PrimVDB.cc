@@ -2077,6 +2077,12 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
         const GA_AIFTuple* tuple = attrib->getAIFTuple();
         const int entries = attrib->getTupleSize();
 
+        if (!tuple)
+        {
+            // Only support tuple-style attributes.
+            continue;
+        }
+
         switch (attrib->getStorageClass()) {
 
         case GA_STORECLASS_INT:
