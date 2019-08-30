@@ -65,7 +65,7 @@ endif()
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_INCLUDES)
 
-# Small function with mimics basic output (bar components) of
+# Small function which mimics basic output (bar components) of
 # FindPackageHandleStandardArgs. This is required as we want to ensure
 # the minimum python version is MINIMUM_PYTHON_VERSION - however this cannot
 # be provided to find_package(Python) with differing major versions. e.g.
