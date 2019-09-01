@@ -277,7 +277,9 @@ public:
     /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     // Windows does not allow base classes to be easily deprecated.
-    // OPENVDB_DEPRECATED
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
@@ -329,11 +331,15 @@ public:
     OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// @deprecated Previously this compressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
-    // OPENVDB_DEPRECATED
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
     virtual bool compress() = 0;
     /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
-    // OPENVDB_DEPRECATED
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
     virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
