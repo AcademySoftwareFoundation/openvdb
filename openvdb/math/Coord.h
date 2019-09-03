@@ -235,7 +235,7 @@ public:
     /// corresponding components of @a b.
     static inline bool lessThan(const Coord& a, const Coord& b)
     {
-            return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
+        return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
 
     /// @brief Return the index (0, 1 or 2) with the smallest value.
@@ -252,9 +252,13 @@ public:
 
     /// @brief Return a hash value for this coordinate
     /// @note Log2N is the binary logarithm of the hash table size.
-    /// @details The hash function is taken from the SIGGRAPh paper: "VDB: High-resolution sparse volumes with dynamic topology"
-    template <int Log2N = 20>
-    inline size_t hash() const { return ( (1<<Log2N)-1 ) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791); }
+    /// @details The hash function is taken from the SIGGRAPH paper:
+    /// "VDB: High-resolution sparse volumes with dynamic topology"
+    template<int Log2N = 20>
+    size_t hash() const
+    {
+        return ((1<<Log2N)-1) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791);
+    }
 
 private:
     std::array<Int32, 3> mVec;
@@ -387,9 +391,11 @@ public:
   #pragma GCC diagnostic pop
 #endif
     }
-    /// @brief Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
+    /// @brief Return @c true if this bounding box is nonempty
+    /// (i.e., encloses at least one coordinate).
     operator bool() const { return !this->empty(); }
-    /// @brief Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
+    /// @brief Return @c true if this bounding box is nonempty
+    /// (i.e., encloses at least one coordinate).
     bool hasVolume() const { return !this->empty(); }
 
     /// @brief Return the floating-point position of the center of this bounding box.
@@ -398,7 +404,7 @@ public:
     /// @brief Return the dimensions of the coordinates spanned by this bounding box.
     /// @note Since coordinates are inclusive, a bounding box with min = max
     /// has dimensions of (1, 1, 1).
-    Coord dim() const { return mMax.offsetBy(1) - mMin; }
+    Coord dim() const { return empty() ? Coord() : (mMax.offsetBy(1) - mMin); }
     /// @todo deprecate - use dim instead
     Coord extents() const { return this->dim(); }
     /// @brief Return the integer volume of coordinates spanned by this bounding box.
