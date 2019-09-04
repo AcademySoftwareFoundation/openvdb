@@ -404,7 +404,7 @@ public:
     /// @brief Return the dimensions of the coordinates spanned by this bounding box.
     /// @note Since coordinates are inclusive, a bounding box with min = max
     /// has dimensions of (1, 1, 1).
-    Coord dim() const { return empty() ? Coord() : (mMax.offsetBy(1) - mMin); }
+    Coord dim() const { return empty() ? Coord(0) : (mMax.offsetBy(1) - mMin); }
     /// @todo deprecate - use dim instead
     Coord extents() const { return this->dim(); }
     /// @brief Return the integer volume of coordinates spanned by this bounding box.
