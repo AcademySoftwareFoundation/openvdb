@@ -388,10 +388,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       message(STATUS "  Current CXX11 ABI matches Houdini configuration "
         "(_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}).")
     else()
-      message(WARNING "A problem or mismatch was detected between the CXX11 ABI "
+      message(WARNING "A potential mismatch was detected between the CXX11 ABI "
         "of GCC and Houdini. The following ABI configuration will be used: "
-        "-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}. Make sure all "
-        "dependencies have been built with the same CXX11 ABI. See: "
+        "-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}. See: "
         "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
         "https://vfxplatform.com/#footnote-gcc6 for more information.")
     endif()
