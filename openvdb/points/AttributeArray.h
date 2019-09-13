@@ -276,7 +276,10 @@ public:
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
     /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
+    // Windows does not allow base classes to be easily deprecated.
+#ifndef _MSC_VER
     OPENVDB_DEPRECATED
+#endif
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
@@ -327,9 +330,17 @@ public:
     /// now it always returns @c false.
     OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// @deprecated Previously this compressed the attribute array, now it does nothing.
-    OPENVDB_DEPRECATED virtual bool compress() = 0;
+    // Windows does not allow base classes to be deprecated
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
+    virtual bool compress() = 0;
     /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
-    OPENVDB_DEPRECATED virtual bool decompress() = 0;
+    // Windows does not allow base classes to be deprecated
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
+    virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
     /// @details This is useful if the attribute is used for blind data or as scratch space
@@ -726,6 +737,9 @@ public:
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    OPENVDB_DEPRECATED
+#endif
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
     /// Return @c true if this array is stored as a single uniform value.

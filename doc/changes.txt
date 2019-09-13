@@ -41,13 +41,15 @@ Improvements:
   and TBB&nbsp;malloc for all other builds.
 - Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
   in color.
-- Add an OPENVDB_CODE_COVERAGE option to CMake.
+- Added an @c OPENVDB_CODE_COVERAGE option to CMake.
 
 @par
 Bug fixes:
 - Replaced @b std::vector with @b std::deque as the underlying container
   for @vdblink{util::PagedArray,PagedArray}, to address a rare crash
   when reading from multiple threads while writing from another thread.
+- Fixed a bug that could cause an empty @vdblink{math::CoordBBox,CoordBBox}
+  to report nonzero volume.
 - Fixed a bug in
   @vdblink{tools::computeScalarPotential(),computeScalarPotential}
   that could produce a corrupt result due to invalid memory access.

@@ -61,7 +61,7 @@ cmake ..
 make -j4
 make install
 ```
-#### Mac OSX
+#### macOS
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
 ```
 brew install boost
