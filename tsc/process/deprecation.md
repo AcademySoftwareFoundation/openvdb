@@ -17,6 +17,6 @@ This infers the following support:
 When version 7.0.0 is released, OpenVDB will support VFX Reference Platform
 years 2020, 2019 and 2018. Support for Houdini 16.5 and C++11 will be dropped.
 
-Support for the previous ABI than meets the criteria above will be maintained
-until the subsequent minor release. For example, the latest version to retain
+Support for obsolete ABIs will not be dropped until the first minor release
+after the introduction of a new ABI. For example, the latest version to retain
 support for ABI=4 will be the release prior to 7.1.0.
