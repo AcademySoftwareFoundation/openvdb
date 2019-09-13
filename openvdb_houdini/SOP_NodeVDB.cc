@@ -45,6 +45,7 @@
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_Type.h>
 #include <SOP/SOP_Cache.h> // for stealable
+#include <SYS/SYS_Version.h>
 #include <UT/UT_InfoTree.h>
 #include <UT/UT_SharedPtr.h>
 #include <tbb/mutex.h>
@@ -750,11 +751,14 @@ OpenVDBOpFactory::OpenVDBOpFactory(
 {
     setNativeName(OpenVDBOpPolicy().getNativeName(*this));
 
-    // store the packed integer library number as the operator version,
-    // which if defined is returned by OP_OperatorDW::getVersion().
-    // note that this differs from the Houdini default which is X.Y.Z.W
-    addSpareData({{"operatorversion",
-        std::to_string(openvdb::OPENVDB_LIBRARY_VERSION)}});
+    std::stringstream ss;
+    ss << "vdb" << OPENVDB_LIBRARY_VERSION_STRING << " ";
+    ss << "houdini" << SYS_Version::full();
+
+    // Define an operator version of the format "vdb6.1.0 houdini18.0.222",
+    // which can be returned by OP_OperatorDW::getVersion() and used to
+    // handle compatibility between specific versions of VDB or Houdini
+    addSpareData({{"operatorversion", ss.str()}});
 }
 
 OpenVDBOpFactory&
