@@ -957,6 +957,19 @@ public:
         return !mDoc.empty();
     }
 
+#ifndef SESI_OPENVDB
+    bool getVersion(UT_String &version) override
+    {
+        auto it = spareData().find("operatorversion");
+        if (it != spareData().end()) {
+            version = it->second;
+            return true;
+        }
+
+        return OP_Operator::getVersion(version);
+    }
+#endif
+
     const SpareDataMap& spareData() const { return mSpareData; }
     SpareDataMap& spareData() { return mSpareData; }
 

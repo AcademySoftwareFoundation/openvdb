@@ -115,6 +115,9 @@ Houdini:
 - Added an @hulink{OpPolicy::getTabSubMenuPath(),OpPolicy::getTabSubMenuPath}
   method to allow @b OpPolicy subclasses to provide their own tab sub-menu path.
 - OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
+- Added an @hulink{OP_OperatorDW::getVersion(),OP_OperatorDW::getVersion}
+  override which returns the operator version that is set in the
+  @hulink{OpenVDBOpFactory,OpenVDBOpFactory} constructor.
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
