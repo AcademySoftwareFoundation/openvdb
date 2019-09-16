@@ -108,6 +108,12 @@ else()
   list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
 endif()
 
+if(USE_NUMPY)
+  if(Python_NumPy_VERSION VERSION_LESS DEPRECATED_NUMPY_VERSION)
+    message(DEPRECATION "Support for NumPy versions < ${DEPRECATED_NUMPY_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 # Boost python handling - try and find both python and pythonXx (version suffixed).
 # Prioritize the version suffixed library, failing if neither exist.
