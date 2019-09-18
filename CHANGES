@@ -30,6 +30,8 @@ Version 6.2.0 - In development
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
     - Added an OPENVDB_CODE_COVERAGE option to CMake.
+    - CMake now automatically detects and configures the CXX11 ABI requirement
+      for Houdini builds.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container

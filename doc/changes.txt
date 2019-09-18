@@ -42,6 +42,8 @@ Improvements:
 - Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
   in color.
 - Added an @c OPENVDB_CODE_COVERAGE option to CMake.
+- CMake now automatically detects and configures the CXX11 ABI requirement
+  for Houdini builds.
 
 @par
 Bug fixes:
