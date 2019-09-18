@@ -42,6 +42,7 @@ Improvements:
 - Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
   in color.
 - Added an @c OPENVDB_CODE_COVERAGE option to CMake.
+- Marked VFX 17 platform version dependencies as deprecated.
 
 @par
 Bug fixes:

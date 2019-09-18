@@ -30,6 +30,7 @@ Version 6.2.0 - In development
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
     - Added an OPENVDB_CODE_COVERAGE option to CMake.
+    - Marked VFX 17 platform version dependencies as deprecated.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
