@@ -30,7 +30,9 @@ Version 6.2.0 - In development
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
     - Added an OPENVDB_CODE_COVERAGE option to CMake.
-    - Marked VFX 17 platform version dependencies as deprecated.
+    - CMake now issues deprecation warnings for 2017 VFX Reference Platform
+      version dependencies. In particular, C++11-only compilers are now
+      deprecated; OpenVDB 7.0 will require a C++14-compatible compiler.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
