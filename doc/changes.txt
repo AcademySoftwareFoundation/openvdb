@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 6.2.0</B> - <I>In development</I>
+<B>Version 6.2.0</B> - <I>September 18, 2019</I>
 
 @par
 New features:
@@ -53,8 +53,8 @@ Bug fixes:
 - Replaced @b std::vector with @b std::deque as the underlying container
   for @vdblink{util::PagedArray,PagedArray}, to address a rare crash
   when reading from multiple threads while writing from another thread.
-- Fixed a bug that could cause an empty @vdblink{math::CoordBBox,CoordBBox}
-  to report nonzero volume.
+- Fixed a bug that could cause an empty
+  @vdblink{math::CoordBBox::volume(),CoordBBox} to report nonzero volume.
 - Fixed a bug in
   @vdblink{tools::computeScalarPotential(),computeScalarPotential}
   that could produce a corrupt result due to invalid memory access.
@@ -66,34 +66,38 @@ Bug fixes:
   @vdblink{tools::fillWithSpheres(),fillWithSpheres} tool
   that caused generated spheres to sometimes extend outside the target volume.
 - CMake now correctly sets rpaths for the unit test binary.
-- Fixed a memory leak in a static variable pointer.
+- Addressed a Valgrind warning by allocating the point attribute array
+  @vdblink{points::AttributeArray::registerType,registry}
+  using a Meyers singleton.
   <I>[Contributed&nbsp;by&nbsp;Autodesk]</I>
 
 @par
 ABI changes:
 - ABI versions&nbsp;3 and older are now deprecated, and support for them will
-  be removed in a future release. Until then, define the macro
-  OPENVDB_USE_DEPRECATED_ABI (or set the CMake OPENVDB_USE_DEPRECATED_ABI
-  option to ON) to suppress deprecation messages when compiling OpenVDB or
-  dependent code.
+  be removed in a future release.
+  Until then, define the macro @c OPENVDB_USE_DEPRECATED_ABI (or set the
+  CMake @c OPENVDB_USE_DEPRECATED_ABI option to @c ON) to suppress deprecation
+  messages when compiling OpenVDB or dependent code.
 
 @par
 API changes:
-- Changed a type alias in @vdblink{points::RandomLeafFilter,RandomLeafFilter}.
+- Changed @vdblink{points::RandomLeafFilter::LeafMap,RandomLeafFilter::LeafMap}
+  from a @b std::map to a @b std::unordered_map.
 - Removed the @b TableT template argument from
   @vdblink{util::PagedArray,PagedArray}.
-  The table type is now hardcoded to <B>std::deque</B>.
+  The table type is now hardcoded to @b std::deque.
 - The minimum supported version of GLFW is now&nbsp;3.1.
 
 @par
 Python:
 - CMake now always produces a <TT>.so</TT> for the Python module
-  on UNIX platforms.
+  on Linux and Unix platforms.
 - Fixed a compile-time error when building the Python module for Python&nbsp;3.
   <I>[Reported&nbsp;by&nbsp;yurivict]</I>
 
 @par
 Houdini:
+- OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
 - Added API documentation and examples.
 - Added @hvdblink{GEOvdbApply,GEOvdbApply}, which invokes a functor
   on a VDB primitive if the resolved grid type is a member of
@@ -119,10 +123,8 @@ Houdini:
   method to pair OpenVDB nodes with their native Houdini equivalents.
 - Added an @hulink{OpPolicy::getTabSubMenuPath(),OpPolicy::getTabSubMenuPath}
   method to allow @b OpPolicy subclasses to provide their own tab sub-menu path.
-- OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
-- Added an @hulink{OP_OperatorDW::getVersion(),OP_OperatorDW::getVersion}
-  override which returns the operator version that is set in the
-  @hulink{OpenVDBOpFactory,OpenVDBOpFactory} constructor.
+- OpenVDB nodes now override @b OP_Operator::getVersion to return
+  a version string of the form @c "vdb6.2.0 houdini18.0.222".
 
 
 @htmlonly <a name="v6_1_0_changes"></a>@endhtmlonly
