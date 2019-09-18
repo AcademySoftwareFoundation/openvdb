@@ -42,6 +42,8 @@ Improvements:
 - Added a @c USE_COLORED_OUTPUT option to CMake to display compiler output
   in color.
 - Added an @c OPENVDB_CODE_COVERAGE option to CMake.
+- CMake now automatically detects and configures the CXX11 ABI requirement
+  for Houdini builds.
 - CMake now issues deprecation warnings for 2017 VFX Reference Platform
   version dependencies. In particular, C++11-only compilers are now
   deprecated; OpenVDB&nbsp;7.0 will require a C++14-compatible compiler.
