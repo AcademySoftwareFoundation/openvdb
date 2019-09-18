@@ -78,8 +78,8 @@ else()
 endif()
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
-if(${Tbb_VERSION} VERSION_LESS DEPRECATED_TBB_VERSION)
-  message(DEPRECATION "Support for TBB versions < ${DEPRECATED_TBB_VERSION} "
+if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+  message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
     "is deprecated and will be removed.")
 endif()
 

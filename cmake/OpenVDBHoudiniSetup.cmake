@@ -179,8 +179,8 @@ if(Houdini_VERSION VERSION_LESS 17)
   endfunction()
 endif()
 
-if(Houdini_VERSION VERSION_LESS ${DEPRECATED_HOUDINI_VERSION})
-  message(DEPRECATION "Support for Houdini versions < ${DEPRECATED_HOUDINI_VERSION} "
+if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
+  message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
     "is deprecated and will be removed.")
 endif()
 
