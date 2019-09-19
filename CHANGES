@@ -1,7 +1,19 @@
 OpenVDB Version History
 =======================
 
-Version 6.2.0 - In development
+Version 7.0.0 - In development
+
+    Improvements:
+    - The minimum ABI for OpenVDB is now always enforced through CMake
+      separately to other minimum dependency version variables.
+
+    Python:
+    - Removed the requirement of CMake 3.14 for NumPy usage.
+    - Added support for Boost >= 1.65 when building the python module with
+      NumPy support through CMake.
+    - Improved CMake Python3 support.
+
+Version 6.2.0 - September 18, 2019
 
     New features:
     - Added tools::FindActiveValues, which counts the active values
@@ -29,14 +41,18 @@ Version 6.2.0 - In development
       and TBB malloc for all other builds.
     - Added a USE_COLORED_OUTPUT option to CMake to display compiler output
       in color.
-    - Add an OPENVDB_CODE_COVERAGE option to CMake.
-    - The minimum ABI for OpenVDB is now always enforced through CMake
-      separately to other minimum dependency version variables.
+    - Added an OPENVDB_CODE_COVERAGE option to CMake.
+    - CMake now automatically detects and configures the CXX11 ABI requirement
+      for Houdini builds.
+    - CMake now issues deprecation warnings for 2017 VFX Reference Platform
+      version dependencies. In particular, C++11-only compilers are now
+      deprecated; OpenVDB 7.0 will require a C++14-compatible compiler.
 
     Bug fixes:
     - Replaced std::vector with std::deque as the underlying container
       for util::PagedArray, to address a rare crash when reading
       from multiple threads while writing from another thread.
+    - Fixed a bug that could cause an empty CoordBBox to report nonzero volume.
     - Fixed a bug in tools::computeScalarPotential() that could produce
       a corrupt result due to invalid memory access.
       [Reported by Edwin Braun]
@@ -45,7 +61,8 @@ Version 6.2.0 - In development
       fillWithSpheres() tool that caused generated spheres to sometimes
       extend outside the target volume.
     - CMake now correctly sets rpaths for the unit test binary.
-    - Fixed a memory leak in a static variable pointer.
+    - Addressed a Valgrind warning by allocating the AttributeArray registry
+      using a Meyers singleton.
       [Contributed by Autodesk]
 
     ABI changes:
@@ -56,21 +73,20 @@ Version 6.2.0 - In development
       dependent code.
 
     API changes:
-    - Changed a type alias in points::RandomLeafFilter.
+    - Changed points::RandomLeafFilter::LeafMap from a std::map to
+      a std::unordered_map.
     - Removed the TableT template argument from util::PagedArray.
       The table type is now hardcoded to std::deque.
     - The minimum supported version of GLFW is now 3.1.
 
     Python:
-    - CMake now always produces a .so for the Python module on UNIX platforms.
+    - CMake now always produces a .so for the Python module on Unix
+      and Linux platforms.
     - Fixed a compile-time error when building the Python module for Python 3.
       [Reported by yurivict]
-    - Removed the requirement of CMake 3.14 for NumPy usage.
-    - Added support for Boost >= 1.65 when building the python module with
-      NumPy support through CMake.
-    - Improved CMake Python3 support.
 
     Houdini:
+    - OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
     - Added API documentation and examples.
     - Added openvdb_houdini::GEOvdbApply(), which invokes a functor
       on a VDB primitive if the resolved grid type is a member of
@@ -94,7 +110,8 @@ Version 6.2.0 - In development
       with their native Houdini equivalents.
     - Added a houdini_utils::OpPolicy::getTabSubMenuPath() method to allow
       OpPolicy subclasses to provide their own tab sub-menu path.
-    - OpenVDB SOPs are now displayed in an ASWF sub-menu of the VDB tab menu.
+    - OpenVDB nodes now override OP_Operator::getVersion() to return
+      a version string of the form "vdb6.2.0 houdini18.0.222".
 
 
 Version 6.1.0 - May 8, 2019

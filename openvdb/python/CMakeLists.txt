@@ -147,6 +147,13 @@ else()
   endif()
 endif()
 
+if(USE_NUMPY)
+  if(Python_NumPy_VERSION VERSION_LESS FUTURE_MINIMUM_NUMPY_VERSION)
+    message(DEPRECATION "Support for NumPy versions < ${FUTURE_MINIMUM_NUMPY_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 # Boost python handling. Try to find the following named boost python libraries:
 # - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
 # - boost_python{Python_VERSION_MAJOR}
