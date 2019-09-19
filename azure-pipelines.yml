@@ -26,7 +26,7 @@ stages:
     displayName: and Test ABI=7 (VFX2020)
     pool:
       vmImage: 'ubuntu-16.04'
-    container: aswf/ci-openvdb:2020
+    container: aswf/ci-openvdb:2020.0
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 7 ON
