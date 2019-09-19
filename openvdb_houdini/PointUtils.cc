@@ -1018,13 +1018,13 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
 
             const GA_Range range(**it);
             tbb::parallel_for(GA_SplittableRange(range),
-                [numHoudiniPoints, &ptGeo, &inGroup](const GA_SplittableRange& r) {
+                [&ptGeo, &inGroup](const GA_SplittableRange& r) {
                 for (GA_PageIterator pit = r.beginPages(); !pit.atEnd(); ++pit) {
                     GA_Offset start, end;
                     for (GA_Iterator iter = pit.begin(); iter.blockAdvance(start, end);) {
                         for (GA_Offset off = start; off < end; ++off) {
                             const GA_Index idx = ptGeo.pointIndex(off);
-                            UT_ASSERT(idx < GA_Offset(numHoudiniPoints));
+                            UT_ASSERT(idx < GA_Index(inGroup.size()));
                             inGroup[idx] = short(1);
                         }
                     }
