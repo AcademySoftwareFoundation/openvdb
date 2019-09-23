@@ -38,15 +38,15 @@ PROJECT_NAME           = "OpenVDB"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 6.2.0
+PROJECT_NUMBER         = 7.0.0
 
-PREDEFINED             = OPENVDB_VERSION_NAME=v6_2
-PREDEFINED            += OPENVDB_ABI_VERSION_NUMBER=6
+PREDEFINED             = OPENVDB_VERSION_NAME=v7_0
+PREDEFINED            += OPENVDB_ABI_VERSION_NUMBER=7
 
 ALIASES               += ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)" \
                          xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)" \
                          const="<tt>const</tt>"
-ALIASES               += "vdbnamespace=openvdb::v6_2" \
+ALIASES               += "vdbnamespace=openvdb::v7_0" \
                          "hunamespace=houdini_utils" \
                          "hvdbnamespace=openvdb_houdini"
 # Use this command to create a link to an OpenVDB class, function, etc.
