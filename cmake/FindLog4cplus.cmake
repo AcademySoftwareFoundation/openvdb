@@ -89,6 +89,8 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
+cmake_minimum_required(VERSION 3.3)
+
 mark_as_advanced(
   Log4cplus_INCLUDE_DIR
   Log4cplus_LIBRARY

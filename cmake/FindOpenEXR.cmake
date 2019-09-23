@@ -97,10 +97,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-# Support new if() IN_LIST operator
-if(POLICY CMP0057)
-  cmake_policy(SET CMP0057 NEW)
-endif()
+cmake_minimum_required(VERSION 3.3)
 
 mark_as_advanced(
   OpenEXR_INCLUDE_DIR

@@ -72,6 +72,8 @@ variables may be provided to tell this module where to look.
 # Find the Maya installation and use Maya's CMake to initialize
 # the Maya lib
 
+cmake_minimum_required(VERSION 3.3)
+
 set(_MAYA_ROOT_SEARCH_DIR)
 
 if(MAYA_ROOT)

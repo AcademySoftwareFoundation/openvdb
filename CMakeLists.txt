@@ -63,12 +63,10 @@
 
 #]=======================================================================]
 
-project(OpenVDB)
+# note: cmake_minimum_required must be called before project commands to
+#  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.3)
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0048)
-  cmake_policy(SET CMP0048 NEW)
-endif()
+project(OpenVDB)
 
 ###### OpenVDB Build/Component Options
 
