@@ -80,7 +80,9 @@ endif()
 
 # Additionally try and use pkconfig to find jemalloc
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_Jemalloc QUIET jemalloc)
 
 # ------------------------------------------------------------------------

@@ -155,7 +155,9 @@ endif()
 
 # Additionally try and use pkconfig to find OpenVDB
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_OpenVDB QUIET OpenVDB)
 
 # This CMake module supports being called from external packages AND from
