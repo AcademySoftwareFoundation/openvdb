@@ -211,12 +211,12 @@ struct StreamMetadata::Impl
     bool mHalfFloat = false;
     bool mWriteGridStats = false;
     bool mSeekable = false;
-    bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
     bool mCountingPasses = false;
     uint32_t mPass = 0;
-    uint64_t mLeaf = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
+    bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
+    uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
 }; // struct StreamMetadata
 
