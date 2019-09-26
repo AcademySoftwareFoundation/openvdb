@@ -7,6 +7,19 @@
 <B>Version 7.0.0</B> - <I>In development</I>
 
 
+@htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 6.2.1</B> - <I>September 30, 2019</I>
+
+@par
+Bug fixes:
+- Fix a crash that arose from an inadvertent ABI change of an IO class with
+  the 6.2.0 release. This crash occurs attempting to write out a VDB Points
+  grid using an IO routine from a different version of the core library
+  than the core library version in which the grid was authored and when one
+  of these core library versions is 6.2.0.
+
+
 @htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 6.2.0</B> - <I>September 18, 2019</I>
