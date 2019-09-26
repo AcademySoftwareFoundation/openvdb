@@ -325,8 +325,11 @@ Offset:\n\
         .setDefault(PRMoneDefaults));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("VDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
-        .setNativeName("vdbsmooth")
+    hvdb::OpenVDBOpFactory("VDB Smooth", SOP_OpenVDB_Filter::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBFilter")
+        .addAliasVerbatim("DW_OpenVDBSmooth")
+#endif
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
         .addOptionalInput("Optional VDB Alpha Mask")

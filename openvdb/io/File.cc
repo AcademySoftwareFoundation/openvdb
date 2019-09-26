@@ -851,6 +851,12 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
     // the order of operations.
     readGridCompression(is);
     grid->readMeta(is);
+
+    // drop DelayedLoadMetadata from the grid as it is only useful for IO
+    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
+    }
+
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
         grid->readTransform(is);
         if (!isInstance && readTopology) {

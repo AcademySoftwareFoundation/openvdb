@@ -78,6 +78,11 @@ else()
 endif()
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+  message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
+    "is deprecated and will be removed.")
+endif()
+
 find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 
 if(USE_LOG4CPLUS)
@@ -191,6 +196,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
   io/Compression.cc
+  io/DelayedLoadMetadata.cc
   io/File.cc
   io/GridDescriptor.cc
   io/Queue.cc
@@ -229,6 +235,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
 set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/Archive.h
   io/Compression.h
+  io/DelayedLoadMetadata.h
   io/File.h
   io/GridDescriptor.h
   io/io.h
@@ -292,6 +299,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/DenseSparseTools.h
   tools/Diagnostics.h
   tools/Filter.h
+  tools/FindActiveValues.h
   tools/GridOperators.h
   tools/GridTransformer.h
   tools/Interpolation.h

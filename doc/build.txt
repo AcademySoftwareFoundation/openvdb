@@ -16,25 +16,23 @@
     - @ref buildBuildMaya
   - @ref buildBuildStandalone
 - @ref buildUsingOpenVDB
+- @ref buildUsingMake
 - @ref buildTroubleshooting
 <!-- - @ref buildContents -->
-
-------------------------------------------------------------------------------
-
-@b Note: The following build instruction are for building OpenVDB with CMake.
-See @b openvdb/INSTALL for instructions on using the older Makefiles directly
-included with OpenVDB.
 
 ------------------------------------------------------------------------------
 
 @section buildIntroduction Introduction
 
 [CMake](https://cmake.org/) is a cross-platform family of tools designed to
-help build software. It doesn't *actually* build the project, but instead
-generates the files required for your toolchain such as
-[GNU make](https://www.gnu.org/software/make/). These makefiles have
-historically always been included directly as the tool for building OpenVDB,
-primarily only on UNIX platforms. CMake support ensures a high level of
+help build software.
+CMake doesn't *actually* build the project but instead generates the files
+required for your toolchain, for example makefiles that serve as input to
+[GNU Make](https://www.gnu.org/software/make/).
+Makefiles have historically been included in the OpenVDB distribution
+and until recently were the preferred means of building OpenVDB
+on UNIX platforms (see @ref buildUsingMake below).
+But CMake support ensures a high level of
 flexibility and pre-compile verification to the build process, making it much
 easier to control and customize the installation process for a wider range of
 platforms.
@@ -475,6 +473,234 @@ provided in the OpenVDB installation to find it's own dependencies. This may
 require you to provide additional dependency locations for OpenVDB's
 dependencies. See [Locating Dependencies](@ref buildDependencies) or the below
 troubleshooting for more information.
+
+
+@section buildUsingMake Building With Make
+
+Makefiles are provided for those not wishing to use the CMake build system.
+However, Make support is now deprecated and will be removed in a future release,
+so one should not expect the Makefiles to provide the same level of functionality
+as the CMake build system.
+
+To build the core library, ensure that you have
+[GNU Make](https://www.gnu.org/software/make/) version 4.1 or later,
+then proceed as follows:
+
+<OL>
+<LI>
+Set values appropriate to your environment for the following variables at the top of
+<TT>openvdb/Makefile</TT>:
+<TABLE>
+<TR><TD><TT>INSTALL_DIR</TT></TD><TD>the directory into which to install libraries,
+    executables and header files (e.g., <TT>/usr/local</TT>)</TD></TR>
+
+<TR><TD><TT>BOOST_INCL_DIR</TT></TD><TD>the parent directory of the <TT>boost/</TT>
+    header directory (e.g., <TT>/usr/include</TT>)</TD></TR>
+
+<TR><TD><TT>BOOST_LIB_DIR</TT></TD><TD>the directory containing <TT>libboost_iostreams</TT>,
+    etc.</TD></TR>
+
+<TR><TD><TT>BOOST_LIB</TT></TD><TD>linker flags for <TT>libboost_iostreams</TT>
+    and <TT>libboost_system</TT></TD></TR>
+
+<TR><TD><TT>BOOST_THREAD_LIB</TT></TD><TD>linker flags for <TT>libboost_thread</TT></TD></TR>
+
+<TR><TD><TT>ILMBASE_INCL_DIR</TT></TD><TD>the parent directory of the <TT>OpenEXR/</TT>
+    header directory (which contains <TT>half.h</TT>)</TD></TR>
+
+<TR><TD><TT>ILMBASE_LIB_DIR</TT></TD><TD>the directory containing <TT>libHalf.so</TT> and/or
+    <TT>libHalf.a</TT></TD></TR>
+
+<TR><TD><TT>ILMBASE_LIB</TT></TD><TD>linker flags for <TT>libIlmThread</TT>, <TT>libIex</TT>
+    and <TT>libImath</TT></TD></TR>
+
+<TR><TD><TT>HALF_LIB</TT></TD><TD>linker flag(s) for the Half library
+    (e.g., <TT>-lHalf</TT>)</TD></TR>
+
+<TR><TD><TT>EXR_INCL_DIR</TT></TD><TD>the parent directory of the <TT>OpenEXR/</TT>
+    header directory<BR>
+    <P>Note: some OpenEXR headers incorrectly include other OpenEXR headers
+    with, e.g., <TT>\#include \<ImfName.h\></TT> instead of <TT>\#include "ImfName.h"</TT>.
+    When compiling with Clang, set <TT>EXR_INCL_DIR</TT> to the parent directory of the
+    <TT>OpenEXR/</TT> directory and <TT>ILMBASE_INCL_DIR</TT> to the <TT>OpenEXR/</TT>
+    directory itself to avoid errors.</P></TD></TR>
+
+<TR><TD><TT>EXR_LIB_DIR</TT></TD><TD>the directory containing <TT>libIlmImf</TT></TD></TR>
+
+<TR><TD><TT>EXR_LIB</TT></TD><TD>linker flags for <TT>libIlmImf</TT></TD></TR>
+
+<TR><TD><TT>TBB_INCL_DIR</TT></TD><TD>the parent directory of the <TT>tbb/</TT>
+    header directory</TD></TR>
+
+<TR><TD><TT>TBB_LIB_DIR</TT></TD><TD>the directory containing <TT>libtbb</TT></TD></TR>
+
+<TR><TD><TT>TBB_LIB</TT></TD><TD>linker flag(s) for the TBB library
+    (e.g., <TT>-ltbb</TT>)</TD></TR>
+
+<TR><TD><TT>BLOSC_INCL_DIR</TT></TD><TD>the parent directory of the
+    <TT>blosc.h</TT> header</TD></TR>
+
+<TR><TD><TT>BLOSC_LIB_DIR</TT></TD><TD>the directory containing <TT>libblosc</TT></TD></TR>
+
+<TR><TD><TT>BLOSC_LIB</TT></TD><TD>linker flags for <TT>libblosc</TT></TD></TR>
+
+<TR><TD><TT>CONCURRENT_MALLOC_LIB_DIR</TT></TD><TD>a directory containing a scalable,
+    concurrent malloc replacement library such as jemalloc or TBB malloc<BR>
+    (leave blank if no such library is available, but be aware that using standard malloc
+    in concurrent code incurs a significant performance penalty)</TD></TR>
+
+<TR><TD><TT>CONCURRENT_MALLOC_LIB</TT></TD><TD>linker flag(s) for the malloc
+    replacement library<BR>(e.g., <TT>-ltbbmalloc_proxy -ltbbmalloc</TT>)</TD></TR>
+
+<TR><TD><TT>CPPUNIT_INCL_DIR</TT></TD><TD>the parent directory of the <TT>cppunit/</TT>
+    header directory<BR>
+    (leave blank if CppUnit is not available)</TD></TR>
+
+<TR><TD><TT>CPPUNIT_LIB_DIR</TT></TD><TD>the directory containing <TT>libcppunit.so</TT> or
+   <TT>libcppunit.a</TT></TD></TR>
+
+<TR><TD><TT>CPPUNIT_LIB</TT></TD><TD>linker flag(s) for the CppUnit library (e.g.,
+   <TT>-lcppunit</TT>)</TD></TR>
+
+<TR><TD><TT>GLFW_INCL_DIR</TT></TD><TD>the directory containing <TT>glfw.h</TT><BR>
+    (leave blank if GLFW is not available; GLFW is needed only for the
+    command-line viewer tool)</TD></TR>
+
+<TR><TD><TT>GLFW_LIB_DIR</TT></TD><TD>the directory containing <TT>libglfw</TT></TD></TR>
+
+<TR><TD><TT>GLFW_LIB</TT></TD><TD>linker flags for the GLFW library
+    (e.g., <TT>-lglfw</TT>)</TD></TR>
+
+<TR><TD><TT>GLFW_MAJOR_VERSION</TT></TD><TD>the major version number of the GLFW library<BR>
+    (header filenames changed between GLFW 2 and 3, so this must be specified explicitly)</TD></TR>
+
+<TR><TD><TT>LOG4CPLUS_INCL_DIR</TT></TD><TD>the parent directory of the
+    <TT>log4cplus/</TT> header directory<BR>
+    (leave blank if log4cplus is not available)</TD></TR>
+
+<TR><TD><TT>LOG4CPLUS_LIB_DIR</TT></TD><TD>directory containing <TT>liblog4cplus.so</TT>
+    or <TT>liblog4cplus.a</TT></TD></TR>
+
+<TR><TD><TT>LOG4CPLUS_LIB</TT></TD><TD>linker flags for the log4cplus library
+    (e.g., <TT>-llog4cplus</TT>)</TD></TR>
+
+<TR><TD><TT>PYTHON_VERSION</TT></TD><TD>the version of Python (e.g.,&nbsp;2.7) for which to build
+    the OpenVDB module (leave blank if Python is unavailable)</TD></TR>
+
+<TR><TD><TT>PYTHON_INCL_DIR</TT></TD><TD>the directory containing the <TT>Python.h</TT>
+    header file<BR>(on macOS, this is usually <TT>/System/Library/Frameworks/Python.framework/Versions/\$(PYTHON_VERSION)/Headers</TT>)</TD></TR>
+
+<TR><TD><TT>PYCONFIG_INCL_DIR</TT></TD><TD>the directory containing the <TT>pyconfig.h</TT>
+    header file (usually but not always the same as <TT>PYTHON_INCL_DIR</TT>)</TD></TR>
+
+<TR><TD><TT>PYTHON_LIB_DIR</TT></TD><TD>the directory containing the Python library<BR>
+    (on macOS, this is usually
+    <TT>/System/Library/Frameworks/Python.framework/Versions/\$(PYTHON_VERSION)/lib</TT>)</TD></TR>
+
+<TR><TD><TT>PYTHON_LIB</TT></TD><TD>linker flags for the Python library
+    (e.g., <TT>-lpython2.7</TT>)</TD></TR>
+
+<TR><TD><TT>BOOST_PYTHON_LIB_DIR</TT></TD><TD>the directory containing the
+    Boost.Python library</TD></TR>
+
+<TR><TD><TT>BOOST_PYTHON_LIB</TT></TD><TD>linker flags for the Boost.Python library
+    (e.g., <TT>-lboost_python-mt</TT>)</TD></TR>
+
+<TR><TD><TT>NUMPY_INCL_DIR</TT></TD><TD>the directory containing the NumPy <TT>arrayobject.h</TT>
+    header file (leave blank if NumPy is unavailable)<BR>(on macOS, this is usually
+    <TT>/System/Library/Frameworks/Python.framework/Versions/\$(PYTHON_VERSION)/Extras/lib/python/numpy/core/include/numpy</TT>)</TD></TR>
+
+<TR><TD><TT>EPYDOC</TT></TD><TD>the path to the Epydoc executable
+    (leave blank if Epydoc is unavailable)</TD></TR>
+
+<TR><TD><TT>PYTHON_WRAP_ALL_GRID_TYPES</TT></TD><TD>if set to \"<TT>no</TT>\",
+    expose only @vdblink::FloatGrid FloatGrid@endlink, @vdblink::BoolGrid BoolGrid@endlink
+    and @vdblink::Vec3SGrid Vec3SGrid@endlink in Python, otherwise expose
+    (most of) the standard grid types defined in openvdb.h.</TD></TR>
+
+<TR><TD><TT>DOXYGEN</TT></TD><TD>the path to the Doxygen executable
+    (leave blank if Doxygen is unavailable)</TD></TR>
+</TABLE>
+
+Note that if you plan to build the Houdini OpenVDB tools, you must build
+the OpenVDB library and the Houdini tools against compatible versions
+of the Boost, OpenEXR and TBB libraries.
+Until Houdini&nbsp;16.5, all three were included in the HDK, so by default
+several of the variables above reference the Houdini environment variables
+<TT>$HDSO</TT>, <TT>$HFS</TT> and <TT>$HT</TT> (source the @c houdini_setup
+script provided with your Houdini installation to set those environment variables).
+As of Houdini&nbsp;16.5, you must provide your own installation of Boost.
+
+Also note that certain new features in OpenVDB (see the
+@subpage changes "Release Notes" for details) necessitated changes to
+the ABI of the @vdblink::Grid Grid@endlink class, rendering it incompatible
+with earlier versions of the library, such as the ones built into Houdini.
+Passing grids between native VDB nodes in a scene graph and nodes built
+against the new ABI will lead to crashes, so to use OpenVDB with Houdini&nbsp;16.5
+set <TT>abi=4</TT> to compile with the incompatible features disabled.
+
+To build the OpenVDB Python module, you will need local installations
+of Python, Boost.Python, and optionally NumPy.
+Houdini ships with Python&nbsp;2 but not with the @c libboost_python library
+or with NumPy or, as of Houdini&nbsp;16.5, with the Boost.Python headers,
+so both Boost.Python and NumPy have to be built separately.
+Point the variables <TT>\$(BOOST_PYTHON_LIB_DIR)</TT>,
+<TT>\$(BOOST_PYTHON_LIB)</TT> and <TT>\$(NUMPY_INCL_DIR)</TT>
+to your local installations of those libraries.
+<P></LI>
+<LI>
+From the top-level <TT>openvdb/</TT> directory, type \"<TT>make</TT>\"
+(or \"<TT>make -s</TT>\" for less verbose output) to locally build
+the library and commands.
+The Makefile supports parallel builds (e.g. \"<TT>make -j 8</TT>\").
+
+A default local build generates the following libraries and executables
+(but see the Makefile for additional targets and build options):
+<TABLE>
+<TR><TD><TT>openvdb/libopenvdb.so.<I>X.Y.Z</I></TT></TD><TD>the OpenVDB library</TD></TR>
+<TR><TD><TT>openvdb/libopenvdb.so</TT></TD><TD>symlink to
+    <TT>libopenvdb.so.<I>X.Y.Z</I></TT></TD></TR>
+<TR><TD><TT>openvdb/pyopenvdb.so</TT></TD><TD>the OpenVDB Python module
+    (if Python and Boost.Python are available)</TD></TR>
+<TR><TD><TT>openvdb/vdb_print</TT></TD><TD>command-line tool that prints info about OpenVDB
+    <TT>.vdb</TT> files</TD></TR>
+<TR><TD><TT>openvdb/vdb_render</TT></TD><TD>command-line tool that ray-traces
+    OpenVDB volumes</TD></TR>
+<TR><TD><TT>openvdb/vdb_test</TT></TD><TD>unit test runner for @c libopenvdb
+    (if CppUnit is available)</TD></TR>
+</TABLE>
+
+From the <TT>openvdb/</TT> directory, type \"<TT>make test</TT>\" to run
+the unit tests and verify that the library is working correctly.
+(Alternatively, once the library has been installed, run the unit test
+executable directly with \"<TT>./vdb_test</TT>\", or \"<TT>./vdb_test -v</TT>\"
+for more verbose output.)
+Type \"<TT>make pytest</TT>\" to run the Python module unit tests.
+<P></LI>
+<LI>
+From the <TT>openvdb/</TT> directory, type \"<TT>make doc</TT>\"
+(or \"<TT>make -s doc</TT>\") to generate HTML library documentation,
+then open the file <TT>openvdb/doc/html/index.html</TT> in a browser.
+Type \"<TT>make pydoc</TT>\" (or \"<TT>make -s pydoc</TT>\") to generate
+HTML Python module documentation, then open
+<TT>openvdb/doc/html/python/index.html</TT> in a browser.
+<P></LI>
+<LI>
+Optionally (if OpenGL and GLFW are available), from the top-level
+<TT>openvdb/</TT> directory, type \"<TT>make vdb_view</TT>\"
+(or \"<TT>make -s vdb_view</TT>\") to locally build the OpenVDB viewer tool.
+Then type \"<TT>./vdb_view</TT>\" for usage information.
+<P></LI>
+<LI>
+From the <TT>openvdb/</TT> directory, type \"<TT>make install</TT>\"
+(or \"<TT>make -s install</TT>\") to copy generated files into
+the directory tree rooted at <TT>\$(INSTALL_DIR)</TT>.
+</LI>
+</OL>
+
+To build the Houdini and Maya plugins the process is similar,
+but see the Makefiles in the <TT>openvdb_</TT><TT>houdini/</TT> and
+<TT>openvdb_</TT><TT>maya/</TT> directories for additional requirements
 
 ------------------------------------------------------------------------------
 

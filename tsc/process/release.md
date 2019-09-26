@@ -4,8 +4,7 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
 
 - [ ] Open a Jira "Release OpenVDB 6.1.0" ticket with "OpenVDB_6.1.0" as the Fix Version.
 - [ ] Update `openvdb/CHANGES` and `openvdb/doc/changes.txt` with release notes.  [_Specifics TBD, pending a review of release note management tools._]
-- [ ] Update `openvdb/INSTALL` with the library version number and any directory hierarchy changes.
-- [ ] Open a pull request to merge the above changes into `openvdb/master`.  Associate the pull request with the Jira ticket created earlier, and verify that the Travis CI build runs successfully.
+- [ ] Open a pull request to merge the above changes into `openvdb/master`.  Associate the pull request with the Jira ticket created earlier, and verify that the CI build runs successfully.
 - [ ] Draft a new [GitHub release](https://github.com/AcademySoftwareFoundation/openvdb/releases). Title it "OpenVDB 6.1.0" and tag it as `v6.1.0`.
 
 - [ ] Update `openvdb-website/contents/index.html` with a news item announcing the release, and delete the oldest news item.  Open that page in a browser and check that the website renders correctly and that there are no broken links.
