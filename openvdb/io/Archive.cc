@@ -105,6 +105,11 @@ struct StreamState
     StreamState();
     ~StreamState();
 
+    // Important:  The size and order of these member variables must *only* change when
+    //             OpenVDB ABI changes to avoid potential segfaults when performing I/O
+    //             across two different versions of the library. Adding new member
+    //             variables to the end of the struct is allowed provided that they
+    //             are only accessed from within an appropriate ABI guard.
     int magicNumber;
     int fileVersion;
     int libraryMajorVersion;
@@ -203,6 +208,12 @@ StreamState::~StreamState()
 
 struct StreamMetadata::Impl
 {
+    // Important:  The size and order of these member variables must *only* change when
+    //             OpenVDB ABI changes to avoid potential segfaults when performing I/O
+    //             across two different versions of the library. Adding new member
+    //             variables to the end of the struct is allowed provided that they
+    //             are only accessed from within an appropriate ABI guard.
+
     uint32_t mFileVersion = OPENVDB_FILE_VERSION;
     VersionId mLibraryVersion = { OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION };
     uint32_t mCompression = COMPRESS_NONE;
