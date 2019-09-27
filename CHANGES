@@ -13,6 +13,14 @@ Version 7.0.0 - In development
       NumPy support through CMake.
     - Improved CMake Python3 support.
 
+    Houdini:
+    - Fixed a bug in the OpenVDB Points Convert SOP during conversion from
+      Houdini geometry to OpenVDB Points, where point group information could
+      end up corrupted or cause a crash with non-contiguous point offsets (mesh
+      inputs).
+    - Threaded the population of point group memberships during conversion from
+      Houdini geometry to OpenVDB Points
+
 
 Version 6.2.0 - September 18, 2019
 
