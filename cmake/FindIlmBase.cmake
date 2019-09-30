@@ -97,7 +97,11 @@ may be provided to tell this module where to look.
 ``ILMBASE_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``ILMBASE_USE_STATIC_LIBS``
+  Only search for static ilmbase libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -112,6 +116,11 @@ mark_as_advanced(
   IlmBase_INCLUDE_DIR
   IlmBase_LIBRARY
 )
+
+set(_FIND_ILMBASE_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_ILMBASE_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_ILMBASE_COMPONENT_LIST
   Half
@@ -177,7 +186,7 @@ list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
 
 # Look for a standard IlmBase header file.
 find_path(IlmBase_INCLUDE_DIR IlmBaseConfig.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include/OpenEXR OpenEXR
 )
@@ -261,7 +270,7 @@ set(IlmBase_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   find_library(IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
   )
@@ -271,7 +280,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
     set(_ILMBASE_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
     find_library(IlmBase_${COMPONENT}_DLL ${COMPONENT}
-      ${USE_CMAKE_DEFAULT_PATH}
+      ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
       PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
     )

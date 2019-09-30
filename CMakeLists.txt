@@ -111,16 +111,20 @@ openvdb build configuration to decide on OpenEXR support. You may set this to on
 know it to be required.]=] OFF)
 CMAKE_DEPENDENT_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_SYSTEM_LIBRARY_PATHS [=[
-Prioritise CMakes default system library/installation paths when attempting to locate dependencies. When disabled,
-only explicitly provided paths will be searched. Note the list variable SYSTEM_LIBRARY_PATHS can be populated with
-paths to use as fallbacks when calling any find_xxx() commands.]=] ON)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
+option(DISABLE_CMAKE_SEARCH_PATHS [=[
+Disable CMakes default system search paths when locating dependencies. When enabled, CMake will fall back to
+its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
+paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
+list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
+
+set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
+A global list of library paths to additionally use into when searching for dependencies.]=])
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -163,6 +167,16 @@ if(OPENVDB_ENABLE_3_ABI_COMPATIBLE)
   endif()
 endif()
 
+if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
+  message(DEPRECATION "The USE_SYSTEM_LIBRARY_PATHS option is deprecated and will be removed. "
+    "Use DISABLE_CMAKE_SEARCH_PATHS.")
+  if(USE_SYSTEM_LIBRARY_PATHS)
+    set(DISABLE_CMAKE_SEARCH_PATHS OFF)
+  else()
+    set(DISABLE_CMAKE_SEARCH_PATHS ON)
+  endif()
+endif()
+
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
@@ -172,13 +186,14 @@ mark_as_advanced(
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
-  USE_SYSTEM_LIBRARY_PATHS
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI
   CONCURRENT_MALLOC
   USE_COLORED_OUTPUT
+  SYSTEM_LIBRARY_PATHS
 )
 
 # Configure minimum version requirements
@@ -370,13 +385,6 @@ if(OPENVDB_CODE_COVERAGE)
 
   # use .gcno extension instead of .cc.gcno
   set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
-endif()
-
-# System path configuration - sets USE_CMAKE_DEFAULT_PATH to NO_DEFAULT_PATH
-# which should be passed to all find_xxx() commands
-
-if(NOT USE_SYSTEM_LIBRARY_PATHS)
-  set(USE_CMAKE_DEFAULT_PATH NO_DEFAULT_PATH)
 endif()
 
 #########################################################################

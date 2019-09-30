@@ -85,7 +85,11 @@ may be provided to tell this module where to look.
 ``LOG4CPLUS_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``LOG4CPLUS_USE_STATIC_LIBS``
+  Only search for static log4cplus libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -101,6 +105,10 @@ mark_as_advanced(
   Log4cplus_LIBRARY
 )
 
+set(_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 # Set _LOG4CPLUS_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
 # are prioritised over the legacy capitalized XXX_ROOT variables for matching
@@ -137,7 +145,7 @@ list(APPEND _LOG4CPLUS_INCLUDE_SEARCH_DIRS
 
 # Look for a standard log4cplus header file.
 find_path(Log4cplus_INCLUDE_DIR log4cplus/version.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -189,7 +197,7 @@ set(LOG4CPLUS_PATH_SUFFIXES
 )
 
 find_library(Log4cplus_LIBRARY log4cplus
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${LOG4CPLUS_PATH_SUFFIXES}
 )

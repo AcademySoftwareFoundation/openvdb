@@ -66,6 +66,8 @@ variables may be provided to tell this module where to look.
   Preferred installation prefix.
 ``ENV{MAYA_LOCATION}``
   Preferred installation prefix.
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -77,6 +79,11 @@ cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
+endif()
+
+set(_FIND_MAYA_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_MAYA_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
 endif()
 
 # Set _MAYA_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
@@ -108,7 +115,7 @@ endif()
 # ------------------------------------------------------------------------
 
 find_path(Maya_INCLUDE_DIR maya/MTypes.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_MAYA_ADDITIONAL_OPTIONS}
   PATHS ${_MAYA_ROOT_SEARCH_DIR}
   PATH_SUFFIXES include
 )
@@ -155,7 +162,7 @@ set(Maya_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${_MAYA_COMPONENT_LIST})
   find_library(Maya_${COMPONENT}_LIBRARY ${COMPONENT}
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_MAYA_ADDITIONAL_OPTIONS}
     PATHS ${Maya_LIBRARY_DIR}
   )
   list(APPEND Maya_LIB_COMPONENTS ${Maya_${COMPONENT}_LIBRARY})

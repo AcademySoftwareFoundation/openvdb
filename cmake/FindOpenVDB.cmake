@@ -98,7 +98,11 @@ may be provided to tell this module where to look.
 ``OPENVDB_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``OPENVDB_USE_STATIC_LIBS``
+  Only search for static openvdb libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -116,6 +120,11 @@ mark_as_advanced(
   OpenVDB_INCLUDE_DIR
   OpenVDB_LIBRARY
 )
+
+set(_FIND_OPENVDB_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_OPENVDB_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_OPENVDB_COMPONENT_LIST
   openvdb
@@ -205,7 +214,7 @@ list(APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
 
 # Look for a standard OpenVDB header file.
 find_path(OpenVDB_INCLUDE_DIR openvdb/version.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
   PATHS ${_OPENVDB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -250,7 +259,7 @@ set(OpenVDB_LIB_COMPONENTS "")
 foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   set(LIB_NAME ${COMPONENT})
   find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
     PATHS ${_OPENVDB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${OPENVDB_PATH_SUFFIXES}
   )

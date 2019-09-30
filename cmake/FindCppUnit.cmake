@@ -85,7 +85,11 @@ may be provided to tell this module where to look.
 ``CPPUNIT_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``CPPUNIT_USE_STATIC_LIBS``
+  Only search for static cppunit libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -101,6 +105,10 @@ mark_as_advanced(
   CppUnit_LIBRARY
 )
 
+set(_FIND_CPPUNIT_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_CPPUNIT_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 # Set _CPPUNIT_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
 # are prioritised over the legacy capitalized XXX_ROOT variables for matching
@@ -137,7 +145,7 @@ list(APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
 
 # Look for a standard cppunit header file.
 find_path(CppUnit_INCLUDE_DIR cppunit/Portability.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -189,7 +197,7 @@ set(CPPUNIT_PATH_SUFFIXES
 )
 
 find_library(CppUnit_LIBRARY cppunit
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
 )

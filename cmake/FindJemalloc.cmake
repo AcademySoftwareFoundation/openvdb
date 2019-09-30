@@ -58,7 +58,11 @@ may be provided to tell this module where to look.
 ``JEMALLOC_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``JEMALLOC_USE_STATIC_LIBS``
+  Only search for static jemalloc libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -73,6 +77,10 @@ mark_as_advanced(
   Jemalloc_LIBRARY
 )
 
+set(_FIND_JEMALLOC_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_JEMALLOC_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 # Set _JEMALLOC_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
 # are prioritised over the legacy capitalized XXX_ROOT variables for matching
@@ -137,9 +145,9 @@ if(UNIX)
 endif()
 
 find_library(Jemalloc_LIBRARY jemalloc
-  ${USE_CMAKE_DEFAULT_PATH}
-  PATHS ${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${JEMALLOC_PATH_SUFFIXES}
+  "${_FIND_JEMALLOC_ADDITIONAL_OPTIONS}"
+  PATHS "${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}"
+  PATH_SUFFIXES "${JEMALLOC_PATH_SUFFIXES}"
 )
 
 # Reset library suffix

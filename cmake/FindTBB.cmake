@@ -91,7 +91,11 @@ may be provided to tell this module where to look.
 ``TBB_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``TBB_USE_STATIC_LIBS``
+  Only search for static tbb libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -106,6 +110,11 @@ mark_as_advanced(
   Tbb_INCLUDE_DIR
   Tbb_LIBRARY
 )
+
+set(_FIND_TBB_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_TBB_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_TBB_COMPONENT_LIST
   tbb
@@ -161,7 +170,7 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
 
 # Look for a standard tbb header file.
 find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -251,7 +260,7 @@ set(Tbb_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   find_library(Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_TBB_ADDITIONAL_OPTIONS}
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
   )

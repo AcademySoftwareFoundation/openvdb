@@ -93,7 +93,11 @@ may be provided to tell this module where to look.
 ``OPENEXR_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``OPENEXR_USE_STATIC_LIBS``
+  Only search for static openexr libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -108,6 +112,11 @@ mark_as_advanced(
   OpenEXR_INCLUDE_DIR
   OpenEXR_LIBRARY
 )
+
+set(_FIND_OPENEXR_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_OPENEXR_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_OPENEXR_COMPONENT_LIST
   IlmImf
@@ -170,7 +179,7 @@ list(APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
 
 # Look for a standard OpenEXR header file.
 find_path(OpenEXR_INCLUDE_DIR OpenEXRConfig.h
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
   PATHS ${_OPENEXR_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES  include/OpenEXR OpenEXR
 )
@@ -254,7 +263,7 @@ set(OpenEXR_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   find_library(OpenEXR_${COMPONENT}_LIBRARY ${COMPONENT}
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
     PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${OPENEXR_PATH_SUFFIXES}
   )
@@ -264,7 +273,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
     set(_OPENEXR_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
     find_library(OpenEXR_${COMPONENT}_DLL ${COMPONENT}
-      ${USE_CMAKE_DEFAULT_PATH}
+      ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
       PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
     )

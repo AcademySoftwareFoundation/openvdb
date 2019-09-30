@@ -86,8 +86,8 @@ may be provided to tell this module where to look.
   Preferred installation prefix.
 ``Houdini_ROOT``
   Preferred installation prefix.
-``CMAKE_PREFIX_PATH``
-  Add the location of your Houdini installations CMake to this path.
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
@@ -99,6 +99,11 @@ cmake_minimum_required(VERSION 3.3)
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
+endif()
+
+set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_HOUDINI_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
 endif()
 
 # Set _HOUDINI_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
@@ -147,7 +152,7 @@ list(APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
 )
 
 find_package(Houdini
-  ${USE_CMAKE_DEFAULT_PATH}
+  ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
   PATHS ${_HOUDINI_ROOT_SEARCH_DIR}
   PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES})
 
@@ -261,7 +266,7 @@ endif()
 if(NOT ZLIB_LIBRARY)
   # Full path to zlib library - FindPackage ( ZLIB)
   find_library(ZLIB_LIBRARY z
-    ${USE_CMAKE_DEFAULT_PATH}
+    ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
     PATHS ${_HOUDINI_LIB_DIR}
   )
   if(NOT EXISTS ${ZLIB_LIBRARY})
