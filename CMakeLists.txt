@@ -215,9 +215,24 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
+# VFX 18 deprecations to transition to MINIMUM_* variables in OpenVDB 7.0.0
+
+set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
+set(FUTURE_MINIMUM_ICC_VERSION 17)
+set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
+set(FUTURE_MINIMUM_TBB_VERSION 2017.6)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.12.1)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 17)
+
 #########################################################################
 
 # General CMake and CXX settings
+
+if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+  message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+    "is deprecated and will be removed.")
+endif()
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -402,6 +417,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
+    message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
@@ -427,7 +446,15 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
       "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
+    message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
+    message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
   # Increase the number of sections that an object file can contain
   add_definitions("/bigobj")
 endif()

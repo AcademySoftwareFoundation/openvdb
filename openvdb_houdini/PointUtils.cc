@@ -1012,20 +1012,24 @@ convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
         std::vector<short> inGroup(groupVectorSize, short(0));
 
         // Set group membership in tree
-        // @todo parallelize group membership construction
 
         for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse();
             it != itEnd; ++it) {
 
-            GA_Offset start, end;
-            GA_Range range(**it);
-            for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
-                end = std::min(end, numHoudiniPoints);
-                for (GA_Offset off = start; off < end; ++off) {
-                    UT_ASSERT(off < GA_Offset(numHoudiniPoints));
-                    inGroup[off] = short(1);
+            const GA_Range range(**it);
+            tbb::parallel_for(GA_SplittableRange(range),
+                [&ptGeo, &inGroup](const GA_SplittableRange& r) {
+                for (GA_PageIterator pit = r.beginPages(); !pit.atEnd(); ++pit) {
+                    GA_Offset start, end;
+                    for (GA_Iterator iter = pit.begin(); iter.blockAdvance(start, end);) {
+                        for (GA_Offset off = start; off < end; ++off) {
+                            const GA_Index idx = ptGeo.pointIndex(off);
+                            UT_ASSERT(idx < GA_Index(inGroup.size()));
+                            inGroup[idx] = short(1);
+                        }
+                    }
                 }
-            }
+            });
 
             const Name groupName = (*it)->getName().toStdString();
             setGroup(tree, indexTree, inGroup, groupName);
