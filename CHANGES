@@ -3,6 +3,16 @@ OpenVDB Version History
 
 Version 7.0.0 - In development
 
+    Improvements:
+    - Added support for CMake 3.12 compatible Xxx_ROOT variables.
+    - Replaced the CMake USE_SYSTEM_LIBRARY_PATHS option with
+      DISABLE_CMAKE_SEARCH_PATHS and removed the hard coded list of
+      SYSTEM_LIBRARY_PATHS in favor of using CMake's default search procedure.
+      SYSTEM_LIBRARY_PATHS can still be used as a global list of paths for all
+      dependency searches.
+    - Improvements to OpenVDB's CMake module setup order in regards to CMake
+      policy, minimum version and project calls.
+
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP during conversion from
       Houdini geometry to OpenVDB Points, where point group information could
