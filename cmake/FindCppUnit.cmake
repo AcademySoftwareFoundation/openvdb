@@ -78,7 +78,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``CPPUNIT_ROOT``
+``CppUnit_ROOT``
   Preferred installation prefix.
 ``CPPUNIT_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
@@ -91,21 +91,29 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 mark_as_advanced(
   CppUnit_INCLUDE_DIR
   CppUnit_LIBRARY
 )
 
-# Append CPPUNIT_ROOT or $ENV{CPPUNIT_ROOT} if set (prioritize the direct cmake var)
-set(_CPPUNIT_ROOT_SEARCH_DIR "")
 
-if(CPPUNIT_ROOT)
-  list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${CPPUNIT_ROOT})
-else()
-  set(_ENV_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT})
-  if(_ENV_CPPUNIT_ROOT)
-    list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${_ENV_CPPUNIT_ROOT})
-  endif()
+# Set _CPPUNIT_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV CPPUNIT_ROOT from CMake 3.12
+if(CppUnit_ROOT)
+  set(_CPPUNIT_ROOT ${CppUnit_ROOT})
+elseif(DEFINED ENV{CppUnit_ROOT})
+  set(_CPPUNIT_ROOT $ENV{CppUnit_ROOT})
+elseif(CPPUNIT_ROOT)
+  set(_CPPUNIT_ROOT ${CPPUNIT_ROOT})
+elseif(DEFINED ENV{CPPUNIT_ROOT})
+  set(_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find cppunit
@@ -122,7 +130,7 @@ pkg_check_modules(PC_CppUnit QUIET cppunit)
 set(_CPPUNIT_INCLUDE_SEARCH_DIRS "")
 list(APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
   ${CPPUNIT_INCLUDEDIR}
-  ${_CPPUNIT_ROOT_SEARCH_DIR}
+  ${_CPPUNIT_ROOT}
   ${PC_CppUnit_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -152,7 +160,7 @@ endif()
 set(_CPPUNIT_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
   ${CPPUNIT_LIBRARYDIR}
-  ${_CPPUNIT_ROOT_SEARCH_DIR}
+  ${_CPPUNIT_ROOT}
   ${PC_CppUnit_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )

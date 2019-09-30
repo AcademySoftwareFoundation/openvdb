@@ -86,7 +86,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``OPENEXR_ROOT``
+``OpenEXR_ROOT``
   Preferred installation prefix.
 ``OPENEXR_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
@@ -98,6 +98,11 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 mark_as_advanced(
   OpenEXR_INCLUDE_DIR
@@ -130,16 +135,18 @@ else()
   set(OpenEXR_FIND_COMPONENTS ${_OPENEXR_COMPONENT_LIST})
 endif()
 
-# Append OPENEXR_ROOT or $ENV{OPENEXR_ROOT} if set (prioritize the direct cmake var)
-set(_OPENEXR_ROOT_SEARCH_DIR "")
-
-if(OPENEXR_ROOT)
-  list(APPEND _OPENEXR_ROOT_SEARCH_DIR ${OPENEXR_ROOT})
-else()
-  set(_ENV_OPENEXR_ROOT $ENV{OPENEXR_ROOT})
-  if(_ENV_OPENEXR_ROOT)
-    list(APPEND _OPENEXR_ROOT_SEARCH_DIR ${_ENV_OPENEXR_ROOT})
-  endif()
+# Set _OPENEXR_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV OPENEXR_ROOT from CMake 3.12
+if(OpenEXR_ROOT)
+  set(_OPENEXR_ROOT ${OpenEXR_ROOT})
+elseif(DEFINED ENV{OpenEXR_ROOT})
+  set(_OPENEXR_ROOT $ENV{OpenEXR_ROOT})
+elseif(OPENEXR_ROOT)
+  set(_OPENEXR_ROOT ${OPENEXR_ROOT})
+elseif(DEFINED ENV{OPENEXR_ROOT})
+  set(_OPENEXR_ROOT $ENV{OPENEXR_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find OpenEXR
@@ -156,7 +163,7 @@ pkg_check_modules(PC_OpenEXR QUIET OpenEXR)
 set(_OPENEXR_INCLUDE_SEARCH_DIRS "")
 list(APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
   ${OPENEXR_INCLUDEDIR}
-  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${_OPENEXR_ROOT}
   ${PC_OpenEXR_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -202,7 +209,7 @@ set(_OPENEXR_LIBRARYDIR_SEARCH_DIRS "")
 
 list(APPEND _OPENEXR_LIBRARYDIR_SEARCH_DIRS
   ${OPENEXR_LIBRARYDIR}
-  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${_OPENEXR_ROOT}
   ${PC_OpenEXR_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )

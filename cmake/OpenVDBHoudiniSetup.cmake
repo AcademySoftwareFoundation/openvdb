@@ -84,7 +84,7 @@ may be provided to tell this module where to look.
 
 ``ENV{HFS}``
   Preferred installation prefix.
-``HOUDINI_ROOT``
+``Houdini_ROOT``
   Preferred installation prefix.
 ``CMAKE_PREFIX_PATH``
   Add the location of your Houdini installations CMake to this path.
@@ -96,15 +96,29 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
+# Set _HOUDINI_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV HOUDINI_ROOT from CMake 3.12
+if(Houdini_ROOT)
+  set(_HOUDINI_ROOT ${Houdini_ROOT})
+elseif(DEFINED ENV{Houdini_ROOT})
+  set(_HOUDINI_ROOT $ENV{Houdini_ROOT})
+elseif(HOUDINI_ROOT)
+  set(_HOUDINI_ROOT ${HOUDINI_ROOT})
+elseif(DEFINED ENV{HOUDINI_ROOT})
+  set(_HOUDINI_ROOT $ENV{HOUDINI_ROOT})
+endif()
+
 set(_HOUDINI_ROOT_SEARCH_DIR)
 
-if(HOUDINI_ROOT)
-  list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${HOUDINI_ROOT})
-else()
-  set(_ENV_HOUDINI_ROOT $ENV{HOUDINI_ROOT})
-  if(_ENV_HOUDINI_ROOT)
-    list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${_ENV_HOUDINI_ROOT})
-  endif()
+if(_HOUDINI_ROOT)
+  list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${_HOUDINI_ROOT})
 endif()
 
 if(DEFINED ENV{HFS})
@@ -112,7 +126,7 @@ if(DEFINED ENV{HFS})
 endif()
 
 # ------------------------------------------------------------------------
-#  Search for Houdini CMake
+#  Search for Houdini
 # ------------------------------------------------------------------------
 
 set(_HOUDINI_CMAKE_PATH_SUFFIXES)
@@ -132,17 +146,10 @@ list(APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
   cmake
 )
 
-find_path(HOUDINI_CMAKE_LOCATION HoudiniConfig.cmake
+find_package(Houdini
   ${USE_CMAKE_DEFAULT_PATH}
   PATHS ${_HOUDINI_ROOT_SEARCH_DIR}
-  PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES}
-)
-
-if(HOUDINI_CMAKE_LOCATION)
-  list(APPEND CMAKE_PREFIX_PATH "${HOUDINI_CMAKE_LOCATION}")
-endif()
-
-find_package(Houdini REQUIRED)
+  PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES})
 
 # Note that passing MINIMUM_HOUDINI_VERSION into find_package(Houdini) doesn't work
 if(NOT Houdini_FOUND)

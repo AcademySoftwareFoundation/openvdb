@@ -97,6 +97,11 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 mark_as_advanced(
   Tbb_INCLUDE_DIR
   Tbb_LIBRARY
@@ -129,16 +134,10 @@ else()
   set(TBB_FIND_COMPONENTS ${_TBB_COMPONENT_LIST})
 endif()
 
-# Append TBB_ROOT or $ENV{TBB_ROOT} if set (prioritize the direct cmake var)
-set(_TBB_ROOT_SEARCH_DIR "")
-
 if(TBB_ROOT)
-  list(APPEND _TBB_ROOT_SEARCH_DIR ${TBB_ROOT})
-else()
-  set(_ENV_TBB_ROOT $ENV{TBB_ROOT})
-  if(_ENV_TBB_ROOT)
-    list(APPEND _TBB_ROOT_SEARCH_DIR ${_ENV_TBB_ROOT})
-  endif()
+  set(_TBB_ROOT ${TBB_ROOT})
+elseif(DEFINED ENV{TBB_ROOT})
+  set(_TBB_ROOT $ENV{TBB_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find Tbb
@@ -155,7 +154,7 @@ pkg_check_modules(PC_Tbb QUIET tbb)
 set(_TBB_INCLUDE_SEARCH_DIRS "")
 list(APPEND _TBB_INCLUDE_SEARCH_DIRS
   ${TBB_INCLUDEDIR}
-  ${_TBB_ROOT_SEARCH_DIR}
+  ${_TBB_ROOT}
   ${PC_Tbb_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -201,7 +200,7 @@ set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
 set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
   ${TBB_LIBRARYDIR}
-  ${_TBB_ROOT_SEARCH_DIR}
+  ${_TBB_ROOT}
   ${PC_Tbb_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )

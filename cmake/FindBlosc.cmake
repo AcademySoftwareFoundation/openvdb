@@ -76,7 +76,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``BLOSC_ROOT``
+``Blosc_ROOT``
   Preferred installation prefix.
 ``BLOSC_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
@@ -89,21 +89,29 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 mark_as_advanced(
   Blosc_INCLUDE_DIR
   Blosc_LIBRARY
 )
 
-# Append BLOSC_ROOT or $ENV{BLOSC_ROOT} if set (prioritize the direct cmake var)
-set(_BLOSC_ROOT_SEARCH_DIR "")
 
-if(BLOSC_ROOT)
-  list(APPEND _BLOSC_ROOT_SEARCH_DIR ${BLOSC_ROOT})
-else()
-  set(_ENV_BLOSC_ROOT $ENV{BLOSC_ROOT})
-  if(_ENV_BLOSC_ROOT)
-    list(APPEND _BLOSC_ROOT_SEARCH_DIR ${_ENV_BLOSC_ROOT})
-  endif()
+# Set _BLOSC_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV BLOSC_ROOT from CMake 3.12
+if(Blosc_ROOT)
+  set(_BLOSC_ROOT ${Blosc_ROOT})
+elseif(DEFINED ENV{Blosc_ROOT})
+  set(_BLOSC_ROOT $ENV{Blosc_ROOT})
+elseif(BLOSC_ROOT)
+  set(_BLOSC_ROOT ${BLOSC_ROOT})
+elseif(DEFINED ENV{BLOSC_ROOT})
+  set(_BLOSC_ROOT $ENV{BLOSC_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find blosc
@@ -120,7 +128,7 @@ pkg_check_modules(PC_Blosc QUIET blosc)
 set(_BLOSC_INCLUDE_SEARCH_DIRS "")
 list(APPEND _BLOSC_INCLUDE_SEARCH_DIRS
   ${BLOSC_INCLUDEDIR}
-  ${_BLOSC_ROOT_SEARCH_DIR}
+  ${_BLOSC_ROOT}
   ${PC_Blosc_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -162,7 +170,7 @@ endif()
 set(_BLOSC_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
   ${BLOSC_LIBRARYDIR}
-  ${_BLOSC_ROOT_SEARCH_DIR}
+  ${_BLOSC_ROOT}
   ${PC_Blosc_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )

@@ -91,7 +91,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``OPENVDB_ROOT``
+``OpenVDB_ROOT``
   Preferred installation prefix.
 ``OPENVDB_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
@@ -142,16 +142,18 @@ else()
   set(OpenVDB_FIND_COMPONENTS ${_OPENVDB_COMPONENT_LIST})
 endif()
 
-# Append OPENVDB_ROOT or $ENV{OPENVDB_ROOT} if set (prioritize the direct cmake var)
-set(_OPENVDB_ROOT_SEARCH_DIR "")
-
-if(OPENVDB_ROOT)
-  list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${OPENVDB_ROOT})
-else()
-  set(_ENV_OPENVDB_ROOT $ENV{OPENVDB_ROOT})
-  if(_ENV_OPENVDB_ROOT)
-    list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${_ENV_OPENVDB_ROOT})
-  endif()
+# Set _OPENVDB_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV OPENVDB_ROOT from CMake 3.12
+if(OpenVDB_ROOT)
+  set(_OPENVDB_ROOT ${OpenVDB_ROOT})
+elseif(DEFINED ENV{OpenVDB_ROOT})
+  set(_OPENVDB_ROOT $ENV{OpenVDB_ROOT})
+elseif(OPENVDB_ROOT)
+  set(_OPENVDB_ROOT ${OPENVDB_ROOT})
+elseif(DEFINED ENV{OPENVDB_ROOT})
+  set(_OPENVDB_ROOT $ENV{OPENVDB_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find OpenVDB
@@ -183,7 +185,7 @@ elseif(${_DIR_NAME} STREQUAL "OpenVDB")
   get_filename_component(_IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY)
   get_filename_component(_IMPORT_PREFIX ${_IMPORT_PREFIX} DIRECTORY)
   set(_OPENVDB_INSTALL ${_IMPORT_PREFIX})
-  list(APPEND _OPENVDB_ROOT_SEARCH_DIR ${_OPENVDB_INSTALL})
+  list(APPEND _OPENVDB_ROOT ${_OPENVDB_INSTALL})
 endif()
 
 unset(_DIR_NAME)
@@ -196,7 +198,7 @@ unset(_IMPORT_PREFIX)
 set(_OPENVDB_INCLUDE_SEARCH_DIRS "")
 list(APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
   ${OPENVDB_INCLUDEDIR}
-  ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${_OPENVDB_ROOT}
   ${PC_OpenVDB_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -225,7 +227,7 @@ set(_OPENVDB_LIBRARYDIR_SEARCH_DIRS "")
 
 list(APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
   ${OPENVDB_LIBRARYDIR}
-  ${_OPENVDB_ROOT_SEARCH_DIR}
+  ${_OPENVDB_ROOT}
   ${PC_OpenVDB_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )

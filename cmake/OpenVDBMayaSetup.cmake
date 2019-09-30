@@ -60,9 +60,9 @@ Hints
 Instead of explicitly setting the cache variables, the following
 variables may be provided to tell this module where to look.
 
-``MAYA_ROOT``
+``Maya_ROOT``
   Preferred installation prefix.
-``ENV{MAYA_ROOT}``
+``ENV{Maya_ROOT}``
   Preferred installation prefix.
 ``ENV{MAYA_LOCATION}``
   Preferred installation prefix.
@@ -74,19 +74,33 @@ variables may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
-set(_MAYA_ROOT_SEARCH_DIR)
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
-if(MAYA_ROOT)
-  list(APPEND _MAYA_ROOT_SEARCH_DIR ${MAYA_ROOT})
-else()
-  set(_ENV_MAYA_ROOT $ENV{MAYA_ROOT})
-  if(_ENV_MAYA_ROOT)
-    list(APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT})
-  endif()
-  set(_ENV_MAYA_ROOT $ENV{MAYA_LOCATION})
-  if(_ENV_MAYA_ROOT)
-    list(APPEND _MAYA_ROOT_SEARCH_DIR ${_ENV_MAYA_ROOT})
-  endif()
+# Set _MAYA_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV MAYA_ROOT from CMake 3.12
+if(Maya_ROOT)
+  set(_MAYA_ROOT ${Maya_ROOT})
+elseif(DEFINED ENV{Maya_ROOT})
+  set(_MAYA_ROOT $ENV{Maya_ROOT})
+elseif(MAYA_ROOT)
+  set(_MAYA_ROOT ${MAYA_ROOT})
+elseif(DEFINED ENV{MAYA_ROOT})
+  set(_MAYA_ROOT $ENV{MAYA_ROOT})
+endif()
+
+set(_MAYA_ROOT_SEARCH_DIR)
+if(_MAYA_ROOT)
+  list(APPEND _MAYA_ROOT_SEARCH_DIR ${_MAYA_ROOT})
+endif()
+
+# @todo deprecate MAYA_LOCATION? There may be workflows which set this variable
+if(DEFINED ENV{MAYA_LOCATION})
+  list(APPEND _MAYA_ROOT_SEARCH_DIR $ENV{MAYA_LOCATION})
 endif()
 
 # ------------------------------------------------------------------------

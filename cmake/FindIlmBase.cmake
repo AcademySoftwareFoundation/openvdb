@@ -90,7 +90,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``ILMBASE_ROOT``
+``IlmBase_ROOT``
   Preferred installation prefix.
 ``ILMBASE_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
@@ -102,6 +102,11 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 mark_as_advanced(
   IlmBase_INCLUDE_DIR
@@ -137,16 +142,18 @@ else()
   set(IlmBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST})
 endif()
 
-# Append ILMBASE_ROOT or $ENV{ILMBASE_ROOT} if set (prioritize the direct cmake var)
-set(_ILMBASE_ROOT_SEARCH_DIR "")
-
-if(ILMBASE_ROOT)
-  list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${ILMBASE_ROOT})
-else()
-  set(_ENV_ILMBASE_ROOT $ENV{ILMBASE_ROOT})
-  if(_ENV_ILMBASE_ROOT)
-    list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${_ENV_ILMBASE_ROOT})
-  endif()
+# Set _ILMBASE_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV ILMBASE_ROOT from CMake 3.12
+if(IlmBase_ROOT)
+  set(_ILMBASE_ROOT ${IlmBase_ROOT})
+elseif(DEFINED ENV{IlmBase_ROOT})
+  set(_ILMBASE_ROOT $ENV{IlmBase_ROOT})
+elseif(ILMBASE_ROOT)
+  set(_ILMBASE_ROOT ${ILMBASE_ROOT})
+elseif(DEFINED ENV{ILMBASE_ROOT})
+  set(_ILMBASE_ROOT $ENV{ILMBASE_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find IlmBase
@@ -163,7 +170,7 @@ pkg_check_modules(PC_IlmBase QUIET IlmBase)
 set(_ILMBASE_INCLUDE_SEARCH_DIRS "")
 list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
   ${ILMBASE_INCLUDEDIR}
-  ${_ILMBASE_ROOT_SEARCH_DIR}
+  ${_ILMBASE_ROOT}
   ${PC_IlmBase_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -209,7 +216,7 @@ set(_ILMBASE_LIBRARYDIR_SEARCH_DIRS "")
 
 list(APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${ILMBASE_LIBRARYDIR}
-  ${_ILMBASE_ROOT_SEARCH_DIR}
+  ${_ILMBASE_ROOT}
   ${PC_IlmBase_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )

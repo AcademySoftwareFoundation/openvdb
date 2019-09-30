@@ -53,7 +53,7 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``JEMALLOC_ROOT``
+``Jemalloc_ROOT``
   Preferred installation prefix.
 ``JEMALLOC_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
@@ -64,20 +64,28 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.3)
 
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 mark_as_advanced(
   Jemalloc_LIBRARY
 )
 
-# Append JEMALLOC_ROOT or $ENV{JEMALLOC_ROOT} if set (prioritize the direct cmake var)
-set(_JEMALLOC_ROOT_SEARCH_DIR "")
 
-if(JEMALLOC_ROOT)
-  list(APPEND _JEMALLOC_ROOT_SEARCH_DIR ${JEMALLOC_ROOT})
-else()
-  set(_ENV_JEMALLOC_ROOT $ENV{JEMALLOC_ROOT})
-  if(_ENV_JEMALLOC_ROOT)
-    list(APPEND _JEMALLOC_ROOT_SEARCH_DIR ${_ENV_JEMALLOC_ROOT})
-  endif()
+# Set _JEMALLOC_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV JEMALLOC_ROOT from CMake 3.12
+if(Jemalloc_ROOT)
+  set(_JEMALLOC_ROOT ${Jemalloc_ROOT})
+elseif(DEFINED ENV{Jemalloc_ROOT})
+  set(_JEMALLOC_ROOT $ENV{Jemalloc_ROOT})
+elseif(JEMALLOC_ROOT)
+  set(_JEMALLOC_ROOT ${JEMALLOC_ROOT})
+elseif(DEFINED ENV{JEMALLOC_ROOT})
+  set(_JEMALLOC_ROOT $ENV{JEMALLOC_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find jemalloc
@@ -94,7 +102,7 @@ pkg_check_modules(PC_Jemalloc QUIET jemalloc)
 set(_JEMALLOC_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _JEMALLOC_LIBRARYDIR_SEARCH_DIRS
   ${JEMALLOC_LIBRARYDIR}
-  ${_JEMALLOC_ROOT_SEARCH_DIR}
+  ${_JEMALLOC_ROOT}
   ${PC_Jemalloc_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
