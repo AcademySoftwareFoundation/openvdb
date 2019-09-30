@@ -38,7 +38,7 @@ PROJECT_NAME           = "OpenVDB"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 6.2.0
+PROJECT_NUMBER         = 6.2.1
 
 PREDEFINED             = OPENVDB_VERSION_NAME=v6_2
 PREDEFINED            += OPENVDB_ABI_VERSION_NUMBER=6
