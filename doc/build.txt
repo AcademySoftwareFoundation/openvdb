@@ -758,4 +758,34 @@ Older versions in particular are not supported by OpenVDB.
 @b Note: Boost will produce a version error in the format `Detected version of
 Boost is too old.`
 
+@subsection troubleshoot3 CMake warnings/errors in FindBoost.cmake
+
+There are a variety of potential warnings and errors that may arise from the
+version compatibility of Boost and CMake. These are related to how both Boost
+and CMake have historically been kept in sync. A common warning and error
+combination is:
+
+@code{.sh}
+  CMake Warning at ...  Imported targets not available for Boost version XXXXXX
+  ...
+  Target "..." links to target "Boost::XXX" but the target
+  was not found.  Perhaps a find_package() call is missing for an IMPORTED
+  target, or an ALIAS target is missing?
+@endcode
+
+OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries)
+for all its dependencies. For imported Boost compatibility, the following
+versions of CMake are required:
+
+  - Boost 1.63 requires CMake 3.7 or newer.
+  - Boost 1.64 requires CMake 3.8 or newer.
+  - Boost 1.65 and 1.65.1 require CMake 3.9.3 or newer.
+  - Boost 1.66 requires CMake 3.11 or newer.
+  - Boost 1.67 requires CMake 3.12 or newer.
+  - Boost 1.68, 1.69 require CMake 3.13 or newer.
+  - Boost 1.70 requires CMake 3.14 or newer.
+
+Use the above list to identify the version of CMake you require for your version
+of Boost. Note that this may be implemented into the OpenVDB CMake in the future.
+
 */

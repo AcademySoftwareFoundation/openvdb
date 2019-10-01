@@ -88,7 +88,7 @@ option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
-CMAKE_DEPENDENT_option(OPENVDB_INSTALL_CMAKE_MODULES
+cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
 
@@ -108,10 +108,10 @@ Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, C
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
 option(USE_EXR [=[
-Use OpenEXR while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+Use OpenEXR while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you
 know it to be required.]=] OFF)
-CMAKE_DEPENDENT_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
+cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
@@ -177,14 +177,19 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   OPENVDB_USE_DEPRECATED_ABI
   CONCURRENT_MALLOC
+  OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
 )
 
-# Configure minimum version requirements
+# Configure minimum version requirements - some are treated specially and fall
+# outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5. Previous versions are incompatible.
 set(MINIMUM_BLOSC_VERSION 1.5)
+# @note  ABI always enforced so the correct deprecation messages are available.
+# OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
+set(MINIMUM_OPENVDB_ABI_VERSION 4)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2017 of the VFX platform where avaiable
@@ -208,7 +213,6 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
-  set(MINIMUM_OPENVDB_ABI_VERSION 4)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
@@ -257,8 +261,10 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
+#  FindOpenGL.cmake is needed if CMake < 3.8
+#  FindNumPy.cmake is needed if CMake < 3.14
 
-if(${CMAKE_VERSION} VERSION_LESS 3.8)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
 endif()
 
@@ -548,7 +554,7 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it
-# via ADD_DEFINITIONS
+# via add_definitions()
 
 if(OpenVDB_ABI EQUAL 3)
   add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)

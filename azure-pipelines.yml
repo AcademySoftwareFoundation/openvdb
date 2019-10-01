@@ -22,8 +22,18 @@ stages:
     - bash: ./build/openvdb/unittest/vdb_test -v
     - bash: ci/test_sonar.sh
 
+  - job: testabi7
+    displayName: and Test ABI=7 (VFX2020)
+    pool:
+      vmImage: 'ubuntu-16.04'
+    container: aswf/ci-openvdb:2020.0
+    timeoutInMinutes: 0
+    steps:
+    - bash: ci/build.sh clang++ Release 7 ON
+    - bash: ./build/openvdb/unittest/vdb_test -v
+
   - job: testabi6
-    displayName: and Test ABI=6
+    displayName: and Test ABI=6 (VFX2019)
     pool:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-openvdb:2019
@@ -33,7 +43,7 @@ stages:
     - bash: ./build/openvdb/unittest/vdb_test -v
 
   - job: testabi5
-    displayName: and Test ABI=5
+    displayName: and Test ABI=5 (VFX2018)
     pool:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-openvdb:2018
@@ -43,7 +53,7 @@ stages:
     - bash: ./build/openvdb/unittest/vdb_test -v
 
   - job: testabi4
-    displayName: and Test ABI=4
+    displayName: and Test ABI=4 (VFX2018)
     pool:
       vmImage: 'ubuntu-16.04'
     container: aswftesting/ci-openvdb:2018
