@@ -8,6 +8,8 @@
 
 @par
 Improvements:
+- The minimum ABI for OpenVDB is now always enforced through CMake
+  separately to other minimum dependency version variables.
 - Added support for CMake 3.12 compatible @c Xxx_ROOT variables.
 - Replaced the CMake @c USE_SYSTEM_LIBRARY_PATHS option with
   @c DISABLE_CMAKE_SEARCH_PATHS and removed the hard coded list of
@@ -18,6 +20,12 @@ Improvements:
   policy, minimum version and project calls.
 
 @par
+Python:
+- Removed the requirement of CMake 3.14 for NumPy usage.
+- Added support for Boost &gt= 1.65 when building the python module with NumPy
+  support through CMake.
+- Improved CMake Python3 support.
+
 Houdini:
 - Fixed a bug in the OpenVDB Points Convert SOP during conversion from
   Houdini geometry to OpenVDB Points, where point group information could
@@ -25,6 +33,19 @@ Houdini:
   inputs).
 - Threaded the population of point group memberships during conversion from
   Houdini geometry to OpenVDB Points
+
+
+@htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 6.2.1</B> - <I>September 30, 2019</I>
+
+@par
+Bug fixes:
+- Fix a crash that arose from an inadvertent ABI change of an IO class with
+  the 6.2.0 release. This crash occurs attempting to write out a VDB Points
+  grid using an IO routine from a different version of the core library
+  than the core library version in which the grid was authored and when one
+  of these core library versions is 6.2.0.
 
 
 @htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly

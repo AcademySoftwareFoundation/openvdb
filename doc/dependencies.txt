@@ -42,9 +42,12 @@ OpenVDB Print           | Core Library dependencies                             
 OpenVDB LOD             | Core Library dependencies                                                            | -
 OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, Boost::thread                              | -
-OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | NumPy
+OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
 OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
 OpenVDB Documentation   | Doxygen                                                                              | -
+
+ - @b * Boost::numpy is required for NumPy support with Boost from version 1.65
+ onwards.
 
 @subsection depDependencyTable Dependency Table
 
@@ -58,7 +61,7 @@ IlmBase        | 2.2     | 2.2         | Used half precision floating points and
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 4.4.6   | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread                     | Y       | Y        | https://www.boost.org
+Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread, numpy              | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
 NumPy          | 1.9.2   | 1.9.2       | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
@@ -75,9 +78,17 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
 
 @subsection depKnownIssues Known Issues
 
-@b GLFW: Crash with GLFW 3.2.1 when used with EGL on Linux. OpenVDB View may
-  segfault on closure. Whilst this [has been fixed in the GLFW repository]
-  (https://github.com/glfw/glfw/issues/1146), there is no new release.
+ - @b GLFW: Crash with GLFW 3.2.1 when used with EGL on Linux. OpenVDB View may
+ segfault on closure. Whilst this [has been fixed in the GLFW repository]
+ (https://github.com/glfw/glfw/issues/1146), there is no new release.
+
+ - @b Boost 1.65/1.66/1.67 + @b Python3 + @b NumPy: Known issue on UNIX systems
+ which can cause the below python runtime error. Consider updating to Boost 1.68
+ if you require both Python3 and NumPy support:
+
+@code{.sh}
+RuntimeError: FATAL: module compiled as little endian, but detected different endianness at runtime.
+@endcode
 
 @section depInstallingDependencies Installing Dependencies
 
@@ -101,6 +112,7 @@ apt-get install libboost-system-dev     # Boost::system
 apt-get install libboost-iostreams-dev  # Boost::iostream
 apt-get install libboost-python-dev     # Boost::python
 apt-get install libboost-thread-dev     # Boost::thread
+apt-get install libboost-numpy-dev      # Boost::numpy
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 apt-get install liblog4cplus-dev        # Log4cplus
