@@ -6,6 +6,7 @@ Version 7.0.0 - In development
     Improvements:
     - The minimum ABI for OpenVDB is now always enforced through CMake
       separately to other minimum dependency version variables.
+    - Added missing test TestClip to the unit test CMakeLists.txt
 
     Python:
     - Removed the requirement of CMake 3.14 for NumPy usage.
