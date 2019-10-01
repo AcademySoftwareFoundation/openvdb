@@ -1,6 +1,16 @@
 OpenVDB Version History
 =======================
 
+Version 6.2.1 - September 30, 2019
+
+    Bug fixes:
+    - Fix a crash that arose from an inadvertent ABI change of an IO class with
+      the 6.2.0 release. This crash occurs attempting to write out a VDB Points
+      grid using an IO routine from a different version of the core library
+      than the core library version in which the grid was authored and when one
+      of these core library versions is 6.2.0.
+
+
 Version 6.2.0 - September 18, 2019
 
     New features:
