@@ -10,6 +10,7 @@
 Improvements:
 - The minimum ABI for OpenVDB is now always enforced through CMake
   separately to other minimum dependency version variables.
+- Added missing test @c TestClip to the unit test CMakeLists.txt
 
 @par
 Python:
