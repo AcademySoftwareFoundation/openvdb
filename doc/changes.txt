@@ -10,6 +10,7 @@
 Improvements:
 - The minimum ABI for OpenVDB is now always enforced through CMake
   separately to other minimum dependency version variables.
+- Added missing test @c TestClip to the unit test CMakeLists.txt
 - Added support for CMake 3.12 compatible @c Xxx_ROOT variables.
 - Replaced the CMake @c USE_SYSTEM_LIBRARY_PATHS option with
   @c DISABLE_CMAKE_SEARCH_PATHS and removed the hard coded list of
