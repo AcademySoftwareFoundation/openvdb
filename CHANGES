@@ -5,32 +5,31 @@ Version 7.0.0 - In development
 
     Improvements:
     - The minimum ABI for OpenVDB is now always enforced through CMake
-      separately to other minimum dependency version variables.
-    - Added missing test TestClip to the unit test CMakeLists.txt
+      separately from other minimum dependency version variables.
 
     Python:
     - Removed the requirement of CMake 3.14 for NumPy usage.
-    - Added support for Boost >= 1.65 when building the python module with
-      NumPy support through CMake.
+    - Added support for Boost versions 1.65 and later when building
+      the Python module with NumPy support through CMake.
     - Improved CMake Python3 support.
 
     Houdini:
-    - Fixed a bug in the OpenVDB Points Convert SOP during conversion from
-      Houdini geometry to OpenVDB Points, where point group information could
-      end up corrupted or cause a crash with non-contiguous point offsets (mesh
-      inputs).
-    - Threaded the population of point group memberships during conversion from
-      Houdini geometry to OpenVDB Points
+    - Fixed a bug in the Points Convert SOP during conversion from
+      Houdini geometry to OpenVDB Points, where point group information
+      could end up corrupted or cause a crash with non-contiguous
+      point offsets (mesh inputs).
+    - Threaded the population of point group memberships during conversion
+      from Houdini geometry to OpenVDB Points
 
 
 Version 6.2.1 - September 30, 2019
 
     Bug fixes:
-    - Fix a crash that arose from an inadvertent ABI change of an IO class with
-      the 6.2.0 release. This crash occurs attempting to write out a VDB Points
-      grid using an IO routine from a different version of the core library
-      than the core library version in which the grid was authored and when one
-      of these core library versions is 6.2.0.
+    - Fixed a crash that arose from an inadvertent ABI change of an I/O class
+      with the 6.2.0 release.  The crash occured when attempting to write out
+      a point data grid using an I/O routine from a different version of
+      OpenVDB than the one with which the grid was authored and when
+      one of those OpenVDB versions was 6.2.0.
 
 
 Version 6.2.0 - September 18, 2019
