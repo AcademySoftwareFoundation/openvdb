@@ -19,7 +19,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build_sonar.sh
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
     - bash: ci/test_sonar.sh
 
   - job: testabi7
@@ -30,7 +30,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 7 ON
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
 
   - job: testabi6
     displayName: and Test ABI=6 (VFX2019)
@@ -40,7 +40,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 6 ON
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
 
   - job: testabi5
     displayName: and Test ABI=5 (VFX2018)
@@ -50,7 +50,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 5 ON
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
 
   - job: testabi4
     displayName: and Test ABI=4 (VFX2018)
@@ -60,7 +60,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 4 ON
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
 
   - job: testhou175
     displayName: Houdini 17.5
@@ -92,7 +92,7 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh clang++ Release 7 OFF
-    - bash: ./build/openvdb/unittest/vdb_test -v
+    - bash: cd build && ctest -V; cd -
 
   - job: testhou175gcc
     displayName: Houdini 17.5 (GCC)
