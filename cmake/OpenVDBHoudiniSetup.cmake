@@ -163,28 +163,10 @@ find_package_handle_standard_args(Houdini
 #  Add support for older versions of Houdini
 # ------------------------------------------------------------------------
 
-if(Houdini_VERSION VERSION_LESS 17)
-  # Missing function in Houdini 16.5 CMake copied from 17.5 - _houdini variables
-  # are set by the Houdini configuration package
-  function(houdini_get_default_install_dir output_var)
-    set( _instdir "")
-    if(_houdini_platform_linux)
-        set(_instdir $ENV{HOME}/houdini${_houdini_release_version})
-    elseif(_houdini_platform_osx)
-        set(_instdir $ENV{HOME}/Library/Preferences/houdini/${_houdini_release_version})
-    elseif(_houdini_platform_win)
-        set(_instdir $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\Documents\\houdini${_houdini_release_version})
-    else()
-        message( FATAL_ERROR "Invalid platform")
-    endif()
-    set(${output_var} ${_instdir} PARENT_SCOPE)
-  endfunction()
-endif()
-
-if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
-  message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
-    "is deprecated and will be removed.")
-endif()
+# if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
+#   message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
+#     "is deprecated and will be removed.")
+# endif()
 
 # ------------------------------------------------------------------------
 #  Configure imported Houdini target

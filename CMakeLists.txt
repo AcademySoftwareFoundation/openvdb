@@ -95,7 +95,7 @@ cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided if Houdini Version >= 16.5. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
+provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -209,7 +209,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_CPPUNIT_VERSION 1.10)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 16.5)
+  set(MINIMUM_HOUDINI_VERSION 17.0)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
@@ -224,7 +224,6 @@ set(FUTURE_MINIMUM_ICC_VERSION 17)
 set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
 set(FUTURE_MINIMUM_TBB_VERSION 2017.6)
 set(FUTURE_MINIMUM_NUMPY_VERSION 1.12.1)
-set(FUTURE_MINIMUM_HOUDINI_VERSION 17)
 
 #########################################################################
 
