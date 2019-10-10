@@ -525,11 +525,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 
             // Create a new, empty output grid of the same type as the input grid
             // and with the same metadata.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            hvdb::GridPtr outGrid = grid.copyGrid(/*tree=*/openvdb::CP_NEW);
-#else
             hvdb::GridPtr outGrid = grid.copyGridWithNewTree();
-#endif
 
             UT_AutoInterrupt scopedInterrupt(
                 ("Resampling " + it.getPrimitiveName().toStdString()).c_str());

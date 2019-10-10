@@ -45,10 +45,6 @@
 #include <openvdb/math/Coord.h>
 #include <memory>
 #include <type_traits>
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
-#endif
 
 
 namespace openvdb {
@@ -117,24 +113,6 @@ using math::Quatd;
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};
 
-
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-
-// Use Boost shared pointers in OpenVDB 3 ABI compatibility mode.
-template<typename T> using SharedPtr = boost::shared_ptr<T>;
-template<typename T> using WeakPtr = boost::weak_ptr<T>;
-
-template<typename T, typename U> inline SharedPtr<T>
-ConstPtrCast(const SharedPtr<U>& ptr) { return boost::const_pointer_cast<T, U>(ptr); }
-
-template<typename T, typename U> inline SharedPtr<T>
-DynamicPtrCast(const SharedPtr<U>& ptr) { return boost::dynamic_pointer_cast<T, U>(ptr); }
-
-template<typename T, typename U> inline SharedPtr<T>
-StaticPtrCast(const SharedPtr<U>& ptr) { return boost::static_pointer_cast<T, U>(ptr); }
-
-#else // if OPENVDB_ABI_VERSION_NUMBER > 3
-
 // Use STL shared pointers from OpenVDB 4 on.
 template<typename T> using SharedPtr = std::shared_ptr<T>;
 template<typename T> using WeakPtr = std::weak_ptr<T>;
@@ -169,8 +147,6 @@ DynamicPtrCast(const SharedPtr<U>& ptr) { return std::dynamic_pointer_cast<T, U>
 /// @endcode
 template<typename T, typename U> inline SharedPtr<T>
 StaticPtrCast(const SharedPtr<U>& ptr) { return std::static_pointer_cast<T, U>(ptr); }
-
-#endif
 
 
 ////////////////////////////////////////
@@ -721,25 +697,6 @@ struct SwappedCombineOp
 
 
 ////////////////////////////////////////
-
-
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-/// In copy constructors, members stored as shared pointers can be handled
-/// in several ways:
-/// <dl>
-/// <dt><b>CP_NEW</b>
-/// <dd>Don't copy the member; default construct a new member object instead.
-///
-/// <dt><b>CP_SHARE</b>
-/// <dd>Copy the shared pointer, so that the original and new objects share
-///     the same member.
-///
-/// <dt><b>CP_COPY</b>
-/// <dd>Create a deep copy of the member.
-/// </dl>
-/// @deprecated ABI versions older than 4 are deprecated.
-enum OPENVDB_DEPRECATED CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
-#endif
 
 
 /// @brief Tag dispatch class that distinguishes shallow copy constructors
