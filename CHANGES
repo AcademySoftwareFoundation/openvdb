@@ -3,6 +3,8 @@ OpenVDB Version History
 
 Version 7.0.0 - In development
 
+    As of this release, a C++14 compiler is required.
+
     Improvements:
     - The minimum ABI for OpenVDB is now always enforced through CMake
       separately from other minimum dependency version variables.

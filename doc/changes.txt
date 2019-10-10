@@ -7,6 +7,11 @@
 <B>Version 7.0.0</B> - <I>In development</I>
 
 @par
+<BLOCKQUOTE>
+As of this release, a C++14 compiler is required.
+</BLOCKQUOTE>
+
+@par
 Improvements:
 - The minimum ABI for OpenVDB is now always enforced through CMake
   separately from other minimum dependency version variables.
