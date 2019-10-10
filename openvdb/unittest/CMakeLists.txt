@@ -218,4 +218,4 @@ if(OPENVDB_ENABLE_RPATH)
   )
 endif()
 
-add_test(vdb_unit_test vdb_test)
+add_test(vdb_unit_test vdb_test -v)

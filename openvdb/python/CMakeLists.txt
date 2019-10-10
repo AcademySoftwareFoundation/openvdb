@@ -325,7 +325,7 @@ install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION include/openvdb/python)
 
 # pytest
 
-add_test(pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py)
+add_test(pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py -v)
 set_tests_properties(pytest PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}")
 
 
