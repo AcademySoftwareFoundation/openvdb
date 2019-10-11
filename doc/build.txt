@@ -90,12 +90,22 @@ given FindModule e.g. `FindBlosc.cmake`:
   They are listed in priority order. Note that the prefix is always capitalized.
    - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
    directories
-   - @b XXX_ROOT - Preferred installation prefix. The given dependency is
-   expected to follow a folder structure `XXX_ROOT/include` and `XXX_ROOT/lib`
-   exist
+   - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
+   expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
+   exist. Note that unlike the above, this is the case matching name of the
+   find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
-   searches. OpenVDB sets this in the root CMake if `USE_SYSTEM_LIBRARY_PATHS`
-   is enabled.
+   searches.
+   - @b XXX_USE_STATIC_LIBS - Only search for static libraries for the given
+   dependency. If OFF, the shared library is prioritized, falling back
+   to the static library. This is OFF by default.
+   - @b DISABLE_CMAKE_SEARCH_PATHS - The above variables are custom to the
+   OpenVDB project. CMake itself implements its own search system to try and
+   find the given libraries and packages. When ON, this variable
+   disables CMake's inbuilt search, guaranteeing that only the above user
+   provided paths are searched. See [CMakes Search Procedure](https://cmake.org/cmake/help/latest/command/find_package.html#search-procedure)
+   for more information. This is OFF by default (and thus CMake's search
+   is enabled).
 .
   - @b Outputs The following variables are always set if the project is found:
     - @b Xxx_FOUND - True if the headers and library was found and exists
@@ -120,7 +130,7 @@ a Maya installation or a manual installation from source) and we want to use
 this with other dependencies installed through a package manager such as
 homebrew. As homebrew copies all headers and libraries it installs to a
 `<homebrew>/include` `<homebrew>/lib` directory structure, it can be tempting
-to set @b XXX_ROOT variables to points to the `<homebrew>` folder. However you
+to set @b Xxx_ROOT variables to points to the `<homebrew>` folder. However you
 may already have an existing installation of TBB through your package manager,
 potentially installed by as a dependency of a completely unrelated piece of
 software. Whilst CMake may report to you the correct include/lib path, this can
@@ -252,7 +262,7 @@ of the OpenVDB source tree along with the following options:
 
 Required:
 
-  - @b HOUDINI_ROOT =`/path/to/houdini/install` # Path to Houdini Install
+  - @b Houdini_ROOT =`/path/to/houdini/install` # Path to Houdini Install
   - @b USE_HOUDINI =`ON` # Force all components to build against Houdini
   - @b OPENVDB_BUILD_HOUDINI_PLUGIN =`ON` # Required for building the Houdini Plugin.
 
@@ -277,7 +287,7 @@ OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D HOUDINI_ROOT=/Applications/Houdini/Houdini17.0.506/ \
+      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
       -D USE_HOUDINI=ON \
       ../
 @endcode
@@ -337,7 +347,7 @@ of the OpenVDB source tree along with the following options:
 
 Required:
 
-  - @b MAYA_ROOT =`/path/to/maya/install` # Path to Maya Install
+  - @b Maya_ROOT =`/path/to/maya/install` # Path to Maya Install
   - @b USE_MAYA =`ON` # Force all components to build against Maya
 
 Optional:
@@ -349,15 +359,15 @@ Optional:
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
   - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
  CMake may find it automatically
-  - @b ILMBASE_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
+  - @b IlmBase_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D ILMBASE_ROOT=/path/to/ilmbase/install \
-      -D MAYA_ROOT=/Applications/Autodesk/maya2019/ \
+      -D IlmBase_ROOT=/path/to/ilmbase/install \
+      -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../
 @endcode
@@ -408,7 +418,7 @@ provide:
 - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
 =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
 the link for default values.
-- @b XXX_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
+- @b Xxx_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
 installed or simply to where your prefered package is installed if it cannot
 locate it.
 

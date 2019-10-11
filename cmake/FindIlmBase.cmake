@@ -90,26 +90,37 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``ILMBASE_ROOT``
+``IlmBase_ROOT``
   Preferred installation prefix.
 ``ILMBASE_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
 ``ILMBASE_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``ILMBASE_USE_STATIC_LIBS``
+  Only search for static ilmbase libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
-# Support new if() IN_LIST operator
-if(POLICY CMP0057)
-  cmake_policy(SET CMP0057 NEW)
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
 endif()
 
 mark_as_advanced(
   IlmBase_INCLUDE_DIR
   IlmBase_LIBRARY
 )
+
+set(_FIND_ILMBASE_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_ILMBASE_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_ILMBASE_COMPONENT_LIST
   Half
@@ -140,21 +151,25 @@ else()
   set(IlmBase_FIND_COMPONENTS ${_ILMBASE_COMPONENT_LIST})
 endif()
 
-# Append ILMBASE_ROOT or $ENV{ILMBASE_ROOT} if set (prioritize the direct cmake var)
-set(_ILMBASE_ROOT_SEARCH_DIR "")
-
-if(ILMBASE_ROOT)
-  list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${ILMBASE_ROOT})
-else()
-  set(_ENV_ILMBASE_ROOT $ENV{ILMBASE_ROOT})
-  if(_ENV_ILMBASE_ROOT)
-    list(APPEND _ILMBASE_ROOT_SEARCH_DIR ${_ENV_ILMBASE_ROOT})
-  endif()
+# Set _ILMBASE_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV ILMBASE_ROOT from CMake 3.12
+if(IlmBase_ROOT)
+  set(_ILMBASE_ROOT ${IlmBase_ROOT})
+elseif(DEFINED ENV{IlmBase_ROOT})
+  set(_ILMBASE_ROOT $ENV{IlmBase_ROOT})
+elseif(ILMBASE_ROOT)
+  set(_ILMBASE_ROOT ${ILMBASE_ROOT})
+elseif(DEFINED ENV{ILMBASE_ROOT})
+  set(_ILMBASE_ROOT $ENV{ILMBASE_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find IlmBase
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_IlmBase QUIET IlmBase)
 
 # ------------------------------------------------------------------------
@@ -164,14 +179,14 @@ pkg_check_modules(PC_IlmBase QUIET IlmBase)
 set(_ILMBASE_INCLUDE_SEARCH_DIRS "")
 list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
   ${ILMBASE_INCLUDEDIR}
-  ${_ILMBASE_ROOT_SEARCH_DIR}
+  ${_ILMBASE_ROOT}
   ${PC_IlmBase_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
 
 # Look for a standard IlmBase header file.
 find_path(IlmBase_INCLUDE_DIR IlmBaseConfig.h
-  NO_DEFAULT_PATH
+  ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include/OpenEXR OpenEXR
 )
@@ -210,7 +225,7 @@ set(_ILMBASE_LIBRARYDIR_SEARCH_DIRS "")
 
 list(APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${ILMBASE_LIBRARYDIR}
-  ${_ILMBASE_ROOT_SEARCH_DIR}
+  ${_ILMBASE_ROOT}
   ${PC_IlmBase_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -255,7 +270,7 @@ set(IlmBase_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   find_library(IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
-    NO_DEFAULT_PATH
+    ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
   )
@@ -265,7 +280,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
     set(_ILMBASE_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
     find_library(IlmBase_${COMPONENT}_DLL ${COMPONENT}
-      NO_DEFAULT_PATH
+      ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
       PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
     )

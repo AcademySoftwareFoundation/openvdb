@@ -53,34 +53,54 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``JEMALLOC_ROOT``
+``Jemalloc_ROOT``
   Preferred installation prefix.
 ``JEMALLOC_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``JEMALLOC_USE_STATIC_LIBS``
+  Only search for static jemalloc libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
+
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 mark_as_advanced(
   Jemalloc_LIBRARY
 )
 
-# Append JEMALLOC_ROOT or $ENV{JEMALLOC_ROOT} if set (prioritize the direct cmake var)
-set(_JEMALLOC_ROOT_SEARCH_DIR "")
+set(_FIND_JEMALLOC_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_JEMALLOC_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
-if(JEMALLOC_ROOT)
-  list(APPEND _JEMALLOC_ROOT_SEARCH_DIR ${JEMALLOC_ROOT})
-else()
-  set(_ENV_JEMALLOC_ROOT $ENV{JEMALLOC_ROOT})
-  if(_ENV_JEMALLOC_ROOT)
-    list(APPEND _JEMALLOC_ROOT_SEARCH_DIR ${_ENV_JEMALLOC_ROOT})
-  endif()
+# Set _JEMALLOC_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV JEMALLOC_ROOT from CMake 3.12
+if(Jemalloc_ROOT)
+  set(_JEMALLOC_ROOT ${Jemalloc_ROOT})
+elseif(DEFINED ENV{Jemalloc_ROOT})
+  set(_JEMALLOC_ROOT $ENV{Jemalloc_ROOT})
+elseif(JEMALLOC_ROOT)
+  set(_JEMALLOC_ROOT ${JEMALLOC_ROOT})
+elseif(DEFINED ENV{JEMALLOC_ROOT})
+  set(_JEMALLOC_ROOT $ENV{JEMALLOC_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find jemalloc
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_Jemalloc QUIET jemalloc)
 
 # ------------------------------------------------------------------------
@@ -90,7 +110,7 @@ pkg_check_modules(PC_Jemalloc QUIET jemalloc)
 set(_JEMALLOC_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _JEMALLOC_LIBRARYDIR_SEARCH_DIRS
   ${JEMALLOC_LIBRARYDIR}
-  ${_JEMALLOC_ROOT_SEARCH_DIR}
+  ${_JEMALLOC_ROOT}
   ${PC_Jemalloc_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -125,9 +145,9 @@ if(UNIX)
 endif()
 
 find_library(Jemalloc_LIBRARY jemalloc
-  NO_DEFAULT_PATH
-  PATHS ${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${JEMALLOC_PATH_SUFFIXES}
+  "${_FIND_JEMALLOC_ADDITIONAL_OPTIONS}"
+  PATHS "${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}"
+  PATH_SUFFIXES "${JEMALLOC_PATH_SUFFIXES}"
 )
 
 # Reset library suffix

@@ -10,6 +10,14 @@
 Improvements:
 - The minimum ABI for OpenVDB is now always enforced through CMake
   separately from other minimum dependency version variables.
+- Added support for CMake 3.12 compatible @c Xxx_ROOT variables.
+- Replaced the CMake @c USE_SYSTEM_LIBRARY_PATHS option with
+  @c DISABLE_CMAKE_SEARCH_PATHS and removed the hard coded list of
+  @c SYSTEM_LIBRARY_PATHS in favor of using CMake's default search procedure.
+  @c SYSTEM_LIBRARY_PATHS can still be used as a global list of paths for all
+  dependency searches.
+- Improvements to OpenVDB's CMake module setup order in regards to CMake
+  policy, minimum version and project calls.
 
 @par
 Python:

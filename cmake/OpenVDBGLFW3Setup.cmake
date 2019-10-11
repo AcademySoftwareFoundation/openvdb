@@ -60,11 +60,22 @@ The following variables may be provided to tell this module where to look.
 
 ``GLFW3_ROOT``
   Preferred installation prefix.
+``SYSTEM_LIBRARY_PATHS``
+  Global list of library paths intended to be searched by and find_xxx call
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
 # Find the glfw3 installation and use glfw's CMake to initialize
 # the glfw lib
+
+cmake_minimum_required(VERSION 3.3)
+
+set(_FIND_GLFW3_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_GLFW3_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_GLFW3_ROOT_SEARCH_DIR "")
 
@@ -80,7 +91,9 @@ endif()
 # Additionally try and use pkconfig to find glfw, though we only use
 # pkg-config to re-direct to the cmake. In other words, glfw's cmake is
 # expected to be installed
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_glfw3 QUIET glfw3)
 
 if(PC_glfw3_FOUND)
@@ -97,7 +110,7 @@ set(_GLFW3_PATH_SUFFIXES "lib/cmake/glfw3" "cmake/glfw3" "glfw3")
 list(APPEND _GLFW3_PATH_SUFFIXES "lib/cmake/glfw" "cmake/glfw" "glfw")
 
 find_path(GLFW3_CMAKE_LOCATION glfw3Config.cmake
-  NO_DEFAULT_PATH
+  ${_FIND_GLFW3_ADDITIONAL_OPTIONS}
   PATHS ${_GLFW3_ROOT_SEARCH_DIR}
   PATH_SUFFIXES ${_GLFW3_PATH_SUFFIXES}
 )
