@@ -293,6 +293,27 @@ TestGrid::testCopyGrid()
     // query changed value and make sure it's different between trees
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree1.getValue(changeCoord));
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, tree2.getValue(changeCoord));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    // shallow-copy a const grid but supply a new transform and meta map
+    CPPUNIT_ASSERT_EQUAL(1.0, grid1->transform().voxelSize().x());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), grid1->metaCount());
+    CPPUNIT_ASSERT_EQUAL(Index(2), grid1->tree().leafCount());
+
+    math::Transform::Ptr xform(math::Transform::createLinearTransform(/*voxelSize=*/0.25));
+    MetaMap meta;
+    meta.insertMeta("test", Int32Metadata(4));
+
+    FloatGrid::ConstPtr constGrid1 = ConstPtrCast<const FloatGrid>(grid1);
+
+    GridBase::ConstPtr grid3 = constGrid1->copyGrid(xform, meta);
+    const FloatTree& tree3 = gridConstPtrCast<FloatGrid>(grid3)->tree();
+
+    CPPUNIT_ASSERT_EQUAL(0.25, grid3->transform().voxelSize().x());
+    CPPUNIT_ASSERT_EQUAL(size_t(1), grid3->metaCount());
+    CPPUNIT_ASSERT_EQUAL(Index(2), tree3.leafCount());
+    CPPUNIT_ASSERT_EQUAL(long(3), constGrid1->constTreePtr().use_count());
+#endif
 }
 
 
