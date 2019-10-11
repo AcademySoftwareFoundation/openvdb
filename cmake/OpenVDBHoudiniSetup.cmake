@@ -163,10 +163,12 @@ find_package_handle_standard_args(Houdini
 #  Add support for older versions of Houdini
 # ------------------------------------------------------------------------
 
-# if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
-#   message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
-#     "is deprecated and will be removed.")
-# endif()
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_HOUDINI_VERSION)
+  if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
+    message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure imported Houdini target

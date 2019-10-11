@@ -119,6 +119,7 @@ option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
@@ -217,17 +218,31 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 18 deprecations to transition to MINIMUM_* variables in OpenVDB 7.0.0
+# VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+
+# No compiler upgrades planned
+#set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
+#set(FUTURE_MINIMUM_ICC_VERSION 17)
+#set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
+
+set(FUTURE_MINIMUM_ILMBASE_VERSION 2.3)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 2.3)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.66)
+set(FUTURE_MINIMUM_TBB_VERSION 2018.0)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.14.0)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 18.0)
 
 #########################################################################
 
 # General CMake and CXX settings
 
-if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
-  message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
-    "is deprecated and will be removed.")
+if(FUTURE_MINIMUM_CMAKE_VERSION)
+  if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 endif()
 
 set(CMAKE_CXX_STANDARD 14)
@@ -423,9 +438,11 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
-    message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GCC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
+      message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
@@ -452,14 +469,18 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
       "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
-    message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ICC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
+      message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
-    message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_MSVC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
+      message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   # Increase the number of sections that an object file can contain
   add_definitions("/bigobj")
