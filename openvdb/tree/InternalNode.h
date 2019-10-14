@@ -302,6 +302,15 @@ public:
     void setOrigin(const Coord& origin) { mOrigin = origin; }
 
     Index32 leafCount() const;
+    void nodeCount(std::vector<Index32> &vec) const
+    {
+        assert(vec.size() > ChildNodeType::LEVEL);
+        const auto count = mChildMask.countOn();
+        if (ChildNodeType::LEVEL > 0 && count > 0) {
+            for (auto iter = this->cbeginChildOn(); iter; ++iter) iter->nodeCount(vec);
+        }
+        vec[ChildNodeType::LEVEL] += count;
+    }
     Index32 nonLeafCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;

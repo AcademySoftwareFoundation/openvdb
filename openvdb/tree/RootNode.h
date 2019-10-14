@@ -51,7 +51,8 @@
 #include <map>
 #include <set>
 #include <sstream>
-#include <deque>
+#include <vector>
+#include <memory> // for std::make_unique
 
 
 namespace openvdb {
@@ -516,6 +517,19 @@ public:
     Index64 onLeafVoxelCount() const;
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
+    void nodeCount(std::vector<Index32> &vec) const
+    {
+        assert(vec.size() > LEVEL);
+        Index32 sum = 0;
+        for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+          if (isChild(i)) {
+              ++sum;
+              getChild(i).nodeCount(vec);
+          }
+        }
+        vec[LEVEL] = 1;// one root node
+        vec[ChildNodeType::LEVEL] = sum;
+    }
 
     bool isValueOn(const Coord& xyz) const;
 

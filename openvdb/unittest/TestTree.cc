@@ -96,6 +96,7 @@ public:
     CPPUNIT_TEST(testStealNodes);
     CPPUNIT_TEST(testProcessBBox);
     CPPUNIT_TEST(testStealNode);
+    CPPUNIT_TEST(testNodeCount);
     CPPUNIT_TEST_SUITE_END();
 
     void testChangeBackground();
@@ -129,6 +130,7 @@ public:
     void testStealNodes();
     void testProcessBBox();
     void testStealNode();
+    void testNodeCount();
 
 private:
     template<typename TreeType> void testWriteHalf();
@@ -2656,7 +2658,7 @@ TestTree::testProcessBBox()
 void
 TestTree::testGetNodes()
 {
-    //unittest_util::CpuTimer timer;
+    //openvdb::util::CpuTimer timer;
     using openvdb::CoordBBox;
     using openvdb::Coord;
     using openvdb::Vec3f;
@@ -2775,7 +2777,7 @@ TestTree::testGetNodes()
 void
 TestTree::testStealNodes()
 {
-    //unittest_util::CpuTimer timer;
+    //openvdb::util::CpuTimer timer
     using openvdb::CoordBBox;
     using openvdb::Coord;
     using openvdb::Vec3f;
@@ -2977,6 +2979,35 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT(node->isValueOn(xyz));
         delete node;
     }
+}
+
+void
+TestTree::testNodeCount()
+{
+    //openvdb::util::CpuTimer timer;// use for benchmark test
+
+    const openvdb::Vec3f center(0.0f, 0.0f, 0.0f);
+    const float radius = 1.0f;
+    //const int dim = 4096, halfWidth = 3;// use for benchmark test
+    const int dim = 512, halfWidth = 3;// use for unit test
+    //timer.start("\nGenerate level set sphere");// use for benchmark test
+    auto  grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, radius/dim, halfWidth);
+    //timer.stop();// use for benchmark test
+    auto& tree = grid->tree();
+
+    std::vector<openvdb::Index> dims;
+    tree.getNodeLog2Dims(dims);
+    std::vector<openvdb::Index32> nodeCount(dims.size());
+    //timer.start("Old technique");// use for benchmark test
+    for (auto it = tree.cbeginNode(); it; ++it) ++(nodeCount[dims.size()-1-it.getDepth()]);
+    //timer.restart("New technique");// use for benchmark test
+    auto ptr = tree.nodeCount();
+    //timer.stop();// use for benchmark test
+    CPPUNIT_ASSERT_EQUAL(nodeCount.size(), ptr->size());
+    //for (size_t i=0; i<ptr->size(); ++i) std::cerr << "nodeCount("<<i<<") OLD/NEW: " << nodeCount[i] << "/" << (*ptr)[i] << std::endl;
+    CPPUNIT_ASSERT_EQUAL(1U, ptr->back());// one root node
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), ptr->front());// leaf nodes
+    for (size_t i=0; i<ptr->size(); ++i) CPPUNIT_ASSERT_EQUAL( nodeCount[i], (*ptr)[i]);
 }
 
 // Copyright (c) DreamWorks Animation LLC

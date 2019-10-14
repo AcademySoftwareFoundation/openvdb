@@ -51,6 +51,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <memory> // for std::make_unique
 
 
 namespace openvdb {
@@ -139,6 +140,10 @@ public:
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
+    /// Return a unique pointer to a vector with node counts. The number of node of type NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size if this vector
+    /// corresponds to the height (or depth) of this tree.
+    virtual std::unique_ptr<std::vector<Index32>> nodeCount() const = 0;
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
     /// Return the number of active voxels stored in leaf nodes.
@@ -366,6 +371,16 @@ public:
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
+    /// Return a unique pointer to a vector with node counts. The number of node of type NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size if this vector
+    /// corresponds to the height (or depth) of this tree.
+    std::unique_ptr<std::vector<Index32>> nodeCount() const override
+    {
+        //auto ptr = std::make_unique<std::vector<Index32>>(DEPTH, 0); // once C++14 is supported
+        std::unique_ptr<std::vector<Index32>> ptr(new std::vector<Index32>(DEPTH, 0));
+        mRoot.nodeCount( *ptr );
+        return ptr;// invokes move construction
+    }
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
@@ -2264,7 +2279,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
             for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
                 os << ", Internal(" << (1 << dims[i]) << "^3)";
             }
-            os << ", Leaf(" << (1 << *dims.rbegin()) << "^3)\n";
+            os << ", Leaf(" << (1 << dims.back()) << "^3)\n";
         }
         os << "  Background value: " << mRoot.background() << "\n";
         return;
@@ -2278,22 +2293,21 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         this->evalMinMax(minVal, maxVal);
     }
 
-    std::vector<Index64> nodeCount(dims.size());
-    for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);
-
+    auto nodeCountPtr = this->nodeCount();
     Index64 totalNodeCount = 0;
-    for (size_t i = 0; i < nodeCount.size(); ++i) totalNodeCount += nodeCount[i];
+    for (size_t i = 0; i < nodeCountPtr->size(); ++i) totalNodeCount += (*nodeCountPtr)[i];
 
     // Print node types, counts and sizes.
     os << "    Root(1 x " << mRoot.getTableSize() << ")";
     if (dims.size() > 1) {
-        for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
-            os << ", Internal(" << util::formattedInt(nodeCount[i]);
+        for (int i = nodeCountPtr->size() - 2; i > 0; --i) {
+            os << ", Internal(" << util::formattedInt((*nodeCountPtr)[i]);
             os << " x " << (1 << dims[i]) << "^3)";
         }
-        os << ", Leaf(" << util::formattedInt(*nodeCount.rbegin());
-        os << " x " << (1 << *dims.rbegin()) << "^3)\n";
+        os << ", Leaf(" << util::formattedInt(nodeCountPtr->front());
+        os << " x " << (1 << dims.back()) << "^3)\n";
     }
+
     os << "  Background value: " << mRoot.background() << "\n";
 
     // Statistics of topology and values
@@ -2303,8 +2317,8 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         os << "  Max value: " << maxVal << "\n";
     }
 
+    const Index32 leafCount = nodeCountPtr->front();
     const Index64
-        leafCount = *nodeCount.rbegin(),
         numActiveVoxels = this->activeVoxelCount(),
         numActiveLeafVoxels = this->activeLeafVoxelCount(),
         numActiveTiles = this->activeTileCount();
