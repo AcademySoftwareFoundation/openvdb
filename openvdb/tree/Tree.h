@@ -2294,13 +2294,14 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     }
 
     auto nodeCountPtr = this->nodeCount();
+    assert(dims.size() == nodeCountPtr->size());
     Index64 totalNodeCount = 0;
     for (size_t i = 0; i < nodeCountPtr->size(); ++i) totalNodeCount += (*nodeCountPtr)[i];
 
     // Print node types, counts and sizes.
     os << "    Root(1 x " << mRoot.getTableSize() << ")";
-    if (dims.size() > 1) {
-        for (int i = nodeCountPtr->size() - 2; i > 0; --i) {
+    if (dims.size() >= 2) {
+        for (size_t i = dims.size() - 2; i > 0; --i) {
             os << ", Internal(" << util::formattedInt((*nodeCountPtr)[i]);
             os << " x " << (1 << dims[i]) << "^3)";
         }
