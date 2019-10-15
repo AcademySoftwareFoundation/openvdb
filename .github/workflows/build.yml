@@ -1,11 +1,7 @@
 
 name: Build
 
-on:
-  push
-  pull_request
-  schedule:
-      - cron: '0 0 * * *' # Once per day at midnight
+on: [push, pull_request]
 
 jobs:
   testabi7:
