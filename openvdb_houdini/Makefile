@@ -66,8 +66,8 @@
 # Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)  Beginning with Houdini 16.5,
-# you must provide your own distribution of Boost.
+# to set those two environment variables.)  You must provide your own
+# distribution of Boost.
 #
 
 ifeq (,$(HFS))
@@ -136,7 +136,7 @@ ifneq (,$(INSTALL_DIR))
 endif
 
 # Error if Houdini version is lower than minimum supported version
-ifeq (1,$(shell expr "$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)" "<" "16.5"))
+ifeq (1,$(shell expr "$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)" "<" "17.0"))
     $(error Error: Unsupported Houdini Version: $(HOUDINI_VERSION))
 endif
 

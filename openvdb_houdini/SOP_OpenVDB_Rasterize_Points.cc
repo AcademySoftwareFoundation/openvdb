@@ -3369,12 +3369,8 @@ SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
 
             // Setup VEX context
 
-#if UT_MAJOR_VERSION_INT >= 17
             OP_Caller caller(this, context.getContextOptionsStack(),
                      context.getContextOptions());
-#else
-            OP_Caller caller(this);
-#endif
             UT_SharedPtr<VEXContext> vexContextPtr;
 
             if (applyVEX) {

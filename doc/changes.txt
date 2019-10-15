@@ -7,6 +7,12 @@
 <B>Version 7.0.0</B> - <I>In development</I>
 
 @par
+<BLOCKQUOTE>
+As of this release, a C++14 compiler is required and the oldest supported
+Houdini version is 17.0.
+</BLOCKQUOTE>
+
+@par
 Improvements:
 - The minimum ABI for OpenVDB is now always enforced through CMake
   separately from other minimum dependency version variables.

@@ -53,17 +53,18 @@ OpenVDB Documentation   | Doxygen                                               
 
 Package        | Minimum | Recommended | Description                                                       | apt-get | Homebrew | Source
 -------------- | ------- | ----------- | ----------------------------------------------------------------- | ------- | -------- | ------
-CMake          | 3.3     | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
-GCC            | 4.8     | 6.3.1       | C++ 11 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
-Clang          | 3.8     | Latest      | C++ 11 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
-Intel ICC      | 15      | Latest      | C++ 11 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
+CMake          | 3.11    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
+GCC            | 6.3.1   | 6.3.1       | C++ 14 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
+Clang          | 3.8     | Latest      | C++ 14 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
+Intel ICC      | 17      | Latest      | C++ 14 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
+MSVC           | 19.10   | Latest      | C++ 14 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
 IlmBase        | 2.2     | 2.2         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
-TBB            | 4.4.6   | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
+TBB            | 2017 U6 | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
 Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread, numpy              | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
-NumPy          | 1.9.2   | 1.9.2       | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
+NumPy          | 1.12.1  | 1.9.2       | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5*    | 1.5*        | Recommended dependency for improved disk compression              | N       | N**      | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus

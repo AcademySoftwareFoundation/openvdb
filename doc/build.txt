@@ -215,7 +215,6 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 16.5              | 4           |
 Houdini  | 17.0              | 5           |
 Houdini  | 17.5              | 5           |
 Maya     | 2017              | Any         |
@@ -639,20 +638,20 @@ Until Houdini&nbsp;16.5, all three were included in the HDK, so by default
 several of the variables above reference the Houdini environment variables
 <TT>$HDSO</TT>, <TT>$HFS</TT> and <TT>$HT</TT> (source the @c houdini_setup
 script provided with your Houdini installation to set those environment variables).
-As of Houdini&nbsp;16.5, you must provide your own installation of Boost.
+You must provide your own installation of Boost.
 
 Also note that certain new features in OpenVDB (see the
 @subpage changes "Release Notes" for details) necessitated changes to
 the ABI of the @vdblink::Grid Grid@endlink class, rendering it incompatible
 with earlier versions of the library, such as the ones built into Houdini.
 Passing grids between native VDB nodes in a scene graph and nodes built
-against the new ABI will lead to crashes, so to use OpenVDB with Houdini&nbsp;16.5
-set <TT>abi=4</TT> to compile with the incompatible features disabled.
+against the new ABI will lead to crashes, so to use OpenVDB with Houdini&nbsp;17.5
+set <TT>abi=5</TT> to compile with the incompatible features disabled.
 
 To build the OpenVDB Python module, you will need local installations
 of Python, Boost.Python, and optionally NumPy.
 Houdini ships with Python&nbsp;2 but not with the @c libboost_python library
-or with NumPy or, as of Houdini&nbsp;16.5, with the Boost.Python headers,
+or with NumPy or with the Boost.Python headers,
 so both Boost.Python and NumPy have to be built separately.
 Point the variables <TT>\$(BOOST_PYTHON_LIB_DIR)</TT>,
 <TT>\$(BOOST_PYTHON_LIB)</TT> and <TT>\$(NUMPY_INCL_DIR)</TT>
