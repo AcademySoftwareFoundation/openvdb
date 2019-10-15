@@ -41,6 +41,7 @@
 #include <openvdb/math/Math.h> // for Abs()
 #include <openvdb/openvdb.h>
 #include <openvdb/util/CpuTimer.h>
+#include <openvdb/tools/Count.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/ChangeBackground.h>
