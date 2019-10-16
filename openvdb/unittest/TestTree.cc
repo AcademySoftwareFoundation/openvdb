@@ -2997,17 +2997,17 @@ TestTree::testNodeCount()
 
     std::vector<openvdb::Index> dims;
     tree.getNodeLog2Dims(dims);
-    std::vector<openvdb::Index32> nodeCount(dims.size());
+    std::vector<openvdb::Index32> nodeCount1(dims.size());
     //timer.start("Old technique");// use for benchmark test
-    for (auto it = tree.cbeginNode(); it; ++it) ++(nodeCount[dims.size()-1-it.getDepth()]);
+    for (auto it = tree.cbeginNode(); it; ++it) ++(nodeCount1[dims.size()-1-it.getDepth()]);
     //timer.restart("New technique");// use for benchmark test
-    auto ptr = tree.nodeCount();
+    const auto nodeCount2 = tree.nodeCount();
     //timer.stop();// use for benchmark test
-    CPPUNIT_ASSERT_EQUAL(nodeCount.size(), ptr->size());
-    //for (size_t i=0; i<ptr->size(); ++i) std::cerr << "nodeCount("<<i<<") OLD/NEW: " << nodeCount[i] << "/" << (*ptr)[i] << std::endl;
-    CPPUNIT_ASSERT_EQUAL(1U, ptr->back());// one root node
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), ptr->front());// leaf nodes
-    for (size_t i=0; i<ptr->size(); ++i) CPPUNIT_ASSERT_EQUAL( nodeCount[i], (*ptr)[i]);
+    CPPUNIT_ASSERT_EQUAL(nodeCount1.size(), nodeCount2.size());
+    //for (size_t i=0; i<nodeCount2.size(); ++i) std::cerr << "nodeCount1("<<i<<") OLD/NEW: " << nodeCount1[i] << "/" << nodeCount2[i] << std::endl;
+    CPPUNIT_ASSERT_EQUAL(1U, nodeCount2.back());// one root node
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), nodeCount2.front());// leaf nodes
+    for (size_t i=0; i<nodeCount2.size(); ++i) CPPUNIT_ASSERT_EQUAL( nodeCount1[i], nodeCount2[i]);
 }
 
 // Copyright (c) DreamWorks Animation LLC

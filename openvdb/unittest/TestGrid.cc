@@ -141,8 +141,8 @@ public:
 
     openvdb::Index treeDepth() const override { return 0; }
     openvdb::Index leafCount() const override { return 0; }
-    std::unique_ptr<std::vector<openvdb::Index32>> nodeCount() const override
-        { return std::make_unique<std::vector<openvdb::Index32>>(DEPTH, 0); }
+    std::vector<openvdb::Index32> nodeCount() const override
+        { return std::vector<openvdb::Index32>(DEPTH, 0); }
     openvdb::Index nonLeafCount() const override { return 0; }
     openvdb::Index64 activeVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
