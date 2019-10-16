@@ -93,7 +93,7 @@ cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided if Houdini Version >= 16.5. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
+provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -121,6 +121,7 @@ its default system search routine if it cannot find a dependency with the provid
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
@@ -191,6 +192,7 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI
+  OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
   OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
@@ -208,50 +210,59 @@ set(MINIMUM_BLOSC_VERSION 1.5)
 set(MINIMUM_OPENVDB_ABI_VERSION 4)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2017 of the VFX platform where avaiable
-  set(MINIMUM_GCC_VERSION 4.8)
+  # @note  Currently tracking CY2018 of the VFX platform where avaiable
+  set(MINIMUM_GCC_VERSION 6.3.1)
   set(MINIMUM_CLANG_VERSION 3.8)
-  set(MINIMUM_ICC_VERSION 15)
+  set(MINIMUM_ICC_VERSION 17)
+  set(MINIMUM_MSVC_VERSION 19.10)
 
   set(MINIMUM_BOOST_VERSION 1.61)
   set(MINIMUM_ILMBASE_VERSION 2.2)
   set(MINIMUM_OPENEXR_VERSION 2.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
-  set(MINIMUM_TBB_VERSION 4.4)
+  set(MINIMUM_TBB_VERSION 2017.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
-  set(MINIMUM_NUMPY_VERSION 1.9.2)
+  set(MINIMUM_NUMPY_VERSION 1.12.1)
 
   set(MINIMUM_CPPUNIT_VERSION 1.10)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 16.5)
+  set(MINIMUM_HOUDINI_VERSION 17.0)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 18 deprecations to transition to MINIMUM_* variables in OpenVDB 7.0.0
+# VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
-set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
-set(FUTURE_MINIMUM_ICC_VERSION 17)
-set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
-set(FUTURE_MINIMUM_TBB_VERSION 2017.6)
-set(FUTURE_MINIMUM_NUMPY_VERSION 1.12.1)
-set(FUTURE_MINIMUM_HOUDINI_VERSION 17)
+
+# No compiler upgrades planned
+#set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
+#set(FUTURE_MINIMUM_ICC_VERSION 17)
+#set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
+
+set(FUTURE_MINIMUM_ILMBASE_VERSION 2.3)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 2.3)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.66)
+set(FUTURE_MINIMUM_TBB_VERSION 2018.0)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.14.0)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 18.0)
 
 #########################################################################
 
 # General CMake and CXX settings
 
-if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
-  message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
-    "is deprecated and will be removed.")
+if(FUTURE_MINIMUM_CMAKE_VERSION)
+  if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -429,9 +440,11 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
-    message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GCC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
+      message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
@@ -458,14 +471,18 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
       "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
-    message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ICC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
+      message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
-    message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_MSVC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
+      message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   # Increase the number of sections that an object file can contain
   add_definitions("/bigobj")

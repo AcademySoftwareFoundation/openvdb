@@ -376,8 +376,7 @@ public:
     /// corresponds to the height (or depth) of this tree.
     std::unique_ptr<std::vector<Index32>> nodeCount() const override
     {
-        //auto ptr = std::make_unique<std::vector<Index32>>(DEPTH, 0); // once C++14 is supported
-        std::unique_ptr<std::vector<Index32>> ptr(new std::vector<Index32>(DEPTH, 0));
+        auto ptr = std::make_unique<std::vector<Index32>>(DEPTH, 0);
         mRoot.nodeCount( *ptr );
         return ptr;// invokes move construction
     }

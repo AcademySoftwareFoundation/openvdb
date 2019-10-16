@@ -6,6 +6,11 @@
 @par
 <B>Version 7.0.0</B> - <I>In development</I>
 
+<BLOCKQUOTE>
+As of this release, a C++14 compiler is required and the oldest supported
+Houdini version is 17.0.
+</BLOCKQUOTE>
+
 @par
 New features:
 - Added @vdblink{tree::Tree::nodeCount,Tree::nodeCount}, which counts
