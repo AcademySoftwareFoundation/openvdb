@@ -3003,8 +3003,11 @@ TestTree::testNodeCount()
     for (auto it = tree.cbeginNode(); it; ++it) ++(nodeCount[dims.size()-1-it.getDepth()]);
     //timer.restart("New technique");// use for benchmark test
     auto ptr = tree.nodeCount();
+    //timer.restart("Newer technique");// use for benchmark test
+    auto vec = openvdb::tools::nodeCount(tree);
     //timer.stop();// use for benchmark test
     CPPUNIT_ASSERT_EQUAL(nodeCount.size(), ptr->size());
+    CPPUNIT_ASSERT_EQUAL(nodeCount.size(), vec.size());
     //for (size_t i=0; i<ptr->size(); ++i) std::cerr << "nodeCount("<<i<<") OLD/NEW: " << nodeCount[i] << "/" << (*ptr)[i] << std::endl;
     CPPUNIT_ASSERT_EQUAL(1U, ptr->back());// one root node
     CPPUNIT_ASSERT_EQUAL(tree.leafCount(), ptr->front());// leaf nodes
