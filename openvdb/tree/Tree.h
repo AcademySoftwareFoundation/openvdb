@@ -140,7 +140,7 @@ public:
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
     /// Return a vector with node counts. The number of nodes of type NodeType
-    /// is given as element NodeType::LEVEL in the return vector. Thus, the size 
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
     /// Return the number of non-leaf nodes.
@@ -371,7 +371,7 @@ public:
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
     /// Return a vector with node counts. The number of nodes of type NodeType
-    /// is given as element NodeType::LEVEL in the return vector. Thus, the size 
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     std::vector<Index32> nodeCount() const override
     {
