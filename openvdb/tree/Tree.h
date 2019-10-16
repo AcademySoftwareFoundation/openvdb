@@ -140,7 +140,7 @@ public:
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
-    /// Return a unique pointer to a vector with node counts. The number of node of type NodeType
+    /// Return a unique pointer to a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size if this vector
     /// corresponds to the height (or depth) of this tree.
     virtual std::unique_ptr<std::vector<Index32>> nodeCount() const = 0;
@@ -371,7 +371,7 @@ public:
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
-    /// Return a unique pointer to a vector with node counts. The number of node of type NodeType
+    /// Return a unique pointer to a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size if this vector
     /// corresponds to the height (or depth) of this tree.
     std::unique_ptr<std::vector<Index32>> nodeCount() const override
