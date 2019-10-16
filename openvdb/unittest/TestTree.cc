@@ -2777,7 +2777,7 @@ TestTree::testGetNodes()
 void
 TestTree::testStealNodes()
 {
-    //openvdb::util::CpuTimer timer
+    //openvdb::util::CpuTimer timer;
     using openvdb::CoordBBox;
     using openvdb::Coord;
     using openvdb::Vec3f;

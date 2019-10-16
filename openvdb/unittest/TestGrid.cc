@@ -38,6 +38,7 @@
 #include <openvdb/util/CpuTimer.h>
 #include <cppunit/extensions/HelperMacros.h>
 #include <iostream>
+#include <memory> // for std::make_unique
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -141,7 +142,7 @@ public:
     openvdb::Index treeDepth() const override { return 0; }
     openvdb::Index leafCount() const override { return 0; }
     std::unique_ptr<std::vector<openvdb::Index32>> nodeCount() const override
-        { return std::unique_ptr<std::vector<openvdb::Index32>>(new std::vector<openvdb::Index32>(DEPTH, 0)); }
+        { return std::make_unique<std::vector<openvdb::Index32>>(DEPTH, 0); }
     openvdb::Index nonLeafCount() const override { return 0; }
     openvdb::Index64 activeVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
