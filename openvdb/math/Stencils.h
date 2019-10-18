@@ -41,7 +41,8 @@
 #define OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
 #include <algorithm>
-#include <vector>
+#include <vector>                          // for std::vector
+#include <bitset>                          // for std::bitset
 #include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
@@ -111,7 +112,7 @@ public:
     template<typename RealType>
     inline void moveTo(const Vec3<RealType>& xyz)
     {
-        Coord ijk = openvdb::Coord::floor(xyz);
+        Coord ijk = Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
     }
 
@@ -193,6 +194,29 @@ public:
                (less  ^  (this->getValue< 0, 1, 0>() < isoValue)) ||
                (less  ^  (this->getValue< 0, 0,-1>() < isoValue)) ||
                (less  ^  (this->getValue< 0, 0, 1>() < isoValue))  ;
+    }
+
+    /// @brief Return true a bit-mask where the 6 bits indicates if the
+    /// center of the stencil intersects the iso-contour specified by the isoValue.
+    ///
+    /// @note There are 2^6 = 64 different possible cases, including no intersections!
+    ///
+    /// @details The ordering of bit mask is ( -x, +x, -y, +y, -z, +z ), so to
+    /// check if there is an intersection in -y use mask.test(2) where mask is
+    /// ther return value from this function. To check if there are any
+    /// intersections use mask.any(), and for no intersections use mask.none().
+    /// To count the number of intersections use mask.count().
+    inline std::bitset<6> intersectionMask(const ValueType &isoValue = zeroVal<ValueType>()) const
+    {
+        std::bitset<6> mask;
+        const bool less =   this->getValue< 0, 0, 0>() < isoValue;
+        mask[0] = less  ^  (this->getValue<-1, 0, 0>() < isoValue);
+        mask[1] = less  ^  (this->getValue< 1, 0, 0>() < isoValue);
+        mask[2] = less  ^  (this->getValue< 0,-1, 0>() < isoValue);
+        mask[3] = less  ^  (this->getValue< 0, 1, 0>() < isoValue);
+        mask[4] = less  ^  (this->getValue< 0, 0,-1>() < isoValue);
+        mask[5] = less  ^  (this->getValue< 0, 0, 1>() < isoValue);
+        return mask;
     }
 
     /// @brief Return a const reference to the grid from which this
@@ -1538,8 +1562,34 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType meanCurvature()
     {
-        Real alpha, beta;
-        return this->meanCurvature(alpha, beta) ? ValueType(alpha*mInv2Dx/math::Pow3(beta)) : 0;
+        Real alpha, normGrad;
+        return this->meanCurvature(alpha, normGrad) ? ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
+    }
+
+    /// @brief Return the Gaussian curvature at the previously buffered location.
+    ///
+    /// @note This method should not be called until the stencil
+    /// buffer has been populated via a call to moveTo(ijk).
+    inline ValueType gaussianCurvature()
+    {
+        Real alpha, normGrad;
+        return this->gaussianCurvature(alpha, normGrad) ? ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
+    }
+
+    /// @brief Return both the mean and the Gaussian curvature at the
+    ///        previously buffered location.
+    ///
+    /// @note This method should not be called until the stencil
+    /// buffer has been populated via a call to moveTo(ijk).
+    inline void curvatures(ValueType &mean, ValueType& gauss)
+    {
+        Real alphaM, alphaG, normGrad;
+        if (this->curvatures(alphaM, alphaG, normGrad)) {
+          mean  = ValueType(alphaM*mInv2Dx/math::Pow3(normGrad));
+          gauss = ValueType(alphaG*mInvDx2/math::Pow4(normGrad));
+        } else {
+          mean = gauss = 0;
+        }
     }
 
     /// Return the mean curvature multiplied by the norm of the
@@ -1550,8 +1600,55 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType meanCurvatureNormGrad()
     {
-        Real alpha, beta;
-        return this->meanCurvature(alpha, beta) ? ValueType(alpha*mInvDx2/(2*math::Pow2(beta))) : 0;
+        Real alpha, normGrad;
+        return this->meanCurvature(alpha, normGrad) ?
+               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : 0;
+    }
+
+    /// Return the mean Gaussian multiplied by the norm of the
+    /// central-difference gradient.
+    ///
+    /// @note This method should not be called until the stencil
+    /// buffer has been populated via a call to moveTo(ijk).
+    inline ValueType gaussianCurvatureNormGrad()
+    {
+        Real alpha, normGrad;
+        return this->gaussianCurvature(alpha, normGrad) ?
+               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : 0;
+    }
+
+    /// @brief Return both the mean and the Gaussian curvature at the
+    ///        previously buffered location.
+    ///
+    /// @note This method should not be called until the stencil
+    /// buffer has been populated via a call to moveTo(ijk).
+    inline void curvaturesNormGrad(ValueType &mean, ValueType& gauss)
+    {
+        Real alphaM, alphaG, normGrad;
+        if (this->curvatures(alphaM, alphaG, normGrad)) {
+          mean  = ValueType(alphaM*mInvDx2/(2*math::Pow2(normGrad)));
+          gauss = ValueType(2*alphaG*mInv2Dx*mInvDx2/math::Pow3(normGrad));
+        } else {
+          mean = gauss = 0;
+        }
+    }
+
+    /// @brief Return the pair (minimum, maximum) principal curvature at the
+    ///        previously buffered location.
+    ///
+    /// @note This method should not be called until the stencil
+    /// buffer has been populated via a call to moveTo(ijk).
+    inline std::pair<ValueType, ValueType> principalCurvatures()
+    {
+        std::pair<ValueType, ValueType> pair(0, 0);// min, max
+        Real alphaM, alphaG, normGrad;
+        if (this->curvatures(alphaM, alphaG, normGrad)) {
+          const Real mean = alphaM*mInv2Dx/math::Pow3(normGrad);
+          const Real tmp = std::sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
+          pair.first  = ValueType(mean - tmp);
+          pair.second = ValueType(mean + tmp);
+        }
+        return pair;// min, max
     }
 
     /// Return the Laplacian computed at the previously buffered
@@ -1608,28 +1705,64 @@ private:
         mStencil[18] = mCache.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    inline bool meanCurvature(Real& alpha, Real& beta) const
+    inline Real Dx()  const { return 0.5*(mStencil[2] - mStencil[1]); }// * 1/dx
+    inline Real Dy()  const { return 0.5*(mStencil[4] - mStencil[3]); }// * 1/dx
+    inline Real Dz()  const { return 0.5*(mStencil[6] - mStencil[5]); }// * 1/dx
+    inline Real Dxx() const { return mStencil[2] - 2 * mStencil[0] + mStencil[1]; }// * 1/dx2
+    inline Real Dyy() const { return mStencil[4] - 2 * mStencil[0] + mStencil[3]; }// * 1/dx2}
+    inline Real Dzz() const { return mStencil[6] - 2 * mStencil[0] + mStencil[5]; }// * 1/dx2
+    inline Real Dxy() const { return 0.25 * (mStencil[10] - mStencil[ 8] + mStencil[ 7] - mStencil[ 9]); }// * 1/dx2
+    inline Real Dxz() const { return 0.25 * (mStencil[14] - mStencil[12] + mStencil[11] - mStencil[13]); }// * 1/dx2
+    inline Real Dyz() const { return 0.25 * (mStencil[18] - mStencil[16] + mStencil[15] - mStencil[17]); }// * 1/dx2
+
+    inline bool meanCurvature(Real& alpha, Real& normGrad) const
     {
         // For performance all finite differences are unscaled wrt dx
-        const Real
-            Half(0.5), Quarter(0.25),
-            Dx  = Half * (mStencil[2] - mStencil[1]), Dx2 = Dx * Dx, // * 1/dx
-            Dy  = Half * (mStencil[4] - mStencil[3]), Dy2 = Dy * Dy, // * 1/dx
-            Dz  = Half * (mStencil[6] - mStencil[5]), Dz2 = Dz * Dz, // * 1/dx
-            normGrad = Dx2 + Dy2 + Dz2;
-        if (normGrad <= math::Tolerance<Real>::value()) {
-             alpha = beta = 0;
+        const Real Dx = this->Dx(), Dy = this->Dy(), Dz = this->Dz(),
+                   Dx2 = Dx*Dx, Dy2 = Dy*Dy, Dz2 = Dz*Dz, normGrad2 = Dx2 + Dy2 + Dz2;
+        if (normGrad2 <= math::Tolerance<Real>::value()) {
+             alpha = normGrad = 0;
              return false;
         }
-        const Real
-            Dxx = mStencil[2] - 2 * mStencil[0] + mStencil[1], // * 1/dx2
-            Dyy = mStencil[4] - 2 * mStencil[0] + mStencil[3], // * 1/dx2
-            Dzz = mStencil[6] - 2 * mStencil[0] + mStencil[5], // * 1/dx2
-            Dxy = Quarter * (mStencil[10] - mStencil[ 8] + mStencil[7] - mStencil[ 9]), // * 1/dx2
-            Dxz = Quarter * (mStencil[14] - mStencil[12] + mStencil[11] - mStencil[13]), // * 1/dx2
-            Dyz = Quarter * (mStencil[18] - mStencil[16] + mStencil[15] - mStencil[17]); // * 1/dx2
-        alpha = (Dx2*(Dyy+Dzz)+Dy2*(Dxx+Dzz)+Dz2*(Dxx+Dyy)-2*(Dx*(Dy*Dxy+Dz*Dxz)+Dy*Dz*Dyz));
-        beta  = std::sqrt(normGrad); // * 1/dx
+        const Real Dxx = this->Dxx(), Dyy = this->Dyy(), Dzz = this->Dzz();
+        alpha = Dx2*(Dyy + Dzz) + Dy2*(Dxx + Dzz) + Dz2*(Dxx + Dyy) -
+                2*(Dx*(Dy*this->Dxy() + Dz*this->Dxz()) + Dy*Dz*this->Dyz());// *1/dx^4
+        normGrad = std::sqrt(normGrad2); // * 1/dx
+        return true;
+    }
+
+    inline bool gaussianCurvature(Real& alpha, Real& normGrad) const
+    {
+        // For performance all finite differences are unscaled wrt dx
+        const Real Dx = this->Dx(), Dy = this->Dy(), Dz = this->Dz(),
+                   Dx2 = Dx*Dx, Dy2 = Dy*Dy, Dz2 = Dz*Dz, normGrad2 = Dx2 + Dy2 + Dz2;
+        if (normGrad2 <= math::Tolerance<Real>::value()) {
+             alpha = normGrad = 0;
+             return false;
+        }
+        const Real Dxx = this->Dxx(), Dyy = this->Dyy(), Dzz = this->Dzz(),
+                   Dxy = this->Dxy(), Dxz = this->Dxz(), Dyz = this->Dyz();
+        alpha = Dx2*(Dyy*Dzz - Dyz*Dyz) + Dy2*(Dxx*Dzz - Dxz*Dxz) + Dz2*(Dxx*Dyy - Dxy*Dxy) +
+                2*( Dy*Dz*(Dxy*Dxz - Dyz*Dxx) + Dx*Dz*(Dxy*Dyz - Dxz*Dyy) + Dx*Dy*(Dxz*Dyz - Dxy*Dzz) );// *1/dx^6
+        normGrad  = std::sqrt(normGrad2); // * 1/dx
+        return true;
+    }
+    inline bool curvatures(Real& alphaM, Real& alphaG, Real& normGrad) const
+    {
+        // For performance all finite differences are unscaled wrt dx
+        const Real Dx = this->Dx(), Dy = this->Dy(), Dz = this->Dz(),
+                   Dx2 = Dx*Dx, Dy2 = Dy*Dy, Dz2 = Dz*Dz, normGrad2 = Dx2 + Dy2 + Dz2;
+        if (normGrad2 <= math::Tolerance<Real>::value()) {
+             alphaM = alphaG =normGrad = 0;
+             return false;
+        }
+        const Real Dxx = this->Dxx(), Dyy = this->Dyy(), Dzz = this->Dzz(),
+                   Dxy = this->Dxy(), Dxz = this->Dxz(), Dyz = this->Dyz();
+        alphaM = Dx2*(Dyy + Dzz) + Dy2*(Dxx + Dzz) + Dz2*(Dxx + Dyy) -
+                 2*(Dx*(Dy*Dxy + Dz*Dxz) + Dy*Dz*Dyz);// *1/dx^4
+        alphaG = Dx2*(Dyy*Dzz - Dyz*Dyz) + Dy2*(Dxx*Dzz - Dxz*Dxz) + Dz2*(Dxx*Dyy - Dxy*Dxy) +
+                 2*( Dy*Dz*(Dxy*Dxz - Dyz*Dxx) + Dx*Dz*(Dxy*Dyz - Dxz*Dyy) + Dx*Dy*(Dxz*Dyz - Dxy*Dzz) );// *1/dx^6
+        normGrad  = std::sqrt(normGrad2); // * 1/dx
         return true;
     }
 
