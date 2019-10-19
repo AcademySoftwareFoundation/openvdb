@@ -288,7 +288,8 @@ inline void appendAttribute(PointDataTreeT& tree,
             auto expected = leaf.attributeSet().descriptorPtr();
 
             auto attribute = leaf.appendAttribute(*expected, newDescriptor,
-                pos, strideOrTotalSize, constantStride, &lock);
+                pos, strideOrTotalSize, constantStride, metaDefaultValue.get(),
+                &lock);
 
             if (hidden)     attribute->setHidden(true);
             if (transient)  attribute->setTransient(true);

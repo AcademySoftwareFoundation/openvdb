@@ -74,14 +74,19 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
         lock = localLock.get();
     }
 
+    const MetaMap& meta = mDescr->getMetadata();
+    bool hasMetadata = meta.metaCount();
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
+        Metadata::ConstPtr metadata;
+        if (hasMetadata)    metadata = meta["default:" + namePos.first];
         const AttributeArray* existingArray = attrSet.getConst(pos);
         const bool constantStride = existingArray->hasConstantStride();
         const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
 
         AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
-            stride, constantStride, lock);
+            stride, constantStride, metadata.get(), lock);
 
         // transfer hidden and transient flags
         if (existingArray->isHidden())      array->setHidden(true);
@@ -103,10 +108,15 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
         lock = localLock.get();
     }
 
+    const MetaMap& meta = mDescr->getMetadata();
+    bool hasMetadata = meta.metaCount();
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
+        Metadata::ConstPtr metadata;
+        if (hasMetadata)    metadata = meta["default:" + namePos.first];
         mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
-            /*stride=*/1, /*constantStride=*/true, lock);
+            /*stride=*/1, /*constantStride=*/true, metadata.get(), lock);
     }
 }
 
@@ -263,7 +273,7 @@ AttributeSet::appendAttribute(  const Name& name,
                                 const NamePair& type,
                                 const Index strideOrTotalSize,
                                 const bool constantStride,
-                                Metadata::Ptr defaultValue)
+                                const Metadata* defaultValue)
 {
     Descriptor::Ptr descriptor = mDescr->duplicateAppend(name, type);
 
@@ -273,13 +283,14 @@ AttributeSet::appendAttribute(  const Name& name,
     // extract the index from the descriptor
     const size_t pos = descriptor->find(name);
 
-    return this->appendAttribute(*mDescr, descriptor, pos, strideOrTotalSize, constantStride);
+    return this->appendAttribute(*mDescr, descriptor, pos, strideOrTotalSize, constantStride, defaultValue);
 }
 
 
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
                                 const size_t pos, const Index strideOrTotalSize, const bool constantStride,
+                                const Metadata* defaultValue,
                                 const AttributeArray::ScopedRegistryLock* lock)
 {
     // ensure the descriptor is as expected
@@ -302,7 +313,8 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
     // append the new array
 
     AttributeArray::Ptr array = AttributeArray::create(
-        type, arrayLength, strideOrTotalSize, constantStride, lock);
+        type, arrayLength, strideOrTotalSize, constantStride,
+        defaultValue, lock);
 
     // if successful, update Descriptor and append the created array
 
@@ -311,6 +323,31 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
     mAttrs.push_back(array);
 
     return array;
+}
+
+
+// deprecated
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Name& name,
+                                const NamePair& type,
+                                const Index strideOrTotalSize,
+                                const bool constantStride,
+                                Metadata::Ptr defaultValue)
+{
+    return this->appendAttribute(name, type, strideOrTotalSize,
+        constantStride, defaultValue.get());
+}
+
+
+// deprecated
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
+                                const size_t pos, const Index strideOrTotalSize,
+                                const bool constantStride,
+                                const AttributeArray::ScopedRegistryLock* lock)
+{
+    return this->appendAttribute(expected, replacement, pos, strideOrTotalSize,
+        constantStride, nullptr, lock);
 }
 
 

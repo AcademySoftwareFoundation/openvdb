@@ -126,7 +126,7 @@ public:
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
-    using FactoryMethod = Ptr (*)(Index, Index, bool);
+    using FactoryMethod = Ptr (*)(Index, Index, bool, const Metadata*);
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
@@ -211,7 +211,13 @@ public:
     /// @details If @a lock is non-null, the AttributeArray registry mutex
     /// has already been locked
     static Ptr create(const NamePair& type, Index length, Index stride = 1,
-        bool constantStride = true, const ScopedRegistryLock* lock = nullptr);
+        bool constantStride = true,
+        const Metadata* metadata = nullptr,
+        const ScopedRegistryLock* lock = nullptr);
+
+    static OPENVDB_DEPRECATED Ptr create(const NamePair& type, Index length,
+        Index stride, bool constantStride, const ScopedRegistryLock* lock);
+
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
     /// Clear the attribute type registry.
@@ -617,7 +623,8 @@ public:
     OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
-    static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true);
+    static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true,
+        const Metadata* metadata = nullptr);
 
     /// Cast an AttributeArray to TypedAttributeArray<T>
     static TypedAttributeArray& cast(AttributeArray& attributeArray);
@@ -825,8 +832,9 @@ private:
     void deallocate();
 
     /// Helper function for use with registerType()
-    static AttributeArray::Ptr factory(Index n, Index strideOrTotalSize, bool constantStride) {
-        return TypedAttributeArray::create(n, strideOrTotalSize, constantStride);
+    static AttributeArray::Ptr factory(Index n, Index strideOrTotalSize, bool constantStride,
+        const Metadata* metadata) {
+        return TypedAttributeArray::create(n, strideOrTotalSize, constantStride, metadata);
     }
 
     static std::unique_ptr<const NamePair> sTypeName;
@@ -1268,9 +1276,14 @@ TypedAttributeArray<ValueType_, Codec_>::unregisterType()
 
 template<typename ValueType_, typename Codec_>
 inline typename TypedAttributeArray<ValueType_, Codec_>::Ptr
-TypedAttributeArray<ValueType_, Codec_>::create(Index n, Index stride, bool constantStride)
+TypedAttributeArray<ValueType_, Codec_>::create(Index n, Index stride, bool constantStride,
+    const Metadata* metadata)
 {
-    return Ptr(new TypedAttributeArray(n, stride, constantStride));
+    const TypedMetadata<ValueType>* typedMetadata = metadata ?
+        dynamic_cast<const TypedMetadata<ValueType>*>(metadata) : nullptr;
+
+    return Ptr(new TypedAttributeArray(n, stride, constantStride,
+        typedMetadata ? typedMetadata->value() : zeroVal<ValueType>()));
 }
 
 template<typename ValueType_, typename Codec_>
