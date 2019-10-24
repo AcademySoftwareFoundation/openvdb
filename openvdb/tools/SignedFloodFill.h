@@ -133,9 +133,8 @@ public:
     {
         if (LeafT::LEVEL < mMinLevel) return;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (!leaf.allocate()) return; // this assures that the buffer is allocated and in-memory
-#endif
+
         const typename LeafT::NodeMaskType& valueMask = leaf.getValueMask();
         // WARNING: "Never do what you're about to see at home, we're what you call experts!"
         typename LeafT::ValueType* buffer =
