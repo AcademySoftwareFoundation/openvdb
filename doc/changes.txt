@@ -12,6 +12,10 @@ Improvements:
   separately from other minimum dependency version variables.
 
 @par
+ABI changes:
+- OpFactory destructor is now virtual as of ABI=7
+
+@par
 Python:
 - Removed the requirement of CMake&nbsp;3.14 for NumPy usage.
 - Added support for Boost versions 1.65 and later when building
