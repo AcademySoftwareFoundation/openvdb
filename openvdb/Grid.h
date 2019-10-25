@@ -512,7 +512,8 @@ protected:
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// @brief Initialize with metadata and a transform.
-    GridBase(math::Transform::Ptr xform, const MetaMap& meta): MetaMap(meta), mTransform(xform) { }
+    /// @throw ValueError if the transform pointer is null
+    GridBase(math::Transform::Ptr xform, const MetaMap& meta);
 #endif
 
     /// @brief Deep copy another grid's metadata and transform.
@@ -1232,6 +1233,14 @@ struct HasMultiPassIO<Grid<TreeType>> {
 
 ////////////////////////////////////////
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+inline GridBase::GridBase(math::Transform::Ptr xform, const MetaMap& meta)
+    : MetaMap(meta)
+    , mTransform(xform)
+{
+    if (!xform) OPENVDB_THROW(ValueError, "Transform pointer is null");
+}
+#endif
 
 template<typename GridType>
 inline typename GridType::Ptr
