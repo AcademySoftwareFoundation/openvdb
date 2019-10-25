@@ -132,9 +132,11 @@ public:
     /// @brief Return a new grid of the same type as this grid whose tree is shared with
     /// this grid, whose metadata is a deep copy of this grid's and whose transform is
     /// provided as an argument.
+    /// @throw ValueError if the transform pointer is null
     virtual GridBase::ConstPtr copyGrid(math::Transform::Ptr xform) const = 0;
     /// @brief Return a new grid of the same type as this grid whose tree is shared with
     /// this grid and whose transform and metadata are provided as arguments.
+    /// @throw ValueError if the transform pointer is null
     virtual GridBase::ConstPtr copyGrid(math::Transform::Ptr xform, const MetaMap& meta) const = 0;
 #endif
     /// @brief Return a new grid of the same type as this grid whose metadata and
