@@ -87,14 +87,16 @@ public:
     {
         count += root.onTileCount() * RootT::ChildNodeType::NUM_VOXELS;
     }
-    void operator()(LeafT& node)
-    {
-        count += node.onVoxelCount();
-    }
     template<typename NodeT>
     void operator()(NodeT& node)
     {
         count += node.getValueMask().countOn() * NodeT::ChildNodeType::NUM_VOXELS;
+
+        if (NodeT::LEVEL == 1) {
+            for (auto leaf = node.cbeginChildOn(); leaf; ++leaf) {
+                count += leaf->onVoxelCount();
+            }
+        }
     }
 
     Index64 count = Index64(0);
@@ -189,7 +191,9 @@ std::vector<Index> nodeCount(const GridBase& grid, bool threaded)
 template <typename TreeT>
 Index64 activeVoxelCount(TreeT& tree, bool threaded)
 {
-    tree::NodeManager<TreeT> nodeManager(tree);
+    // use LEVEL-1 to avoid caching the leaf node pointers
+    // this algorithm is threaded over the last InternalNodes in the hierarchy
+    tree::NodeManager<TreeT, TreeT::RootNodeType::LEVEL-1> nodeManager(tree);
     count_internal::ActiveVoxelCountOp<TreeT> op;
     nodeManager.reduceTopDown(op, threaded);
     return op.count;
