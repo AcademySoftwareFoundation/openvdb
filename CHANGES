@@ -18,6 +18,9 @@ Version 7.0.0 - In development
     - Improvements to OpenVDB's CMake module setup order in regards to CMake
       policy, minimum version and project calls.
 
+    ABI changes:
+    - OpFactory destructor is now virtual as of ABI=7
+
     Python:
     - Removed the requirement of CMake 3.14 for NumPy usage.
     - Added support for Boost versions 1.65 and later when building

@@ -26,6 +26,10 @@ Improvements:
   policy, minimum version and project calls.
 
 @par
+ABI changes:
+- OpFactory destructor is now virtual as of ABI=7
+
+@par
 Python:
 - Removed the requirement of CMake&nbsp;3.14 for NumPy usage.
 - Added support for Boost versions 1.65 and later when building
