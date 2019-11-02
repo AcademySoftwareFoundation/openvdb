@@ -190,7 +190,7 @@
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         __pragma(warning(push)) \
         __pragma(warning(disable : 4996)) \
-        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__  \
+        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__ \
             ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         __pragma(warning(pop))
