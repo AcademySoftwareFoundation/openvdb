@@ -261,7 +261,7 @@ private:
 
         void increment() { if (this->test()) { ++mIter; } this->skip(); }
         bool next() { this->increment(); return this->test(); }
-        void increment(Index n) { for (int i = 0; i < n && this->next(); ++i) {} }
+        void increment(Index n) { for (Index i = 0; i < n && this->next(); ++i) {} }
 
         /// @brief Return this iterator's position as an offset from
         /// the beginning of the parent node's map.
