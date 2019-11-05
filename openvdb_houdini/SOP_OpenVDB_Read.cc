@@ -38,6 +38,7 @@
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 
