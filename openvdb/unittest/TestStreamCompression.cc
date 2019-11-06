@@ -72,7 +72,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <blosc.h>
 // A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
 // HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
-#if BLOSC_VERSION_MAJOR > 0 && BLOSC_VERSION_MINOR > 10
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR > 10)
 #define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
 #endif
 #endif
