@@ -18,6 +18,10 @@ Version 7.0.0 - In development
     - Improvements to OpenVDB's CMake module setup order in regards to CMake
       policy, minimum version and project calls.
 
+    Bug fixes:
+    - Fixed a bug in FindJemalloc.cmake where paths were not being handled
+      correctly.
+
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7
 

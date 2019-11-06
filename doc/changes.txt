@@ -26,6 +26,11 @@ Improvements:
   policy, minimum version and project calls.
 
 @par
+Bug fixes:
+- Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
+  correctly.
+
+@par
 ABI changes:
 - OpFactory destructor is now virtual as of ABI=7
 
