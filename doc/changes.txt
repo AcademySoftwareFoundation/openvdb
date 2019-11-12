@@ -29,6 +29,7 @@ Improvements:
 Bug fixes:
 - Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
   correctly.
+- Fixed a Windows build issue in openvdb_render.
 
 @par
 ABI changes:
