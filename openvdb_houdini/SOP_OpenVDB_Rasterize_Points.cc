@@ -2185,8 +2185,10 @@ struct RasterizePoints
 
                 if (transferAttributes) {
                     for (size_t nn = 0; nn < BoolLeafNodeType::SIZE; ++nn) {
-                        voxelWeightArray[nn] =
-                            voxelWeightArray[nn] > 0.0f ? 1.0f / voxelWeightArray[nn] : 0.0f;
+                        const float weight = (voxelWeightArray[nn] > 0.0f) ?
+                            (1.0f / voxelWeightArray[nn]) : 0.0f;
+                        // Subnormal input values are nonzero but can result in infinite weights.
+                        voxelWeightArray[nn] = openvdb::math::isFinite(weight) ? weight : 0.0f;
                     }
 
                     for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
