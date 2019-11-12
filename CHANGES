@@ -38,6 +38,8 @@ Version 7.0.0 - In development
       point offsets (mesh inputs).
     - Threaded the population of point group memberships during conversion
       from Houdini geometry to OpenVDB Points
+    - Added logic to the Rasterize Points SOP to suppress the output of
+      non-finite attribute values due to subnormal input densities.
 
 
 Version 6.2.1 - September 30, 2019
