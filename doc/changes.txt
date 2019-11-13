@@ -24,6 +24,8 @@ Improvements:
   dependency searches.
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
+- Made various small changes to improve Visual Studio compatiblity and
+  deprecate some logic for compilers older than Visual Studio&nbsp;2017.
 
 @par
 Bug fixes:
