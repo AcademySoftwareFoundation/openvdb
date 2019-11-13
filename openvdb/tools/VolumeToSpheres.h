@@ -45,7 +45,6 @@
 
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/int.hpp>
-#include <boost/scoped_array.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -927,7 +926,7 @@ ClosestSurfacePoint<GridT>::initialize(
 
         const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
 
-        boost::scoped_array<Index32> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
+        std::unique_ptr<Index32[]> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
 
         tbb::parallel_for(auxiliaryLeafNodeRange,
             volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
