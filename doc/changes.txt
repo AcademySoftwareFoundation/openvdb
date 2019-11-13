@@ -24,6 +24,7 @@ Improvements:
   dependency searches.
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
+- Replaced occurrences of boost::scoped_array with std::unique_ptr.
 
 @par
 Bug fixes:

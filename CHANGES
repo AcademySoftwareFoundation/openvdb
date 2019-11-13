@@ -17,6 +17,7 @@ Version 7.0.0 - In development
       dependency searches.
     - Improvements to OpenVDB's CMake module setup order in regards to CMake
       policy, minimum version and project calls.
+    - Replaced occurrences of boost::scoped_array with std::unique_ptr.
 
     Bug fixes:
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled
