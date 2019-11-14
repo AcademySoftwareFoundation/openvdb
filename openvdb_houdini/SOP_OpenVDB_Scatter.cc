@@ -77,6 +77,8 @@ public:
 
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
 
+    void syncNodeVersion(const char* oldVersion, const char*, bool*) override;
+
 protected:
     bool updateParmsFlags() override;
     void resolveObsoleteParms(PRM_ParmList*) override;
@@ -273,6 +275,38 @@ For all other volumes, points are scattered in active voxels.\n\
 \n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
+}
+
+
+void
+SOP_OpenVDB_Scatter::syncNodeVersion(const char* oldVersion, const char*, bool*)
+{
+    // Since VDB 7.0.0, position compression is now set to 16-bit fixed point
+    // by default. Detect if the VDB version that this node was created with
+    // was earlier than 7.0.0 and revert back to null compression if so to
+    // prevent potentially breaking older scenes.
+
+    // VDB version string prior to 6.2.0 - "17.5.204"
+    // VDB version string since 6.2.0 - "vdb6.2.0 houdini17.5.204"
+
+    openvdb::Name oldVersionStr(oldVersion);
+
+    bool disableCompression = false;
+    size_t spacePos = oldVersionStr.find_first_of(' ');
+    if (spacePos == std::string::npos) {
+        // no space in VDB versions prior to 6.2.0
+        disableCompression = true;
+    } else if (oldVersionStr.size() > 3 && oldVersionStr.substr(0,3) == "vdb") {
+        std::string vdbVersion = oldVersionStr.substr(3,spacePos-3);
+        // disable compression in VDB version 6.2.1 or earlier
+        if (UT_String::compareVersionString(vdbVersion.c_str(), "6.2.1") < 0) {
+            disableCompression = true;
+        }
+    }
+
+    if (disableCompression) {
+        setInt("poscompression", 0, 0, 0);
+    }
 }
 
 
