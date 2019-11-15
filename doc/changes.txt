@@ -24,6 +24,7 @@ Improvements:
   dependency searches.
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
+- Replaced occurrences of boost::scoped_array with std::unique_ptr.
 
 @par
 Bug fixes:
@@ -33,6 +34,12 @@ Bug fixes:
 @par
 ABI changes:
 - OpFactory destructor is now virtual as of ABI=7
+
+@par
+API changes:
+- @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
+  @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
+  now return a std::unique_ptr instead of a boost::scoped_array.
 
 @par
 Python:
