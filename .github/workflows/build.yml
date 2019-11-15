@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 ON
+      run: ./ci/build.sh clang++ Release 7 ON None
     - name: test
       run: cd build && ctest -V
 
@@ -22,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 6 ON
+      run: ./ci/build.sh clang++ Release 6 ON None
     - name: test
       run: cd build && ctest -V
 
@@ -33,7 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 5 ON
+      run: ./ci/build.sh clang++ Release 5 ON None
     - name: test
       run: cd build && ctest -V
 
@@ -44,7 +44,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 4 ON
+      run: ./ci/build.sh clang++ Release 4 ON None
     - name: test
       run: cd build && ctest -V
 
@@ -77,7 +77,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 OFF
+      run: ./ci/build.sh clang++ Release 7 OFF None
     - name: test
       run: cd build && ctest -V
 
@@ -110,7 +110,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh g++ Release 7 ON
+      run: ./ci/build.sh g++ Release 7 ON None
 
   testabi7debug:
     runs-on: ubuntu-16.04
@@ -119,4 +119,13 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Debug 7 ON
+      run: ./ci/build.sh clang++ Debug 7 ON None
+
+  testabi7sse:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Debug 7 ON SSE42
