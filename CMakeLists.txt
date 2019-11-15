@@ -148,7 +148,8 @@ if(NOT OPENVDB_SIMD)
     None is the default." FORCE
   )
 elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
-  message(WARNING "Unrecognized value for OPENVDB_SIMD, using None instead.")
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
@@ -527,11 +528,11 @@ endif()
 # Configure SIMD. AVX implies SSE 4.2.
 
 if(OPENVDB_SIMD STREQUAL "AVX")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx -msse4.2")
+  add_compile_options(-mavx -msse4.2)
   add_definitions(-DOPENVDB_USE_AVX)
   add_definitions(-DOPENVDB_USE_SSE42)
 elseif(OPENVDB_SIMD STREQUAL "SSE42")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2")
+  add_compile_options(-msse4.2)
   add_definitions(-DOPENVDB_USE_SSE42)
 endif()
 
