@@ -306,7 +306,7 @@ TestGrid::testCopyGrid()
 
     FloatGrid::ConstPtr constGrid1 = ConstPtrCast<const FloatGrid>(grid1);
 
-    GridBase::ConstPtr grid3 = constGrid1->copyGrid(xform, meta);
+    GridBase::ConstPtr grid3 = constGrid1->copyGridReplacingMetadataAndTransform(meta, xform);
     const FloatTree& tree3 = gridConstPtrCast<FloatGrid>(grid3)->tree();
 
     CPPUNIT_ASSERT_EQUAL(0.25, grid3->transform().voxelSize().x());

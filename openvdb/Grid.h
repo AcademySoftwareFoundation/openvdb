@@ -128,21 +128,27 @@ public:
     /// @brief Return a new grid of the same type as this grid whose metadata is a
     /// deep copy of this grid's and whose tree and transform are shared with this grid.
     virtual GridBase::ConstPtr copyGrid() const = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
-    /// provided as an argument.
-    /// @throw ValueError if the transform pointer is null
-    virtual GridBase::ConstPtr copyGrid(math::Transform::Ptr xform) const = 0;
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid and whose transform and metadata are provided as arguments.
-    /// @throw ValueError if the transform pointer is null
-    virtual GridBase::ConstPtr copyGrid(math::Transform::Ptr xform, const MetaMap& meta) const = 0;
-#endif
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     virtual GridBase::Ptr copyGridWithNewTree() const = 0;
 #endif
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    /// @brief Return a new grid of the same type as this grid whose tree and transform
+    /// is shared with this grid and whose metadata is provided as an argument.
+    virtual GridBase::ConstPtr copyGridReplacingMetadata(const MetaMap& meta) const = 0;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
+    /// provided as an argument.
+    /// @throw ValueError if the transform pointer is null
+    virtual GridBase::ConstPtr copyGridReplacingTransform(math::Transform::Ptr xform) const = 0;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid and whose transform and metadata are provided as arguments.
+    /// @throw ValueError if the transform pointer is null
+    virtual GridBase::ConstPtr copyGridReplacingMetadataAndTransform(const MetaMap& meta,
+        math::Transform::Ptr xform) const = 0;
+#endif
+
     /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     virtual GridBase::Ptr deepCopyGrid() const = 0;
 
@@ -515,7 +521,7 @@ protected:
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// @brief Initialize with metadata and a transform.
     /// @throw ValueError if the transform pointer is null
-    GridBase(math::Transform::Ptr xform, const MetaMap& meta);
+    GridBase(const MetaMap& meta, math::Transform::Ptr xform);
 #endif
 
     /// @brief Deep copy another grid's metadata and transform.
@@ -711,17 +717,6 @@ public:
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is shared with this grid.
     ConstPtr copy() const;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
-    /// provided as an argument.
-    /// @throw ValueError if the transform pointer is null
-    ConstPtr copy(math::Transform::Ptr xform) const;
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid and whose transform and metadata are provided as arguments.
-    /// @throw ValueError if the transform pointer is null
-    ConstPtr copy(math::Transform::Ptr xform, const MetaMap& meta) const;
-#endif
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     Ptr copyWithNewTree() const;
@@ -732,25 +727,44 @@ public:
     /// @brief Return a new grid of the same type as this grid whose metadata is a
     /// deep copy of this grid's and whose tree and transform are shared with this grid.
     GridBase::ConstPtr copyGrid() const override;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
-    /// provided as an argument.
-    /// @throw ValueError if the transform pointer is null
-    GridBase::ConstPtr copyGrid(math::Transform::Ptr xform) const override;
-    /// @brief Return a new grid of the same type as this grid whose tree is shared with
-    /// this grid and whose transform and metadata are provided as arguments.
-    /// @throw ValueError if the transform pointer is null
-    GridBase::ConstPtr copyGrid(math::Transform::Ptr xform, const MetaMap& meta) const override;
-#endif
-
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     GridBase::Ptr copyGridWithNewTree() const override;
     //@}
 #endif
+
     /// @name Copying
     /// @{
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    /// @brief Return a new grid of the same type as this grid whose tree and transform
+    /// is shared with this grid and whose metadata is provided as an argument.
+    ConstPtr copyReplacingMetadata(const MetaMap& meta) const;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
+    /// provided as an argument.
+    /// @throw ValueError if the transform pointer is null
+    ConstPtr copyReplacingTransform(math::Transform::Ptr xform) const;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid and whose transform and metadata are provided as arguments.
+    /// @throw ValueError if the transform pointer is null
+    ConstPtr copyReplacingMetadataAndTransform(const MetaMap& meta,
+        math::Transform::Ptr xform) const;
+
+    /// @brief Return a new grid of the same type as this grid whose tree and transform
+    /// is shared with this grid and whose metadata is provided as an argument.
+    GridBase::ConstPtr copyGridReplacingMetadata(const MetaMap& meta) const override;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid, whose metadata is a deep copy of this grid's and whose transform is
+    /// provided as an argument.
+    /// @throw ValueError if the transform pointer is null
+    GridBase::ConstPtr copyGridReplacingTransform(math::Transform::Ptr xform) const override;
+    /// @brief Return a new grid of the same type as this grid whose tree is shared with
+    /// this grid and whose transform and metadata are provided as arguments.
+    /// @throw ValueError if the transform pointer is null
+    GridBase::ConstPtr copyGridReplacingMetadataAndTransform(const MetaMap& meta,
+        math::Transform::Ptr xform) const override;
+#endif
 
     /// @brief Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     Ptr deepCopy() const { return Ptr(new Grid(*this)); }
@@ -1039,7 +1053,7 @@ public:
 private:
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Deep copy metadata, but share tree and transform.
-    Grid(TreePtrType tree, math::Transform::Ptr xform, const MetaMap& meta);
+    Grid(TreePtrType tree, const MetaMap& meta, math::Transform::Ptr xform);
 #endif
 
     /// Helper function for use with registerGrid()
@@ -1240,7 +1254,7 @@ struct HasMultiPassIO<Grid<TreeType>> {
 ////////////////////////////////////////
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
-inline GridBase::GridBase(math::Transform::Ptr xform, const MetaMap& meta)
+inline GridBase::GridBase(const MetaMap& meta, math::Transform::Ptr xform)
     : MetaMap(meta)
     , mTransform(xform)
 {
@@ -1326,8 +1340,8 @@ inline Grid<TreeT>::Grid(TreePtrType tree): mTree(tree)
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename TreeT>
-inline Grid<TreeT>::Grid(TreePtrType tree, math::Transform::Ptr xform, const MetaMap& meta):
-    GridBase(xform, meta),
+inline Grid<TreeT>::Grid(TreePtrType tree, const MetaMap& meta, math::Transform::Ptr xform):
+    GridBase(meta, xform),
     mTree(tree)
 {
     if (!tree) OPENVDB_THROW(ValueError, "Tree pointer is null");
@@ -1459,17 +1473,28 @@ Grid<TreeT>::copy() const
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename TreeT>
 inline typename Grid<TreeT>::ConstPtr
-Grid<TreeT>::copy(math::Transform::Ptr xform) const
+Grid<TreeT>::copyReplacingMetadata(const MetaMap& meta) const
 {
-    return this->copy(xform, *this);
+    math::Transform::Ptr transformPtr = ConstPtrCast<math::Transform>(
+        this->constTransformPtr());
+    TreePtrType treePtr = ConstPtrCast<TreeT>(this->constTreePtr());
+    return ConstPtr{new Grid<TreeT>{treePtr, meta, transformPtr}};
 }
 
 template<typename TreeT>
 inline typename Grid<TreeT>::ConstPtr
-Grid<TreeT>::copy(math::Transform::Ptr xform, const MetaMap& meta) const
+Grid<TreeT>::copyReplacingTransform(math::Transform::Ptr xform) const
+{
+    return this->copyReplacingMetadataAndTransform(*this, xform);
+}
+
+template<typename TreeT>
+inline typename Grid<TreeT>::ConstPtr
+Grid<TreeT>::copyReplacingMetadataAndTransform(const MetaMap& meta,
+    math::Transform::Ptr xform) const
 {
     TreePtrType treePtr = ConstPtrCast<TreeT>(this->constTreePtr());
-    return ConstPtr{new Grid<TreeT>{treePtr, xform, meta}};
+    return ConstPtr{new Grid<TreeT>{treePtr, meta, xform}};
 }
 #endif
 
@@ -1509,16 +1534,24 @@ Grid<TreeT>::copyGrid() const
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename TreeT>
 inline GridBase::ConstPtr
-Grid<TreeT>::copyGrid(math::Transform::Ptr xform) const
+Grid<TreeT>::copyGridReplacingMetadata(const MetaMap& meta) const
 {
-    return this->copy(xform);
+    return this->copyReplacingMetadata(meta);
 }
 
 template<typename TreeT>
 inline GridBase::ConstPtr
-Grid<TreeT>::copyGrid(math::Transform::Ptr xform, const MetaMap& meta) const
+Grid<TreeT>::copyGridReplacingTransform(math::Transform::Ptr xform) const
 {
-    return this->copy(xform, meta);
+    return this->copyReplacingTransform(xform);
+}
+
+template<typename TreeT>
+inline GridBase::ConstPtr
+Grid<TreeT>::copyGridReplacingMetadataAndTransform(const MetaMap& meta,
+    math::Transform::Ptr xform) const
+{
+    return this->copyReplacingMetadataAndTransform(meta, xform);
 }
 #endif
 
