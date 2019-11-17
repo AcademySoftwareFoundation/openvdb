@@ -125,7 +125,6 @@ public:
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     virtual GridBase::Ptr copyGridWithNewTree() const = 0;
-#endif
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// @brief Return a new grid of the same type as this grid whose tree and transform
