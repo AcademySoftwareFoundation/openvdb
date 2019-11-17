@@ -69,6 +69,8 @@ The following functions are provided:
 
 #]=======================================================================]
 
+cmake_minimum_required(VERSION 3.3)
+
 
 function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
   cmake_parse_arguments(_VDB "" "VERSION;MAJOR;MINOR;PATCH" "" ${ARGN})

@@ -30,8 +30,9 @@
 
 #]=======================================================================]
 
-project(OpenVDBCore)
 cmake_minimum_required(VERSION 3.3)
+project(OpenVDBCore)
+
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -73,14 +74,30 @@ message(STATUS "----------------------------------------------------")
 if(USE_EXR)
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
+    if(${OpenEXR_VERSION} VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
+      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 else()
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
-if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
-  message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
-    "is deprecated and will be removed.")
+
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
+  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+    message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 endif()
 
 find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
@@ -115,6 +132,13 @@ if(OPENVDB_CORE_SHARED)
 endif()
 
 find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
+
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
+  if(${Boost_LIB_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
+    message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 if(UNIX)
   find_package(Threads REQUIRED)

@@ -108,11 +108,9 @@ public:
     void readTopology(std::istream& is, bool = false) override { is.seekg(0, std::ios::beg); }
     void writeTopology(std::ostream& os, bool = false) const override { os.seekp(0); }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void readBuffers(std::istream& is,
         const openvdb::CoordBBox&, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void readNonresidentBuffers() const override {}
-#endif
     void readBuffers(std::istream& is, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void writeBuffers(std::ostream& os, bool /*saveFloatAsHalf*/=false) const override
         { os.seekp(0, std::ios::beg); }
@@ -121,9 +119,7 @@ public:
     void clear() {}
     void prune(const ValueType& = 0) {}
     void clip(const openvdb::CoordBBox&) {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void clipUnallocatedNodes() override {}
-#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 4
     openvdb::Index32 unallocatedLeafCount() const override { return 0; }
 #endif
@@ -145,9 +141,7 @@ public:
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
     openvdb::Index64 activeLeafVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveLeafVoxelCount() const override { return 0UL; }
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     openvdb::Index64 activeTileCount() const override { return 0UL; }
-#endif
 };
 
 const openvdb::Index ProxyTree::DEPTH = 0;
@@ -427,33 +421,21 @@ TestGrid::testClipping()
         const float fg = 5.f;
         FloatGrid cube(0.f);
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     {
         const bool fg = true;
         BoolGrid cube(false);
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     {
         const Vec3s fg(1.f, -2.f, 3.f);
         Vec3SGrid cube(Vec3s(0.f));
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     /*

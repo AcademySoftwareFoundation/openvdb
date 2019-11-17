@@ -78,37 +78,57 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``LOG4CPLUS_ROOT``
+``Log4cplus_ROOT``
   Preferred installation prefix.
 ``LOG4CPLUS_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
 ``LOG4CPLUS_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``LOG4CPLUS_USE_STATIC_LIBS``
+  Only search for static log4cplus libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
+
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 mark_as_advanced(
   Log4cplus_INCLUDE_DIR
   Log4cplus_LIBRARY
 )
 
-# Append LOG4CPLUS_ROOT or $ENV{LOG4CPLUS_ROOT} if set (prioritize the direct cmake var)
-set(_LOG4CPLUS_ROOT_SEARCH_DIR "")
+set(_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
-if(LOG4CPLUS_ROOT)
-  list(APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${LOG4CPLUS_ROOT})
-else()
-  set(_ENV_LOG4CPLUS_ROOT $ENV{LOG4CPLUS_ROOT})
-  if(_ENV_LOG4CPLUS_ROOT)
-    list(APPEND _LOG4CPLUS_ROOT_SEARCH_DIR ${_ENV_LOG4CPLUS_ROOT})
-  endif()
+# Set _LOG4CPLUS_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV LOG4CPLUS_ROOT from CMake 3.12
+if(Log4cplus_ROOT)
+  set(_LOG4CPLUS_ROOT ${Log4cplus_ROOT})
+elseif(DEFINED ENV{Log4cplus_ROOT})
+  set(_LOG4CPLUS_ROOT $ENV{Log4cplus_ROOT})
+elseif(LOG4CPLUS_ROOT)
+  set(_LOG4CPLUS_ROOT ${LOG4CPLUS_ROOT})
+elseif(DEFINED ENV{LOG4CPLUS_ROOT})
+  set(_LOG4CPLUS_ROOT $ENV{LOG4CPLUS_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find log4cplus
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_Log4cplus QUIET log4cplus)
 
 # ------------------------------------------------------------------------
@@ -118,14 +138,14 @@ pkg_check_modules(PC_Log4cplus QUIET log4cplus)
 set(_LOG4CPLUS_INCLUDE_SEARCH_DIRS "")
 list(APPEND _LOG4CPLUS_INCLUDE_SEARCH_DIRS
   ${LOG4CPLUS_INCLUDEDIR}
-  ${_LOG4CPLUS_ROOT_SEARCH_DIR}
+  ${_LOG4CPLUS_ROOT}
   ${PC_Log4cplus_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
 
 # Look for a standard log4cplus header file.
 find_path(Log4cplus_INCLUDE_DIR log4cplus/version.h
-  NO_DEFAULT_PATH
+  ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -158,7 +178,7 @@ endif()
 set(_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS
   ${LOG4CPLUS_LIBRARYDIR}
-  ${_LOG4CPLUS_ROOT_SEARCH_DIR}
+  ${_LOG4CPLUS_ROOT}
   ${PC_Log4cplus_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -177,7 +197,7 @@ set(LOG4CPLUS_PATH_SUFFIXES
 )
 
 find_library(Log4cplus_LIBRARY log4cplus
-  NO_DEFAULT_PATH
+  ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${LOG4CPLUS_PATH_SUFFIXES}
 )

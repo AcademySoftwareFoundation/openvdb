@@ -86,26 +86,37 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``OPENEXR_ROOT``
+``OpenEXR_ROOT``
   Preferred installation prefix.
 ``OPENEXR_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
 ``OPENEXR_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``OPENEXR_USE_STATIC_LIBS``
+  Only search for static openexr libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
-# Support new if() IN_LIST operator
-if(POLICY CMP0057)
-  cmake_policy(SET CMP0057 NEW)
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
 endif()
 
 mark_as_advanced(
   OpenEXR_INCLUDE_DIR
   OpenEXR_LIBRARY
 )
+
+set(_FIND_OPENEXR_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_OPENEXR_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
 set(_OPENEXR_COMPONENT_LIST
   IlmImf
@@ -133,21 +144,25 @@ else()
   set(OpenEXR_FIND_COMPONENTS ${_OPENEXR_COMPONENT_LIST})
 endif()
 
-# Append OPENEXR_ROOT or $ENV{OPENEXR_ROOT} if set (prioritize the direct cmake var)
-set(_OPENEXR_ROOT_SEARCH_DIR "")
-
-if(OPENEXR_ROOT)
-  list(APPEND _OPENEXR_ROOT_SEARCH_DIR ${OPENEXR_ROOT})
-else()
-  set(_ENV_OPENEXR_ROOT $ENV{OPENEXR_ROOT})
-  if(_ENV_OPENEXR_ROOT)
-    list(APPEND _OPENEXR_ROOT_SEARCH_DIR ${_ENV_OPENEXR_ROOT})
-  endif()
+# Set _OPENEXR_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV OPENEXR_ROOT from CMake 3.12
+if(OpenEXR_ROOT)
+  set(_OPENEXR_ROOT ${OpenEXR_ROOT})
+elseif(DEFINED ENV{OpenEXR_ROOT})
+  set(_OPENEXR_ROOT $ENV{OpenEXR_ROOT})
+elseif(OPENEXR_ROOT)
+  set(_OPENEXR_ROOT ${OPENEXR_ROOT})
+elseif(DEFINED ENV{OPENEXR_ROOT})
+  set(_OPENEXR_ROOT $ENV{OPENEXR_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find OpenEXR
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_OpenEXR QUIET OpenEXR)
 
 # ------------------------------------------------------------------------
@@ -157,14 +172,14 @@ pkg_check_modules(PC_OpenEXR QUIET OpenEXR)
 set(_OPENEXR_INCLUDE_SEARCH_DIRS "")
 list(APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
   ${OPENEXR_INCLUDEDIR}
-  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${_OPENEXR_ROOT}
   ${PC_OpenEXR_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
 
 # Look for a standard OpenEXR header file.
 find_path(OpenEXR_INCLUDE_DIR OpenEXRConfig.h
-  NO_DEFAULT_PATH
+  ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
   PATHS ${_OPENEXR_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES  include/OpenEXR OpenEXR
 )
@@ -203,7 +218,7 @@ set(_OPENEXR_LIBRARYDIR_SEARCH_DIRS "")
 
 list(APPEND _OPENEXR_LIBRARYDIR_SEARCH_DIRS
   ${OPENEXR_LIBRARYDIR}
-  ${_OPENEXR_ROOT_SEARCH_DIR}
+  ${_OPENEXR_ROOT}
   ${PC_OpenEXR_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -248,7 +263,7 @@ set(OpenEXR_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   find_library(OpenEXR_${COMPONENT}_LIBRARY ${COMPONENT}
-    NO_DEFAULT_PATH
+    ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
     PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${OPENEXR_PATH_SUFFIXES}
   )
@@ -258,7 +273,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
     set(_OPENEXR_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
     find_library(OpenEXR_${COMPONENT}_DLL ${COMPONENT}
-      NO_DEFAULT_PATH
+      ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
       PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES bin
     )

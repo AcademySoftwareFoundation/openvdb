@@ -30,8 +30,9 @@
 
 #]=======================================================================]
 
-project(OpenVDBPython)
 cmake_minimum_required(VERSION 3.3)
+project(OpenVDBPython)
+
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -148,9 +149,11 @@ else()
 endif()
 
 if(USE_NUMPY)
-  if(Python_NumPy_VERSION VERSION_LESS FUTURE_MINIMUM_NUMPY_VERSION)
-    message(DEPRECATION "Support for NumPy versions < ${FUTURE_MINIMUM_NUMPY_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NUMPY_VERSION)
+    if(Python_NumPy_VERSION VERSION_LESS FUTURE_MINIMUM_NUMPY_VERSION)
+      message(DEPRECATION "Support for NumPy versions < ${FUTURE_MINIMUM_NUMPY_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 endif()
 

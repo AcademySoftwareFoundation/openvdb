@@ -336,12 +336,10 @@ public:
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
         , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
-#endif
 
 public:
 
@@ -1577,9 +1575,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     this->assertNonModifiableUnlessZero(value);
 

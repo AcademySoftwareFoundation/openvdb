@@ -329,11 +329,7 @@ doClip(
         gridMask.topologyDifference(clipMask.constTree());
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    auto outGrid = grid.copy(CP_NEW);
-#else
     auto outGrid = grid.copyWithNewTree();
-#endif
     {
         // Copy voxel values and states.
         tree::LeafManager<const MaskTreeT> leafNodes(gridMask);
@@ -462,11 +458,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
     };
 
     // Construct an output grid with the same transform and metadata as the input grid.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    auto outGrid = inGrid.copy(CP_NEW);
-#else
     auto outGrid = inGrid.copyWithNewTree();
-#endif
     if (outGrid->getGridClass() == GRID_LEVEL_SET) {
         // After clipping, a level set grid might no longer be a valid SDF.
         outGrid->setGridClass(GRID_UNKNOWN);
