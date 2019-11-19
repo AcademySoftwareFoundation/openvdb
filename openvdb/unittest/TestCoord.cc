@@ -184,13 +184,18 @@ TestCoord::testCoordBBox()
         CPPUNIT_ASSERT_EQUAL(openvdb::Coord::min(), b.min());
         CPPUNIT_ASSERT_EQUAL(openvdb::Coord::max(), b.max());
     }
-    {// empty, hasVolume and volume
+    {// empty, dim, hasVolume and volume
         const openvdb::Coord c(1,2,3);
-        const openvdb::CoordBBox a(c, c), b(c, c.offsetBy(0,-1,0));
-        CPPUNIT_ASSERT( a.hasVolume() && !a.empty());
-        CPPUNIT_ASSERT(!b.hasVolume() &&  b.empty());
-        CPPUNIT_ASSERT_EQUAL(uint64_t(1), a.volume());
-        CPPUNIT_ASSERT_EQUAL(uint64_t(0), b.volume());
+        const openvdb::CoordBBox b0(c, c), b1(c, c.offsetBy(0,-1,0)), b2;
+        CPPUNIT_ASSERT( b0.hasVolume() && !b0.empty());
+        CPPUNIT_ASSERT(!b1.hasVolume() &&  b1.empty());
+        CPPUNIT_ASSERT(!b2.hasVolume() &&  b2.empty());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1), b0.dim());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), b1.dim());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), b2.dim());
+        CPPUNIT_ASSERT_EQUAL(uint64_t(1), b0.volume());
+        CPPUNIT_ASSERT_EQUAL(uint64_t(0), b1.volume());
+        CPPUNIT_ASSERT_EQUAL(uint64_t(0), b2.volume());
     }
     {// volume and split constructor
         const openvdb::Coord min(-1,-2,30), max(20,30,55);

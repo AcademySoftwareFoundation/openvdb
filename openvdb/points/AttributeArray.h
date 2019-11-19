@@ -141,6 +141,14 @@ public:
         WRITEPAGED = 0x8            /// data is written out in pages
     };
 
+    // Scoped Lock wrapper class that locks the AttributeArray registry mutex
+    class OPENVDB_API ScopedRegistryLock
+    {
+        tbb::spin_mutex::scoped_lock lock;
+    public:
+        ScopedRegistryLock();
+    }; // class ScopedRegistryLock
+
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
@@ -246,11 +254,14 @@ public:
     virtual size_t memUsage() const = 0;
 
     /// Create a new attribute array of the given (registered) type, length and stride.
-    static Ptr create(const NamePair& type, Index length, Index stride = 1, bool constantStride = true);
+    /// @details If @a lock is non-null, the AttributeArray registry mutex
+    /// has already been locked
+    static Ptr create(const NamePair& type, Index length, Index stride = 1,
+        bool constantStride = true, const ScopedRegistryLock* lock = nullptr);
     /// Return @c true if the given attribute type name is registered.
-    static bool isRegistered(const NamePair& type);
+    static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
     /// Clear the attribute type registry.
-    static void clearRegistry();
+    static void clearRegistry(const ScopedRegistryLock* lock = nullptr);
 
     /// Return the name of this attribute's type.
     virtual const NamePair& type() const = 0;
@@ -265,7 +276,10 @@ public:
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
     /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
+    // Windows does not allow base classes to be easily deprecated.
+#ifndef _MSC_VER
     OPENVDB_DEPRECATED
+#endif
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
@@ -316,9 +330,17 @@ public:
     /// now it always returns @c false.
     OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// @deprecated Previously this compressed the attribute array, now it does nothing.
-    OPENVDB_DEPRECATED virtual bool compress() = 0;
+    // Windows does not allow base classes to be deprecated
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
+    virtual bool compress() = 0;
     /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
-    OPENVDB_DEPRECATED virtual bool decompress() = 0;
+    // Windows does not allow base classes to be deprecated
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
+    virtual bool decompress() = 0;
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
     /// @details This is useful if the attribute is used for blind data or as scratch space
@@ -416,9 +438,11 @@ protected:
     virtual AccessorBasePtr getAccessor() const = 0;
 
     /// Register a attribute type along with a factory function.
-    static void registerType(const NamePair& type, FactoryMethod);
+    static void registerType(const NamePair& type, FactoryMethod,
+        const ScopedRegistryLock* lock = nullptr);
     /// Remove a attribute type from the registry.
-    static void unregisterType(const NamePair& type);
+    static void unregisterType(const NamePair& type,
+        const ScopedRegistryLock* lock = nullptr);
 
 #if OPENVDB_ABI_VERSION_NUMBER < 6
 
@@ -713,6 +737,9 @@ public:
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    OPENVDB_DEPRECATED
+#endif
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
     /// Return @c true if this array is stored as a single uniform value.

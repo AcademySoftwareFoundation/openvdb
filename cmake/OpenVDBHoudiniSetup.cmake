@@ -74,6 +74,7 @@ overwrite user provided values.
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
 ``BLOSC_LIBRARYDIR``
+``JEMALLOC_LIBRARYDIR``
 
 Hints
 ^^^^^
@@ -83,25 +84,46 @@ may be provided to tell this module where to look.
 
 ``ENV{HFS}``
   Preferred installation prefix.
-``HOUDINI_ROOT``
+``Houdini_ROOT``
   Preferred installation prefix.
-``CMAKE_PREFIX_PATH``
-  Add the location of your Houdini installations CMake to this path.
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
+set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_HOUDINI_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
+
+# Set _HOUDINI_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV HOUDINI_ROOT from CMake 3.12
+if(Houdini_ROOT)
+  set(_HOUDINI_ROOT ${Houdini_ROOT})
+elseif(DEFINED ENV{Houdini_ROOT})
+  set(_HOUDINI_ROOT $ENV{Houdini_ROOT})
+elseif(HOUDINI_ROOT)
+  set(_HOUDINI_ROOT ${HOUDINI_ROOT})
+elseif(DEFINED ENV{HOUDINI_ROOT})
+  set(_HOUDINI_ROOT $ENV{HOUDINI_ROOT})
+endif()
+
 set(_HOUDINI_ROOT_SEARCH_DIR)
 
-if(HOUDINI_ROOT)
-  list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${HOUDINI_ROOT})
-else()
-  set(_ENV_HOUDINI_ROOT $ENV{HOUDINI_ROOT})
-  if(_ENV_HOUDINI_ROOT)
-    list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${_ENV_HOUDINI_ROOT})
-  endif()
+if(_HOUDINI_ROOT)
+  list(APPEND _HOUDINI_ROOT_SEARCH_DIR ${_HOUDINI_ROOT})
 endif()
 
 if(DEFINED ENV{HFS})
@@ -109,7 +131,7 @@ if(DEFINED ENV{HFS})
 endif()
 
 # ------------------------------------------------------------------------
-#  Search for Houdini CMake
+#  Search for Houdini
 # ------------------------------------------------------------------------
 
 set(_HOUDINI_CMAKE_PATH_SUFFIXES)
@@ -129,17 +151,11 @@ list(APPEND _HOUDINI_CMAKE_PATH_SUFFIXES
   cmake
 )
 
-find_path(HOUDINI_CMAKE_LOCATION HoudiniConfig.cmake
-  NO_DEFAULT_PATH
+find_package(Houdini
+  ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
   PATHS ${_HOUDINI_ROOT_SEARCH_DIR}
   PATH_SUFFIXES ${_HOUDINI_CMAKE_PATH_SUFFIXES}
-)
-
-if(HOUDINI_CMAKE_LOCATION)
-  list(APPEND CMAKE_PREFIX_PATH "${HOUDINI_CMAKE_LOCATION}")
-endif()
-
-find_package(Houdini REQUIRED)
+  REQUIRED)
 
 # Note that passing MINIMUM_HOUDINI_VERSION into find_package(Houdini) doesn't work
 if(NOT Houdini_FOUND)
@@ -160,22 +176,11 @@ find_package_handle_standard_args(Houdini
 #  Add support for older versions of Houdini
 # ------------------------------------------------------------------------
 
-if(Houdini_VERSION VERSION_LESS 17)
-  # Missing function in Houdini 16.5 CMake copied from 17.5 - _houdini variables
-  # are set by the Houdini configuration package
-  function(houdini_get_default_install_dir output_var)
-    set( _instdir "")
-    if(_houdini_platform_linux)
-        set(_instdir $ENV{HOME}/houdini${_houdini_release_version})
-    elseif(_houdini_platform_osx)
-        set(_instdir $ENV{HOME}/Library/Preferences/houdini/${_houdini_release_version})
-    elseif(_houdini_platform_win)
-        set(_instdir $ENV{HOMEDRIVE}$ENV{HOMEPATH}\\Documents\\houdini${_houdini_release_version})
-    else()
-        message( FATAL_ERROR "Invalid platform")
-    endif()
-    set(${output_var} ${_instdir} PARENT_SCOPE)
-  endfunction()
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_HOUDINI_VERSION)
+  if(Houdini_VERSION VERSION_LESS ${FUTURE_MINIMUM_HOUDINI_VERSION})
+    message(DEPRECATION "Support for Houdini versions < ${FUTURE_MINIMUM_HOUDINI_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 endif()
 
 # ------------------------------------------------------------------------
@@ -196,18 +201,21 @@ if(APPLE)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
     ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
+    ${_HOUDINI_LIB_DIR}/libhboost_thread.dylib
   )
 else()
   set(_HOUDINI_LIB_DIR dsolib)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
     ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
     ${_HOUDINI_LIB_DIR}/libhboost_regex.so
+    ${_HOUDINI_LIB_DIR}/libhboost_thread.so
   )
 endif()
 
 list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
   HoudiniRAY
   hboost_regex
+  hboost_thread
 )
 
 # Additionally link extra deps
@@ -243,7 +251,7 @@ endif()
 if(NOT ZLIB_LIBRARY)
   # Full path to zlib library - FindPackage ( ZLIB)
   find_library(ZLIB_LIBRARY z
-    NO_DEFAULT_PATH
+    ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
     PATHS ${_HOUDINI_LIB_DIR}
   )
   if(NOT EXISTS ${ZLIB_LIBRARY})
@@ -269,6 +277,12 @@ if(NOT BLOSC_INCLUDEDIR)
 endif()
 if(NOT BLOSC_LIBRARYDIR)
   set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+endif()
+
+# Jemalloc
+
+if(NOT JEMALLOC_LIBRARYDIR)
+  set(JEMALLOC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
 endif()
 
 # OpenEXR
@@ -318,4 +332,71 @@ elseif(Houdini_VERSION VERSION_LESS 18)
 else()
   # Anticipated ABI version for H18
   set(OPENVDB_HOUDINI_ABI 6)
+endif()
+
+# ------------------------------------------------------------------------
+#  Configure GCC CXX11 ABI
+# ------------------------------------------------------------------------
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if((CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 5.1) OR
+     (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1))
+    message(STATUS "GCC >= 5.1 detected. Configuring GCC CXX11 ABI for Houdini compatibility...")
+
+    execute_process(COMMAND echo "#include <string>"
+      COMMAND ${CMAKE_CXX_COMPILER} "-x" "c++" "-E" "-dM" "-"
+      COMMAND grep "-F" "_GLIBCXX_USE_CXX11_ABI"
+      TIMEOUT 10
+      RESULT_VARIABLE QUERIED_GCC_CXX11_ABI_SUCCESS
+      OUTPUT_VARIABLE _GCC_CXX11_ABI)
+
+    set(GLIBCXX_USE_CXX11_ABI "UNKNOWN")
+
+    if(NOT QUERIED_GCC_CXX11_ABI_SUCCESS)
+      string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 0" GCC_OLD_CXX11_ABI)
+      string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 1" GCC_NEW_CXX11_ABI)
+      if(NOT (${GCC_OLD_CXX11_ABI} EQUAL -1))
+        set(GLIBCXX_USE_CXX11_ABI 0)
+      endif()
+      if(NOT (${GCC_NEW_CXX11_ABI} EQUAL -1))
+        set(GLIBCXX_USE_CXX11_ABI 1)
+      endif()
+    endif()
+
+    # Try and query the Houdini CXX11 ABI. Allow it to be provided by users to
+    # override this logic should Houdini's CMake ever change
+
+    if(NOT DEFINED HOUDINI_CXX11_ABI)
+      get_target_property(houdini_interface_compile_options
+        Houdini INTERFACE_COMPILE_OPTIONS)
+      set(HOUDINI_CXX11_ABI "UNKNOWN")
+      if("-D_GLIBCXX_USE_CXX11_ABI=0" IN_LIST houdini_interface_compile_options)
+        set(HOUDINI_CXX11_ABI 0)
+      elseif("-D_GLIBCXX_USE_CXX11_ABI=1" IN_LIST houdini_interface_compile_options)
+        set(HOUDINI_CXX11_ABI 1)
+      endif()
+    endif()
+
+    message(STATUS "  GCC CXX11 ABI     : ${GLIBCXX_USE_CXX11_ABI}")
+    message(STATUS "  Houdini CXX11 ABI : ${HOUDINI_CXX11_ABI}")
+
+    if(${HOUDINI_CXX11_ABI} STREQUAL "UNKNOWN")
+      message(WARNING "Unable to determine Houdini CXX11 ABI. Assuming newer ABI "
+        "has been used.")
+      set(HOUDINI_CXX11_ABI 1)
+    endif()
+
+    if(${GLIBCXX_USE_CXX11_ABI} EQUAL ${HOUDINI_CXX11_ABI})
+      message(STATUS "  Current CXX11 ABI matches Houdini configuration "
+        "(_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}).")
+    else()
+      message(WARNING "A potential mismatch was detected between the CXX11 ABI "
+        "of GCC and Houdini. The following ABI configuration will be used: "
+        "-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}. See: "
+        "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
+        "https://vfxplatform.com/#footnote-gcc6 for more information.")
+    endif()
+
+    add_definitions(-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI})
+  endif()
 endif()

@@ -116,12 +116,6 @@ public:
     /// @name Copying
     /// @{
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    /// @brief Return a new grid of the same type as this grid and whose
-    /// metadata and transform are deep copies of this grid's.
-    /// @deprecated ABI versions older than 4 are deprecated.
-    OPENVDB_DEPRECATED virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
-#else
     /// @brief Return a new grid of the same type as this grid whose metadata is a
     /// deep copy of this grid's and whose tree and transform are shared with this grid.
     virtual GridBase::Ptr copyGrid() = 0;
@@ -131,7 +125,6 @@ public:
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     virtual GridBase::Ptr copyGridWithNewTree() const = 0;
-#endif
     /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     virtual GridBase::Ptr deepCopyGrid() const = 0;
 
@@ -237,7 +230,6 @@ public:
     /// (converted to this grid's value type).
     virtual void pruneGrid(float tolerance = 0.0) = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Clip this grid to the given world-space bounding box.
     /// @details Voxels that lie outside the bounding box are set to the background.
     /// @warning Clipping a level set will likely produce a grid that is
@@ -249,7 +241,6 @@ public:
     /// @warning Clipping a level set will likely produce a grid that is
     /// no longer a valid level set.
     virtual void clip(const CoordBBox&) = 0;
-#endif
 
     /// @}
 
@@ -377,6 +368,7 @@ public:
     static const char* const META_FILE_COMPRESSION;
     static const char* const META_FILE_MEM_BYTES;
     static const char* const META_FILE_VOXEL_COUNT;
+    static const char* const META_FILE_DELAYED_LOAD;
 
 
     /// @name Statistics
@@ -472,7 +464,6 @@ public:
 
     /// Read all data buffers for this grid.
     virtual void readBuffers(std::istream&) = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
     /// @brief Read all of this grid's data buffers that are not yet resident in memory
@@ -481,7 +472,6 @@ public:
     /// disconnects the grid from the file.
     /// @sa io::File::open, io::MappedFile
     virtual void readNonresidentBuffers() const = 0;
-#endif
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const = 0;
 
@@ -503,14 +493,8 @@ protected:
     /// @brief Deep copy another grid's metadata and transform.
     GridBase(const GridBase& other): MetaMap(other), mTransform(other.mTransform->copy()) {}
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    /// @brief Copy another grid's metadata but share its transform.
-    /// @deprecated ABI versions older than 4 are deprecated.
-    OPENVDB_DEPRECATED GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
-#else
     /// @brief Copy another grid's metadata but share its transform.
     GridBase(GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
-#endif
 
     /// Register a grid type along with a factory function.
     static void registerGrid(const Name& type, GridFactory);
@@ -652,14 +636,8 @@ public:
     /// or if this grid's ValueType is not constructible from the other grid's ValueType.
     template<typename OtherTreeType>
     explicit Grid(const Grid<OtherTreeType>&);
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    /// Deep copy another grid's metadata, but share its tree and transform.
-    /// @deprecated ABI versions older than 4 are deprecated.
-    OPENVDB_DEPRECATED Grid(const Grid&, ShallowCopy);
-#else
     /// Deep copy another grid's metadata and transform, but share its tree.
     Grid(Grid&, ShallowCopy);
-#endif
     /// @brief Deep copy another grid's metadata and transform, but construct a new tree
     /// with background value zero.
     explicit Grid(const GridBase&);
@@ -669,55 +647,55 @@ public:
     /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
     Grid& operator=(const Grid&) = delete;
 
+    /// @name Copying
+    /// @{
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    //@{
-    /// @brief Return a new grid of the same type as this grid whose metadata
-    /// is a deep copy of this grid's.
-    /// @details If @a treePolicy is @c CP_NEW, the new grid is given a new, empty tree,
-    /// and it shares its transform with this grid;
-    /// if @c CP_SHARE, the new grid shares this grid's tree and transform;
-    /// if @c CP_COPY, the new grid's tree and transform are deep copies of this grid's.
-    /// @deprecated ABI versions older than 4 are deprecated.
-    OPENVDB_DEPRECATED Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
-    OPENVDB_DEPRECATED GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const override;
-    //@}
-#else
-    //@{
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is shared with this grid.
     Ptr copy();
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is shared with this grid.
     ConstPtr copy() const;
-    //@}
     /// @brief Return a new grid of the same type as this grid whose metadata and
     /// transform are deep copies of this grid's and whose tree is default-constructed.
     Ptr copyWithNewTree() const;
 
+    /// @brief Return a new grid of the same type as this grid whose metadata is a
+    /// deep copy of this grid's and whose tree and transform are shared with this grid.
     GridBase::Ptr copyGrid() override;
+    /// @brief Return a new grid of the same type as this grid whose metadata is a
+    /// deep copy of this grid's and whose tree and transform are shared with this grid.
     GridBase::ConstPtr copyGrid() const override;
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is default-constructed.
     GridBase::Ptr copyGridWithNewTree() const override;
-#endif
-    //@{
-    /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
-    Ptr deepCopy() const { return Ptr(new Grid(*this)); }
-    GridBase::Ptr deepCopyGrid() const override { return this->deepCopy(); }
     //@}
+
+    /// @name Copying
+    /// @{
+
+    /// @brief Return a new grid whose metadata, transform and tree are deep copies of this grid's.
+    Ptr deepCopy() const { return Ptr(new Grid(*this)); }
+    /// @brief Return a new grid whose metadata, transform and tree are deep copies of this grid's.
+    GridBase::Ptr deepCopyGrid() const override { return this->deepCopy(); }
+
+    //@}
+
 
     /// Return the name of this grid's type.
     Name type() const override { return this->gridType(); }
     /// Return the name of this type of grid.
     static Name gridType() { return TreeType::treeType(); }
 
-
-    //
-    // Voxel access methods
-    //
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
     Name valueType() const override { return tree().valueType(); }
 
+
+    /// @name Voxel access
+    /// @{
+
     /// @brief Return this grid's background value.
-    ///
-    /// @note Use tools::changeBackground to efficiently modify the background values.
+    /// @note Use tools::changeBackground to efficiently modify the background value.
     const ValueType& background() const { return mTree->background(); }
 
     /// Return @c true if this grid contains only inactive background voxels.
@@ -726,56 +704,54 @@ public:
     void clear() override { tree().clear(); }
 
     /// @brief Return an accessor that provides random read and write access
-    /// to this grid's voxels. The accessor is safe in the sense that
-    /// it is registered by the tree of this grid.
+    /// to this grid's voxels.
+    /// @details The accessor is safe in the sense that it is registered with this grid's tree.
     Accessor getAccessor() { return Accessor(tree()); }
-    /// @brief Return an accessor that provides random read and write access
-    /// to this grid's voxels. The accessor is unsafe in the sense that
-    /// it is not registered by the tree of this grid. In some rare
-    /// cases this can give a performance advantage over a registered
-    /// accessor but it is unsafe if the tree topology is modified.
-    ///
+    /// @brief Return an unsafe accessor that provides random read and write access
+    /// to this grid's voxels.
+    /// @details The accessor is unsafe in the sense that it is not registered
+    /// with this grid's tree.  In some rare cases this can give a performance advantage
+    /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
     UnsafeAccessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
-    //@{
     /// Return an accessor that provides random read-only access to this grid's voxels.
     ConstAccessor getAccessor() const { return ConstAccessor(tree()); }
+    /// Return an accessor that provides random read-only access to this grid's voxels.
     ConstAccessor getConstAccessor() const { return ConstAccessor(tree()); }
-    //@}
-    /// @brief Return an accessor that provides random read-only access
-    /// to this grid's voxels. The accessor is unsafe in the sense that
-    /// it is not registered by the tree of this grid. In some rare
-    /// cases this can give a performance advantage over a registered
-    /// accessor but it is unsafe if the tree topology is modified.
-    ///
+    /// @brief Return an unsafe accessor that provides random read-only access
+    /// to this grid's voxels.
+    /// @details The accessor is unsafe in the sense that it is not registered
+    /// with this grid's tree.  In some rare cases this can give a performance advantage
+    /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
     ConstUnsafeAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
 
-    //@{
     /// Return an iterator over all of this grid's active values (tile and voxel).
     ValueOnIter   beginValueOn()       { return tree().beginValueOn(); }
+    /// Return an iterator over all of this grid's active values (tile and voxel).
     ValueOnCIter  beginValueOn() const { return tree().cbeginValueOn(); }
+    /// Return an iterator over all of this grid's active values (tile and voxel).
     ValueOnCIter cbeginValueOn() const { return tree().cbeginValueOn(); }
-    //@}
-    //@{
     /// Return an iterator over all of this grid's inactive values (tile and voxel).
     ValueOffIter   beginValueOff()       { return tree().beginValueOff(); }
+    /// Return an iterator over all of this grid's inactive values (tile and voxel).
     ValueOffCIter  beginValueOff() const { return tree().cbeginValueOff(); }
+    /// Return an iterator over all of this grid's inactive values (tile and voxel).
     ValueOffCIter cbeginValueOff() const { return tree().cbeginValueOff(); }
-    //@}
-    //@{
     /// Return an iterator over all of this grid's values (tile and voxel).
     ValueAllIter   beginValueAll()       { return tree().beginValueAll(); }
+    /// Return an iterator over all of this grid's values (tile and voxel).
     ValueAllCIter  beginValueAll() const { return tree().cbeginValueAll(); }
+    /// Return an iterator over all of this grid's values (tile and voxel).
     ValueAllCIter cbeginValueAll() const { return tree().cbeginValueAll(); }
-    //@}
 
-    /// Return the minimum and maximum active values in this grid.
-    void evalMinMax(ValueType& minVal, ValueType& maxVal) const;
+    /// @}
 
-    //@{
+    /// @name Tools
+    /// @{
+
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
@@ -785,8 +761,15 @@ public:
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
     void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
+    /// @param value   the value to which to set voxels within the box
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive
+    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// representation of the filled box.  Follow fill operations with a prune()
+    /// operation for optimal sparseness.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
-    //@}
 
     /// @brief Set all voxels within a given axis-aligned box to a constant value
     /// and ensure that those voxels are all represented at the leaf level.
@@ -799,13 +782,11 @@ public:
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     void pruneGrid(float tolerance = 0.0) override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Clip this grid to the given index-space bounding box.
     /// @details Voxels that lie outside the bounding box are set to the background.
     /// @warning Clipping a level set will likely produce a grid that is
     /// no longer a valid level set.
     void clip(const CoordBBox&) override;
-#endif
 
     /// @brief Efficiently merge another grid into this grid using one of several schemes.
     /// @details This operation is primarily intended to combine grids that are mostly
@@ -858,24 +839,30 @@ public:
     template<typename OtherTreeType>
     void topologyDifference(const Grid<OtherTreeType>& other);
 
-    //
-    // Statistics
-    //
+    /// @}
+
+    /// @name Statistics
+    /// @{
+
     /// Return the number of active voxels.
     Index64 activeVoxelCount() const override { return tree().activeVoxelCount(); }
     /// Return the axis-aligned bounding box of all active voxels.
     CoordBBox evalActiveVoxelBoundingBox() const override;
     /// Return the dimensions of the axis-aligned bounding box of all active voxels.
     Coord evalActiveVoxelDim() const override;
+    /// Return the minimum and maximum active values in this grid.
+    void evalMinMax(ValueType& minVal, ValueType& maxVal) const;
 
     /// Return the number of bytes of memory used by this grid.
     /// @todo Add transform().memUsage()
     Index64 memUsage() const override { return tree().memUsage(); }
 
+    /// @}
 
-    //
-    // Tree methods
-    //
+
+    /// @name Tree
+    /// @{
+
     //@{
     /// @brief Return a pointer to this grid's tree, which might be
     /// shared with other grids.  The pointer is guaranteed to be non-null.
@@ -894,6 +881,11 @@ public:
     const TreeType& constTree() const { return *mTree; }
     //@}
 
+    /// @}
+
+    /// @name Tree
+    /// @{
+
     /// @brief Associate the given tree with this grid, in place of its existing tree.
     /// @throw ValueError if the tree pointer is null
     /// @throw TypeError if the tree is not of type TreeType
@@ -905,10 +897,12 @@ public:
     /// @note The new tree has the same background value as the existing tree.
     void newTree() override;
 
+    /// @}
 
-    //
-    // I/O methods
-    //
+
+    /// @name I/O
+    /// @{
+
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
     void readTopology(std::istream&) override;
@@ -918,7 +912,6 @@ public:
 
     /// Read all data buffers for this grid.
     void readBuffers(std::istream&) override;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
     /// @brief Read all of this grid's data buffers that are not yet resident in memory
@@ -927,12 +920,13 @@ public:
     /// disconnects the grid from the file.
     /// @sa io::File::open, io::MappedFile
     void readNonresidentBuffers() const override;
-#endif
     /// Write out all data buffers for this grid.
     void writeBuffers(std::ostream&) const override;
 
     /// Output a human-readable description of this grid.
     void print(std::ostream& = std::cout, int verboseLevel = 1) const override;
+
+    /// @}
 
     /// @brief Return @c true if grids of this type require multiple I/O passes
     /// to read and write data buffers.
@@ -940,9 +934,9 @@ public:
     static inline bool hasMultiPassIO();
 
 
-    //
-    // Registry methods
-    //
+    /// @name Registry
+    /// @{
+
     /// Return @c true if this grid type is registered.
     static bool isRegistered() { return GridBase::isRegistered(Grid::gridType()); }
     /// Register this grid type along with a factory function.
@@ -956,6 +950,8 @@ public:
     }
     /// Remove this grid type from the registry.
     static void unregisterGrid() { GridBase::unregisterGrid(Grid::gridType()); }
+
+    /// @}
 
 
 private:
@@ -1250,21 +1246,12 @@ inline Grid<TreeT>::Grid(const Grid<OtherTreeType>& other):
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-template<typename TreeT>
-inline Grid<TreeT>::Grid(const Grid& other, ShallowCopy):
-    GridBase(other, ShallowCopy()),
-    mTree(other.mTree)
-{
-}
-#else
 template<typename TreeT>
 inline Grid<TreeT>::Grid(Grid& other, ShallowCopy):
     GridBase(other),
     mTree(other.mTree)
 {
 }
-#endif
 
 
 template<typename TreeT>
@@ -1314,38 +1301,6 @@ Grid<TreeT>::create(const GridBase& other)
 ////////////////////////////////////////
 
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-
-template<typename TreeT>
-inline typename Grid<TreeT>::Ptr
-Grid<TreeT>::copy(CopyPolicy treePolicy) const
-{
-    Ptr ret;
-    switch (treePolicy) {
-        case CP_NEW:
-            ret.reset(new Grid(*this, ShallowCopy()));
-            ret->newTree();
-            break;
-        case CP_COPY:
-            ret.reset(new Grid(*this));
-            break;
-        case CP_SHARE:
-            ret.reset(new Grid(*this, ShallowCopy()));
-            break;
-    }
-    return ret;
-}
-
-
-template<typename TreeT>
-inline GridBase::Ptr
-Grid<TreeT>::copyGrid(CopyPolicy treePolicy) const
-{
-    return this->copy(treePolicy);
-}
-
-#else // if OPENVDB_ABI_VERSION_NUMBER > 3
-
 template<typename TreeT>
 inline typename Grid<TreeT>::ConstPtr
 Grid<TreeT>::copy() const
@@ -1392,8 +1347,6 @@ Grid<TreeT>::copyGridWithNewTree() const
 {
     return this->copyWithNewTree();
 }
-
-#endif
 
 
 ////////////////////////////////////////
@@ -1455,15 +1408,12 @@ Grid<TreeT>::pruneGrid(float tolerance)
     this->tree().prune(static_cast<ValueType>(value));
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<typename TreeT>
 inline void
 Grid<TreeT>::clip(const CoordBBox& bbox)
 {
     tree().clip(bbox);
 }
-#endif
-
 
 template<typename TreeT>
 inline void
@@ -1573,8 +1523,6 @@ Grid<TreeT>::readBuffers(std::istream& is)
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
-
 /// @todo Refactor this and the readBuffers() above
 /// once support for ABI 2 compatibility is dropped.
 template<typename TreeT>
@@ -1606,8 +1554,6 @@ Grid<TreeT>::readNonresidentBuffers() const
 {
     tree().readNonresidentBuffers();
 }
-
-#endif
 
 
 template<typename TreeT>

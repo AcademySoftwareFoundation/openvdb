@@ -47,6 +47,8 @@ IMPORTED Targets
   The tbb library target.
 ``TBB::tbbmalloc``
   The tbbmalloc library target.
+``TBB::tbbmalloc_proxy``
+  The tbbmalloc_proxy library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -89,13 +91,19 @@ may be provided to tell this module where to look.
 ``TBB_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``TBB_USE_STATIC_LIBS``
+  Only search for static tbb libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
 
-# Support new if() IN_LIST operator
-if(POLICY CMP0057)
-  cmake_policy(SET CMP0057 NEW)
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
 endif()
 
 mark_as_advanced(
@@ -103,9 +111,15 @@ mark_as_advanced(
   Tbb_LIBRARY
 )
 
+set(_FIND_TBB_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_TBB_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
+
 set(_TBB_COMPONENT_LIST
   tbb
   tbbmalloc
+  tbbmalloc_proxy
 )
 
 if(TBB_FIND_COMPONENTS)
@@ -129,21 +143,17 @@ else()
   set(TBB_FIND_COMPONENTS ${_TBB_COMPONENT_LIST})
 endif()
 
-# Append TBB_ROOT or $ENV{TBB_ROOT} if set (prioritize the direct cmake var)
-set(_TBB_ROOT_SEARCH_DIR "")
-
 if(TBB_ROOT)
-  list(APPEND _TBB_ROOT_SEARCH_DIR ${TBB_ROOT})
-else()
-  set(_ENV_TBB_ROOT $ENV{TBB_ROOT})
-  if(_ENV_TBB_ROOT)
-    list(APPEND _TBB_ROOT_SEARCH_DIR ${_ENV_TBB_ROOT})
-  endif()
+  set(_TBB_ROOT ${TBB_ROOT})
+elseif(DEFINED ENV{TBB_ROOT})
+  set(_TBB_ROOT $ENV{TBB_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find Tbb
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_Tbb QUIET tbb)
 
 # ------------------------------------------------------------------------
@@ -153,14 +163,14 @@ pkg_check_modules(PC_Tbb QUIET tbb)
 set(_TBB_INCLUDE_SEARCH_DIRS "")
 list(APPEND _TBB_INCLUDE_SEARCH_DIRS
   ${TBB_INCLUDEDIR}
-  ${_TBB_ROOT_SEARCH_DIR}
+  ${_TBB_ROOT}
   ${PC_Tbb_INCLUDE_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )
 
 # Look for a standard tbb header file.
 find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
-  NO_DEFAULT_PATH
+  ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -199,7 +209,7 @@ set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
 set(_TBB_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
   ${TBB_LIBRARYDIR}
-  ${_TBB_ROOT_SEARCH_DIR}
+  ${_TBB_ROOT}
   ${PC_Tbb_LIBRARY_DIRS}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -250,7 +260,7 @@ set(Tbb_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   find_library(Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
-    NO_DEFAULT_PATH
+    ${_FIND_TBB_ADDITIONAL_OPTIONS}
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
   )

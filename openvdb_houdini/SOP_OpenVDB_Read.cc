@@ -38,6 +38,7 @@
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 
@@ -56,9 +57,7 @@ public:
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     int isRefInput(unsigned input) const override { return (input == 0); }
-#endif
 
 protected:
     OP_ERROR cookVDBSop(OP_Context&) override;
@@ -169,12 +168,10 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip(
             "If enabled, output empty VDBs populated with their metadata and transforms only."));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     // Clipping toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "clip", "Clip to Reference Bounds")
         .setDefault(PRMzeroDefaults)
         .setTooltip("Clip VDBs to the bounding box of the reference geometry."));
-#endif
 
     // Filename
     parms.add(hutil::ParmFactory(PRM_FILE, "file_name", "File Name")
@@ -230,7 +227,6 @@ newSopOperator(OP_OperatorTable* table)
         .setCallbackFunc(&reloadCB)
         .setTooltip("Reread the VDB file."));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
 
     // Delayed loading
@@ -261,13 +257,11 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB")
         .setDocumentation(nullptr));
-#endif
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Read", SOP_OpenVDB_Read::factory, parms, *table)
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
+        .setNativeName("")
         .addOptionalInput("Optional Bounding Geometry")
-#endif
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -326,11 +320,9 @@ SOP_OpenVDB_Read::updateParmsFlags()
 
     changed |= enableParm("group", bool(evalInt("enable_grouping", 0, t)));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const bool delayedLoad = evalInt("delayload", 0, t);
     changed |= enableParm("copylimit", delayedLoad);
     changed |= enableParm("copylimitlabel", delayedLoad);
-#endif
 
     return changed;
 }
@@ -375,7 +367,6 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
             //}
         }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         const bool delayedLoad = evalInt("delayload", 0, t);
         const openvdb::Index64 copyMaxBytes =
             openvdb::Index64(1.0e9 * evalFloat("copylimit", 0, t));
@@ -395,7 +386,6 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
             }
             clip = clipBBox.isSorted();
         }
-#endif
 
         UT_AutoInterrupt progress(("Reading " + filename).c_str());
 
@@ -403,12 +393,8 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
         openvdb::MetaMap::Ptr fileMetadata;
         try {
             // Open the VDB file, but don't read any grids yet.
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
             file.setCopyMaxBytes(copyMaxBytes);
             file.open(delayedLoad);
-#else
-            file.open();
-#endif
 
             // Read the file-level metadata.
             fileMetadata = file.getMetadata();
@@ -447,10 +433,8 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
             hvdb::GridPtr grid;
             if (readMetadataOnly) {
                 grid = file.readGridMetadata(gridName);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
             } else if (clip) {
                 grid = file.readGrid(gridName, clipBBox);
-#endif
             } else {
                 grid = file.readGrid(gridName);
             }

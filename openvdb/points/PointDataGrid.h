@@ -336,12 +336,10 @@ public:
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
         , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
-#endif
 
 public:
 
@@ -349,9 +347,11 @@ public:
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
     /// @brief Create a new attribute set. Existing attributes will be removed.
-    void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength);
+    void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
     /// @brief Clear the attribute set.
-    void clearAttributes(const bool updateValueMask = true);
+    void clearAttributes(const bool updateValueMask = true,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// @brief Returns @c true if an attribute with this index exists.
     /// @param pos Index of the attribute
@@ -366,9 +366,11 @@ public:
     /// @param pos Index of the new attribute in the descriptor replacement.
     /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
     /// @param constantStride if @c false, stride is interpreted as total size of the array
+    /// @param lock an optional scoped registry lock to avoid contention
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
-                                        const bool constantStride = true);
+                                        const bool constantStride = true,
+                                        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -791,7 +793,8 @@ public:
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength)
+PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
 {
     if (descriptor->size() != 1 ||
         descriptor->find("P") == AttributeSet::INVALID_POS ||
@@ -800,14 +803,15 @@ PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descr
         OPENVDB_THROW(IndexError, "Initializing attributes only allowed with one Vec3f position attribute.");
     }
 
-    mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
+    mAttributeSet.reset(new AttributeSet(descriptor, arrayLength, lock));
 }
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
+PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask,
+    const AttributeArray::ScopedRegistryLock* lock)
 {
-    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0));
+    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0, lock));
 
     // zero voxel values
 
@@ -837,9 +841,11 @@ template<typename T, Index Log2Dim>
 inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
                                                 const size_t pos, const Index strideOrTotalSize,
-                                                const bool constantStride)
+                                                const bool constantStride,
+                                                const AttributeArray::ScopedRegistryLock* lock)
 {
-    return mAttributeSet->appendAttribute(expected, replacement, pos, strideOrTotalSize, constantStride);
+    return mAttributeSet->appendAttribute(
+        expected, replacement, pos, strideOrTotalSize, constantStride, lock);
 }
 
 template<typename T, Index Log2Dim>
@@ -1569,9 +1575,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     this->assertNonModifiableUnlessZero(value);
 

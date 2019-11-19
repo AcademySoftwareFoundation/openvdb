@@ -30,8 +30,9 @@
 
 #]=======================================================================]
 
-project(OpenVDBCore)
 cmake_minimum_required(VERSION 3.3)
+project(OpenVDBCore)
+
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -73,11 +74,32 @@ message(STATUS "----------------------------------------------------")
 if(USE_EXR)
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
+    if(${OpenEXR_VERSION} VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
+      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 else()
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
+  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+    message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 
 if(USE_LOG4CPLUS)
@@ -100,10 +122,38 @@ else()
   )
 endif()
 
+if(OPENVDB_CORE_SHARED)
+  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
+  #        boost shared libraries (more specifically libraries built with -fPIC).
+  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
+  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
+  set(BUILD_SHARED_LIBS ON)
+  set(Boost_USE_STATIC_LIBS OFF)
+endif()
+
 find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
+
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
+  if(${Boost_LIB_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
+    message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 if(UNIX)
   find_package(Threads REQUIRED)
+endif()
+
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc)
+  if(NOT TARGET Jemalloc::jemalloc)
+    message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+      It is recommended to use Jemalloc for optimum performance."
+    )
+    find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc tbbmalloc_proxy)
+  endif()
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc tbbmalloc_proxy)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
@@ -142,9 +192,19 @@ list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
   ZLIB::ZLIB
 )
+
 if(UNIX)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
+endif()
+
+if(TARGET Jemalloc::jemalloc)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Jemalloc::jemalloc)
+endif()
+
+if(TARGET TBB::tbbmalloc AND TARGET TBB::tbbmalloc_proxy)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    Threads::Threads
+    TBB::tbbmalloc
+    TBB::tbbmalloc_proxy
   )
 endif()
 
@@ -169,6 +229,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
   io/Compression.cc
+  io/DelayedLoadMetadata.cc
   io/File.cc
   io/GridDescriptor.cc
   io/Queue.cc
@@ -207,6 +268,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
 set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/Archive.h
   io/Compression.h
+  io/DelayedLoadMetadata.h
   io/File.h
   io/GridDescriptor.h
   io/io.h
@@ -270,6 +332,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/DenseSparseTools.h
   tools/Diagnostics.h
   tools/Filter.h
+  tools/FindActiveValues.h
   tools/GridOperators.h
   tools/GridTransformer.h
   tools/Interpolation.h

@@ -84,10 +84,12 @@ set(UNITTEST_SOURCE_FILES
   TestAttributeGroup.cc
   TestAttributeSet.cc
   TestBBox.cc
+  TestClip.cc
   TestConjGradient.cc
   TestCoord.cc
   TestCpt.cc
   TestCurl.cc
+  TestDelayedLoadMetadata.cc
   TestDense.cc
   TestDenseSparseTools.cc
   TestDiagnostics.cc
@@ -95,6 +97,7 @@ set(UNITTEST_SOURCE_FILES
   TestDoubleMetadata.cc
   TestExceptions.cc
   TestFile.cc
+  TestFindActiveValues.cc
   TestFloatMetadata.cc
   TestGradient.cc
   TestGrid.cc
@@ -111,9 +114,9 @@ set(UNITTEST_SOURCE_FILES
   TestLaplacian.cc
   TestLeaf.cc
   TestLeafBool.cc
+  TestLeafIO.cc
   TestLeafManager.cc
   TestLeafMask.cc
-  TestLeafIO.cc
   TestLeafOrigin.cc
   TestLevelSetRayIntersector.cc
   TestLevelSetUtil.cc
@@ -187,6 +190,32 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
 endif()
 
-target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
+target_link_libraries(vdb_test
+  ${OPENVDB_TEST_DEPENDENT_LIBS}
+)
 
-add_test(vdb_unit_test vdb_test)
+if(OPENVDB_ENABLE_RPATH)
+  set(RPATHS "")
+  # @todo There is probably a better way to do this for imported targets
+  list(APPEND RPATHS
+    ${Boost_LIBRARY_DIRS}
+    ${IlmBase_LIBRARY_DIRS}
+    ${Log4cplus_LIBRARY_DIRS}
+    ${Blosc_LIBRARY_DIRS}
+    ${Tbb_LIBRARY_DIRS}
+    ${CppUnit_LIBRARY_DIRS}
+  )
+  if(OPENVDB_BUILD_CORE)
+    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+  else()
+    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
+  endif()
+
+  list(REMOVE_DUPLICATES RPATHS)
+
+  set_target_properties(vdb_test
+    PROPERTIES INSTALL_RPATH "${RPATHS}"
+  )
+endif()
+
+add_test(vdb_unit_test vdb_test -v)

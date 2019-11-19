@@ -186,6 +186,14 @@
         _Pragma("message(\"NOTE: ignoring deprecation warning\")")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("GCC diagnostic pop")
+#elif defined _MSC_VER
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
+        __pragma(warning(push)) \
+        __pragma(warning(disable : 4996)) \
+        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__ \
+            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+    #define OPENVDB_NO_DEPRECATION_WARNING_END \
+        __pragma(warning(pop))
 #else
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     #define OPENVDB_NO_DEPRECATION_WARNING_END

@@ -3181,6 +3181,7 @@ newSopOperator(OP_OperatorTable* table)
 
     hvdb::OpenVDBOpFactory("VDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
+        .setNativeName("")
         .setOperatorTable(VOP_TABLE_NAME)
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
         .addInput("Points to rasterize")
@@ -3368,12 +3369,8 @@ SOP_OpenVDB_Rasterize_Points::cookVDBSop(OP_Context& context)
 
             // Setup VEX context
 
-#if UT_MAJOR_VERSION_INT >= 17
             OP_Caller caller(this, context.getContextOptionsStack(),
                      context.getContextOptions());
-#else
-            OP_Caller caller(this);
-#endif
             UT_SharedPtr<VEXContext> vexContextPtr;
 
             if (applyVEX) {

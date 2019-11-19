@@ -29,9 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 /*
- * PROPRIETARY INFORMATION.  This software is proprietary to
- * Side Effects Software Inc., and is not to be reproduced,
- * transmitted, or disclosed in any way without written permission.
+ * Copyright (c) Side Effects Software Inc.
  *
  * Produced by:
  *      Side Effects Software Inc
@@ -271,11 +269,7 @@ GT_GEOPrimCollectVDB::endCollecting(
 
     GT_AttributeListHandle
 
-#if (UT_VERSION_INT >= 0x11000000) // 17.0 or later
     vertices = GT_AttributeList::createAttributeList("P", task.myPos);
-#else
-        vertices = GT_AttributeList::createAttributeList("P", task.myPos, NULL);
-#endif
 
     return GT_PrimitiveHandle(
                 new GT_PrimCurveMesh(

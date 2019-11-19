@@ -2550,11 +2550,14 @@ exportGrid()
 
             ; // py::class_<Grid>
 
-#if DWA_BOOST_VERSION >= 1060000 && DWA_BOOST_VERSION < 1065000
-        // Boost versions 1.60 through 1.6x, for some x < 5, require the GridPtr-to-Python
-        // object converter to be explicitly registered.
-        py::register_ptr_to_python<GridPtr>();
-#endif
+        // Register the GridPtr-to-Python object converter explicitly
+        // if it is not already implicitly registered.
+        try {
+            py::object testObj{GridPtr()};
+        } catch (py::error_already_set& e) {
+            PyErr_Clear();
+            py::register_ptr_to_python<GridPtr>();
+        }
 
         py::implicitly_convertible<GridPtr, GridBase::Ptr>();
         py::implicitly_convertible<GridPtr, GridBase::ConstPtr>();

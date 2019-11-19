@@ -34,6 +34,8 @@
 #include "ParmFactory.h"
 
 #include <CH/CH_Manager.h>
+#include <CMD/CMD_Args.h>
+#include <CMD/CMD_Manager.h>
 #include <GOP/GOP_GroupParse.h>
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
@@ -41,9 +43,13 @@
 #include <GA/GA_AIFSharedStringTuple.h>
 #include <GA/GA_Attribute.h>
 #include <GA/GA_AttributeRef.h>
+#include <HOM/HOM_Module.h>
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#include <PY/PY_CPythonAPI.h>
+#include <PY/PY_InterpreterAutoLock.h>
+#include <PY/PY_Python.h>
 #include <SOP/SOP_NodeParmsOptions.h>
 #include <UT/UT_IntArray.h>
 #include <UT/UT_WorkArgs.h>
@@ -119,6 +125,17 @@ getSparePointer(const PRM_SpareData* spare, const char* token, const void* deflt
         return reinterpret_cast<void*>(intPtr);
     }
     return deflt;
+}
+
+
+// Copy elements from one spare data map to another,
+// overwriting any existing elements with the same keys.
+inline void
+mergeSpareData(SpareDataMap& dst, const SpareDataMap& src)
+{
+    for (const auto& it: src) {
+        dst[it.first] = it.second;
+    }
 }
 
 } // anonymous namespace
@@ -644,12 +661,11 @@ ParmFactory&
 ParmFactory::setRange(const PRM_Range* r) { mImpl->range = r; return *this; }
 
 ParmFactory&
-ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
+ParmFactory::setSpareData(const SpareDataMap& items)
 {
-    using StringMap = std::map<std::string, std::string>;
     if (!items.empty()) {
         if (!mImpl->spareData) { mImpl->spareData = new PRM_SpareData; }
-        for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
+        for (SpareDataMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
             mImpl->spareData->addTokenValue(i->first.c_str(), i->second.c_str());
         }
     }
@@ -941,8 +957,25 @@ public:
         return !mDoc.empty();
     }
 
+#ifndef SESI_OPENVDB
+    bool getVersion(UT_String &version) override
+    {
+        auto it = spareData().find("operatorversion");
+        if (it != spareData().end()) {
+            version = it->second;
+            return true;
+        }
+
+        return OP_Operator::getVersion(version);
+    }
+#endif
+
+    const SpareDataMap& spareData() const { return mSpareData; }
+    SpareDataMap& spareData() { return mSpareData; }
+
 private:
     const std::string mHelpUrl, mDoc;
+    SpareDataMap mSpareData;
 };
 
 
@@ -1018,6 +1051,9 @@ struct OpFactory::Impl
         mIconName = mPolicy->getIconName(factory);
         mHelpUrl = mPolicy->getHelpURL(factory);
         mFirstName = mPolicy->getFirstName(factory);
+        mTabSubMenuPath = mPolicy->getTabSubMenuPath(factory);
+
+        initScripting();
     }
 
     OP_OperatorDW* get()
@@ -1043,17 +1079,210 @@ struct OpFactory::Impl
 
         if (!mIconName.empty()) op->setIconName(mIconName.c_str());
 
+        if (!mTabSubMenuPath.empty()) op->setOpTabSubMenuPath(mTabSubMenuPath.c_str());
+
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
         if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
 
+        mergeSpareData(op->spareData(), mSpareData);
+
         return op;
     }
+
+    void initScripting()
+    {
+        // Install an HScript command to retrieve spare data from operators.
+        if (auto* cmgr = CMD_Manager::getContext()) {
+            if (!cmgr->isCommandDefined(kSpareDataCmdName)) {
+                cmgr->installCommand(kSpareDataCmdName, "", cmdGetOperatorSpareData);
+            }
+        }
+
+        // Install Python functions to retrieve spare data from operators.
+        static bool sDidInstallHOMModule = false;
+        if (!sDidInstallHOMModule) {
+            // Install a _dwhoudiniutils module with a NodeType_spareData() function.
+            static PY_PyMethodDef sMethods[] = {
+                {"NodeType_spareData", homGetOperatorSpareData, PY_METH_VARARGS(), ""},
+                { nullptr, nullptr, 0, nullptr }
+            };
+            {
+                PY_InterpreterAutoLock interpreterLock;
+                PY_Py_InitModule("_dwhoudiniutils", sMethods);
+                sDidInstallHOMModule = true;
+            }
+
+            // Add methods to the hou.NodeType class.
+            PYrunPythonStatementsAndExpectNoErrors("\
+def _spareData(self, name):\n\
+    '''\n\
+    spareData(name) -> str or None\n\
+    \n\
+    Return the spare data with the given name, or None\n\
+    if no data with that name is defined for this node type.\n\
+    \n\
+    Currently, only node types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
+    '''\n\
+    import _dwhoudiniutils\n\
+    return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name(), name)\n\
+\n\
+def _spareDataDict(self):\n\
+    '''\n\
+    spareDataDict() -> dict of str to str\n\
+    \n\
+    Return a dictionary of the spare data for this node type.\n\
+    \n\
+    Currently, only node types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
+    '''\n\
+    import _dwhoudiniutils\n\
+    return _dwhoudiniutils.NodeType_spareData(self.category().name(), self.name())\n\
+\n\
+nt = __import__('hou').NodeType\n\
+nt.spareData = _spareData\n\
+nt.spareDataDict = _spareDataDict\n\
+del nt, _spareData, _spareDataDict\n");
+        }
+    }
+
+    // HScript callback to retrieve spare data from an OP_OperatorDW-derived operator
+    static void cmdGetOperatorSpareData(CMD_Args& args)
+    {
+        // The operator's network type ("Sop", "Dop", etc.)
+        const char* const networkType = args[1];
+        // The operator's name
+        const char* const opName = args[2];
+        // An optional spare data token
+        const char* const token = args[3];
+
+        if (!networkType || !opName) {
+            /// @todo Install this as a command.help file?
+            args.out() << kSpareDataCmdName << "\n\
+\n\
+    List spare data associated with an operator type.\n\
+\n\
+    USAGE\n\
+      " << kSpareDataCmdName << " <networktype> <opname> [<token>]\n\
+\n\
+    When the token is omitted, all (token, value) pairs\n\
+    associated with the operator type are displayed.\n\
+\n\
+    Currently, only operator types defined with OpenVDB's OpFactory\n\
+    can have spare data.  See www.openvdb.org for more information.\n\
+\n\
+    EXAMPLES\n\
+      > " << kSpareDataCmdName << " Sop DW_OpenVDBConvert\n\
+        lists all spare data associated with the Convert VDB SOP\n\
+      > " << kSpareDataCmdName << " Sop DW_OpenVDBClip nativename\n\
+        displays the VDB Clip SOP's native name\n\
+\n";
+            return;
+        }
+
+        // Retrieve the operator table for the specified network type.
+        const OP_OperatorTable* table = nullptr;
+        {
+            OP_OperatorTableList opTables;
+            OP_OperatorTable::getAllOperatorTables(opTables);
+            for (const auto& t: opTables) {
+                if (t && (t->getName() == networkType)) {
+                    table = t;
+                    break;
+                }
+            }
+        }
+        if (table) {
+            if (const auto* op = table->getOperator(opName)) {
+                // Retrieve the operator's spare data map.
+                // (The map is empty for operators that don't support spare data.)
+                const auto& spare = getOperatorSpareData(*op);
+                if (token) {
+                    // If a token was provided and it exists in the map,
+                    // print the corresponding value.
+                    const auto it = spare.find(token);
+                    if (it != spare.end()) {
+                        args.out() << it->second << "\n";
+                    }
+                } else {
+                    // If no token was provided, print all of the operator's
+                    // (token, value) pairs.
+                    for (const auto& it: spare) {
+                        args.out() << it.first << " " << it.second << "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    // Python callback to retrieve spare data from an OP_OperatorDW-derived operator
+    static PY_PyObject* homGetOperatorSpareData(PY_PyObject* self, PY_PyObject* args)
+    {
+        // The operator's network type ("Sop", "Dop", etc.)
+        const char* networkType = nullptr;
+        // The operator's name
+        const char* opName = nullptr;
+        // An optional spare data token
+        const char* token = nullptr;
+        if (!PY_PyArg_ParseTuple(args, "ss|s", &networkType, &opName, &token)) {
+            return nullptr;
+        }
+
+        if (!networkType || !opName) {
+            return PY_Py_None();
+        }
+
+        try {
+            HOM_AutoLock homLock;
+
+            // Retrieve the operator table for the specified network type.
+            const OP_OperatorTable* table = nullptr;
+            {
+                OP_OperatorTableList opTables;
+                OP_OperatorTable::getAllOperatorTables(opTables);
+                for (const auto& t: opTables) {
+                    if (t && (t->getName() == networkType)) {
+                        table = t;
+                        break;
+                    }
+                }
+            }
+            if (table) {
+                if (const auto* op = table->getOperator(opName)) {
+                    // Retrieve the operator's spare data map.
+                    // (The map is empty for operators that don't support spare data.)
+                    const auto& spare = getOperatorSpareData(*op);
+                    if (token) {
+                        // If a token was provided and it exists in the map,
+                        // return the corresponding value.
+                        const auto it = spare.find(token);
+                        if (it != spare.end()) {
+                            return PY_Py_BuildValue("s", it->second.c_str());
+                        }
+                    } else {
+                        // If no token was provided, return a dictionary
+                        // of all of the operator's (token, value) pairs.
+                        if (auto* dict = PY_Py_BuildValue("{}")) {
+                            for (const auto& it: spare) {
+                                PY_PyDict_SetItemString(dict, it.first.c_str(),
+                                    PY_Py_BuildValue("s", it.second.c_str()));
+                            }
+                            return dict;
+                        }
+                    }
+                }
+            }
+        } catch (HOM_Error& err) {
+        }
+        return PY_Py_None();
+    }
+
 
     OpPolicyPtr mPolicy; // polymorphic, so stored by pointer
     OpFactory::OpFlavor mFlavor;
     std::string mEnglish, mName, mLabelName, mIconName, mHelpUrl, mDoc, mOperatorTableName;
-    std::string mFirstName;
+    std::string mFirstName, mTabSubMenuPath;
     OP_Constructor mConstruct;
     OP_OperatorTable* mTable;
     PRM_Template *mParms, *mObsoleteParms;
@@ -1064,6 +1293,10 @@ struct OpFactory::Impl
     std::vector<std::string> mAliases;
     std::vector<char*> mInputLabels, mOptInputLabels;
     OpFactoryVerb* mVerb = nullptr;
+    bool mInvisible = false;
+    SpareDataMap mSpareData;
+
+    static constexpr auto* kSpareDataCmdName = "opsparedata";
 };
 
 
@@ -1089,6 +1322,12 @@ OpFactory::~OpFactory()
 
     if (!mImpl->mFirstName.empty()) {
         mImpl->mTable->setOpFirstName(mImpl->mName.c_str(), mImpl->mFirstName.c_str());
+    }
+
+    // hide node if marked as invisible
+
+    if (mImpl->mInvisible) {
+        mImpl->mTable->addOpHidden(mImpl->mName.c_str());
     }
 }
 
@@ -1168,6 +1407,13 @@ OpFactory::documentation() const
 
 const OP_OperatorTable&
 OpFactory::table() const
+{
+    return *mImpl->mTable;
+}
+
+
+OP_OperatorTable&
+OpFactory::table()
 {
     return *mImpl->mTable;
 }
@@ -1265,6 +1511,47 @@ OpFactory::setVerb(SOP_NodeVerb::CookMode cookMode, const CacheAllocFunc& alloca
     mImpl->mVerb = new OpFactoryVerb{name(), cookMode, allocator, mImpl->mParms};
 
     return *this;
+}
+
+
+OpFactory&
+OpFactory::setInvisible()
+{
+    mImpl->mInvisible = true;
+    return *this;
+}
+
+
+OpFactory&
+OpFactory::addSpareData(const SpareDataMap& spare)
+{
+    mergeSpareData(mImpl->mSpareData, spare);
+    return *this;
+}
+
+
+////////////////////////////////////////
+
+
+const SpareDataMap&
+getOperatorSpareData(const OP_Operator& op)
+{
+    static const SpareDataMap sNoSpareData;
+    if (const auto* opdw = dynamic_cast<const OP_OperatorDW*>(&op)) {
+        return opdw->spareData();
+    }
+    return sNoSpareData;
+}
+
+void
+addOperatorSpareData(OP_Operator& op, SpareDataMap& spare)
+{
+    if (auto* opdw = dynamic_cast<OP_OperatorDW*>(&op)) {
+        mergeSpareData(opdw->spareData(), spare);
+    } else {
+        throw std::runtime_error("spare data cannot be added to the \""
+            + op.getName().toStdString() + "\" operator");
+    }
 }
 
 
