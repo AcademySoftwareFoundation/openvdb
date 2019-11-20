@@ -709,6 +709,10 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
+    /// @brief Add the given child node at the root level.
+    /// If a child node with the same origin already exists, replace it.
+    void addChild(ChildType* child);
+
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
     void addTile(const Coord& xyz, const ValueType& value, bool state);
@@ -2585,6 +2589,20 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     }
     acc.insert(xyz, child);
     child->addLeafAndCache(leaf, acc);
+}
+
+template<typename ChildT>
+inline void
+RootNode<ChildT>::addChild(ChildT* child)
+{
+    if (!child) return;
+    const Coord& xyz = child->origin();
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {//background
+        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+    } else {//child or tile
+        setChild(iter, *child);//this also deletes the existing child node
+    }
 }
 
 template<typename ChildT>
