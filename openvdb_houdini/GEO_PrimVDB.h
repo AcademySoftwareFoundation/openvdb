@@ -429,6 +429,11 @@ public:
     void                        makeGridUnique()
                                     { myGridAccessor.makeGridUnique(); }
 
+    /// @brief Returns if the tree is not shared.  If it is not shared,
+    /// one can make destructive edits without makeGridUnique.
+    bool                        isGridUnique() const
+                                    { return myGridAccessor.isGridUnique(); }
+
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
     const openvdb::GridBase &   getConstGrid() const
@@ -670,6 +675,7 @@ protected:
                         { setTransformAdapter(&xform, prim); }
 
         void            makeGridUnique();
+        bool            isGridUnique() const;
 
         UT_VDBType      getStorageType() const { return myStorageType; }
         bool            hasGrid() const { return myGrid != 0; }
