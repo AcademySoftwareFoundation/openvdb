@@ -149,6 +149,11 @@ set(OPENVDB_PYTHON_DEPENDENT_LIBS
 
 ##########################################################################
 
+# @todo Should be target definitions
+if(WIN32)
+  add_definitions(-DNOMINMAX)
+endif()
+
 set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
   pyFloatGrid.cc
   pyIntGrid.cc
