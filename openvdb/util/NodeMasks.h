@@ -55,11 +55,8 @@ inline Index32
 CountOn(Byte v)
 {
     // Simple LUT:
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
     /// @todo Move this table and others into, say, Util.cc
-    const Byte numBits[256] = {
+    static const Byte numBits[256] = {
 #define COUNTONB2(n)  n,            n+1,            n+1,            n+2
 #define COUNTONB4(n)  COUNTONB2(n), COUNTONB2(n+1), COUNTONB2(n+1), COUNTONB2(n+2)
 #define COUNTONB6(n)  COUNTONB4(n), COUNTONB4(n+1), COUNTONB4(n+1), COUNTONB4(n+2)
@@ -112,10 +109,7 @@ inline Index32
 FindLowestOn(Byte v)
 {
     assert(v);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[8] = {0, 1, 6, 2, 7, 5, 4, 3};
+    static const Byte DeBruijn[8] = {0, 1, 6, 2, 7, 5, 4, 3};
     return DeBruijn[Byte((v & -v) * 0x1DU) >> 5];
 }
 
@@ -125,10 +119,7 @@ FindLowestOn(Index32 v)
 {
     assert(v);
     //return ffs(v);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[32] = {
+    static const Byte DeBruijn[32] = {
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
@@ -141,10 +132,7 @@ FindLowestOn(Index64 v)
 {
     assert(v);
     //return ffsll(v);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[64] = {
+    static const Byte DeBruijn[64] = {
         0,   1,  2, 53,  3,  7, 54, 27, 4,  38, 41,  8, 34, 55, 48, 28,
         62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
         63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
@@ -157,10 +145,7 @@ FindLowestOn(Index64 v)
 inline Index32
 FindHighestOn(Index32 v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const Byte DeBruijn[32] = {
+    static const Byte DeBruijn[32] = {
         0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
         8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
     };
