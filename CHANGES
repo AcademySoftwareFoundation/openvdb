@@ -25,6 +25,10 @@ Version 7.0.0 - In development
 
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7
+    - Added new virtual methods for copying const grids and replacing
+      the metadata and/or the transform - GridBase::copyGridReplacingMetadata,
+      GridBase::copyGridReplacingTransform and
+      GridBase::copyGridReplacingMetadataAndTransform.
 
     API changes:
     - VolumeToMesh::pointList() and VolumeToMesh::polygonPoolList() now return

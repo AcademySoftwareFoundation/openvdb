@@ -34,6 +34,12 @@ Bug fixes:
 @par
 ABI changes:
 - OpFactory destructor is now virtual as of ABI=7
+- Added new virtual methods for copying const grids and replacing
+  the metadata and/or the transform -
+  @vdblink::GridBase::copyGridReplacingMetadata() GridBase::copyGridReplacingMetadata@endlink,
+  @vdblink::GridBase::copyGridReplacingTransform() GridBase::copyGridReplacingTransform@endlink
+  and @vdblink::GridBase::copyGridReplacingMetadataAndTransform()
+  GridBase::copyGridReplacingMetadataAndTransform@endlink.
 
 @par
 API changes:
