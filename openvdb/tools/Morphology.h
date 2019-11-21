@@ -306,10 +306,7 @@ protected:
                 leaf = acc.probeLeaf(orig);
                 if ((leaf == nullptr) && !acc.isValueOn(orig)) leaf = acc.touchLeaf(orig);
             }
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-            static
-#endif
-            const int N = (LEAF_DIM - 1)*(DY + DX*LEAF_DIM);
+            static const int N = (LEAF_DIM - 1)*(DY + DX*LEAF_DIM);
             if (leaf) leaf->getValueMask().template getWord<Word>(indx-N) |= mask;
         }
 
@@ -322,10 +319,7 @@ protected:
                 leaf = acc.probeLeaf(orig);
                 isOn = leaf ? false : acc.isValueOn(orig);
             }
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-            static
-#endif
-            const int N = (LEAF_DIM -1 )*(DY + DX*LEAF_DIM);
+            static const int N = (LEAF_DIM -1 )*(DY + DX*LEAF_DIM);
             return leaf ? leaf->getValueMask().template getWord<Word>(indx-N)
                 : isOn ? ~Word(0) : Word(0);
         }

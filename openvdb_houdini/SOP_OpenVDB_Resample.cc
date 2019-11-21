@@ -174,11 +174,11 @@ Using Voxel Scale Only:\n\
             " for the new transform"));
 
     // Translation
-    parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate")
+    parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate Voxels")
         .setDefault(PRMzeroDefaults)
         .setVectorSize(3)
         .setTooltip(
-            "When __Define Transform__ is Explicitly, the position for the new transform"));
+            "When __Define Transform__ is Explicitly, the shift in voxels for the new transform"));
 
     // Rotation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "r", "Rotate")
