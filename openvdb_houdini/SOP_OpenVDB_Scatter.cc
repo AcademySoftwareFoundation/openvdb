@@ -300,7 +300,7 @@ SOP_OpenVDB_Scatter::syncNodeVersion(const char* oldVersion, const char*, bool*)
     } else if (oldVersionStr.size() > 3 && oldVersionStr.substr(0,3) == "vdb") {
         std::string vdbVersion = oldVersionStr.substr(3,spacePos-3);
         // disable compression in VDB version 6.2.1 or earlier
-        if (UT_String::compareVersionString(vdbVersion.c_str(), "6.2.1") < 0) {
+        if (UT_String::compareVersionString(vdbVersion.c_str(), "6.2.1") <= 0) {
             disableCompression = true;
         }
     }
