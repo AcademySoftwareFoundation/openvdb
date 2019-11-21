@@ -206,6 +206,9 @@ if(APPLE)
     ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
     ${_HOUDINI_LIB_DIR}/libhboost_thread.dylib
   )
+elseif(WIN32)
+  set(_HOUDINI_LIB_DIR custom/houdini/dsolib)
+  file(GLOB _HOUDINI_EXTRA_LIBRARIES ${_HOUDINI_LIB_DIR}/*.lib)
 else()
   set(_HOUDINI_LIB_DIR dsolib)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
