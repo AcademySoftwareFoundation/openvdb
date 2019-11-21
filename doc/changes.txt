@@ -25,6 +25,8 @@ Improvements:
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
 - Replaced occurrences of boost::scoped_array with std::unique_ptr.
+- Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
+  AVX compiler flags, this is switched off by default.
 
 @par
 Bug fixes:
