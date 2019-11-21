@@ -22,6 +22,7 @@ Version 7.0.0 - In development
     Bug fixes:
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled
       correctly.
+    - Fixed a Windows build issue in openvdb_render.
 
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7

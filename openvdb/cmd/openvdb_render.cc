@@ -46,6 +46,7 @@
 #include <vector>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <openvdb/PlatformConfig.h> // defines OPENEXR_DLL if required, must come before OpenEXR includes
 #include <OpenEXR/ImfChannelList.h>
 #include <OpenEXR/ImfFrameBuffer.h>
 #include <OpenEXR/ImfHeader.h>
