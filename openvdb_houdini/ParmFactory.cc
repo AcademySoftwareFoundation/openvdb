@@ -1029,8 +1029,7 @@ struct OpFactory::Impl
         mObsoleteParms(nullptr),
         mMaxSources(0),
         mVariables(nullptr),
-        mFlags(0),
-	mOperatorTableName("")
+        mFlags(0)
     {
     }
 

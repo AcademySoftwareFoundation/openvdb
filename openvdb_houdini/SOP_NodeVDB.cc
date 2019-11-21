@@ -266,25 +266,6 @@ SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
     return group;
 }
 
-const GA_PrimitiveGroup*
-SOP_NodeVDB::matchGroup(const GU_Detail& aGdp, const std::string& pattern)
-{
-    const GA_PrimitiveGroup* group = NULL;
-    if (!pattern.empty()) {
-        // If a pattern was provided, try to match it.
-#if (UT_MAJOR_VERSION_INT >= 15)
-        group = parsePrimitiveGroups(pattern.c_str(), GroupCreator(&aGdp));
-#else
-        group = parsePrimitiveGroups(pattern.c_str(), const_cast<GU_Detail*>(&aGdp));
-#endif
-        if (!group) {
-            // Report an error if the pattern didn't match.
-            throw std::runtime_error(("Invalid group (" + pattern + ")").c_str());
-        }
-    }
-    return group;
-}
-
 
 ////////////////////////////////////////
 

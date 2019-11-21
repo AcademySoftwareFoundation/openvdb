@@ -293,17 +293,17 @@ private: // METHODS
                             const GEO_PrimVDB&,
                             const GEO_Detail&);
 
-    static void		createAttrsFromMetadataAdapter(
-			    GA_AttributeOwner owner,
-			    GA_Offset element,
-			    const void* meta_map_ptr,
-			    GEO_Detail& geo);
+    static void createAttrsFromMetadataAdapter(
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const void* meta_map_ptr,
+        GEO_Detail& geo);
 
-    static void		createMetadataFromAttrsAdapter(
-			    void* meta_map_ptr,
-			    GA_AttributeOwner owner,
-			    GA_Offset element,
-			    const GEO_Detail& geo);
+    static void createMetadataFromAttrsAdapter(
+        void* meta_map_ptr,
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const GEO_Detail& geo);
 
 private: // DATA
 

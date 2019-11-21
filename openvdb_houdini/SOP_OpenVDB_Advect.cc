@@ -66,9 +66,6 @@ namespace { struct AdvectionParms; }
 class SOP_OpenVDB_Advect: public hvdb::SOP_NodeVDB
 {
 public:
-#if SESI_VERBIFY
-    const SOP_NodeVerb	*cookVerb() const;
-#endif
     SOP_OpenVDB_Advect(OP_Network*, const char* name, OP_Operator*);
     ~SOP_OpenVDB_Advect() override {}
 
@@ -88,8 +85,6 @@ protected:
 
 
 // Build UI and register this operator
-
-static PRM_Template	*theParmTemplates = 0;
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -333,8 +328,6 @@ the advected field from the previous frame, do one of the following:\n\
 \n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
-
-    theParmTemplates = parms.get();
 }
 
 

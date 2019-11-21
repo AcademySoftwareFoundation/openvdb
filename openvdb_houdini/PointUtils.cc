@@ -731,7 +731,7 @@ template<typename HoudiniType, typename ValueType>
 GA_Defaults
 buildDefaults(const ValueType& value)
 {
-    HoudiniType	values[1];
+    HoudiniType values[1];
     values[0] = value;
     return GA_Defaults(values, 1);
 }

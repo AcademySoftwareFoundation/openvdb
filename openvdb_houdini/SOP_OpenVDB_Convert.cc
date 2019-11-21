@@ -958,7 +958,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     // Enable/disable
     //
     changed |= enableParm("adaptivity", toPoly);
-    changed |= enableParm("isoValue", toPoly);
+    changed |= enableParm("isoValue", toPoly || (toOpenVDB && toSDF));
     changed |= enableParm("fogisovalue", toOpenVDB && toSDF);
 
     if (toOpenVDB) {
@@ -1269,7 +1269,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
     if (!boss.wasInterrupted() && computeNormals) {
 
         UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),
-            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0 : 0.7) ));
+            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0f : 0.7f) ));
 
         if (!interiorGroup) {
             addWarning(SOP_MESSAGE, "More accurate vertex normals can be generated "
