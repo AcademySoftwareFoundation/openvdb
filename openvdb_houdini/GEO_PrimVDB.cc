@@ -1678,11 +1678,11 @@ GEO_PrimVDB::GridAccessor::isGridUnique() const
     if (myGrid) {
         // We require the grid to always be unique, it is the tree
         // that is allowed to be shared.
-	UT_ASSERT(myGrid.unique());
-	openvdb::TreeBase::Ptr localTreePtr = myGrid->baseTreePtr();
-	if (localTreePtr.use_count() > 2) { // myGrid + localTreePtr = 2
+        UT_ASSERT(myGrid.unique());
+        openvdb::TreeBase::Ptr localTreePtr = myGrid->baseTreePtr();
+        if (localTreePtr.use_count() > 2) { // myGrid + localTreePtr = 2
             return false;
-	}
+        }
         return true;
     }
     // Empty grids are trivially unique
