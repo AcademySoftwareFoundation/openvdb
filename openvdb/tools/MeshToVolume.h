@@ -1113,7 +1113,7 @@ public:
     using ValueType = typename TreeType::ValueType;
     using LeafNodeType = typename TreeType::LeafNodeType;
 
-    SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, bool* changedNodeMask)
+    SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, const bool* changedNodeMask)
         : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
     {
@@ -1123,13 +1123,16 @@ public:
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             if (mChangedNodeMask[n]) {
                 //seedFill(*mNodes[n]);
-                mChangedNodeMask[n] = scanFill(*mNodes[n]);
+                //Whether or not scanFill changes any values, the node
+                //has still changed since the last attempt to propagate
+                //to adjacent nodes. The mask is therefore left unchanged.
+                scanFill(*mNodes[n]);
             }
         }
     }
 
     LeafNodeType    ** const mNodes;
-    bool             * const mChangedNodeMask;
+    const bool       * const mChangedNodeMask;
 };
 
 
@@ -1220,22 +1223,18 @@ public:
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            bool changedValue = false;
 
-            if (!mChangedNodeMask[n]) {
+            changedValue |= processZ(n, /*firstFace=*/true);
+            changedValue |= processZ(n, /*firstFace=*/false);
 
-                bool changedValue = false;
+            changedValue |= processY(n, /*firstFace=*/true);
+            changedValue |= processY(n, /*firstFace=*/false);
 
-                changedValue |= processZ(n, /*firstFace=*/true);
-                changedValue |= processZ(n, /*firstFace=*/false);
+            changedValue |= processX(n, /*firstFace=*/true);
+            changedValue |= processX(n, /*firstFace=*/false);
 
-                changedValue |= processY(n, /*firstFace=*/true);
-                changedValue |= processY(n, /*firstFace=*/false);
-
-                changedValue |= processX(n, /*firstFace=*/true);
-                changedValue |= processX(n, /*firstFace=*/false);
-
-                mNodeMask[n] = changedValue;
-            }
+            mNodeMask[n] = changedValue;
         }
     }
 
@@ -3082,6 +3081,8 @@ traceExteriorBoundaries(FloatTreeT& tree)
             nodeConnectivity, changedNodeMaskA.get(), changedNodeMaskB.get(),
             changedVoxelMask.get()));
 
+        //Only nodes where a value was influenced by an adjacent node need to be
+        //processed on the next pass.
         changedNodeMaskA.swap(changedNodeMaskB);
 
         nodesUpdated = false;
