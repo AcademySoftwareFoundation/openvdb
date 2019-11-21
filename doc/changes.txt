@@ -25,6 +25,9 @@ Improvements:
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
 - Replaced occurrences of boost::scoped_array with std::unique_ptr.
+- Added new @vdblink::tree::RootNode::addChild() RootNode::addChild@endlink and
+  @vdblink::tree::InternalNode::addChild() InternalNode::addChild@endlink methods to
+  allow the insertion of child elements directly.
 
 @par
 Bug fixes:
