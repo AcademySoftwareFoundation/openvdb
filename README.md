@@ -92,6 +92,10 @@ make install
 ```
 #### Windows
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
+
+It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
+variable to use 64-bit libraries by default.
+
 ```
 vcpkg install boost zlib blosc openexr tbb
 vcpkg integrate install
