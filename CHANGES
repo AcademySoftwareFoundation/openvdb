@@ -50,6 +50,8 @@ Version 7.0.0 - In development
       point offsets (mesh inputs).
     - Threaded the population of point group memberships during conversion
       from Houdini geometry to OpenVDB Points
+    - Introduced a position compression option to the Scatter SOP for VDB
+      Points and default to 16-bit fixed point.
 
 
 Version 6.2.1 - September 30, 2019

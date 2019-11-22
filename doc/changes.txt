@@ -65,6 +65,8 @@ Houdini:
   inputs).
 - Threaded the population of point group memberships during conversion from
   Houdini geometry to OpenVDB Points
+- Introduced a position compression option to the Scatter&nbsp;SOP for VDB
+  Points and default to 16-bit fixed point.
 
 
 @htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly
