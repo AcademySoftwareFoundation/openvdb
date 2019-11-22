@@ -8,7 +8,6 @@ illustrate how to use OpenVDB and how to perform common tasks.
 
 @section sCookbookContents Contents
 - @ref sHelloWorld
-  - @ref sCompilingHelloWorld
 - @ref sAllocatingGrids
 - @ref sPopulatingGrids
 - @ref sModifyingGrids
@@ -117,34 +116,12 @@ Grid[1000, 200000000, -30000000] = 2
 Grid[2147483647, 2147483647, 2147483647] = 4
 @endcode
 
-@subsection sCompilingHelloWorld Compiling
-See the @c Makefile and @c INSTALL file included in this distribution for
-details on how to build and install the OpenVDB library.
-By default, installation is into the directory tree rooted at
-<tt>/tmp/OpenVDB/</tt>, but this can be changed either by editing the value
-of the @c INSTALL_DIR variable in the makefile or by setting the desired
-value from the command line, as in the following example:
-@code
-make install INSTALL_DIR=/usr/local
-@endcode
-Once OpenVDB has been installed, the simplest way to compile a program
-like the &ldquo;Hello, World&rdquo; example above is to examine the
-commands that are used to build the @c vdb_print tool:
-@code
-rm vdb_print
-make verbose=yes vdb_print
-@endcode
-and then replace &ldquo;<tt>-o vdb_print</tt>&rdquo; with, for example,
-&ldquo;<tt>-o helloworld</tt>&rdquo;
-and &ldquo;<tt>cmd/openvdb_print/main.cc</tt>&rdquo;
-with &ldquo;<tt>helloworld.cc</tt>&rdquo;.
-
 
 
 @section sAllocatingGrids Creating and writing a grid
 This example is a complete program that illustrates some of the basic steps
 to create grids and write them to disk.  (See @ref sPopulatingGrids,
-below, for the implementation of the @c makeSphere() function.)
+below, for the implementation of the @b makeSphere function.)
 @code
 #include <openvdb/openvdb.h>
 
@@ -195,7 +172,7 @@ int main()
 
 The OpenVDB library includes optimized routines for many common tasks.
 For example, most of the steps given above are encapsulated in the function
-@vdblink::tools::createLevelSetSphere() tools::createLevelSetSphere()@endlink, so that
+@vdblink::tools::createLevelSetSphere() tools::createLevelSetSphere@endlink, so that
 the above can be written simply as follows:
 
 @code
@@ -368,7 +345,7 @@ to be written to and read from streams that do not support random access,
 with the restriction that all grids must be written or read at once.
 (With @vdblink::io::File io::File@endlink,
 grids can be read individually by name, provided that they were originally
-written with @c io::File, rather than streamed to a file.)
+written with @b io::File, rather than streamed to a file.)
 
 @code
 #include <openvdb/openvdb.h>
@@ -403,15 +380,15 @@ grids = openvdb::io::Stream(ifile).getGrids();
 
 @section sHandlingMetadata Handling metadata
 Metadata of various types (string, floating point, integer, etc.&mdash;see
-metadata/Metadata.h for more) can be attached both to individual <tt>Grid</tt>s
+Metadata.h for more) can be attached both to individual <b>Grid</b>s
 and to files on disk.
-The examples that follow refer to <tt>Grid</tt>s, but the usage is the same
+The examples that follow refer to <b>Grid</b>s, but the usage is the same
 for the @vdblink::MetaMap MetaMap@endlink that can optionally be supplied
 to a @vdblink::io::File::write() file@endlink or
 @vdblink::io::Stream::write() stream@endlink for writing.
 
 @subsection sAddingMetadata Adding metadata
-The @vdblink::Grid::insertMeta() Grid::insertMeta()@endlink method either
+The @vdblink::Grid::insertMeta() Grid::insertMeta@endlink method either
 adds a new (@em name, @em value) pair if the name is unique, or overwrites
 the existing value if the name matches an existing one.  An existing value
 cannot be overwritten with a new value of a different type; the old metadata
@@ -434,7 +411,7 @@ grid->insertMeta("center", openvdb::FloatMetadata(0.0));
 @endcode
 
 @subsection sGettingMetadata Retrieving metadata
-Call @vdblink::Grid::metaValue() Grid::metaValue()@endlink to retrieve
+Call @vdblink::Grid::metaValue() Grid::metaValue@endlink to retrieve
 the value of metadata of a known type.  For example,
 @code
 std::string s = grid->metaValue<std::string>("vector type");
@@ -445,8 +422,8 @@ float r = grid->metaValue<float>("radius");
 float center = grid->metaValue<float>("center");
 @endcode
 
-@vdblink::Grid::beginMeta() Grid::beginMeta()@endlink and
-@vdblink::Grid::beginMeta() Grid::beginMeta()@endlink return STL @c std::map
+@vdblink::Grid::beginMeta() Grid::beginMeta@endlink and
+@vdblink::Grid::endMeta() Grid::endMeta@endlink return @b std::map
 iterators over all of the metadata associated with a grid:
 @code
 for (openvdb::MetaMap::MetaIterator iter = grid->beginMeta();
@@ -481,7 +458,7 @@ if (metadata->typeName() == openvdb::StringMetadata::staticTypeName()) {
 @endcode
 
 @subsection sRemovingMetadata Removing metadata
-@vdblink::Grid::removeMeta() Grid::removeMeta()@endlink removes metadata
+@vdblink::Grid::removeMeta() Grid::removeMeta@endlink removes metadata
 by name.  If the given name is not found, the call has no effect.
 @code
 grid->removeMeta("vector type");
@@ -611,9 +588,9 @@ A @vdblink::tree::IteratorRange tree::IteratorRange@endlink wraps any grid or
 tree iterator and gives the iterator
 <A HREF="http://www.threadingbuildingblocks.org">TBB</A> splittable range
 semantics, so that it can be used as the Range argument to functions like
-@c tbb::parallel_for() and @c tbb::parallel_reduce().
-(This is in fact how @vdblink::tools::foreach() tools::foreach()@endlink and
-@vdblink::tools::transformValues() tools::transformValues()@endlink are
+@b tbb::parallel_for and @b tbb::parallel_reduce.
+(This is in fact how @vdblink::tools::foreach() tools::foreach@endlink and
+@vdblink::tools::transformValues() tools::transformValues@endlink are
 implemented; see @ref sValueXformTools, below, for more on those functions.)
 There is some overhead to splitting, since grid and tree iterators are not
 random-access, but the overhead should typically be negligible compared with
@@ -702,7 +679,7 @@ in index space.
 The following sections introduce OpenVDB&rsquo;s various interpolation schemes
 as well as the @ref sGridSampler and @ref sDualGridSampler classes for
 efficient, continuous sampling of grids.
-In most cases, GridSampler is the preferred interface for interpolation,
+In most cases, @b GridSampler is the preferred interface for interpolation,
 but note that when a fixed transform is to be applied to all values in a grid
 (that is, the grid is to be resampled), it is both easier and more efficient to
 use the multithreaded @vdblink::tools::GridTransformer GridTransformer@endlink
@@ -797,9 +774,9 @@ indexValue = fastSampler.isSample(openvdb::Vec3R(10.5, -100.2, 50.3));
 // Compute the value of the grid at a location in world space.
 worldValue = fastSampler.wsSample(openvdb::Vec3R(0.25, 1.4, -1.1));
 @endcode
-Note that when constructing a GridSampler with either a tree or a
+Note that when constructing a @b GridSampler with either a tree or a
 value accessor, you must also supply an index-to-world transform.
-When constructing a GridSampler with a grid, the grid's transform is used
+When constructing a @b GridSampler with a grid, the grid's transform is used
 automatically.
 
 
@@ -811,11 +788,11 @@ If this transformation is to be applied to all of the values in the source grid,
 then it is best to use the tools in GridTransformer.h.
 For other cases, consider using the
 @vdblink::tools::DualGridSampler DualGridSampler@endlink class.
-Like the GridSampler class, this class can be used with grids, trees or value
-accessors.
-In addition, DualGridSampler checks if the source and target grids are aligned
-(that is, they have the same transform), in which case it avoids unnecessary
-interpolation.
+Like the @b GridSampler class, this class can be used with grids, trees
+or value accessors.
+In addition, @b DualGridSampler checks if the source and target grids
+are aligned (that is, they have the same transform), in which case
+it avoids unnecessary interpolation.
 
 @code
 #include <openvdb/openvdb.h>
@@ -846,8 +823,8 @@ openvdb::tools::DualGridSampler<GridType::ConstAccessor, openvdb::tools::BoxSamp
 // target grid's index space.
 value = fastSampler(openvdb::Coord(-23, -50, 202));
 @endcode
-Note that interpolation is done by invoking a DualGridSampler as a functor,
-in contrast to the more general-purpose GridSampler.
+Note that interpolation is done by invoking a @b DualGridSampler as a functor,
+in contrast to the more general-purpose @b GridSampler.
 
 
 
@@ -859,7 +836,7 @@ geometric transformation to an input grid using one of several sampling
 schemes, and stores the result in an output grid.  The operation is
 multithreaded by default, though threading can be disabled by calling
 @vdblink::tools::GridTransformer::setThreaded() setThreaded(false)@endlink.
-A @c GridTransformer object can be reused to apply the same transformation
+A @b GridTransformer object can be reused to apply the same transformation
 to multiple input grids, optionally using different sampling schemes.
 @code
 #include <openvdb/openvdb.h>
@@ -902,7 +879,7 @@ targetGrid->tree().prune();
 
 @subsection sValueXformTools Value transformation
 
-This example uses @vdblink::tools::foreach() tools::foreach()@endlink to
+This example uses @vdblink::tools::foreach() tools::foreach@endlink to
 multiply all values (both tile and voxel and both active and inactive)
 of a scalar, floating-point grid by two:
 @code
@@ -923,8 +900,8 @@ openvdb::FloatGrid::Ptr grid = ...;
 openvdb::tools::foreach(grid->beginValueAll(), Local::op);
 @endcode
 
-This example uses @vdblink::tools::foreach() tools::foreach()@endlink to
-rotate all active vectors of a vector-valued grid by 45 degrees about the
+This example uses @vdblink::tools::foreach() tools::foreach@endlink to
+rotate all active vectors of a vector-valued grid by 45&deg; about the
 @em y axis:
 @code
 #include <openvdb/openvdb.h>
@@ -950,13 +927,13 @@ openvdb::math::Mat3s rot45 =
 openvdb::tools::foreach(grid->beginValueOn(), MatMul(rot45));
 @endcode
 
-@vdblink::tools::transformValues() tools::transformValues()@endlink is
-similar to @vdblink::tools::foreach() tools::foreach()@endlink, but it populates
+@vdblink::tools::transformValues() tools::transformValues@endlink is
+similar to @vdblink::tools::foreach() tools::foreach@endlink, but it populates
 an output grid with transformed values from an input grid that may have a
 different value type.  The following example populates a scalar,
 floating-point grid with the lengths of all active vectors from a
 vector-valued grid
-(like @vdblink::tools::magnitude() tools::magnitude()@endlink):
+(like @vdblink::tools::magnitude() tools::magnitude@endlink):
 @code
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ValueTransformer.h>
@@ -1079,12 +1056,12 @@ openvdb::tools::compMul(*gridA, *gridB);
 
 
 @subsection sCombineTools Generic combination
-The @vdblink::tree::Tree::combine() Tree::combine()@endlink family of
+The @vdblink::tree::Tree::combine() Tree::combine@endlink family of
 methods apply a user-supplied operator to pairs of corresponding values
 of two trees.  These methods are efficient because they take into account
 the sparsity of the trees; they are not multithreaded, however.
 
-This example uses the @vdblink::tree::Tree::combine() Tree::combine()@endlink
+This example uses the @vdblink::tree::Tree::combine() Tree::combine@endlink
 method to compute the difference between corresponding voxels of two
 floating-point grids:
 @code
@@ -1104,7 +1081,7 @@ openvdb::FloatGrid::Ptr aGrid = ..., bGrid = ...;
 aGrid->tree().combine(bGrid->tree(), Local::diff);
 @endcode
 
-Another @vdblink::tree::Tree::combine() Tree::combine()@endlink example,
+Another @vdblink::tree::Tree::combine() Tree::combine@endlink example,
 this time using a functor to preserve state:
 @code
 #include <openvdb/openvdb.h>
@@ -1126,13 +1103,13 @@ openvdb::FloatGrid::Ptr aGrid = ..., bGrid = ...;
 aGrid->tree().combine(bGrid->tree(), Blend(0.25));
 @endcode
 
-The @vdblink::tree::Tree::combineExtended() Tree::combineExtended()@endlink
+The @vdblink::tree::Tree::combineExtended() Tree::combineExtended@endlink
 method invokes a function of the form <tt>void f(CombineArgs\<T>& args)</tt>,
 where the @vdblink::CombineArgs CombineArgs@endlink object encapsulates an
 @em a and a @em b value and their active states as well as a result value
 and its active state.  In the following example, voxel values in
-floating-point @c aGrid are replaced with corresponding values from
-floating-point @c bGrid (leaving @c bGrid empty) wherever the @em b values
+floating-point @a aGrid are replaced with corresponding values from
+floating-point @a bGrid (leaving @a bGrid empty) wherever the @em b values
 are larger.  The active states of any transferred values are preserved.
 @code
 #include <openvdb/openvdb.h>
@@ -1158,12 +1135,12 @@ openvdb::FloatGrid::Ptr aGrid = ..., bGrid = ...;
 aGrid->tree().combineExtended(bGrid->tree(), Local::max);
 @endcode
 
-Like @c combine(), @vdblink::tree::Tree::combine2() Tree::combine2()@endlink
+Like @b combine, @vdblink::tree::Tree::combine2() Tree::combine2@endlink
 applies an operation to pairs of corresponding values of two trees.
-However, @c combine2() writes the result to a third, output tree and does
+However, @b combine2 writes the result to a third, output tree and does
 not modify either of the two input trees.  (As a result, it is less
-space-efficient than the @c combine() method.)  Here, the voxel differencing
-example above is repeated using @c combine2():
+space-efficient than the @b combine method.)  Here, the voxel differencing
+example above is repeated using @b combine2:
 @code #include
 <openvdb/openvdb.h>
 
@@ -1180,7 +1157,7 @@ openvdb::FloatGrid::Ptr resultGrid = openvdb::FloatGrid::create();
 // The input grids are not modified.
 resultGrid->tree().combine2(aGrid->tree(), bGrid->tree(), Local::diff);
 @endcode
-An @vdblink::tree::Tree::combine2Extended() extended combine2()@endlink
+An @vdblink::tree::Tree::combine2Extended() extended combine2@endlink
 is also available.
 
 
@@ -1191,19 +1168,19 @@ is also available.
 A common task is to perform some operation on all of the grids in a file,
 where the operation involves @vdblink::Grid Grid@endlink method calls
 and the grids are of different types.
-Only a handful of @c Grid methods, such as
-@vdblink::Grid::activeVoxelCount() activeVoxelCount()@endlink,
+Only a handful of @b Grid methods, such as
+@vdblink::Grid::activeVoxelCount() activeVoxelCount@endlink,
 are virtual and can be called through a @vdblink::GridBase GridBase@endlink
-pointer; most are not, because they require knowledge of the <tt>Grid</tt>'s
+pointer; most are not, because they require knowledge of the <b>Grid</b>'s
 value type.
-For example, one might want to @vdblink::tree::Tree::prune() prune()@endlink
+For example, one might want to @vdblink::tree::Tree::prune() prune@endlink
 the trees of all of the grids in a file regardless of their type, but
-@c Tree::prune() is non-virtual because it accepts an optional pruning
+@b Tree::prune is non-virtual because it accepts an optional pruning
 tolerance argument whose type is the grid's value type.
 
-The @c processTypedGrid() function below makes this kind of task easier.
-It is called with a @c GridBase pointer and a functor whose call operator
-accepts a pointer to a @c Grid of arbitrary type.  The call operator should
+The @b processTypedGrid function below makes this kind of task easier.
+It is called with a @b GridBase pointer and a functor whose call operator
+accepts a pointer to a @b Grid of arbitrary type.  The call operator should
 be templated on the grid type and, if necessary, overloaded for specific
 grid types.
 
@@ -1228,7 +1205,7 @@ void processTypedGrid(openvdb::GridBase::Ptr grid, OpType& op)
 }
 @endcode
 
-The following example shows how to use @c processTypedGrid() to implement
+The following example shows how to use @b processTypedGrid to implement
 a generic pruning operation for grids of all built-in types:
 @code
 #include <openvdb.h>

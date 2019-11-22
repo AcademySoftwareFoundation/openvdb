@@ -2,6 +2,85 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 7.0.0</B> - <I>In development</I>
+
+@par
+<BLOCKQUOTE>
+As of this release, a C++14 compiler is required and the oldest supported
+Houdini version is 17.0.
+</BLOCKQUOTE>
+
+@par
+Improvements:
+- The minimum ABI for OpenVDB is now always enforced through CMake
+  separately from other minimum dependency version variables.
+- Added support for CMake 3.12 compatible @c Xxx_ROOT variables.
+- Replaced the CMake @c USE_SYSTEM_LIBRARY_PATHS option with
+  @c DISABLE_CMAKE_SEARCH_PATHS and removed the hard coded list of
+  @c SYSTEM_LIBRARY_PATHS in favor of using CMake's default search procedure.
+  @c SYSTEM_LIBRARY_PATHS can still be used as a global list of paths for all
+  dependency searches.
+- Improvements to OpenVDB's CMake module setup order in regards to CMake
+  policy, minimum version and project calls.
+- Replaced occurrences of boost::scoped_array with std::unique_ptr.
+- Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
+  AVX compiler flags, this is switched off by default.
+
+@par
+Bug fixes:
+- Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
+  correctly.
+- Fixed a Windows build issue in openvdb_render.
+
+@par
+ABI changes:
+- OpFactory destructor is now virtual as of ABI=7
+- Added new virtual methods for copying const grids and replacing
+  the metadata and/or the transform -
+  @vdblink::GridBase::copyGridReplacingMetadata() GridBase::copyGridReplacingMetadata@endlink,
+  @vdblink::GridBase::copyGridReplacingTransform() GridBase::copyGridReplacingTransform@endlink
+  and @vdblink::GridBase::copyGridReplacingMetadataAndTransform()
+  GridBase::copyGridReplacingMetadataAndTransform@endlink.
+
+@par
+API changes:
+- @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
+  @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
+  now return a std::unique_ptr instead of a boost::scoped_array.
+
+@par
+Python:
+- Removed the requirement of CMake&nbsp;3.14 for NumPy usage.
+- Added support for Boost versions 1.65 and later when building
+  the Python module with NumPy support through CMake.
+- Improved CMake Python3 support.
+
+@par
+Houdini:
+- Fixed a bug in the Points Convert SOP during conversion from
+  Houdini geometry to OpenVDB Points, where point group information could
+  end up corrupted or cause a crash with non-contiguous point offsets (mesh
+  inputs).
+- Threaded the population of point group memberships during conversion from
+  Houdini geometry to OpenVDB Points
+
+
+@htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 6.2.1</B> - <I>September 30, 2019</I>
+
+@par
+Bug fixes:
+- Fixed a crash that arose from an inadvertent ABI change of an I/O class
+  with the 6.2.0 release.
+  The crash occured when attempting to write out
+  a point data grid using an I/O routine from a different version of
+  OpenVDB than the one with which the grid was authored and when
+  one of those OpenVDB versions was 6.2.0.
+
+
 @htmlonly <a name="v6_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 6.2.0</B> - <I>September 18, 2019</I>

@@ -8,6 +8,7 @@
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
   - @ref buildBloscSupport
+  - @ref buildVCPKG
 - @ref buildComponents
 - @ref buildGuide
   - @ref buildBuildTypes
@@ -90,12 +91,22 @@ given FindModule e.g. `FindBlosc.cmake`:
   They are listed in priority order. Note that the prefix is always capitalized.
    - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
    directories
-   - @b XXX_ROOT - Preferred installation prefix. The given dependency is
-   expected to follow a folder structure `XXX_ROOT/include` and `XXX_ROOT/lib`
-   exist
+   - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
+   expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
+   exist. Note that unlike the above, this is the case matching name of the
+   find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
-   searches. OpenVDB sets this in the root CMake if `USE_SYSTEM_LIBRARY_PATHS`
-   is enabled.
+   searches.
+   - @b XXX_USE_STATIC_LIBS - Only search for static libraries for the given
+   dependency. If OFF, the shared library is prioritized, falling back
+   to the static library. This is OFF by default.
+   - @b DISABLE_CMAKE_SEARCH_PATHS - The above variables are custom to the
+   OpenVDB project. CMake itself implements its own search system to try and
+   find the given libraries and packages. When ON, this variable
+   disables CMake's inbuilt search, guaranteeing that only the above user
+   provided paths are searched. See [CMakes Search Procedure](https://cmake.org/cmake/help/latest/command/find_package.html#search-procedure)
+   for more information. This is OFF by default (and thus CMake's search
+   is enabled).
 .
   - @b Outputs The following variables are always set if the project is found:
     - @b Xxx_FOUND - True if the headers and library was found and exists
@@ -120,7 +131,7 @@ a Maya installation or a manual installation from source) and we want to use
 this with other dependencies installed through a package manager such as
 homebrew. As homebrew copies all headers and libraries it installs to a
 `<homebrew>/include` `<homebrew>/lib` directory structure, it can be tempting
-to set @b XXX_ROOT variables to points to the `<homebrew>` folder. However you
+to set @b Xxx_ROOT variables to points to the `<homebrew>` folder. However you
 may already have an existing installation of TBB through your package manager,
 potentially installed by as a dependency of a completely unrelated piece of
 software. Whilst CMake may report to you the correct include/lib path, this can
@@ -147,6 +158,12 @@ treat blosc as a required dependency. There are two reasons for this:
    Houdini.
 
 You can disable Blosc using `-D USE_BLOSC=OFF`.
+
+@subsection buildVCPKG Building Dependencies using VCPKG
+
+It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
+variable to use 64-bit libraries by default as even on a 64-bit Windows OS,
+VCPKG builds and installs 32-bit libraries by default.
 
 @section buildComponents OpenVDB Components
 
@@ -205,7 +222,6 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 16.5              | 4           |
 Houdini  | 17.0              | 5           |
 Houdini  | 17.5              | 5           |
 Maya     | 2017              | Any         |
@@ -252,7 +268,7 @@ of the OpenVDB source tree along with the following options:
 
 Required:
 
-  - @b HOUDINI_ROOT =`/path/to/houdini/install` # Path to Houdini Install
+  - @b Houdini_ROOT =`/path/to/houdini/install` # Path to Houdini Install
   - @b USE_HOUDINI =`ON` # Force all components to build against Houdini
   - @b OPENVDB_BUILD_HOUDINI_PLUGIN =`ON` # Required for building the Houdini Plugin.
 
@@ -277,7 +293,7 @@ OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D HOUDINI_ROOT=/Applications/Houdini/Houdini17.0.506/ \
+      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
       -D USE_HOUDINI=ON \
       ../
 @endcode
@@ -337,7 +353,7 @@ of the OpenVDB source tree along with the following options:
 
 Required:
 
-  - @b MAYA_ROOT =`/path/to/maya/install` # Path to Maya Install
+  - @b Maya_ROOT =`/path/to/maya/install` # Path to Maya Install
   - @b USE_MAYA =`ON` # Force all components to build against Maya
 
 Optional:
@@ -349,15 +365,15 @@ Optional:
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
   - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
  CMake may find it automatically
-  - @b ILMBASE_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
+  - @b IlmBase_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D ILMBASE_ROOT=/path/to/ilmbase/install \
-      -D MAYA_ROOT=/Applications/Autodesk/maya2019/ \
+      -D IlmBase_ROOT=/path/to/ilmbase/install \
+      -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../
 @endcode
@@ -408,7 +424,7 @@ provide:
 - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
 =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
 the link for default values.
-- @b XXX_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
+- @b Xxx_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
 installed or simply to where your prefered package is installed if it cannot
 locate it.
 
@@ -629,20 +645,20 @@ Until Houdini&nbsp;16.5, all three were included in the HDK, so by default
 several of the variables above reference the Houdini environment variables
 <TT>$HDSO</TT>, <TT>$HFS</TT> and <TT>$HT</TT> (source the @c houdini_setup
 script provided with your Houdini installation to set those environment variables).
-As of Houdini&nbsp;16.5, you must provide your own installation of Boost.
+You must provide your own installation of Boost.
 
 Also note that certain new features in OpenVDB (see the
 @subpage changes "Release Notes" for details) necessitated changes to
 the ABI of the @vdblink::Grid Grid@endlink class, rendering it incompatible
 with earlier versions of the library, such as the ones built into Houdini.
 Passing grids between native VDB nodes in a scene graph and nodes built
-against the new ABI will lead to crashes, so to use OpenVDB with Houdini&nbsp;16.5
-set <TT>abi=4</TT> to compile with the incompatible features disabled.
+against the new ABI will lead to crashes, so to use OpenVDB with Houdini&nbsp;17.5
+set <TT>abi=5</TT> to compile with the incompatible features disabled.
 
 To build the OpenVDB Python module, you will need local installations
 of Python, Boost.Python, and optionally NumPy.
 Houdini ships with Python&nbsp;2 but not with the @c libboost_python library
-or with NumPy or, as of Houdini&nbsp;16.5, with the Boost.Python headers,
+or with NumPy or with the Boost.Python headers,
 so both Boost.Python and NumPy have to be built separately.
 Point the variables <TT>\$(BOOST_PYTHON_LIB_DIR)</TT>,
 <TT>\$(BOOST_PYTHON_LIB)</TT> and <TT>\$(NUMPY_INCL_DIR)</TT>
@@ -757,5 +773,35 @@ Older versions in particular are not supported by OpenVDB.
 
 @b Note: Boost will produce a version error in the format `Detected version of
 Boost is too old.`
+
+@subsection troubleshoot3 CMake warnings/errors in FindBoost.cmake
+
+There are a variety of potential warnings and errors that may arise from the
+version compatibility of Boost and CMake. These are related to how both Boost
+and CMake have historically been kept in sync. A common warning and error
+combination is:
+
+@code{.sh}
+  CMake Warning at ...  Imported targets not available for Boost version XXXXXX
+  ...
+  Target "..." links to target "Boost::XXX" but the target
+  was not found.  Perhaps a find_package() call is missing for an IMPORTED
+  target, or an ALIAS target is missing?
+@endcode
+
+OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries)
+for all its dependencies. For imported Boost compatibility, the following
+versions of CMake are required:
+
+  - Boost 1.63 requires CMake 3.7 or newer.
+  - Boost 1.64 requires CMake 3.8 or newer.
+  - Boost 1.65 and 1.65.1 require CMake 3.9.3 or newer.
+  - Boost 1.66 requires CMake 3.11 or newer.
+  - Boost 1.67 requires CMake 3.12 or newer.
+  - Boost 1.68, 1.69 require CMake 3.13 or newer.
+  - Boost 1.70 requires CMake 3.14 or newer.
+
+Use the above list to identify the version of CMake you require for your version
+of Boost. Note that this may be implemented into the OpenVDB CMake in the future.
 
 */

@@ -78,37 +78,57 @@ Hints
 Instead of explicitly setting the cache variables, the following variables
 may be provided to tell this module where to look.
 
-``CPPUNIT_ROOT``
+``CppUnit_ROOT``
   Preferred installation prefix.
 ``CPPUNIT_INCLUDEDIR``
   Preferred include directory e.g. <prefix>/include
 ``CPPUNIT_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
 ``SYSTEM_LIBRARY_PATHS``
-  Paths appended to all include and lib searches.
+  Global list of library paths intended to be searched by and find_xxx call
+``CPPUNIT_USE_STATIC_LIBS``
+  Only search for static cppunit libraries
+``DISABLE_CMAKE_SEARCH_PATHS``
+  Disable CMakes default search paths for find_xxx calls in this module
 
 #]=======================================================================]
+
+cmake_minimum_required(VERSION 3.3)
+
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
 mark_as_advanced(
   CppUnit_INCLUDE_DIR
   CppUnit_LIBRARY
 )
 
-# Append CPPUNIT_ROOT or $ENV{CPPUNIT_ROOT} if set (prioritize the direct cmake var)
-set(_CPPUNIT_ROOT_SEARCH_DIR "")
+set(_FIND_CPPUNIT_ADDITIONAL_OPTIONS "")
+if(DISABLE_CMAKE_SEARCH_PATHS)
+  set(_FIND_CPPUNIT_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
+endif()
 
-if(CPPUNIT_ROOT)
-  list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${CPPUNIT_ROOT})
-else()
-  set(_ENV_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT})
-  if(_ENV_CPPUNIT_ROOT)
-    list(APPEND _CPPUNIT_ROOT_SEARCH_DIR ${_ENV_CPPUNIT_ROOT})
-  endif()
+# Set _CPPUNIT_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
+# are prioritised over the legacy capitalized XXX_ROOT variables for matching
+# CMake 3.12 behaviour
+# @todo  deprecate -D and ENV CPPUNIT_ROOT from CMake 3.12
+if(CppUnit_ROOT)
+  set(_CPPUNIT_ROOT ${CppUnit_ROOT})
+elseif(DEFINED ENV{CppUnit_ROOT})
+  set(_CPPUNIT_ROOT $ENV{CppUnit_ROOT})
+elseif(CPPUNIT_ROOT)
+  set(_CPPUNIT_ROOT ${CPPUNIT_ROOT})
+elseif(DEFINED ENV{CPPUNIT_ROOT})
+  set(_CPPUNIT_ROOT $ENV{CPPUNIT_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find cppunit
 
-find_package(PkgConfig)
+if(NOT DEFINED PKG_CONFIG_FOUND)
+  find_package(PkgConfig)
+endif()
 pkg_check_modules(PC_CppUnit QUIET cppunit)
 
 # ------------------------------------------------------------------------
@@ -118,14 +138,14 @@ pkg_check_modules(PC_CppUnit QUIET cppunit)
 set(_CPPUNIT_INCLUDE_SEARCH_DIRS "")
 list(APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
   ${CPPUNIT_INCLUDEDIR}
-  ${_CPPUNIT_ROOT_SEARCH_DIR}
+  ${_CPPUNIT_ROOT}
   ${PC_CppUnit_INCLUDEDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
 
 # Look for a standard cppunit header file.
 find_path(CppUnit_INCLUDE_DIR cppunit/Portability.h
-  NO_DEFAULT_PATH
+  ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES include
 )
@@ -148,7 +168,7 @@ endif()
 set(_CPPUNIT_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
   ${CPPUNIT_LIBRARYDIR}
-  ${_CPPUNIT_ROOT_SEARCH_DIR}
+  ${_CPPUNIT_ROOT}
   ${PC_CppUnit_LIBDIR}
   ${SYSTEM_LIBRARY_PATHS}
 )
@@ -177,7 +197,7 @@ set(CPPUNIT_PATH_SUFFIXES
 )
 
 find_library(CppUnit_LIBRARY cppunit
-  NO_DEFAULT_PATH
+  ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
 )

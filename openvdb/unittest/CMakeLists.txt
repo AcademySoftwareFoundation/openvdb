@@ -84,6 +84,7 @@ set(UNITTEST_SOURCE_FILES
   TestAttributeGroup.cc
   TestAttributeSet.cc
   TestBBox.cc
+  TestClip.cc
   TestConjGradient.cc
   TestCoord.cc
   TestCpt.cc
@@ -113,9 +114,9 @@ set(UNITTEST_SOURCE_FILES
   TestLaplacian.cc
   TestLeaf.cc
   TestLeafBool.cc
+  TestLeafIO.cc
   TestLeafManager.cc
   TestLeafMask.cc
-  TestLeafIO.cc
   TestLeafOrigin.cc
   TestLevelSetRayIntersector.cc
   TestLevelSetUtil.cc
@@ -217,4 +218,4 @@ if(OPENVDB_ENABLE_RPATH)
   )
 endif()
 
-add_test(vdb_unit_test vdb_test)
+add_test(vdb_unit_test vdb_test -v)

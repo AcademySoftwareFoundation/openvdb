@@ -45,8 +45,10 @@
 // Do this in the .cc of openvdb.cc to ensure this decision is made at the time of
 // building the core library
 #ifndef OPENVDB_USE_DEPRECATED_ABI
-    #if OPENVDB_ABI_VERSION_NUMBER <= 3
-        #error ABI <= 3 is deprecated, define OPENVDB_USE_DEPRECATED_ABI to suppress this error
+    #if OPENVDB_ABI_VERSION_NUMBER == 4
+        #error ABI = 4 is deprecated, define OPENVDB_USE_DEPRECATED_ABI to suppress this error
+    #elif OPENVDB_ABI_VERSION_NUMBER < 4
+        #error ABI <= 3 is no longer supported
     #endif
 #endif
 

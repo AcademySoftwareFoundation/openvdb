@@ -75,8 +75,6 @@
 #include "AttributeGroup.h"
 #include "AttributeSet.h"
 
-#include <boost/ptr_container/ptr_vector.hpp>
-
 #include <random> // std::mt19937
 #include <numeric> // std::iota
 #include <unordered_map>

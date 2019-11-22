@@ -63,12 +63,10 @@
 
 #]=======================================================================]
 
-project(OpenVDB)
+# note: cmake_minimum_required must be called before project commands to
+#  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.3)
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0048)
-  cmake_policy(SET CMP0048 NEW)
-endif()
+project(OpenVDB)
 
 ###### OpenVDB Build/Component Options
 
@@ -88,14 +86,14 @@ option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
-CMAKE_DEPENDENT_option(OPENVDB_INSTALL_CMAKE_MODULES
+cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
 
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided if Houdini Version >= 16.5. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
+provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -108,18 +106,26 @@ Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, C
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
 option(USE_EXR [=[
-Use OpenEXR while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+Use OpenEXR while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you
 know it to be required.]=] OFF)
-CMAKE_DEPENDENT_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
+cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_SYSTEM_LIBRARY_PATHS "Build with system library paths" ON)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
+option(DISABLE_CMAKE_SEARCH_PATHS [=[
+Disable CMakes default system search paths when locating dependencies. When enabled, CMake will fall back to
+its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
+paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
+list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
+
+set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
+A global list of library paths to additionally use into when searching for dependencies.]=])
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -132,6 +138,19 @@ if(NOT CONCURRENT_MALLOC)
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
+endif()
+
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING
+    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
+    None is the default." FORCE
+  )
+elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
+  set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
 ###### Deprecated options
@@ -162,6 +181,16 @@ if(OPENVDB_ENABLE_3_ABI_COMPATIBLE)
   endif()
 endif()
 
+if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
+  message(DEPRECATION "The USE_SYSTEM_LIBRARY_PATHS option is deprecated and will be removed. "
+    "Use DISABLE_CMAKE_SEARCH_PATHS.")
+  if(USE_SYSTEM_LIBRARY_PATHS)
+    set(DISABLE_CMAKE_SEARCH_PATHS OFF)
+  else()
+    set(DISABLE_CMAKE_SEARCH_PATHS ON)
+  endif()
+endif()
+
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
@@ -171,67 +200,84 @@ mark_as_advanced(
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
-  USE_SYSTEM_LIBRARY_PATHS
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
   DISABLE_DEPENDENCY_VERSION_CHECKS
+  DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI
+  OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
+  OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
+  SYSTEM_LIBRARY_PATHS
+  OPENVDB_SIMD
 )
 
-# Configure minimum version requirements
+# Configure minimum version requirements - some are treated specially and fall
+# outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5. Previous versions are incompatible.
 set(MINIMUM_BLOSC_VERSION 1.5)
+# @note  ABI always enforced so the correct deprecation messages are available.
+# OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
+set(MINIMUM_OPENVDB_ABI_VERSION 4)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 5)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2017 of the VFX platform where avaiable
-  set(MINIMUM_GCC_VERSION 4.8)
+  # @note  Currently tracking CY2018 of the VFX platform where avaiable
+  set(MINIMUM_GCC_VERSION 6.3.1)
   set(MINIMUM_CLANG_VERSION 3.8)
-  set(MINIMUM_ICC_VERSION 15)
+  set(MINIMUM_ICC_VERSION 17)
+  set(MINIMUM_MSVC_VERSION 19.10)
 
   set(MINIMUM_BOOST_VERSION 1.61)
   set(MINIMUM_ILMBASE_VERSION 2.2)
   set(MINIMUM_OPENEXR_VERSION 2.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
-  set(MINIMUM_TBB_VERSION 4.4)
+  set(MINIMUM_TBB_VERSION 2017.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
-  set(MINIMUM_NUMPY_VERSION 1.9.2)
+  set(MINIMUM_NUMPY_VERSION 1.12.1)
 
   set(MINIMUM_CPPUNIT_VERSION 1.10)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 16.5)
+  set(MINIMUM_HOUDINI_VERSION 17.0)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
-  set(MINIMUM_OPENVDB_ABI_VERSION 4)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 18 deprecations to transition to MINIMUM_* variables in OpenVDB 7.0.0
+# VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
-set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
-set(FUTURE_MINIMUM_ICC_VERSION 17)
-set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
-set(FUTURE_MINIMUM_TBB_VERSION 2017.6)
-set(FUTURE_MINIMUM_NUMPY_VERSION 1.12.1)
-set(FUTURE_MINIMUM_HOUDINI_VERSION 17)
+
+# No compiler upgrades planned
+#set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
+#set(FUTURE_MINIMUM_ICC_VERSION 17)
+#set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
+
+set(FUTURE_MINIMUM_ILMBASE_VERSION 2.3)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 2.3)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.66)
+set(FUTURE_MINIMUM_TBB_VERSION 2018.0)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.14.0)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 18.0)
 
 #########################################################################
 
 # General CMake and CXX settings
 
-if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
-  message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
-    "is deprecated and will be removed.")
+if(FUTURE_MINIMUM_CMAKE_VERSION)
+  if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -257,8 +303,10 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
+#  FindOpenGL.cmake is needed if CMake < 3.8
+#  FindNumPy.cmake is needed if CMake < 3.14
 
-if(${CMAKE_VERSION} VERSION_LESS 3.8)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
 endif()
 
@@ -371,21 +419,6 @@ if(OPENVDB_CODE_COVERAGE)
   set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
 endif()
 
-# System path configuration
-
-if(USE_SYSTEM_LIBRARY_PATHS)
-  set(SYSTEM_LIBRARY_PATHS
-    ~/Library/Frameworks
-    /Library/Frameworks
-    /usr/local
-    /usr
-    /sw  # Fink
-    /opt/local  # DarwinPorts
-    /opt/csw  # Blastwave
-    /opt
-  )
-endif()
-
 #########################################################################
 
 # Compiler configuration. Add definitions for a number of compiler warnings
@@ -395,7 +428,7 @@ endif()
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION)
     message(FATAL_ERROR "Insufficient clang++ version. Minimum required is "
       "\"${MINIMUM_CLANG_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
@@ -422,9 +455,11 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
-    message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GCC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
+      message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
@@ -451,14 +486,18 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
       "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
   endif()
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
-    message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ICC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
+      message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
-    message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_MSVC_VERSION)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
+      message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
   # Increase the number of sections that an object file can contain
   add_definitions("/bigobj")
@@ -507,6 +546,17 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
   endif()
+endif()
+
+# Configure SIMD. AVX implies SSE 4.2.
+
+if(OPENVDB_SIMD STREQUAL "AVX")
+  add_compile_options(-mavx -msse4.2)
+  add_definitions(-DOPENVDB_USE_AVX)
+  add_definitions(-DOPENVDB_USE_SSE42)
+elseif(OPENVDB_SIMD STREQUAL "SSE42")
+  add_compile_options(-msse4.2)
+  add_definitions(-DOPENVDB_USE_SSE42)
 endif()
 
 #########################################################################
@@ -559,19 +609,24 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
 endif()
 
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
+  message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+    "no longer supported.")
+endif()
+
+if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
   if(OPENVDB_USE_DEPRECATED_ABI)
-    message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated and will soon be removed.")
+    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated and will soon be removed.")
   else()
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
   endif()
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it
-# via ADD_DEFINITIONS
+# via add_definitions()
 
 if(OpenVDB_ABI EQUAL 3)
   add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)

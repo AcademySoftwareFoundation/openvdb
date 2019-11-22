@@ -83,7 +83,6 @@ struct File::Impl
         file.Archive::readGrid(grid, gd, file.inputStream());
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     static void unarchive(const File& file, GridBase::Ptr& grid,
         const GridDescriptor& gd, const CoordBBox& indexBBox)
     {
@@ -95,7 +94,6 @@ struct File::Impl
     {
         file.Archive::readGrid(grid, gd, file.inputStream(), worldBBox);
     }
-#endif
 
     static Index64 getDefaultCopyMaxBytes()
     {
@@ -532,11 +530,7 @@ File::readAllGridMetadata()
         // have already been streamed in and stored in mGrids.
         for (size_t i = 0, N = mImpl->mGrids->size(); i < N; ++i) {
             // Return copies of the grids, but with empty trees.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            ret->push_back((*mImpl->mGrids)[i]->copyGrid(/*treePolicy=*/CP_NEW));
-#else
             ret->push_back((*mImpl->mGrids)[i]->copyGridWithNewTree());
-#endif
         }
     } else {
         // Read just the metadata and transforms for all grids.
@@ -547,11 +541,7 @@ File::readAllGridMetadata()
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGridPartial(), but shallow
             // copying the grids helps to ensure future compatibility.)
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            ret->push_back(grid->copyGrid(/*treePolicy=*/CP_NEW));
-#else
             ret->push_back(grid->copyGridWithNewTree());
-#endif
         }
     }
     return ret;
@@ -580,11 +570,7 @@ File::readGridMetadata(const Name& name)
         const GridDescriptor& gd = it->second;
         ret = readGridPartial(gd, /*readTopology=*/false);
     }
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    return ret->copyGrid(/*treePolicy=*/CP_NEW);
-#else
     return ret->copyGridWithNewTree();
-#endif
 }
 
 
@@ -598,42 +584,31 @@ File::readGrid(const Name& name)
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const Name& name, const BBoxd& bbox)
 {
     return readGridByName(name, bbox);
 }
-#endif
 
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-GridBase::Ptr
-File::readGridByName(const Name& name, const BBoxd&)
-#else
 GridBase::Ptr
 File::readGridByName(const Name& name, const BBoxd& bbox)
-#endif
 {
     if (!isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const bool clip = bbox.isSorted();
-#endif
 
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
     GridBase::Ptr grid = retrieveCachedGrid(name);
     if (grid) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (clip) {
             grid = grid->deepCopyGrid();
             grid->clipGrid(bbox);
         }
-#endif
         return grid;
     }
 
@@ -644,11 +619,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
 
     // Seek to and read in the grid from the file.
     const GridDescriptor& gd = it->second;
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-    grid = readGrid(gd);
-#else
     grid = (clip ? readGrid(gd, bbox) : readGrid(gd));
-#endif
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
@@ -662,16 +633,12 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
         }
 
         GridBase::Ptr parent;
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        parent = readGrid(parentIt->second);
-#else
         if (clip) {
             const CoordBBox indexBBox = grid->constTransform().worldToIndexNodeCentered(bbox);
             parent = readGrid(parentIt->second, indexBBox);
         } else {
             parent = readGrid(parentIt->second);
         }
-#endif
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -824,7 +791,6 @@ File::readGrid(const GridDescriptor& gd) const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const GridDescriptor& gd, const BBoxd& bbox) const
 {
@@ -837,7 +803,6 @@ File::readGrid(const GridDescriptor& gd, const CoordBBox& bbox) const
 {
     return Impl::readGrid(*this, gd, bbox);
 }
-#endif
 
 
 void

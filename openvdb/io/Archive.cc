@@ -1112,11 +1112,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-    return false;
-#else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
-#endif
 }
 
 
@@ -1130,14 +1126,12 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 {
     struct Local {
         static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
             g.readBuffers(istrm, indexBBox);
         }
         static void readBuffers(GridBase& g, std::istream& istrm, const BBoxd& worldBBox) {
             g.readBuffers(istrm, g.constTransform().worldToIndexNodeCentered(worldBBox));
         }
-#endif
     };
 
     // Restore the file-level stream metadata on exit.
@@ -1236,7 +1230,6 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     doReadGrid(grid, gd, is, NoBBox());
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     std::istream& is, const BBoxd& worldBBox)
@@ -1252,7 +1245,6 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     readGridCompression(is);
     doReadGrid(grid, gd, is, indexBBox);
 }
-#endif
 
 
 ////////////////////////////////////////

@@ -1193,7 +1193,6 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(leaf == *leafFromDisk);
         }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         { // read grids from file and pre-fetch
             PointDataGrid::Ptr gridFromDisk;
 
@@ -1294,7 +1293,6 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(!position3.isOutOfCore());
             CPPUNIT_ASSERT(!density3.isOutOfCore());
         }
-#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
         remove("leaf.vdb");
     }

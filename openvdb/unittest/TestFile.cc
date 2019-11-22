@@ -87,9 +87,7 @@ public:
     CPPUNIT_TEST(testWriteOpenFile);
     CPPUNIT_TEST(testReadGridMetadata);
     CPPUNIT_TEST(testReadGrid);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     CPPUNIT_TEST(testReadClippedGrid);
-#endif
     CPPUNIT_TEST(testMultiPassIO);
     CPPUNIT_TEST(testHasGrid);
     CPPUNIT_TEST(testNameIterator);
@@ -118,9 +116,7 @@ public:
     void testWriteOpenFile();
     void testReadGridMetadata();
     void testReadGrid();
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void testReadClippedGrid();
-#endif
     void testMultiPassIO();
     void testHasGrid();
     void testNameIterator();
@@ -1646,8 +1642,6 @@ TestFile::testReadGrid()
 ////////////////////////////////////////
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
-
 template<typename GridT>
 void
 validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
@@ -1759,8 +1753,6 @@ TestFile::testReadClippedGrid()
     }
 }
 
-#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
-
 
 ////////////////////////////////////////
 
@@ -1802,10 +1794,8 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
 
     MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
         : BaseLeaf(coords, value, active) {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     MultiPassLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value,
         bool active = false): BaseLeaf(openvdb::PartialCreate(), coords, value, active) {}
-#endif
     MultiPassLeafNode(const MultiPassLeafNode& rhs): BaseLeaf(rhs) {}
 
     ValueOnCIter cbeginValueOn() const { return ValueOnCIter(this->getValueMask().beginOn(),this); }
@@ -2574,7 +2564,12 @@ TestFile::testBlosc()
 
     for (int compcode = 0; compcode <= BLOSC_ZLIB; ++compcode) {
         char* compname = nullptr;
-        if (0 > blosc_compcode_to_compname(compcode, &compname)) continue;
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR >= 15)
+        if (0 > blosc_compcode_to_compname(compcode, const_cast<const char**>(&compname)))
+#else
+        if (0 > blosc_compcode_to_compname(compcode, &compname))
+#endif
+            continue;
         /// @todo This changes the compressor setting globally.
         if (blosc_set_compressor(compname) < 0) continue;
 
