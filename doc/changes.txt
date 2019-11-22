@@ -33,6 +33,9 @@ Bug fixes:
 - Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
   correctly.
 - Fixed a Windows build issue in openvdb_render.
+- Fixed a non deterministic threading bug in @vdblink::tools::meshToVolume()
+  mesh to volume@endlink during polygon voxelization which could result in
+  different distance values.
 
 @par
 ABI changes:
