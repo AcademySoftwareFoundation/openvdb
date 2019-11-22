@@ -429,7 +429,7 @@ public:
     void                        makeGridUnique()
                                     { myGridAccessor.makeGridUnique(); }
 
-    /// @brief Returns if the tree is not shared.  If it is not shared,
+    /// @brief Returns true if the tree is not shared.  If it is not shared,
     /// one can make destructive edits without makeGridUnique.
     bool                        isGridUnique() const
                                     { return myGridAccessor.isGridUnique(); }
