@@ -1960,6 +1960,7 @@ struct VoxelizationData {
         if (mPrimCount == MaxPrimId || primIdTree.leafCount() > 1000) {
             mPrimCount = 0;
             primIdTree.clear();
+            mPrimCount = 0;
         }
 
         return mPrimCount++;
