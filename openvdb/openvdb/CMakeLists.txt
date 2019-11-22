@@ -449,6 +449,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterize.h
   points/PointSample.h
   points/PointScatter.h
   points/PointStatistics.h
