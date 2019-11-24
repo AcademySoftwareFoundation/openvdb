@@ -6,6 +6,7 @@ COMPILER="$1"
 RELEASE="$2"
 ABI="$3"
 BLOSC="$4"
+SIMD="$5"
 
 mkdir build
 cd build
@@ -20,5 +21,6 @@ cmake \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_RENDER=ON \
     -DOPENVDB_BUILD_VDB_VIEW=OFF \
+    -DOPENVDB_SIMD=${SIMD} \
     ..
 make -j2

@@ -140,6 +140,19 @@ elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
 endif()
 
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING
+    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
+    None is the default." FORCE
+  )
+elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
+  set(OPENVDB_SIMD None CACHE STRING FORCE)
+endif()
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
@@ -197,6 +210,7 @@ mark_as_advanced(
   OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
+  OPENVDB_SIMD
 )
 
 # Configure minimum version requirements - some are treated specially and fall
@@ -532,6 +546,17 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
   endif()
+endif()
+
+# Configure SIMD. AVX implies SSE 4.2.
+
+if(OPENVDB_SIMD STREQUAL "AVX")
+  add_compile_options(-mavx -msse4.2)
+  add_definitions(-DOPENVDB_USE_AVX)
+  add_definitions(-DOPENVDB_USE_SSE42)
+elseif(OPENVDB_SIMD STREQUAL "SSE42")
+  add_compile_options(-msse4.2)
+  add_definitions(-DOPENVDB_USE_SSE42)
 endif()
 
 #########################################################################
