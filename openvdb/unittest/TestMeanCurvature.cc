@@ -35,7 +35,7 @@
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <cppunit/extensions/HelperMacros.h>
-
+#include <openvdb/tools/LevelSetSphere.h>
 
 class TestMeanCurvature: public CppUnit::TestFixture
 {
@@ -725,20 +725,19 @@ TestMeanCurvature::testCurvatureStencil()
         cs.moveTo(xyz);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, cs.meanCurvature(), 0.01);// 1/distance from center
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/4.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, cs.gaussianCurvature(), 0.01);// 1/distance from center
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/16.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance from center
-        
-        auto principalCurvatures = cs.principalCurvatures();  
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, cs.gaussianCurvature(), 0.01);// 1/distance^2 from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance^2 from center
+
+        float mean, gaussian;
+        cs.curvatures(mean, gaussian);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, mean, 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, gaussian, 0.01);// 1/distance^2 from center
+
+        auto principalCurvatures = cs.principalCurvatures();
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, principalCurvatures.first,  0.01);// 1/distance from center
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, principalCurvatures.second, 0.01);// 1/distance from center
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/4.0, principalCurvatures.first,  0.01);// 1/distance from center
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/4.0, principalCurvatures.second, 0.01);// 1/distance from center
 
         xyz.reset(12,16,10);//i.e. 10 voxel or 5 world units away from the center
         cs.moveTo(xyz);
@@ -746,9 +745,9 @@ TestMeanCurvature::testCurvatureStencil()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
             1.0/5.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/25.0, cs.gaussianCurvature(), 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/25.0, cs.gaussianCurvature(), 0.01);// 1/distance^2 from center
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/25.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance from center
+            1.0/25.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance^2 from center
 
         principalCurvatures = cs.principalCurvatures();
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, principalCurvatures.first,  0.01);// 1/distance from center
@@ -756,7 +755,38 @@ TestMeanCurvature::testCurvatureStencil()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
             1.0/5.0, principalCurvatures.first,  0.01);// 1/distance from center
             CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/5.0, principalCurvatures.second, 0.01);// 1/distance from center        
+            1.0/5.0, principalCurvatures.second, 0.01);// 1/distance from center
+
+        cs.curvaturesNormGrad(mean, gaussian);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, mean, 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/25.0, gaussian, 0.01);// 1/distance^2 from center
+    }
+    {// test sparse level set sphere
+      const double percentage = 0.1/100.0;//i.e. 0.1%
+      const int dim = 256;
+
+      // sparse level set sphere
+      Vec3f C(0.35f, 0.35f, 0.35f);
+      Real r = 0.15, voxelSize = 1.0/(dim-1);
+      FloatGrid::Ptr sphere = tools::createLevelSetSphere<FloatGrid>(float(r), C, float(voxelSize));
+
+      math::CurvatureStencil<FloatGrid> cs(*sphere);
+      const Coord ijk = Coord::round(sphere->worldToIndex(Vec3d(0.35, 0.35, 0.35 + 0.15)));
+      const double radius = (sphere->indexToWorld(ijk)-Vec3d(0.35)).length();
+      //std::cerr << "\rRadius = " << radius << std::endl;
+      //std::cerr << "Index coord =" << ijk << std::endl;
+      cs.moveTo(ijk);
+
+      //std::cerr << "Mean curvature = "     << cs.meanCurvature()     << ", 1/r=" << 1.0/radius << std::endl;
+      //std::cerr << "Gaussian curvature = " << cs.gaussianCurvature() << ", 1/(r*r)=" << 1.0/(radius*radius) << std::endl;
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/radius,  cs.meanCurvature(), percentage*1.0/radius);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/(radius*radius),  cs.gaussianCurvature(), percentage*1.0/(radius*radius));
+      float mean, gauss;
+      cs.curvatures(mean, gauss);
+      //std::cerr << "Mean curvature = "     << mean     << ", 1/r=" << 1.0/radius << std::endl;
+      //std::cerr << "Gaussian curvature = " << gauss << ", 1/(r*r)=" << 1.0/(radius*radius) << std::endl;
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/radius,  mean, percentage*1.0/radius);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/(radius*radius),  gauss, percentage*1.0/(radius*radius));
     }
 }
 
