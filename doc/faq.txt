@@ -43,9 +43,7 @@ details of VDB are described in the paper
 OpenVDB is released under the Mozilla Public License Version 2.0, which is a
 free, open source software license developed and maintained by the Mozilla
 Foundation. For more information about this license, see the
-<a href="http://www.mozilla.org/MPL" target="_blank">Mozilla FAQ</a>. The
-LICENSE file also contains a short notice and disclaimer statement for
-redistributions of OpenVDB source code.
+<a href="https://www.mozilla.org/en-US/MPL/" target="_blank">Mozilla FAQ</a>.
 
 @section sWhatCLA Is there a Contributor License Agreement for OpenVDB?
 Yes, developers who wish to contribute code to be considered for inclusion
