@@ -47,9 +47,12 @@ Foundation. For more information about this license, see the
 
 @section sWhatCLA Is there a Contributor License Agreement for OpenVDB?
 Yes, developers who wish to contribute code to be considered for inclusion
-in the OpenVDB distribution must first complete this
-<a href="http://www.openvdb.org//download/OpenVDBContributorLicenseAgreement.pdf" target="_blank">Contributor License Agreement</a>
-and submit it to DreamWorks (directions are in the CLA).
+in the OpenVDB distribution must first be authorized under a signed Contributor
+License Agreement. The signature and authorization process is managed via
+the Linux Foundation's EasyCLA system, to handle the different CLAs depending
+on whether you are contributing on your own behalf or on behalf of your
+employer. The EasyCLA process will begin the first time you submit a PR
+to the project.
 
 @section sWhyUseVDB Why should I use OpenVDB?
 The typical reasons to adopt OpenVDB are if you are <b>storing sparse
