@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -70,8 +70,8 @@ public:
     template <typename Source>
     Vec2(Source *a)
     {
-        this->mm[0] = a[0];
-        this->mm[1] = a[1];
+        this->mm[0] = static_cast<T>(a[0]);
+        this->mm[1] = static_cast<T>(a[1]);
     } // trivial
 
     /// Conversion constructor
@@ -564,6 +564,6 @@ using Vec2d = Vec2<double>;
 
 #endif // OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

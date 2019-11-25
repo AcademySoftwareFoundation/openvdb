@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -2053,7 +2053,7 @@ private:
                 typename VoxelizationDataType::Ptr& dataPtr = mLocalDataTable->local();
                 if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
 
-                voxelizeTriangle(mPrim, *dataPtr);
+                voxelizeTriangle(mPrim, *dataPtr, mInterrupter);
 
             } else if (!(mInterrupter && mInterrupter->wasInterrupted())) {
                 spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount, mInterrupter);
@@ -2088,7 +2088,7 @@ private:
             polygonCount < SubTask::POLYGON_LIMIT ? evalSubdivisionCount(prim) : 0;
 
         if (subdivisionCount <= 0) {
-            voxelizeTriangle(prim, data);
+            voxelizeTriangle(prim, data, mInterrupter);
         } else {
             spawnTasks(prim, *mDataTable, subdivisionCount, polygonCount, mInterrupter);
         }
@@ -2136,7 +2136,7 @@ private:
         tasks.wait();
     }
 
-    static void voxelizeTriangle(const Triangle& prim, VoxelizationDataType& data)
+    static void voxelizeTriangle(const Triangle& prim, VoxelizationDataType& data, Interrupter* const interrupter)
     {
         std::deque<Coord> coordList;
         Coord ijk, nijk;
@@ -2144,26 +2144,35 @@ private:
         ijk = Coord::floor(prim.a);
         coordList.push_back(ijk);
 
-        computeDistance(ijk, prim, data);
+        // The first point may not be quite in bounds, and rely
+        // on one of the neighbours to have the first valid seed,
+        // so we cannot early-exit here.
+        updateDistance(ijk, prim, data);
 
         unsigned char primId = data.getNewPrimId();
         data.primIdAcc.setValueOnly(ijk, primId);
 
         while (!coordList.empty()) {
-            ijk = coordList.back();
-            coordList.pop_back();
+            if (interrupter && interrupter->wasInterrupted()) {
+                tbb::task::self().cancel_group_execution();
+                break;
+            }
+            for (Int32 pass = 0; pass < 1048576 && !coordList.empty(); ++pass) {
+                ijk = coordList.back();
+                coordList.pop_back();
 
-            for (Int32 i = 0; i < 26; ++i) {
-                nijk = ijk + util::COORD_OFFSETS[i];
-                if (primId != data.primIdAcc.getValue(nijk)) {
-                    data.primIdAcc.setValueOnly(nijk, primId);
-                    if(computeDistance(nijk, prim, data)) coordList.push_back(nijk);
+                for (Int32 i = 0; i < 26; ++i) {
+                    nijk = ijk + util::COORD_OFFSETS[i];
+                    if (primId != data.primIdAcc.getValue(nijk)) {
+                        data.primIdAcc.setValueOnly(nijk, primId);
+                        if(updateDistance(nijk, prim, data)) coordList.push_back(nijk);
+                    }
                 }
             }
         }
     }
 
-    static bool computeDistance(const Coord& ijk, const Triangle& prim, VoxelizationDataType& data)
+    static bool updateDistance(const Coord& ijk, const Triangle& prim, VoxelizationDataType& data)
     {
         Vec3d uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
 
@@ -2171,6 +2180,11 @@ private:
 
         const ValueType dist = ValueType((voxelCenter -
             closestPointOnTriangleToPoint(prim.a, prim.c, prim.b, voxelCenter, uvw)).lengthSqr());
+
+        // Either the points may be NAN, or they could be far enough from
+        // the origin that computing distance fails.
+        if (std::isnan(dist))
+            return false;
 
         const ValueType oldDist = data.distAcc.getValue(ijk);
 
@@ -4212,6 +4226,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

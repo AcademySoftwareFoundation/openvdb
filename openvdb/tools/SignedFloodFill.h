@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -133,9 +133,8 @@ public:
     {
         if (LeafT::LEVEL < mMinLevel) return;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (!leaf.allocate()) return; // this assures that the buffer is allocated and in-memory
-#endif
+
         const typename LeafT::NodeMaskType& valueMask = leaf.getValueMask();
         // WARNING: "Never do what you're about to see at home, we're what you call experts!"
         typename LeafT::ValueType* buffer =
@@ -306,6 +305,6 @@ signedFloodFill(TreeOrLeafManagerT& tree,
 
 #endif // OPENVDB_TOOLS_RESETBACKGROUND_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

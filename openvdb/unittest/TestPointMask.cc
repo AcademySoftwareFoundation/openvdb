@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -129,7 +129,7 @@ TestPointMask::testMask()
     }
 
     { // use a much larger voxel size that splits the points into two regions
-        const float newVoxelSize(2);
+        const float newVoxelSize(4);
         openvdb::math::Transform::Ptr newTransform(
             openvdb::math::Transform::createLinearTransform(newVoxelSize));
 
@@ -378,6 +378,6 @@ TestPointMask::testMaskDeformer()
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointMask);
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

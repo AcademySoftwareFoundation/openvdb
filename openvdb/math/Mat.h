@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -159,7 +159,7 @@ public:
     /// True if a Nan is present in this matrix
     bool isNan() const {
         for (unsigned i = 0; i < numElements(); ++i) {
-            if (std::isnan(mm[i])) return true;
+            if (math::isNan(mm[i])) return true;
         }
         return false;
     }
@@ -167,7 +167,7 @@ public:
     /// True if an Inf is present in this matrix
     bool isInfinite() const {
         for (unsigned i = 0; i < numElements(); ++i) {
-            if (std::isinf(mm[i])) return true;
+            if (math::isInfinite(mm[i])) return true;
         }
         return false;
     }
@@ -175,7 +175,7 @@ public:
     /// True if no Nan or Inf values are present
     bool isFinite() const {
         for (unsigned i = 0; i < numElements(); ++i) {
-            if (!std::isfinite(mm[i])) return false;
+            if (!math::isFinite(mm[i])) return false;
         }
         return true;
     }
@@ -811,7 +811,7 @@ snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::valu
 /// @brief Write 0s along Mat4's last row and column, and a 1 on its diagonal.
 /// @details Useful initialization when we're initializing just the 3&times;3 block.
 template<class MatType>
-static MatType&
+inline MatType&
 padMat4(MatType& dest)
 {
     dest[0][3] = dest[1][3] = dest[2][3] = 0;
@@ -1045,6 +1045,6 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
 #endif // OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

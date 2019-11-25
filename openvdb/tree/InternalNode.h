@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -108,9 +108,7 @@ public:
     /// @param active    State assigned to all the tiles
     InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
-#endif
 
     /// @brief Deep copy constructor
     ///
@@ -885,7 +883,6 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 // For InternalNodes, the PartialCreate constructor is identical to its
 // non-PartialCreate counterpart.
 template<typename ChildT, Index Log2Dim>
@@ -897,7 +894,6 @@ InternalNode<ChildT, Log2Dim>::InternalNode(PartialCreate,
     if (active) mValueMask.setOn();
     for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
 }
-#endif
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherInternalNode>
@@ -2203,10 +2199,8 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
-#endif
 
     mChildMask.load(is);
     mValueMask.load(is);
@@ -2215,11 +2209,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-                    new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
-#else
                     new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
-#endif
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -2254,11 +2244,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-            ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
-#else
             ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
-#endif
             mNodes[iter.pos()].setChild(child);
             child->readTopology(is, fromHalf);
         }
@@ -3298,6 +3284,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

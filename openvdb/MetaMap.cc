@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -102,7 +102,12 @@ MetaMap::readMeta(std::istream &is)
 #if OPENVDB_ABI_VERSION_NUMBER >= 5
             UnknownMetadata metadata(typeName);
             metadata.read(is); // read raw bytes into an array
-            insertMeta(name, metadata);
+            // only add unknown metadata to the grid if not temporary,
+            // denoted by a double underscore prefix (such as __metadata)
+            bool temporary = typeName.compare(0, 2, "__") == 0;
+            if (!temporary) {
+                insertMeta(name, metadata);
+            }
 #else
             OPENVDB_LOG_WARN("cannot read metadata \"" << name
                 << "\" of unregistered type \"" << typeName << "\"");
@@ -230,6 +235,6 @@ operator<<(std::ostream& ostr, const MetaMap& metamap)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

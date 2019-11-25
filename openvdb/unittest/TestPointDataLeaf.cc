@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1193,7 +1193,6 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(leaf == *leafFromDisk);
         }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         { // read grids from file and pre-fetch
             PointDataGrid::Ptr gridFromDisk;
 
@@ -1294,7 +1293,6 @@ TestPointDataLeaf::testIO()
             CPPUNIT_ASSERT(!position3.isOutOfCore());
             CPPUNIT_ASSERT(!density3.isOutOfCore());
         }
-#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
 
         remove("leaf.vdb");
     }
@@ -1578,6 +1576,6 @@ TestPointDataLeaf::testCopyDescriptor()
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

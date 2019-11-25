@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2016 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -24,129 +24,172 @@
 # IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
-PROJECT ( OpenVDBMaya )
+#[=======================================================================[
 
-OPTION ( OPENVDB_MAYA_SUBDIR "Install plug-ins to <prefix>/maya/<version> instead of <prefix>/maya<version>" OFF)
-OPTION ( OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
+  CMake Configuration for OpenVDB Maya
 
-FIND_PACKAGE ( Maya REQUIRED )
-FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED )
-FIND_PACKAGE ( ILMBase REQUIRED )
+#]=======================================================================]
 
-IF ( NOT OPENVDB_BUILD_CORE )
-  FIND_PACKAGE ( OpenVDB REQUIRED )
+cmake_minimum_required(VERSION 3.3)
+project(OpenVDBMaya)
 
-  # Use the library installed
-  SET ( OPENVDB_SHARED_LIB ${OpenVDB_OPENVDB_LIBRARY} )
-ELSE ()
-  # Use the target
-  SET ( OPENVDB_SHARED_LIB openvdb_shared)
-ENDIF ()
+# Monitoring <PackageName>_ROOT variables
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
-# Include them as system headers to avoid getting spammed by internal
-# warnings
-INCLUDE_DIRECTORIES ( SYSTEM ${MAYA_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( SYSTEM ${Boost_INCLUDE_DIR} )
-INCLUDE_DIRECTORIES ( SYSTEM ${ILMBASE_INCLUDE_DIRS} )
+###### OpenVDB Maya Options
 
-ADD_DEFINITIONS ( ${MAYA_DEFINITIONS} )
+option(OPENVDB_MAYA_INSTALL_MOD "Install module file" ON)
+
+if(OPENVDB_MAYA_SUBDIR)
+  message(DEPRECATION "OPENVDB_MAYA_SUBDIR is deprecated and will be removed. "
+    "Set OPENVDB_MAYA_INSTALL_PREFIX to your install location."
+  )
+endif()
+
+##########################################################################
+
+message(STATUS "----------------------------------------------------" )
+message(STATUS "------------- Configuring OpenVDBMaya --------------" )
+message(STATUS "----------------------------------------------------" )
+
+#########################################################################
+
+# Configure prefix
+
+if(NOT OPENVDB_MAYA_INSTALL_PREFIX)
+  if(OPENVDB_MAYA_SUBDIR)
+    set(MAYA_INSTALL_LOCATION
+      ${CMAKE_INSTALL_PREFIX}/maya/${Maya_VERSION}
+    )
+  else()
+    set(MAYA_INSTALL_LOCATION
+      ${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}
+    )
+  endif()
+endif()
+
+set(OPENVDB_MAYA_INSTALL_PREFIX ${MAYA_INSTALL_LOCATION}
+  CACHE PATH "Base install path for OpenVDB Maya libraries and headers."
+)
+
+message(STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}")
+
+#########################################################################
+
+# Collect and configure lib dependencies
+
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
+
+find_package(OpenGL REQUIRED)
+
+set(OPENVDB_MAYA_DEPENDENT_LIBS
+  ${OPENVDB_LIB}
+  Maya
+  OpenGL::GL
+)
+
+#########################################################################
+
+# WARNING:  Compilation order of these files is extremely important. On
+# MacOS/Clang (and potentially other platform/compiler combos), TBB fails
+# to mutex lock the node registry in OpenVDBPlugin.cc if OpenVDBPlugin.cc
+# is linked in after any of the nodes which create NodeRegistry objects.
+# This is most likely due to the construction order of file static data.
+# @todo  Restructure the node registry implementation
+
+set(OPENVDB_MAYA_MODULE_SOURCE_FILES
+  OpenVDBData.cc
+  OpenVDBPlugin.cc
+  OpenVDBCopyNode.cc
+  OpenVDBFilterNode.cc
+  OpenVDBFromMayaFluidNode.cc
+  OpenVDBFromPolygonsNode.cc
+  OpenVDBReadNode.cc
+  OpenVDBToPolygonsNode.cc
+  OpenVDBTransformNode.cc
+  OpenVDBUtil.cc
+  OpenVDBVisualizeNode.cc
+  OpenVDBWriteNode.cc
+)
+
+set(OPENVDB_MAYA_MODULE_MEL_FILES
+  AEOpenVDBCopyTemplate.mel
+  AEOpenVDBFilterTemplate.mel
+  AEOpenVDBFromMayaFluidTemplate.mel
+  AEOpenVDBFromPolygonsTemplate.mel
+  AEOpenVDBReadTemplate.mel
+  AEOpenVDBToPolygonsTemplate.mel
+  AEOpenVDBTransformTemplate.mel
+  AEOpenVDBVisualizeTemplate.mel
+  AEOpenVDBWriteTemplate.mel
+)
+
+#########################################################################
 
 # This is to work around DWA way of doing stuff
-LIST ( APPEND OPENVDB_MAYA_HEADER "maya/OpenVDBData.h" )
-LIST ( APPEND OPENVDB_MAYA_HEADER "maya/OpenVDBUtil.h" )
-SET  ( OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya )
-FILE ( MAKE_DIRECTORY ${OPENVDB_MAYA_DIR} )
-FILE ( COPY ${OPENVDB_MAYA_HEADER} DESTINATION ${OPENVDB_MAYA_DIR} )
-INCLUDE_DIRECTORIES ( ${PROJECT_BINARY_DIR} )
+set(OPENVDB_MAYA_HEADERS
+  "OpenVDBData.h"
+  "OpenVDBUtil.h"
+)
 
-# RPath handling
-IF ( OPENVDB_ENABLE_RPATH )
+set(OPENVDB_MAYA_DIR ${PROJECT_BINARY_DIR}/openvdb_maya)
+file(MAKE_DIRECTORY ${OPENVDB_MAYA_DIR})
+file(COPY ${OPENVDB_MAYA_HEADERS} DESTINATION ${OPENVDB_MAYA_DIR})
 
-  # when building, don't use the install RPATH already
-  # (but later on when installing)
-  SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+#########################################################################
 
-  # Use $ORIGIN for relative referencing
-  SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib")
-
-ENDIF ( OPENVDB_ENABLE_RPATH )
-
-SET ( OPENVDB_MAYA_MODULE_SOURCE_FILES
-  maya/OpenVDBCopyNode.cc
-  maya/OpenVDBData.cc
-  maya/OpenVDBFilterNode.cc
-  maya/OpenVDBFromMayaFluidNode.cc
-  maya/OpenVDBFromPolygonsNode.cc
-  maya/OpenVDBPlugin.cc
-  maya/OpenVDBReadNode.cc
-  maya/OpenVDBToPolygonsNode.cc
-  maya/OpenVDBTransformNode.cc
-  maya/OpenVDBUtil.cc
-  maya/OpenVDBVisualizeNode.cc
-  maya/OpenVDBWriteNode.cc
-  )
-
-SET_SOURCE_FILES_PROPERTIES ( ${OPENVDB_MAYA_MODULE_SOURCE_FILES}
-  PROPERTIES
-  COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC"
-  )
-
-ADD_LIBRARY ( openvdb_maya SHARED
+add_library(openvdb_maya SHARED
   ${OPENVDB_MAYA_MODULE_SOURCE_FILES}
-  )
+)
 
-TARGET_LINK_LIBRARIES ( openvdb_maya
-  ${OPENVDB_SHARED_LIB}
-  ${MAYA_OpenMayaFX_LIBRARY}
-  ${MAYA_OpenMayaUI_LIBRARY}
-  ${MAYA_OpenMaya_LIBRARY}
-  ${MAYA_Foundation_LIBRARY}
-  )
+target_include_directories(openvdb_maya PUBLIC ${PROJECT_BINARY_DIR})
+target_link_libraries(openvdb_maya ${OPENVDB_MAYA_DEPENDENT_LIBS})
 
-SET_TARGET_PROPERTIES ( openvdb_maya
+maya_set_library_properties(openvdb_maya)
+
+set_target_properties(openvdb_maya
   PROPERTIES
   OUTPUT_NAME OpenVDB
+)
+
+if(OPENVDB_ENABLE_RPATH)
+  set(RPATHS "")
+  if(OPENVDB_BUILD_CORE)
+    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+  else()
+    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
+  endif()
+
+  list(REMOVE_DUPLICATES RPATHS)
+  set_target_properties(openvdb_maya
+    PROPERTIES INSTALL_RPATH "${RPATHS}"
   )
+  unset(RPATHS)
+endif()
 
-MAYA_SET_LIBRARY_PROPERTIES ( openvdb_maya )
+#########################################################################
 
-SET( OPENVDB_MAYA_INSTALL_BASE_DIR
-  maya$<$<BOOL:${OPENVDB_MAYA_SUBDIR}>:/>${MAYA_VERSION_NUMBER}
-  CACHE PATH "Openvdb's maya install directory")
-
-INSTALL ( TARGETS
+install(TARGETS
   openvdb_maya
   DESTINATION
-  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/plug-ins
-  )
+  ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
+)
 
-INSTALL ( FILES
-  maya/AEOpenVDBCopyTemplate.mel
-  maya/AEOpenVDBFilterTemplate.mel
-  maya/AEOpenVDBFromMayaFluidTemplate.mel
-  maya/AEOpenVDBFromPolygonsTemplate.mel
-  maya/AEOpenVDBReadTemplate.mel
-  maya/AEOpenVDBToPolygonsTemplate.mel
-  maya/AEOpenVDBTransformTemplate.mel
-  maya/AEOpenVDBVisualizeTemplate.mel
-  maya/AEOpenVDBWriteTemplate.mel
+install(FILES
+  ${OPENVDB_MAYA_MODULE_MEL_FILES}
   DESTINATION
-  ${OPENVDB_MAYA_INSTALL_BASE_DIR}/scripts
-  )
+  ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
+)
 
-IF ( OPENVDB_MAYA_INSTALL_MOD )
-  # Cmake doesn't evaluate the generator-expression.
-  IF ( OPENVDB_MAYA_SUBDIR )
-    INSTALL ( CODE
-      "FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya/${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya/${MAYA_VERSION_NUMBER}\n\")
-  "
-      COMPONENT Runtime
-      )
-  ELSE ()
-    INSTALL ( CODE
-      "FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}\n\")
-  "
-      COMPONENT Runtime
-      )
-  ENDIF ( OPENVDB_MAYA_SUBDIR )
-ENDIF ( OPENVDB_MAYA_INSTALL_MOD )
+if(OPENVDB_MAYA_INSTALL_MOD)
+  install(CODE
+    "FILE (WRITE ${OPENVDB_MAYA_INSTALL_PREFIX}/openvdb.mod \"+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n\")"
+    COMPONENT Runtime
+  )
+endif()

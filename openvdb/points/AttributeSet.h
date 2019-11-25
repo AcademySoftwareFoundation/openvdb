@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -97,17 +97,21 @@ public:
     /// Construct a new AttributeSet from the given AttributeSet.
     /// @param attributeSet the old attribute set
     /// @param arrayLength the desired length of the arrays in the new AttributeSet
+    /// @param lock an optional scoped registry lock to avoid contention
     /// @note This constructor is typically used to resize an existing AttributeSet as
     ///       it transfers attribute metadata such as hidden and transient flags
-    AttributeSet(const AttributeSet& attributeSet, Index arrayLength);
+    AttributeSet(const AttributeSet& attributeSet, Index arrayLength,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// Construct a new AttributeSet from the given Descriptor.
     /// @param descriptor stored in the new AttributeSet and used in construction
     /// @param arrayLength the desired length of the arrays in the new AttributeSet
+    /// @param lock an optional scoped registry lock to avoid contention
     /// @note Descriptors do not store attribute metadata such as hidden and transient flags
     ///       which live on the AttributeArrays, so for constructing from an existing AttributeSet
     ///       use the AttributeSet(const AttributeSet&, Index) constructor instead
-    explicit AttributeSet(const DescriptorPtr& descriptor, Index arrayLength = 1);
+    AttributeSet(const DescriptorPtr& descriptor, Index arrayLength = 1,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
@@ -198,9 +202,11 @@ public:
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
+    /// Provide a @a lock object to avoid contention from appending in parallel
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
-                                        const bool constantStride = true);
+                                        const bool constantStride = true,
+                                        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -485,6 +491,6 @@ private:
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

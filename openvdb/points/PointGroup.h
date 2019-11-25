@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,6 +45,8 @@
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
 #include "PointCount.h"
+
+#include <tbb/parallel_reduce.h>
 
 #include <algorithm>
 #include <random>
@@ -450,13 +452,9 @@ inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void appendGroup(PointDataTree& tree, const Name& group)
+template <typename PointDataTreeT>
+inline void appendGroup(PointDataTreeT& tree, const Name& group)
 {
-    using Descriptor = AttributeSet::Descriptor;
-    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
-
-    using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
 
     if (group.empty()) {
@@ -468,7 +466,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
-    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
+    auto descriptor = attributeSet.descriptorPtr();
     GroupInfo groupInfo(attributeSet);
 
     // don't add if group already exists
@@ -486,14 +484,17 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         const Name groupName = descriptor->uniqueName("__group");
 
         descriptor = descriptor->duplicateAppend(groupName, GroupAttributeArray::attributeType());
-
         const size_t pos = descriptor->find(groupName);
 
         // insert new group attribute
 
-        AppendAttributeOp<PointDataTree> append(descriptor, pos);
-        LeafManagerT leafManager(tree);
-        tbb::parallel_for(leafManager.leafRange(), append);
+        tree::LeafManager<PointDataTreeT> leafManager(tree);
+        leafManager.foreach(
+            [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
+                auto expected = leaf.attributeSet().descriptorPtr();
+                leaf.appendAttribute(*expected, descriptor, pos);
+            }, /*threaded=*/true
+        );
     }
     else {
         // make the descriptor unique before we modify the group map
@@ -696,15 +697,9 @@ inline void setGroup(   PointDataTree& tree,
 {
     using Descriptor    = AttributeSet::Descriptor;
     using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
-
-    if (membership.size() != pointCount(tree)) {
-        OPENVDB_THROW(LookupError, "Membership vector size must match number of points.");
-    }
-
     using point_group_internal::SetGroupFromIndexOp;
 
     auto iter = tree.cbeginLeaf();
-
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
@@ -714,19 +709,47 @@ inline void setGroup(   PointDataTree& tree,
         OPENVDB_THROW(LookupError, "Group must exist on Tree before defining membership.");
     }
 
+    {
+        // Check that that the largest index in the PointIndexTree is smaller than the size
+        // of the membership vector. The index tree will be used to lookup membership
+        // values. If the index tree was constructed with nan positions, this index will
+        // differ from the PointDataTree count
+
+        using IndexTreeManager = tree::LeafManager<const PointIndexTree>;
+        IndexTreeManager leafManager(indexTree);
+
+        const int64_t max = tbb::parallel_reduce(leafManager.leafRange(), -1,
+            [](const typename IndexTreeManager::LeafRange& range, int64_t value) -> int64_t {
+                for (auto leaf = range.begin(); leaf; ++leaf) {
+                    auto it = std::max_element(leaf->indices().begin(), leaf->indices().end());
+                    value = std::max(value, static_cast<int64_t>(*it));
+                }
+                return value;
+            },
+            [](const int64_t a, const int64_t b) {
+                return std::max(a, b);
+            }
+        );
+
+        if (max != -1 && membership.size() <= static_cast<size_t>(max)) {
+            OPENVDB_THROW(IndexError, "Group membership vector size must be larger than "
+                " the maximum index within the provided index tree.");
+        }
+    }
+
     const Descriptor::GroupIndex index = attributeSet.groupIndex(group);
     LeafManagerT leafManager(tree);
 
     // set membership
 
     if (remove) {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, false> set(indexTree, membership, index);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, true>
+            set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
     else {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, true> set(indexTree, membership, index);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, false>
+            set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
 }
@@ -830,7 +853,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
     using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
-    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
+    const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -848,6 +871,6 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
 
 #endif // OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

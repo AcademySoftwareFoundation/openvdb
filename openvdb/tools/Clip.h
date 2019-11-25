@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -329,13 +329,13 @@ doClip(
         gridMask.topologyDifference(clipMask.constTree());
     }
 
-    typename GridType::Ptr outGrid;
+    auto outGrid = grid.copyWithNewTree();
     {
         // Copy voxel values and states.
         tree::LeafManager<const MaskTreeT> leafNodes(gridMask);
         CopyLeafNodes<TreeT> maskOp(tree, leafNodes);
         maskOp.run();
-        outGrid = GridType::create(maskOp.tree());
+        outGrid->setTree(maskOp.tree());
     }
     {
         // Copy tile values and states.
@@ -458,11 +458,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
     };
 
     // Construct an output grid with the same transform and metadata as the input grid.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    auto outGrid = inGrid.copy(CP_NEW);
-#else
     auto outGrid = inGrid.copyWithNewTree();
-#endif
     if (outGrid->getGridClass() == GRID_LEVEL_SET) {
         // After clipping, a level set grid might no longer be a valid SDF.
         outGrid->setGridClass(GRID_UNKNOWN);
@@ -597,6 +593,6 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
 
 #endif // OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -82,6 +82,7 @@ TestStream::setUp()
     openvdb::Int32Metadata::registerType();
     openvdb::Int64Metadata::registerType();
     openvdb::Vec3IMetadata::registerType();
+    openvdb::io::DelayedLoadMetadata::registerType();
 
     // Register maps
     openvdb::math::MapRegistry::clear();
@@ -273,6 +274,6 @@ TestStream::testFileReadFromStream()
     verifyTestGrids(grids, meta);
 }
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

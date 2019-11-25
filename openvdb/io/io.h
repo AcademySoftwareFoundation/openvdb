@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,6 +41,7 @@
 #include <memory>
 #include <string>
 
+class TestMappedFile;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -94,11 +95,16 @@ public:
     bool seekable() const;
     void setSeekable(bool);
 
+    bool delayedLoadMeta() const;
+
     bool countingPasses() const;
     void setCountingPasses(bool);
 
     uint32_t pass() const;
     void setPass(uint32_t);
+
+    uint64_t leaf() const;
+    void setLeaf(uint64_t);
 
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid
@@ -116,6 +122,11 @@ public:
     AuxDataMap& auxData();
     const AuxDataMap& auxData() const;
     //@}
+
+    /// @private
+    uint32_t __test() const;
+    /// @private
+    void __setTest(uint32_t);
 
     /// Return a string describing this stream metadata.
     std::string str() const;
@@ -178,6 +189,7 @@ public:
 
 private:
     friend class File;
+    friend class ::TestMappedFile;
 
     explicit MappedFile(const std::string& filename, bool autoDelete = false);
 
@@ -288,6 +300,6 @@ OPENVDB_API SharedPtr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
 
 #endif // OPENVDB_IO_IO_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

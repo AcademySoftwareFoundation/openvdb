@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -349,6 +349,26 @@ isFinite(const float x) { return std::isfinite(x); }
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
 isFinite(const Type& x) { return std::isfinite(static_cast<double>(x)); }
+
+
+/// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
+inline bool
+isInfinite(const float x) { return std::isinf(x); }
+
+/// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
+inline bool
+isInfinite(const Type& x) { return std::isinf(static_cast<double>(x)); }
+
+
+/// Return @c true if @a x is a NaN (Not-A-Number) value.
+inline bool
+isNan(const float x) { return std::isnan(x); }
+
+/// Return @c true if @a x is a NaN (Not-A-Number) value.
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
+inline bool
+isNan(const Type& x) { return std::isnan(static_cast<double>(x)); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
@@ -889,10 +909,7 @@ template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -910,10 +927,7 @@ template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -925,6 +939,6 @@ MaxIndex(const Vec3T& v)
 
 #endif // OPENVDB_MATH_MATH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

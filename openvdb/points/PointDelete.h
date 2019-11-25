@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -103,6 +103,22 @@ inline void deleteFromGroup(PointDataTreeT& pointTree,
 namespace point_delete_internal {
 
 
+struct VectorWrapper
+{
+    using T = std::vector<std::pair<Index, Index>>;
+
+    VectorWrapper(const T& _data) : data(_data) { }
+    operator bool() const { return index < data.size(); }
+    VectorWrapper& operator++() { index++; return *this; }
+    Index sourceIndex() const { assert(*this); return data[index].first; }
+    Index targetIndex() const { assert(*this); return data[index].second; }
+
+private:
+    const T& data;
+    T::size_type index = 0;
+}; // struct VectorWrapper
+
+
 template <typename PointDataTreeT, typename FilterT>
 struct DeleteByFilterOp
 {
@@ -111,8 +127,10 @@ struct DeleteByFilterOp
     using LeafNodeT = typename PointDataTreeT::LeafNodeType;
     using ValueType = typename LeafNodeT::ValueType;
 
-    DeleteByFilterOp(const FilterT& filter)
-        : mFilter(filter) { }
+    DeleteByFilterOp(const FilterT& filter,
+                     const AttributeArray::ScopedRegistryLock* lock)
+        : mFilter(filter)
+        , mLock(lock) { }
 
     void operator()(const LeafRangeT& range) const
     {
@@ -123,7 +141,7 @@ struct DeleteByFilterOp
 
             // if all points are being deleted, clear the leaf attributes
             if (newSize == 0) {
-                leaf->clearAttributes();
+                leaf->clearAttributes(/*updateValueMask=*/true, mLock);
                 continue;
             }
 
@@ -134,7 +152,7 @@ struct DeleteByFilterOp
 
             const AttributeSet& existingAttributeSet = leaf->attributeSet();
             AttributeSet* newAttributeSet = new AttributeSet(
-                existingAttributeSet, static_cast<Index>(newSize));
+                existingAttributeSet, static_cast<Index>(newSize), mLock);
             const size_t attributeSetSize = existingAttributeSet.size();
 
             // cache the attribute arrays for efficiency
@@ -167,6 +185,23 @@ struct DeleteByFilterOp
 
             // now construct new attribute arrays which exclude data from deleted points
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+            std::vector<std::pair<Index, Index>> indexMapping;
+            indexMapping.reserve(newSize);
+
+            for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
+                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter);
+                     iter; ++iter) {
+                    indexMapping.emplace_back(*iter, attributeIndex++);
+                }
+                endOffsets.push_back(static_cast<ValueType>(attributeIndex));
+            }
+
+            for (size_t i = 0; i < attributeSetSize; i++) {
+                VectorWrapper indexMappingWrapper(indexMapping);
+                newAttributeArrays[i]->copyValues(*(existingAttributeArrays[i]), indexMappingWrapper);
+            }
+#else
             for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
                 for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter);
                      iter; ++iter) {
@@ -178,6 +213,7 @@ struct DeleteByFilterOp
                 }
                 endOffsets.push_back(static_cast<ValueType>(attributeIndex));
             }
+#endif
 
             leaf->replaceAttributeSet(newAttributeSet);
             leaf->setOffsets(endOffsets);
@@ -186,6 +222,7 @@ struct DeleteByFilterOp
 
 private:
     const FilterT& mFilter;
+    const AttributeArray::ScopedRegistryLock* mLock;
 }; // struct DeleteByFilterOp
 
 } // namespace point_delete_internal
@@ -228,9 +265,15 @@ inline void deleteFromGroups(PointDataTreeT& pointTree,
         filter.reset(new MultiGroupFilter(empty, groups, leafIter->attributeSet()));
     }
 
-    tree::LeafManager<PointDataTreeT> leafManager(pointTree);
-    point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(*filter);
-    tbb::parallel_for(leafManager.leafRange(), deleteOp);
+    { // acquire registry lock to avoid locking when appending attributes in parallel
+
+        AttributeArray::ScopedRegistryLock lock;
+
+        tree::LeafManager<PointDataTreeT> leafManager(pointTree);
+        point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(
+            *filter, &lock);
+        tbb::parallel_for(leafManager.leafRange(), deleteOp);
+    }
 
     // remove empty leaf nodes
 
@@ -261,6 +304,6 @@ inline void deleteFromGroup(PointDataTreeT& pointTree,
 
 #endif // OPENVDB_POINTS_POINT_DELETE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

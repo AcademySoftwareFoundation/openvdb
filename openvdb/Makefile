@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,6 +62,8 @@
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -74,16 +76,15 @@
 # Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)  Beginning with Houdini 16.5,
-# you must provide your own distribution of Boost.
+# to set those two environment variables.)  You must provide your own
+# distribution of Boost.
 #
 # To build the OpenVDB Python module, you will need local distributions of
 # Python, Boost.Python, and optionally NumPy.  The Houdini HDK includes
-# Python 2.x, but not the libboost_python library or NumPy or, as of
-# Houdini 16.5, the Boost.Python headers, so both Boost.Python and NumPy
-# have to be built separately.  Point the variables $(BOOST_PYTHON_LIB_DIR),
-# $(BOOST_PYTHON_LIB) and $(NUMPY_INCL_DIR) below to your local distributions
-# of those libraries.
+# Python 2.x, but not the libboost_python library or NumPy or  the Boost.Python
+# headers, so both Boost.Python and NumPy have to be built separately.  Point
+# the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
+# $(NUMPY_INCL_DIR) below to your local distributions of those libraries.
 #
 
 # The directory into which to install libraries, executables and header files
@@ -282,6 +283,32 @@ ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        CXXFLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        CXXFLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
+endif
+
 LIBS := \
     -ldl -lm -lz \
     -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
@@ -317,6 +344,7 @@ INCLUDE_NAMES := \
     Grid.h \
     io/Archive.h \
     io/Compression.h \
+    io/DelayedLoadMetadata.h \
     io/File.h \
     io/GridDescriptor.h \
     io/io.h \
@@ -376,6 +404,7 @@ INCLUDE_NAMES := \
     tools/DenseSparseTools.h \
     tools/Diagnostics.h \
     tools/Filter.h \
+    tools/FindActiveValues.h \
     tools/GridOperators.h \
     tools/GridTransformer.h \
     tools/Interpolation.h \
@@ -444,6 +473,7 @@ SRC_NAMES := \
     Grid.cc \
     io/Archive.cc \
     io/Compression.cc \
+    io/DelayedLoadMetadata.cc \
     io/File.cc \
     io/GridDescriptor.cc \
     io/Queue.cc \
@@ -482,6 +512,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestCoord.cc \
     unittest/TestCpt.cc \
     unittest/TestCurl.cc \
+    unittest/TestDelayedLoadMetadata.cc \
     unittest/TestDense.cc \
     unittest/TestDenseSparseTools.cc \
     unittest/TestDiagnostics.cc \
@@ -489,6 +520,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestDoubleMetadata.cc \
     unittest/TestExceptions.cc \
     unittest/TestFile.cc \
+    unittest/TestFindActiveValues.cc \
     unittest/TestFloatMetadata.cc \
     unittest/TestGradient.cc \
     unittest/TestGrid.cc \
@@ -560,6 +592,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestTreeGetSetValues.cc \
     unittest/TestTreeIterators.cc \
     unittest/TestTreeVisitor.cc \
+    unittest/TestTypes.cc \
     unittest/TestUtil.cc \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
@@ -569,9 +602,17 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVolumeToSpheres.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/points.txt doc/python.txt
-DOC_INDEX := doc/html/index.html
-DOC_PDF := doc/latex/refman.pdf
+DOC_FILES := \
+    ../doc/changes.txt \
+    ../doc/codingstyle.txt \
+    ../doc/doc.txt \
+    ../doc/examplecode.txt \
+    ../doc/faq.txt \
+    ../doc/math.txt \
+    ../doc/points.txt \
+    ../doc/python.txt
+DOC_INDEX := ../doc/html/index.html
+DOC_PDF := ../doc/latex/refman.pdf
 
 LIBVIEWER_INCLUDE_NAMES := \
     viewer/Camera.h \
@@ -602,9 +643,10 @@ CMD_INCLUDE_NAMES := \
 #
 
 CMD_SRC_NAMES := \
-    cmd/openvdb_print/main.cc \
-    cmd/openvdb_render/main.cc \
-    cmd/openvdb_view/main.cc \
+    cmd/openvdb_lod.cc \
+    cmd/openvdb_print.cc \
+    cmd/openvdb_render.cc \
+    cmd/openvdb_view.cc \
 #
 
 
@@ -623,6 +665,7 @@ PYTHON_SRC_NAMES := \
     python/pyIntGrid.cc \
     python/pyMetadata.cc \
     python/pyOpenVDBModule.cc \
+    python/pyPointGrid.cc \
     python/pyTransform.cc \
     python/pyVec3Grid.cc \
 #
@@ -773,16 +816,20 @@ $(LIBOPENVDB_STATIC): $(OBJ_NAMES)
 endif # shared
 
 
-$(DOC_INDEX): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
+$(DOC_INDEX): ../doc/doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
 	@echo "Generating documentation because of $(list_deps)"
-	echo 'OUTPUT_DIRECTORY=./doc' | cat doxygen-config - | $(DOXYGEN) - $(QUIET)
+	pushd ..; \
+	echo 'OUTPUT_DIRECTORY=./doc' | cat ./doc/doxygen-config - | $(DOXYGEN) - $(QUIET); \
+	popd > /dev/null
 
-$(DOC_PDF): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
+$(DOC_PDF): ../doc/doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
 	@echo "Generating documentation because of $(list_deps)"
+	pushd ..; \
 	echo -e 'OUTPUT_DIRECTORY=./doc\nGENERATE_LATEX=YES\nGENERATE_HTML=NO' \
-	    | cat doxygen-config - | $(DOXYGEN) - $(QUIET) \
+	    | cat ./doc/doxygen-config - | $(DOXYGEN) - $(QUIET) \
 	    && cd ./doc/latex && make refman.pdf $(QUIET) \
-	    && echo 'Created doc/latex/refman.pdf'
+	    && echo 'Created doc/latex/refman.pdf'; \
+	popd > /dev/null
 
 ifneq (,$(strip $(DOXYGEN)))
 doc: $(DOC_INDEX)
@@ -794,21 +841,21 @@ pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
 
-vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod/main.cc
+vdb_lod: $(LIBOPENVDB) cmd/openvdb_lod.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_lod.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
+vdb_print: $(LIBOPENVDB) cmd/openvdb_print.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
-vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
+vdb_render: $(LIBOPENVDB) cmd/openvdb_render.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render.cc -I . \
 	    -isystem $(EXR_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) \
 	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
 	    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(ILMBASE_LIB) \
@@ -831,9 +878,9 @@ $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1 -fPIC -o $@ $<
 
-vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
+vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view.cc
 	@echo "Building $@ because of $(list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view.cc $(LIBVIEWER_OBJ_NAMES) \
 	    -I . $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
 	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB)
@@ -857,7 +904,7 @@ ifeq (yes,$(has_python))
 ifneq (,$(strip $(EPYDOC)))
 pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	@echo "Generating Python module documentation because of $(list_deps)"
-	pydocdir=doc/html/python; \
+	pydocdir=../doc/html/python; \
 	mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
 	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
@@ -969,11 +1016,11 @@ install: install_lib python vdb_lod vdb_print vdb_render vdb_view doc pydoc
 	    echo "Copied vdb_view to $(DESTDIR)/bin/"; \
 	fi
 	@#
-	if [ -d doc/html ]; \
+	if [ -d ../doc/html ]; \
 	then \
 	    mkdir -p $(DESTDIR)/share/doc/openvdb; \
 	    echo "Created $(DESTDIR)/share/doc/openvdb/"; \
-	    cp -r -f doc/html $(DESTDIR)/share/doc/openvdb; \
+	    cp -r -f ../doc/html $(DESTDIR)/share/doc/openvdb; \
 	    echo "Copied documentation to $(DESTDIR)/share/doc/openvdb/"; \
 	fi
 
@@ -1026,12 +1073,12 @@ clean:
 	$(RM) $(LIBVIEWER_OBJ_NAMES)
 	$(RM) $(PYTHON_OBJ_NAMES)
 	$(RM) $(UNITTEST_OBJ_NAMES)
-	$(RM) -r ./doc/html ./doc/latex
+	$(RM) -r ../doc/html ../doc/latex
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

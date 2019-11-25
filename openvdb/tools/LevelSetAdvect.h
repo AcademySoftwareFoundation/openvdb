@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -482,10 +482,7 @@ sampleField(ValueType time0, ValueType time1)
 
     // Compute the CFL number
     if (math::isApproxZero(maxAbsV, math::Delta<ValueType>::value())) return ValueType(0);
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const ValueType CFL = (TemporalScheme == math::TVD_RK1 ? ValueType(0.3) :
+    static const ValueType CFL = (TemporalScheme == math::TVD_RK1 ? ValueType(0.3) :
         TemporalScheme == math::TVD_RK2 ? ValueType(0.9) :
         ValueType(1.0))/math::Sqrt(ValueType(3.0));
     const ValueType dt = math::Abs(time1 - time0), dx = mParent.mTracker.voxelSize();
@@ -604,6 +601,6 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

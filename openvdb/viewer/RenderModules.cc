@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -288,22 +288,22 @@ BufferObject::render() const
 
     glBindBuffer(GL_ARRAY_BUFFER, mVertexBuffer);
     glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(3, GL_FLOAT, 0, 0);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
 
     if (usesColorBuffer) {
         glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
         glEnableClientState(GL_COLOR_ARRAY);
-        glColorPointer(3, GL_FLOAT, 0, 0);
+        glColorPointer(3, GL_FLOAT, 0, nullptr);
     }
 
     if (usesNormalBuffer) {
         glEnableClientState(GL_NORMAL_ARRAY);
         glBindBuffer(GL_ARRAY_BUFFER, mNormalBuffer);
-        glNormalPointer(GL_FLOAT, 0, 0);
+        glNormalPointer(GL_FLOAT, 0, nullptr);
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
-    glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, 0);
+    glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, nullptr);
 
     // disable client-side capabilities
     if (usesColorBuffer) glDisableClientState(GL_COLOR_ARRAY);
@@ -902,7 +902,7 @@ public:
                 insertPoint(pos, index);
                 ++index;
 
-                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / activeVoxels));
+                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / double(activeVoxels)));
                 for (Index64 i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
                     pos = mTransform.indexToWorld(coords[static_cast<size_t>(i * r)]);
                     insertPoint(pos, index);
@@ -1086,10 +1086,10 @@ private:
     {
         mOffset[0] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[0] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[0])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[0])));
         mOffset[1] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[1] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[1])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[1])));
     }
 
     std::vector<GLfloat>& mPoints;
@@ -1691,6 +1691,6 @@ MeshModule::render()
 
 } // namespace openvdb_viewer
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

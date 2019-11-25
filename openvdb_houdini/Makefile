@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -53,6 +53,8 @@
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (in particular, hcustom and doxygen)
 #                       in verbose mode
+#   strict=yes          Enable a collection of pre defined compiler warnings
+#                       for GCC and clang
 
 
 #
@@ -64,8 +66,8 @@
 # Until Houdini 16.5, all three were included in the HDK, so the relevant
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
-# to set those two environment variables.)  Beginning with Houdini 16.5,
-# you must provide your own distribution of Boost.
+# to set those two environment variables.)  You must provide your own
+# distribution of Boost.
 #
 
 ifeq (,$(HFS))
@@ -83,6 +85,10 @@ DESTDIR_LIB_DIR := $(DESTDIR)/lib
 
 # The directory into which to install Houdini SOPs
 HOUDINI_DESTDIR := $(HIH)/dso
+
+# The directory into which to install the Houdini startup script
+# (leave blank to not install the script)
+HOUDINI_PYTHONRC_DESTDIR := $(HOUDINI_DESTDIR)/python2.7libs
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
@@ -127,6 +133,11 @@ SHELL = /bin/bash
 
 ifneq (,$(INSTALL_DIR))
     $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+endif
+
+# Error if Houdini version is lower than minimum supported version
+ifeq (1,$(shell expr "$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)" "<" "17.0"))
+    $(error Error: Unsupported Houdini Version: $(HOUDINI_VERSION))
 endif
 
 # Determine the platform.
@@ -204,6 +215,34 @@ ifdef MBSD
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
+ifeq (yes,$(strip $(strict)))
+    USING_CLANG=$(shell ${CXX} --version | grep clang)
+    USING_GCC=$(shell ${CXX} --version | grep GCC)
+    ifneq (,$(USING_CLANG))
+        WARNING_FLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -Wconversion \
+            -Wno-sign-conversion \
+        #
+    else ifneq (,$(USING_GCC))
+        WARNING_FLAGS += \
+            -Werror \
+            -Wall \
+            -Wextra \
+            -pedantic \
+            -Wcast-align \
+            -Wcast-qual \
+            -Wconversion \
+            -Wdisabled-optimization \
+            -Woverloaded-virtual \
+        #
+    endif
+    CXXFLAGS += $(WARNING_FLAGS)
+    HCUSTOM_EXTRA_CFLAGS += $(WARNING_FLAGS)
+endif
+
 ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
     HOUDINI_CXXFLAGS := $(shell hcustom -c)
     HOUDINI_LDFLAGS := $(shell hcustom -m)
@@ -231,100 +270,95 @@ ifdef LINUX
 endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
-    houdini/AttributeTransferUtil.h \
-    houdini/GeometryUtil.h \
-    houdini/GEO_PrimVDB.h \
-    houdini/GT_GEOPrimCollectVDB.h \
-    houdini/GU_PrimVDB.h \
-    houdini/GU_VDBPointTools.h \
-    houdini/OP_NodeChain.h \
-    houdini/geometry.h \
-    houdini/ParmFactory.h \
-    houdini/PointUtils.h \
-    houdini/SOP_NodeVDB.h \
-    houdini/SOP_VDBVerbUtils.h \
-    houdini/UT_VDBTools.h \
-    houdini/UT_VDBUtils.h \
-    houdini/Utils.h \
+    AttributeTransferUtil.h \
+    GeometryUtil.h \
+    GEO_PrimVDB.h \
+    GT_GEOPrimCollectVDB.h \
+    GU_PrimVDB.h \
+    GU_VDBPointTools.h \
+    OP_NodeChain.h \
+    geometry.h \
+    ParmFactory.h \
+    PointUtils.h \
+    SOP_NodeVDB.h \
+    SOP_VDBVerbUtils.h \
+    UT_VDBTools.h \
+    UT_VDBUtils.h \
+    Utils.h \
 #
 LIBHOUDINI_SRC_NAMES := \
-    houdini/GeometryUtil.cc \
-    houdini/GEO_PrimVDB.cc \
-    houdini/GEO_VDBTranslator.cc \
-    houdini/GT_GEOPrimCollectVDB.cc \
-    houdini/GU_PrimVDB.cc \
-    houdini/GU_VDBPointTools.cc \
-    houdini/geometry.cc \
-    houdini/ParmFactory.cc \
-    houdini/PointUtils.cc \
-    houdini/SOP_NodeVDB.cc \
-    houdini/UT_VDBUtils.cc \
-    houdini/Utils.cc \
+    GeometryUtil.cc \
+    GEO_PrimVDB.cc \
+    GEO_VDBTranslator.cc \
+    GT_GEOPrimCollectVDB.cc \
+    GU_PrimVDB.cc \
+    GU_VDBPointTools.cc \
+    geometry.cc \
+    ParmFactory.cc \
+    PointUtils.cc \
+    SOP_NodeVDB.cc \
+    UT_VDBUtils.cc \
+    Utils.cc \
 #
 # Note that creation script names coincide with operator names,
 # not (necessarily) with SOP names.
 HOUDINI_SOP_SCRIPT_NAMES := \
-    houdini/DW_OpenVDBRasterizePoints.cmd \
+    DW_OpenVDBRasterizePoints.cmd \
 #
 HOUDINI_SOP_SRC_NAMES := \
-    houdini/GR_PrimVDBPoints.cc \
-    houdini/SHOP_OpenVDB_Points.cc \
-    houdini/SOP_OpenVDB_Advect.cc \
-    houdini/SOP_OpenVDB_Advect_Points.cc \
-    houdini/SOP_OpenVDB_Analysis.cc \
-    houdini/SOP_OpenVDB_Clip.cc \
-    houdini/SOP_OpenVDB_Combine.cc \
-    houdini/SOP_OpenVDB_Convert.cc \
-    houdini/SOP_OpenVDB_Create.cc \
-    houdini/SOP_OpenVDB_Densify.cc \
-    houdini/SOP_OpenVDB_Diagnostics.cc \
-    houdini/SOP_OpenVDB_Fill.cc \
-    houdini/SOP_OpenVDB_Filter.cc \
-    houdini/SOP_OpenVDB_Filter_Level_Set.cc \
-    houdini/SOP_OpenVDB_Fracture.cc \
-    houdini/SOP_OpenVDB_From_Particles.cc \
-    houdini/SOP_OpenVDB_From_Polygons.cc \
-    houdini/SOP_OpenVDB_LOD.cc \
-    houdini/SOP_OpenVDB_Metadata.cc \
-    houdini/SOP_OpenVDB_Morph_Level_Set.cc \
-    houdini/SOP_OpenVDB_Noise.cc \
-    houdini/SOP_OpenVDB_Occlusion_Mask.cc \
-    houdini/SOP_OpenVDB_Platonic.cc \
-    houdini/SOP_OpenVDB_Points_Convert.cc \
-    houdini/SOP_OpenVDB_Points_Delete.cc \
-    houdini/SOP_OpenVDB_Points_Group.cc \
-    houdini/SOP_OpenVDB_Potential_Flow.cc \
-    houdini/SOP_OpenVDB_Prune.cc \
-    houdini/SOP_OpenVDB_Rasterize_Points.cc \
-    houdini/SOP_OpenVDB_Ray.cc \
-    houdini/SOP_OpenVDB_Read.cc \
-    houdini/SOP_OpenVDB_Rebuild_Level_Set.cc \
-    houdini/SOP_OpenVDB_Remap.cc \
-    houdini/SOP_OpenVDB_Remove_Divergence.cc \
-    houdini/SOP_OpenVDB_Resample.cc \
-    houdini/SOP_OpenVDB_Sample_Points.cc \
-    houdini/SOP_OpenVDB_Sort_Points.cc \
-    houdini/SOP_OpenVDB_Scatter.cc \
-    houdini/SOP_OpenVDB_Segment.cc \
-    houdini/SOP_OpenVDB_To_Polygons.cc \
-    houdini/SOP_OpenVDB_To_Spheres.cc \
-    houdini/SOP_OpenVDB_Topology_To_Level_Set.cc \
-    houdini/SOP_OpenVDB_Transform.cc \
-    houdini/SOP_OpenVDB_Vector_Merge.cc \
-    houdini/SOP_OpenVDB_Vector_Split.cc \
-    houdini/SOP_OpenVDB_Visualize.cc \
-    houdini/SOP_OpenVDB_Write.cc \
+    GR_PrimVDBPoints.cc \
+    SHOP_OpenVDB_Points.cc \
+    SOP_OpenVDB_Advect.cc \
+    SOP_OpenVDB_Advect_Points.cc \
+    SOP_OpenVDB_Analysis.cc \
+    SOP_OpenVDB_Clip.cc \
+    SOP_OpenVDB_Combine.cc \
+    SOP_OpenVDB_Convert.cc \
+    SOP_OpenVDB_Create.cc \
+    SOP_OpenVDB_Densify.cc \
+    SOP_OpenVDB_Diagnostics.cc \
+    SOP_OpenVDB_Fill.cc \
+    SOP_OpenVDB_Filter.cc \
+    SOP_OpenVDB_Filter_Level_Set.cc \
+    SOP_OpenVDB_Fracture.cc \
+    SOP_OpenVDB_From_Particles.cc \
+    SOP_OpenVDB_From_Polygons.cc \
+    SOP_OpenVDB_LOD.cc \
+    SOP_OpenVDB_Metadata.cc \
+    SOP_OpenVDB_Morph_Level_Set.cc \
+    SOP_OpenVDB_Noise.cc \
+    SOP_OpenVDB_Occlusion_Mask.cc \
+    SOP_OpenVDB_Platonic.cc \
+    SOP_OpenVDB_Points_Convert.cc \
+    SOP_OpenVDB_Points_Delete.cc \
+    SOP_OpenVDB_Points_Group.cc \
+    SOP_OpenVDB_Potential_Flow.cc \
+    SOP_OpenVDB_Prune.cc \
+    SOP_OpenVDB_Rasterize_Points.cc \
+    SOP_OpenVDB_Ray.cc \
+    SOP_OpenVDB_Read.cc \
+    SOP_OpenVDB_Rebuild_Level_Set.cc \
+    SOP_OpenVDB_Remap.cc \
+    SOP_OpenVDB_Remove_Divergence.cc \
+    SOP_OpenVDB_Resample.cc \
+    SOP_OpenVDB_Sample_Points.cc \
+    SOP_OpenVDB_Sort_Points.cc \
+    SOP_OpenVDB_Scatter.cc \
+    SOP_OpenVDB_Segment.cc \
+    SOP_OpenVDB_To_Polygons.cc \
+    SOP_OpenVDB_To_Spheres.cc \
+    SOP_OpenVDB_Topology_To_Level_Set.cc \
+    SOP_OpenVDB_Transform.cc \
+    SOP_OpenVDB_Vector_Merge.cc \
+    SOP_OpenVDB_Vector_Split.cc \
+    SOP_OpenVDB_Visualize.cc \
+    SOP_OpenVDB_Write.cc \
 #
 MANTRA_VRAY_SRC_NAMES := \
-    houdini/VRAY_OpenVDB_Points.cc \
+    VRAY_OpenVDB_Points.cc \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
 MANTRA_VRAY_NAMES := $(basename $(notdir $(MANTRA_VRAY_SRC_NAMES)))
-
-# Replace filenames of the form "houdini/<name>.cc" with
-# "$(DWA_HOUDINI_SOP_SRC_DIR)/<name>/<name>.cc"
-DWA_HOUDINI_FILES += $(addprefix $(DWA_HOUDINI_SOP_SRC_DIR)/,\
-    $(join $(HOUDINI_SOP_NAMES),$(patsubst houdini/%,/%,$(HOUDINI_SOP_SRC_NAMES))))
 
 ALL_INCLUDE_FILES := \
     $(LIBHOUDINI_INCLUDE_NAMES) \
@@ -405,16 +439,14 @@ ALL_TARGETS := \
 
 all: depend houdinilib houdinisops mantradsos
 
-# Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
+# Create an openvdb_houdini/ symlink to this directory, to mirror the DWA directory structure.
 openvdb_houdini:
-	ln -f -s houdini openvdb_houdini
+	ln -f -s . openvdb_houdini
 openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
 
-# Create a houdini_utils/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
+# Create a houdini_utils/ symlink to this directory, to mirror the DWA directory structure.
 houdini_utils:
-	ln -f -s houdini houdini_utils
+	ln -f -s . houdini_utils
 houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
 
 $(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
@@ -446,8 +478,8 @@ endif
 $(HOUDINI_SOP_OBJ_NAMES): $(LIBHOUDINI)
 $(MANTRA_VRAY_OBJ_NAMES): $(LIBHOUDINI)
 
-houdini/GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
-houdini/VRAY_OpenVDB_Points.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniRAY
+GR_PrimVDBPoints.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniAPPS3
+VRAY_OpenVDB_Points.o: HCUSTOM_FLAGS += -L$(HDSO) -lHoudiniRAY
 
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
@@ -479,16 +511,25 @@ $(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
-$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
-$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
+$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: %.o
+$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: %.o
 
-houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_OpenVDB.svg
+houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) SOP_OpenVDB.svg pythonrc.py
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/config/Icons" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/config/Icons; \
 	    echo "Created $(HOUDINI_USER_PREF_DIR)/config/Icons/"; \
 	fi
-	cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	cp -f SOP_OpenVDB.svg $(HOUDINI_USER_PREF_DIR)/config/Icons/; \
+	if [ -n "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	then \
+	    if [ ! -d "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	    then \
+	        mkdir -p $(HOUDINI_PYTHONRC_DESTDIR); \
+	        echo "Created $(HOUDINI_PYTHONRC_DESTDIR)/"; \
+	    fi; \
+	    cp -f pythonrc.py $(HOUDINI_PYTHONRC_DESTDIR)/; \
+	fi
 	if [ ! -d "$(HOUDINI_USER_PREF_DIR)/scripts/sop" ]; \
 	then \
 	    mkdir -p $(HOUDINI_USER_PREF_DIR)/scripts/sop; \
@@ -555,6 +596,10 @@ clean:
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_USER_PREF_DIR)/config/Icons/SOP_OpenVDB.svg
+	if [ -n "$(HOUDINI_PYTHONRC_DESTDIR)" ]; \
+	then \
+	    $(RM) $(HOUDINI_PYTHONRC_DESTDIR)/pythonrc.py; \
+	fi
 	$(RM) $(addprefix $(HOUDINI_USER_PREF_DIR)/scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
@@ -562,6 +607,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2018 DreamWorks Animation LLC
+# Copyright (c) DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -336,12 +336,10 @@ public:
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
         , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
-#endif
 
 public:
 
@@ -349,9 +347,11 @@ public:
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
     /// @brief Create a new attribute set. Existing attributes will be removed.
-    void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength);
+    void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
     /// @brief Clear the attribute set.
-    void clearAttributes(const bool updateValueMask = true);
+    void clearAttributes(const bool updateValueMask = true,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// @brief Returns @c true if an attribute with this index exists.
     /// @param pos Index of the attribute
@@ -366,9 +366,11 @@ public:
     /// @param pos Index of the new attribute in the descriptor replacement.
     /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
     /// @param constantStride if @c false, stride is interpreted as total size of the array
+    /// @param lock an optional scoped registry lock to avoid contention
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
-                                        const bool constantStride = true);
+                                        const bool constantStride = true,
+                                        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -407,12 +409,18 @@ public:
     void validateOffsets() const;
 
     /// @brief Read-write attribute array reference from index
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const size_t pos);
     const AttributeArray& attributeArray(const size_t pos) const;
     const AttributeArray& constAttributeArray(const size_t pos) const;
     /// }
     /// @brief Read-write attribute array reference from name
+    /// @details Attribute arrays can be shared across leaf nodes, so non-const
+    /// access will deep-copy the array to make it unique. Always prefer
+    /// accessing const arrays where possible to eliminate this copying.
     /// {
     AttributeArray& attributeArray(const Name& attributeName);
     const AttributeArray& attributeArray(const Name& attributeName) const;
@@ -695,18 +703,18 @@ public:
     /// @brief Leaf index iterator
     IndexAllIter beginIndexAll() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueAllCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueAllCIter, NullFilter>(filter);
     }
     IndexOnIter beginIndexOn() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueOnCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueOnCIter, NullFilter>(filter);
     }
     IndexOffIter beginIndexOff() const
     {
-	NullFilter filter;
-	return this->beginIndex<ValueOffCIter, NullFilter>(filter);
+        NullFilter filter;
+        return this->beginIndex<ValueOffCIter, NullFilter>(filter);
     }
 
     template<typename IterT, typename FilterT>
@@ -716,17 +724,17 @@ public:
     template<typename FilterT>
     IndexIter<ValueAllCIter, FilterT> beginIndexAll(const FilterT& filter) const
     {
-	return this->beginIndex<ValueAllCIter, FilterT>(filter);
+        return this->beginIndex<ValueAllCIter, FilterT>(filter);
     }
     template<typename FilterT>
     IndexIter<ValueOnCIter, FilterT> beginIndexOn(const FilterT& filter) const
     {
-	return this->beginIndex<ValueOnCIter, FilterT>(filter);
+        return this->beginIndex<ValueOnCIter, FilterT>(filter);
     }
     template<typename FilterT>
     IndexIter<ValueOffCIter, FilterT> beginIndexOff(const FilterT& filter) const
     {
-	return this->beginIndex<ValueOffCIter, FilterT>(filter);
+        return this->beginIndex<ValueOffCIter, FilterT>(filter);
     }
 
     /// @brief Leaf index iterator from voxel
@@ -785,7 +793,8 @@ public:
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength)
+PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
 {
     if (descriptor->size() != 1 ||
         descriptor->find("P") == AttributeSet::INVALID_POS ||
@@ -794,14 +803,15 @@ PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descr
         OPENVDB_THROW(IndexError, "Initializing attributes only allowed with one Vec3f position attribute.");
     }
 
-    mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
+    mAttributeSet.reset(new AttributeSet(descriptor, arrayLength, lock));
 }
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
+PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask,
+    const AttributeArray::ScopedRegistryLock* lock)
 {
-    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0));
+    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0, lock));
 
     // zero voxel values
 
@@ -831,9 +841,11 @@ template<typename T, Index Log2Dim>
 inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
                                                 const size_t pos, const Index strideOrTotalSize,
-                                                const bool constantStride)
+                                                const bool constantStride,
+                                                const AttributeArray::ScopedRegistryLock* lock)
 {
-    return mAttributeSet->appendAttribute(expected, replacement, pos, strideOrTotalSize, constantStride);
+    return mAttributeSet->appendAttribute(
+        expected, replacement, pos, strideOrTotalSize, constantStride, lock);
 }
 
 template<typename T, Index Log2Dim>
@@ -1563,9 +1575,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     this->assertNonModifiableUnlessZero(value);
 
@@ -1752,6 +1762,6 @@ struct SameLeafConfig<Dim1, points::PointDataLeafNode<T2, Dim1>> { static const 
 
 #endif // OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

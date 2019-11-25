@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -158,14 +158,12 @@ protected:
 
     /// Populate the given grid from the input stream.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Populate the given grid from the input stream, but only where it
     /// intersects the given world-space bounding box.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const BBoxd&);
     /// @brief Populate the given grid from the input stream, but only where it
     /// intersects the given index-space bounding box.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const CoordBBox&);
-#endif
 
     using NamedGridMap = std::map<Name /*uniqueName*/, GridBase::Ptr>;
 
@@ -225,6 +223,6 @@ private:
 
 #endif // OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

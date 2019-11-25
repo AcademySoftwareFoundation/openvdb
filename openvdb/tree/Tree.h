@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -116,14 +116,12 @@ public:
 
     virtual void getIndexRange(CoordBBox& bbox) const = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Replace with background tiles any nodes whose voxel buffers
     /// have not yet been allocated.
     /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
-#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 4
     /// Return the total number of unallocated leaf nodes residing in this tree.
     virtual Index32 unallocatedLeafCount() const = 0;
@@ -149,10 +147,8 @@ public:
     virtual Index64 activeVoxelCount() const = 0;
     /// Return the number of inactive voxels within the bounding box of all active voxels.
     virtual Index64 inactiveVoxelCount() const = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Return the total number of active tiles.
     virtual Index64 activeTileCount() const = 0;
-#endif
 
     /// Return the total amount of memory in bytes occupied by this tree.
     virtual Index64 memUsage() const { return 0; }
@@ -172,7 +168,6 @@ public:
 
     /// Read all data buffers for this tree.
     virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this tree's data buffers that intersect the given bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
     /// @brief Read all of this tree's data buffers that are not yet resident in memory
@@ -181,7 +176,6 @@ public:
     /// disconnects the tree from the file.
     /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
     virtual void readNonresidentBuffers() const = 0;
-#endif
     /// Write out all the data buffers for this tree.
     virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
 
@@ -341,7 +335,6 @@ public:
     void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const override;
     /// Read all data buffers for this tree.
     void readBuffers(std::istream&, bool saveFloatAsHalf = false) override;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read all of this tree's data buffers that intersect the given bounding box.
     void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
     /// @brief Read all of this tree's data buffers that are not yet resident in memory
@@ -350,7 +343,6 @@ public:
     /// disconnects the tree from the file.
     /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
     void readNonresidentBuffers() const override;
-#endif
     /// Write out all data buffers for this tree.
     void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
 
@@ -376,12 +368,8 @@ public:
     Index64 activeVoxelCount() const override { return mRoot.onVoxelCount(); }
     /// Return the number of inactive voxels within the bounding box of all active voxels.
     Index64 inactiveVoxelCount() const override;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Return the total number of active tiles.
     Index64 activeTileCount() const override { return mRoot.onTileCount(); }
-#else
-    Index64 activeTileCount() const { return mRoot.onTileCount(); }
-#endif
 
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
@@ -477,15 +465,13 @@ public:
 
     /// Set all voxels that lie outside the given axis-aligned box to the background.
     void clip(const CoordBBox&);
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Replace with background tiles any nodes whose voxel buffers
     /// have not yet been allocated.
     /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
     void clipUnallocatedNodes() override;
-#endif
+
 #if OPENVDB_ABI_VERSION_NUMBER >= 4
     /// Return the total number of unallocated leaf nodes residing in this tree.
     Index32 unallocatedLeafCount() const override;
@@ -1305,9 +1291,7 @@ TreeBase::print(std::ostream& os, int /*verboseLevel*/) const
 {
     os << "    Tree Type: " << type()
        << "    Active Voxel Count: " << activeVoxelCount() << std::endl
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
        << "    Active tile Count: " << activeTileCount() << std::endl
-#endif
        << "    Inactive Voxel Count: " << inactiveVoxelCount() << std::endl
        << "    Leaf Node Count: " << leafCount() << std::endl
        << "    Non-leaf Node Count: " << nonLeafCount() << std::endl;
@@ -1451,8 +1435,6 @@ Tree<RootNodeType>::readBuffers(std::istream &is, bool saveFloatAsHalf)
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
-
 template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::readBuffers(std::istream &is, const CoordBBox& bbox, bool saveFloatAsHalf)
@@ -1471,8 +1453,6 @@ Tree<RootNodeType>::readNonresidentBuffers() const
         it->getValue(Index(0));
     }
 }
-
-#endif
 
 
 template<typename RootNodeType>
@@ -1784,7 +1764,6 @@ Tree<RootNodeType>::clip(const CoordBBox& bbox)
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::clipUnallocatedNodes()
@@ -1798,7 +1777,6 @@ Tree<RootNodeType>::clipUnallocatedNodes()
         }
     }
 }
-#endif
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 4
 template<typename RootNodeType>
@@ -2333,7 +2311,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
             os << "  Average leaf node fill ratio:  " << fillRatio << "%\n";
         }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (verboseLevel > 2) {
             Index64 sum = 0;// count the number of unallocated leaf nodes
             for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
@@ -2341,7 +2318,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
                << util::formattedInt(sum) << " ("
                << (100.0 * double(sum) / double(totalNodeCount)) << "%)\n";
         }
-#endif
     } else {
         os << "  Tree is empty!\n";
     }
@@ -2375,6 +2351,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
 #endif // OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

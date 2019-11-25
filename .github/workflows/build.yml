@@ -1,0 +1,131 @@
+
+name: Build
+
+on: [push]
+
+jobs:
+  testabi7:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 7 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  testabi6:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2019
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 6 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  testabi5:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 5 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  testabi4:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 4 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  testhou175:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: houdini
+      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Release ON
+
+  testhou170:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: houdini
+      run: ./ci/install_houdini.sh 17.0 ${{ secrets.HOUPASS }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Release OFF
+
+  testabi7noblosc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 7 OFF None
+    - name: test
+      run: cd build && ctest -V
+
+  testhou175gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: houdini
+      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+    - name: build
+      run: ./ci/build_houdini.sh g++ Release OFF
+
+  testhou175debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2018
+    steps:
+    - uses: actions/checkout@v1
+    - name: houdini
+      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Debug OFF
+
+  testabi7gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh g++ Release 7 ON None
+
+  testabi7debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Debug 7 ON None
+
+  testabi7sse:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Debug 7 ON SSE42

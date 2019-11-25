@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -140,11 +140,9 @@ public:
 
     /// Read an entire grid, including all of its data blocks.
     GridBase::Ptr readGrid(const Name&);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Read a grid, including its data blocks, but only where it
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
-#endif
 
     /// @todo GridPtrVec readAllGrids(const Name&)
 
@@ -205,14 +203,12 @@ private:
 
     /// Read in and return the grid specified by the given grid descriptor.
     GridBase::Ptr readGrid(const GridDescriptor&) const;
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read in and return the region of the grid specified by the given grid descriptor
     /// that intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
     /// Read in and return the region of the grid specified by the given grid descriptor
     /// that intersects the given index-space bounding box.
     GridBase::Ptr readGrid(const GridDescriptor&, const CoordBBox&) const;
-#endif
 
     /// @brief Partially populate the given grid by reading its metadata and transform and,
     /// if the grid is not an instance, its tree structure, but not the tree's leaf nodes.
@@ -266,6 +262,6 @@ File::write(const GridPtrContainerT& container, const MetaMap& meta) const
 
 #endif // OPENVDB_IO_FILE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
+// Copyright (c) DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
