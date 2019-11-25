@@ -2564,7 +2564,12 @@ TestFile::testBlosc()
 
     for (int compcode = 0; compcode <= BLOSC_ZLIB; ++compcode) {
         char* compname = nullptr;
-        if (0 > blosc_compcode_to_compname(compcode, &compname)) continue;
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR >= 15)
+        if (0 > blosc_compcode_to_compname(compcode, const_cast<const char**>(&compname)))
+#else
+        if (0 > blosc_compcode_to_compname(compcode, &compname))
+#endif
+            continue;
         /// @todo This changes the compressor setting globally.
         if (blosc_set_compressor(compname) < 0) continue;
 
