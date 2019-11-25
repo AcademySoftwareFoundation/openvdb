@@ -29,7 +29,7 @@ stages:
     container: aswf/ci-openvdb:2020
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Release 7 ON
+    - bash: ci/build.sh clang++ Release 7 ON None
     - bash: cd build && ctest -V; cd -
 
   - job: testabi6
@@ -39,7 +39,7 @@ stages:
     container: aswf/ci-openvdb:2019
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Release 6 ON
+    - bash: ci/build.sh clang++ Release 6 ON None
     - bash: cd build && ctest -V; cd -
 
   - job: testabi5
@@ -49,7 +49,7 @@ stages:
     container: aswf/ci-openvdb:2018
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Release 5 ON
+    - bash: ci/build.sh clang++ Release 5 ON None
     - bash: cd build && ctest -V; cd -
 
   - job: testabi4
@@ -59,7 +59,7 @@ stages:
     container: aswf/ci-openvdb:2018
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Release 4 ON
+    - bash: ci/build.sh clang++ Release 4 ON None
     - bash: cd build && ctest -V; cd -
 
   - job: testhou175
@@ -91,7 +91,7 @@ stages:
     container: aswf/ci-openvdb:2020
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Release 7 OFF
+    - bash: ci/build.sh clang++ Release 7 OFF None
     - bash: cd build && ctest -V; cd -
 
   - job: testhou175gcc
@@ -123,7 +123,7 @@ stages:
     container: aswf/ci-openvdb:2020
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh g++ Release 7 ON
+    - bash: ci/build.sh g++ Release 7 ON None
 
   - job: testabi7debug
     displayName: ABI=7 (Debug)
@@ -132,4 +132,13 @@ stages:
     container: aswf/ci-openvdb:2020
     timeoutInMinutes: 0
     steps:
-    - bash: ci/build.sh clang++ Debug 7 ON
+    - bash: ci/build.sh clang++ Debug 7 ON None
+
+  - job: testabi7sse
+    displayName: ABI=7 (SSE42)
+    pool:
+      vmImage: 'ubuntu-16.04'
+    container: aswf/ci-openvdb:2020
+    timeoutInMinutes: 0
+    steps:
+    - bash: ci/build.sh g++ Release 7 ON SSE42

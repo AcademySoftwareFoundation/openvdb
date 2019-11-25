@@ -1428,14 +1428,12 @@ public:
     {
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     PointIndexLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
         , mIndices()
     {
     }
-#endif
 
     /// Deep copy constructor
     PointIndexLeafNode(const PointIndexLeafNode& rhs) : BaseLeaf(rhs), mIndices(rhs.mIndices) {}

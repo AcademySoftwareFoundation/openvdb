@@ -140,6 +140,19 @@ elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
 endif()
 
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING
+    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
+    None is the default." FORCE
+  )
+elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
+  set(OPENVDB_SIMD None CACHE STRING FORCE)
+endif()
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
@@ -197,6 +210,7 @@ mark_as_advanced(
   OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
+  OPENVDB_SIMD
 )
 
 # Configure minimum version requirements - some are treated specially and fall
@@ -208,6 +222,7 @@ set(MINIMUM_BLOSC_VERSION 1.5)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 4)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 5)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2018 of the VFX platform where avaiable
@@ -413,7 +428,7 @@ endif()
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION)
     message(FATAL_ERROR "Insufficient clang++ version. Minimum required is "
       "\"${MINIMUM_CLANG_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
@@ -510,6 +525,17 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   endif()
 endif()
 
+# Configure SIMD. AVX implies SSE 4.2.
+
+if(OPENVDB_SIMD STREQUAL "AVX")
+  add_compile_options(-mavx -msse4.2)
+  add_definitions(-DOPENVDB_USE_AVX)
+  add_definitions(-DOPENVDB_USE_SSE42)
+elseif(OPENVDB_SIMD STREQUAL "SSE42")
+  add_compile_options(-msse4.2)
+  add_definitions(-DOPENVDB_USE_SSE42)
+endif()
+
 #########################################################################
 
 # Configure OpenVDB Library and ABI versions
@@ -560,12 +586,17 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
 endif()
 
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
+  message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+    "no longer supported.")
+endif()
+
+if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
   if(OPENVDB_USE_DEPRECATED_ABI)
-    message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated and will soon be removed.")
+    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated and will soon be removed.")
   else()
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
   endif()
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)

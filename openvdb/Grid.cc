@@ -470,7 +470,6 @@ GridBase::getStatsMetadata() const
 ////////////////////////////////////////
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 void
 GridBase::clipGrid(const BBoxd& worldBBox)
 {
@@ -478,7 +477,6 @@ GridBase::clipGrid(const BBoxd& worldBBox)
         this->constTransform().worldToIndexNodeCentered(worldBBox);
     this->clip(indexBBox);
 }
-#endif
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

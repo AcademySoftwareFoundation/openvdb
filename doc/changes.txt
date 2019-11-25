@@ -24,6 +24,31 @@ Improvements:
   dependency searches.
 - Improvements to OpenVDB's CMake module setup order in regards to CMake
   policy, minimum version and project calls.
+- Replaced occurrences of boost::scoped_array with std::unique_ptr.
+- Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
+  AVX compiler flags, this is switched off by default.
+
+@par
+Bug fixes:
+- Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
+  correctly.
+- Fixed a Windows build issue in openvdb_render.
+
+@par
+ABI changes:
+- OpFactory destructor is now virtual as of ABI=7
+- Added new virtual methods for copying const grids and replacing
+  the metadata and/or the transform -
+  @vdblink::GridBase::copyGridReplacingMetadata() GridBase::copyGridReplacingMetadata@endlink,
+  @vdblink::GridBase::copyGridReplacingTransform() GridBase::copyGridReplacingTransform@endlink
+  and @vdblink::GridBase::copyGridReplacingMetadataAndTransform()
+  GridBase::copyGridReplacingMetadataAndTransform@endlink.
+
+@par
+API changes:
+- @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
+  @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
+  now return a std::unique_ptr instead of a boost::scoped_array.
 
 @par
 Python:
@@ -40,6 +65,8 @@ Houdini:
   inputs).
 - Threaded the population of point group memberships during conversion from
   Houdini geometry to OpenVDB Points
+- Introduced a position compression option to the Scatter&nbsp;SOP for VDB
+  Points and default to 16-bit fixed point.
 
 
 @htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly

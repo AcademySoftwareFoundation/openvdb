@@ -151,11 +151,7 @@ public:
     {
         if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
         if (grainSize > 0) {
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            typename GridT::Ptr examplar = mGrid->copy(CP_NEW);
-#else
             typename GridT::Ptr examplar = mGrid->copyWithNewTree();
-#endif
             PoolType pool( *examplar );//thread local storage pool of grids
             AddPoints<PointListT> tmp(points, pool, grainSize, *this );
             if ( this->interrupt() ) return;

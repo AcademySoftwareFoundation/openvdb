@@ -909,10 +909,7 @@ template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -930,10 +927,7 @@ template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];

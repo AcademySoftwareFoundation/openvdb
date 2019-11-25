@@ -100,8 +100,8 @@
 // behavior during compilation of the library. Both can be optionally suppressed
 // by defining OPENVDB_USE_DEPRECATED_ABI.
 #ifndef OPENVDB_USE_DEPRECATED_ABI
-    #if OPENVDB_ABI_VERSION_NUMBER <= 3
-        PRAGMA(message("NOTE: ABI <= 3 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
+    #if OPENVDB_ABI_VERSION_NUMBER == 4
+        PRAGMA(message("NOTE: ABI = 4 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
             "to suppress this message"))
     #endif
 #endif
