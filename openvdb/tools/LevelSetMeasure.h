@@ -340,7 +340,7 @@ LevelSetMeasure<GridT, InterruptT>::totMeanCurvature(bool useWorldUnits)
 
 template<typename GridT, typename InterruptT>
 inline Real
-LevelSetMeasure<GridT, InterruptT>::totGaussianCurvature(bool useWorldUnits)
+LevelSetMeasure<GridT, InterruptT>::totGaussianCurvature(bool)
 {
     if (mUpdateCurvature) {MeasureCurvatures m(this);};
     return mTotGausCurvature;
@@ -415,7 +415,6 @@ MeasureCurvatures::operator()(const LeafRange& range) const
             const Real dd = DD(invDx * (*voxelIter));
             if (dd > 0.0) {
                 mStencil.moveTo(voxelIter);
-                const Coord& p = mStencil.getCenterCoord();
                 const Vec3T g  = mStencil.gradient();
                 const Real dA  = dd*g.length();// \delta(\phi)*\delta(\phi)
                 mStencil.curvatures(mean, gauss);
