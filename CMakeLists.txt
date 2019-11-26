@@ -154,6 +154,9 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
+# Top-level location for all openvdb headers
+set(OPENVDB_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
