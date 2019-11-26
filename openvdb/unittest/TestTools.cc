@@ -1826,7 +1826,7 @@ TestTools::testLevelSetMeasure()
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
      CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=3; ++i) {
-       auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r+i*5.0f , openvdb::Vec3f(100.0f*i), dx);
+       auto sphere = openvdb::tools::createLevelSetSphere<GridT>(r+float(i)*5.0f , openvdb::Vec3f(100.0f*float(i)), dx);
        openvdb::tools::csgUnion(*grid, *sphere);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);// since they are not overlapping re-normalization is not required
        //std::cerr << "Euler characteristics of " << i << " sphere(s) = " << x << std::endl;
@@ -1838,7 +1838,7 @@ TestTools::testLevelSetMeasure()
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
      CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=2; ++i) {
-       auto shape = openvdb::tools::createLevelSetCube<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*i), dx);
+       auto shape = openvdb::tools::createLevelSetCube<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*float(i)), dx);
        openvdb::tools::csgUnion(*grid, *shape);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);
        //std::cerr << "Euler characteristics of " << i << " cubes(s) = " << x << std::endl;
@@ -1850,7 +1850,7 @@ TestTools::testLevelSetMeasure()
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
      CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=4; ++i) {
-       auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r , openvdb::Vec3f(30.0f*i,0,0), dx);
+       auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r , openvdb::Vec3f(30.0f*float(i), 0.0f, 0.0f), dx);
        openvdb::tools::csgUnion(*grid, *sphere);
        const int genus = openvdb::tools::levelSetGenus(*grid);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);

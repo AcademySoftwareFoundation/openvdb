@@ -387,7 +387,7 @@ MeasureArea::operator()(const LeafRange& range) const
                 const Coord& p = mStencil.getCenterCoord();// in voxel units
                 const Vec3T g  = mStencil.gradient();// in world units
                 sumA += dd*g.length();// \delta(\phi)*|\nabla\phi|
-                sumV += dd*(g[0]*p[0] + g[1]*p[1] + g[2]*p[2]);// \delta(\phi)\vec{x}\cdot\nabla\phi
+                sumV += dd*(g[0]*Real(p[0]) + g[1]*Real(p[1]) + g[2]*Real(p[2]));// \delta(\phi)\vec{x}\cdot\nabla\phi
             }
         }
         double* ptr = mParent->mBuffer.get() + leafIter.pos();
