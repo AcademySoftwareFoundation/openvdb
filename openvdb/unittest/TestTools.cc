@@ -1826,7 +1826,7 @@ TestTools::testLevelSetMeasure()
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
      CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=3; ++i) {
-       auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r+i*5 , openvdb::Vec3f(100.0f*i), dx);
+       auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r+i*5.0f , openvdb::Vec3f(100.0f*i), dx);
        openvdb::tools::csgUnion(*grid, *sphere);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);// since they are not overlapping re-normalization is not required
        //std::cerr << "Euler characteristics of " << i << " sphere(s) = " << x << std::endl;
@@ -1845,35 +1845,6 @@ TestTools::testLevelSetMeasure()
        CPPUNIT_ASSERT_EQUAL(2*i, x);
      }
    }
-   /*
-   {// testing total genus of multiple disjoint level set tetrahedrons of different size
-     const float dx = 0.05f, size = 25.0f;
-     auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid,-1), openvdb::RuntimeError);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid, 0), openvdb::RuntimeError);
-     for (int i=1; i<=4; ++i) {
-       auto shape = openvdb::tools::createLevelSetTetrahedron<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*i), dx);
-       openvdb::tools::csgUnion(*grid, *shape);
-       const int genus = openvdb::tools::levelSetGenus(*grid, i);// since they are not overlapping re-normalization is not required
-       std::cerr << "Genus of " << i << " tetrahedron(s) = " << genus << std::endl;
-       CPPUNIT_ASSERT_EQUAL(0, genus);
-     }
-   }
-   {// testing total genus of multiple disjoint level set octahedrons of different size
-     const float dx = 0.5f, size = 25.0f;
-     auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid,-1), openvdb::RuntimeError);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid, 0), openvdb::RuntimeError);
-     for (int i=1; i<=4; ++i) {
-       auto shape = openvdb::tools::createLevelSetOctahedron<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*i), dx);
-       openvdb::tools::csgUnion(*grid, *shape);
-       const int genus = openvdb::tools::levelSetGenus(*grid, i);// since they are not overlapping re-normalization is not required
-       std::cerr << "Genus of " << i << " octahedron(s) = " << genus << std::endl;
-       CPPUNIT_ASSERT_EQUAL(0, genus);
-     }
-   }
-   */
-
    {// testing Euler characteristic and total genus of multiple intersecting (connected) level set spheres
      const float dx = 0.5f, r = 50.0f;
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
