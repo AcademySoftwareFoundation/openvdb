@@ -27,6 +27,8 @@ Improvements:
 - Replaced occurrences of boost::scoped_array with std::unique_ptr.
 - Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
   AVX compiler flags, this is switched off by default.
+- Standardized CMake install locations using GNUInstallDirs
+  <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
 
 @par
 Bug fixes:
