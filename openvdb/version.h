@@ -70,6 +70,7 @@
 #define OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
 #include "Platform.h"
+#include <cstdint> // uint32_t
 
 
 // Library major, minor and patch version numbers

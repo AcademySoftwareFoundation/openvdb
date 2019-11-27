@@ -2554,7 +2554,7 @@ exportGrid()
         // if it is not already implicitly registered.
         try {
             py::object testObj{GridPtr()};
-        } catch (py::error_already_set& e) {
+        } catch (py::error_already_set&) {
             PyErr_Clear();
             py::register_ptr_to_python<GridPtr>();
         }

@@ -20,6 +20,8 @@ Version 7.0.0 - In development
     - Replaced occurrences of boost::scoped_array with std::unique_ptr.
     - Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
       AVX compiler flags, this is switched off by default.
+    - Made various small changes to improve Visual Studio compatiblity and
+      deprecate some logic for compilers older than Visual Studio 2017.
 
     Bug fixes:
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled
