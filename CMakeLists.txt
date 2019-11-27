@@ -71,6 +71,7 @@ project(OpenVDB)
 ###### OpenVDB Build/Component Options
 
 include(CMakeDependentOption)
+include(GNUInstallDirs)
 
 # todo SSE/AVX instruction options
 # todo epydoc and pdflatex
@@ -152,6 +153,9 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
     "using None instead.")
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
+
+# Top-level location for all openvdb headers
+set(OPENVDB_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
@@ -328,7 +332,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure DCC installation if necessary
