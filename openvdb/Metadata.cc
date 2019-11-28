@@ -55,28 +55,12 @@ struct LockedMetadataTypeRegistry {
     MetadataFactoryMap mMap;
 };
 
-// Declare this at file scope to ensure thread-safe initialization
-static Mutex theInitMetadataTypeRegistryMutex;
-
 // Global function for accessing the regsitry
 static LockedMetadataTypeRegistry*
 getMetadataTypeRegistry()
 {
-    Lock lock(theInitMetadataTypeRegistryMutex);
-
-    static LockedMetadataTypeRegistry *registry = nullptr;
-
-    if (registry == nullptr) {
-#if defined(__ICC)
-__pragma(warning(disable:1711)) // disable ICC "assignment to static variable" warnings
-#endif
-        registry = new LockedMetadataTypeRegistry();
-#if defined(__ICC)
-__pragma(warning(default:1711))
-#endif
-    }
-
-    return registry;
+    static LockedMetadataTypeRegistry registry;
+    return &registry;
 }
 
 bool

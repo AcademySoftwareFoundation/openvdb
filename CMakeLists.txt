@@ -441,7 +441,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring Clang CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -468,7 +468,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -504,7 +504,30 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     endif()
   endif()
   # Increase the number of sections that an object file can contain
-  add_definitions("/bigobj")
+  add_compile_options(/bigobj)
+  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
+  # defined on MSVC
+  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
+  add_definitions(-D_USE_MATH_DEFINES)
+  # Disable the non-portable Windows definitions of min() and max() macros
+  add_definitions(-DNOMINMAX)
+  # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
+  add_definitions(-DWIN32_LEAN_AND_MEAN)
+  if(NOT OPENVDB_CXX_STRICT)
+    message(STATUS "Suppressing some noisy MSVC CXX warnings, "
+      "set OPENVDB_CXX_STRICT=ON to re-enable them.")
+    # Conversion from int64_t to long
+    add_compile_options(/wd4244)
+    # It's not possible to use STL types in DLL interfaces in a portable and
+    # reliable way so disable this warning
+    add_compile_options(/wd4251)
+    # Conversion from size_t to uLong
+    add_compile_options(/wd4267)
+    # Non dll-interface class used as base for dll-interface class
+    add_compile_options(/wd4275)
+    # Truncation from 'int' to 'bool'
+    add_compile_options(/wd4305)
+  endif()
 endif()
 
 if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)

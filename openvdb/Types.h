@@ -43,6 +43,7 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
+#include <cstdint>
 #include <memory>
 #include <type_traits>
 
