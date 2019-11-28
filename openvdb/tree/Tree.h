@@ -45,10 +45,10 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
-#include <tbb/atomic.h>
 #include <tbb/concurrent_hash_map.h>
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -1229,11 +1229,11 @@ protected:
     mutable AccessorRegistry mAccessorRegistry;
     mutable ConstAccessorRegistry mConstAccessorRegistry;
 
-    static tbb::atomic<const Name*> sTreeTypeName;
+    static std::unique_ptr<const Name> sTreeTypeName;
 }; // end of Tree class
 
 template<typename _RootNodeType>
-tbb::atomic<const Name*> Tree<_RootNodeType>::sTreeTypeName;
+std::unique_ptr<const Name> Tree<_RootNodeType>::sTreeTypeName;
 
 
 /// @brief Tree3<T, N1, N2>::Type is the type of a three-level tree
@@ -2099,7 +2099,9 @@ template<typename RootNodeType>
 inline const Name&
 Tree<RootNodeType>::treeType()
 {
-    if (sTreeTypeName == nullptr) {
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
@@ -2107,9 +2109,8 @@ Tree<RootNodeType>::treeType()
         for (size_t i = 1, N = dims.size(); i < N; ++i) { // start from 1 to skip the RootNode
             ostr << "_" << dims[i];
         }
-        Name* s = new Name(ostr.str());
-        if (sTreeTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
-    }
+        sTreeTypeName.reset(new Name(ostr.str()));
+    });
     return *sTreeTypeName;
 }
 

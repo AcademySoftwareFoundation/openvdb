@@ -52,20 +52,12 @@ Mutex sInitMapRegistryMutex;
 ////////////////////////////////////////
 
 
-MapRegistry* MapRegistry::mInstance = nullptr;
-
-
 // Caller is responsible for calling this function serially.
 MapRegistry*
 MapRegistry::staticInstance()
 {
-    if (mInstance == nullptr) {
-        OPENVDB_START_THREADSAFE_STATIC_WRITE
-            mInstance = new MapRegistry();
-        OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
-            return mInstance;
-    }
-    return mInstance;
+    static MapRegistry registry;
+    return &registry;
 }
 
 

@@ -74,35 +74,13 @@ struct LockedGridRegistry {
     GridFactoryMap mMap;
 };
 
-// Declare this at file scope to ensure thread-safe initialization.
-Mutex sInitGridRegistryMutex;
-
 
 // Global function for accessing the registry
 LockedGridRegistry*
 getGridRegistry()
 {
-    Lock lock(sInitGridRegistryMutex);
-
-    static LockedGridRegistry* registry = nullptr;
-
-    if (registry == nullptr) {
-
-#ifdef __ICC
-// Disable ICC "assignment to statically allocated variable" warning.
-// This assignment is mutex-protected and therefore thread-safe.
-__pragma(warning(disable:1711))
-#endif
-
-        registry = new LockedGridRegistry();
-
-#ifdef __ICC
-__pragma(warning(default:1711))
-#endif
-
-    }
-
-    return registry;
+    static LockedGridRegistry registry;
+    return &registry;
 }
 
 } // unnamed namespace

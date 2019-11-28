@@ -313,8 +313,6 @@ private:
 
     static MapRegistry* staticInstance();
 
-    static MapRegistry* mInstance;
-
     MapDictionary mMap;
 };
 

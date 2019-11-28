@@ -51,6 +51,7 @@
 #include <tbb/atomic.h>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -853,7 +854,7 @@ private:
         return TypedAttributeArray::create(n, strideOrTotalSize, constantStride);
     }
 
-    static tbb::atomic<const NamePair*> sTypeName;
+    static std::unique_ptr<const NamePair> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
@@ -1167,7 +1168,7 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 // TypedAttributeArray implementation
 
 template<typename ValueType_, typename Codec_>
-tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
+std::unique_ptr<const NamePair> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 
 template<typename ValueType_, typename Codec_>
@@ -1243,10 +1244,11 @@ template<typename ValueType_, typename Codec_>
 inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
-    if (sTypeName == nullptr) {
-        NamePair* s = new NamePair(typeNameAsString<ValueType>(), Codec::name());
-        if (sTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
-    }
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
+        sTypeName.reset(new NamePair(typeNameAsString<ValueType>(), Codec::name()));
+    });
     return *sTypeName;
 }
 
