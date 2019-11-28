@@ -322,12 +322,14 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   # If the sesi tag needs removing, manually configure the compile
   # options for each DSO and replace the UT_DSO_TAGINFO define
 
-  if(NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG)
-    get_target_property(DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS)
-    string(REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
-    set_target_properties(${DSO_NAME}
-      PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
-    )
+  if(Houdini_VERSION VERSION_LESS 18)
+    if(NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG)
+      get_target_property(DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS)
+      string(REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
+      set_target_properties(${DSO_NAME}
+        PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
+      )
+    endif()
   endif()
 
   # Configure rpaths
