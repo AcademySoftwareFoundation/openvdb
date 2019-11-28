@@ -174,11 +174,11 @@ Using Voxel Scale Only:\n\
             " for the new transform"));
 
     // Translation
-    parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate")
+    parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate Voxels")
         .setDefault(PRMzeroDefaults)
         .setVectorSize(3)
         .setTooltip(
-            "When __Define Transform__ is Explicitly, the position for the new transform"));
+            "When __Define Transform__ is Explicitly, the shift in voxels for the new transform"));
 
     // Rotation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "r", "Rotate")
@@ -525,11 +525,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 
             // Create a new, empty output grid of the same type as the input grid
             // and with the same metadata.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            hvdb::GridPtr outGrid = grid.copyGrid(/*tree=*/openvdb::CP_NEW);
-#else
             hvdb::GridPtr outGrid = grid.copyGridWithNewTree();
-#endif
 
             UT_AutoInterrupt scopedInterrupt(
                 ("Resampling " + it.getPrimitiveName().toStdString()).c_str());

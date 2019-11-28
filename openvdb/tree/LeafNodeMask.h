@@ -94,10 +94,8 @@ public:
     /// @param dummy   dummy value
     explicit LeafNode(const Coord& xyz, bool value = false, bool dummy = false);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// "Partial creation" constructor used during file input
     LeafNode(PartialCreate, const Coord& xyz, bool value = false, bool dummy = false);
-#endif
 
     /// Deep copy constructor
     LeafNode(const LeafNode&);
@@ -159,8 +157,6 @@ public:
     bool isEmpty() const { return mBuffer.mData.isOff(); }
     /// Return @c true if this node only contains active voxels.
     bool isDense() const { return mBuffer.mData.isOn(); }
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Return @c true if memory for this node's buffer has been allocated.
     /// @details Currently, boolean leaf nodes don't support partial creation,
     /// so this always returns @c true.
@@ -169,7 +165,6 @@ public:
     /// @details Currently, boolean leaf nodes don't support partial creation,
     /// so this has no effect.
     bool allocate() { return true; }
-#endif
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
@@ -811,7 +806,6 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<Index Log2Dim>
 inline
 LeafNode<ValueMask, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active)
@@ -819,7 +813,6 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool val
     , mOrigin(xyz & (~(DIM - 1)))
 {
 }
-#endif
 
 
 template<Index Log2Dim>

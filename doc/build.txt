@@ -8,6 +8,7 @@
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
   - @ref buildBloscSupport
+  - @ref buildVCPKG
 - @ref buildComponents
 - @ref buildGuide
   - @ref buildBuildTypes
@@ -157,6 +158,12 @@ treat blosc as a required dependency. There are two reasons for this:
    Houdini.
 
 You can disable Blosc using `-D USE_BLOSC=OFF`.
+
+@subsection buildVCPKG Building Dependencies using VCPKG
+
+It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
+variable to use 64-bit libraries by default as even on a 64-bit Windows OS,
+VCPKG builds and installs 32-bit libraries by default.
 
 @section buildComponents OpenVDB Components
 

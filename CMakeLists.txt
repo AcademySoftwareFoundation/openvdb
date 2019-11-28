@@ -71,6 +71,7 @@ project(OpenVDB)
 ###### OpenVDB Build/Component Options
 
 include(CMakeDependentOption)
+include(GNUInstallDirs)
 
 # todo SSE/AVX instruction options
 # todo epydoc and pdflatex
@@ -140,6 +141,22 @@ elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
 endif()
 
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING
+    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
+    None is the default." FORCE
+  )
+elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
+  set(OPENVDB_SIMD None CACHE STRING FORCE)
+endif()
+
+# Top-level location for all openvdb headers
+set(OPENVDB_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
@@ -197,6 +214,7 @@ mark_as_advanced(
   OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
+  OPENVDB_SIMD
 )
 
 # Configure minimum version requirements - some are treated specially and fall
@@ -208,6 +226,7 @@ set(MINIMUM_BLOSC_VERSION 1.5)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 4)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 5)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2018 of the VFX platform where avaiable
@@ -313,7 +332,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure DCC installation if necessary
@@ -413,7 +432,7 @@ endif()
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION)
     message(FATAL_ERROR "Insufficient clang++ version. Minimum required is "
       "\"${MINIMUM_CLANG_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
@@ -422,7 +441,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring Clang CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -449,7 +468,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -485,7 +504,30 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     endif()
   endif()
   # Increase the number of sections that an object file can contain
-  add_definitions("/bigobj")
+  add_compile_options(/bigobj)
+  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
+  # defined on MSVC
+  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
+  add_definitions(-D_USE_MATH_DEFINES)
+  # Disable the non-portable Windows definitions of min() and max() macros
+  add_definitions(-DNOMINMAX)
+  # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
+  add_definitions(-DWIN32_LEAN_AND_MEAN)
+  if(NOT OPENVDB_CXX_STRICT)
+    message(STATUS "Suppressing some noisy MSVC CXX warnings, "
+      "set OPENVDB_CXX_STRICT=ON to re-enable them.")
+    # Conversion from int64_t to long
+    add_compile_options(/wd4244)
+    # It's not possible to use STL types in DLL interfaces in a portable and
+    # reliable way so disable this warning
+    add_compile_options(/wd4251)
+    # Conversion from size_t to uLong
+    add_compile_options(/wd4267)
+    # Non dll-interface class used as base for dll-interface class
+    add_compile_options(/wd4275)
+    # Truncation from 'int' to 'bool'
+    add_compile_options(/wd4305)
+  endif()
 endif()
 
 if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
@@ -508,6 +550,17 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
   endif()
+endif()
+
+# Configure SIMD. AVX implies SSE 4.2.
+
+if(OPENVDB_SIMD STREQUAL "AVX")
+  add_compile_options(-mavx -msse4.2)
+  add_definitions(-DOPENVDB_USE_AVX)
+  add_definitions(-DOPENVDB_USE_SSE42)
+elseif(OPENVDB_SIMD STREQUAL "SSE42")
+  add_compile_options(-msse4.2)
+  add_definitions(-DOPENVDB_USE_SSE42)
 endif()
 
 #########################################################################
@@ -560,12 +613,17 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
 endif()
 
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
+  message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
+    "no longer supported.")
+endif()
+
+if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
   if(OPENVDB_USE_DEPRECATED_ABI)
-    message(WARNING "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated and will soon be removed.")
+    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated and will soon be removed.")
   else()
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-      "deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+      "are deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
   endif()
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)

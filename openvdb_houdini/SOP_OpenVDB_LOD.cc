@@ -294,6 +294,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
         std::vector<std::string> skipped;
 
         hvdb::Interrupter boss("Creating VDB LoD pyramid");
+        GA_RWHandleS name_h(gdp, GA_ATTRIB_PRIMITIVE, "name");
 
         const auto lodMode = evalInt("lod", 0, 0);
         if (lodMode == 0) {
@@ -303,6 +304,9 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
             for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
                 if (boss.wasInterrupted()) return error();
+
+                if (name_h.isValid())
+                    it->getGrid().setName(static_cast<const char *>(name_h.get(it->getMapOffset())));
 
                 if (!it->getGrid().transform().isLinear()) {
                     skipped.push_back(it->getGrid().getName());
@@ -337,6 +341,9 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
 
                 if (boss.wasInterrupted()) return error();
 
+                if (name_h.isValid())
+                    it->getGrid().setName(static_cast<const char *>(name_h.get(it->getMapOffset())));
+
                 if (!it->getGrid().transform().isLinear()) {
                     skipped.push_back(it->getGrid().getName());
                     continue;
@@ -358,6 +365,9 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
             for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
                 if (boss.wasInterrupted()) return error();
+
+                if (name_h.isValid())
+                    it->getGrid().setName(static_cast<const char *>(name_h.get(it->getMapOffset())));
 
                 if (!it->getGrid().transform().isLinear()) {
                     skipped.push_back(it->getGrid().getName());

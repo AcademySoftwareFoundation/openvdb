@@ -379,7 +379,6 @@ TestPointCount::testGroup()
 
             bool inCoreOnly = true;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(0));
@@ -388,16 +387,6 @@ TestPointCount::testGroup()
                 groupFilter, ActiveFilter()), inCoreOnly), Index64(0));
             CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
                 groupFilter, InactiveFilter()), inCoreOnly), Index64(0));
-#else
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
-                groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
-            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
-                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
-#endif
 
             inCoreOnly = false;
 
@@ -632,21 +621,12 @@ TestPointCount::testOffsets()
         MultiGroupFilter filter(includeGroups, excludeGroups, inputTree.cbeginLeaf()->attributeSet());
         Index64 total = pointOffsets(offsets, inputTree, filter, /*inCoreOnly=*/true);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
         CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(0));
         CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(0));
         CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(0));
         CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(0));
         CPPUNIT_ASSERT_EQUAL(total, Index64(0));
-#else
-        CPPUNIT_ASSERT_EQUAL(offsets.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(offsets[0], Index64(1));
-        CPPUNIT_ASSERT_EQUAL(offsets[1], Index64(3));
-        CPPUNIT_ASSERT_EQUAL(offsets[2], Index64(4));
-        CPPUNIT_ASSERT_EQUAL(offsets[3], Index64(5));
-        CPPUNIT_ASSERT_EQUAL(total, Index64(5));
-#endif
 
         offsets.clear();
 

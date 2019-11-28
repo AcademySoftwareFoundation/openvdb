@@ -37,6 +37,7 @@ project(OpenVDBPython)
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
+include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
 
@@ -254,7 +255,7 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   set(PYOPENVDB_INSTALL_DIRECTORY
-    lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
+    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()
@@ -324,7 +325,7 @@ install(TARGETS
   ${PYOPENVDB_INSTALL_DIRECTORY}
 )
 
-install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION include/openvdb/python)
+install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION ${OPENVDB_INCLUDE_DIR}/python)
 
 # pytest
 

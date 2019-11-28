@@ -104,8 +104,6 @@ public:
                       const ValueType& value = zeroVal<ValueType>(),
                       bool active = false);
 
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief "Partial creation" constructor used during file input
     /// @param coords  the grid index coordinates of a voxel
     /// @param value   a value with which to fill the buffer
@@ -115,7 +113,6 @@ public:
              const Coord& coords,
              const ValueType& value = zeroVal<ValueType>(),
              bool active = false);
-#endif
 
     /// Deep copy constructor
     LeafNode(const LeafNode&);
@@ -176,13 +173,10 @@ public:
     bool isEmpty() const { return mValueMask.isOff(); }
     /// Return @c true if this node contains only active voxels.
     bool isDense() const { return mValueMask.isOn(); }
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Return @c true if memory for this node's buffer has been allocated.
     bool isAllocated() const { return !mBuffer.isOutOfCore() && !mBuffer.empty(); }
     /// Allocate memory for this node's buffer if it has not already been allocated.
     bool allocate() { return mBuffer.allocate(); }
-#endif
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
@@ -969,7 +963,6 @@ LeafNode<T, Log2Dim>::LeafNode(const Coord& xyz, const ValueType& val, bool acti
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<typename T, Index Log2Dim>
 inline
 LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType& val, bool active):
@@ -978,7 +971,6 @@ LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType&
     mOrigin(xyz & (~(DIM - 1)))
 {
 }
-#endif
 
 
 template<typename T, Index Log2Dim>
@@ -1211,9 +1203,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     auto clippedBBox = this->getNodeBoundingBox();
     clippedBBox.intersect(bbox);
@@ -1256,9 +1246,7 @@ template<typename DenseT>
 inline void
 LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     mBuffer.loadValues();
-#endif
 
     using DenseValueType = typename DenseT::ValueType;
 
@@ -1286,9 +1274,7 @@ inline void
 LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
                                     const ValueType& background, const ValueType& tolerance)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     using DenseValueType = typename DenseT::ValueType;
 
@@ -1371,9 +1357,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     std::streamoff maskpos = is.tellg();
-#endif
 
     if (seekable) {
         // Seek over the value mask.
@@ -1399,7 +1383,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         // If this node lies completely inside the clipping region and it is being read
         // from a memory-mapped file, delay loading of its buffer until the buffer
         // is actually accessed.  (If this node requires clipping, its buffer
@@ -1419,7 +1402,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             // Skip over voxel values.
             skipCompressedValues(seekable, is, fromHalf);
         } else {
-#endif
             mBuffer.allocate();
             io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
             mBuffer.setOutOfCore(false);
@@ -1430,9 +1412,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
                 background = *static_cast<const T*>(bgPtr);
             }
             this->clip(clipBBox, background);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         }
-#endif
     }
 
     if (numBuffers > 1) {
@@ -1656,9 +1636,7 @@ inline void
 LeafNode<T, Log2Dim>::resetBackground(const ValueType& oldBackground,
                                       const ValueType& newBackground)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     typename NodeMaskType::OffIterator iter;
     // For all inactive values...
@@ -1678,9 +1656,7 @@ template<MergePolicy Policy>
 inline void
 LeafNode<T, Log2Dim>::merge(const LeafNode& other)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy == MERGE_NODES) return;
@@ -1709,9 +1685,7 @@ template<MergePolicy Policy>
 inline void
 LeafNode<T, Log2Dim>::merge(const ValueType& tileValue, bool tileActive)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
 
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy != MERGE_ACTIVE_STATES_AND_NODES) return;
@@ -1756,9 +1730,8 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::negate()
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     for (Index i = 0; i < SIZE; ++i) {
         mBuffer[i] = -mBuffer[i];
     }
@@ -1773,9 +1746,8 @@ template<typename CombineOp>
 inline void
 LeafNode<T, Log2Dim>::combine(const LeafNode& other, CombineOp& op)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     CombineArgs<T> args;
     for (Index i = 0; i < SIZE; ++i) {
         op(args.setARef(mBuffer[i])
@@ -1793,9 +1765,8 @@ template<typename CombineOp>
 inline void
 LeafNode<T, Log2Dim>::combine(const ValueType& value, bool valueIsActive, CombineOp& op)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     CombineArgs<T> args;
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1816,9 +1787,8 @@ inline void
 LeafNode<T, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     bool valueIsActive, CombineOp& op)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     CombineArgs<T, OtherType> args;
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1836,9 +1806,8 @@ inline void
 LeafNode<T, Log2Dim>::combine2(const ValueType& value, const OtherNodeT& other,
     bool valueIsActive, CombineOp& op)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     CombineArgs<T, typename OtherNodeT::ValueType> args;
     args.setARef(value).setAIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1855,9 +1824,8 @@ template<typename CombineOp, typename OtherNodeT>
 inline void
 LeafNode<T, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, CombineOp& op)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     if (!this->allocate()) return;
-#endif
+
     CombineArgs<T, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
         mValueMask.set(i, b0.valueMask().isOn(i) || b1.valueMask().isOn(i));

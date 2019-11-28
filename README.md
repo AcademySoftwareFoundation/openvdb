@@ -19,6 +19,8 @@ This GitHub repository hosts the trunk of the OpenVDB development. This implies 
 
 OpenVDB is released under the [Mozilla Public License Version 2.0](https://www.mozilla.org/MPL/2.0/), which is a free, open source software license developed and maintained by the Mozilla Foundation. The LICENSE file also contains a short notice and disclaimer statement for redistributions of OpenVDB source code.
 
+The trademarks of any contributor to this project may not be used in association with the project without the contributor's express permission.
+
 
 ### Contributing
 
@@ -92,6 +94,10 @@ make install
 ```
 #### Windows
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
+
+It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
+variable to use 64-bit libraries by default.
+
 ```
 vcpkg install boost zlib blosc openexr tbb
 vcpkg integrate install

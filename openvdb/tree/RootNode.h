@@ -262,7 +262,7 @@ private:
 
         void increment() { if (this->test()) { ++mIter; } this->skip(); }
         bool next() { this->increment(); return this->test(); }
-        void increment(Index n) { for (int i = 0; i < n && this->next(); ++i) {} }
+        void increment(Index n) { for (Index i = 0; i < n && this->next(); ++i) {} }
 
         /// @brief Return this iterator's position as an offset from
         /// the beginning of the parent node's map.
@@ -2356,11 +2356,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 
             if (childMask.isOn(i)) {
                 // Read in and insert a child node.
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-                ChildT* child = new ChildT(origin, mBackground);
-#else
                 ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
-#endif
                 child->readTopology(is);
                 mTable[origin] = NodeStruct(*child);
             } else {
@@ -2403,11 +2399,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     for (Index n = 0; n < numChildren; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
         Coord origin(vec);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        ChildT* child = new ChildT(origin, mBackground);
-#else
         ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
-#endif
         child->readTopology(is, fromHalf);
         mTable[Coord(vec)] = NodeStruct(*child);
     }

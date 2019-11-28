@@ -158,14 +158,12 @@ protected:
 
     /// Populate the given grid from the input stream.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Populate the given grid from the input stream, but only where it
     /// intersects the given world-space bounding box.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const BBoxd&);
     /// @brief Populate the given grid from the input stream, but only where it
     /// intersects the given index-space bounding box.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const CoordBBox&);
-#endif
 
     using NamedGridMap = std::map<Name /*uniqueName*/, GridBase::Ptr>;
 

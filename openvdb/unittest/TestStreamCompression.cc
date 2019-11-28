@@ -72,8 +72,13 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <blosc.h>
 // A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
 // HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
-#if BLOSC_VERSION_MAJOR > 0 && BLOSC_VERSION_MINOR > 10
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR > 10)
 #define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+#endif
+// Blosc 1.14+ writes backwards-compatible data by default.
+// http://blosc.org/posts/new-forward-compat-policy/
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 &&  BLOSC_VERSION_MINOR >= 14)
+#define BLOSC_BACKWARDS_COMPATIBLE
 #endif
 #endif
 
@@ -446,10 +451,14 @@ TestStreamCompression::testPagedStreams()
         ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(5400));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4422));
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4452));
+#endif
 #endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(PageSize+sizeof(int)));
@@ -475,10 +484,14 @@ TestStreamCompression::testPagedStreams()
         istream.read(handle, values.size(), false);
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(5400));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4422));
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4452));
+#endif
 #endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(PageSize+sizeof(int)));
@@ -564,10 +577,14 @@ TestStreamCompression::testPagedStreams()
             ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(51480));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42424));
 #else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
+#endif
 #endif
 #else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));

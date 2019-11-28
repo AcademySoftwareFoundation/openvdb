@@ -77,30 +77,8 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
-/// Macro for determining if there are sufficient C++0x/C++11 features
-#ifdef __INTEL_COMPILER
-    #ifdef __INTEL_CXX11_MODE__
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#elif defined(__clang__)
-    #ifndef _LIBCPP_VERSION
-        #include <ciso646>
-    #endif
-    #ifdef _LIBCPP_VERSION
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#elif defined(__GXX_EXPERIMENTAL_CXX0X__) || (__cplusplus > 199711L)
-    #define OPENVDB_HAS_CXX11 1
-#elif defined(_MSC_VER)
-    #if (_MSC_VER >= 1700)
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#endif
-#if defined(__GNUC__) && !OPENVDB_CHECK_GCC(4, 4)
-    // ICC uses GCC's standard library headers, so even if the ICC version
-    // is recent enough for C++11, the GCC version might not be.
-    #undef OPENVDB_HAS_CXX11
-#endif
+/// OpenVDB now requires C++11
+#define OPENVDB_HAS_CXX11 1
 
 /// For compilers that need templated function specializations to have
 /// storage qualifiers, we need to declare the specializations as static inline.
@@ -186,6 +164,14 @@
         _Pragma("message(\"NOTE: ignoring deprecation warning\")")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("GCC diagnostic pop")
+#elif defined _MSC_VER
+    #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
+        __pragma(warning(push)) \
+        __pragma(warning(disable : 4996)) \
+        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__ \
+            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+    #define OPENVDB_NO_DEPRECATION_WARNING_END \
+        __pragma(warning(pop))
 #else
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     #define OPENVDB_NO_DEPRECATION_WARNING_END
@@ -223,37 +209,6 @@
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 #endif
-
-
-#ifdef _MSC_VER
-    /// Visual C++ does not have constants like M_PI unless this is defined.
-    /// @note This is needed even though the core library is built with this but
-    /// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif
-    /// Visual C++ does not have round
-    #include <boost/math/special_functions/round.hpp>
-    using boost::math::round;
-#endif
-
-/// Visual C++ uses _copysign() instead of copysign()
-#ifdef _MSC_VER
-    #include <float.h>
-    static inline double copysign(double x, double y) { return _copysign(x, y); }
-#endif
-
-/// Visual C++ does not have stdint.h which defines types like uint64_t.
-/// So for portability we instead include boost/cstdint.hpp.
-#include <boost/cstdint.hpp>
-using boost::int8_t;
-using boost::int16_t;
-using boost::int32_t;
-using boost::int64_t;
-using boost::uint8_t;
-using boost::uint16_t;
-using boost::uint32_t;
-using boost::uint64_t;
 
 /// Helper macros for defining library symbol visibility
 #ifdef OPENVDB_EXPORT

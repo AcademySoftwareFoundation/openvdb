@@ -21,6 +21,27 @@ Version 7.0.0 - In development
       dependency searches.
     - Improvements to OpenVDB's CMake module setup order in regards to CMake
       policy, minimum version and project calls.
+    - Replaced occurrences of boost::scoped_array with std::unique_ptr.
+    - Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
+      AVX compiler flags, this is switched off by default.
+    - Made various small changes to improve Visual Studio compatiblity and
+      deprecate some logic for compilers older than Visual Studio 2017.
+
+    Bug fixes:
+    - Fixed a bug in FindJemalloc.cmake where paths were not being handled
+      correctly.
+    - Fixed a Windows build issue in openvdb_render.
+
+    ABI changes:
+    - OpFactory destructor is now virtual as of ABI=7
+    - Added new virtual methods for copying const grids and replacing
+      the metadata and/or the transform - GridBase::copyGridReplacingMetadata,
+      GridBase::copyGridReplacingTransform and
+      GridBase::copyGridReplacingMetadataAndTransform.
+
+    API changes:
+    - VolumeToMesh::pointList() and VolumeToMesh::polygonPoolList() now return
+      a std::unique_ptr instead of a boost::scoped_array.
 
     Python:
     - Removed the requirement of CMake 3.14 for NumPy usage.
@@ -35,6 +56,8 @@ Version 7.0.0 - In development
       point offsets (mesh inputs).
     - Threaded the population of point group memberships during conversion
       from Houdini geometry to OpenVDB Points
+    - Introduced a position compression option to the Scatter SOP for VDB
+      Points and default to 16-bit fixed point.
 
 
 Version 6.2.1 - September 30, 2019

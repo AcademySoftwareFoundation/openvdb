@@ -109,11 +109,9 @@ public:
     void readTopology(std::istream& is, bool = false) override { is.seekg(0, std::ios::beg); }
     void writeTopology(std::ostream& os, bool = false) const override { os.seekp(0); }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void readBuffers(std::istream& is,
         const openvdb::CoordBBox&, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void readNonresidentBuffers() const override {}
-#endif
     void readBuffers(std::istream& is, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void writeBuffers(std::ostream& os, bool /*saveFloatAsHalf*/=false) const override
         { os.seekp(0, std::ios::beg); }
@@ -122,9 +120,7 @@ public:
     void clear() {}
     void prune(const ValueType& = 0) {}
     void clip(const openvdb::CoordBBox&) {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void clipUnallocatedNodes() override {}
-#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 4
     openvdb::Index32 unallocatedLeafCount() const override { return 0; }
 #endif
@@ -148,9 +144,7 @@ public:
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
     openvdb::Index64 activeLeafVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveLeafVoxelCount() const override { return 0UL; }
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     openvdb::Index64 activeTileCount() const override { return 0UL; }
-#endif
 };
 
 const openvdb::Index ProxyTree::DEPTH = 0;
@@ -296,6 +290,27 @@ TestGrid::testCopyGrid()
     // query changed value and make sure it's different between trees
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree1.getValue(changeCoord));
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, tree2.getValue(changeCoord));
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    // shallow-copy a const grid but supply a new transform and meta map
+    CPPUNIT_ASSERT_EQUAL(1.0, grid1->transform().voxelSize().x());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), grid1->metaCount());
+    CPPUNIT_ASSERT_EQUAL(Index(2), grid1->tree().leafCount());
+
+    math::Transform::Ptr xform(math::Transform::createLinearTransform(/*voxelSize=*/0.25));
+    MetaMap meta;
+    meta.insertMeta("test", Int32Metadata(4));
+
+    FloatGrid::ConstPtr constGrid1 = ConstPtrCast<const FloatGrid>(grid1);
+
+    GridBase::ConstPtr grid3 = constGrid1->copyGridReplacingMetadataAndTransform(meta, xform);
+    const FloatTree& tree3 = gridConstPtrCast<FloatGrid>(grid3)->tree();
+
+    CPPUNIT_ASSERT_EQUAL(0.25, grid3->transform().voxelSize().x());
+    CPPUNIT_ASSERT_EQUAL(size_t(1), grid3->metaCount());
+    CPPUNIT_ASSERT_EQUAL(Index(2), tree3.leafCount());
+    CPPUNIT_ASSERT_EQUAL(long(3), constGrid1->constTreePtr().use_count());
+#endif
 }
 
 
@@ -409,33 +424,21 @@ TestGrid::testClipping()
         const float fg = 5.f;
         FloatGrid cube(0.f);
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     {
         const bool fg = true;
         BoolGrid cube(false);
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     {
         const Vec3s fg(1.f, -2.f, 3.f);
         Vec3SGrid cube(Vec3s(0.f));
         cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
-#else
         cube.clipGrid(clipBox);
-#endif
         validateClippedGrid(cube, fg);
     }
     /*
