@@ -155,7 +155,7 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
 endif()
 
 # Top-level location for all openvdb headers
-set(OPENVDB_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
+set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
