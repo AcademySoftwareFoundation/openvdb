@@ -186,6 +186,9 @@ public:
 
     /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
     /// @note This method is thread-safe.
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
     /// Return the number of elements in this array.
@@ -623,7 +626,7 @@ public:
 
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
     /// @note This method is thread-safe.
-    AttributeArray::Ptr copyUncompressed() const override;
+    OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true);
