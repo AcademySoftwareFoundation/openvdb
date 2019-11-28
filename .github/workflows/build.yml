@@ -129,3 +129,5 @@ jobs:
     - uses: actions/checkout@v1
     - name: build
       run: ./ci/build.sh clang++ Debug 7 ON SSE42
+    - name: test
+      run: cd build && ctest -V
