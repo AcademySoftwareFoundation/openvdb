@@ -609,7 +609,12 @@ public:
         const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor.
     /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    TypedAttributeArray(const TypedAttributeArray&);
+    OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
+#else
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
+#endif
     /// Deep copy assignment operator.
     /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
@@ -1182,8 +1187,19 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
+    : TypedAttributeArray(rhs)
+{
+}
+
+
+template<typename ValueType_, typename Codec_>
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+#else
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
+#endif
     : AttributeArray(rhs)
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
