@@ -1957,10 +1957,25 @@ struct VoxelizationData {
 
     unsigned char getNewPrimId() {
 
+        /// @warning Don't use parallel methods here!
+        /// The primIdTree is used as a "scratch" pad to mark visits for a given polygon
+        /// into voxels which it may contribute to. The tree is kept as lightweight as
+        /// possible and is reset when a maximum count or size is reached. A previous
+        /// bug here occurred due to the calling of tree methods with multi-threaded
+        /// implementations, resulting in nested parallelization and re-use of the TLS
+        /// from the initial task. This consequently resulted in non deterministic values
+        /// of mPrimCount on the return of the initial task, and could potentially end up
+        /// with a mPrimCount equal to that of the MaxPrimId. This is used as the background
+        /// value of the scratch tree.
+        /// @see jira.aswf.io/browse/OVDB-117, PR #564
+        /// @todo Consider profiling this operator with tree.clear() and Investigate the
+        /// chosen value of MaxPrimId
+
         if (mPrimCount == MaxPrimId || primIdTree.leafCount() > 1000) {
             mPrimCount = 0;
-            primIdTree.clear();
-            mPrimCount = 0;
+            primIdTree.root().clear();
+            primIdTree.clearAllAccessors();
+            assert(mPrimCount == 0);
         }
 
         return mPrimCount++;
