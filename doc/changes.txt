@@ -31,6 +31,8 @@ Improvements:
   deprecate some logic for compilers older than Visual Studio&nbsp;2017.
 - Standardized CMake install locations using GNUInstallDirs
   <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
+- Added SIMD intrinsics to a few common NodeMask methods.
+  <I>[Contributed&nbsp;by&nbsp;Konstantin]</I>
 
 @par
 Bug fixes:
