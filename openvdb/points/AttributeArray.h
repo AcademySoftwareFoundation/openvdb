@@ -168,32 +168,13 @@ public:
         if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
     }
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-    AttributeArray(const AttributeArray& rhs)
-        : mIsUniform(rhs.mIsUniform)
-        , mFlags(rhs.mFlags)
-        , mUsePagedRead(rhs.mUsePagedRead)
-        , mOutOfCore(rhs.mOutOfCore)
-        , mPageHandle()
-    {
-        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
-        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
-    }
-    AttributeArray& operator=(const AttributeArray& rhs)
-    {
-        // if this AttributeArray has been partially read, zero the compressed bytes,
-        // so the page handle won't attempt to clean up invalid memory
-        if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
-        mIsUniform = rhs.mIsUniform;
-        mFlags = rhs.mFlags;
-        mUsePagedRead = rhs.mUsePagedRead;
-        mOutOfCore = rhs.mOutOfCore;
-        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
-        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
-        else                            mPageHandle.reset();
-        return *this;
-    }
+    AttributeArray(const AttributeArray& rhs);
 #else
     AttributeArray(const AttributeArray&) = default;
+#endif
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+    AttributeArray& operator=(const AttributeArray& rhs);
+#else
     AttributeArray& operator=(const AttributeArray&) = default;
 #endif
     AttributeArray(AttributeArray&&) = default;
