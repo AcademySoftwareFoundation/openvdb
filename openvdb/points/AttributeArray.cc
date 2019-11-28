@@ -79,7 +79,18 @@ AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
 
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
 AttributeArray::AttributeArray(const AttributeArray& rhs)
+    : AttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
+{
+}
+
+
+AttributeArray::AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&)
+#else
+AttributeArray::AttributeArray(const AttributeArray& rhs)
+#endif
     : mIsUniform(rhs.mIsUniform)
     , mFlags(rhs.mFlags)
     , mUsePagedRead(rhs.mUsePagedRead)

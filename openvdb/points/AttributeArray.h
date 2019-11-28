@@ -169,23 +169,19 @@ public:
     }
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     AttributeArray(const AttributeArray& rhs);
-#else
-    AttributeArray(const AttributeArray&) = default;
-#endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     AttributeArray& operator=(const AttributeArray& rhs);
 #else
+    AttributeArray(const AttributeArray&) = default;
     AttributeArray& operator=(const AttributeArray&) = default;
 #endif
     AttributeArray(AttributeArray&&) = default;
     AttributeArray& operator=(AttributeArray&&) = default;
 
     /// Return a copy of this attribute.
-    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copy() const = 0;
 
-    /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
-    /// @note This method is thread-safe.
+    /// Return a copy of this attribute.
+    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
 #ifndef _MSC_VER
     OPENVDB_DEPRECATED
 #endif
@@ -415,6 +411,10 @@ private:
 #endif
 
 protected:
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&);
+#endif
+
     /// @brief Specify whether this attribute has a constant stride or not.
     void setConstantStride(bool state);
 
@@ -607,12 +607,16 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor.
-    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
+    /// Deep copy constructor.
+    /// @note this method is thread-safe as of ABI=7
     TypedAttributeArray(const TypedAttributeArray&);
+    /// Deep copy constructor.
+    /// @deprecated Use copy-constructor without unused bool parameter
     OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
 #else
+    /// Deep copy constructor.
+    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
 #endif
     /// Deep copy assignment operator.
@@ -812,6 +816,10 @@ protected:
 
 private:
     friend class ::TestAttributeArray;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
+#endif
 
     /// Load data from memory-mapped file.
     inline void doLoad() const;
@@ -1189,18 +1197,21 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
-    : TypedAttributeArray(rhs)
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+    : TypedAttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
 {
 }
 
 
 template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs,
+    const tbb::spin_mutex::scoped_lock& lock)
+    : AttributeArray(rhs, lock)
 #else
+template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
-#endif
     : AttributeArray(rhs)
+#endif
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
 #if OPENVDB_ABI_VERSION_NUMBER < 6
@@ -1306,7 +1317,9 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
+#if OPENVDB_ABI_VERSION_NUMBER < 7
     tbb::spin_mutex::scoped_lock lock(mMutex);
+#endif
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
@@ -1315,8 +1328,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 {
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-    return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this, /*decompress = */true));
+    return this->copy();
 }
 
 
