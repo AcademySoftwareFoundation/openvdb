@@ -684,8 +684,11 @@ public:
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
     /// @brief Add the given child node at the root level.
-    /// If a child node with the same origin already exists, replace it.
-    void addChild(ChildType* child);
+    /// If a child node with the same origin already exists, delete the old node and add
+    /// the new node in its place (i.e. ownership of the new child node is transferred
+    /// to this RootNode).
+    /// @return @c true (for consistency with InternalNode::addChild)
+    bool addChild(ChildType* child);
 
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
@@ -2582,7 +2585,7 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
 }
 
 template<typename ChildT>
-inline void
+inline bool
 RootNode<ChildT>::addChild(ChildT* child)
 {
     if (!child) return;
@@ -2593,6 +2596,7 @@ RootNode<ChildT>::addChild(ChildT* child)
     } else {//child or tile
         setChild(iter, *child);//this also deletes the existing child node
     }
+    return true;
 }
 
 template<typename ChildT>
