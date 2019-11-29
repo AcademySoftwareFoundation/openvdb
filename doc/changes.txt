@@ -14,6 +14,13 @@ Houdini version is 17.0.
 
 @par
 New features:
+- @vdblink{tools::LevelSetMeasure, tools::LevelSetMeasure} can now compute multiple
+  types of curvatures (averge and total Gaussian and mean curvature) as well as
+  Euler characteristic and genus of level set surfaces.
+- Most stencil classes now have an intersection method that detcts the axial
+  directions of zero-crossings (as oppose to the existing boolean intersection test).
+- The @vdblink{math::CurvatureStencil, math::CurvatureStencil} can now compute
+  Gaussian and principal curvatures (in addition to mean curvature).
 - Added @vdblink{tree::Tree::nodeCount,Tree::nodeCount}, which counts
   the number and type of nodes in a tree very efficiently.
 
