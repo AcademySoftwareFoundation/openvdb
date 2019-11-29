@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 ///
 /// @file Platform.h
 
@@ -77,30 +50,8 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
-/// Macro for determining if there are sufficient C++0x/C++11 features
-#ifdef __INTEL_COMPILER
-    #ifdef __INTEL_CXX11_MODE__
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#elif defined(__clang__)
-    #ifndef _LIBCPP_VERSION
-        #include <ciso646>
-    #endif
-    #ifdef _LIBCPP_VERSION
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#elif defined(__GXX_EXPERIMENTAL_CXX0X__) || (__cplusplus > 199711L)
-    #define OPENVDB_HAS_CXX11 1
-#elif defined(_MSC_VER)
-    #if (_MSC_VER >= 1700)
-        #define OPENVDB_HAS_CXX11 1
-    #endif
-#endif
-#if defined(__GNUC__) && !OPENVDB_CHECK_GCC(4, 4)
-    // ICC uses GCC's standard library headers, so even if the ICC version
-    // is recent enough for C++11, the GCC version might not be.
-    #undef OPENVDB_HAS_CXX11
-#endif
+/// OpenVDB now requires C++11
+#define OPENVDB_HAS_CXX11 1
 
 /// For compilers that need templated function specializations to have
 /// storage qualifiers, we need to declare the specializations as static inline.
@@ -232,37 +183,6 @@
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 #endif
 
-
-#ifdef _MSC_VER
-    /// Visual C++ does not have constants like M_PI unless this is defined.
-    /// @note This is needed even though the core library is built with this but
-    /// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif
-    /// Visual C++ does not have round
-    #include <boost/math/special_functions/round.hpp>
-    using boost::math::round;
-#endif
-
-/// Visual C++ uses _copysign() instead of copysign()
-#ifdef _MSC_VER
-    #include <float.h>
-    static inline double copysign(double x, double y) { return _copysign(x, y); }
-#endif
-
-/// Visual C++ does not have stdint.h which defines types like uint64_t.
-/// So for portability we instead include boost/cstdint.hpp.
-#include <boost/cstdint.hpp>
-using boost::int8_t;
-using boost::int16_t;
-using boost::int32_t;
-using boost::int64_t;
-using boost::uint8_t;
-using boost::uint16_t;
-using boost::uint32_t;
-using boost::uint64_t;
-
 /// Helper macros for defining library symbol visibility
 #ifdef OPENVDB_EXPORT
 #undef OPENVDB_EXPORT
@@ -305,7 +225,3 @@ using boost::uint64_t;
 #endif
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,28 +1,5 @@
-# Copyright (c) DreamWorks Animation LLC
-#
-# All rights reserved. This software is distributed under the
-# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-#
-# Redistributions of source code must retain the above copyright
-# and license notice and the following restrictions and disclaimer.
-#
-# *     Neither the name of DreamWorks Animation nor the names of
-# its contributors may be used to endorse or promote products derived
-# from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-# LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
 #
 #[=======================================================================[
 
@@ -50,7 +27,7 @@
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
-  library, the vdb_print binary and python module are enabled.
+  library and the vdb_print binary are enabled.
 
   Note that various packages have inbuilt CMake module support. See the
   CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
@@ -71,12 +48,12 @@ project(OpenVDB)
 ###### OpenVDB Build/Component Options
 
 include(CMakeDependentOption)
+include(GNUInstallDirs)
 
-# todo SSE/AVX instruction options
 # todo epydoc and pdflatex
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
-option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON)
+option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
@@ -140,6 +117,22 @@ elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
 endif()
 
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING
+    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
+    None is the default." FORCE
+  )
+elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
+    "using None instead.")
+  set(OPENVDB_SIMD None CACHE STRING FORCE)
+endif()
+
+# Top-level location for all openvdb headers
+set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
+
 ###### Deprecated options
 
 option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
@@ -197,6 +190,7 @@ mark_as_advanced(
   OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
+  OPENVDB_SIMD
 )
 
 # Configure minimum version requirements - some are treated specially and fall
@@ -314,7 +308,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION lib/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure DCC installation if necessary
@@ -409,8 +403,7 @@ endif()
 
 # Compiler configuration. Add definitions for a number of compiler warnings
 # for sub projects and verify version requirements
-# @todo  add definitions for MSVC and Intel.
-# @todo  add minimum version for MSVC
+# @todo  add definitions for Intel.
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
@@ -423,7 +416,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring Clang CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -450,7 +443,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(OPENVDB_CXX_STRICT)
     message(STATUS "Configuring GCC CXX warnings")
     set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_definitions(
+    add_compile_options(
       -Werror
       -Wall
       -Wextra
@@ -486,7 +479,30 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     endif()
   endif()
   # Increase the number of sections that an object file can contain
-  add_definitions("/bigobj")
+  add_compile_options(/bigobj)
+  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
+  # defined on MSVC
+  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
+  add_definitions(-D_USE_MATH_DEFINES)
+  # Disable the non-portable Windows definitions of min() and max() macros
+  add_definitions(-DNOMINMAX)
+  # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
+  add_definitions(-DWIN32_LEAN_AND_MEAN)
+  if(NOT OPENVDB_CXX_STRICT)
+    message(STATUS "Suppressing some noisy MSVC CXX warnings, "
+      "set OPENVDB_CXX_STRICT=ON to re-enable them.")
+    # Conversion from int64_t to long
+    add_compile_options(/wd4244)
+    # It's not possible to use STL types in DLL interfaces in a portable and
+    # reliable way so disable this warning
+    add_compile_options(/wd4251)
+    # Conversion from size_t to uLong
+    add_compile_options(/wd4267)
+    # Non dll-interface class used as base for dll-interface class
+    add_compile_options(/wd4275)
+    # Truncation from 'int' to 'bool'
+    add_compile_options(/wd4305)
+  endif()
 endif()
 
 if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
@@ -509,6 +525,17 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
   endif()
+endif()
+
+# Configure SIMD. AVX implies SSE 4.2.
+
+if(OPENVDB_SIMD STREQUAL "AVX")
+  add_compile_options(-mavx -msse4.2)
+  add_definitions(-DOPENVDB_USE_AVX)
+  add_definitions(-DOPENVDB_USE_SSE42)
+elseif(OPENVDB_SIMD STREQUAL "SSE42")
+  add_compile_options(-msse4.2)
+  add_definitions(-DOPENVDB_USE_SSE42)
 endif()
 
 #########################################################################
