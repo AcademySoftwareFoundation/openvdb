@@ -102,6 +102,15 @@ levelSetGenus(const GridType& grid);
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+/// @deprecated Use the @a LevelSetMeasure class instead.
+template<class GridType>
+OPENVDB_DEPRECATED
+inline void
+levelSetMeasure(const GridType& grid, Real& area, Real& volume, Real& avgCurvature,
+                bool useWorldSpace = true);
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 /// @brief Smeared-out and continuous Dirac Delta function.
 template<typename RealT>
 class DiracDelta
@@ -572,7 +581,18 @@ levelSetGenus(const GridT& grid)
     return doLevelSetGenus(grid);
 }
 
-////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+template<class GridT>
+inline void
+levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
+                bool useWorldUnits)
+{
+    LevelSetMeasure<GridT> m(grid);
+    area = m.area(useWorldUnits);
+    volume = m.volume(useWorldUnits);
+    avgCurvature = m.avgMeanCurvature(useWorldUnits);
+}
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
