@@ -50,7 +50,6 @@ project(OpenVDB)
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 
-# todo SSE/AVX instruction options
 # todo epydoc and pdflatex
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
@@ -404,8 +403,7 @@ endif()
 
 # Compiler configuration. Add definitions for a number of compiler warnings
 # for sub projects and verify version requirements
-# @todo  add definitions for MSVC and Intel.
-# @todo  add minimum version for MSVC
+# @todo  add definitions for Intel.
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
