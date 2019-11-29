@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file tree/Tree.h
 
@@ -45,10 +18,10 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
-#include <tbb/atomic.h>
 #include <tbb/concurrent_hash_map.h>
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -137,6 +110,10 @@ public:
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
+    /// Return a vector with node counts. The number of nodes of type NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// of this vector corresponds to the height (or depth) of this tree.
+    virtual std::vector<Index32> nodeCount() const = 0;
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
     /// Return the number of active voxels stored in leaf nodes.
@@ -358,6 +335,15 @@ public:
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
+    /// Return a vector with node counts. The number of nodes of type NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// of this vector corresponds to the height (or depth) of this tree.
+    std::vector<Index32> nodeCount() const override
+    {
+        std::vector<Index32> vec(DEPTH, 0);
+        mRoot.nodeCount( vec );
+        return vec;// Named Return Value Optimization
+    }
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
@@ -1229,11 +1215,11 @@ protected:
     mutable AccessorRegistry mAccessorRegistry;
     mutable ConstAccessorRegistry mConstAccessorRegistry;
 
-    static tbb::atomic<const Name*> sTreeTypeName;
+    static std::unique_ptr<const Name> sTreeTypeName;
 }; // end of Tree class
 
 template<typename _RootNodeType>
-tbb::atomic<const Name*> Tree<_RootNodeType>::sTreeTypeName;
+std::unique_ptr<const Name> Tree<_RootNodeType>::sTreeTypeName;
 
 
 /// @brief Tree3<T, N1, N2>::Type is the type of a three-level tree
@@ -2099,7 +2085,9 @@ template<typename RootNodeType>
 inline const Name&
 Tree<RootNodeType>::treeType()
 {
-    if (sTreeTypeName == nullptr) {
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
@@ -2107,9 +2095,8 @@ Tree<RootNodeType>::treeType()
         for (size_t i = 1, N = dims.size(); i < N; ++i) { // start from 1 to skip the RootNode
             ostr << "_" << dims[i];
         }
-        Name* s = new Name(ostr.str());
-        if (sTreeTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
-    }
+        sTreeTypeName.reset(new Name(ostr.str()));
+    });
     return *sTreeTypeName;
 }
 
@@ -2242,7 +2229,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
             for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
                 os << ", Internal(" << (1 << dims[i]) << "^3)";
             }
-            os << ", Leaf(" << (1 << *dims.rbegin()) << "^3)\n";
+            os << ", Leaf(" << (1 << dims.back()) << "^3)\n";
         }
         os << "  Background value: " << mRoot.background() << "\n";
         return;
@@ -2256,22 +2243,22 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         this->evalMinMax(minVal, maxVal);
     }
 
-    std::vector<Index64> nodeCount(dims.size());
-    for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);
-
+    const auto nodeCount = this->nodeCount();
+    assert(dims.size() == nodeCount.size());
     Index64 totalNodeCount = 0;
     for (size_t i = 0; i < nodeCount.size(); ++i) totalNodeCount += nodeCount[i];
 
     // Print node types, counts and sizes.
     os << "    Root(1 x " << mRoot.getTableSize() << ")";
-    if (dims.size() > 1) {
-        for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
+    if (dims.size() >= 2) {
+        for (size_t i = dims.size() - 2; i > 0; --i) {
             os << ", Internal(" << util::formattedInt(nodeCount[i]);
             os << " x " << (1 << dims[i]) << "^3)";
         }
-        os << ", Leaf(" << util::formattedInt(*nodeCount.rbegin());
-        os << " x " << (1 << *dims.rbegin()) << "^3)\n";
+        os << ", Leaf(" << util::formattedInt(nodeCount.front());
+        os << " x " << (1 << dims.back()) << "^3)\n";
     }
+
     os << "  Background value: " << mRoot.background() << "\n";
 
     // Statistics of topology and values
@@ -2281,8 +2268,8 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         os << "  Max value: " << maxVal << "\n";
     }
 
+    const Index32 leafCount = nodeCount.front();
     const Index64
-        leafCount = *nodeCount.rbegin(),
         numActiveVoxels = this->activeVoxelCount(),
         numActiveLeafVoxels = this->activeLeafVoxelCount(),
         numActiveTiles = this->activeTileCount();
@@ -2350,7 +2337,3 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 } // namespace openvdb
 
 #endif // OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
