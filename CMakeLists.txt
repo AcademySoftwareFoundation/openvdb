@@ -27,7 +27,7 @@
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
-  library, the vdb_print binary and python module are enabled.
+  library and the vdb_print binary are enabled.
 
   Note that various packages have inbuilt CMake module support. See the
   CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
