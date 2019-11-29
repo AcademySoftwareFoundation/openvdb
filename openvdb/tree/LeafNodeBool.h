@@ -109,6 +109,8 @@ public:
     static Index getChildDim() { return 1; }
 
     static Index32 leafCount() { return 1; }
+    /// no-op
+    void nodeCount(std::vector<Index32> &) const {}
     static Index32 nonLeafCount() { return 0; }
 
     /// Return the number of active voxels.

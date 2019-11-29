@@ -6,6 +6,10 @@ Version 7.0.0 - In development
     As of this release, a C++14 compiler is required and the oldest
     supported Houdini version is 17.0.
 
+    New features:
+    - Added Tree::nodeCount, which counts the number and type of nodes
+      in a tree very efficiently.
+
     Improvements:
     - The minimum ABI for OpenVDB is now always enforced through CMake
       separately from other minimum dependency version variables.
