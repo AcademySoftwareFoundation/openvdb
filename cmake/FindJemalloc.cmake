@@ -1,7 +1,5 @@
-#
-# TM & (c) Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-# All rights reserved. This software is distributed under the
-# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
 #
 #[=======================================================================[.rst:
 
