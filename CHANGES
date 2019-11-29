@@ -26,6 +26,8 @@ Version 7.0.0 - In development
       AVX compiler flags, this is switched off by default.
     - Made various small changes to improve Visual Studio compatiblity and
       deprecate some logic for compilers older than Visual Studio 2017.
+    - Standardized CMake install locations using GNUInstallDirs
+      [Contributed by David Aguilar]
 
     Bug fixes:
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled
@@ -56,6 +58,8 @@ Version 7.0.0 - In development
       point offsets (mesh inputs).
     - Threaded the population of point group memberships during conversion
       from Houdini geometry to OpenVDB Points
+    - Added logic to the Rasterize Points SOP to suppress the output of
+      non-finite attribute values due to subnormal input densities.
     - Introduced a position compression option to the Scatter SOP for VDB
       Points and default to 16-bit fixed point.
 

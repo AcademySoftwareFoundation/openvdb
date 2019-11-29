@@ -34,6 +34,8 @@ Improvements:
   AVX compiler flags, this is switched off by default.
 - Made various small changes to improve Visual Studio compatiblity and
   deprecate some logic for compilers older than Visual Studio&nbsp;2017.
+- Standardized CMake install locations using GNUInstallDirs
+  <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
 
 @par
 Bug fixes:
@@ -72,6 +74,8 @@ Houdini:
   inputs).
 - Threaded the population of point group memberships during conversion from
   Houdini geometry to OpenVDB Points
+- Added logic to the Rasterize&nbsp;Points SOP to suppress the output of
+  non-finite attribute values due to subnormal input densities.
 - Introduced a position compression option to the Scatter&nbsp;SOP for VDB
   Points and default to 16-bit fixed point.
 
