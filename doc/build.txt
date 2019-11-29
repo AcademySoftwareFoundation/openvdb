@@ -178,7 +178,7 @@ OpenVDB Print           | Command line binary for displaying information about O
 OpenVDB LOD             | Command line binary for generating volume mipmaps from an OpenVDB grid | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_LOD    | ON / OFF   |
 OpenVDB Render          | Command line binary for ray-tracing OpenVDB grids                      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_RENDER | ON / OFF   |
 OpenVDB View            | Command line binary for displaying OpenVDB grids in a GL viewport      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_VIEW   | ON / OFF   |
-OpenVDB Python          | Python module for OpenVDB C++ Python bindings                          | OPENVDB_BUILD_PYTHON_MODULE                       | ON         |
+OpenVDB Python          | Python module for OpenVDB C++ Python bindings                          | OPENVDB_BUILD_PYTHON_MODULE                       | OFF        |
 OpenVDB UnitTests       | OpenVDB's Unit Test suite                                              | OPENVDB_BUILD_UNITTESTS                           | OFF        |
 OpenVDB Houdini Plugin  | The OpenVDB Houdini shared library and OpenVDB Nodes                   | OPENVDB_BUILD_HOUDINI_PLUGIN                      | OFF        |
 OpenVDB Maya Plugin     | The Maya OpenVDB Nodes                                                 | OPENVDB_BUILD_MAYA_PLUGIN                         | OFF        |

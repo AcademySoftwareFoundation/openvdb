@@ -65,6 +65,7 @@ Python:
 - Added support for Boost versions 1.65 and later when building
   the Python module with NumPy support through CMake.
 - Improved CMake Python3 support.
+- The Python Module is now disabled by default in CMake.
 
 @par
 Houdini:

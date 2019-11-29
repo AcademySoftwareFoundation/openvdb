@@ -27,7 +27,7 @@
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
-  library, the vdb_print binary and python module are enabled.
+  library and the vdb_print binary are enabled.
 
   Note that various packages have inbuilt CMake module support. See the
   CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
@@ -50,11 +50,10 @@ project(OpenVDB)
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 
-# todo SSE/AVX instruction options
 # todo epydoc and pdflatex
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
-option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON)
+option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
@@ -404,8 +403,7 @@ endif()
 
 # Compiler configuration. Add definitions for a number of compiler warnings
 # for sub projects and verify version requirements
-# @todo  add definitions for MSVC and Intel.
-# @todo  add minimum version for MSVC
+# @todo  add definitions for Intel.
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
 
