@@ -2588,7 +2588,7 @@ template<typename ChildT>
 inline bool
 RootNode<ChildT>::addChild(ChildT* child)
 {
-    if (!child) return;
+    if (!child) return false;
     const Coord& xyz = child->origin();
     MapIter iter = this->findCoord(xyz);
     if (iter == mTable.end()) {//background
