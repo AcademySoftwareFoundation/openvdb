@@ -30,6 +30,8 @@ Version 7.0.0 - In development
       deprecate some logic for compilers older than Visual Studio 2017.
     - Standardized CMake install locations using GNUInstallDirs
       [Contributed by David Aguilar]
+    - Added SIMD intrinsics to a few common NodeMask methods.
+      [Contributed by Konstantin]
 
     Bug fixes:
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled

@@ -27,8 +27,12 @@ namespace util {
 inline Index32
 CountOn(Byte v)
 {
-    // Simple LUT:
-    /// @todo Move this table and others into, say, Util.cc
+#if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER)
+    return __popcnt16(v);
+#elif defined(OPENVDB_USE_SSE42) && (defined(__GNUC__) || defined(__clang__))
+    return __builtin_popcount(v);
+#else
+    // Software Implementation - Simple LUT
     static const Byte numBits[256] = {
 #define COUNTONB2(n)  n,            n+1,            n+1,            n+2
 #define COUNTONB4(n)  COUNTONB2(n), COUNTONB2(n+1), COUNTONB2(n+1), COUNTONB2(n+2)
@@ -39,14 +43,7 @@ CountOn(Byte v)
 #undef COUNTONB6
 #undef COUNTONB4
 #undef COUNTONB2
-
-    // Sequentially clear least significant bits
-    //Index32 c;
-    //for (c = 0; v; c++)  v &= v - 0x01U;
-    //return c;
-
-    // This version is only fast on CPUs with fast "%" and "*" operations
-    //return (v * UINT64_C(0x200040008001) & UINT64_C(0x111111111111111)) % 0xF;
+#endif
 }
 
 /// Return the number of off bits in the given 8-bit value.
@@ -68,10 +65,17 @@ inline Index32 CountOff(Index32 v) { return CountOn(~v); }
 inline Index32
 CountOn(Index64 v)
 {
+#if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER) && defined(_M_X64)
+    v = __popcnt64(v);
+#elif defined(OPENVDB_USE_SSE42) && (defined(__GNUC__) || defined(__clang__))
+    v = __builtin_popcountll(v);
+#else
+    // Software Implementation
     v = v - ((v >> 1) & UINT64_C(0x5555555555555555));
     v = (v & UINT64_C(0x3333333333333333)) + ((v >> 2) & UINT64_C(0x3333333333333333));
-    return static_cast<Index32>(
-        (((v + (v >> 4)) & UINT64_C(0xF0F0F0F0F0F0F0F)) * UINT64_C(0x101010101010101)) >> 56);
+    v = (((v + (v >> 4)) & UINT64_C(0xF0F0F0F0F0F0F0F)) * UINT64_C(0x101010101010101)) >> 56;
+#endif
+    return static_cast<Index32>(v);
 }
 
 /// Return the number of off bits in the given 64-bit value.
@@ -82,8 +86,17 @@ inline Index32
 FindLowestOn(Byte v)
 {
     assert(v);
+#if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER)
+    unsigned long index;
+    _BitScanForward(&index, static_cast<Index32>(v));
+    return static_cast<Index32>(index);
+#elif defined(OPENVDB_USE_SSE42) && (defined(__GNUC__) || defined(__clang__))
+    return __builtin_ctz(v);
+#else
+    // Software Implementation
     static const Byte DeBruijn[8] = {0, 1, 6, 2, 7, 5, 4, 3};
     return DeBruijn[Byte((v & -v) * 0x1DU) >> 5];
+#endif
 }
 
 /// Return the least significant on bit of the given 32-bit value.
@@ -104,7 +117,14 @@ inline Index32
 FindLowestOn(Index64 v)
 {
     assert(v);
-    //return ffsll(v);
+#if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER)
+    unsigned long index;
+    _BitScanForward64(&index, v);
+    return static_cast<Index32>(index);
+#elif defined(OPENVDB_USE_SSE42) && (defined(__GNUC__) || defined(__clang__))
+    return static_cast<Index32>(__builtin_ctzll(v));
+#else
+    // Software Implementation
     static const Byte DeBruijn[64] = {
         0,   1,  2, 53,  3,  7, 54, 27, 4,  38, 41,  8, 34, 55, 48, 28,
         62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
@@ -112,6 +132,7 @@ FindLowestOn(Index64 v)
         51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
     };
     return DeBruijn[Index64((v & -v) * UINT64_C(0x022FDD63CC95386D)) >> 58];
+#endif
 }
 
 /// Return the most significant on bit of the given 32-bit value.
