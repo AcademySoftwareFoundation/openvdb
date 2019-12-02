@@ -9,6 +9,8 @@ Version 7.0.0 - In development
     New features:
     - Added Tree::nodeCount, which counts the number and type of nodes
       in a tree very efficiently.
+    - Added new RootNode::addChild() and InternalNode::addChild() methods to
+      allow the insertion of child nodes directly.
 
     Improvements:
     - The minimum ABI for OpenVDB is now always enforced through CMake

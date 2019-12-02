@@ -16,6 +16,9 @@ Houdini version is 17.0.
 New features:
 - Added @vdblink{tree::Tree::nodeCount,Tree::nodeCount}, which counts
   the number and type of nodes in a tree very efficiently.
+- Added new @vdblink::tree::RootNode::addChild() RootNode::addChild@endlink and
+  @vdblink::tree::InternalNode::addChild() InternalNode::addChild@endlink methods to
+  allow the insertion of child nodes directly.
 
 @par
 Improvements:
