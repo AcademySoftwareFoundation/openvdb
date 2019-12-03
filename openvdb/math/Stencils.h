@@ -1532,20 +1532,22 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType meanCurvature()
+    inline ValueType meanCurvature() const
     {
         Real alpha, normGrad;
-        return this->meanCurvature(alpha, normGrad) ? ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
+        return this->meanCurvature(alpha, normGrad) ?
+               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
     }
 
     /// @brief Return the Gaussian curvature at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType gaussianCurvature()
+    inline ValueType gaussianCurvature() const
     {
         Real alpha, normGrad;
-        return this->gaussianCurvature(alpha, normGrad) ? ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
+        return this->gaussianCurvature(alpha, normGrad) ?
+               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1553,7 +1555,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline void curvatures(ValueType &mean, ValueType& gauss)
+    inline void curvatures(ValueType &mean, ValueType& gauss) const
     {
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
@@ -1570,7 +1572,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType meanCurvatureNormGrad()
+    inline ValueType meanCurvatureNormGrad() const
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
@@ -1582,7 +1584,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType gaussianCurvatureNormGrad()
+    inline ValueType gaussianCurvatureNormGrad() const
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
@@ -1594,7 +1596,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline void curvaturesNormGrad(ValueType &mean, ValueType& gauss)
+    inline void curvaturesNormGrad(ValueType &mean, ValueType& gauss) const
     {
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
@@ -1610,7 +1612,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline std::pair<ValueType, ValueType> principalCurvatures()
+    inline std::pair<ValueType, ValueType> principalCurvatures() const
     {
         std::pair<ValueType, ValueType> pair(0, 0);// min, max
         Real alphaM, alphaG, normGrad;
@@ -1641,7 +1643,7 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline math::Vec3<ValueType> gradient()
+    inline math::Vec3<ValueType> gradient() const
     {
         return math::Vec3<ValueType>(
             mValues[2] - mValues[1],

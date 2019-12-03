@@ -20,8 +20,8 @@
 #include <boost/math/constants/constants.hpp>//for Pi
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
+#include <tbb/parallel_invoke.h>
 #include <type_traits>
-#include <thread>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -72,15 +72,6 @@ levelSetEulerCharacteristic(const GridType& grid);
 template<class GridType>
 inline int
 levelSetGenus(const GridType& grid);
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-/// @deprecated Use the @a LevelSetMeasure class instead.
-template<class GridType>
-OPENVDB_DEPRECATED
-inline void
-levelSetMeasure(const GridType& grid, Real& area, Real& volume, Real& avgCurvature,
-                bool useWorldSpace = true);
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -211,10 +202,8 @@ private:
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
-            std::thread t1([&](){parent->mArea   = parent->reduce(0);});
-            std::thread t2([&](){parent->mVolume = parent->reduce(1)/3.0;});
-            t1.join();
-            t2.join();
+            tbb::parallel_invoke([&](){parent->mArea   = parent->reduce(0);},
+                                 [&](){parent->mVolume = parent->reduce(1)/3.0;});
             parent->mUpdateArea = false;
             if (parent->mInterrupter) parent->mInterrupter->end();
         }
@@ -234,10 +223,8 @@ private:
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
-            std::thread t1([&](){parent->mTotMeanCurvature = parent->reduce(0);});
-            std::thread t2([&](){parent->mTotGausCurvature = parent->reduce(1);});
-            t1.join();
-            t2.join();
+            tbb::parallel_invoke([&](){parent->mTotMeanCurvature = parent->reduce(0);},
+                                 [&](){parent->mTotGausCurvature = parent->reduce(1);});
             parent->mUpdateCurvature = false;
             if (parent->mInterrupter) parent->mInterrupter->end();
         }
@@ -556,7 +543,9 @@ levelSetGenus(const GridT& grid)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+/// @deprecated Use the @a LevelSetMeasure class instead.
 template<class GridT>
+OPENVDB_DEPRECATED
 inline void
 levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
                 bool useWorldUnits)
