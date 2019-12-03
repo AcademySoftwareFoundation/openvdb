@@ -23,6 +23,9 @@ New features:
   Gaussian and principal curvatures (in addition to mean curvature).
 - Added @vdblink{tree::Tree::nodeCount,Tree::nodeCount}, which counts
   the number and type of nodes in a tree very efficiently.
+- Added new @vdblink::tree::RootNode::addChild() RootNode::addChild@endlink and
+  @vdblink::tree::InternalNode::addChild() InternalNode::addChild@endlink methods to
+  allow the insertion of child nodes directly.
 
 @par
 Improvements:
@@ -43,6 +46,8 @@ Improvements:
   deprecate some logic for compilers older than Visual Studio&nbsp;2017.
 - Standardized CMake install locations using GNUInstallDirs
   <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
+- Added SIMD intrinsics to a few common NodeMask methods.
+  <I>[Contributed&nbsp;by&nbsp;Konstantin]</I>
 
 @par
 Bug fixes:

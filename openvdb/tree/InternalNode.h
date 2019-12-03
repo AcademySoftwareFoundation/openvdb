@@ -611,6 +611,14 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
+    /// @brief Add the given child node at this level deducing the offset from it's origin.
+    /// If a child node with this offset already exists, delete the old node and add the
+    /// new node in its place (i.e. ownership of the new child node is transferred to
+    /// this InternalNode)
+    /// @return @c true if inserting the child has been successful, otherwise the caller
+    /// retains ownership of the node and is responsible for deleting it.
+    bool addChild(ChildNodeType* child);
+
     /// @brief Add a tile at the specified tree level that contains voxel (x, y, z),
     /// possibly creating a parent branch or deleting a child branch in the process.
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
@@ -1359,6 +1367,22 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 
 
 ////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::addChild(ChildT* child)
+{
+    assert(child);
+    const Coord& xyz = child->origin();
+    // verify that the child belongs in this internal node
+    if (Coord((xyz & ~(DIM-1))) != this->origin())  return false;
+    // compute the offset and insert the child node
+    const Index n = this->coordToOffset(xyz);
+    // this also deletes an existing child node
+    this->resetChildNode(n, child);
+    return true;
+}
 
 
 template<typename ChildT, Index Log2Dim>

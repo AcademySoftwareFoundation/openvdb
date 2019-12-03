@@ -63,6 +63,20 @@
 #endif
 
 
+/// SIMD Intrinsic Headers
+#if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)
+    #if defined(_WIN32)
+        #include <intrin.h>
+    #elif defined(__GNUC__)
+        #if defined(__x86_64__) || defined(__i386__)
+            #include <x86intrin.h>
+        #elif defined(__ARM_NEON__)
+            #include <arm_neon.h>
+        #endif
+    #endif
+#endif
+
+
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:
 /// @code
