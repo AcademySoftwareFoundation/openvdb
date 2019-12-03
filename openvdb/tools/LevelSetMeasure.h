@@ -548,7 +548,7 @@ template<class GridT>
 OPENVDB_DEPRECATED
 inline void
 levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
-                bool useWorldUnits)
+                bool useWorldUnits = yes)
 {
     LevelSetMeasure<GridT> m(grid);
     area = m.area(useWorldUnits);
