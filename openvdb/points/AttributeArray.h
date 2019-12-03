@@ -609,14 +609,19 @@ public:
         const ValueType& uniformValue = zeroVal<ValueType>());
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Deep copy constructor.
-    /// @note this method is thread-safe as of ABI=7
+    /// @note This method is thread-safe (as of ABI=7) for concurrently reading from the
+    /// source attribute array while being deep-copied. Specifically, this means that the
+    /// attribute array being deep-copied can be out-of-core and safely loaded in one thread
+    /// while being copied using this copy-constructor in another thread.
+    /// It is not thread-safe for write.
     TypedAttributeArray(const TypedAttributeArray&);
     /// Deep copy constructor.
     /// @deprecated Use copy-constructor without unused bool parameter
     OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
 #else
     /// Deep copy constructor.
-    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
+    /// @note This method is not thread-safe for reading or writing, use
+    /// TypedAttributeArray::copy() to ensure thread-safety when reading concurrently.
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
 #endif
     /// Deep copy assignment operator.
