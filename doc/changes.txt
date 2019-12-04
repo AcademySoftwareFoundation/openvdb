@@ -50,6 +50,8 @@ Bug fixes:
 - Fixed a non deterministic threading bug in @vdblink::tools::meshToVolume()
   mesh to volume@endlink during polygon voxelization which could result in
   different distance values.
+- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
+  decompose@endlink utility that caused it to fail to decompose some matrices.
 
 @par
 ABI changes:

@@ -39,6 +39,8 @@ Version 7.0.0 - In development
     - Fixed a Windows build issue in openvdb_render.
     - Fixed a non deterministic threading bug in tools::meshToVolume() during
       polygon voxelization which could result in different distance values.
+    - Fixed a rotation order bug in tools::local_util::decompose()
+      that caused it to fail to decompose some matrices.
 
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7
