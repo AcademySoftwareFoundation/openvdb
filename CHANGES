@@ -37,6 +37,8 @@ Version 7.0.0 - In development
     - Fixed a bug in FindJemalloc.cmake where paths were not being handled
       correctly.
     - Fixed a Windows build issue in openvdb_render.
+    - Fixed a non deterministic threading bug in tools::meshToVolume() during
+      polygon voxelization which could result in different distance values.
 
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7
