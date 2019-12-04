@@ -29,8 +29,7 @@ license.
 #### Contributor License Agreements
 
 Developers who wish to contribute code to be considered for inclusion
-in OpenVDB must first complete a **Contributor
-License Agreement**.
+in OpenVDB must first complete a **Contributor License Agreement**.
 
 OpenVDB uses [EasyCLA](https://lfcla.com/) for managing CLAs, which automatically
 checks to ensure CLAs are signed by a contributor before a commit
@@ -38,7 +37,7 @@ can be merged.
 
 * If you are an individual writing the code on your own time and
   you're SURE you are the sole owner of any intellectual property you
-  contribute, you can [signing the CLA as an individual contributor](https://github.com/communitybridge/easycla/blob/master/docs/sign-a-cla-as-an-individual-contributor-to-github.md).
+  contribute, you can [sign the CLA as an individual contributor](https://github.com/communitybridge/easycla/blob/master/docs/sign-a-cla-as-an-individual-contributor-to-github.md).
 
 * If you are writing the code as part of your job, or if there is any
   possibility that your employers might think they own any
@@ -46,7 +45,7 @@ can be merged.
   Contributor Licence
   Agreement](https://github.com/communitybridge/easycla/blob/master/docs/contribute-to-a-github-company-project.md).
 
-The OpenVDB CLA's are the standard forms used by Linux Foundation
+The OpenVDB CLAs are the standard forms used by Linux Foundation
 projects and [recommended by the ASWF TAC](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contributor-license-agreement-cla). You can review the text of the CLAs in the [TSC directory](tsc/).
 
 #### Commit Sign-Off
@@ -55,7 +54,7 @@ Every commit must be signed off.  That is, every commit log message
 must include a “`Signed-off-by`” line (generated, for example, with
 “`git commit --signoff`”), indicating that the committer wrote the
 code and has the right to release it under the
-[Modified-BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause)
+[Mozilla Public License, version 2.0](LICENSE.md)
 license. See https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off for more information on this requirement.
 
 ## Committer
