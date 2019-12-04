@@ -105,17 +105,17 @@ Project releases will occur on a scheduled basis as agreed to by the TSC.
 
 # Conflict resolution and voting
 
-In general, we prefer that technical issues and maintainer membership are amicably worked out
+In general, we prefer that technical issues and committer status/TSC membership are amicably worked out
 between the persons involved. If a dispute cannot be decided independently, the TSC can be
 called in to decide an issue. If the TSC themselves cannot decide an issue, the issue will
 be resolved by voting. The voting process is a simple majority in which each TSC receives one vote.
 
 # Communication
 
-This project, just like all of open source, is a global community. In addition to the Code of Conduct, this project will:
+This project, just like all of open source, is a global community. In addition to the [Code of Conduct](CODE_OF_CONDUCT.md), this project will:
 
 * Keep all communication on open channels ( mailing list, forums, chat ).
 * Be respectful of time and language differences between community members ( such as scheduling meetings, email/issue responsiveness, etc ).
 * Ensure tools are able to be used by community members regardless of their region.
 
-If you have concerns about communication challenges for this project, please contact the maintainers.
+If you have concerns about communication challenges for this project, please contact the [TSC](mailto:openvdb-tsc-private@lists.aswf.io).
