@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/points/AttributeArray.h>
@@ -852,16 +825,7 @@ TestAttributeArray::testAttributeArray()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrB.read(istr);
 
-        CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
-        CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
-        CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
-        CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
-
-        for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-        }
+        CPPUNIT_ASSERT(attrA == attrB);
 
         AttributeArrayI attrC(count, 3);
         attrC.setTransient(true);
@@ -869,12 +833,12 @@ TestAttributeArray::testAttributeArray()
         std::ostringstream ostrC(std::ios_base::binary);
         attrC.write(ostrC);
 
-        CPPUNIT_ASSERT_EQUAL(size_t(0), ostrC.str().size());
+        CPPUNIT_ASSERT(ostrC.str().empty());
 
         std::ostringstream ostrD(std::ios_base::binary);
         attrC.write(ostrD, /*transient=*/true);
 
-        CPPUNIT_ASSERT(ostrD.str().size() != size_t(0));
+        CPPUNIT_ASSERT(!ostrD.str().empty());
     }
 
     // Registry
@@ -1418,6 +1382,25 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT(!handle.hasConstantStride());
         CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
         CPPUNIT_ASSERT_EQUAL(array->dataSize(), handle.size());
+    }
+
+    { // IO
+        const Index count = 50, total = 100;
+        AttributeArrayI attrA(count, total, /*constantStride=*/false);
+
+        for (unsigned i = 0; i < unsigned(total); ++i) {
+            attrA.set(i, int(i));
+        }
+
+        std::ostringstream ostr(std::ios_base::binary);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+        attrA.write(ostr);
+
+        AttributeArrayI attrB;
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrB.read(istr);
+
+        CPPUNIT_ASSERT(attrA == attrB);
     }
 }
 
@@ -2468,7 +2451,3 @@ TestAttributeArray::testProfile()
         profile::sumH<FixedPointCodec<true>>("AttributeHandle<float, fp8, Codec>", attr);
     }
 }
-
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
@@ -79,15 +52,15 @@ public:
          Source d, Source e, Source f,
          Source g, Source h, Source i)
     {
-        MyBase::mm[0] = static_cast<ValueType>(a);
-        MyBase::mm[1] = static_cast<ValueType>(b);
-        MyBase::mm[2] = static_cast<ValueType>(c);
-        MyBase::mm[3] = static_cast<ValueType>(d);
-        MyBase::mm[4] = static_cast<ValueType>(e);
-        MyBase::mm[5] = static_cast<ValueType>(f);
-        MyBase::mm[6] = static_cast<ValueType>(g);
-        MyBase::mm[7] = static_cast<ValueType>(h);
-        MyBase::mm[8] = static_cast<ValueType>(i);
+        MyBase::mm[0] = static_cast<T>(a);
+        MyBase::mm[1] = static_cast<T>(b);
+        MyBase::mm[2] = static_cast<T>(c);
+        MyBase::mm[3] = static_cast<T>(d);
+        MyBase::mm[4] = static_cast<T>(e);
+        MyBase::mm[5] = static_cast<T>(f);
+        MyBase::mm[6] = static_cast<T>(g);
+        MyBase::mm[7] = static_cast<T>(h);
+        MyBase::mm[8] = static_cast<T>(i);
     } // constructor1Test
 
     /// Construct matrix from rows or columns vectors (defaults to rows
@@ -109,15 +82,15 @@ public:
     template<typename Source>
     Mat3(Source *a)
     {
-        MyBase::mm[0] = a[0];
-        MyBase::mm[1] = a[1];
-        MyBase::mm[2] = a[2];
-        MyBase::mm[3] = a[3];
-        MyBase::mm[4] = a[4];
-        MyBase::mm[5] = a[5];
-        MyBase::mm[6] = a[6];
-        MyBase::mm[7] = a[7];
-        MyBase::mm[8] = a[8];
+        MyBase::mm[0] = static_cast<T>(a[0]);
+        MyBase::mm[1] = static_cast<T>(a[1]);
+        MyBase::mm[2] = static_cast<T>(a[2]);
+        MyBase::mm[3] = static_cast<T>(a[3]);
+        MyBase::mm[4] = static_cast<T>(a[4]);
+        MyBase::mm[5] = static_cast<T>(a[5]);
+        MyBase::mm[6] = static_cast<T>(a[6]);
+        MyBase::mm[7] = static_cast<T>(a[7]);
+        MyBase::mm[8] = static_cast<T>(a[8]);
     } // constructor1Test
 
     /// Copy constructor
@@ -853,7 +826,3 @@ template<> inline math::Mat3d zeroVal<math::Mat3d>() { return math::Mat3d::zero(
 } // namespace openvdb
 
 #endif // OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

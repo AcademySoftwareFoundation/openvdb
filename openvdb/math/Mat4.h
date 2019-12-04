@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
@@ -76,7 +49,7 @@ public:
     Mat4(Source *a)
     {
         for (int i = 0; i < 16; i++) {
-            MyBase::mm[i] = a[i];
+            MyBase::mm[i] = static_cast<T>(a[i]);
         }
     }
 
@@ -93,25 +66,25 @@ public:
          Source i, Source j, Source k, Source l,
          Source m, Source n, Source o, Source p)
     {
-        MyBase::mm[ 0] = T(a);
-        MyBase::mm[ 1] = T(b);
-        MyBase::mm[ 2] = T(c);
-        MyBase::mm[ 3] = T(d);
+        MyBase::mm[ 0] = static_cast<T>(a);
+        MyBase::mm[ 1] = static_cast<T>(b);
+        MyBase::mm[ 2] = static_cast<T>(c);
+        MyBase::mm[ 3] = static_cast<T>(d);
 
-        MyBase::mm[ 4] = T(e);
-        MyBase::mm[ 5] = T(f);
-        MyBase::mm[ 6] = T(g);
-        MyBase::mm[ 7] = T(h);
+        MyBase::mm[ 4] = static_cast<T>(e);
+        MyBase::mm[ 5] = static_cast<T>(f);
+        MyBase::mm[ 6] = static_cast<T>(g);
+        MyBase::mm[ 7] = static_cast<T>(h);
 
-        MyBase::mm[ 8] = T(i);
-        MyBase::mm[ 9] = T(j);
-        MyBase::mm[10] = T(k);
-        MyBase::mm[11] = T(l);
+        MyBase::mm[ 8] = static_cast<T>(i);
+        MyBase::mm[ 9] = static_cast<T>(j);
+        MyBase::mm[10] = static_cast<T>(k);
+        MyBase::mm[11] = static_cast<T>(l);
 
-        MyBase::mm[12] = T(m);
-        MyBase::mm[13] = T(n);
-        MyBase::mm[14] = T(o);
-        MyBase::mm[15] = T(p);
+        MyBase::mm[12] = static_cast<T>(m);
+        MyBase::mm[13] = static_cast<T>(n);
+        MyBase::mm[14] = static_cast<T>(o);
+        MyBase::mm[15] = static_cast<T>(p);
     }
 
     /// Construct matrix from rows or columns vectors (defaults to rows
@@ -1371,7 +1344,3 @@ template<> inline math::Mat4d zeroVal<math::Mat4d>() { return math::Mat4d::zero(
 } // namespace openvdb
 
 #endif // OPENVDB_UTIL_MAT4_H_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

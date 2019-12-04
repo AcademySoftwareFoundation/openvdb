@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -54,6 +27,7 @@ public:
     CPPUNIT_TEST(testPointConversionNans);
     CPPUNIT_TEST(testStride);
     CPPUNIT_TEST(testComputeVoxelSize);
+    CPPUNIT_TEST(testPrecision);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -61,6 +35,7 @@ public:
     void testPointConversionNans();
     void testStride();
     void testComputeVoxelSize();
+    void testPrecision();
 
 }; // class TestPointConversion
 
@@ -1126,6 +1101,180 @@ TestPointConversion::testComputeVoxelSize()
     }
 }
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+void
+TestPointConversion::testPrecision()
+{
+    const double tolerance = math::Tolerance<float>::value();
+
+    { // test values far from origin
+        const double voxelSize = 0.5;
+        const float halfVoxelSize = 0.25f;
+        auto transform = math::Transform::createLinearTransform(voxelSize);
+
+        float onBorder = 1000.0f + halfVoxelSize; // can be represented exactly in floating-point
+        float beforeBorder = std::nextafterf(onBorder, /*to=*/0.0f);
+        float afterBorder = std::nextafterf(onBorder, /*to=*/2000.0f);
+
+        const Vec3f positionBefore(beforeBorder, afterBorder, onBorder);
+
+        std::vector<Vec3f> points{positionBefore};
+        PointAttributeVector<Vec3f> wrapper(points);
+        auto pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(
+            wrapper, *transform);
+
+        Vec3f positionAfterNull;
+        Vec3f positionAfterFixed16;
+
+        { // null codec
+            auto points = createPointDataGrid<NullCodec, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 2000);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 2001);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 2001); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterNull = Vec3f(transform->indexToWorld(positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.z(), positionBefore.z(), tolerance);
+        }
+
+        { // fixed 16-bit codec
+            auto points = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 2000);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 2001);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 2001); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterFixed16 = Vec3f(transform->indexToWorld(
+                positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.z(), positionBefore.z(), tolerance);
+        }
+
+        // at this precision null codec == fixed-point 16-bit codec
+
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.x(), positionAfterFixed16.x());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.y(), positionAfterFixed16.y());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.z(), positionAfterFixed16.z());
+    }
+
+    { // test values near to origin
+        const double voxelSize = 0.5;
+        const float halfVoxelSize = 0.25f;
+        auto transform = math::Transform::createLinearTransform(voxelSize);
+
+        float onBorder = 0.0f+halfVoxelSize;
+        float beforeBorder = std::nextafterf(onBorder, /*to=*/0.0f);
+        float afterBorder = std::nextafterf(onBorder, /*to=*/2000.0f);
+
+        const Vec3f positionBefore(beforeBorder, afterBorder, onBorder);
+
+        std::vector<Vec3f> points{positionBefore};
+        PointAttributeVector<Vec3f> wrapper(points);
+        auto pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(
+            wrapper, *transform);
+
+        Vec3f positionAfterNull;
+        Vec3f positionAfterFixed16;
+
+        { // null codec
+            auto points = createPointDataGrid<NullCodec, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 0);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 1);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 1); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() > 0.49f && positionVoxelSpace.x() < 0.5f);
+            CPPUNIT_ASSERT(positionVoxelSpace.y() > -0.5f && positionVoxelSpace.y() < -0.49f);
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border value is stored at -0.5f
+
+            positionAfterNull = Vec3f(transform->indexToWorld(positionVoxelSpace + ijk.asVec3d()));
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.x(), positionBefore.x(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.y(), positionBefore.y(), tolerance);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterNull.z(), positionBefore.z(), tolerance);
+        }
+
+        { // fixed 16-bit codec - at this precision, this codec results in lossy compression
+            auto points = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(
+                *pointIndexGrid, wrapper, *transform);
+
+            auto leafIter = points->tree().cbeginLeaf();
+            auto indexIter = leafIter->beginIndexOn();
+            auto handle = AttributeHandle<Vec3f>(leafIter->constAttributeArray("P"));
+
+            const auto& ijk = indexIter.getCoord();
+
+            CPPUNIT_ASSERT_EQUAL(ijk.x(), 0);
+            CPPUNIT_ASSERT_EQUAL(ijk.y(), 1);
+            CPPUNIT_ASSERT_EQUAL(ijk.z(), 1); // on border value is stored in the higher voxel
+
+            const Vec3f positionVoxelSpace = handle.get(*indexIter);
+
+            // voxel-space range: -0.5f >= value > 0.5f
+
+            CPPUNIT_ASSERT(positionVoxelSpace.x() == 0.5f); // before border is clamped to 0.5f
+            CPPUNIT_ASSERT(positionVoxelSpace.y() == -0.5f); // after border is clamped to -0.5f
+            CPPUNIT_ASSERT(positionVoxelSpace.z() == -0.5f); // on border is stored at -0.5f
+
+            positionAfterFixed16 = Vec3f(transform->indexToWorld(
+                positionVoxelSpace + ijk.asVec3d()));
+
+            // reduce tolerance to handle lack of precision
+
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.x(), positionBefore.x(), 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.y(), positionBefore.y(), 1e-6);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(positionAfterFixed16.z(), positionBefore.z(), tolerance);
+        }
+
+        // only z matches precisely due to lossy compression
+
+        CPPUNIT_ASSERT(positionAfterNull.x() != positionAfterFixed16.x());
+        CPPUNIT_ASSERT(positionAfterNull.y() != positionAfterFixed16.y());
+        CPPUNIT_ASSERT_EQUAL(positionAfterNull.z(), positionAfterFixed16.z());
+    }
+}

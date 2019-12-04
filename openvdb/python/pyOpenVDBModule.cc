@@ -1,33 +1,7 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
+#include <iostream> // must be included before python on macos
 #include <cstring> // for strncmp(), strrchr(), etc.
 #include <limits>
 #include <string>
@@ -215,6 +189,93 @@ struct VecConverter
 ////////////////////////////////////////
 
 
+/// Helper class to convert between a 2D Python numeric sequence
+/// (tuple, list, etc.) and an openvdb::Mat
+template<typename MatT>
+struct MatConverter
+{
+    /// Return the given matrix as a Python list of lists.
+    static py::object toList(const MatT& m)
+    {
+        py::list obj;
+        for (int i = 0; i < MatT::size; ++i) {
+            py::list rowObj;
+            for (int j = 0; j < MatT::size; ++j) { rowObj.append(m(i, j)); }
+            obj.append(rowObj);
+        }
+        return std::move(obj);
+    }
+
+    /// Extract a matrix from a Python sequence of numeric sequences.
+    static MatT fromSeq(py::object obj)
+    {
+        MatT m = MatT::zero();
+        if (py::len(obj) == MatT::size) {
+            for (int i = 0; i < MatT::size; ++i) {
+                py::object rowObj = obj[i];
+                if (py::len(rowObj) != MatT::size) return MatT::zero();
+                for (int j = 0; j < MatT::size; ++j) {
+                    m(i, j) = py::extract<typename MatT::value_type>(rowObj[j]);
+                }
+            }
+        }
+        return m;
+    }
+
+    static PyObject* convert(const MatT& m)
+    {
+        py::object obj = toList(m);
+        Py_INCREF(obj.ptr());
+        return obj.ptr();
+    }
+
+    static void* convertible(PyObject* obj)
+    {
+        if (!PySequence_Check(obj)) return nullptr; // not a Python sequence
+
+        Py_ssize_t len = PySequence_Length(obj);
+        if (len != MatT::size) return nullptr;
+
+        py::object seq = pyutil::pyBorrow(obj);
+        for (int i = 0; i < MatT::size; ++i) {
+            py::object rowObj = seq[i];
+            if (py::len(rowObj) != MatT::size) return nullptr;
+            // Check that all elements of the Python sequence are convertible
+            // to the Mat's value type.
+            for (int j = 0; j < MatT::size; ++j) {
+                if (!py::extract<typename MatT::value_type>(rowObj[j]).check()) {
+                    return nullptr;
+                }
+            }
+        }
+        return obj;
+    }
+
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a Mat in the provided memory location.
+        using StorageT = py::converter::rvalue_from_python_storage<MatT>;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) MatT; // placement new
+        data->convertible = storage;
+        *(static_cast<MatT*>(storage)) = fromSeq(pyutil::pyBorrow(obj));
+    }
+
+    static void registerConverter()
+    {
+        py::to_python_converter<MatT, MatConverter<MatT> >();
+        py::converter::registry::push_back(
+            &MatConverter<MatT>::convertible,
+            &MatConverter<MatT>::construct,
+            py::type_id<MatT>());
+    }
+}; // struct MatConverter
+
+
+////////////////////////////////////////
+
+
 /// Helper class to convert between a Python integer and a openvdb::PointIndex
 template <typename PointIndexT>
 struct PointIndexConverter
@@ -232,7 +293,11 @@ struct PointIndexConverter
     /// @return nullptr if the given Python object is not convertible to the PointIndex.
     static void* convertible(PyObject* obj)
     {
+#if PY_MAJOR_VERSION >= 3
+        if (!PyLong_Check(obj)) return nullptr; // not a Python integer
+#else
         if (!PyInt_Check(obj)) return nullptr; // not a Python integer
+#endif
         return obj;
     }
 
@@ -248,8 +313,11 @@ struct PointIndexConverter
 
         // Extract the PointIndex from the python integer
         PointIndexT* index = static_cast<PointIndexT*>(storage);
-
+#if PY_MAJOR_VERSION >= 3
+        *index = static_cast<IntType>(PyLong_AsLong(obj));
+#else
         *index = static_cast<IntType>(PyInt_AsLong(obj));
+#endif
     }
 
     /// Register both the PointIndex-to-integer and the integer-to-PointIndex converters.
@@ -320,6 +388,12 @@ struct MetaMapConverter
                 } else if (typeName == Vec4SMetadata::staticTypeName()) {
                     const Vec4s v = static_cast<Vec4SMetadata&>(*meta).value();
                     obj = py::make_tuple(v[0], v[1], v[2], v[3]);
+                } else if (typeName == Mat4SMetadata::staticTypeName()) {
+                    const Mat4s m = static_cast<Mat4SMetadata&>(*meta).value();
+                    obj = MatConverter<Mat4s>::toList(m);
+                } else if (typeName == Mat4DMetadata::staticTypeName()) {
+                    const Mat4d m = static_cast<Mat4DMetadata&>(*meta).value();
+                    obj = MatConverter<Mat4d>::toList(m);
                 }
                 ret[it->first] = obj;
             }
@@ -400,6 +474,10 @@ struct MetaMapConverter
                 value.reset(new Vec4DMetadata(py::extract<Vec4d>(val)));
             } else if (py::extract<Vec4s>(val).check()) {
                 value.reset(new Vec4SMetadata(py::extract<Vec4s>(val)));
+            } else if (py::extract<Mat4d>(val).check()) {
+                value.reset(new Mat4DMetadata(py::extract<Mat4d>(val)));
+            } else if (py::extract<Mat4s>(val).check()) {
+                value.reset(new Mat4SMetadata(py::extract<Mat4s>(val)));
             } else if (py::extract<Metadata::Ptr>(val).check()) {
                 value = py::extract<Metadata::Ptr>(val);
             } else {
@@ -774,6 +852,9 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     _openvdbmodule::VecConverter<Vec4s>::registerConverter();
     _openvdbmodule::VecConverter<Vec4d>::registerConverter();
 
+    _openvdbmodule::MatConverter<Mat4s>::registerConverter();
+    _openvdbmodule::MatConverter<Mat4d>::registerConverter();
+
     _openvdbmodule::PointIndexConverter<PointDataIndex32>::registerConverter();
 
     _openvdbmodule::MetaMapConverter::registerConverter();
@@ -875,7 +956,3 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     pyutil::StringEnum<_openvdbmodule::VecTypeDescr>::wrap();
 
 } // BOOST_PYTHON_MODULE
-
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

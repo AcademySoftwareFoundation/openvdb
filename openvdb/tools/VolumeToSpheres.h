@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file tools/VolumeToSpheres.h
 ///
@@ -45,7 +18,6 @@
 
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/int.hpp>
-#include <boost/scoped_array.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -279,7 +251,7 @@ LeafOp<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = std::sqrt(maxDist);
+        sphere[3] = maxDist * 2.0; // padded radius
     }
 }
 
@@ -351,8 +323,9 @@ NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
             pos[0] = mLeafBoundingSpheres[i][0];
             pos[1] = mLeafBoundingSpheres[i][1];
             pos[2] = mLeafBoundingSpheres[i][2];
+            const auto radiusSqr = mLeafBoundingSpheres[i][3];
 
-            double tmpDist = (pos - avg).length() + mLeafBoundingSpheres[i][3];
+            double tmpDist = (pos - avg).lengthSqr() + radiusSqr;
             if (tmpDist > maxDist) maxDist = tmpDist;
         }
 
@@ -361,7 +334,7 @@ NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = maxDist;
+        sphere[3] = maxDist * 2.0; // padded radius
     }
 }
 
@@ -493,9 +466,9 @@ ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) co
         center[0] = mLeafBoundingSpheres[i][0];
         center[1] = mLeafBoundingSpheres[i][1];
         center[2] = mLeafBoundingSpheres[i][2];
-        const auto radius = mLeafBoundingSpheres[i][3];
+        const auto radiusSqr = mLeafBoundingSpheres[i][3];
 
-        distToLeaf = float(std::max(0.0, (pos - center).length() - radius));
+        distToLeaf = float(std::max(0.0, (pos - center).lengthSqr() - radiusSqr));
 
         if (distToLeaf < minDist) {
             minDist = distToLeaf;
@@ -535,9 +508,9 @@ ClosestPointDist<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& ran
             center[0] = mNodeBoundingSpheres[i][0];
             center[1] = mNodeBoundingSpheres[i][1];
             center[2] = mNodeBoundingSpheres[i][2];
-            const auto radius = mNodeBoundingSpheres[i][3];
+            const auto radiusSqr = mNodeBoundingSpheres[i][3];
 
-            distToNode = float(std::max(0.0, (pos - center).length() - radius));
+            distToNode = float(std::max(0.0, (pos - center).lengthSqr() - radiusSqr));
 
             if (distToNode < minDist) {
                 minDist = distToNode;
@@ -926,7 +899,7 @@ ClosestSurfacePoint<GridT>::initialize(
 
         const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
 
-        boost::scoped_array<Index32> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
+        std::unique_ptr<Index32[]> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
 
         tbb::parallel_for(auxiliaryLeafNodeRange,
             volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
@@ -1055,7 +1028,3 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

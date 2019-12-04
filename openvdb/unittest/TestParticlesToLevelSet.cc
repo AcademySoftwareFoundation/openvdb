@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <vector>
 #include <cppunit/extensions/HelperMacros.h>
@@ -59,6 +32,7 @@ public:
     }
 
     CPPUNIT_TEST_SUITE(TestParticlesToLevelSet);
+    CPPUNIT_TEST(testBlindData);
     CPPUNIT_TEST(testMyParticleList);
     CPPUNIT_TEST(testRasterizeSpheres);
     CPPUNIT_TEST(testRasterizeSpheresAndId);
@@ -67,6 +41,7 @@ public:
     CPPUNIT_TEST(testMaskOutput);
     CPPUNIT_TEST_SUITE_END();
 
+    void testBlindData();
     void testMyParticleList();
     void testRasterizeSpheres();
     void testRasterizeSpheresAndId();
@@ -153,6 +128,44 @@ public:
     // The method below is only required for attribute transfer
     void getAtt(size_t n, openvdb::Index32& att) const { att = openvdb::Index32(n); }
 };
+
+
+void
+TestParticlesToLevelSet::testBlindData()
+{
+    using BlindTypeIF = openvdb::tools::p2ls_internal::BlindData<openvdb::Index, float>;
+
+    BlindTypeIF value(openvdb::Index(8), 5.2f);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(8), value.visible());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(5.2f, value.blind());
+
+    BlindTypeIF value2(openvdb::Index(13), 1.6f);
+
+    { // test equality
+        // only visible portion needs to be equal
+        BlindTypeIF blind(openvdb::Index(13), 6.7f);
+        CPPUNIT_ASSERT(value2 == blind);
+    }
+
+    { // test addition of two blind types
+        BlindTypeIF blind = value + value2;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+13), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(0.0f, blind.blind()); // blind values are both dropped
+    }
+
+    { // test addition of blind type with visible type
+        BlindTypeIF blind = value + 3;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+
+    { // test addition of blind type with type that requires casting
+        // note that this will generate conversion warnings if not handled properly
+        BlindTypeIF blind = value + 3.7;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(8+3), blind.visible());
+        CPPUNIT_ASSERT_EQUAL(5.2f, blind.blind());
+    }
+}
 
 
 void
@@ -565,7 +578,3 @@ TestParticlesToLevelSet::testMaskOutput()
         }
     }
 }
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

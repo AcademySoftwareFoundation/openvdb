@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file   VolumeToMesh.h
 ///
@@ -41,8 +14,6 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
-
-#include <boost/scoped_array.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -168,16 +139,16 @@ private:
     void operator=(const PolygonPool&) {}
 
     size_t mNumQuads, mNumTriangles;
-    boost::scoped_array<openvdb::Vec4I> mQuads;
-    boost::scoped_array<openvdb::Vec3I> mTriangles;
-    boost::scoped_array<char> mQuadFlags, mTriangleFlags;
+    std::unique_ptr<openvdb::Vec4I[]> mQuads;
+    std::unique_ptr<openvdb::Vec3I[]> mTriangles;
+    std::unique_ptr<char[]> mQuadFlags, mTriangleFlags;
 };
 
 
 /// @{
 /// @brief Point and primitive list types.
-using PointList = boost::scoped_array<openvdb::Vec3s>;
-using PolygonPoolList = boost::scoped_array<PolygonPool>;
+using PointList = std::unique_ptr<openvdb::Vec3s[]>;
+using PolygonPoolList = std::unique_ptr<PolygonPool[]>;
 /// @}
 
 
@@ -281,7 +252,7 @@ private:
 
     bool mInvertSurfaceMask, mRelaxDisorientedTriangles;
 
-    boost::scoped_array<uint32_t> mQuantizedSeamPoints;
+    std::unique_ptr<uint32_t[]> mQuantizedSeamPoints;
     std::vector<uint8_t> mPointFlags;
 }; // struct VolumeToMesh
 
@@ -1489,7 +1460,7 @@ struct ComputePoints
         const InputTreeType& inputTree,
         const std::vector<Index32LeafNodeType*>& pointIndexLeafNodes,
         const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
-        const boost::scoped_array<Index32>& leafNodeOffsets,
+        const std::unique_ptr<Index32[]>& leafNodeOffsets,
         const math::Transform& xform,
         double iso);
 
@@ -1524,7 +1495,7 @@ ComputePoints<InputTreeType>::ComputePoints(
     const InputTreeType& inputTree,
     const std::vector<Index32LeafNodeType*>& pointIndexLeafNodes,
     const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
-    const boost::scoped_array<Index32>& leafNodeOffsets,
+    const std::unique_ptr<Index32[]>& leafNodeOffsets,
     const math::Transform& xform,
     double iso)
     : mPoints(pointArray)
@@ -2843,7 +2814,7 @@ maskActiveTileBorders(const InputTreeType& inputTree, typename InputTreeType::Va
     }
 
     if (tileCount > 0) {
-        boost::scoped_array<Vec4i> tiles(new Vec4i[tileCount]);
+        std::unique_ptr<Vec4i[]> tiles(new Vec4i[tileCount]);
 
         CoordBBox bbox;
         size_t index = 0;
@@ -3919,7 +3890,7 @@ struct LeafNodePointCount
     using Int16LeafNodeType = tree::LeafNode<Int16, LeafNodeLog2Dim>;
 
     LeafNodePointCount(const std::vector<Int16LeafNodeType*>& leafNodes,
-        boost::scoped_array<Index32>& leafNodeCount)
+        std::unique_ptr<Index32[]>& leafNodeCount)
         : mLeafNodes(leafNodes.empty() ? nullptr : &leafNodes.front())
         , mData(leafNodeCount.get())
     {
@@ -3956,7 +3927,7 @@ struct AdaptiveLeafNodePointCount
 
     AdaptiveLeafNodePointCount(const std::vector<PointIndexLeafNode*>& pointIndexNodes,
         const std::vector<Int16LeafNodeType*>& signDataNodes,
-        boost::scoped_array<Index32>& leafNodeCount)
+        std::unique_ptr<Index32[]>& leafNodeCount)
         : mPointIndexNodes(pointIndexNodes.empty() ? nullptr : &pointIndexNodes.front())
         , mSignDataNodes(signDataNodes.empty() ? nullptr : &signDataNodes.front())
         , mData(leafNodeCount.get())
@@ -4005,7 +3976,7 @@ struct MapPoints
 
     MapPoints(const std::vector<PointIndexLeafNode*>& pointIndexNodes,
         const std::vector<Int16LeafNodeType*>& signDataNodes,
-        boost::scoped_array<Index32>& leafNodeCount)
+        std::unique_ptr<Index32[]>& leafNodeCount)
         : mPointIndexNodes(pointIndexNodes.empty() ? nullptr : &pointIndexNodes.front())
         , mSignDataNodes(signDataNodes.empty() ? nullptr : &signDataNodes.front())
         , mData(leafNodeCount.get())
@@ -4203,8 +4174,8 @@ struct FlagAndCountQuadsToSubdivide
 {
     FlagAndCountQuadsToSubdivide(PolygonPoolList& polygons,
         const std::vector<uint8_t>& pointFlags,
-        boost::scoped_array<openvdb::Vec3s>& points,
-        boost::scoped_array<unsigned>& numQuadsToDivide)
+        std::unique_ptr<openvdb::Vec3s[]>& points,
+        std::unique_ptr<unsigned[]>& numQuadsToDivide)
         : mPolygonPoolList(&polygons)
         , mPointFlags(pointFlags.empty() ? nullptr : &pointFlags.front())
         , mPoints(points.get())
@@ -4261,11 +4232,11 @@ private:
 struct SubdivideQuads
 {
     SubdivideQuads(PolygonPoolList& polygons,
-        const boost::scoped_array<openvdb::Vec3s>& points,
+        const std::unique_ptr<openvdb::Vec3s[]>& points,
         size_t pointCount,
-        boost::scoped_array<openvdb::Vec3s>& centroids,
-        boost::scoped_array<unsigned>& numQuadsToDivide,
-        boost::scoped_array<unsigned>& centroidOffsets)
+        std::unique_ptr<openvdb::Vec3s[]>& centroids,
+        std::unique_ptr<unsigned[]>& numQuadsToDivide,
+        std::unique_ptr<unsigned[]>& centroidOffsets)
         : mPolygonPoolList(&polygons)
         , mPoints(points.get())
         , mCentroids(centroids.get())
@@ -4402,12 +4373,12 @@ subdivideNonplanarSeamLineQuads(
 {
     const tbb::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
 
-    boost::scoped_array<unsigned> numQuadsToDivide(new unsigned[polygonPoolListSize]);
+    std::unique_ptr<unsigned[]> numQuadsToDivide(new unsigned[polygonPoolListSize]);
 
     tbb::parallel_for(polygonPoolListRange,
         FlagAndCountQuadsToSubdivide(polygonPoolList, pointFlags, pointList, numQuadsToDivide));
 
-    boost::scoped_array<unsigned> centroidOffsets(new unsigned[polygonPoolListSize]);
+    std::unique_ptr<unsigned[]> centroidOffsets(new unsigned[polygonPoolListSize]);
 
     size_t centroidCount = 0;
 
@@ -4420,7 +4391,7 @@ subdivideNonplanarSeamLineQuads(
         centroidCount = size_t(sum);
     }
 
-    boost::scoped_array<Vec3s> centroidList(new Vec3s[centroidCount]);
+    std::unique_ptr<Vec3s[]> centroidList(new Vec3s[centroidCount]);
 
     tbb::parallel_for(polygonPoolListRange,
         SubdivideQuads(polygonPoolList, pointList, pointListSize,
@@ -4430,7 +4401,7 @@ subdivideNonplanarSeamLineQuads(
 
         const size_t newPointListSize = centroidCount + pointListSize;
 
-        boost::scoped_array<openvdb::Vec3s> newPointList(new openvdb::Vec3s[newPointListSize]);
+        std::unique_ptr<openvdb::Vec3s[]> newPointList(new openvdb::Vec3s[newPointListSize]);
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, pointListSize),
             CopyArray<Vec3s>(newPointList.get(), pointList.get()));
@@ -4521,7 +4492,7 @@ template<typename InputTreeType>
 struct MaskDisorientedTrianglePoints
 {
     MaskDisorientedTrianglePoints(const InputTreeType& inputTree, const PolygonPoolList& polygons,
-        const PointList& pointList, boost::scoped_array<uint8_t>& pointMask,
+        const PointList& pointList, std::unique_ptr<uint8_t[]>& pointMask,
         const math::Transform& transform, bool invertSurfaceOrientation)
         : mInputTree(&inputTree)
         , mPolygonPoolList(&polygons)
@@ -4606,17 +4577,17 @@ relaxDisorientedTriangles(
 {
     const tbb::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
 
-    boost::scoped_array<uint8_t> pointMask(new uint8_t[pointListSize]);
+    std::unique_ptr<uint8_t[]> pointMask(new uint8_t[pointListSize]);
     fillArray(pointMask.get(), uint8_t(0), pointListSize);
 
     tbb::parallel_for(polygonPoolListRange,
         MaskDisorientedTrianglePoints<InputTree>(
             inputTree, polygonPoolList, pointList, pointMask, transform, invertSurfaceOrientation));
 
-    boost::scoped_array<uint8_t> pointUpdates(new uint8_t[pointListSize]);
+    std::unique_ptr<uint8_t[]> pointUpdates(new uint8_t[pointListSize]);
     fillArray(pointUpdates.get(), uint8_t(0), pointListSize);
 
-    boost::scoped_array<Vec3s> newPoints(new Vec3s[pointListSize]);
+    std::unique_ptr<Vec3s[]> newPoints(new Vec3s[pointListSize]);
     fillArray(newPoints.get(), Vec3s(0.0f, 0.0f, 0.0f), pointListSize);
 
     for (size_t n = 0, N = polygonPoolListSize; n < N; ++n) {
@@ -4762,8 +4733,8 @@ PolygonPool::trimQuads(const size_t n, bool reallocate)
             mQuads.reset(nullptr);
         } else {
 
-            boost::scoped_array<openvdb::Vec4I> quads(new openvdb::Vec4I[n]);
-            boost::scoped_array<char> flags(new char[n]);
+            std::unique_ptr<openvdb::Vec4I[]> quads(new openvdb::Vec4I[n]);
+            std::unique_ptr<char[]> flags(new char[n]);
 
             for (size_t i = 0; i < n; ++i) {
                 quads[i] = mQuads[i];
@@ -4791,8 +4762,8 @@ PolygonPool::trimTrinagles(const size_t n, bool reallocate)
             mTriangles.reset(nullptr);
         } else {
 
-            boost::scoped_array<openvdb::Vec3I> triangles(new openvdb::Vec3I[n]);
-            boost::scoped_array<char> flags(new char[n]);
+            std::unique_ptr<openvdb::Vec3I[]> triangles(new openvdb::Vec3I[n]);
+            std::unique_ptr<char[]> flags(new char[n]);
 
             for (size_t i = 0; i < n; ++i) {
                 triangles[i] = mTriangles[i];
@@ -5006,7 +4977,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
                 std::vector<Int16LeafNodeType*> refSignFlagsLeafNodes;
                 refSignFlagsTree->getNodes(refSignFlagsLeafNodes);
 
-                boost::scoped_array<Index32> leafNodeOffsets(
+                std::unique_ptr<Index32[]> leafNodeOffsets(
                     new Index32[refSignFlagsLeafNodes.size()]);
 
                 tbb::parallel_for(tbb::blocked_range<size_t>(0, refSignFlagsLeafNodes.size()),
@@ -5053,7 +5024,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
     // adapt and count unique points
 
-    boost::scoped_array<Index32> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
+    std::unique_ptr<Index32[]> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
 
     if (adaptive) {
         volume_to_mesh_internal::MergeVoxelRegions<InputGridType> mergeOp(
@@ -5289,7 +5260,3 @@ volumeToMesh(
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file Interpolation.h
 ///
@@ -738,23 +711,30 @@ template<class ValueT, size_t N>
 inline ValueT
 BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
+    auto _interpolate = [](const ValueT& a, const ValueT& b, double weight)
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const auto temp = (b - a) * weight;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return static_cast<ValueT>(a + ValueT(temp));
+    };
+
     // Trilinear interpolation:
     // The eight surrounding latice values are used to construct the result. \n
     // result(x,y,z) =
     //     v000 (1-x)(1-y)(1-z) + v001 (1-x)(1-y)z + v010 (1-x)y(1-z) + v011 (1-x)yz
     //   + v100 x(1-y)(1-z)     + v101 x(1-y)z     + v110 xy(1-z)     + v111 xyz
 
-    ValueT resultA, resultB;
-
-    resultA = data[0][0][0] + ValueT((data[0][0][1] - data[0][0][0]) * uvw[2]);
-    resultB = data[0][1][0] + ValueT((data[0][1][1] - data[0][1][0]) * uvw[2]);
-    ValueT result1 = resultA + ValueT((resultB-resultA) * uvw[1]);
-
-    resultA = data[1][0][0] + ValueT((data[1][0][1] - data[1][0][0]) * uvw[2]);
-    resultB = data[1][1][0] + ValueT((data[1][1][1] - data[1][1][0]) * uvw[2]);
-    ValueT result2 = resultA + ValueT((resultB - resultA) * uvw[1]);
-
-    return result1 + ValueT(uvw[0] * (result2 - result1));
+    return  _interpolate(
+                _interpolate(
+                    _interpolate(data[0][0][0], data[0][0][1], uvw[2]),
+                    _interpolate(data[0][1][0], data[0][1][1], uvw[2]),
+                    uvw[1]),
+                _interpolate(
+                    _interpolate(data[1][0][0], data[1][0][1], uvw[2]),
+                    _interpolate(data[1][1][0], data[1][1][1], uvw[2]),
+                    uvw[1]),
+                uvw[0]);
 }
 
 
@@ -805,6 +785,18 @@ template<class ValueT, size_t N>
 inline ValueT
 QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
+    auto _interpolate = [](const ValueT* value, double weight)
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const ValueT
+            a = static_cast<ValueT>(0.5 * (value[0] + value[2]) - value[1]),
+            b = static_cast<ValueT>(0.5 * (value[2] - value[0])),
+            c = static_cast<ValueT>(value[1]);
+        const auto temp = weight * (weight * a + b) + c;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return static_cast<ValueT>(temp);
+    };
+
     /// @todo For vector types, interpolate over each component independently.
     ValueT vx[3];
     for (int dx = 0; dx < 3; ++dx) {
@@ -821,28 +813,16 @@ QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R
             //
             // for a, b and c.
             const ValueT* vz = &data[dx][dy][0];
-            const ValueT
-                az = static_cast<ValueT>(0.5 * (vz[0] + vz[2]) - vz[1]),
-                bz = static_cast<ValueT>(0.5 * (vz[2] - vz[0])),
-                cz = static_cast<ValueT>(vz[1]);
-            vy[dy] = static_cast<ValueT>(uvw.z() * (uvw.z() * az + bz) + cz);
+            vy[dy] = _interpolate(vz, uvw.z());
         }//loop over y
         // Fit a parabola to three interpolated samples in y, then
         // evaluate the parabola at y', where y' is the fractional
         // part of inCoord.y.
-        const ValueT
-            ay = static_cast<ValueT>(0.5 * (vy[0] + vy[2]) - vy[1]),
-            by = static_cast<ValueT>(0.5 * (vy[2] - vy[0])),
-            cy = static_cast<ValueT>(vy[1]);
-        vx[dx] = static_cast<ValueT>(uvw.y() * (uvw.y() * ay + by) + cy);
+        vx[dx] = _interpolate(vy, uvw.y());
     }//loop over x
     // Fit a parabola to three interpolated samples in x, then
     // evaluate the parabola at the fractional part of inCoord.x.
-    const ValueT
-        ax = static_cast<ValueT>(0.5 * (vx[0] + vx[2]) - vx[1]),
-        bx = static_cast<ValueT>(0.5 * (vx[2] - vx[0])),
-        cx = static_cast<ValueT>(vx[1]);
-    return static_cast<ValueT>(uvw.x() * (uvw.x() * ax + bx) + cx);
+    return _interpolate(vx, uvw.x());
 }
 
 template<class TreeT>
@@ -1035,7 +1015,3 @@ struct Sampler<2, true> : public StaggeredQuadraticSampler {};
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

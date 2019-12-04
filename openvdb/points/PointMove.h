@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @author Dan Bailey
 ///
@@ -175,7 +148,6 @@ private:
     friend class ::TestPointMove;
 
     Cache& mCache;
-    LeafVecT mLocalLeafVec;
     const LeafVecT* mLeafVec = nullptr;
     const LeafMapT* mLeafMap = nullptr;
 }; // class CachedDeformer
@@ -199,7 +171,7 @@ using LocalPointIndexMap = std::vector<IndexPairArray>;
 
 using LeafIndexArray = std::vector<LeafIndex>;
 using LeafOffsetArray = std::vector<LeafIndexArray>;
-using LeafMap = std::map<Coord, LeafIndex>;
+using LeafMap = std::unordered_map<Coord, LeafIndex>;
 
 
 template <typename DeformerT, typename TreeT, typename FilterT>
@@ -985,6 +957,10 @@ inline void movePoints( PointDataGridT& points,
             targetLeafMap.insert({leaf->origin(), LeafIndex(static_cast<LeafIndex>(leaf.pos()))});
         }
 
+         // acquire registry lock to avoid locking when appending attributes in parallel
+
+        AttributeArray::ScopedRegistryLock lock;
+
         // perform four independent per-leaf operations in parallel
         targetLeafManager.foreach(
             [&](LeafT& leaf, size_t idx) {
@@ -994,7 +970,8 @@ inline void movePoints( PointDataGridT& points,
                     buffer[i] = buffer[i-1] + buffer[i];
                 }
                 // replace attribute set with a copy of the existing one
-                leaf.replaceAttributeSet(new AttributeSet(existingAttributeSet, leaf.getLastValue()),
+                leaf.replaceAttributeSet(
+                    new AttributeSet(existingAttributeSet, leaf.getLastValue(), &lock),
                     /*allowMismatchingDescriptors=*/true);
                 // store the index of the source leaf in a corresponding target leaf array
                 const auto it = sourceLeafMap.find(leaf.origin());
@@ -1155,10 +1132,6 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
 
         DeformerT newDeformer(deformer);
 
-        // if more than half the number of total points are evaluated by the filter, prefer
-        // accessing the data from a vector instead of a hash map for faster performance
-        const Index64 vectorThreshold = totalPointCount / 2;
-
         newDeformer.reset(leaf, idx);
 
         auto handle = AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
@@ -1166,10 +1139,10 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
         auto& cache = leafs[idx];
         cache.clear();
 
-        // only insert into a vector directly if the filter evaluates all points and the
-        // number of active points is greater than the vector threshold
+        // only insert into a vector directly if the filter evaluates all points
+        // and all points are stored in active voxels
         const bool useVector = filter.state() == index::ALL &&
-            (leaf.isDense() || (leaf.onPointCount() > vectorThreshold));
+            (leaf.isDense() || (leaf.onPointCount() == leaf.pointCount()));
         if (useVector) {
             cache.vecData.resize(totalPointCount);
         }
@@ -1202,16 +1175,6 @@ void CachedDeformer<T>::evaluate(PointDataGridT& grid, DeformerT& deformer, cons
             }
         }
 
-        // after insertion, move the data into a vector if the threshold is reached
-
-        if (!useVector && cache.mapData.size() > vectorThreshold) {
-            cache.vecData.resize(totalPointCount);
-            for (const auto& it : cache.mapData) {
-                cache.vecData[it.first] = it.second;
-            }
-            cache.mapData.clear();
-        }
-
         // store the total number of points to allow use of an expanded vector on access
 
         if (!cache.mapData.empty()) {
@@ -1236,26 +1199,8 @@ void CachedDeformer<T>::reset(const LeafT& /*leaf*/, size_t idx)
     }
     auto& cache = mCache.leafs[idx];
     if (!cache.mapData.empty()) {
-        // expand into a local vector if there are greater than 16 values in the hash map
-        // and the expanded vector would contain fewer values than 256 times those in the
-        // hash map, this trades a little extra storage for faster random access performance
-        if (cache.mapData.size() > 16 &&
-            cache.totalSize < (cache.mapData.size() * 256)) {
-            if (cache.totalSize < cache.mapData.size()) {
-                throw ValueError("Cache total size is not valid.");
-            }
-            mLocalLeafVec.resize(cache.totalSize);
-            for (const auto& it : cache.mapData) {
-                assert(it.first < cache.totalSize);
-                mLocalLeafVec[it.first] = it.second;
-            }
-            mLeafVec = &mLocalLeafVec;
-            mLeafMap = nullptr;
-        }
-        else {
-            mLeafMap = &cache.mapData;
-            mLeafVec = nullptr;
-        }
+        mLeafMap = &cache.mapData;
+        mLeafVec = nullptr;
     }
     else {
         mLeafVec = &cache.vecData;
@@ -1290,7 +1235,3 @@ void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
 } // namespace openvdb
 
 #endif // OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

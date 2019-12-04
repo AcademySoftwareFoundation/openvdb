@@ -1,39 +1,14 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef OPENVDB_IO_COMPRESSION_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_COMPRESSION_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/MetaMap.h>
 #include <openvdb/math/Math.h> // for negative()
 #include "io.h" // for getDataCompression(), etc.
+#include "DelayedLoadMetadata.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -101,6 +76,94 @@ enum {
 };
 
 
+template <typename ValueT, typename MaskT>
+struct MaskCompress
+{
+    // Comparison function for values
+    static inline bool eq(const ValueT& a, const ValueT& b) {
+        return math::isExactlyEqual(a, b);
+    }
+
+    MaskCompress(
+        const MaskT& valueMask, const MaskT& childMask,
+        const ValueT* srcBuf, const ValueT& background)
+    {
+        /// @todo Consider all values, not just inactive values?
+        inactiveVal[0] = inactiveVal[1] = background;
+        int numUniqueInactiveVals = 0;
+        for (typename MaskT::OffIterator it = valueMask.beginOff();
+            numUniqueInactiveVals < 3 && it; ++it)
+        {
+            const Index32 idx = it.pos();
+
+            // Skip inactive values that are actually child node pointers.
+            if (childMask.isOn(idx)) continue;
+
+            const ValueT& val = srcBuf[idx];
+            const bool unique = !(
+                (numUniqueInactiveVals > 0 && MaskCompress::eq(val, inactiveVal[0])) ||
+                (numUniqueInactiveVals > 1 && MaskCompress::eq(val, inactiveVal[1]))
+            );
+            if (unique) {
+                if (numUniqueInactiveVals < 2) inactiveVal[numUniqueInactiveVals] = val;
+                ++numUniqueInactiveVals;
+            }
+        }
+
+        metadata = NO_MASK_OR_INACTIVE_VALS;
+
+        if (numUniqueInactiveVals == 1) {
+            if (!MaskCompress::eq(inactiveVal[0], background)) {
+                if (MaskCompress::eq(inactiveVal[0], math::negative(background))) {
+                    metadata = NO_MASK_AND_MINUS_BG;
+                } else {
+                    metadata = NO_MASK_AND_ONE_INACTIVE_VAL;
+                }
+            }
+        } else if (numUniqueInactiveVals == 2) {
+            metadata = NO_MASK_OR_INACTIVE_VALS;
+            if (!MaskCompress::eq(inactiveVal[0], background) && !MaskCompress::eq(inactiveVal[1], background)) {
+                // If neither inactive value is equal to the background, both values
+                // need to be saved, along with a mask that selects between them.
+                metadata = MASK_AND_TWO_INACTIVE_VALS;
+
+            } else if (MaskCompress::eq(inactiveVal[1], background)) {
+                if (MaskCompress::eq(inactiveVal[0], math::negative(background))) {
+                    // If the second inactive value is equal to the background and
+                    // the first is equal to -background, neither value needs to be saved,
+                    // but save a mask that selects between -background and +background.
+                    metadata = MASK_AND_NO_INACTIVE_VALS;
+                } else {
+                    // If the second inactive value is equal to the background, only
+                    // the first value needs to be saved, along with a mask that selects
+                    // between it and the background.
+                    metadata = MASK_AND_ONE_INACTIVE_VAL;
+                }
+            } else if (MaskCompress::eq(inactiveVal[0], background)) {
+                if (MaskCompress::eq(inactiveVal[1], math::negative(background))) {
+                    // If the first inactive value is equal to the background and
+                    // the second is equal to -background, neither value needs to be saved,
+                    // but save a mask that selects between -background and +background.
+                    metadata = MASK_AND_NO_INACTIVE_VALS;
+                    std::swap(inactiveVal[0], inactiveVal[1]);
+                } else {
+                    // If the first inactive value is equal to the background, swap it
+                    // with the second value and save only that value, along with a mask
+                    // that selects between it and the background.
+                    std::swap(inactiveVal[0], inactiveVal[1]);
+                    metadata = MASK_AND_ONE_INACTIVE_VAL;
+                }
+            }
+        } else if (numUniqueInactiveVals > 2) {
+            metadata = NO_MASK_AND_ALL_VALS;
+        }
+    }
+
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
+    ValueT inactiveVal[2];
+};
+
+
 ////////////////////////////////////////
 
 
@@ -159,8 +222,10 @@ truncateRealToHalf(const T& val)
 ////////////////////////////////////////
 
 
+OPENVDB_API size_t zipToStreamSize(const char* data, size_t numBytes);
 OPENVDB_API void zipToStream(std::ostream&, const char* data, size_t numBytes);
 OPENVDB_API void unzipFromStream(std::istream&, char* data, size_t numBytes);
+OPENVDB_API size_t bloscToStreamSize(const char* data, size_t valSize, size_t numVals);
 OPENVDB_API void bloscToStream(std::ostream&, const char* data, size_t valSize, size_t numVals);
 OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 
@@ -170,32 +235,43 @@ OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 /// @param count        the number of elements to read in
 /// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
 ///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @param metadata     optional pointer to a DelayedLoadMetadata object that stores
+///                     the size of the compressed buffer
+/// @param metadataOffset offset into DelayedLoadMetadata, ignored if pointer is null
 /// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
 /// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
 template<typename T>
 inline void
-readData(std::istream& is, T* data, Index count, uint32_t compression)
+readData(std::istream& is, T* data, Index count, uint32_t compression,
+    DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0))
 {
-    if (compression & COMPRESS_BLOSC) {
+    const bool seek = data == nullptr;
+    if (seek) {
+        assert(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
+    }
+    const bool hasCompression = compression & (COMPRESS_BLOSC | COMPRESS_ZIP);
+
+    if (metadata && seek && hasCompression) {
+        size_t compressedSize = metadata->getCompressedSize(metadataOffset);
+        is.seekg(compressedSize, std::ios_base::cur);
+    } else if (compression & COMPRESS_BLOSC) {
         bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
+    } else if (seek) {
+        is.seekg(sizeof(T) * count, std::ios_base::cur);
     } else {
-        if (data == nullptr) {
-            assert(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
-            is.seekg(sizeof(T) * count, std::ios_base::cur);
-        } else {
-            is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
-        }
+        is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
     }
 }
 
 /// Specialization for std::string input
 template<>
 inline void
-readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t /*compression*/)
+readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t /*compression*/,
+    DelayedLoadMetadata* /*metadata*/, size_t /*metadataOffset*/)
 {
     for (Index i = 0; i < count; ++i) {
         size_t len = 0;
@@ -217,27 +293,59 @@ template<bool IsReal, typename T> struct HalfReader;
 /// Partial specialization for non-floating-point types (no half to float promotion)
 template<typename T>
 struct HalfReader</*IsReal=*/false, T> {
-    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
-        readData(is, data, count, compression);
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression,
+        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0)) {
+        readData(is, data, count, compression, metadata, metadataOffset);
     }
 };
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfReader</*IsReal=*/true, T> {
     using HalfT = typename RealToHalf<T>::HalfT;
-    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression,
+        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0)) {
         if (count < 1) return;
         if (data == nullptr) {
             // seek mode - pass through null pointer
-            readData<HalfT>(is, nullptr, count, compression);
+            readData<HalfT>(is, nullptr, count, compression, metadata, metadataOffset);
         } else {
             std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
-            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression);
+            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression,
+                metadata, metadataOffset);
             // Copy half float values from the temporary buffer to the full float output array.
             std::copy(halfData.begin(), halfData.end(), data);
         }
     }
 };
+
+
+template<typename T>
+inline size_t
+writeDataSize(const T *data, Index count, uint32_t compression)
+{
+    if (compression & COMPRESS_BLOSC) {
+        return bloscToStreamSize(reinterpret_cast<const char*>(data), sizeof(T), count);
+    } else if (compression & COMPRESS_ZIP) {
+        return zipToStreamSize(reinterpret_cast<const char*>(data), sizeof(T) * count);
+    } else {
+        return sizeof(T) * count;
+    }
+}
+
+
+/// Specialization for std::string output
+template<>
+inline size_t
+writeDataSize<std::string>(const std::string* data, Index count,
+    uint32_t /*compression*/) ///< @todo add compression
+{
+    size_t size(0);
+    for (Index i = 0; i < count; ++i) {
+        const size_t len = data[i].size();
+        size += sizeof(size_t) + (len+1);
+    }
+    return size;
+}
 
 
 /// Write data to a stream.
@@ -285,6 +393,9 @@ template<bool IsReal, typename T> struct HalfWriter;
 /// Partial specialization for non-floating-point types (no float to half quantization)
 template<typename T>
 struct HalfWriter</*IsReal=*/false, T> {
+    static inline size_t writeSize(const T* data, Index count, uint32_t compression) {
+        return writeDataSize(data, count, compression);
+    }
     static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         writeData(os, data, count, compression);
     }
@@ -293,6 +404,13 @@ struct HalfWriter</*IsReal=*/false, T> {
 template<typename T>
 struct HalfWriter</*IsReal=*/true, T> {
     using HalfT = typename RealToHalf<T>::HalfT;
+    static inline size_t writeSize(const T* data, Index count, uint32_t compression) {
+        if (count < 1) return size_t(0);
+        // Convert full float values to half float, then output the half float array.
+        std::vector<HalfT> halfData(count);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<T>::convert(data[i]);
+        return writeDataSize<HalfT>(reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
+    }
     static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
@@ -306,6 +424,14 @@ struct HalfWriter</*IsReal=*/true, T> {
 template<>
 struct HalfWriter</*IsReal=*/true, double> {
     using HalfT = RealToHalf<double>::HalfT;
+    static inline size_t writeSize(const double* data, Index count, uint32_t compression)
+    {
+        if (count < 1) return size_t(0);
+        // Convert full float values to half float, then output the half float array.
+        std::vector<HalfT> halfData(count);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<double>::convert(data[i]);
+        return writeDataSize<HalfT>(reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
+    }
     static inline void write(std::ostream& os, const double* data, Index count,
         uint32_t compression)
     {
@@ -340,17 +466,31 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
     // Get the stream's compression settings.
+    auto meta = getStreamMetadataPtr(is);
     const uint32_t compression = getDataCompression(is);
     const bool maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
     const bool seek = (destBuf == nullptr);
-    assert(!seek || (!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable()));
+    assert(!seek || (!meta || meta->seekable()));
+
+    // Get delayed load metadata if it exists
+
+    DelayedLoadMetadata::Ptr delayLoadMeta;
+    uint64_t leafIndex(0);
+    if (seek && meta && meta->delayedLoadMeta()) {
+        delayLoadMeta =
+            meta->gridMetadata().getMetadata<DelayedLoadMetadata>("file_delayed_load");
+        leafIndex = meta->leaf();
+    }
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read the flag that specifies what, if any, additional metadata
         // (selection mask and/or inactive value(s)) is saved.
         if (seek && !maskCompressed) {
+            is.seekg(/*bytes=*/1, std::ios_base::cur);
+        } else if (seek && delayLoadMeta) {
+            metadata = delayLoadMeta->getMask(leafIndex);
             is.seekg(/*bytes=*/1, std::ios_base::cur);
         } else {
             is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
@@ -419,9 +559,10 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     // Read in the buffer.
     if (fromHalf) {
         HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(
-            is, (seek ? nullptr : tempBuf), tempCount, compression);
+            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
     } else {
-        readData<ValueT>(is, (seek ? nullptr : tempBuf), tempCount, compression);
+        readData<ValueT>(
+            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
     }
 
     // If mask compression is enabled and the number of active values read into
@@ -445,6 +586,48 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 }
 
 
+template<typename ValueT, typename MaskT>
+inline size_t
+writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
+    const MaskT& valueMask, uint8_t maskMetadata, bool toHalf, uint32_t compress)
+{
+    using NonConstValueT = typename std::remove_const<ValueT>::type;
+
+    const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
+
+    Index tempCount = srcCount;
+    ValueT* tempBuf = srcBuf;
+    std::unique_ptr<NonConstValueT[]> scopedTempBuf;
+
+    if (maskCompress && maskMetadata != NO_MASK_AND_ALL_VALS) {
+
+        tempCount = 0;
+
+        Index64 onVoxels = valueMask.countOn();
+        if (onVoxels > Index64(0)) {
+            // Create a new array to hold just the active values.
+            scopedTempBuf.reset(new NonConstValueT[onVoxels]);
+            NonConstValueT* localTempBuf = scopedTempBuf.get();
+
+            // Copy active values to a new, contiguous array.
+            for (typename MaskT::OnIterator it = valueMask.beginOn(); it; ++it, ++tempCount) {
+                localTempBuf[tempCount] = srcBuf[it.pos()];
+            }
+
+            tempBuf = scopedTempBuf.get();
+        }
+    }
+
+    // Return the buffer size.
+    if (toHalf) {
+        return HalfWriter<RealToHalf<NonConstValueT>::isReal, NonConstValueT>::writeSize(
+            tempBuf, tempCount, compress);
+    } else {
+        return writeDataSize<NonConstValueT>(tempBuf, tempCount, compress);
+    }
+}
+
+
 /// Write @a srcCount values of type @c ValueT to the given stream, optionally
 /// after compressing the values via one of several supported schemes.
 /// [Mainly for internal use]
@@ -462,13 +645,6 @@ inline void
 writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     const MaskT& valueMask, const MaskT& childMask, bool toHalf)
 {
-    struct Local {
-        // Comparison function for values
-        static inline bool eq(const ValueT& a, const ValueT& b) {
-            return math::isExactlyEqual(a, b);
-        }
-    };
-
     // Get the stream's compression settings.
     const uint32_t compress = getDataCompression(os);
     const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
@@ -494,75 +670,8 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
             background = *static_cast<const ValueT*>(bgPtr);
         }
 
-        /// @todo Consider all values, not just inactive values?
-        ValueT inactiveVal[2] = { background, background };
-        int numUniqueInactiveVals = 0;
-        for (typename MaskT::OffIterator it = valueMask.beginOff();
-            numUniqueInactiveVals < 3 && it; ++it)
-        {
-            const Index32 idx = it.pos();
-
-            // Skip inactive values that are actually child node pointers.
-            if (childMask.isOn(idx)) continue;
-
-            const ValueT& val = srcBuf[idx];
-            const bool unique = !(
-                (numUniqueInactiveVals > 0 && Local::eq(val, inactiveVal[0])) ||
-                (numUniqueInactiveVals > 1 && Local::eq(val, inactiveVal[1]))
-            );
-            if (unique) {
-                if (numUniqueInactiveVals < 2) inactiveVal[numUniqueInactiveVals] = val;
-                ++numUniqueInactiveVals;
-            }
-        }
-
-        metadata = NO_MASK_OR_INACTIVE_VALS;
-
-        if (numUniqueInactiveVals == 1) {
-            if (!Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[0], math::negative(background))) {
-                    metadata = NO_MASK_AND_MINUS_BG;
-                } else {
-                    metadata = NO_MASK_AND_ONE_INACTIVE_VAL;
-                }
-            }
-        } else if (numUniqueInactiveVals == 2) {
-            metadata = NO_MASK_OR_INACTIVE_VALS;
-            if (!Local::eq(inactiveVal[0], background) && !Local::eq(inactiveVal[1], background)) {
-                // If neither inactive value is equal to the background, both values
-                // need to be saved, along with a mask that selects between them.
-                metadata = MASK_AND_TWO_INACTIVE_VALS;
-
-            } else if (Local::eq(inactiveVal[1], background)) {
-                if (Local::eq(inactiveVal[0], math::negative(background))) {
-                    // If the second inactive value is equal to the background and
-                    // the first is equal to -background, neither value needs to be saved,
-                    // but save a mask that selects between -background and +background.
-                    metadata = MASK_AND_NO_INACTIVE_VALS;
-                } else {
-                    // If the second inactive value is equal to the background, only
-                    // the first value needs to be saved, along with a mask that selects
-                    // between it and the background.
-                    metadata = MASK_AND_ONE_INACTIVE_VAL;
-                }
-            } else if (Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[1], math::negative(background))) {
-                    // If the first inactive value is equal to the background and
-                    // the second is equal to -background, neither value needs to be saved,
-                    // but save a mask that selects between -background and +background.
-                    metadata = MASK_AND_NO_INACTIVE_VALS;
-                    std::swap(inactiveVal[0], inactiveVal[1]);
-                } else {
-                    // If the first inactive value is equal to the background, swap it
-                    // with the second value and save only that value, along with a mask
-                    // that selects between it and the background.
-                    std::swap(inactiveVal[0], inactiveVal[1]);
-                    metadata = MASK_AND_ONE_INACTIVE_VAL;
-                }
-            }
-        } else if (numUniqueInactiveVals > 2) {
-            metadata = NO_MASK_AND_ALL_VALS;
-        }
+        MaskCompress<ValueT, MaskT> maskCompressData(valueMask, childMask, srcBuf, background);
+        metadata = maskCompressData.metadata;
 
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);
 
@@ -572,18 +681,18 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
         {
             if (!toHalf) {
                 // Write one of at most two distinct inactive values.
-                os.write(reinterpret_cast<const char*>(&inactiveVal[0]), sizeof(ValueT));
+                os.write(reinterpret_cast<const char*>(&maskCompressData.inactiveVal[0]), sizeof(ValueT));
                 if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
                     // Write the second of two distinct inactive values.
-                    os.write(reinterpret_cast<const char*>(&inactiveVal[1]), sizeof(ValueT));
+                    os.write(reinterpret_cast<const char*>(&maskCompressData.inactiveVal[1]), sizeof(ValueT));
                 }
             } else {
                 // Write one of at most two distinct inactive values.
-                ValueT truncatedVal = static_cast<ValueT>(truncateRealToHalf(inactiveVal[0]));
+                ValueT truncatedVal = static_cast<ValueT>(truncateRealToHalf(maskCompressData.inactiveVal[0]));
                 os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
                 if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
                     // Write the second of two distinct inactive values.
-                    truncatedVal = truncateRealToHalf(inactiveVal[1]);
+                    truncatedVal = truncateRealToHalf(maskCompressData.inactiveVal[1]);
                     os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
                 }
             }
@@ -618,7 +727,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                         tempBuf[tempCount] = srcBuf[srcIdx];
                         ++tempCount;
                     } else { // inactive value
-                        if (Local::eq(srcBuf[srcIdx], inactiveVal[1])) {
+                        if (MaskCompress<ValueT, MaskT>::eq(srcBuf[srcIdx], maskCompressData.inactiveVal[1])) {
                             selectionMask.setOn(srcIdx); // inactive value 1
                         } // else inactive value 0
                     }
@@ -644,7 +753,3 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 } // namespace openvdb
 
 #endif // OPENVDB_IO_COMPRESSION_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

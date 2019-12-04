@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include "RenderModules.h"
 
@@ -902,7 +875,7 @@ public:
                 insertPoint(pos, index);
                 ++index;
 
-                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / activeVoxels));
+                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / double(activeVoxels)));
                 for (Index64 i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
                     pos = mTransform.indexToWorld(coords[static_cast<size_t>(i * r)]);
                     insertPoint(pos, index);
@@ -1086,10 +1059,10 @@ private:
     {
         mOffset[0] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[0] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[0])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[0])));
         mOffset[1] = static_cast<float>(std::min(mZeroValue, mMinValue));
         mScale[1] = static_cast<float>(
-            1.0 / (std::abs(std::max(mZeroValue, mMaxValue) - mOffset[1])));
+            1.0 / (std::abs(float(std::max(mZeroValue, mMaxValue)) - mOffset[1])));
     }
 
     std::vector<GLfloat>& mPoints;
@@ -1690,7 +1663,3 @@ MeshModule::render()
 }
 
 } // namespace openvdb_viewer
-
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

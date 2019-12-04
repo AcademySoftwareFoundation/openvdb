@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 ///
 /// @file RootNode.h
 ///
@@ -51,7 +24,7 @@
 #include <map>
 #include <set>
 #include <sstream>
-#include <deque>
+#include <vector>
 
 
 namespace openvdb {
@@ -261,7 +234,7 @@ private:
 
         void increment() { if (this->test()) { ++mIter; } this->skip(); }
         bool next() { this->increment(); return this->test(); }
-        void increment(Index n) { for (int i = 0; i < n && this->next(); ++i) {} }
+        void increment(Index n) { for (Index i = 0; i < n && this->next(); ++i) {} }
 
         /// @brief Return this iterator's position as an offset from
         /// the beginning of the parent node's map.
@@ -516,6 +489,7 @@ public:
     Index64 onLeafVoxelCount() const;
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
+    void nodeCount(std::vector<Index32> &vec) const;
 
     bool isValueOn(const Coord& xyz) const;
 
@@ -708,6 +682,13 @@ public:
     /// it is important to clear the caches of all ValueAccessors associated with this tree.
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
+
+    /// @brief Add the given child node at the root level.
+    /// If a child node with the same origin already exists, delete the old node and add
+    /// the new node in its place (i.e. ownership of the new child node is transferred
+    /// to this RootNode).
+    /// @return @c true (for consistency with InternalNode::addChild)
+    bool addChild(ChildType* child);
 
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
@@ -1640,6 +1621,22 @@ RootNode<ChildT>::onTileCount() const
     return sum;
 }
 
+template<typename ChildT>
+inline void
+RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
+{
+    assert(vec.size() > LEVEL);
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isChild(i)) {
+            ++sum;
+            getChild(i).nodeCount(vec);
+        }
+    }
+    vec[LEVEL] = 1;// one root node
+    vec[ChildNodeType::LEVEL] = sum;
+}
+
 ////////////////////////////////////////
 
 
@@ -2342,11 +2339,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 
             if (childMask.isOn(i)) {
                 // Read in and insert a child node.
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-                ChildT* child = new ChildT(origin, mBackground);
-#else
                 ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
-#endif
                 child->readTopology(is);
                 mTable[origin] = NodeStruct(*child);
             } else {
@@ -2389,11 +2382,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     for (Index n = 0; n < numChildren; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
         Coord origin(vec);
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        ChildT* child = new ChildT(origin, mBackground);
-#else
         ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
-#endif
         child->readTopology(is, fromHalf);
         mTable[Coord(vec)] = NodeStruct(*child);
     }
@@ -2593,6 +2582,21 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     }
     acc.insert(xyz, child);
     child->addLeafAndCache(leaf, acc);
+}
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::addChild(ChildT* child)
+{
+    if (!child) return false;
+    const Coord& xyz = child->origin();
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {//background
+        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+    } else {//child or tile
+        setChild(iter, *child);//this also deletes the existing child node
+    }
+    return true;
 }
 
 template<typename ChildT>
@@ -3478,7 +3482,3 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 } // namespace openvdb
 
 #endif // OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 //
 /// @file Math.h
 /// @brief General-purpose arithmetic and comparison routines, most of which
@@ -349,6 +322,26 @@ isFinite(const float x) { return std::isfinite(x); }
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
 isFinite(const Type& x) { return std::isfinite(static_cast<double>(x)); }
+
+
+/// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
+inline bool
+isInfinite(const float x) { return std::isinf(x); }
+
+/// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
+inline bool
+isInfinite(const Type& x) { return std::isinf(static_cast<double>(x)); }
+
+
+/// Return @c true if @a x is a NaN (Not-A-Number) value.
+inline bool
+isNan(const float x) { return std::isnan(x); }
+
+/// Return @c true if @a x is a NaN (Not-A-Number) value.
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
+inline bool
+isNan(const Type& x) { return std::isnan(static_cast<double>(x)); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
@@ -889,10 +882,7 @@ template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -910,10 +900,7 @@ template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)
 {
-#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
-    static
-#endif
-    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -924,7 +911,3 @@ MaxIndex(const Vec3T& v)
 } // namespace openvdb
 
 #endif // OPENVDB_MATH_MATH_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

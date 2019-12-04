@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef OPENVDB_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_TYPES_HAS_BEEN_INCLUDED
@@ -43,12 +16,9 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
+#include <cstdint>
 #include <memory>
 #include <type_traits>
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-#include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
-#endif
 
 
 namespace openvdb {
@@ -117,24 +87,6 @@ using math::Quatd;
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};
 
-
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-
-// Use Boost shared pointers in OpenVDB 3 ABI compatibility mode.
-template<typename T> using SharedPtr = boost::shared_ptr<T>;
-template<typename T> using WeakPtr = boost::weak_ptr<T>;
-
-template<typename T, typename U> inline SharedPtr<T>
-ConstPtrCast(const SharedPtr<U>& ptr) { return boost::const_pointer_cast<T, U>(ptr); }
-
-template<typename T, typename U> inline SharedPtr<T>
-DynamicPtrCast(const SharedPtr<U>& ptr) { return boost::dynamic_pointer_cast<T, U>(ptr); }
-
-template<typename T, typename U> inline SharedPtr<T>
-StaticPtrCast(const SharedPtr<U>& ptr) { return boost::static_pointer_cast<T, U>(ptr); }
-
-#else // if OPENVDB_ABI_VERSION_NUMBER > 3
-
 // Use STL shared pointers from OpenVDB 4 on.
 template<typename T> using SharedPtr = std::shared_ptr<T>;
 template<typename T> using WeakPtr = std::weak_ptr<T>;
@@ -169,8 +121,6 @@ DynamicPtrCast(const SharedPtr<U>& ptr) { return std::dynamic_pointer_cast<T, U>
 /// @endcode
 template<typename T, typename U> inline SharedPtr<T>
 StaticPtrCast(const SharedPtr<U>& ptr) { return std::static_pointer_cast<T, U>(ptr); }
-
-#endif
 
 
 ////////////////////////////////////////
@@ -216,10 +166,10 @@ using PointDataIndex64 = PointIndex<Index64, 1>;
 /// parameter is a specialization of the class template given in the second
 /// template parameter
 template <typename T, template <typename...> class Template>
-struct IsSpecializationOf : std::false_type {};
+struct IsSpecializationOf: public std::false_type {};
 
 template <typename... Args, template <typename...> class Template>
-struct IsSpecializationOf<Template<Args...>, Template> : std::true_type {};
+struct IsSpecializationOf<Template<Args...>, Template>: public std::true_type {};
 
 
 ////////////////////////////////////////
@@ -332,6 +282,167 @@ template<typename T>
 struct CanConvertType<T, ValueMask> { enum {value = CanConvertType<T, bool>::value}; };
 template<typename T>
 struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::value}; };
+
+
+////////////////////////////////////////
+
+
+/// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
+/// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
+/// @details For example,
+/// - CopyConstness<int, int>::Type is @c int
+/// - CopyConstness<int, const int>::Type is @c int
+/// - CopyConstness<const int, int>::Type is <tt>const int</tt>
+/// - CopyConstness<const int, const int>::Type is <tt>const int</tt>
+template<typename FromType, typename ToType> struct CopyConstness {
+    using Type = typename std::remove_const<ToType>::type;
+};
+
+/// @cond OPENVDB_TYPES_INTERNAL
+template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
+    using Type = const ToType;
+};
+/// @endcond
+
+
+////////////////////////////////////////
+
+
+/// @cond OPENVDB_TYPES_INTERNAL
+
+template<typename... Ts> struct TypeList; // forward declaration
+
+namespace internal {
+
+// Implementation details of TypeList
+
+template<typename ListT, typename... Ts> struct TSAppendImpl;
+
+// Append zero or more types.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, OtherTs...> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+// Append another TypeList's members.
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TypeList<Ts...>, TypeList<OtherTs...>> {
+    using type = TypeList<Ts..., OtherTs...>;
+};
+
+
+// Remove all occurrences of type T.
+template<typename ListT, typename T> struct TSEraseImpl;
+
+// TypeList<>::Erase<int> = TypeList<>
+template<typename T>
+struct TSEraseImpl<TypeList<>, T> { using type = TypeList<>; };
+
+// TypeList<int, char, ...>::Erase<int> = TypeList<char, ...>::Erase<int>
+template<typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T, Ts...>, T> {
+    using type = typename TSEraseImpl<TypeList<Ts...>, T>::type;
+};
+
+// TypeList<float, int, char...>::Erase<int> =
+//     TypeList<float>::Append<TypeList<int, char...>::Erase<int>>
+template<typename T2, typename... Ts, typename T>
+struct TSEraseImpl<TypeList<T2, Ts...>, T> {
+    using type = typename TSAppendImpl<TypeList<T2>,
+        typename TSEraseImpl<TypeList<Ts...>, T>::type>::type;
+};
+
+
+template<typename ListT, typename... Ts> struct TSRemoveImpl;
+
+template<typename ListT>
+struct TSRemoveImpl<ListT> { using type = ListT; };
+
+// Remove one or more types.
+template<typename ListT, typename T, typename... Ts>
+struct TSRemoveImpl<ListT, T, Ts...> {
+    using type = typename TSRemoveImpl<typename TSEraseImpl<ListT, T>::type, Ts...>::type;
+};
+
+// Remove the members of another TypeList.
+template<typename ListT, typename... Ts>
+struct TSRemoveImpl<ListT, TypeList<Ts...>> {
+    using type = typename TSRemoveImpl<ListT, Ts...>::type;
+};
+
+
+template<typename OpT> inline void TSForEachImpl(OpT) {}
+template<typename OpT, typename T, typename... Ts>
+inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
+
+} // namespace internal
+
+/// @endcond
+
+
+/// @brief A list of types (not necessarily unique)
+/// @details Example:
+/// @code
+/// using MyTypes = openvdb::TypeList<int, float, int, double, float>;
+/// @endcode
+template<typename... Ts>
+struct TypeList
+{
+    /// The type of this list
+    using Self = TypeList;
+
+    /// @brief Append types, or the members of another TypeList, to this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = openvdb::TypeList<float, double>;
+    ///     using NumericTypes = IntTypes::Append<RealTypes>;
+    /// }
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16>::Append<Int32, Int64>;
+    ///     using NumericTypes = IntTypes::Append<float>::Append<double>;
+    /// }
+    /// @endcode
+    template<typename... TypesToAppend>
+    using Append = typename internal::TSAppendImpl<Self, TypesToAppend...>::type;
+
+    /// @brief Remove all occurrences of one or more types, or the members of
+    /// another TypeList, from this list.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using NumericTypes = openvdb::TypeList<float, double, Int16, Int32, Int64>;
+    ///     using LongTypes = openvdb::TypeList<Int64, double>;
+    ///     using ShortTypes = NumericTypes::Remove<LongTypes>; // float, Int16, Int32
+    /// }
+    /// @endcode
+    template<typename... TypesToRemove>
+    using Remove = typename internal::TSRemoveImpl<Self, TypesToRemove...>::type;
+
+    /// @brief Invoke a templated, unary functor on a value of each type in this list.
+    /// @details Example:
+    /// @code
+    /// #include <typeinfo>
+    ///
+    /// template<typename ListT>
+    /// void printTypeList()
+    /// {
+    ///     std::string sep;
+    ///     auto op = [&](auto x) {  // C++14
+    ///         std::cout << sep << typeid(decltype(x)).name(); sep = ", "; };
+    ///     ListT::foreach(op);
+    /// }
+    ///
+    /// using MyTypes = openvdb::TypeList<int, float, double>;
+    /// printTypeList<MyTypes>(); // "i, f, d" (exact output is compiler-dependent)
+    /// @endcode
+    ///
+    /// @note The functor object is passed by value.  Wrap it with @c std::ref
+    /// to use the same object for each type.
+    template<typename OpT>
+    static void foreach(OpT op) { internal::TSForEachImpl<OpT, Ts...>(op); }
+};
 
 
 ////////////////////////////////////////
@@ -562,24 +673,6 @@ struct SwappedCombineOp
 ////////////////////////////////////////
 
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-/// In copy constructors, members stored as shared pointers can be handled
-/// in several ways:
-/// <dl>
-/// <dt><b>CP_NEW</b>
-/// <dd>Don't copy the member; default construct a new member object instead.
-///
-/// <dt><b>CP_SHARE</b>
-/// <dd>Copy the shared pointer, so that the original and new objects share
-///     the same member.
-///
-/// <dt><b>CP_COPY</b>
-/// <dd>Create a deep copy of the member.
-/// </dl>
-enum CopyPolicy { CP_NEW, CP_SHARE, CP_COPY };
-#endif
-
-
 /// @brief Tag dispatch class that distinguishes shallow copy constructors
 /// from deep copy constructors
 class ShallowCopy {};
@@ -644,7 +737,3 @@ class PartialCreate {};
 #endif // defined(__ICC)
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

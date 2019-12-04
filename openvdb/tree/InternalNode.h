@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 //
 /// @file InternalNode.h
 ///
@@ -108,9 +81,7 @@ public:
     /// @param active    State assigned to all the tiles
     InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
-#endif
 
     /// @brief Deep copy constructor
     ///
@@ -302,6 +273,7 @@ public:
     void setOrigin(const Coord& origin) { mOrigin = origin; }
 
     Index32 leafCount() const;
+    void nodeCount(std::vector<Index32> &vec) const;
     Index32 nonLeafCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -639,6 +611,14 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
+    /// @brief Add the given child node at this level deducing the offset from it's origin.
+    /// If a child node with this offset already exists, delete the old node and add the
+    /// new node in its place (i.e. ownership of the new child node is transferred to
+    /// this InternalNode)
+    /// @return @c true if inserting the child has been successful, otherwise the caller
+    /// retains ownership of the node and is responsible for deleting it.
+    bool addChild(ChildNodeType* child);
+
     /// @brief Add a tile at the specified tree level that contains voxel (x, y, z),
     /// possibly creating a parent branch or deleting a child branch in the process.
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
@@ -885,7 +865,6 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 // For InternalNodes, the PartialCreate constructor is identical to its
 // non-PartialCreate counterpart.
 template<typename ChildT, Index Log2Dim>
@@ -897,7 +876,6 @@ InternalNode<ChildT, Log2Dim>::InternalNode(PartialCreate,
     if (active) mValueMask.setOn();
     for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
 }
-#endif
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherInternalNode>
@@ -1040,6 +1018,18 @@ InternalNode<ChildT, Log2Dim>::leafCount() const
         sum += iter->leafCount();
     }
     return sum;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
+{
+    assert(vec.size() > ChildNodeType::LEVEL);
+    const auto count = mChildMask.countOn();
+    if (ChildNodeType::LEVEL > 0 && count > 0) {
+        for (auto iter = this->cbeginChildOn(); iter; ++iter) iter->nodeCount(vec);
+    }
+    vec[ChildNodeType::LEVEL] += count;
 }
 
 
@@ -1377,6 +1367,22 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 
 
 ////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::addChild(ChildT* child)
+{
+    assert(child);
+    const Coord& xyz = child->origin();
+    // verify that the child belongs in this internal node
+    if (Coord((xyz & ~(DIM-1))) != this->origin())  return false;
+    // compute the offset and insert the child node
+    const Index n = this->coordToOffset(xyz);
+    // this also deletes an existing child node
+    this->resetChildNode(n, child);
+    return true;
+}
 
 
 template<typename ChildT, Index Log2Dim>
@@ -2203,10 +2209,8 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
-#endif
 
     mChildMask.load(is);
     mValueMask.load(is);
@@ -2215,11 +2219,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-                    new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
-#else
                     new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
-#endif
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -2254,11 +2254,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-            ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
-#else
             ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
-#endif
             mNodes[iter.pos()].setChild(child);
             child->readTopology(is, fromHalf);
         }
@@ -3297,7 +3293,3 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 } // namespace openvdb
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

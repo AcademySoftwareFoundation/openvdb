@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file io/File.cc
 
@@ -83,7 +56,6 @@ struct File::Impl
         file.Archive::readGrid(grid, gd, file.inputStream());
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     static void unarchive(const File& file, GridBase::Ptr& grid,
         const GridDescriptor& gd, const CoordBBox& indexBBox)
     {
@@ -95,7 +67,6 @@ struct File::Impl
     {
         file.Archive::readGrid(grid, gd, file.inputStream(), worldBBox);
     }
-#endif
 
     static Index64 getDefaultCopyMaxBytes()
     {
@@ -532,11 +503,7 @@ File::readAllGridMetadata()
         // have already been streamed in and stored in mGrids.
         for (size_t i = 0, N = mImpl->mGrids->size(); i < N; ++i) {
             // Return copies of the grids, but with empty trees.
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            ret->push_back((*mImpl->mGrids)[i]->copyGrid(/*treePolicy=*/CP_NEW));
-#else
             ret->push_back((*mImpl->mGrids)[i]->copyGridWithNewTree());
-#endif
         }
     } else {
         // Read just the metadata and transforms for all grids.
@@ -547,11 +514,7 @@ File::readAllGridMetadata()
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGridPartial(), but shallow
             // copying the grids helps to ensure future compatibility.)
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-            ret->push_back(grid->copyGrid(/*treePolicy=*/CP_NEW));
-#else
             ret->push_back(grid->copyGridWithNewTree());
-#endif
         }
     }
     return ret;
@@ -580,11 +543,7 @@ File::readGridMetadata(const Name& name)
         const GridDescriptor& gd = it->second;
         ret = readGridPartial(gd, /*readTopology=*/false);
     }
-#if OPENVDB_ABI_VERSION_NUMBER <= 3
-    return ret->copyGrid(/*treePolicy=*/CP_NEW);
-#else
     return ret->copyGridWithNewTree();
-#endif
 }
 
 
@@ -598,42 +557,31 @@ File::readGrid(const Name& name)
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const Name& name, const BBoxd& bbox)
 {
     return readGridByName(name, bbox);
 }
-#endif
 
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-GridBase::Ptr
-File::readGridByName(const Name& name, const BBoxd&)
-#else
 GridBase::Ptr
 File::readGridByName(const Name& name, const BBoxd& bbox)
-#endif
 {
     if (!isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     const bool clip = bbox.isSorted();
-#endif
 
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
     GridBase::Ptr grid = retrieveCachedGrid(name);
     if (grid) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
         if (clip) {
             grid = grid->deepCopyGrid();
             grid->clipGrid(bbox);
         }
-#endif
         return grid;
     }
 
@@ -644,11 +592,7 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
 
     // Seek to and read in the grid from the file.
     const GridDescriptor& gd = it->second;
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-    grid = readGrid(gd);
-#else
     grid = (clip ? readGrid(gd, bbox) : readGrid(gd));
-#endif
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
@@ -662,16 +606,12 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
         }
 
         GridBase::Ptr parent;
-#if OPENVDB_ABI_VERSION_NUMBER <= 2
-        parent = readGrid(parentIt->second);
-#else
         if (clip) {
             const CoordBBox indexBBox = grid->constTransform().worldToIndexNodeCentered(bbox);
             parent = readGrid(parentIt->second, indexBBox);
         } else {
             parent = readGrid(parentIt->second);
         }
-#endif
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -824,7 +764,6 @@ File::readGrid(const GridDescriptor& gd) const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 GridBase::Ptr
 File::readGrid(const GridDescriptor& gd, const BBoxd& bbox) const
 {
@@ -837,7 +776,6 @@ File::readGrid(const GridDescriptor& gd, const CoordBBox& bbox) const
 {
     return Impl::readGrid(*this, gd, bbox);
 }
-#endif
 
 
 void
@@ -851,6 +789,12 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
     // the order of operations.
     readGridCompression(is);
     grid->readMeta(is);
+
+    // drop DelayedLoadMetadata from the grid as it is only useful for IO
+    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
+    }
+
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
         grid->readTransform(is);
         if (!isInstance && readTopology) {
@@ -887,7 +831,3 @@ File::endName() const
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

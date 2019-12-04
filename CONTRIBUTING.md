@@ -32,7 +32,7 @@ The committer role enables the participant to commit code directly to the reposi
 * Monitor Slack (delayed response is perfectly acceptable).
 * Triage GitHub issues and perform pull request reviews for other committers and the community.
 * Make sure that ongoing PRs are moving forward at the right pace or close them.
-* In general continue to be willing to spend at least 25% of one's time working on the project (~1.25 business days per week).
+* Remain an active contributor to the project in general and the code base in particular.
 
 ### When does a committer lose committer status?
 

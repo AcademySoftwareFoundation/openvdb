@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <vector>
 #include <cppunit/extensions/HelperMacros.h>
@@ -180,6 +153,46 @@ TestLevelSetUtil::testSegmentationTools()
         CPPUNIT_ASSERT(segments[0]->tree().getValue(ijk) > 0.0f);
     }
 
+    { // Test empty SDF grid
+
+        FloatGrid::Ptr sdfGrid = openvdb::FloatGrid::create(/*background=*/10.2f);
+        sdfGrid->setGridClass(openvdb::GRID_LEVEL_SET);
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentSDF(*sdfGrid, segments);
+
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
+        CPPUNIT_ASSERT_EQUAL(10.2f, segments[0]->background());
+    }
+
+    { // Test SDF grid with inactive leaf nodes
+
+        BBoxs bbox(Vec3s(0.0, 0.0, 0.0), Vec3s(1.0, 1.0, 1.0));
+        Transform::Ptr transform = Transform::createLinearTransform(0.1);
+        FloatGrid::Ptr sdfGrid = openvdb::tools::createLevelSetBox<FloatGrid>(bbox, *transform,
+            /*halfwidth=*/5);
+
+        CPPUNIT_ASSERT(sdfGrid->tree().activeVoxelCount() > openvdb::Index64(0));
+
+        // make all active voxels inactive
+
+        for (auto leaf = sdfGrid->tree().beginLeaf(); leaf; ++leaf) {
+            for (auto iter = leaf->beginValueOn(); iter; ++iter) {
+                leaf->setValueOff(iter.getCoord());
+            }
+        }
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), sdfGrid->tree().activeVoxelCount());
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentSDF(*sdfGrid, segments);
+
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
+        CPPUNIT_ASSERT_EQUAL(sdfGrid->background(), segments[0]->background());
+    }
+
     { // Test fog volume with active tiles
 
         openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0);
@@ -191,11 +204,39 @@ TestLevelSetUtil::testSegmentationTools()
 
         std::vector<FloatGrid::Ptr> segments;
         openvdb::tools::segmentActiveVoxels(*grid, segments);
-        CPPUNIT_ASSERT(segments.size() == 2);
+        CPPUNIT_ASSERT_EQUAL(size_t(2), segments.size());
+    }
+
+    { // Test an empty fog volume
+
+        openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(/*background=*/3.1f);
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), grid->tree().leafCount());
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentActiveVoxels(*grid, segments);
+
+        // note that an empty volume should segment into an empty volume
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
+        CPPUNIT_ASSERT_EQUAL(3.1f, segments[0]->background());
+    }
+
+    { // Test fog volume with two inactive leaf nodes
+
+        openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0);
+
+        grid->tree().touchLeaf(openvdb::Coord(0,0,0));
+        grid->tree().touchLeaf(openvdb::Coord(100,100,100));
+
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), grid->tree().leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), grid->tree().activeVoxelCount());
+
+        std::vector<FloatGrid::Ptr> segments;
+        openvdb::tools::segmentActiveVoxels(*grid, segments);
+
+        CPPUNIT_ASSERT_EQUAL(size_t(1), segments.size());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), segments[0]->tree().leafCount());
     }
 }
 
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

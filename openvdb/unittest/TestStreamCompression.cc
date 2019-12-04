@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/points/StreamCompression.h>
@@ -72,8 +45,13 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <blosc.h>
 // A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
 // HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
-#if BLOSC_VERSION_MAJOR > 0 && BLOSC_VERSION_MINOR > 10
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR > 10)
 #define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
+#endif
+// Blosc 1.14+ writes backwards-compatible data by default.
+// http://blosc.org/posts/new-forward-compat-policy/
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 &&  BLOSC_VERSION_MINOR >= 14)
+#define BLOSC_BACKWARDS_COMPATIBLE
 #endif
 #endif
 
@@ -446,10 +424,14 @@ TestStreamCompression::testPagedStreams()
         ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(5400));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4422));
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4452));
+#endif
 #endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(PageSize+sizeof(int)));
@@ -475,10 +457,14 @@ TestStreamCompression::testPagedStreams()
         istream.read(handle, values.size(), false);
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(5400));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4422));
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4452));
+#endif
 #endif
 #else
         CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(PageSize+sizeof(int)));
@@ -564,10 +550,14 @@ TestStreamCompression::testPagedStreams()
             ostream.flush();
 
 #ifdef OPENVDB_USE_BLOSC
+#ifdef BLOSC_BACKWARDS_COMPATIBLE
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(51480));
+#else
 #ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42424));
 #else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
+#endif
 #endif
 #else
             CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
@@ -668,7 +658,3 @@ TestStreamCompression::testPagedStreams()
         std::remove(filename.c_str());
     }
 }
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

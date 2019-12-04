@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 #include "util.h"
@@ -265,7 +238,6 @@ TestPointMove::testCachedDeformer()
     CachedDeformer<double> cachedDeformer(cache);
 
     // check initialization is as expected
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
 
@@ -281,7 +253,6 @@ TestPointMove::testCachedDeformer()
 
     // reset should no longer throw and leaf vec pointer should now be non-null
     CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec != nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec->empty());
@@ -309,63 +280,11 @@ TestPointMove::testCachedDeformer()
     // now reset the cached deformer and verify the value is updated
     // (map has precedence over vector)
     cachedDeformer.reset(nullObject, size_t(0));
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
     CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
     CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
     newPosition.setZero();
     cachedDeformer.apply(newPosition, indexIter);
     CPPUNIT_ASSERT(math::isApproxEqual(newDeformedPosition, newPosition));
-
-    // test map -> vector expansion
-    leaf.mapData.clear();
-    for (int i = 0; i < 16; i++) {
-        leaf.mapData.insert({i, Vec3d(0, i, 0)});
-    }
-
-    cachedDeformer.reset(nullObject, size_t(0));
-
-    // 16 values (or less) so local vector is not populated
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
-
-    // check value access
-    for (int i = 0; i < 16; i++) {
-        DummyIter indexIterI(i);
-        cachedDeformer.apply(newPosition, indexIterI);
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3d(0, i, 0), newPosition));
-    }
-
-    leaf.mapData.insert({16, Vec3d(0, 16, 0)});
-
-    // ValueError thrown because totalSize has not been set correctly
-    CPPUNIT_ASSERT_THROW(cachedDeformer.reset(nullObject, size_t(0)), openvdb::ValueError);
-
-    // use very large total size to prevent local expansion
-    leaf.totalSize = 17 * 256 + 1;
-
-    CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-
-    CPPUNIT_ASSERT(cachedDeformer.mLocalLeafVec.empty());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap != nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec == nullptr);
-
-    // use total size that represents a sequential dataset
-    leaf.totalSize = Index(leaf.mapData.size());
-
-    CPPUNIT_ASSERT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-
-    // greater than 16 values so local vector is populated
-    CPPUNIT_ASSERT_EQUAL(leaf.mapData.size(), cachedDeformer.mLocalLeafVec.size());
-    CPPUNIT_ASSERT(cachedDeformer.mLeafMap == nullptr);
-    CPPUNIT_ASSERT(cachedDeformer.mLeafVec != nullptr);
-
-    // check value access
-    for (int i = 0; i < 17; i++) {
-        DummyIter indexIterI(i);
-        cachedDeformer.apply(newPosition, indexIterI);
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3d(0, i, 0), newPosition));
-    }
 
     // four points, some same leaf, some different
     const float voxelSize = 1.0f;
@@ -856,8 +775,9 @@ TestPointMove::testCustomDeformer()
         const int leafCount = points->tree().leafCount();
         const int pointCount = int(positions.size());
 
-        tbb::atomic<int> resetCalls = 0;
-        tbb::atomic<int> applyCalls = 0;
+        tbb::atomic<int> resetCalls, applyCalls;
+        resetCalls = 0;
+        applyCalls = 0;
 
         // this deformer applies an offset and tracks the number of calls
 
@@ -1128,6 +1048,77 @@ TestPointMove::testPointData()
         CPPUNIT_ASSERT_EQUAL(short(0), nonZeroGroups2[2]);
         CPPUNIT_ASSERT_EQUAL(short(1), nonZeroGroups2[3]);
     }
+
+    { // larger data set with a cached deformer and group filtering
+        std::vector<openvdb::Vec3R> newPositions;
+        const int count = 10000;
+        unittest_util::genPoints(count, newPositions);
+
+        // manually construct point data grid instead of using positionsToGrid()
+
+        const PointAttributeVector<openvdb::Vec3R> pointList(newPositions);
+
+        openvdb::math::Transform::Ptr transform(
+            openvdb::math::Transform::createLinearTransform(/*voxelSize=*/0.1));
+
+        tools::PointIndexGrid::Ptr pointIndexGrid =
+            tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, *transform);
+
+        PointDataGrid::Ptr points =
+                createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid,
+                                                              pointList, *transform);
+
+        appendGroup(points->tree(), "odd");
+
+        std::vector<short> oddGroups(newPositions.size(), 0);
+        for (size_t i = 1; i < newPositions.size(); i += 2) {
+            oddGroups[i] = 1;
+        }
+
+        setGroup(points->tree(), pointIndexGrid->tree(), oddGroups, "odd");
+
+        std::vector<std::string> includeGroups{"odd"};
+        std::vector<std::string> excludeGroups;
+
+        auto leaf = points->tree().cbeginLeaf();
+        MultiGroupFilter advectFilter(includeGroups, excludeGroups, leaf->attributeSet());
+        OffsetDeformer offsetDeformer(Vec3d(0, 1, 0));
+
+        CachedDeformer<double>::Cache cache;
+        CachedDeformer<double> cachedDeformer(cache);
+
+        cachedDeformer.evaluate(*points, offsetDeformer, advectFilter);
+
+        double ySumBefore = 0.0;
+        double ySumAfter = 0.0;
+
+        for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
+            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
+            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
+                position = transform->indexToWorld(position);
+                ySumBefore += position.y();
+            }
+        }
+
+        movePoints(*points, cachedDeformer);
+
+        for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
+            AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
+            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
+                position = transform->indexToWorld(position);
+                ySumAfter += position.y();
+            }
+        }
+
+        // total increase in Y should be approximately count / 2
+        // (only odd points are being moved 1.0 in Y)
+        double increaseInY = ySumAfter - ySumBefore;
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(increaseInY, static_cast<double>(count) / 2.0,
+            /*tolerance=*/double(0.01));
+    }
 }
 
 
@@ -1183,7 +1174,3 @@ TestPointMove::testPointOrder()
     ASSERT_APPROX_EQUAL(positions1, positions2, __LINE__);
     ASSERT_APPROX_EQUAL(positions1, positions3, __LINE__);
 }
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

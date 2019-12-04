@@ -1,36 +1,10 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/io/Compression.h>
 
 using openvdb::Index;
 
@@ -44,12 +18,15 @@ public:
     CPPUNIT_TEST(testAll3);
     CPPUNIT_TEST(testAll2);
     CPPUNIT_TEST(testAll1);
+    CPPUNIT_TEST(testCompress);
     CPPUNIT_TEST_SUITE_END();
 
     void testAll4() { TestAll<openvdb::util::NodeMask<4> >(); }
     void testAll3() { TestAll<openvdb::util::NodeMask<3> >(); }
     void testAll2() { TestAll<openvdb::util::NodeMask<2> >(); }
     void testAll1() { TestAll<openvdb::util::NodeMask<1> >(); }
+
+    void testCompress();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestNodeMask);
@@ -181,9 +158,214 @@ void TestAll()
     }
 }
 
+void
+TestNodeMask::testCompress()
+{
+    using namespace openvdb;
+
+    using ValueT = int;
+    using MaskT = openvdb::util::NodeMask<1>;
+
+    { // no inactive values
+        MaskT valueMask(true);
+        MaskT childMask;
+        std::vector<int> values = {0,1,2,3,4,5,6,7};
+        int background = 0;
+
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(8));
+        CPPUNIT_ASSERT_EQUAL(childMask.countOn(), Index32(0));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(maskCompress.metadata, int8_t(openvdb::io::NO_MASK_OR_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], background);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // all inactive values are +background
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {10,10,10,10,10,10,10,10};
+        int background = 10;
+
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(0));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(maskCompress.metadata, int8_t(openvdb::io::NO_MASK_OR_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], background);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // all inactive values are -background
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {-10,-10,-10,-10,-10,-10,-10,-10};
+        int background = 10;
+
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(0));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(maskCompress.metadata, int8_t(openvdb::io::NO_MASK_AND_MINUS_BG));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], -background);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // all inactive vals have the same non-background val
+        MaskT valueMask(true);
+        MaskT childMask;
+        std::vector<int> values = {0,1,500,500,4,500,500,7};
+        int background = 10;
+
+        valueMask.setOff(2);
+        valueMask.setOff(3);
+        valueMask.setOff(5);
+        valueMask.setOff(6);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(4));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::NO_MASK_AND_ONE_INACTIVE_VAL));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 500);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // mask selects between -background and +background
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,10,10,-10,4,10,-10,10};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_NO_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], -background);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // mask selects between -background and +background
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,-10,-10,10,4,-10,10,-10};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_NO_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], -background);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // mask selects between backgd and one other inactive val
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,500,500,10,4,500,10,500};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_ONE_INACTIVE_VAL));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 500);
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], background);
+    }
+
+    { // mask selects between two non-background inactive vals
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,500,500,2000,4,500,2000,500};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_TWO_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 500); // first unique value
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], 2000); // second unique value
+    }
+
+    { // mask selects between two non-background inactive vals
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,2000,2000,500,4,2000,500,2000};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_TWO_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 2000); // first unique value
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], 500); // second unique value
+    }
+
+    { // > 2 inactive vals, so no mask compression at all
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,1000,2000,3000,4,2000,500,2000};
+        int background = 10;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::NO_MASK_AND_ALL_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 1000); // first unique value
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], 2000); // second unique value
+    }
+
+    { // mask selects between two non-background inactive vals (selective child mask)
+        MaskT valueMask;
+        MaskT childMask;
+        std::vector<int> values = {0,1000,2000,3000,4,2000,500,2000};
+        int background = 0;
+
+        valueMask.setOn(0);
+        valueMask.setOn(4);
+        CPPUNIT_ASSERT_EQUAL(valueMask.countOn(), Index32(2));
+
+        childMask.setOn(3);
+        childMask.setOn(6);
+        CPPUNIT_ASSERT_EQUAL(childMask.countOn(), Index32(2));
+
+        openvdb::io::MaskCompress<ValueT, MaskT> maskCompress(
+            valueMask, childMask, values.data(), background);
+
+        CPPUNIT_ASSERT_EQUAL(int(maskCompress.metadata), int(openvdb::io::MASK_AND_TWO_INACTIVE_VALS));
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[0], 1000); // first unique value
+        CPPUNIT_ASSERT_EQUAL(maskCompress.inactiveVal[1], 2000); // secone unique value
+    }
+}
 
 
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+

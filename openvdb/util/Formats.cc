@@ -1,35 +1,7 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include "Formats.h"
-
 #include <openvdb/Platform.h>
 #include <iostream>
 #include <iomanip>
@@ -112,10 +84,65 @@ printNumber(std::ostream& os, uint64_t number,
     return group;
 }
 
+int
+printTime(std::ostream& os, double milliseconds,
+  const std::string& head, const std::string& tail,
+  int width, int precision, int verbose)
+  {
+    int group = 0;
+
+    // Write to a string stream so that I/O manipulators like
+    // std::setprecision() don't alter the output stream.
+    std::ostringstream ostr;
+    ostr << head;
+    ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+
+    if (milliseconds >= 1000.0) {// one second or longer
+      const uint32_t seconds = static_cast<uint32_t>(milliseconds / 1000.0) % 60 ;
+      const uint32_t minutes = static_cast<uint32_t>(milliseconds / (1000.0*60)) % 60;
+      const uint32_t hours   = static_cast<uint32_t>(milliseconds / (1000.0*60*60)) % 24;
+      const uint32_t days    = static_cast<uint32_t>(milliseconds / (1000.0*60*60*24));
+      if (days>0) {
+        ostr << days << (verbose==0 ? "d " : days>1 ? " days, " : " day, ");
+        group = 4;
+      }
+      if (hours>0) {
+        ostr << hours << (verbose==0 ? "h " : hours>1 ? " hours, " : " hour, ");
+        if (!group) group = 3;
+      }
+      if (minutes>0) {
+        ostr << minutes << (verbose==0 ? "m " : minutes>1 ? " minutes, " : " minute, ");
+        if (!group) group = 2;
+      }
+      if (seconds>0) {
+        if (verbose) {
+          ostr << seconds << (seconds>1 ? " seconds and " : " second and ");
+          const double msec = milliseconds - (seconds + (minutes + (hours + days * 24) * 60) * 60) * 1000.0;
+          ostr << std::setw(width) << msec << " milliseconds (" << milliseconds << "ms)";
+        } else {
+          const double sec = milliseconds/1000.0 - (minutes + (hours + days * 24) * 60) * 60;
+          ostr << std::setw(width) << sec << "s";
+        }
+      } else {// zero seconds
+        const double msec = milliseconds - (minutes + (hours + days * 24) * 60) * 60 * 1000.0;
+        if (verbose) {
+          ostr << std::setw(width) << msec << " milliseconds (" << milliseconds << "ms)";
+        } else {
+          ostr << std::setw(width) << msec << "ms";
+        }
+      }
+      if (!group) group = 1;
+    } else {// less than a second
+      ostr << std::setw(width) << milliseconds << (verbose ? " milliseconds" : "ms");
+    }
+
+    ostr << tail;
+
+    os << ostr.str();
+
+    return group;
+  }
+
 } // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

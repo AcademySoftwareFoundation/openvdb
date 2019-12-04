@@ -1,36 +1,11 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
-
 #include <openvdb/Types.h>
+#include <functional> // for std::ref()
+#include <string>
+
 
 using namespace openvdb;
 
@@ -42,12 +17,14 @@ public:
     CPPUNIT_TEST(testQuatTraits);
     CPPUNIT_TEST(testMatTraits);
     CPPUNIT_TEST(testValueTraits);
+    CPPUNIT_TEST(testTypeList);
     CPPUNIT_TEST_SUITE_END();
 
     void testVecTraits();
     void testQuatTraits();
     void testMatTraits();
     void testValueTraits();
+    void testTypeList();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTypes);
@@ -409,6 +386,83 @@ TestTypes::testValueTraits()
     }
 }
 
-// Copyright (c) 2012-2019 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+
+////////////////////////////////////////
+
+
+namespace {
+
+template<typename T> char typeCode() { return '.'; }
+template<> char typeCode<bool>()   { return 'b'; }
+template<> char typeCode<char>()   { return 'c'; }
+template<> char typeCode<double>() { return 'd'; }
+template<> char typeCode<float>()  { return 'f'; }
+template<> char typeCode<int>()    { return 'i'; }
+template<> char typeCode<long>()   { return 'l'; }
+
+
+struct TypeCodeOp
+{
+    std::string codes;
+    template<typename T> void operator()(const T&) { codes.push_back(typeCode<T>()); }
+};
+
+
+template<typename TSet>
+inline std::string
+typeSetAsString()
+{
+    TypeCodeOp op;
+    TSet::foreach(std::ref(op));
+    return op.codes;
+}
+
+} // anonymous namespace
+
+
+void
+TestTypes::testTypeList()
+{
+    using T0 = TypeList<>;
+    CPPUNIT_ASSERT_EQUAL(std::string(), typeSetAsString<T0>());
+
+    using T1 = TypeList<int>;
+    CPPUNIT_ASSERT_EQUAL(std::string("i"), typeSetAsString<T1>());
+
+    using T2 = TypeList<float>;
+    CPPUNIT_ASSERT_EQUAL(std::string("f"), typeSetAsString<T2>());
+
+    using T3 = TypeList<bool, double>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bd"), typeSetAsString<T3>());
+
+    using T4 = T1::Append<T2>;
+    CPPUNIT_ASSERT_EQUAL(std::string("if"), typeSetAsString<T4>());
+    CPPUNIT_ASSERT_EQUAL(std::string("fi"), typeSetAsString<T2::Append<T1>>());
+
+    using T5 = T3::Append<T4>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdif"), typeSetAsString<T5>());
+
+    using T6 = T5::Append<T5>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdifbdif"), typeSetAsString<T6>());
+
+    using T7 = T5::Append<char, long>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdifcl"), typeSetAsString<T7>());
+
+    using T8 = T5::Append<char>::Append<long>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdifcl"), typeSetAsString<T8>());
+
+    using T9 = T8::Remove<TypeList<>>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdifcl"), typeSetAsString<T9>());
+
+    using T10 = T8::Remove<std::string>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdifcl"), typeSetAsString<T10>());
+
+    using T11 = T8::Remove<char>::Remove<int>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdfl"), typeSetAsString<T11>());
+
+    using T12 = T8::Remove<char, int>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdfl"), typeSetAsString<T12>());
+
+    using T13 = T8::Remove<TypeList<char, int>>;
+    CPPUNIT_ASSERT_EQUAL(std::string("bdfl"), typeSetAsString<T13>());
+}

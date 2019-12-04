@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 //
 /// @author Ken Museth
 ///
@@ -159,7 +132,7 @@ public:
     {
         ValueType sum = 0.0;
         for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
-        return sum / mStencil.size();
+        return sum / ValueType(mStencil.size());
     }
 
     /// @brief Return the smallest value in the stencil buffer.
@@ -334,9 +307,15 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline ValueType interpolation(const math::Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const ValueType u = xyz[0] - BaseType::mCenter[0];
+        const ValueType v = xyz[1] - BaseType::mCenter[1];
+        const ValueType w = xyz[2] - BaseType::mCenter[2];
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+
+        assert(u>=0 && u<=1);
+        assert(v>=0 && v<=1);
+        assert(w>=0 && w<=1);
 
         ValueType V = BaseType::template getValue<0,0,0>();
         ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
@@ -362,9 +341,15 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const ValueType u = xyz[0] - BaseType::mCenter[0];
+        const ValueType v = xyz[1] - BaseType::mCenter[1];
+        const ValueType w = xyz[2] - BaseType::mCenter[2];
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+
+        assert(u>=0 && u<=1);
+        assert(v>=0 && v<=1);
+        assert(w>=0 && w<=1);
 
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
@@ -1307,9 +1292,12 @@ public:
     {
         const Coord& ijk = BaseType::getCenterCoord();
         const ValueType d = ValueType(mStencil[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
-        return math::Vec3<ValueType>(ijk[0] - d*(mStencil[2] - mStencil[1]),
-                                     ijk[1] - d*(mStencil[4] - mStencil[3]),
-                                     ijk[2] - d*(mStencil[6] - mStencil[5]));
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const auto value = math::Vec3<ValueType>(   ijk[0] - d*(mStencil[2] - mStencil[1]),
+                                                    ijk[1] - d*(mStencil[4] - mStencil[3]),
+                                                    ijk[2] - d*(mStencil[6] - mStencil[5]));
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return value;
     }
 
     /// Return linear offset for the specified stencil point relative to its center
@@ -1691,7 +1679,3 @@ private:
 } // end openvdb namespace
 
 #endif // OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

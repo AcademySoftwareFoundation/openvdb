@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include "Compression.h"
 
@@ -63,6 +36,26 @@ compressionToString(uint32_t flags)
 namespace {
 const int ZIP_COMPRESSION_LEVEL = Z_DEFAULT_COMPRESSION; ///< @todo use Z_BEST_SPEED?
 }
+
+
+size_t
+zipToStreamSize(const char* data, size_t numBytes)
+{
+    // Get an upper bound on the size of the compressed data.
+    uLongf numZippedBytes = compressBound(numBytes);
+    // Compress the data.
+    std::unique_ptr<Bytef[]> zippedData(new Bytef[numZippedBytes]);
+    int status = compress2(
+        /*dest=*/zippedData.get(), &numZippedBytes,
+        /*src=*/reinterpret_cast<const Bytef*>(data), numBytes,
+        /*level=*/ZIP_COMPRESSION_LEVEL);
+    if (status == Z_OK && numZippedBytes < numBytes) {
+        return size_t(numZippedBytes);
+    } else {
+        return size_t(numBytes);
+    }
+}
+
 
 void
 zipToStream(std::ostream& os, const char* data, size_t numBytes)
@@ -145,6 +138,54 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 }
 
 
+namespace {
+
+#ifdef OPENVDB_USE_BLOSC
+int bloscCompress(size_t inBytes, const char* data, char* compressedData, int outBytes)
+{
+    return blosc_compress_ctx(
+        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+        /*doshuffle=*/true,
+        /*typesize=*/sizeof(float), //for optimal float and Vec3f compression
+        /*srcsize=*/inBytes,
+        /*src=*/data,
+        /*dest=*/compressedData,
+        /*destsize=*/outBytes,
+        BLOSC_LZ4_COMPNAME,
+        /*blocksize=*/inBytes,//previously set to 256 (in v3.x)
+        /*numthreads=*/1);
+}
+#endif
+
+} // namespace
+
+
+#ifndef OPENVDB_USE_BLOSC
+size_t
+bloscToStreamSize(const char*, size_t, size_t)
+{
+    OPENVDB_THROW(IoError, "Blosc encoding is not supported");
+}
+#else
+size_t
+bloscToStreamSize(const char* data, size_t valSize, size_t numVals)
+{
+    const size_t inBytes = valSize * numVals;
+
+    int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
+    std::unique_ptr<char[]> compressedData(new char[outBytes]);
+
+    outBytes = bloscCompress(inBytes, data, compressedData.get(), outBytes);
+
+    if (outBytes <= 0) {
+        return size_t(inBytes);
+    }
+
+    return size_t(outBytes);
+}
+#endif
+
+
 #ifndef OPENVDB_USE_BLOSC
 void
 bloscToStream(std::ostream&, const char*, size_t, size_t)
@@ -160,17 +201,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);
 
-    outBytes = blosc_compress_ctx(
-        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
-        /*doshuffle=*/true,
-        /*typesize=*/sizeof(float), //for optimal float and Vec3f compression
-        /*srcsize=*/inBytes,
-        /*src=*/data,
-        /*dest=*/compressedData.get(),
-        /*destsize=*/outBytes,
-        BLOSC_LZ4_COMPNAME,
-        /*blocksize=*/inBytes,//previously set to 256 (in v3.x)
-        /*numthreads=*/1);
+    outBytes = bloscCompress(inBytes, data, compressedData.get(), outBytes);
 
     if (outBytes <= 0) {
         std::ostringstream ostr;
@@ -248,7 +279,3 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @author Ken Museth
 ///
@@ -926,7 +899,6 @@ public:
     bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; }
     bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; }
     BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); }
-    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); }
     BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); }
     BlindData operator-() const { return BlindData(-mVisible, mBlind); }
 
@@ -950,6 +922,15 @@ template<typename VisibleT, typename BlindT>
 inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 {
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
+}
+
+/// @private
+// Required to support the (zeroVal<BlindData>() + val) idiom.
+template<typename VisibleT, typename BlindT, typename T>
+inline BlindData<VisibleT, BlindT>
+operator+(const BlindData<VisibleT, BlindT>& x, const T& rhs)
+{
+    return BlindData<VisibleT, BlindT>(x.visible() + static_cast<VisibleT>(rhs), x.blind());
 }
 
 } // namespace p2ls_internal
@@ -1049,7 +1030,3 @@ particleTrailsToMask(const ParticleListT& plist, GridT& grid, Real delta, Interr
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

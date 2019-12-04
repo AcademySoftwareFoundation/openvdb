@@ -1,36 +1,10 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
+#include <functional>// for std::hash
 #include <algorithm> // for std::min(), std::max()
 #include <array> // for std::array
 #include <iostream>
@@ -234,7 +208,7 @@ public:
     /// corresponding components of @a b.
     static inline bool lessThan(const Coord& a, const Coord& b)
     {
-            return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
+        return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
 
     /// @brief Return the index (0, 1 or 2) with the smallest value.
@@ -247,6 +221,16 @@ public:
     void write(std::ostream& os) const
     {
         os.write(reinterpret_cast<const char*>(mVec.data()), sizeof(mVec));
+    }
+
+    /// @brief Return a hash value for this coordinate
+    /// @note Log2N is the binary logarithm of the hash table size.
+    /// @details The hash function is taken from the SIGGRAPH paper:
+    /// "VDB: High-resolution sparse volumes with dynamic topology"
+    template<int Log2N = 20>
+    size_t hash() const
+    {
+        return ((1<<Log2N)-1) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791);
     }
 
 private:
@@ -369,19 +353,31 @@ public:
     bool operator!=(const CoordBBox& rhs) const { return !(*this == rhs); }
 
     /// @brief Return @c true if this bounding box is empty (i.e., encloses no coordinates).
-    bool empty() const { return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]); }
-    /// Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
+    bool empty() const
+    {
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
+        return (mMin[0] > mMax[0] || mMin[1] > mMax[1] || mMin[2] > mMax[2]);
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+  #pragma GCC diagnostic pop
+#endif
+    }
+    /// @brief Return @c true if this bounding box is nonempty
+    /// (i.e., encloses at least one coordinate).
     operator bool() const { return !this->empty(); }
-    /// Return @c true if this bounding box is nonempty (i.e., encloses at least one coordinate).
+    /// @brief Return @c true if this bounding box is nonempty
+    /// (i.e., encloses at least one coordinate).
     bool hasVolume() const { return !this->empty(); }
 
-    /// Return the floating-point position of the center of this bounding box.
+    /// @brief Return the floating-point position of the center of this bounding box.
     Vec3d getCenter() const { return 0.5 * Vec3d((mMin + mMax).asPointer()); }
 
     /// @brief Return the dimensions of the coordinates spanned by this bounding box.
     /// @note Since coordinates are inclusive, a bounding box with min = max
     /// has dimensions of (1, 1, 1).
-    Coord dim() const { return mMax.offsetBy(1) - mMin; }
+    Coord dim() const { return empty() ? Coord(0) : (mMax.offsetBy(1) - mMin); }
     /// @todo deprecate - use dim instead
     Coord extents() const { return this->dim(); }
     /// @brief Return the integer volume of coordinates spanned by this bounding box.
@@ -391,7 +387,7 @@ public:
         const Coord d = this->dim();
         return Index64(d[0]) * Index64(d[1]) * Index64(d[2]);
     }
-    /// Return @c true if this bounding box can be subdivided [mainly for use by TBB].
+    /// @brief Return @c true if this bounding box can be subdivided [mainly for use by TBB].
     bool is_divisible() const { return mMin[0]<mMax[0] && mMin[1]<mMax[1] && mMin[2]<mMax[2]; }
 
     /// @brief Return the index (0, 1 or 2) of the shortest axis.
@@ -400,51 +396,51 @@ public:
     /// @brief Return the index (0, 1 or 2) of the longest axis.
     size_t maxExtent() const { return this->dim().maxIndex(); }
 
-    /// Return @c true if point (x, y, z) is inside this bounding box.
+    /// @brief Return @c true if point (x, y, z) is inside this bounding box.
     bool isInside(const Coord& xyz) const
     {
         return !(Coord::lessThan(xyz,mMin) || Coord::lessThan(mMax,xyz));
     }
 
-    /// Return @c true if the given bounding box is inside this bounding box.
+    /// @brief Return @c true if the given bounding box is inside this bounding box.
     bool isInside(const CoordBBox& b) const
     {
         return !(Coord::lessThan(b.mMin,mMin) || Coord::lessThan(mMax,b.mMax));
     }
 
-    /// Return @c true if the given bounding box overlaps with this bounding box.
+    /// @brief Return @c true if the given bounding box overlaps with this bounding box.
     bool hasOverlap(const CoordBBox& b) const
     {
         return !(Coord::lessThan(mMax,b.mMin) || Coord::lessThan(b.mMax,mMin));
     }
 
-    /// Pad this bounding box with the specified padding.
+    /// @brief Pad this bounding box with the specified padding.
     void expand(ValueType padding)
     {
         mMin.offset(-padding);
         mMax.offset( padding);
     }
 
-    /// Return a new instance that is expanded by the specified padding.
+    /// @brief Return a new instance that is expanded by the specified padding.
     CoordBBox expandBy(ValueType padding) const
     {
         return CoordBBox(mMin.offsetBy(-padding),mMax.offsetBy(padding));
     }
 
-    /// Expand this bounding box to enclose point (x, y, z).
+    /// @brief Expand this bounding box to enclose point (x, y, z).
     void expand(const Coord& xyz)
     {
         mMin.minComponent(xyz);
         mMax.maxComponent(xyz);
     }
 
-    /// Union this bounding box with the given bounding box.
+    /// @brief Union this bounding box with the given bounding box.
     void expand(const CoordBBox& bbox)
     {
           mMin.minComponent(bbox.min());
           mMax.maxComponent(bbox.max());
     }
-    /// Intersect this bounding box with the given bounding box.
+    /// @brief Intersect this bounding box with the given bounding box.
     void intersect(const CoordBBox& bbox)
     {
         mMin.maxComponent(bbox.min());
@@ -457,9 +453,15 @@ public:
         mMin.minComponent(min);
         mMax.maxComponent(min.offsetBy(dim-1));
     }
-    /// Translate this bounding box by
+    /// @brief Translate this bounding box by
     /// (<i>t<sub>x</sub></i>, <i>t<sub>y</sub></i>, <i>t<sub>z</sub></i>).
     void translate(const Coord& t) { mMin += t; mMax += t; }
+
+    /// @brief Move this bounding box to the specified min
+    void moveMin(const Coord& min) { mMax += min - mMin; mMin = min; }
+
+    /// @brief Move this bounding box to the specified max
+    void moveMax(const Coord& max) { mMin += max - mMax; mMax = max; }
 
     /// @brief Populates an array with the eight corner points of this bounding box.
     /// @details The ordering of the corner points is lexicographic.
@@ -490,9 +492,9 @@ public:
     CoordBBox& operator|= (Coord::Int32 n) { mMin |= n; mMax |= n; return *this; }
     //@}
 
-    /// Unserialize this bounding box from the given stream.
+    /// @brief Unserialize this bounding box from the given stream.
     void read(std::istream& is) { mMin.read(is); mMax.read(is); }
-    /// Serialize this bounding box to the given stream.
+    /// @brief Serialize this bounding box to the given stream.
     void write(std::ostream& os) const { mMin.write(os); mMax.write(os); }
 
 private:
@@ -578,8 +580,21 @@ operator<<(std::ostream& os, const CoordBBox& b)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
+////////////////////////////////////////
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+// template specialization of std::hash with Coord, which
+// allows for Coord to be used as the key in std::unordered_map
+namespace std {// injected in namespace std
+
+template<>
+struct hash<openvdb::math::Coord>
+{
+    using Coord = openvdb::math::Coord;
+    using argument_type = Coord;
+    using result_type = std::size_t;
+    std::size_t operator()(const Coord& ijk) const noexcept { return ijk.Coord::hash<>(); }
+};// std::hash<openvdb::math::Coord>
+
+}// namespace std
+
+#endif // OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED

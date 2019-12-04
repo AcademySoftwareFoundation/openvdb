@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 ///
 /// @file   PagedArray.h
 ///
@@ -43,7 +16,8 @@
 #define OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <vector>
+#include <openvdb/Types.h>// SharedPtr
+#include <deque>
 #include <cassert>
 #include <iostream>
 #include <algorithm>// std::swap
@@ -72,15 +46,10 @@ namespace util {
 ///          elements (when multiple instances are used).
 ///
 /// @details This data structure employes contiguous pages of elements
-///          (like a std::deque) which avoids moving data when the
+///          (a std::deque) which avoids moving data when the
 ///          capacity is out-grown and new pages are allocated. The
 ///          size of the pages can be controlled with the Log2PageSize
 ///          template parameter (defaults to 1024 elements of type ValueT).
-///          The TableT template parameter is used to define the data
-///          structure for the page table. The default, std::vector,
-///          offers fast random access in exchange for slower
-///          push_back, whereas std:deque offers faster push_back but
-///          slower random access.
 ///
 /// There are three fundamentally different ways to insert elements to
 /// this container - each with different advanteges and disadvanteges.
@@ -183,26 +152,21 @@ namespace util {
 /// involve multi-threading of dynamically growing linear arrays that
 /// require fast random access.
 
-template<typename ValueT,
-         size_t Log2PageSize = 10UL,
-         template<typename ...> class TableT = std::vector>
+template<typename ValueT, size_t Log2PageSize = 10UL>
 class PagedArray
 {
 private:
     class Page;
 
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700
-    // Workaround for ICC 15/16 "too few arguments to template" bug (fixed in ICC 17)
-    using PageTableT = TableT<Page*, std::allocator<Page*>>;
-#else
-    using PageTableT = TableT<Page*>;
-#endif
+    // must allow mutiple threads to call operator[] as long as only one thread calls push_back
+    using PageTableT = std::deque<Page*>;
 
 public:
     using ValueType = ValueT;
+    using Ptr       = SharedPtr<PagedArray>;
 
     /// @brief Default constructor
-    PagedArray() = default;
+    PagedArray() : mCapacity{0} { mSize = 0; }
 
     /// @brief Destructor removed all allocated pages
     ~PagedArray() { this->clear(); }
@@ -210,6 +174,9 @@ public:
     // Disallow copy construction and assignment
     PagedArray(const PagedArray&) = delete;
     PagedArray& operator=(const PagedArray&) = delete;
+
+    /// @brief Return a shared pointer to a new instance of this class
+    static Ptr create() { return Ptr(new PagedArray); }
 
     /// @brief Caches values into a local memory Page to improve
     ///        performance of push_back into a PagedArray.
@@ -510,15 +477,15 @@ private:
         }
     }
     PageTableT mPageTable;//holds points to allocated pages
-    tbb::atomic<size_t> mSize{0};// current number of elements in array
-    size_t mCapacity = 0;//capacity of array given the current page count
+    tbb::atomic<size_t> mSize;// current number of elements in array
+    size_t mCapacity;//capacity of array given the current page count
     tbb::spin_mutex mGrowthMutex;//Mutex-lock required to grow pages
 }; // Public class PagedArray
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::shrink_to_fit()
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::shrink_to_fit()
 {
     if (mPageTable.size() > (mSize >> Log2PageSize) + 1) {
         tbb::spin_mutex::scoped_lock lock(mGrowthMutex);
@@ -531,8 +498,8 @@ void PagedArray<ValueT, Log2PageSize, TableT>::shrink_to_fit()
     }
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize,TableT >::merge(PagedArray& other)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::merge(PagedArray& other)
 {
     if (&other != this && !other.isEmpty()) {
         tbb::spin_mutex::scoped_lock lock(mGrowthMutex);
@@ -556,8 +523,8 @@ void PagedArray<ValueT, Log2PageSize,TableT >::merge(PagedArray& other)
     }
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::add_full(Page*& page, size_t size)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::add_full(Page*& page, size_t size)
 {
     assert(size == Page::Size);//page must be full
     if (mSize & Page::Mask) {//page-table is partially full
@@ -570,8 +537,8 @@ void PagedArray<ValueT, Log2PageSize, TableT>::add_full(Page*& page, size_t size
     page       = nullptr;
 }
 
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-void PagedArray<ValueT, Log2PageSize, TableT>::add_partially_full(Page*& page, size_t size)
+template <typename ValueT, size_t Log2PageSize>
+void PagedArray<ValueT, Log2PageSize>::add_partially_full(Page*& page, size_t size)
 {
     assert(size > 0 && size < Page::Size);//page must be partially full
     if (size_t m = mSize & Page::Mask) {//page table is also partially full
@@ -594,12 +561,12 @@ void PagedArray<ValueT, Log2PageSize, TableT>::add_partially_full(Page*& page, s
 ////////////////////////////////////////////////////////////////////////////////
 
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 ValueBuffer
 {
 public:
-    using PagedArrayType = PagedArray<ValueT, Log2PageSize, TableT>;
+    using PagedArrayType = PagedArray<ValueT, Log2PageSize>;
     /// @brief Constructor from a PageArray
     ValueBuffer(PagedArray& parent) : mParent(&parent), mPage(new Page()), mSize(0) {}
     /// @warning This copy-constructor is shallow in the sense that no
@@ -642,8 +609,8 @@ private:
 
 // Const std-compliant iterator
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 ConstIterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
@@ -693,8 +660,8 @@ private:
 
 // Non-const std-compliant iterator
 // Public member-class of PagedArray
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 Iterator : public std::iterator<std::random_access_iterator_tag, ValueT>
 {
 public:
@@ -743,8 +710,8 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 // Private member-class of PagedArray implementing a memory page
-template <typename ValueT, size_t Log2PageSize, template<typename ...> class TableT>
-class PagedArray<ValueT, Log2PageSize, TableT>::
+template <typename ValueT, size_t Log2PageSize>
+class PagedArray<ValueT, Log2PageSize>::
 Page
 {
 public:
@@ -780,7 +747,3 @@ protected:
 } // namespace openvdb
 
 #endif // OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

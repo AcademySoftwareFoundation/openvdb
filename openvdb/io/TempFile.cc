@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file TempFile.cc
 
@@ -36,7 +9,6 @@
 #ifndef _MSC_VER
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/version.hpp> // for BOOST_VERSION
 #include <cstdlib> // for std::getenv(), mkstemp()
 #include <sys/types.h> // for mode_t
 #include <sys/stat.h> // for mkdir(), umask()
@@ -49,10 +21,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
-#ifndef DWA_BOOST_VERSION
-#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
-#endif
 
 
 namespace openvdb {
@@ -87,11 +55,7 @@ struct TempFile::TempFileImpl
 
         mPath.assign(&fnbuf[0]);
 
-#if DWA_BOOST_VERSION >= 1046000
         mDevice = DeviceType(mFileDescr, boost::iostreams::never_close_handle);
-#else
-        mDevice = DeviceType(mFileDescr, /*closeOnExit=*/false);
-#endif
         mBuffer.open(mDevice);
         os.rdbuf(&mBuffer);
 
@@ -170,7 +134,3 @@ void TempFile::close() { mImpl->close(); }
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

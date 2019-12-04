@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file points/AttributeSet.cc
 
@@ -90,30 +63,50 @@ AttributeSet::AttributeSet()
 }
 
 
-AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
+AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
-        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        const AttributeArray* existingArray = attrSet.getConst(pos);
+        const bool constantStride = existingArray->hasConstantStride();
+        const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
+
+        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
+            stride, constantStride, lock);
 
         // transfer hidden and transient flags
-        if (attrSet.getConst(pos)->isHidden())      array->setHidden(true);
-        if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
+        if (existingArray->isHidden())      array->setHidden(true);
+        if (existingArray->isTransient())   array->setTransient(true);
 
         mAttrs[pos] = array;
     }
 }
 
 
-AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength)
+AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
+            /*stride=*/1, /*constantStride=*/true, lock);
     }
 }
 
@@ -286,7 +279,8 @@ AttributeSet::appendAttribute(  const Name& name,
 
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
-                                const size_t pos, const Index strideOrTotalSize, const bool constantStride)
+                                const size_t pos, const Index strideOrTotalSize, const bool constantStride,
+                                const AttributeArray::ScopedRegistryLock* lock)
 {
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
@@ -307,7 +301,8 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 
     // append the new array
 
-    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, strideOrTotalSize, constantStride);
+    AttributeArray::Ptr array = AttributeArray::create(
+        type, arrayLength, strideOrTotalSize, constantStride, lock);
 
     // if successful, update Descriptor and append the created array
 
@@ -1182,7 +1177,3 @@ AttributeSet::Descriptor::read(std::istream& is)
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

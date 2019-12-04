@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Types.h>
@@ -119,7 +92,7 @@ template<typename ValueT>
 struct OrderDependentCombineOp {
     OrderDependentCombineOp() {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& result) const {
-        result = a + 100 * b; // result is order-dependent on A and B
+        result = a + ValueT(100) * b; // result is order-dependent on A and B
     }
 };
 
@@ -141,7 +114,7 @@ void extendedCombine(TreeT& a, TreeT& b)
     struct ArgsOp {
         static void order(openvdb::CombineArgs<ValueT>& args) {
             // The result is order-dependent on A and B.
-            args.setResult(args.a() + 100 * args.b());
+            args.setResult(args.a() + ValueT(100) * args.b());
             args.setResultIsActive(args.aIsActive() || args.bIsActive());
         }
     };
@@ -154,14 +127,14 @@ template<typename TreeT> void compSum(TreeT& a, TreeT& b) { openvdb::tools::comp
 template<typename TreeT> void compMul(TreeT& a, TreeT& b) { openvdb::tools::compMul(a, b); }\
 template<typename TreeT> void compDiv(TreeT& a, TreeT& b) { openvdb::tools::compDiv(a, b); }\
 
-inline float orderf(float a, float b) { return a + 100 * b; }
+inline float orderf(float a, float b) { return a + 100.0f * b; }
 inline float maxf(float a, float b) { return std::max(a, b); }
 inline float minf(float a, float b) { return std::min(a, b); }
 inline float sumf(float a, float b) { return a + b; }
 inline float mulf(float a, float b) { return a * b; }
 inline float divf(float a, float b) { return a / b; }
 
-inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100*b; }
+inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100.0f*b; }
 inline openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
     const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
     return (aMag > bMag ? a : (bMag > aMag ? b : std::max(a, b)));
@@ -787,7 +760,7 @@ TestTreeCombine::testCsg()
     CPPUNIT_ASSERT(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
-    std::cerr << "file read: " << timer.delta() << " sec\n";
+    std::cerr << "file read: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if TEST_CSG_VERBOSE
@@ -836,7 +809,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     TreePtr aTree(new TreeT(aInputTree));
     TreeT bTree(bInputTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "deep copy: " << timer.delta() << " ms\n";
+    std::cerr << "deep copy: " << timer.milliseconds() << " msec\n";
 #endif
 
 #if (TEST_CSG_VERBOSE > 1)
@@ -855,7 +828,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
     visitor(*aTree, bTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "combine: " << timer.delta() << " ms\n";
+    std::cerr << "combine: " << timer.milliseconds() << " msec\n";
 #endif
 #if (TEST_CSG_VERBOSE > 1)
     std::cerr << "\nActual:\n";
@@ -1069,7 +1042,3 @@ TestTreeCombine::testCompActiveLeafVoxels()
 
 ////////////////////////////////////////
 
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

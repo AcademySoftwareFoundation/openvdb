@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/io/File.h>
@@ -87,9 +60,7 @@ public:
     CPPUNIT_TEST(testWriteOpenFile);
     CPPUNIT_TEST(testReadGridMetadata);
     CPPUNIT_TEST(testReadGrid);
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     CPPUNIT_TEST(testReadClippedGrid);
-#endif
     CPPUNIT_TEST(testMultiPassIO);
     CPPUNIT_TEST(testHasGrid);
     CPPUNIT_TEST(testNameIterator);
@@ -99,6 +70,7 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     CPPUNIT_TEST(testBlosc);
 #endif
+    CPPUNIT_TEST(testDelayedLoadMetadata);
     CPPUNIT_TEST_SUITE_END();
 
     void testHeader();
@@ -117,9 +89,7 @@ public:
     void testWriteOpenFile();
     void testReadGridMetadata();
     void testReadGrid();
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     void testReadClippedGrid();
-#endif
     void testMultiPassIO();
     void testHasGrid();
     void testNameIterator();
@@ -129,6 +99,7 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     void testBlosc();
 #endif
+    void testDelayedLoadMetadata();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
@@ -186,6 +157,8 @@ TestFile::testWriteGrid()
 
     using TreeType = Int32Tree;
     using GridType = Grid<TreeType>;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     File file("something.vdb2");
 
@@ -264,6 +237,11 @@ TestFile::testWriteGrid()
     gd2_grid->readTransform(istr);
     gd2_grid->readTopology(istr);
 
+    // Remove delay load metadata if it exists.
+    if ((*gd2_grid)["file_delayed_load"]) {
+        gd2_grid->removeMeta("file_delayed_load");
+    }
+
     // Ensure that we have the same metadata.
     CPPUNIT_ASSERT_EQUAL(grid->metaCount(), gd2_grid->metaCount());
     CPPUNIT_ASSERT((*gd2_grid)["meta0"]);
@@ -309,6 +287,8 @@ TestFile::testWriteMultipleGrids()
 
     using TreeType = Int32Tree;
     using GridType = Grid<TreeType>;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
 
     File file("something.vdb2");
 
@@ -978,6 +958,8 @@ TestFile::testEmptyGridIO()
 
     using GridType = Int32Grid;
 
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
+
     const char* filename = "something.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
 
@@ -1522,6 +1504,10 @@ TestFile::testReadGridMetadata()
                 if ((*statsMetadata)[it->first]) {
                     otherMetadata->removeMeta(it->first);
                 }
+                // Remove delay load metadata if it exists.
+                if ((*otherMetadata)["file_delayed_load"]) {
+                    otherMetadata->removeMeta("file_delayed_load");
+                }
             }
             CPPUNIT_ASSERT_EQUAL(srcGrid->str(), otherMetadata->str());
 
@@ -1628,8 +1614,6 @@ TestFile::testReadGrid()
 
 ////////////////////////////////////////
 
-
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
 
 template<typename GridT>
 void
@@ -1742,8 +1726,6 @@ TestFile::testReadClippedGrid()
     }
 }
 
-#endif // OPENVDB_ABI_VERSION_NUMBER >= 3
-
 
 ////////////////////////////////////////
 
@@ -1785,10 +1767,8 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
 
     MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
         : BaseLeaf(coords, value, active) {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 3
     MultiPassLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value,
         bool active = false): BaseLeaf(openvdb::PartialCreate(), coords, value, active) {}
-#endif
     MultiPassLeafNode(const MultiPassLeafNode& rhs): BaseLeaf(rhs) {}
 
     ValueOnCIter cbeginValueOn() const { return ValueOnCIter(this->getValueMask().beginOn(),this); }
@@ -2216,9 +2196,14 @@ TestFile::testCompression()
 
     // Write the grids out with various combinations of compression options
     // and verify that they can be read back successfully.
-    // Currently, only bits 0 and 1 have meaning as compression flags
-    // (see io/Compression.h), so the valid combinations range from 0x0 to 0x3.
-    for (uint32_t flags = 0x0; flags <= 0x3; ++flags) {
+    // See io/Compression.h for the flag values.
+
+#ifdef OPENVDB_USE_BLOSC
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+#else
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+#endif
+    for (uint32_t flags : validFlags) {
 
         if (flags != io::COMPRESS_NONE) {
             io::File vdbfile(filename);
@@ -2552,7 +2537,12 @@ TestFile::testBlosc()
 
     for (int compcode = 0; compcode <= BLOSC_ZLIB; ++compcode) {
         char* compname = nullptr;
-        if (0 > blosc_compcode_to_compname(compcode, &compname)) continue;
+#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR >= 15)
+        if (0 > blosc_compcode_to_compname(compcode, const_cast<const char**>(&compname)))
+#else
+        if (0 > blosc_compcode_to_compname(compcode, &compname))
+#endif
+            continue;
         /// @todo This changes the compressor setting globally.
         if (blosc_set_compressor(compname) < 0) continue;
 
@@ -2596,6 +2586,144 @@ TestFile::testBlosc()
 }
 #endif
 
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+
+void
+TestFile::testDelayedLoadMetadata()
+{
+    openvdb::initialize();
+
+    using namespace openvdb;
+
+    io::File file("something.vdb2");
+
+    // Create a level set grid.
+    auto lsGrid = createLevelSet<FloatGrid>();
+    lsGrid->setName("sphere");
+    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
+        *lsGrid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+
+    // Write the VDB to a string stream.
+    std::ostringstream ostr(std::ios_base::binary);
+
+    // Create the grid descriptor out of this grid.
+    io::GridDescriptor gd(Name("sphere"), lsGrid->type());
+
+    // Write out the grid.
+    file.writeGrid(gd, lsGrid, ostr, /*seekable=*/true);
+
+    // Duplicate VDB string stream.
+    std::ostringstream ostr2(std::ios_base::binary);
+
+    { // Read back in, clip and write out again to verify metadata is rebuilt.
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+
+        const BBoxd clipBbox(Vec3d(-10.0,-10.0,-10.0), Vec3d(10.0,10.0,10.0));
+        io::Archive::readGrid(grid, gd2, istr, clipBbox);
+
+        // Verify clipping is working as expected.
+        CPPUNIT_ASSERT(grid->baseTreePtr()->leafCount() < lsGrid->tree().leafCount());
+
+        file.writeGrid(gd, grid, ostr2, /*seekable=*/true);
+    }
+
+    // Since the input is only a fragment of a VDB file (in particular,
+    // it doesn't have a header), set the file format version number explicitly.
+    // On read, the delayed load metadata for OpenVDB library versions less than 6.1
+    // should be removed to ensure correctness as it possible for the metadata to
+    // have been treated as unknown and blindly copied over when read and re-written
+    // using this library version resulting in out-of-sync metadata.
+
+    // By default, DelayedLoadMetadata is dropped from the grid during read so
+    // as not to be exposed to the user.
+
+    { // read using current library version
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    // To test the version mechanism, a stream metadata object is created with
+    // a non-zero test value and set on the input stream. This disables the
+    // behaviour where the DelayedLoadMetadata is dropped from the grid.
+
+    io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+    streamMetadata->__setTest(uint32_t(1));
+
+    { // read using current library version
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 5.0
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(5,0), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 4.9
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(4,9), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 6.1
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(6,1), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    { // read using library version of 6.2
+        std::istringstream istr(ostr2.str(), std::ios_base::binary);
+        io::setVersion(istr, VersionId(6,2), file.fileVersion());
+        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
+
+        io::GridDescriptor gd2;
+        GridBase::Ptr grid = gd2.read(istr);
+        gd2.seekToGrid(istr);
+        io::Archive::readGrid(grid, gd2, istr);
+
+        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+    }
+
+    remove("something.vdb2");
+}
