@@ -44,10 +44,12 @@ Version 7.0.0 - In development
       the metadata and/or the transform - GridBase::copyGridReplacingMetadata,
       GridBase::copyGridReplacingTransform and
       GridBase::copyGridReplacingMetadataAndTransform.
+    - AttributeArray copy constructor is now thread-safe.
 
     API changes:
     - VolumeToMesh::pointList() and VolumeToMesh::polygonPoolList() now return
       a std::unique_ptr instead of a boost::scoped_array.
+    - AttributeArray::copyUncompressed() is now deprecated.
 
     Python:
     - Removed the requirement of CMake 3.14 for NumPy usage.

@@ -57,12 +57,15 @@ ABI changes:
   @vdblink::GridBase::copyGridReplacingTransform() GridBase::copyGridReplacingTransform@endlink
   and @vdblink::GridBase::copyGridReplacingMetadataAndTransform()
   GridBase::copyGridReplacingMetadataAndTransform@endlink.
+- AttributeArray copy constructor is now thread-safe.
 
 @par
 API changes:
 - @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
   @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
   now return a std::unique_ptr instead of a boost::scoped_array.
+- @vdblink::points::AttributeArray::copyUncompressed() AttributeArray::copyUncompressed@endlink
+  is now deprecated.
 
 @par
 Python:
