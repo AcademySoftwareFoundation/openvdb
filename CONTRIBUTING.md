@@ -1,6 +1,6 @@
 # Overview
 
-This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affilation. Participants all our bound to the [Code of Conduct](CODE_OF_CONDUCT.md).
+This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affiliation. Participants are all bound to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 # Project roles
 
