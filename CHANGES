@@ -7,6 +7,13 @@ Version 7.0.0 - In development
     supported Houdini version is 17.0.
 
     New features:
+    - LevelSetMeasure can now compute multiple types of curvatures (averge and total
+      Gaussian and mean curvature) as well as Euler characteristic and genus of
+      level set surfaces.
+    - Most stencil classes now have an intersection method that detcts the axial
+      directions of zero-crossings (as oppose to the existing boolean intersection test).
+    - The CurvatureStencil can now compute Gaussian and principal
+      curvatures (in addition to mean curvature).
     - Added Tree::nodeCount, which counts the number and type of nodes
       in a tree very efficiently.
     - Added new RootNode::addChild() and InternalNode::addChild() methods to
