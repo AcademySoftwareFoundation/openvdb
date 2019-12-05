@@ -1,10 +1,18 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.0 - In development
+Version 7.0.0 - December 5, 2019
 
-    As of this release, a C++14 compiler is required and the oldest
-    supported Houdini version is 17.0.
+      Some changes in this release (see "ABI changes" below) alter
+      the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones built into Houdini
+      up to and including Houdini 18.0. To preserve ABI compatibility,
+      when compiling OpenVDB or any dependent code define the macro
+      OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 5 for
+      Houdini 17.0 and 17.5 and 6 for Houdini 18.0.
+
+      As of this release, a C++14 compiler is required and the oldest
+      supported Houdini version is 17.0.
 
     New features:
     - LevelSetMeasure can now compute multiple types of curvatures (averge and total
