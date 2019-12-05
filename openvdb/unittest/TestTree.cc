@@ -69,7 +69,9 @@ public:
     CPPUNIT_TEST(testStealNodes);
     CPPUNIT_TEST(testProcessBBox);
     CPPUNIT_TEST(testStealNode);
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
     CPPUNIT_TEST(testNodeCount);
+#endif
     CPPUNIT_TEST(testRootNode);
     CPPUNIT_TEST(testInternalNode);
     CPPUNIT_TEST_SUITE_END();
@@ -105,7 +107,9 @@ public:
     void testStealNodes();
     void testProcessBBox();
     void testStealNode();
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
     void testNodeCount();
+#endif
     void testRootNode();
     void testInternalNode();
 
@@ -2958,6 +2962,7 @@ TestTree::testStealNode()
     }
 }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
 void
 TestTree::testNodeCount()
 {
@@ -2986,6 +2991,7 @@ TestTree::testNodeCount()
     CPPUNIT_ASSERT_EQUAL(tree.leafCount(), nodeCount2.front());// leaf nodes
     for (size_t i=0; i<nodeCount2.size(); ++i) CPPUNIT_ASSERT_EQUAL( nodeCount1[i], nodeCount2[i]);
 }
+#endif
 
 void
 TestTree::testRootNode()
