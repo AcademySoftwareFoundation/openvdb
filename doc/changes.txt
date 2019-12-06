@@ -4,10 +4,19 @@
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.0</B> - <I>In development</I>
+<B>Version 7.0.0</B> - <I>December 6, 2019</I>
 
 @par
 <BLOCKQUOTE>
+Some changes in this release (see @ref v7_0_0_ABI_changes "ABI changes" below)
+alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
+the OpenVDB library, such as the ones built into Houdini up to and including
+Houdini&nbsp;18.
+To preserve ABI compatibility, when compiling OpenVDB or any dependent code
+define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
+for example, <I>N</I> is 5 for Houdini&nbsp;17.0 and&nbsp;17.5 and 6 for
+Houdini&nbsp;18.0.
+
 As of this release, a C++14 compiler is required and the oldest supported
 Houdini version is 17.0.
 </BLOCKQUOTE>
@@ -44,7 +53,9 @@ Improvements:
   AVX compiler flags, this is switched off by default.
 - Made various small changes to improve Visual Studio compatiblity and
   deprecate some logic for compilers older than Visual Studio&nbsp;2017.
-- Standardized CMake install locations using GNUInstallDirs
+- Standardized CMake install locations using GNUInstallDirs. Importantly,
+  this changes the default library installation folder from lib to lib64
+  on some 64-bit systems, or to lib/multiarch-tuple on Debian
   <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
 - Added SIMD intrinsics to a few common NodeMask methods.
   <I>[Contributed&nbsp;by&nbsp;Konstantin]</I>
@@ -58,6 +69,7 @@ Bug fixes:
   mesh to volume@endlink during polygon voxelization which could result in
   different distance values.
 
+@anchor v7_0_0_ABI_changes
 @par
 ABI changes:
 - OpFactory destructor is now virtual as of ABI=7
