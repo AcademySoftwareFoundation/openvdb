@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.0 - December 5, 2019
+Version 7.0.0 - December 6, 2019
 
       Some changes in this release (see "ABI changes" below) alter
       the grid ABI so that it is incompatible with earlier versions
