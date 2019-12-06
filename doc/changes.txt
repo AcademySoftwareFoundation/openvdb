@@ -53,7 +53,9 @@ Improvements:
   AVX compiler flags, this is switched off by default.
 - Made various small changes to improve Visual Studio compatiblity and
   deprecate some logic for compilers older than Visual Studio&nbsp;2017.
-- Standardized CMake install locations using GNUInstallDirs
+- Standardized CMake install locations using GNUInstallDirs. Importantly,
+  this changes the default library installation folder from lib to lib64
+  on some 64-bit systems, or to lib/multiarch-tuple on Debian
   <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
 - Added SIMD intrinsics to a few common NodeMask methods.
   <I>[Contributed&nbsp;by&nbsp;Konstantin]</I>
