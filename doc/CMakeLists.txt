@@ -14,6 +14,14 @@ if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
 
+# If OPENVDB_DOXYGEN_HOUDINI is set, the Houdini documentation is also
+# built. You can provide this module a value for Houdini_VERSION which will
+# take into account any conditional compiled blocks. Whilst this doesn't
+# require you to build the Houdini plugin, building from the root CMake
+# with OPENVDB_BUILD_HOUDINI_PLUGIN or USE_HOUDINI will define this value.
+# If Houdini_VERSION is not set, all documentation is included.
+option(OPENVDB_DOXYGEN_HOUDINI "Build Houdini documentation" ON)
+
 # Add the doxygen command if required - do this here so we guarantee
 # not to error on unrelated build issues
 find_package(Doxygen REQUIRED)
@@ -27,7 +35,7 @@ endif()
 # @todo use cmake doxygen functions available from cmake 3.9
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config DOXYGEN_CONFIG_CONTENT)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+if(OPENVDB_DOXYGEN_HOUDINI)
   # Append Houdini-specific settings to the Doxygen config file.
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config-houdini DOXYGEN_CONFIG_CONTENT)
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
