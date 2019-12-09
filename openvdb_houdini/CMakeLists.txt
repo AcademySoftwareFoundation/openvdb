@@ -48,11 +48,6 @@ houdini_get_default_install_dir():
   Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
 
-# SESITAG CMake options
-option(OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
-Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
-older Houdini versions and will be removed in Houdini 18. ]=] OFF)
-
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
   set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING
@@ -65,15 +60,18 @@ if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
   )
 else()
   string(TOLOWER ${OPENVDB_HOUDINI_OPHIDE_POLICY} OPENVDB_HOUDINI_OPHIDE_POLICY)
-  if (NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} IN_LIST _OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS)
+  if(NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} IN_LIST _OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS)
     message(WARNING "Unrecognized value for OPENVDB_HOUDINI_OPHIDE_POLICY, using none instead.")
     set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING FORCE)
   endif()
 endif()
 
-mark_as_advanced(
-  OPENVDB_HOUDINI_ENABLE_SESI_TAG
-)
+if(OPENVDB_HOUDINI_ENABLE_SESI_TAG)
+  # SESI tag information on the OpenVDB DSOs. This is legacy functionality for
+  # older Houdini versions (< 18) and will be removed.
+  message(DEPRECATION "The OPENVDB_HOUDINI_ENABLE_SESI_TAG option is deprecated "
+    "and will be removed.")
+endif()
 
 #########################################################################
 
