@@ -48,6 +48,17 @@ jobs:
     - name: test
       run: cd build && ctest -V
 
+  testhou180:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v1
+    - name: houdini
+      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Release ON
+
   testhou175:
     runs-on: ubuntu-16.04
     container:
@@ -81,25 +92,25 @@ jobs:
     - name: test
       run: cd build && ctest -V
 
-  testhou175gcc:
+  testhou180gcc:
     runs-on: ubuntu-16.04
     container:
-      image: aswf/ci-base:2018
+      image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
     - name: houdini
-      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
 
-  testhou175debug:
+  testhou180debug:
     runs-on: ubuntu-16.04
     container:
-      image: aswf/ci-base:2018
+      image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
     - name: houdini
-      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Debug OFF
 

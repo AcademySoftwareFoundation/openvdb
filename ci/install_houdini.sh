@@ -5,6 +5,8 @@ set -e
 HOUDINI_MAJOR="$1"
 HOUPASS="$2"
 
+pip install --user future
+pip install --user lxml
 pip install --user mechanize
 
 export PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/dist-packages
