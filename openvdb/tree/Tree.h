@@ -2138,7 +2138,7 @@ Tree<RootNodeType>::evalLeafBoundingBox(CoordBBox& bbox) const
 
     mRoot.evalActiveBoundingBox(bbox, false);
 
-    return true;// not empty
+    return !bbox.empty();
 }
 
 template<typename RootNodeType>
@@ -2151,7 +2151,7 @@ Tree<RootNodeType>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 
     mRoot.evalActiveBoundingBox(bbox, true);
 
-    return true;// not empty
+    return !bbox.empty();
 }
 
 
