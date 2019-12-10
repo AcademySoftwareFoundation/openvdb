@@ -1139,7 +1139,9 @@ TestAttributeSet::testAttributeSetGroups()
         // no groups
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(1)));
+        CPPUNIT_ASSERT_EQUAL(size_t(5), descriptor.unusedGroupOffset(/*hint=*/size_t(5)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         CPPUNIT_ASSERT_EQUAL(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1149,7 +1151,9 @@ TestAttributeSet::testAttributeSetGroups()
         descriptor.setGroup("test0", size_t(0));
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset());
+        // hint already in use
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(0)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         CPPUNIT_ASSERT_EQUAL(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1161,7 +1165,10 @@ TestAttributeSet::testAttributeSetGroups()
         descriptor.setGroup("test7", size_t(7));
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroupOffset(/*hint=*/size_t(6)));
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset(/*hint=*/size_t(7)));
+        CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset(/*hint=*/size_t(8)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         // note that requiresGroupMove() is not particularly clever because it
         // blindly recommends moving the group even if it ultimately remains in
@@ -1192,7 +1199,7 @@ TestAttributeSet::testAttributeSetGroups()
             // no test7
 
             CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1200,7 +1207,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test7", size_t(7));
 
             CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1208,7 +1215,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test8", size_t(8));
 
             CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1217,7 +1224,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test13", size_t(13));
 
             CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(true,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1237,7 +1244,7 @@ TestAttributeSet::testAttributeSetGroups()
                 /*checkValidOffset=*/true), RuntimeError);
 
             CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(std::numeric_limits<size_t>::max(), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));

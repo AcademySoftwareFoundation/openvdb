@@ -1154,8 +1154,14 @@ AttributeSet::Descriptor::canCompactGroups() const
 }
 
 size_t
-AttributeSet::Descriptor::nextUnusedGroupOffset() const
+AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
 {
+    // all group offsets are in use
+
+    if (unusedGroups() == size_t(0)) {
+        return std::numeric_limits<size_t>::max();
+    }
+
     // build a list of group indices
 
     std::vector<size_t> indices;
@@ -1166,7 +1172,15 @@ AttributeSet::Descriptor::nextUnusedGroupOffset() const
 
     std::sort(indices.begin(), indices.end());
 
-    // return first index not present
+    // return hint if not already in use
+
+    if (hint != std::numeric_limits<Index>::max() &&
+        hint < availableGroups() &&
+        std::find(indices.begin(), indices.end(), hint) == indices.end()) {
+        return hint;
+    }
+
+    // otherwise return first index not present
 
     size_t offset = 0;
     for (const size_t& index : indices) {
@@ -1181,8 +1195,7 @@ bool
 AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
     size_t& sourceOffset, size_t& targetOffset) const
 {
-
-    targetOffset = this->nextUnusedGroupOffset();
+    targetOffset = this->unusedGroupOffset();
 
     for (const auto& namePos : mGroupMap) {
 
