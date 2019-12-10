@@ -8,8 +8,9 @@
 
 @par
 Bug fixes:
-- Fixed a bug where empty grids were still returning true from
-  <TT>evalActiveVoxelBoundingBox</TT> when leaf nodes were still present.
+- Fixed a bug where grids with no active values might return true when the
+  method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to
+  only return true if the grid contains any active values.
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
