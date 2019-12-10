@@ -60,7 +60,7 @@ public:
     virtual Metadata::Ptr getBackgroundValue() const { return Metadata::Ptr(); }
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
-    /// leaf nodes and active tiles.
+    /// active tiles and leaf nodes with active values.
     /// @details This is faster than calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
