@@ -202,6 +202,7 @@ set(MINIMUM_BLOSC_VERSION 1.5)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 4)
+set(MINIMUM_CXX_STANDARD 14)
 set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 5)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
@@ -257,7 +258,14 @@ if(FUTURE_MINIMUM_CMAKE_VERSION)
   endif()
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD ${MINIMUM_CXX_STANDARD} CACHE STRING
+    "The C++ standard whose features are requested to build OpenVDB components." FORCE)
+elseif(CMAKE_CXX_STANDARD LESS ${MINIMUM_CXX_STANDARD})
+  message(FATAL_ERROR "Provided C++ Standard is less than the supported minimum."
+    "Required is at least \"${MINIMUM_CXX_STANDARD}\" (found ${CMAKE_CXX_STANDARD})")
+endif()
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
