@@ -14,6 +14,7 @@
 #include <openvdb/version.h>
 #include <openvdb/MetaMap.h>
 
+#include <deque>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -49,6 +50,8 @@ public:
     using DescriptorPtr         = std::shared_ptr<Descriptor>;
     using DescriptorConstPtr    = std::shared_ptr<const Descriptor>;
 
+    class Info;
+
     //////////
 
     struct Util
@@ -69,7 +72,19 @@ public:
 
     //////////
 
-    AttributeSet();
+    AttributeSet() = default;
+
+    /// Construct a new AttributeSet from the given Info and optionally steal
+    /// from an existing attribute set.
+    /// @param info the attribute info
+    /// @param arrayLength the desired length of the arrays in the new AttributeSet
+    /// @param lock an optional scoped registry lock to avoid contention
+    /// @param attributeSet an existing attribute set that can be stolen from
+    /// @note if provided, the attribute set in this constructor will be
+    /// cleared on completion of this constructor
+    AttributeSet(const Info& info, Index arrayLength,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr,
+        AttributeSet* attributeSet = nullptr);
 
     /// Construct a new AttributeSet from the given AttributeSet.
     /// @param attributeSet the old attribute set
@@ -95,6 +110,9 @@ public:
 
     /// Disallow copy assignment, since it wouldn't be obvious whether the copy is deep or shallow.
     AttributeSet& operator=(const AttributeSet&) = delete;
+
+    /// Delete the contents of this AttributeSet
+    void clear();
 
     //@{
     /// @brief  Return a reference to this attribute set's descriptor, which might
@@ -290,7 +308,7 @@ public:
 private:
     using AttrArrayVec = std::vector<AttributeArray::Ptr>;
 
-    DescriptorPtr mDescr;
+    DescriptorPtr mDescr = std::make_shared<Descriptor>();
     AttrArrayVec  mAttrs;
 }; // class AttributeSet
 
@@ -539,6 +557,82 @@ private:
     int64_t                     mReserved[8];       // for future use
 #endif
 }; // class Descriptor
+
+
+////////////////////////////////////////
+
+/// @brief A convenience class that collates the Descriptor with metadata that
+/// is only available on each AttributeArray, such as whether the array is
+/// uniform or not. This is useful for querying and during construction of new
+/// AttributeSets.
+/// @note For performance reasons, this class uses copy-on-write for storing
+/// the Descriptor so any modification of the source Descriptor also requires
+/// a deep-copy for the data in this class to remain valid.
+class AttributeSet::Info {
+public:
+    struct Array {
+        Index stride = 1;
+        bool constantStride = true;
+        bool hidden = false;
+        bool transient = false;
+        bool group = false;
+        bool string = false;
+    }; // struct Array
+
+    /// Default constructor
+    Info() = default;
+
+    /// Construct a new Info class from the given Descriptor.
+    /// @param descriptorPtr the descriptor
+    /// @note Array metadata is default-initialized when using this constructor
+    explicit Info(const AttributeSet::Descriptor::Ptr& descriptorPtr);
+
+    /// Construct a new Info class from the given AttributeSet.
+    /// @param attributeSet the attribute set
+    /// @details This method extracts and stores Array metadata from the
+    /// AttributeArray objects stored within it
+    explicit Info(const AttributeSet& attributeSet);
+
+    /// @brief Return the descriptor
+    Descriptor& descriptor() { return *mDescriptor; }
+    /// @brief Return the descriptor
+    const Descriptor& descriptor() const { return *mDescriptor; }
+    /// @brief Return a shared pointer to the descriptor
+    Descriptor::Ptr descriptorPtr() const { return mDescriptor; }
+    /// @brief Return the number of array attributes
+    size_t size() const { return mDescriptor->size(); }
+
+    /// @brief Return an Array metadata object by name
+    /// @param name The name of the array
+    /// @throws LookupError if name does not exist
+    Array& arrayInfo(const Name& name);
+    /// @brief Return an Array metadata object by name
+    /// @param name The name of the array
+    /// @throws LookupError if name does not exist
+    const Array& arrayInfo(const Name& name) const;
+
+    /// @brief Return an Array metadata object by index
+    /// @param idx The index of the array
+    /// @throws LookupError if idx out of range
+    Array& arrayInfo(size_t idx);
+    /// @brief Return an Array metadata object by index
+    /// @param idx The index of the array
+    /// @throws LookupError if idx out of range
+    const Array& arrayInfo(size_t idx) const;
+
+    /// Placeholder method for merging another Info object into this one
+    /// @throws NotImplementedError
+    void merge(const AttributeSet::Info&);
+
+    /// @brief Print information for debugging
+    /// @param os the output stream to write to
+    void print(std::ostream& os = std::cout) const;
+
+private:
+    Descriptor::Ptr mDescriptor = std::make_shared<Descriptor>();
+    std::deque<Array> mArrayInfo;
+}; // class AttributeSet::Info
+
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME

@@ -3,6 +3,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
@@ -21,12 +22,14 @@ public:
     CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
     CPPUNIT_TEST(testAttributeSetGroups);
+    CPPUNIT_TEST(testAttributeSetInfo);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAttributeSetDescriptor();
     void testAttributeSet();
     void testAttributeSetGroups();
+    void testAttributeSetInfo();
 }; // class TestAttributeSet
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeSet);
@@ -1298,6 +1301,219 @@ TestAttributeSet::testAttributeSetGroups()
             // attempt to use a group offset that is out-of-range
             CPPUNIT_ASSERT_THROW(descriptor.setGroup("test16", size_t(16),
                 /*checkValidOffset=*/true), RuntimeError);
+        }
+    }
+}
+
+void
+TestAttributeSet::testAttributeSetInfo()
+{
+    // Define and register some common attribute types
+    using AttributeI        = TypedAttributeArray<int32_t>;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+
+    using Descriptor        = AttributeSet::Descriptor;
+
+    { // simple descriptor construction
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        AttributeSet::Info info(descr);
+        CPPUNIT_ASSERT_EQUAL(size_t(1), info.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), info.descriptor().size());
+
+        Descriptor::Ptr descr2 = info.descriptorPtr();
+        CPPUNIT_ASSERT_EQUAL(descr.get(), descr2.get());
+
+        // out of range or invalid name
+        CPPUNIT_ASSERT_THROW(info.arrayInfo(100), LookupError);
+        CPPUNIT_ASSERT_THROW(info.arrayInfo("invalidname"), LookupError);
+
+        // should all be default values
+        AttributeSet::Info::Array& arrayInfo = info.arrayInfo("P");
+        CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+        CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+        CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+        CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+        CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+        CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+
+        // string stream is non-zero
+        std::ostringstream os;
+        info.print(os);
+        CPPUNIT_ASSERT(os.str().size() > 0);
+    }
+
+    { // attribute set construction
+        AttributeSet attrSet(Descriptor::create(AttributeVec3s::attributeType()),
+            /*arrayLength=*/Index(17));
+        auto testI = attrSet.appendAttribute("testI", AttributeI::attributeType());
+        attrSet.appendAttribute("group1", GroupAttributeArray::attributeType());
+        auto testV3 = attrSet.appendAttribute("testV3", AttributeVec3s::attributeType());
+        attrSet.appendAttribute("testStr", StringAttributeArray::attributeType());
+        attrSet.appendAttribute("testStrided", AttributeI::attributeType(), /*stride=*/10);
+        attrSet.appendAttribute("testDynamic", AttributeI::attributeType(),
+            /*totalSize=*/100, /*constantStride=*/false);
+
+        testI->setHidden(true);
+        testV3->setTransient(true);
+
+        attrSet.descriptor().setGroup("group1", size_t(1));
+
+        AttributeSet::Info info(attrSet);
+
+        { // from attribute set
+            CPPUNIT_ASSERT_EQUAL(size_t(7), info.size());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), info.descriptor().size());
+
+            // verify array info data
+
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("P");
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("testI");
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("group1");
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("testV3");
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("testStr");
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("testStrided");
+                CPPUNIT_ASSERT_EQUAL(Index(10), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+            {
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo("testDynamic");
+                CPPUNIT_ASSERT_EQUAL(Index(100), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+
+            { // by index
+                AttributeSet::Info::Array& arrayInfo = info.arrayInfo(4);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.string);
+            }
+        }
+
+        { // from descriptor
+            AttributeSet::Info infoDescr(attrSet.descriptorPtr());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), infoDescr.size());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), infoDescr.descriptor().size());
+
+            // all array info set to defaults
+
+            for (size_t i = 0; i < size_t(7); i++) {
+                AttributeSet::Info::Array& arrayInfo = infoDescr.arrayInfo(i);
+                CPPUNIT_ASSERT_EQUAL(Index(1), arrayInfo.stride);
+                CPPUNIT_ASSERT_EQUAL(true, arrayInfo.constantStride);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.hidden);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.transient);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.group);
+                CPPUNIT_ASSERT_EQUAL(false, arrayInfo.string);
+            }
+        }
+
+        AttributeArray::ScopedRegistryLock lock;
+
+        { // create attribute set from info
+            AttributeSet newAttrSet(info, 100, &lock);
+            CPPUNIT_ASSERT_EQUAL(size_t(7), newAttrSet.size());
+        }
+
+        { // create attribute set from info using existing attr set of wrong size
+            AttributeSet attrSetWrongSize(attrSet.descriptorPtr(), /*size=*/Index(23), &lock);
+            CPPUNIT_ASSERT_EQUAL(size_t(7), attrSetWrongSize.size());
+
+            auto testArray = attrSetWrongSize.get("testI");
+            testArray->expand();
+
+            CPPUNIT_ASSERT_EQUAL(Index(23), testArray->size());
+            CPPUNIT_ASSERT_EQUAL(false, testArray->isUniform());
+
+            { // set a few values in one of the arrays of the temporary attribute set
+                auto positionHandle = AttributeWriteHandle<int>::create(*testArray);
+                positionHandle->set(Index(0), 16);
+                positionHandle->set(Index(1), -19);
+                positionHandle->set(Index(20), 10978);
+            }
+
+            AttributeSet newAttrSet(info, 100, &lock, &attrSetWrongSize);
+            CPPUNIT_ASSERT_EQUAL(size_t(0), attrSetWrongSize.size());
+
+            // newly created attribute set has not stolen arrays
+            testArray = newAttrSet.get("testI");
+            CPPUNIT_ASSERT_EQUAL(true, testArray->isUniform());
+        }
+
+        { // create attribute set from info using stealing
+            // put some test data into one of the arrays
+            auto testArray = attrSet.get("testI");
+            testArray->expand();
+
+            CPPUNIT_ASSERT_EQUAL(Index(17), testArray->size());
+            CPPUNIT_ASSERT_EQUAL(false, testArray->isUniform());
+
+            { // set a few values
+                auto positionHandle = AttributeWriteHandle<int>::create(*testArray);
+                positionHandle->set(Index(0), 17);
+                positionHandle->set(Index(1), -20);
+                positionHandle->set(Index(11), 10979);
+            }
+
+            AttributeSet newAttrSet(info, Index(17), &lock, &attrSet);
+
+            CPPUNIT_ASSERT_EQUAL(size_t(7), newAttrSet.size());
+            CPPUNIT_ASSERT_EQUAL(size_t(0), attrSet.size());
+
+            { // check values have been transferred across and hence stealing has succeeded
+                auto newTestArray = newAttrSet.get("testI");
+                CPPUNIT_ASSERT(!newTestArray->isUniform());
+                auto positionHandle = AttributeHandle<int>::create(*newTestArray);
+                CPPUNIT_ASSERT_EQUAL(17, positionHandle->get(Index(0)));
+                CPPUNIT_ASSERT_EQUAL(-20, positionHandle->get(Index(1)));
+                CPPUNIT_ASSERT_EQUAL(10979, positionHandle->get(Index(11)));
+            }
         }
     }
 }
