@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 7.0.1 - In Development
 
+    Bug fixes:
+    - Fixed a bug where empty grids were still returning true from
+      evalActiveVoxelBoundingBox when leaf nodes were still present.
 
 Version 7.0.0 - December 6, 2019
 

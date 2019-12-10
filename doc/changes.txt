@@ -2,6 +2,15 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 7.0.1</B> - <I>In Development</I>
+
+@par
+Bug fixes:
+- Fixed a bug where empty grids were still returning true from
+  <TT>evalActiveVoxelBoundingBox</TT> when leaf nodes were still present.
+
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.0.0</B> - <I>December 6, 2019</I>
