@@ -18,8 +18,9 @@ endif()
 # built. You can provide this module a value for Houdini_VERSION which will
 # take into account any conditional compiled blocks. Whilst this doesn't
 # require you to build the Houdini plugin, building from the root CMake
-# with OPENVDB_BUILD_HOUDINI_PLUGIN or USE_HOUDINI will define this value.
-# If Houdini_VERSION is not set, all documentation is included.
+# with OPENVDB_BUILD_DOCS=ON and either OPENVDB_BUILD_HOUDINI_PLUGIN=ON or
+# USE_HOUDINI=ON will define Houdini_VERSION. If Houdini_VERSION is not set,
+# all documentation is included.
 option(OPENVDB_DOXYGEN_HOUDINI "Build Houdini documentation" ON)
 
 # Add the doxygen command if required - do this here so we guarantee
