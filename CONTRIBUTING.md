@@ -1,6 +1,6 @@
 # Overview
 
-This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affilation. Participants all our bound to the ASWF Code of Conduct.
+This project aims to be governed in a transparent, accessible way for the benefit of the community. All participation in this project is open and not bound to corporate affiliation. Participants are all bound to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 # Project roles
 
@@ -8,12 +8,54 @@ This project aims to be governed in a transparent, accessible way for the benefi
 
 The contributor role is the starting role for anyone participating in the project and wishing to contribute code.
 
-# Process for becoming a contributor
+### Process for becoming a contributor
 
 * Review the [coding standards](http://www.openvdb.org/documentation/doxygen/codingStyle.html) to ensure your contribution is in line with the project's coding and styling guidelines.
-* Sign the Individual CLA and have your organization sign the Corporate CLA.
-* Submit your code as a PR with the appropriate DCO sign-off.
-* Have your submission approved by the maintainer(s) and merged into the codebase.
+* Have a signed CLA on file ( see [below](#contributor-license-agreements) )
+* Submit your code as a PR with the appropriate [DCO sign-off](#commit-sign-off).
+* Have your submission approved by the [committer(s)](#committer) and merged into the codebase.
+
+### Legal Requirements
+
+OpenVDB is a project of the Academy Software Foundation and follows the
+open source software best practice policies of the Linux Foundation.
+
+#### License
+
+OpenVDB is licensed under the [Mozilla Public License, version 2.0](LICENSE.md)
+license. Contributions to OpenVDB should abide by that standard
+license.
+
+#### Contributor License Agreements
+
+Developers who wish to contribute code to be considered for inclusion
+in OpenVDB must first complete a **Contributor License Agreement**.
+
+OpenVDB uses [EasyCLA](https://lfcla.com/) for managing CLAs, which automatically
+checks to ensure CLAs are signed by a contributor before a commit
+can be merged. 
+
+* If you are an individual writing the code on your own time and
+  you're SURE you are the sole owner of any intellectual property you
+  contribute, you can [sign the CLA as an individual contributor](https://github.com/communitybridge/easycla/blob/master/docs/sign-a-cla-as-an-individual-contributor-to-github.md).
+
+* If you are writing the code as part of your job, or if there is any
+  possibility that your employers might think they own any
+  intellectual property you create, then you should use the [Corporate
+  Contributor Licence
+  Agreement](https://github.com/communitybridge/easycla/blob/master/docs/contribute-to-a-github-company-project.md).
+
+The OpenVDB CLAs are the standard forms used by Linux Foundation
+projects and [recommended by the ASWF TAC](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contributor-license-agreement-cla). You can review the text of the CLAs in the [TSC directory](tsc/).
+
+#### Commit Sign-Off
+
+Every commit must be signed off.  That is, every commit log message
+must include a “`Signed-off-by`” line (generated, for example, with
+“`git commit --signoff`”), indicating that the committer wrote the
+code and has the right to release it under the
+[Mozilla Public License, version 2.0](LICENSE.md)
+license. See https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off for more information on this requirement.
 
 ## Committer
 
@@ -62,17 +104,17 @@ Project releases will occur on a scheduled basis as agreed to by the TSC.
 
 # Conflict resolution and voting
 
-In general, we prefer that technical issues and maintainer membership are amicably worked out
+In general, we prefer that technical issues and committer status/TSC membership are amicably worked out
 between the persons involved. If a dispute cannot be decided independently, the TSC can be
 called in to decide an issue. If the TSC themselves cannot decide an issue, the issue will
 be resolved by voting. The voting process is a simple majority in which each TSC receives one vote.
 
 # Communication
 
-This project, just like all of open source, is a global community. In addition to the Code of Conduct, this project will:
+This project, just like all of open source, is a global community. In addition to the [Code of Conduct](CODE_OF_CONDUCT.md), this project will:
 
 * Keep all communication on open channels ( mailing list, forums, chat ).
 * Be respectful of time and language differences between community members ( such as scheduling meetings, email/issue responsiveness, etc ).
 * Ensure tools are able to be used by community members regardless of their region.
 
-If you have concerns about communication challenges for this project, please contact the maintainers.
+If you have concerns about communication challenges for this project, please contact the [TSC](mailto:openvdb-tsc-private@lists.aswf.io).
