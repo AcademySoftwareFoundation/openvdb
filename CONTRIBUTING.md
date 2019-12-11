@@ -33,7 +33,7 @@ in OpenVDB must first complete a **Contributor License Agreement**.
 
 OpenVDB uses [EasyCLA](https://lfcla.com/) for managing CLAs, which automatically
 checks to ensure CLAs are signed by a contributor before a commit
-can be merged. 
+can be merged.
 
 * If you are an individual writing the code on your own time and
   you're SURE you are the sole owner of any intellectual property you
