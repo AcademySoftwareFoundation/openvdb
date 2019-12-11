@@ -1,12 +1,16 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.1 - In Development
+Version 7.1.0 - In Development
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
       only return true if the grid contains any active values.
+
+    API changes:
+    - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
+      a boost::scoped_array.
 
 Version 7.0.0 - December 6, 2019
 

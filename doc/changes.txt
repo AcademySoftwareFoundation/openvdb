@@ -2,15 +2,20 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.1</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>In Development</I>
 
 @par
 Bug fixes:
 - Fixed a bug where grids with no active values might return true when the
   method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to
   only return true if the grid contains any active values.
+
+@par
+API changes:
+- @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
+  now returns a std::unique_ptr instead of a boost::scoped_array.
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
