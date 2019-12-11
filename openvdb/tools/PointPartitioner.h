@@ -339,61 +339,6 @@ struct VoxelOrderOp
 }; // struct VoxelOrderOp
 
 
-template<typename PointArray, typename PointIndexType>
-struct LeafNodeOriginOp
-{
-    using IndexArray = boost::scoped_array<PointIndexType>;
-    using CoordArray = boost::scoped_array<Coord>;
-
-    LeafNodeOriginOp(CoordArray& coordinates,
-        const IndexArray& indices, const IndexArray& pages,
-        const PointArray& points, const math::Transform& m, int log2dim, bool cellCenteredTransform)
-        : mCoordinates(coordinates.get())
-        , mIndices(indices.get())
-        , mPages(pages.get())
-        , mPoints(&points)
-        , mXForm(m)
-        , mLog2Dim(log2dim)
-        , mCellCenteredTransform(cellCenteredTransform)
-    {
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-
-        using PosType = typename PointArray::PosType;
-
-        const bool cellCentered = mCellCenteredTransform;
-        const int mask = ~((1 << mLog2Dim) - 1);
-        Coord ijk;
-        PosType pos;
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-
-            mPoints->getPos(mIndices[mPages[n]], pos);
-
-            if (std::isfinite(pos[0]) && std::isfinite(pos[1]) && std::isfinite(pos[2])) {
-                ijk = cellCentered ? mXForm.worldToIndexCellCentered(pos) :
-                    mXForm.worldToIndexNodeCentered(pos);
-
-                ijk[0] &= mask;
-                ijk[1] &= mask;
-                ijk[2] &= mask;
-
-                mCoordinates[n] = ijk;
-            }
-        }
-    }
-
-    Coord                 * const mCoordinates;
-    PointIndexType  const * const mIndices;
-    PointIndexType  const * const mPages;
-    PointArray      const * const mPoints;
-    math::Transform         const mXForm;
-    int                     const mLog2Dim;
-    bool                    const mCellCenteredTransform;
-}; // struct LeafNodeOriginOp
-
-
 ////////////////////////////////////////
 
 
@@ -803,7 +748,7 @@ inline void binAndSegment(
     const math::Transform& xform,
     boost::scoped_array<typename Array<PointIndexType>::Ptr>& indexSegments,
     boost::scoped_array<typename Array<PointIndexType>::Ptr>& offsetSegments,
-    size_t& segmentCount,
+    std::vector<Coord>& coords,
     const Index binLog2Dim,
     const Index bucketLog2Dim,
     VoxelOffsetType* voxelOffsets = nullptr,
@@ -836,10 +781,10 @@ inline void binAndSegment(
         }
     }
 
-    std::vector<Coord> coords(uniqueCoords.begin(), uniqueCoords.end());
+    coords.assign(uniqueCoords.begin(), uniqueCoords.end());
     uniqueCoords.clear();
 
-    segmentCount = coords.size();
+    size_t segmentCount = coords.size();
 
     using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
@@ -860,6 +805,7 @@ inline void partition(
     const Index bucketLog2Dim,
     boost::scoped_array<PointIndexType>& pointIndices,
     boost::scoped_array<PointIndexType>& pageOffsets,
+    boost::scoped_array<Coord>& pageCoordinates,
     PointIndexType& pageCount,
     boost::scoped_array<VoxelOffsetType>& voxelOffsets,
     bool recordVoxelOffsets,
@@ -874,14 +820,16 @@ inline void partition(
     //       (2^8)^3 = 256^3 voxel region.
 
 
-    size_t numSegments = 0;
+    std::vector<Coord> segmentCoords;
 
     boost::scoped_array<typename Array<PointIndexType>::Ptr> indexSegments;
     boost::scoped_array<typename Array<PointIndexType>::Ptr> offsetSegments;
 
     binAndSegment<PointIndexType, VoxelOffsetType, PointArray>(points, xform,
-        indexSegments, offsetSegments, numSegments, binLog2Dim, bucketLog2Dim,
+        indexSegments, offsetSegments, segmentCoords, binLog2Dim, bucketLog2Dim,
             voxelOffsets.get(), cellCenteredTransform);
+
+    size_t numSegments = segmentCoords.size();
 
     const tbb::blocked_range<size_t> segmentRange(0, numSegments);
 
@@ -897,8 +845,12 @@ inline void partition(
 
     indexSegments.reset();
 
+    std::vector<Index> segmentOffsets;
+    segmentOffsets.reserve(numSegments);
+
     pageCount = 0;
     for (size_t n = 0; n < numSegments; ++n) {
+        segmentOffsets.push_back(pageCount);
         pageCount += pageOffsetArrays[n][0] - 1;
     }
 
@@ -928,6 +880,44 @@ inline void partition(
         indexArray.push_back(index);
         index += offsetSegments[n]->size();
     }
+
+    // compute leaf node origin for each page
+
+    pageCoordinates.reset(new Coord[pageCount]);
+
+    tbb::parallel_for(segmentRange,
+        [&](tbb::blocked_range<size_t>& range)
+        {
+            for (size_t n = range.begin(); n < range.end(); n++)
+            {
+                Index segmentOffset = segmentOffsets[n];
+                PointIndexType* indices = pageIndexArrays[n].get();
+
+                const Coord& segmentCoord = segmentCoords[n];
+
+                tbb::blocked_range<size_t> copyRange(0, pageOffsetArrays[n][0] - 1);
+                tbb::parallel_for(copyRange,
+                    [&](tbb::blocked_range<size_t>& r)
+                    {
+                        for (size_t i = r.begin(); i < r.end(); i++)
+                        {
+                            Index pageIndex = indices[i];
+                            Coord& ijk = pageCoordinates[segmentOffset+i];
+
+                            ijk[0] = pageIndex >> (2 * binLog2Dim);
+                            Index pageIndexModulo = pageIndex - (ijk[0] << (2 * binLog2Dim));
+                            ijk[1] = pageIndexModulo >> binLog2Dim;
+                            ijk[2] = pageIndexModulo - (ijk[1] << binLog2Dim);
+
+                            ijk = (ijk << bucketLog2Dim) + segmentCoord;
+                        }
+                    }
+                );
+            }
+        }
+    );
+
+    // move segment data
 
     tbb::parallel_for(segmentRange,
         MoveSegmentDataOp<PointIndexType>(indexArray, offsetSegments.get()));
@@ -1008,16 +998,10 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::construct(
     mUsingCellCenteredTransform = cellCenteredTransform;
 
     point_partitioner_internal::partition(points, xform, BucketLog2Dim,
-        mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets,
+        mPointIndices, mPageOffsets, mPageCoordinates, mPageCount, mVoxelOffsets,
             (voxelOrder || recordVoxelOffsets), cellCenteredTransform);
 
     const tbb::blocked_range<size_t> pageRange(0, mPageCount);
-    mPageCoordinates.reset(new Coord[mPageCount]);
-
-    tbb::parallel_for(pageRange,
-        point_partitioner_internal::LeafNodeOriginOp<PointArray, IndexType>
-            (mPageCoordinates, mPointIndices, mPageOffsets, points, xform,
-                BucketLog2Dim, cellCenteredTransform));
 
     if (mVoxelOffsets && voxelOrder) {
         tbb::parallel_for(pageRange, point_partitioner_internal::VoxelOrderOp<
