@@ -65,9 +65,9 @@ GridDescriptor::writeHeader(std::ostream &os) const
 void
 GridDescriptor::writeStreamPos(std::ostream &os) const
 {
-    os.write(reinterpret_cast<const char*>(&mGridPos), sizeof(boost::int64_t));
-    os.write(reinterpret_cast<const char*>(&mBlockPos), sizeof(boost::int64_t));
-    os.write(reinterpret_cast<const char*>(&mEndPos), sizeof(boost::int64_t));
+    os.write(reinterpret_cast<const char*>(&mGridPos), sizeof(int64_t));
+    os.write(reinterpret_cast<const char*>(&mBlockPos), sizeof(int64_t));
+    os.write(reinterpret_cast<const char*>(&mEndPos), sizeof(int64_t));
 }
 
 GridBase::Ptr
@@ -98,9 +98,9 @@ GridDescriptor::read(std::istream &is)
     if (grid) grid->setSaveFloatAsHalf(mSaveFloatAsHalf);
 
     // Read in the offsets.
-    is.read(reinterpret_cast<char*>(&mGridPos), sizeof(boost::int64_t));
-    is.read(reinterpret_cast<char*>(&mBlockPos), sizeof(boost::int64_t));
-    is.read(reinterpret_cast<char*>(&mEndPos), sizeof(boost::int64_t));
+    is.read(reinterpret_cast<char*>(&mGridPos), sizeof(int64_t));
+    is.read(reinterpret_cast<char*>(&mBlockPos), sizeof(int64_t));
+    is.read(reinterpret_cast<char*>(&mEndPos), sizeof(int64_t));
 
     return grid;
 }

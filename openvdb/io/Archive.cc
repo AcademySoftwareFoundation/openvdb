@@ -1002,9 +1002,6 @@ Archive::readHeader(std::istream& is)
 void
 Archive::writeHeader(std::ostream& os, bool seekable) const
 {
-    using boost::uint32_t;
-    using boost::int64_t;
-
     // 1) Write the magic number for VDB.
     int64_t magic = OPENVDB_MAGIC;
     os.write(reinterpret_cast<char*>(&magic), sizeof(int64_t));
