@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 7.0.1 - In Development
 
+    Bug fixes:
+    - Fixed a bug where grids with no active values might return true when the
+      method evalActiveVoxelBoundingBox is called. The correct behavior is to
+      only return true if the grid contains any active values.
 
 Version 7.0.0 - December 6, 2019
 

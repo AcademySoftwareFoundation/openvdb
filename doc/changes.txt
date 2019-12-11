@@ -2,6 +2,16 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 7.0.1</B> - <I>In Development</I>
+
+@par
+Bug fixes:
+- Fixed a bug where grids with no active values might return true when the
+  method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to
+  only return true if the grid contains any active values.
+
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.0.0</B> - <I>December 6, 2019</I>
