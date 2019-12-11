@@ -710,10 +710,11 @@ struct OrderSegmentsOp
     using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offsetSegments,
-        IndexArray* pageOffsetArrays, Index binVolume)
+        IndexArray* pageOffsetArrays, IndexArray* pageIndexArrays, Index binVolume)
         : mIndexSegments(indexSegments)
         , mOffsetSegments(offsetSegments)
         , mPageOffsetArrays(pageOffsetArrays)
+        , mPageIndexArrays(pageIndexArrays)
         , mBinVolume(binVolume)
     {
     }
@@ -754,10 +755,14 @@ struct OrderSegmentsOp
             pageOffsets.reset(new PointIndexType[nonemptyBucketCount + 1]);
             pageOffsets[0] = nonemptyBucketCount + 1; // stores array size in first element
 
+            IndexArray& pageIndices = mPageIndexArrays[n];
+            pageIndices.reset(new PointIndexType[nonemptyBucketCount]);
+
             // Compute bucket counter prefix sum
             PointIndexType count = 0, idx = 0;
             for (size_t i = 0; i < bucketCountersSize; ++i) {
                 if (bucketCounters[i] != 0) {
+                    pageIndices[idx] = static_cast<PointIndexType>(i);
                     pageOffsets[idx+1] = bucketCounters[i];
                     bucketCounters[i] = count;
                     count += pageOffsets[idx+1];
@@ -783,6 +788,7 @@ struct OrderSegmentsOp
     SegmentPtr * const mIndexSegments;
     SegmentPtr * const mOffsetSegments;
     IndexArray * const mPageOffsetArrays;
+    IndexArray * const mPageIndexArrays;
     Index        const mBinVolume;
 }; // struct OrderSegmentsOp
 
@@ -881,11 +887,13 @@ inline void partition(
 
     using IndexArray = boost::scoped_array<PointIndexType>;
     boost::scoped_array<IndexArray> pageOffsetArrays(new IndexArray[numSegments]);
+    boost::scoped_array<IndexArray> pageIndexArrays(new IndexArray[numSegments]);
 
     const Index binVolume = 1u << (3u * binLog2Dim);
 
     tbb::parallel_for(segmentRange, OrderSegmentsOp<PointIndexType>
-        (indexSegments.get(), offsetSegments.get(), pageOffsetArrays.get(), binVolume));
+        (indexSegments.get(), offsetSegments.get(),
+            pageOffsetArrays.get(), pageIndexArrays.get(), binVolume));
 
     indexSegments.reset();
 
