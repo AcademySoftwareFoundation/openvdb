@@ -76,6 +76,7 @@ class OPENVDB_API GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupHandle>;
+    using UniquePtr = std::unique_ptr<GroupHandle>;
 
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
@@ -104,6 +105,7 @@ class OPENVDB_API GroupWriteHandle : public GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupWriteHandle>;
+    using UniquePtr = std::unique_ptr<GroupWriteHandle>;
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
