@@ -2,9 +2,14 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.1</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>In Development</I>
+
+@par
+Improvements:
+- Add support for default value metadata when creating AttributeArrays or
+  appending to an AttributeSet.
 
 @par
 Bug fixes:

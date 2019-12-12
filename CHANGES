@@ -1,7 +1,11 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.1 - In Development
+Version 7.1.0 - In Development
+
+    Improvements:
+    - Add support for default value metadata when creating AttributeArrays or
+      appending to an AttributeSet.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
