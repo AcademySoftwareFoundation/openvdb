@@ -732,8 +732,7 @@ removeDivergenceWithColliderGrid(SolverParms& parms, const BoundaryOpType& bound
         if (parms.colliderType == CT_BBOX) {
             op.correctVelocity(BBoxConstAccessor(parms));
         } else {
-            UTvdbProcessTypedGridTopology(
-                UTvdbGetGridType(*parms.colliderGrid), *parms.colliderGrid, op);
+            parms.colliderGrid->apply<hvdb::VolumeGridTypes>(op);
         }
     }
 
@@ -798,8 +797,7 @@ processGrid(SolverParms& parms)
             // If a dynamic collider grid was supplied, its active values define
             // the velocities of solid obstacles.
             ColliderDispatchOp<VelocityGridType> op(parms);
-            success = UTvdbProcessTypedGridVec3(
-                UTvdbGetGridType(*parms.colliderGrid), *parms.colliderGrid, op);
+            success = parms.colliderGrid->apply<hvdb::Vec3GridTypes>(op);
             if (success) success = op.success;
             break;
         }
@@ -934,9 +932,9 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                         parms.colliderType = CT_STATIC;
                         ColliderMaskOp op;
                         op.mask = ColliderMaskGrid::create();
-                        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
-                            *parms.colliderGrid, op);
-                        parms.colliderGrid = op.mask;
+                        if (parms.colliderGrid->apply<hvdb::VolumeGridTypes>(op)) {
+                            parms.colliderGrid = op.mask;
+                        }
                     }
                 }
             }

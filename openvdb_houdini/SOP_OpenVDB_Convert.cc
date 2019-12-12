@@ -795,7 +795,7 @@ getVDBTypeFromNameAndPrecision(const UT_String& name, int bits)
 ////////////////////////////////////////
 
 
-// Functor for use with GEOvdbProcessTypedGrid*() to create a copy of a grid,
+// Functor for use with GEOvdbApply() to create a copy of a grid,
 // but with a new value type
 struct GridCopyOp
 {
@@ -894,7 +894,7 @@ getMaskFromGrid(const hvdb::GridCPtr& gridPtr, double isovalue = 0.0)
             maskGridPtr = gridPtr;
         } else {
             InteriorMaskOp op{isovalue};
-            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*gridPtr), *gridPtr, op);
+            gridPtr->apply<hvdb::VolumeGridTypes>(op);
             maskGridPtr = op.outGridPtr;
         }
     }

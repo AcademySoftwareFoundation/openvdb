@@ -398,7 +398,7 @@ SOP_OpenVDB_Filter::updateParmsFlags()
 ////////////////////////////////////////
 
 
-// Helper class for use with UTvdbProcessTypedGrid()
+// Helper class for use with GridBase::apply()
 struct SOP_OpenVDB_Filter::FilterOp
 {
     FilterParmVec opSequence;

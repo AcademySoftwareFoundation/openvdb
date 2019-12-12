@@ -140,7 +140,7 @@ SOP_OpenVDB_Transform::SOP_OpenVDB_Transform(OP_Network* net,
 
 namespace {
 
-// Functor for use with GEOvdbProcessTypedGridVec3() to apply a transform
+// Functor for use with GEOvdbApply() to apply a transform
 // to the voxel values of vector-valued grids
 struct VecXformOp
 {

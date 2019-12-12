@@ -447,8 +447,7 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
 
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
-            UTvdbProcessTypedGridScalar(it->getStorageType(), it->getGrid(), shadowOp);
-            //GEOvdbProcessTypedGridTopology(**it, clipOp);
+            hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**it, shadowOp);
 
             // Replace the original VDB primitive with a new primitive that contains
             // the output grid and has the same attributes and group membership.

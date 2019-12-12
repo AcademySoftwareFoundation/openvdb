@@ -695,7 +695,7 @@ SOP_OpenVDB_Vector_Merge::Cache::cookVDBSop(OP_Context& context)
             // This does not support a partial set so we quit early in that case.
             ScalarGridMerger op(xGrid, yGrid, zGrid, outGridName, copyInactiveValues,
                 [this](const char* msg) { addWarning(SOP_MESSAGE, msg); });
-            UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
+            nonNullGrid->apply<hvdb::NumericGridTypes>(op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {
                 outGrid->setName(outGridName);

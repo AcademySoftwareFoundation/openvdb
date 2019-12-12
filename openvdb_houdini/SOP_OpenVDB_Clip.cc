@@ -411,8 +411,9 @@ struct MaskClipOp
         if (mask) {
             // Dispatch on the mask grid type, now that the source grid type is resolved.
             MaskClipDispatchOp<GridType> op(grid, inside);
-            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op);
-            outputGrid = op.outputGrid;
+            if (mask->apply<hvdb::VolumeGridTypes>(op)) {
+                outputGrid = op.outputGrid;
+            }
         }
     }
 
@@ -568,11 +569,8 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                             "nonuniform padding is not supported for mask clipping");
                     }
                     if (const int dilation = int(std::round(paddingInVoxels[0]))) {
-                        const auto maskType = UTvdbGetGridType(*maskGrid);
                         DilatedMaskOp op{dilation};
-                        if (!UTvdbProcessTypedGridTopology(maskType, *maskGrid, op)) {
-                            UTvdbProcessTypedGridPoint(maskType, *maskGrid, op);
-                        }
+                        maskGrid->apply<hvdb::AllGridTypes>(op);
                         if (op.maskGrid) maskGrid = op.maskGrid;
                     }
                 }

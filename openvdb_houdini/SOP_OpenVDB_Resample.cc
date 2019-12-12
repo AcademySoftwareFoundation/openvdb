@@ -14,7 +14,7 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/UT_VDBTools.h> // for GridTransformOp, et al.
-#include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbProcessTypedGridReal()
+#include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbGridCast()
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridTransformer.h>
@@ -348,7 +348,7 @@ SOP_OpenVDB_Resample::SOP_OpenVDB_Resample(OP_Network* net, const char* name, OP
 
 namespace {
 
-// Helper class for use with UTvdbProcessTypedGrid()
+// Helper class for use with GridBase::apply()
 struct RebuildOp
 {
     std::function<void (const std::string&)> addWarning;
@@ -376,7 +376,7 @@ struct RebuildOp
 }; // struct RebuildOp
 
 
-// Functor for use with UTvdbProcessTypedGridVec3() to apply a transform
+// Functor for use with GridBase::apply() to apply a transform
 // to the voxel values of vector-valued grids
 struct VecXformOp
 {
@@ -518,7 +518,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
                     RebuildOp op;
                     op.addWarning = addWarningCB;
                     op.xform = *refXform;
-                    UTvdbProcessTypedGridReal(valueType, grid, op);
+                    grid.apply<hvdb::RealGridTypes>(op);
                     outGrid = op.outGrid;
 
                 } else {
@@ -565,7 +565,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
                     op.xform = grid.constTransform();
                     op.xform.preMult(xform.getTransform().inverse());
 
-                    UTvdbProcessTypedGridReal(valueType, grid, op);
+                    grid.apply<hvdb::RealGridTypes>(op);
                     outGrid = op.outGrid;
                     outGrid->setTransform(grid.constTransform().copy());
 
@@ -601,7 +601,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
                     // If (and only if) the grid is vector-valued, apply the transform
                     // to each voxel's value.
                     VecXformOp op(xform.getTransform());
-                    UTvdbProcessTypedGridVec3(valueType, *outGrid, op);
+                    outGrid->apply<hvdb::Vec3GridTypes>(op);
                 }
             }
 

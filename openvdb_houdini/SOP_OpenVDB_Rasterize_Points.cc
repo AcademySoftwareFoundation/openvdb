@@ -2579,8 +2579,7 @@ applyClippingMask(PointIndexGridCollection::BoolTreeType& mask, RasterizationSet
 
         GridTopologyClipOp<PointIndexGridCollection::BoolTreeType>
             op(mask, *settings.transform, settings.invertMask);
-
-        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*settings.maskGrid), *settings.maskGrid, op);
+        settings.maskGrid->apply<hvdb::VolumeGridTypes>(op);
     }
 }
 

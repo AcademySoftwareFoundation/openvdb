@@ -371,8 +371,9 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
-                UTvdbProcessTypedGridTopology(maskIt->getStorageType(), maskIt->getGrid(), op);
-                maskGrid = op.mMaskGrid;
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**maskIt, op)) {
+                    maskGrid = op.mMaskGrid;
+                }
             }
 
             if (!maskGrid) addWarning(SOP_MESSAGE, "Mask VDB not found.");
