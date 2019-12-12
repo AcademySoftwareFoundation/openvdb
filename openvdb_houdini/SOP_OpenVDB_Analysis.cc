@@ -18,7 +18,6 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
-#include <GEO/GEO_PrimVDB.h> // for GEOvdbProcessTypedGridScalar(), etc.
 
 #include <sstream>
 #include <stdexcept>
@@ -394,64 +393,72 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 case OP_GRADIENT: // gradient of scalar field
                 {
                     ToolOp<cvdb::tools::Gradient> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridScalar(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_gradient";
                     break;
                 }
                 case OP_CURVATURE: // mean curvature of scalar field
                 {
                     ToolOp<cvdb::tools::MeanCurvature> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridScalar(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_curvature";
                     break;
                 }
                 case OP_LAPLACIAN: // Laplacian of scalar field
                 {
                     ToolOp<cvdb::tools::Laplacian> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridScalar(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_laplacian";
                     break;
                 }
                 case OP_CPT: // closest point transform of scalar level set
                 {
                     ToolOp<cvdb::tools::Cpt> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridScalar(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_cpt";
                     break;
                 }
                 case OP_DIVERGENCE: // divergence of vector field
                 {
                     ToolOp<cvdb::tools::Divergence> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridVec3(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_divergence";
                     break;
                 }
                 case OP_CURL: // curl (rotation) of vector field
                 {
                     ToolOp<cvdb::tools::Curl> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridVec3(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_curl";
                     break;
                 }
                 case OP_MAGNITUDE: // magnitude of vector field
                 {
                     ToolOp<cvdb::tools::Magnitude> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridVec3(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_magnitude";
                     break;
                 }
                 case OP_NORMALIZE: // normalize vector field
                 {
                     ToolOp<cvdb::tools::Normalize> op(threaded, boss, maskGrid.get());
-                    ok = GEOvdbProcessTypedGridVec3(*vdb, op, /*makeUnique=*/false);
-                    if (ok) outGrid = op.mOutGrid;
+                    if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
+                        outGrid = op.mOutGrid;
+                    }
                     operationName = "_normalize";
                     break;
                 }
@@ -462,7 +469,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 std::ostringstream ss;
                 ss << "Can't compute " << sOpName[whichOp] << " from grid";
                 if (inGridName.isstring()) ss << " " << inGridName;
-                ss << " of type " << vdb->getGrid().valueType();
+                ss << " of type " << UTvdbGetGridTypeString(vdb->getGrid());
                 addWarning(SOP_MESSAGE, ss.str().c_str());
             }
 

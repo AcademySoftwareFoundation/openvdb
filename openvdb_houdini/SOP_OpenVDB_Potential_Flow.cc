@@ -430,13 +430,8 @@ SOP_OpenVDB_Potential_Flow::Cache::cookVDBSop(OP_Context& context)
 
                 if (boss.wasInterrupted()) break;
 
-                const GU_PrimVDB *vdb = *vdbIt;
-
                 MaskToLevelSetOp op;
-                if (GEOvdbProcessTypedGridTopology(*vdb, op)) {
-                    grid = op.mSdfGrid;
-                }
-                else if (GEOvdbProcessTypedGridPoint(*vdb, op)) {
+                if (hvdb::GEOvdbApply<hvdb::AllGridTypes>(**vdbIt, op)) {
                     grid = op.mSdfGrid;
                 }
             }

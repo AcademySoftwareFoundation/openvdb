@@ -312,7 +312,7 @@ SOP_OpenVDB_Transform::Cache::cookVDBSop(OP_Context& context)
             {
                 // If (and only if) the grid is vector-valued, deep copy it,
                 // then apply the transform to each voxel's value.
-                GEOvdbProcessTypedGridVec3(*vdb, xformOp, /*makeUnique=*/true);
+                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, xformOp);
             }
         }
     } catch (std::exception& e) {

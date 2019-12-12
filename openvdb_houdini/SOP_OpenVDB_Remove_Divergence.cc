@@ -891,7 +891,7 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                     if (colliderIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         // If the collider grid is a level set, extract an interior mask from it.
                         LevelSetMaskOp op;
-                        if (GEOvdbProcessTypedGridScalar(**colliderIt, op)) {
+                        if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**colliderIt, op)) {
                             parms.colliderGrid = op.outputGrid;
                         }
                     }

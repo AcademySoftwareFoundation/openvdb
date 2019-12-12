@@ -567,9 +567,7 @@ SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
             }
 #endif
 
-            int success = GEOvdbProcessTypedGridTopology(*vdbPrim, filterOp);
-
-            if (!success) {
+            if (!hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(*vdbPrim, filterOp)) {
                 std::stringstream ss;
                 ss << "VDB grid " << name << " of type "
                     << vdbPrim->getConstGrid().valueType() << " was skipped";

@@ -1034,7 +1034,7 @@ SOP_OpenVDB_Convert::Cache::convertVDBType(
             op.outType = outType;
             // Create a copy of the grid, but with a different value type.
             // Store the copy as op.outGrid.
-            GEOvdbProcessTypedGridTopology(*it.getPrimitive(), op);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
             if (op.outGrid) {
                 auto& grid = *op.outGrid;
                 grid.removeMeta("value_type");
@@ -1414,7 +1414,7 @@ SOP_OpenVDB_Convert::Cache::convertToPoly(
         for (; vdbIt; ++vdbIt) {
 
             if (boss.wasInterrupted()) break;
-            GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
+            hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**vdbIt, mesher);
 
             delGroup->addOffset(vdbIt.getOffset());
 

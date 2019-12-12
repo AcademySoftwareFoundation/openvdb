@@ -548,7 +548,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         // If the mask grid is a level set, extract an interior mask from it.
                         LevelSetMaskOp op;
-                        GEOvdbProcessTypedGridScalar(**maskIt, op);
+                        hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**maskIt, op);
                         maskGrid = op.outputGrid;
                     } else {
                         maskGrid = maskIt->getConstGridPtr();
@@ -616,7 +616,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
 
             if (maskGrid) {
                 MaskClipOp op{maskGrid, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     addWarning(SOP_MESSAGE,
@@ -624,7 +624,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 }
             } else if (useCamera) {
                 FrustumClipOp op{mFrustum, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     addWarning(SOP_MESSAGE,
@@ -632,7 +632,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 }
             } else {
                 BBoxClipOp op{clipBox, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     if (inside) {

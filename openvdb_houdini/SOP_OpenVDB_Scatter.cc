@@ -1024,10 +1024,10 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
                     const GA_Range range(gdp->getPointMap(),startOffset,gdp->getNumPointOffsets());
                     // Use the original spread value to control how close to the surface points lie.
                     SnapPointsOp op{*gdp, range, theSpread, isovalue, rebuild, dilate, mask, &boss};
-                    GEOvdbProcessTypedGridReal(**primIter, op); // process the original input grid
+                    hvdb::GEOvdbApply<hvdb::RealGridTypes>(**primIter, op); // process the original input grid
                 } else if (vdbPoints && pointGrid) {
                     SnapPointsOp op{*pointGrid, theSpread, isovalue, rebuild, dilate, mask, &boss};
-                    GEOvdbProcessTypedGridReal(**primIter, op);
+                    hvdb::GEOvdbApply<hvdb::RealGridTypes>(**primIter, op);
                 }
             }
         } // for each grid
