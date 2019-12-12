@@ -557,7 +557,7 @@ getMaskFromGrid(const hvdb::GridCPtr& gridPtr, double isovalue = 0.0)
             maskGridPtr = gridPtr;
         } else {
             InteriorMaskOp op{isovalue};
-            gridPtr->apply<hvdb::VolumeGridTypes>(op);
+            gridPtr->apply<hvdb::AllGridTypes>(op);
             maskGridPtr = op.outGridPtr;
         }
     }

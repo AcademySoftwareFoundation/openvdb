@@ -529,13 +529,13 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 
                     if (curOrder == 0) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::PointSampler> op(outGrid);
-                        grid.apply<hvdb::VolumeGridTypes>(op);
+                        grid.apply<hvdb::AllGridTypes>(op);
                     } else if (curOrder == 1) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::BoxSampler> op(outGrid);
-                        grid.apply<hvdb::VolumeGridTypes>(op);
+                        grid.apply<hvdb::AllGridTypes>(op);
                     } else if (curOrder == 2) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::QuadraticSampler> op(outGrid);
-                        grid.apply<hvdb::VolumeGridTypes>(op);
+                        grid.apply<hvdb::AllGridTypes>(op);
                     }
 
 #ifdef SESI_OPENVDB

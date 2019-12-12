@@ -371,7 +371,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
             hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
             if (maskIt) {
                 MaskOp op;
-                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**maskIt, op)) {
+                if (hvdb::GEOvdbApply<hvdb::AllGridTypes>(**maskIt, op)) {
                     maskGrid = op.mMaskGrid;
                 }
             }

@@ -1000,7 +1000,7 @@ SOP_OpenVDB_Create::createMaskGrid(const GU_PrimVDB* refVdb,
 
     cvdb::MaskGrid::Ptr maskGrid;
     GridConvertToMask op(maskGrid);
-    if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(*refVdb, op)) {
+    if (hvdb::GEOvdbApply<hvdb::AllGridTypes>(*refVdb, op)) {
         maskGrid->setTransform(refVdb->getGrid().transform().copy());
     } else {
         throw std::runtime_error("No valid reference grid found");

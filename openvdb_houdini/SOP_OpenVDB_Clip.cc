@@ -411,7 +411,7 @@ struct MaskClipOp
         if (mask) {
             // Dispatch on the mask grid type, now that the source grid type is resolved.
             MaskClipDispatchOp<GridType> op(grid, inside);
-            if (mask->apply<hvdb::VolumeGridTypes>(op)) {
+            if (mask->apply<hvdb::AllGridTypes>(op)) {
                 outputGrid = op.outputGrid;
             }
         }
