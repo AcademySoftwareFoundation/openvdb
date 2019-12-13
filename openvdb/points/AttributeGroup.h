@@ -109,7 +109,10 @@ public:
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
+    /// Set @a on at the given index @a n
     void set(Index n, bool on);
+    /// Set @a on at the given index @a n (assumes in-core and non-uniform)
+    void setUnsafe(Index n, bool on);
 
     /// @brief Set membership for the whole array and attempt to collapse
     ///
