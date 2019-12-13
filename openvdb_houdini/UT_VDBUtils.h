@@ -213,7 +213,7 @@ template<typename GridType, typename OpType, typename GridBaseType>
 inline void
 callTypedGrid(GridBaseType &grid, OpType& op)
 {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
     op.operator()<GridType>(UTvdbGridCast<GridType>(grid));
 #else
     op.template operator()<GridType>(UTvdbGridCast<GridType>(grid));
