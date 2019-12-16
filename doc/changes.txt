@@ -12,6 +12,11 @@ Bug fixes:
   method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to
   only return true if the grid contains any active values.
 
+@par
+Improvements:
+- Added new group inspection methods to the
+  @vdblink::points::AttributeSet::Descriptor AttributeSet::Descriptor@endlink.
+
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.0.0</B> - <I>December 6, 2019</I>
