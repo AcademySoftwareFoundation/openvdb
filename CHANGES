@@ -8,6 +8,10 @@ Version 7.0.1 - In Development
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
       only return true if the grid contains any active values.
 
+    Improvements:
+    - Introduced a StringMetaCache class for convenient string attribute
+      metadata lookup and performed some minor optimizations.
+
 Version 7.0.0 - December 6, 2019
 
       Some changes in this release (see "ABI changes" below) alter
