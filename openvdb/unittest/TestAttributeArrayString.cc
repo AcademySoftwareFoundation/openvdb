@@ -19,6 +19,7 @@ public:
     virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeArrayString);
+    CPPUNIT_TEST(testStringMetaCache);
     CPPUNIT_TEST(testStringMetaInserter);
     CPPUNIT_TEST(testStringAttribute);
     CPPUNIT_TEST(testStringAttributeHandle);
@@ -27,6 +28,7 @@ public:
 
     CPPUNIT_TEST_SUITE_END();
 
+    void testStringMetaCache();
     void testStringMetaInserter();
     void testStringAttribute();
     void testStringAttributeHandle();
@@ -60,6 +62,56 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 
 
 void
+TestAttributeArrayString::testStringMetaCache()
+{
+    { // cache with manual insertion
+        StringMetaCache cache;
+        CPPUNIT_ASSERT(cache.empty());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), cache.size());
+
+        cache.insert("test", 1);
+
+        CPPUNIT_ASSERT(!cache.empty());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), cache.size());
+
+        auto it = cache.map().find("test");
+        CPPUNIT_ASSERT(it != cache.map().end());
+    }
+
+    { // cache with metadata insertion and reset
+        MetaMap metadata;
+
+        StringMetaInserter inserter(metadata);
+        inserter.insert("test1");
+        inserter.insert("test2");
+
+        StringMetaCache cache(metadata);
+        CPPUNIT_ASSERT(!cache.empty());
+        CPPUNIT_ASSERT_EQUAL(size_t(2), cache.size());
+
+        auto it = cache.map().find("test1");
+        CPPUNIT_ASSERT(it != cache.map().end());
+        CPPUNIT_ASSERT_EQUAL(Name("test1"), it->first);
+        CPPUNIT_ASSERT_EQUAL(Index(1), it->second);
+        it = cache.map().find("test2");
+        CPPUNIT_ASSERT(it != cache.map().end());
+        CPPUNIT_ASSERT_EQUAL(Name("test2"), it->first);
+        CPPUNIT_ASSERT_EQUAL(Index(2), it->second);
+
+        MetaMap metadata2;
+
+        StringMetaInserter inserter2(metadata2);
+        inserter2.insert("test3");
+
+        cache.reset(metadata2);
+        CPPUNIT_ASSERT_EQUAL(size_t(1), cache.size());
+        it = cache.map().find("test3");
+        CPPUNIT_ASSERT(it != cache.map().end());
+    }
+}
+
+
+void
 TestAttributeArrayString::testStringMetaInserter()
 {
     MetaMap metadata;
@@ -67,16 +119,24 @@ TestAttributeArrayString::testStringMetaInserter()
     StringMetaInserter inserter(metadata);
 
     { // insert one value
-        inserter.insert("test");
+        Index index = inserter.insert("test");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(Index(1), index);
+        CPPUNIT_ASSERT(inserter.hasIndex(1));
+        CPPUNIT_ASSERT(inserter.hasKey("test"));
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
     }
 
     { // insert another value
-        inserter.insert("test2");
+        Index index = inserter.insert("test2");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(Index(2), index);
+        CPPUNIT_ASSERT(inserter.hasIndex(1));
+        CPPUNIT_ASSERT(inserter.hasKey("test"));
+        CPPUNIT_ASSERT(inserter.hasIndex(2));
+        CPPUNIT_ASSERT(inserter.hasKey("test2"));
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
@@ -91,8 +151,9 @@ TestAttributeArrayString::testStringMetaInserter()
     inserter.resetCache();
 
     { // re-insert value
-        inserter.insert("test3");
+        Index index = inserter.insert("test3");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(Index(2), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
@@ -102,8 +163,9 @@ TestAttributeArrayString::testStringMetaInserter()
     }
 
     { // insert and remove to create a gap
-        inserter.insert("test4");
+        Index index = inserter.insert("test4");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(Index(3), index);
         metadata.removeMeta("string:1");
         inserter.resetCache();
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
@@ -116,8 +178,9 @@ TestAttributeArrayString::testStringMetaInserter()
     }
 
     { // insert to fill gap
-        inserter.insert("test10");
+        Index index = inserter.insert("test10");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(Index(2), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
@@ -131,8 +194,9 @@ TestAttributeArrayString::testStringMetaInserter()
 
     { // insert existing value
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
-        inserter.insert("test10");
+        Index index = inserter.insert("test10");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(Index(2), index);
     }
 
     metadata.removeMeta("string:0");
@@ -144,8 +208,9 @@ TestAttributeArrayString::testStringMetaInserter()
         metadata.insertMeta("irrelevant", StringMetadata("irrelevant"));
         inserter.resetCache();
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
-        inserter.insert("test15");
+        Index index = inserter.insert("test15");
         CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(Index(1), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test15"));
@@ -153,10 +218,43 @@ TestAttributeArrayString::testStringMetaInserter()
         CPPUNIT_ASSERT(meta);
         CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test10"));
     }
+
+    { // insert using a hint
+        Index index = inserter.insert("test1000", 1000);
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(5));
+        CPPUNIT_ASSERT_EQUAL(Index(1000), index);
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:999");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1000"));
+    }
+
+    { // insert using same hint (fail to use hint this time)
+        Index index = inserter.insert("test1001", 1000);
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(6));
+        CPPUNIT_ASSERT_EQUAL(Index(3), index);
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:2");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1001"));
+    }
+
+    { // insert using next adjacent hint
+        Index index = inserter.insert("test1002", 1001);
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(7));
+        CPPUNIT_ASSERT_EQUAL(Index(1001), index);
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:1000");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1002"));
+    }
+
+    { // insert using previous adjacent hint
+        Index index = inserter.insert("test999", 999);
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(8));
+        CPPUNIT_ASSERT_EQUAL(Index(999), index);
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:998");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test999"));
+    }
 }
-
-
-////////////////////////////////////////
 
 
 void
@@ -465,7 +563,6 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
 void
 TestAttributeArrayString::testProfile()
 {
-
 #ifdef PROFILE
     struct Timer : public openvdb::util::CpuTimer {};
     const size_t elements = 1000000;

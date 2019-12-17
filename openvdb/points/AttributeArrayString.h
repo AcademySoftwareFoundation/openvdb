@@ -12,7 +12,7 @@
 
 #include "AttributeArray.h"
 #include <memory>
-#include <unordered_set>
+#include <deque>
 #include <unordered_map>
 
 
@@ -25,12 +25,12 @@ namespace points {
 ////////////////////////////////////////
 
 
-using StringIndexType = uint32_t;
+using StringIndexType = Index;
 
 
 namespace attribute_traits
 {
-    template <bool Truncate> struct StringTypeTrait { using Type = StringIndexType; };
+    template <bool Truncate> struct StringTypeTrait { using Type = Index; };
     template<> struct StringTypeTrait</*Truncate=*/true> { using Type = uint16_t; };
 }
 
@@ -38,7 +38,7 @@ namespace attribute_traits
 template <bool Truncate>
 struct StringCodec
 {
-    using ValueType = StringIndexType;
+    using ValueType = Index;
 
     template <typename T>
     struct Storage { using Type = typename attribute_traits::StringTypeTrait<Truncate>::Type; };
@@ -49,27 +49,68 @@ struct StringCodec
 };
 
 
-using StringAttributeArray = TypedAttributeArray<StringIndexType, StringCodec<false>>;
+using StringAttributeArray = TypedAttributeArray<Index, StringCodec<false>>;
 
 
 ////////////////////////////////////////
 
 
+/// Class to compute a string->index map from all string:N metadata
+class OPENVDB_API StringMetaCache
+{
+public:
+    using UniquePtr = std::unique_ptr<StringMetaCache>;
+    using ValueMap = std::unordered_map<Name, Index>;
+
+    StringMetaCache() = default;
+    explicit StringMetaCache(const MetaMap& metadata);
+
+    /// Return @c true if no string elements in metadata
+    bool empty() const { return mCache.empty(); }
+    /// Returns the number of string elements in metadata
+    size_t size() const { return mCache.size(); }
+
+    /// Clears and re-populates the cache
+    void reset(const MetaMap& metadata);
+
+    /// Insert a new element in the cache
+    void insert(const Name& key, Index index);
+
+    /// Retrieve the value map (string -> index)
+    const ValueMap& map() const { return mCache; }
+
+private:
+    ValueMap mCache;
+}; // StringMetaCache
+
+
+////////////////////////////////////////
+
+
+/// Class to help with insertion of keyed string values into metadata
 class OPENVDB_API StringMetaInserter
 {
 public:
-    StringMetaInserter(MetaMap& metadata);
+    explicit StringMetaInserter(MetaMap& metadata);
 
-    /// Insert the string into the metadata
-    void insert(const Name& name);
+    /// Returns @c true if key exists
+    bool hasKey(const Name& key) const;
+    /// Returns @c true if index exists
+    bool hasIndex(Index index) const;
+
+    /// Insert the string into the metadata, hint is used if non-zero
+    /// Returns the chosen index which will match hint if not in use
+    Index insert(const Name& name, Index hint = Index(0));
 
     /// Reset the cache from the metadata
     void resetCache();
 
 private:
+    using IndexPairArray = std::deque<std::pair<Index, Index>>;
+
     MetaMap& mMetadata;
-    std::vector<std::pair<Index, Index>> mIdBlocks;
-    std::unordered_set<Name> mValues;
+    IndexPairArray mIdBlocks;
+    StringMetaCache mCache;
 }; // StringMetaInserter
 
 
@@ -130,7 +171,7 @@ public:
     const AttributeArray& array() const;
 
 protected:
-    AttributeHandle<StringIndexType, StringCodec<false>>    mHandle;
+    AttributeHandle<Index, StringCodec<false>>    mHandle;
     const MetaMap&                                          mMetadata;
 }; // class StringAttributeHandle
 
@@ -185,10 +226,8 @@ private:
     /// @note throws if name does not exist in cache
     Index getIndex(const Name& name) const;
 
-    using ValueMap = std::unordered_map<std::string, Index>;
-
-    ValueMap                                                    mCache;
-    AttributeWriteHandle<StringIndexType, StringCodec<false>>   mWriteHandle;
+    StringMetaCache                                             mCache;
+    AttributeWriteHandle<Index, StringCodec<false>>   mWriteHandle;
 }; // class StringAttributeWriteHandle
 
 
