@@ -932,9 +932,8 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                         parms.colliderType = CT_STATIC;
                         ColliderMaskOp op;
                         op.mask = ColliderMaskGrid::create();
-                        if (parms.colliderGrid->apply<hvdb::AllGridTypes>(op)) {
-                            parms.colliderGrid = op.mask;
-                        }
+                        parms.colliderGrid->apply<hvdb::AllGridTypes>(op);
+                        parms.colliderGrid = op.mask;
                     }
                 }
             }
