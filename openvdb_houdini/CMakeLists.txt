@@ -237,6 +237,7 @@ set(OPENVDB_DSO_NAMES
   SOP_OpenVDB_From_Particles
   SOP_OpenVDB_From_Polygons
   SOP_OpenVDB_LOD
+  SOP_OpenVDB_Merge
   SOP_OpenVDB_Metadata
   SOP_OpenVDB_Morph_Level_Set
   SOP_OpenVDB_Noise
