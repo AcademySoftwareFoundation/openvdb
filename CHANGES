@@ -12,6 +12,9 @@ Version 7.0.1 - In Development
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
       array is known to be in-core and non-uniform.
 
+     Houdini:
+    - Platonic SOP is now verbified.
+
 Version 7.0.0 - December 6, 2019
 
       Some changes in this release (see "ABI changes" below) alter

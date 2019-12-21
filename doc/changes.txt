@@ -17,6 +17,10 @@ Improvements:
 - Added GroupWriteHandle::setUnsafe() for faster performance when the group
   array is known to be in-core and non-uniform.
 
+@par
+Houdini:
+- Platonic SOP is now verbified.
+
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.0.0</B> - <I>December 6, 2019</I>
