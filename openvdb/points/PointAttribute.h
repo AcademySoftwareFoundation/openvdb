@@ -531,17 +531,6 @@ inline void compactAttributes(PointDataTreeT& tree)
 ////////////////////////////////////////
 
 
-template <typename PointDataTreeT>
-OPENVDB_DEPRECATED inline void bloscCompressAttribute(  PointDataTreeT&,
-                                                        const Name&)
-{
-    // in-memory compression is no longer supported
-}
-
-
-////////////////////////////////////////
-
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

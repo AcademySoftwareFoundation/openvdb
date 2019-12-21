@@ -77,6 +77,17 @@ void GroupWriteHandle::set(Index n, bool on)
 }
 
 
+void GroupWriteHandle::setUnsafe(Index n, bool on)
+{
+    const GroupType& value = mArray.getUnsafe(n);
+
+    GroupAttributeArray& array(const_cast<GroupAttributeArray&>(mArray));
+
+    if (on)     array.setUnsafe(n, value | mBitMask);
+    else        array.setUnsafe(n, value & ~mBitMask);
+}
+
+
 bool GroupWriteHandle::collapse(bool on)
 {
     using ValueT = GroupAttributeArray::ValueType;
