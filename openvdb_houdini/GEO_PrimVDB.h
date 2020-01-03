@@ -735,12 +735,7 @@ inline void
 callTypedGrid(GEO_PrimVDB& prim, OpType& op)
 {
     prim.makeGridUnique();
-
-#if defined(_MSC_VER) && !defined(__clang__)
-    op.operator()<GridType>(*(UTverify_cast<GridType*>(&prim.getGrid())));
-#else
     op.template operator()<GridType>(*(UTverify_cast<GridType*>(&prim.getGrid())));
-#endif
 }
 
 // Overload of callTypedGrid() for GridBaseType = const GEO_PrimVDB
@@ -748,11 +743,7 @@ template<typename GridType, typename OpType>
 inline void
 callTypedGrid(const GEO_PrimVDB& prim, OpType& op)
 {
-#if defined(_MSC_VER) && !defined(__clang__)
-    op.operator()<GridType>(*(UTverify_cast<const GridType*>(&prim.getConstGrid())));
-#else
     op.template operator()<GridType>(*(UTverify_cast<const GridType*>(&prim.getConstGrid())));
-#endif
 }
 
 } // namespace UT_VDBUtils
