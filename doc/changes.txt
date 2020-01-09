@@ -16,6 +16,7 @@ Bug fixes:
 Improvements:
 - Added GroupWriteHandle::setUnsafe() for faster performance when the group
   array is known to be in-core and non-uniform.
+- Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
 
 @par
 Houdini:
