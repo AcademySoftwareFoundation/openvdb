@@ -897,6 +897,9 @@ public:
     ConstTreePtrType constTreePtr() const { return mTree; }
     TreeBase::ConstPtr constBaseTreePtr() const override { return mTree; }
     //@}
+    /// @brief Return true if tree is not shared with another grid.
+    /// @todo Make this into a virtual function with ABI=8
+    bool isTreeUnique() const;
     //@{
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
@@ -1453,6 +1456,14 @@ Grid<TreeT>::copyGridWithNewTree() const
 
 
 ////////////////////////////////////////
+
+
+template<typename TreeT>
+inline bool
+Grid<TreeT>::isTreeUnique() const
+{
+    return mTree.use_count() == 1;
+}
 
 
 template<typename TreeT>
