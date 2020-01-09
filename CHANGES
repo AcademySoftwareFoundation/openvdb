@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 7.0.1 - In Development
 
+    New features:
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
