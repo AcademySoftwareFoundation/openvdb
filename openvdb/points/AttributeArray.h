@@ -280,9 +280,6 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// @deprecated Previously this returned @c true if the array was compressed,
-    /// now it always returns @c false.
-    OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// @deprecated Previously this compressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
@@ -612,8 +609,9 @@ public:
     /// @note This method is thread-safe.
     AttributeArray::Ptr copy() const override;
 
-    /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
+    /// Return a copy of this attribute.
     /// @note This method is thread-safe.
+    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
     OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
@@ -682,30 +680,30 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
-    /// Return the value at index @a n (assumes uncompressed and in-core)
+    /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
     /// Return the value at index @a n
     ValueType get(Index n) const;
-    /// Return the @a value at index @a n (assumes uncompressed and in-core)
+    /// Return the @a value at index @a n (assumes in-core)
     template<typename T> void getUnsafe(Index n, T& value) const;
     /// Return the @a value at index @a n
     template<typename T> void get(Index n, T& value) const;
 
     /// Non-member equivalent to getUnsafe() that static_casts array to this TypedAttributeArray
-    /// (assumes uncompressed and in-core)
+    /// (assumes in-core)
     static ValueType getUnsafe(const AttributeArray* array, const Index n);
 
-    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    /// Set @a value at the given index @a n (assumes in-core)
     void setUnsafe(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
     void set(Index n, const ValueType& value);
-    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    /// Set @a value at the given index @a n (assumes in-core)
     template<typename T> void setUnsafe(Index n, const T& value);
     /// Set @a value at the given index @a n
     template<typename T> void set(Index n, const T& value);
 
     /// Non-member equivalent to setUnsafe() that static_casts array to this TypedAttributeArray
-    /// (assumes uncompressed and in-core)
+    /// (assumes in-core)
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
@@ -803,7 +801,7 @@ private:
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
-    /// @param compression if true, loading previously compressed data will re-compressed it
+    /// @param compression parameter no longer used
     inline void doLoadUnsafe(const bool compression = true) const;
     /// Compress in-core data assuming mutex is locked
     inline bool compressUnsafe();
@@ -2029,7 +2027,7 @@ AttributeArray::AccessorBasePtr
 TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
 {
     // use the faster 'unsafe' get and set methods as attribute handles
-    // ensure data is uncompressed and in-core when constructed
+    // ensure data is in-core when constructed
 
     return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
         &TypedAttributeArray<ValueType_, Codec_>::getUnsafe,

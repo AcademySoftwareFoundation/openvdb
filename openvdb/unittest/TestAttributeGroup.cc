@@ -277,8 +277,8 @@ TestAttributeGroup::testAttributeGroupHandle()
 
     writeHandle3.set(1, true);
     writeHandle6.set(2, true);
-    writeHandle3.set(3, true);
-    writeHandle6.set(3, true);
+    writeHandle3.setUnsafe(3, true);
+    writeHandle6.setUnsafe(3, true);
 
     { // group 3 valid for attributes 1 and 3 (using specific offset)
         GroupHandle handle3(attr, 3);

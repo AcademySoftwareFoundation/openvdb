@@ -13,8 +13,15 @@ Bug fixes:
   only return true if the grid contains any active values.
 
 @par
+Improvements:
+- Added GroupWriteHandle::setUnsafe() for faster performance when the group
+  array is known to be in-core and non-uniform.
+
+@par
 Houdini:
+- Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
+
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
