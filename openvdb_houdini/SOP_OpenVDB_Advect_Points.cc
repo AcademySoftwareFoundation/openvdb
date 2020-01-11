@@ -998,7 +998,7 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
                     {
                         VDBPointsAdvection<openvdb::points::PointDataGrid> advection(
                             outputGrid, parms, boss);
-                        GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+                        hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, advection);
                         break;
                     }
                     case PROPAGATION_TYPE_PROJECTION: break; // not implemented
@@ -1013,13 +1013,13 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
             case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
             {
                 Advection advection(parms, boss);
-                GEOvdbProcessTypedGridVec3(*parms.mVelPrim, advection);
+                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, advection);
                 break;
             }
             case PROPAGATION_TYPE_PROJECTION:
             {
                 Projection projection(parms, boss);
-                GEOvdbProcessTypedGridVec3(*parms.mCptPrim, projection);
+                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, projection);
                 break;
             }
             case PROPAGATION_TYPE_UNKNOWN: break;

@@ -20,6 +20,8 @@ Improvements:
 @par
 Houdini:
 - Platonic SOP is now verbified.
+- Extend all SOP references to support VDB Points.
+
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par

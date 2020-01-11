@@ -1230,17 +1230,14 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                 if (meshing == MESH_HOUDINI) {
                     GridSurfacer surfacer(*gdp, static_cast<float>(iso),
                         static_cast<float>(adaptivity), false, &boss);
-                    GEOvdbProcessTypedGridScalar(*vdb, surfacer);
+                    hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, surfacer);
                 }
 #endif
 
                 // draw tree topology
                 if (drawTree) {
                     TreeVisualizer draw(*gdp, treeParms, &boss);
-
-                    if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
-                        GEOvdbProcessTypedGridPoint(*vdb, draw);
-                    }
+                    hvdb::GEOvdbApply<hvdb::AllGridTypes>(*vdb, draw);
                 }
 
                 if (showFrustum) {
