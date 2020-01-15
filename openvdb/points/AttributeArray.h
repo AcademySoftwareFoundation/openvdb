@@ -52,7 +52,7 @@ floatingPointToFixedPoint(const FloatT s)
     static_assert(std::is_unsigned<IntegerT>::value, "IntegerT must be unsigned");
     if (FloatT(0.0) > s) return std::numeric_limits<IntegerT>::min();
     else if (FloatT(1.0) <= s) return std::numeric_limits<IntegerT>::max();
-    return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max())));
+    return IntegerT(s * FloatT(std::numeric_limits<IntegerT>::max()));
 }
 
 
