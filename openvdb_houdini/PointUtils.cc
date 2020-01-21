@@ -477,7 +477,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     }
 
     appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(),
-        stride, /*constantstride=*/true, defaultValue);
+        stride, /*constantstride=*/true, defaultValue.get());
 
     HoudiniAttribute houdiniAttribute(*attribute);
     populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniAttribute>(
