@@ -534,14 +534,6 @@ inline void compactAttributes(PointDataTreeT& tree)
 
 template <typename PointDataTreeT>
 OPENVDB_DEPRECATED inline void
-bloscCompressAttribute(PointDataTreeT&, const Name&)
-{
-    // in-memory compression is no longer supported
-}
-
-
-template <typename PointDataTreeT>
-OPENVDB_DEPRECATED inline void
 appendAttribute(PointDataTreeT& tree,
                 const Name& name,
                 const NamePair& type,

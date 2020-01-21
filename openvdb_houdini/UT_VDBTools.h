@@ -14,7 +14,7 @@
 
 namespace openvdb_houdini {
 
-/// @brief GridTransformOp is a functor class for use with UTvdbProcessTypedGrid()
+/// @brief GridTransformOp is a functor class for use with GridBase::apply()
 /// that samples an input grid into an output grid of the same type through
 /// a given affine transform.
 /// @details The output grid's transform is unchanged by this operation.
@@ -33,7 +33,7 @@ namespace openvdb_houdini {
 /// // Resolve the input grid's type and resample it into the output grid,
 /// // using a second-order sampling kernel.
 /// GridTransformOp<openvdb::tools::QuadraticSampler> op(outGrid, xform);
-/// UTvdbProcessTypedGrid(UTvdbGetGridType(inGrid), inGrid, op);
+/// inGrid.apply<openvdb_houdini::ScalarGridTypes>(op);
 /// @endcode
 template<typename Sampler>
 class GridTransformOp
@@ -94,7 +94,7 @@ private:
 /// // Resolve the input grid's type and resample it into the output grid,
 /// // using a trilinear sampling kernel.
 /// GridResampleOp<openvdb::tools::BoxSampler, MyXform> op(outGrid, MyXform());
-/// UTvdbProcessTypedGrid(UTvdbGetGridType(inGrid), inGrid, op);
+/// inGrid.apply<openvdb_houdini::ScalarGridTypes>(op);
 /// @endcode
 template<typename Sampler, typename TransformerType>
 class GridResampleOp
@@ -131,7 +131,7 @@ private:
 
 
 /// @brief GridResampleToMatchOp is a functor class for use with
-/// UTvdbProcessTypedGrid() that samples an input grid into an output grid
+/// GridBase::apply() that samples an input grid into an output grid
 /// of the same type such that, after resampling, the input and output grids
 /// coincide, but the output grid's transform is unchanged.
 /// @sa GridTransformOp, GridResampleOp
@@ -147,7 +147,7 @@ private:
 /// // Resolve the input grid's type and resample it into the output grid,
 /// // using a second-order sampling kernel.
 /// GridResampleToMatchOp<openvdb::tools::QuadraticSampler> op(outGrid);
-/// UTvdbProcessTypedGrid(UTvdbGetGridType(inGrid), inGrid, op);
+/// inGrid.apply<openvdb_houdini::ScalarGridTypes>(op);
 /// @endcode
 template<typename Sampler>
 class GridResampleToMatchOp

@@ -674,7 +674,7 @@ SOP_OpenVDB_Remap::Cache::cookVDBSop(OP_Context& context)
             remap.setPrimitiveName(it.getPrimitiveName().toStdString());
             remap.setPrimitiveIndex(int(it.getIndex()));
 
-            GEOvdbProcessTypedGrid(**it, remap, /*makeUnique=*/true);
+            hvdb::GEOvdbApply<hvdb::NumericGridTypes::Append<hvdb::Vec3GridTypes>>(**it, remap);
 
             GU_PrimVDB* vdbPrim = *it;
             const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();

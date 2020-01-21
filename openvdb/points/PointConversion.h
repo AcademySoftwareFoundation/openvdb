@@ -1039,67 +1039,6 @@ computeVoxelSize(  const PositionWrapper& positions,
 
 // deprecated functions
 
-
-template <typename PositionAttribute, typename PointDataGridT>
-OPENVDB_DEPRECATED
-inline void
-convertPointDataGridPosition(   PositionAttribute& positionAttribute,
-                                const PointDataGridT& grid,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const std::vector<Name>& includeGroups,
-                                const std::vector<Name>& excludeGroups,
-                                const bool inCoreOnly = false)
-{
-    auto leaf = grid.tree().cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset,
-        filter, inCoreOnly);
-}
-
-
-template <typename TypedAttribute, typename PointDataTreeT>
-OPENVDB_DEPRECATED
-inline void
-convertPointDataGridAttribute(  TypedAttribute& attribute,
-                                const PointDataTreeT& tree,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const unsigned arrayIndex,
-                                const Index stride,
-                                const std::vector<Name>& includeGroups,
-                                const std::vector<Name>& excludeGroups,
-                                const bool inCoreOnly = false)
-{
-    auto leaf = tree.cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset,
-        arrayIndex, stride, filter, inCoreOnly);
-}
-
-
-template <typename Group, typename PointDataTreeT>
-OPENVDB_DEPRECATED
-inline void
-convertPointDataGridGroup(  Group& group,
-                            const PointDataTreeT& tree,
-                            const std::vector<Index64>& pointOffsets,
-                            const Index64 startOffset,
-                            const AttributeSet::Descriptor::GroupIndex index,
-                            const std::vector<Name>& includeGroups,
-                            const std::vector<Name>& excludeGroups,
-                            const bool inCoreOnly = false)
-{
-    auto leaf = tree.cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridGroup(group, tree, pointOffsets, startOffset,
-        index, filter, inCoreOnly);
-}
-
-
 template<
     typename CompressionT,
     typename PointDataGridT,
@@ -1127,6 +1066,9 @@ createPointDataGrid(const std::vector<ValueT>& positions,
     return createPointDataGrid<CompressionT, PointDataGridT>(
         positions, xform, positionDefaultValue.get());
 }
+
+
+////////////////////////////////////////
 
 
 } // namespace points

@@ -12,6 +12,14 @@ Version 7.1.0 - In Development
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
       only return true if the grid contains any active values.
 
+    Improvements:
+    - Added GroupWriteHandle::setUnsafe() for faster performance when the group
+      array is known to be in-core and non-uniform.
+
+     Houdini:
+    - Platonic SOP is now verbified.
+    - Extend all SOP references to support VDB Points.
+
 Version 7.0.0 - December 6, 2019
 
       Some changes in this release (see "ABI changes" below) alter
