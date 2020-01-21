@@ -42,7 +42,7 @@ struct Default
 /// @param type               the type of the attibute.
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param metaDefaultValue   metadata default attribute value
+/// @param defaultValue       metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename PointDataTreeT>
@@ -62,7 +62,7 @@ inline void appendAttribute(PointDataTreeT& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param metaDefaultValue   metadata default attribute value
+/// @param defaultValue       metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType,
@@ -74,7 +74,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                                 point_attribute_internal::Default<ValueType>::value(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            const Metadata* metaDefaultValue = nullptr,
+                            const Metadata* defaultValue = nullptr,
                             const bool hidden = false,
                             const bool transient = false);
 
