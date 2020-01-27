@@ -198,9 +198,7 @@ SOP_OpenVDB_Prune::Cache::cookVDBSop(OP_Context& context)
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
-
-            GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, pruneOp);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, pruneOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

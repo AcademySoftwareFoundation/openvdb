@@ -744,11 +744,7 @@ template<typename OpType>
 inline bool
 process(const UT_VDBType type, const openvdb::GridBase& grid, OpType& op, const std::string* name)
 {
-    bool success(false);
-    success = UTvdbProcessTypedGridTopology(type, grid, op);
-    if (!success) {
-        success = UTvdbProcessTypedGridPoint(type, grid, op);
-    }
+    bool success = grid.apply<hvdb::AllGridTypes>(op);
     if (name) op.print(*name);
     return success;
 }
@@ -967,14 +963,14 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
                         const auto dim = grid->transform().voxelSize();
                         VDBNonUniformScatter scatter(static_cast<float>(density * dim.product()),
                             seed, spread, posCompression, &boss);
-                        if (!UTvdbProcessTypedGridScalar(gridType, *grid, scatter)) {
+                        if (!grid->apply<hvdb::NumericGridTypes>(scatter)) {
                             throw std::runtime_error(
                                 "Only scalar grids support voxel scaling of density");
                         }
                         postprocessVDBPoints(scatter, /*cull=*/false);
                     } else { // Houdini points
                         NonuniformScatterer scatter(pointAccessor, density, mtRand, spread, &boss);
-                        if (!UTvdbProcessTypedGridScalar(gridType, *grid, scatter)) {
+                        if (!grid->apply<hvdb::NumericGridTypes>(scatter)) {
                             throw std::runtime_error(
                                 "Only scalar grids support voxel scaling of density");
                         }
@@ -1024,10 +1020,10 @@ SOP_OpenVDB_Scatter::Cache::cookVDBSop(OP_Context& context)
                     const GA_Range range(gdp->getPointMap(),startOffset,gdp->getNumPointOffsets());
                     // Use the original spread value to control how close to the surface points lie.
                     SnapPointsOp op{*gdp, range, theSpread, isovalue, rebuild, dilate, mask, &boss};
-                    GEOvdbProcessTypedGridReal(**primIter, op); // process the original input grid
+                    hvdb::GEOvdbApply<hvdb::RealGridTypes>(**primIter, op); // process the original input grid
                 } else if (vdbPoints && pointGrid) {
                     SnapPointsOp op{*pointGrid, theSpread, isovalue, rebuild, dilate, mask, &boss};
-                    GEOvdbProcessTypedGridReal(**primIter, op);
+                    hvdb::GEOvdbApply<hvdb::RealGridTypes>(**primIter, op);
                 }
             }
         } // for each grid
