@@ -536,11 +536,7 @@ private:
 template<typename ValueType, typename OpType>
 struct ArrayProcessor {
     static inline void call(OpType& op, const AttributeArray& array) {
-#ifdef _MSC_VER
-        op.operator()<ValueType>(array);
-#else
         op.template operator()<ValueType>(array);
-#endif
     }
 };
 

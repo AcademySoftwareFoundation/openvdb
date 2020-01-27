@@ -167,33 +167,52 @@ endif()
 # Set the relative directory containing Houdini libs and populate an extra list
 # of Houdini dependencies for _houdini_create_libraries.
 
-set(_HOUDINI_LIB_DIR)
+if(NOT HOUDINI_DSOLIB_DIR)
+  if(APPLE)
+    set(HOUDINI_DSOLIB_DIR Frameworks/Houdini.framework/Versions/Current/Libraries)
+  elseif(UNIX)
+    set(HOUDINI_DSOLIB_DIR dsolib)
+  elseif(WIN32)
+    set(HOUDINI_DSOLIB_DIR custom/houdini/dsolib)
+  endif()
+endif()
+
 set(_HOUDINI_EXTRA_LIBRARIES)
 set(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
 if(APPLE)
-  set(_HOUDINI_LIB_DIR
-    Frameworks/Houdini.framework/Versions/Current/Libraries
-  )
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
-    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
-    ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
-    ${_HOUDINI_LIB_DIR}/libhboost_thread.dylib
+    ${HOUDINI_DSOLIB_DIR}/libHoudiniRAY.dylib
+    ${HOUDINI_DSOLIB_DIR}/libhboost_regex.dylib
+    ${HOUDINI_DSOLIB_DIR}/libhboost_thread.dylib
   )
-else()
-  set(_HOUDINI_LIB_DIR dsolib)
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    HoudiniRAY
+    hboost_regex
+    hboost_thread
+  )
+elseif(UNIX)
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
-    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
-    ${_HOUDINI_LIB_DIR}/libhboost_regex.so
-    ${_HOUDINI_LIB_DIR}/libhboost_thread.so
+    ${HOUDINI_DSOLIB_DIR}/libHoudiniRAY.so
+    ${HOUDINI_DSOLIB_DIR}/libhboost_regex.so
+    ${HOUDINI_DSOLIB_DIR}/libhboost_thread.so
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    HoudiniRAY
+    hboost_regex
+    hboost_thread
+  )
+elseif(WIN32)
+  #libRAY is already included by houdini for windows builds
+  list(APPEND _HOUDINI_EXTRA_LIBRARIES
+    ${HOUDINI_DSOLIB_DIR}/hboost_regex-mt.lib
+    ${HOUDINI_DSOLIB_DIR}/hboost_thread-mt.lib
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    hboost_regex
+    hboost_thread
   )
 endif()
-
-list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
-  HoudiniRAY
-  hboost_regex
-  hboost_thread
-)
 
 # Additionally link extra deps
 
@@ -209,7 +228,7 @@ unset(_HOUDINI_EXTRA_LIBRARY_NAMES)
 # Set Houdini lib and include directories
 
 set(_HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
-set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR})
+set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
@@ -293,6 +312,8 @@ if(APPLE)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
 elseif(UNIX)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.so")
+elseif(WIN32)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.lib")
 endif()
 
 # ------------------------------------------------------------------------

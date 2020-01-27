@@ -624,32 +624,6 @@ public:
 
 public:
 
-#if defined(_MSC_VER) && (_MSC_VER < 1914)
-    using ValueOnIter = typename BaseLeaf::ValueIter<
-        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
-    using ValueOnCIter = typename BaseLeaf::ValueIter<
-        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn>;
-    using ValueOffIter = typename BaseLeaf::ValueIter<
-        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff>;
-    using ValueOffCIter = typename BaseLeaf::ValueIter<
-        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff>;
-    using ValueAllIter = typename BaseLeaf::ValueIter<
-        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll>;
-    using ValueAllCIter = typename BaseLeaf::ValueIter<
-        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll>;
-    using ChildOnIter = typename BaseLeaf::ChildIter<
-        MaskOnIterator, PointDataLeafNode, ChildOn>;
-    using ChildOnCIter = typename BaseLeaf::ChildIter<
-        MaskOnIterator, const PointDataLeafNode, ChildOn>;
-    using ChildOffIter = typename BaseLeaf::ChildIter<
-        MaskOffIterator, PointDataLeafNode, ChildOff>;
-    using ChildOffCIter = typename BaseLeaf::ChildIter<
-        MaskOffIterator, const PointDataLeafNode, ChildOff>;
-    using ChildAllIter = typename BaseLeaf::DenseIter<
-        PointDataLeafNode, ValueType, ChildAll>;
-    using ChildAllCIter = typename BaseLeaf::DenseIter<
-        const PointDataLeafNode, const ValueType, ChildAll>;
-#else
     using ValueOnIter = typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
     using ValueOnCIter = typename BaseLeaf::template ValueIter<
@@ -674,7 +648,6 @@ public:
         PointDataLeafNode, ValueType, ChildAll>;
     using ChildAllCIter = typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll>;
-#endif
 
     using IndexVoxelIter    = IndexIter<ValueVoxelCIter, NullFilter>;
     using IndexAllIter      = IndexIter<ValueAllCIter, NullFilter>;
