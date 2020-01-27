@@ -4,6 +4,8 @@ OpenVDB Version History
 Version 7.1.0 - In Development
 
     Improvements:
+    - Added GroupWriteHandle::setUnsafe() for faster performance when the group
+      array is known to be in-core and non-uniform.
     - Add support for default value metadata when creating AttributeArrays or
       appending to an AttributeSet.
 
@@ -12,11 +14,10 @@ Version 7.1.0 - In Development
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
       only return true if the grid contains any active values.
 
-    Improvements:
-    - Added GroupWriteHandle::setUnsafe() for faster performance when the group
-      array is known to be in-core and non-uniform.
+    API changes:
+    - Removed a number of deprecated point methods.
 
-     Houdini:
+    Houdini:
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
 

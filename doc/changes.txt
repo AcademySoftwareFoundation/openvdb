@@ -8,6 +8,8 @@
 
 @par
 Improvements:
+- Added GroupWriteHandle::setUnsafe() for faster performance when the group
+  array is known to be in-core and non-uniform.
 - Add support for default value metadata when creating AttributeArrays or
   appending to an AttributeSet.
 
@@ -18,9 +20,8 @@ Bug fixes:
   only return true if the grid contains any active values.
 
 @par
-Improvements:
-- Added GroupWriteHandle::setUnsafe() for faster performance when the group
-  array is known to be in-core and non-uniform.
+API changes:
+- Removed a number of deprecated point methods.
 
 @par
 Houdini:
