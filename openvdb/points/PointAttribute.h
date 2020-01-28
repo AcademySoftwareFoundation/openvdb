@@ -74,7 +74,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                                 point_attribute_internal::Default<ValueType>::value(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            const Metadata* defaultValue = nullptr,
+                            const TypedMetadata<ValueType>* defaultValue = nullptr,
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -307,7 +307,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            const Metadata* defaultValue,
+                            const TypedMetadata<ValueType>* defaultValue,
                             const bool hidden,
                             const bool transient)
 {
