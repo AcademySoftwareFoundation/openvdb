@@ -57,6 +57,7 @@ option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
+option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
@@ -321,7 +322,7 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
   set(USE_HOUDINI ON)
 endif()
 
@@ -352,6 +353,7 @@ if(NOT (
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
+    OPENVDB_BUILD_HOUDINI_ABITESTS OR
     OPENVDB_BUILD_MAYA_PLUGIN)
   )
   return()
@@ -648,6 +650,10 @@ endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
   add_subdirectory(openvdb_houdini)
+endif()
+
+if(OPENVDB_BUILD_HOUDINI_ABITESTS)
+  add_subdirectory(openvdb_houdini/abitest)
 endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
