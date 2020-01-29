@@ -47,9 +47,6 @@ houdini_get_default_install_dir():
   Mac: $ENV{HOME}/Library/Preferences/houdini/X.X
   Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
-option(USE_SESI_OPENVDB_PRIM [=[
-Use the bundled Houdini source files to build the Houdini GU Primitive
-type. This is typically only for developer use.]=] OFF)
 
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
@@ -75,8 +72,6 @@ if(OPENVDB_HOUDINI_ENABLE_SESI_TAG)
   message(DEPRECATION "The OPENVDB_HOUDINI_ENABLE_SESI_TAG option is deprecated "
     "and will be removed.")
 endif()
-
-mark_as_advanced(USE_SESI_OPENVDB_PRIM)
 
 #########################################################################
 
@@ -187,11 +182,6 @@ target_link_libraries(openvdb_houdini PUBLIC
 )
 
 target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
-
-if(USE_SESI_OPENVDB_PRIM)
-  message(STATUS "Configuring OpenVDB Houdini to use local SESI headers.")
-  target_compile_definitions(openvdb_houdini PUBLIC -DSESI_OPENVDB_PRIM)
-endif()
 
 if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
