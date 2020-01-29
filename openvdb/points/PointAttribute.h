@@ -562,9 +562,13 @@ appendAttribute(PointDataTreeT& tree,
                 const bool hidden = false,
                 const bool transient = false)
 {
-    // default metadata value must now be provided as a raw pointer
+    // default metadata value must now be provided as a typed raw pointer
+    TypedMetadata<ValueType>* metadata = nullptr;
+    if (metaDefaultValue) {
+        metadata = dynamic_cast<TypedMetadata<ValueType>*>(metaDefaultValue.get());
+    }
     appendAttribute<ValueType, CodecType>(tree, name, uniformValue, strideOrTotalSize, constantStride,
-        metaDefaultValue.get(), hidden, transient);
+        metadata, hidden, transient);
 }
 
 
