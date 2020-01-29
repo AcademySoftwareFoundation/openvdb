@@ -299,6 +299,25 @@ if(NOT ILMBASE_LIBRARYDIR)
   set(ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR})
 endif()
 
+# OpenVDB
+
+if(NOT OPENVDB_INCLUDEDIR)
+  set(OPENVDB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+endif()
+if(NOT OPENVDB_SESI_LIB)
+  # Full path to openvdb_sesi library
+  find_library(OPENVDB_SESI_LIB openvdb_sesi
+    ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
+    PATHS ${_HOUDINI_LIB_DIR}
+  )
+  if(NOT EXISTS ${OPENVDB_SESI_LIB})
+    message(WARNING "The OpenVDB Houdini CMake setup is unable to locate libopenvdb_sesi "
+      "within the Houdini installation at: ${_HOUDINI_LIB_DIR}. "
+      "This is needed for building the ABI tests."
+    )
+  endif()
+endif()
+
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
 
