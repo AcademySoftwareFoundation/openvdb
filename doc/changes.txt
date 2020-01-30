@@ -31,8 +31,8 @@ Bug fixes:
 @par
 API changes:
 - Removed a number of deprecated point methods.
-- @vdblink::points::StringIndexType StringIndexType@endlink is now deprecated,
-  use @vdblink::Index Index@endlink instead.
+- points::StringIndexType is now deprecated, use @vdblink::Index Index@endlink
+  instead.
 
 @par
 Houdini:
