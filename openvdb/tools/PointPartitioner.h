@@ -364,8 +364,7 @@ private:
 template<typename PointIndexType>
 struct MoveSegmentDataOp
 {
-    using Segment = Array<PointIndexType>;
-    using SegmentPtr = typename Segment::Ptr;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     MoveSegmentDataOp(std::vector<PointIndexType*>& indexLists, SegmentPtr* segments)
         : mIndexLists(&indexLists[0]), mSegments(segments)
@@ -409,7 +408,7 @@ template<typename PointIndexType>
 struct MergeBinsOp
 {
     using Segment = Array<PointIndexType>;
-    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
+    using SegmentPtr = typename Segment::Ptr;
 
     using IndexPair = std::pair<PointIndexType, PointIndexType>;
     using IndexPairList = std::deque<IndexPair>;
@@ -651,7 +650,7 @@ template<typename PointIndexType>
 struct OrderSegmentsOp
 {
     using IndexArray = std::unique_ptr<PointIndexType[]>;
-    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offsetSegments,
         IndexArray* pageOffsetArrays, IndexArray* pageIndexArrays, Index binVolume)
@@ -784,7 +783,7 @@ inline void binAndSegment(
 
     size_t segmentCount = coords.size();
 
-    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     indexSegments.reset(new SegmentPtr[segmentCount]);
     offsetSegments.reset(new SegmentPtr[segmentCount]);
@@ -809,7 +808,7 @@ inline void partition(
     bool recordVoxelOffsets,
     bool cellCenteredTransform)
 {
-    using SegmentPtr = std::unique_ptr<Array<PointIndexType>>;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     if (recordVoxelOffsets) voxelOffsets.reset(new VoxelOffsetType[points.size()]);
     else  voxelOffsets.reset();
@@ -895,7 +894,9 @@ inline void partition(
 
                 const Coord& segmentCoord = segmentCoords[n];
 
-                tbb::blocked_range<size_t> copyRange(0, pageOffsetArrays[n][0] - 1);
+                // segment size stored in the first value of the offset array
+                const size_t segmentSize = pageOffsetArrays[n][0] - 1;
+                tbb::blocked_range<size_t> copyRange(0, segmentSize);
                 tbb::parallel_for(copyRange,
                     [&](tbb::blocked_range<size_t>& r)
                     {
