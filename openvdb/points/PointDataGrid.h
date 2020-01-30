@@ -339,11 +339,19 @@ public:
     /// @param pos Index of the new attribute in the descriptor replacement.
     /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
     /// @param constantStride if @c false, stride is interpreted as total size of the array
+    /// @param metadata optional default value metadata
     /// @param lock an optional scoped registry lock to avoid contention
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
+                                        const Metadata* metadata = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
+                                        const size_t pos, const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -788,10 +796,23 @@ inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
                                                 const size_t pos, const Index strideOrTotalSize,
                                                 const bool constantStride,
+                                                const Metadata* metadata,
                                                 const AttributeArray::ScopedRegistryLock* lock)
 {
     return mAttributeSet->appendAttribute(
-        expected, replacement, pos, strideOrTotalSize, constantStride, lock);
+        expected, replacement, pos, strideOrTotalSize, constantStride, metadata, lock);
+}
+
+// deprecated
+template<typename T, Index Log2Dim>
+inline AttributeArray::Ptr
+PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
+                                                const size_t pos, const Index strideOrTotalSize,
+                                                const bool constantStride,
+                                                const AttributeArray::ScopedRegistryLock* lock)
+{
+    return this->appendAttribute(expected, replacement, pos,
+        strideOrTotalSize, constantStride, nullptr, lock);
 }
 
 template<typename T, Index Log2Dim>

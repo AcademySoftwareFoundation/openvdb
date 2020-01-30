@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.1</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>In Development</I>
 
 @par
 Improvements:
@@ -13,6 +13,8 @@ Improvements:
 - Improved the CMake build for the OpenVDB Houdini library on Windows.
   <I>[Reported&nbsp;by&nbsp;Ian&nbsp;Woodward]</I>
 - Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
+- Add support for default value metadata when creating AttributeArrays or
+  appending to an AttributeSet.
 
 @par
 Bug fixes:
@@ -25,6 +27,10 @@ Bug fixes:
   node boundaries, leading to voxels incorrectly being marked as inside the
   isosurface.
   <I>[Contributed&nbsp;by&nbsp;Tristan&nbsp;Barback]</I>
+
+@par
+API changes:
+- Removed a number of deprecated point methods.
 
 @par
 Houdini:

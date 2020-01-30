@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.1 - In Development
+Version 7.1.0 - In Development
 
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
@@ -9,6 +9,8 @@ Version 7.0.1 - In Development
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
       [Reported by Ian Woodward]
     - Remove some logic for compilers older than Visual Studio 2019.
+    - Add support for default value metadata when creating AttributeArrays or
+      appending to an AttributeSet.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -19,7 +21,10 @@ Version 7.0.1 - In Development
       node boundaries, leading to voxels incorrectly being marked as inside the
       isosurface. [Contributed by Tristan Barback]
 
-     Houdini:
+    API changes:
+    - Removed a number of deprecated point methods.
+
+    Houdini:
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
 
