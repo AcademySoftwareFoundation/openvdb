@@ -59,7 +59,7 @@ inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid,
                     const PositionArrayT& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
+                    const Metadata* positionDefaultValue = nullptr);
 
 
 /// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
@@ -76,7 +76,7 @@ template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
+                    const Metadata* positionDefaultValue = nullptr);
 
 
 /// @brief  Stores point attribute data in an existing @c PointDataGrid attribute.
@@ -613,8 +613,10 @@ private:
 
 template<typename CompressionT, typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const math::Transform& xform, Metadata::Ptr positionDefaultValue)
+createPointDataGrid(const PointIndexGridT& pointIndexGrid,
+                    const PositionArrayT& positions,
+                    const math::Transform& xform,
+                    const Metadata* positionDefaultValue)
 {
     using PointDataTreeT        = typename PointDataGridT::TreeType;
     using LeafT                 = typename PointDataTree::LeafNodeType;
@@ -718,12 +720,14 @@ template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue)
+                    const Metadata* positionDefaultValue)
 {
     const PointAttributeVector<ValueT> pointList(positions);
 
-    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, xform);
-    return createPointDataGrid<CompressionT, PointDataGridT>(*pointIndexGrid, pointList, xform, positionDefaultValue);
+    tools::PointIndexGrid::Ptr pointIndexGrid =
+        tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, xform);
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        *pointIndexGrid, pointList, xform, positionDefaultValue);
 }
 
 
@@ -1035,65 +1039,36 @@ computeVoxelSize(  const PositionWrapper& positions,
 
 // deprecated functions
 
-
-template <typename PositionAttribute, typename PointDataGridT>
+template<
+    typename CompressionT,
+    typename PointDataGridT,
+    typename PositionArrayT,
+    typename PointIndexGridT>
 OPENVDB_DEPRECATED
-inline void
-convertPointDataGridPosition(   PositionAttribute& positionAttribute,
-                                const PointDataGridT& grid,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const std::vector<Name>& includeGroups,
-                                const std::vector<Name>& excludeGroups,
-                                const bool inCoreOnly = false)
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const PointIndexGridT& pointIndexGrid,
+                    const PositionArrayT& positions,
+                    const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
 {
-    auto leaf = grid.tree().cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset,
-        filter, inCoreOnly);
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        pointIndexGrid, positions, xform, positionDefaultValue.get());
 }
 
 
-template <typename TypedAttribute, typename PointDataTreeT>
+template <typename CompressionT, typename PointDataGridT, typename ValueT>
 OPENVDB_DEPRECATED
-inline void
-convertPointDataGridAttribute(  TypedAttribute& attribute,
-                                const PointDataTreeT& tree,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const unsigned arrayIndex,
-                                const Index stride,
-                                const std::vector<Name>& includeGroups,
-                                const std::vector<Name>& excludeGroups,
-                                const bool inCoreOnly = false)
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const std::vector<ValueT>& positions,
+                    const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
 {
-    auto leaf = tree.cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset,
-        arrayIndex, stride, filter, inCoreOnly);
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        positions, xform, positionDefaultValue.get());
 }
 
 
-template <typename Group, typename PointDataTreeT>
-OPENVDB_DEPRECATED
-inline void
-convertPointDataGridGroup(  Group& group,
-                            const PointDataTreeT& tree,
-                            const std::vector<Index64>& pointOffsets,
-                            const Index64 startOffset,
-                            const AttributeSet::Descriptor::GroupIndex index,
-                            const std::vector<Name>& includeGroups,
-                            const std::vector<Name>& excludeGroups,
-                            const bool inCoreOnly = false)
-{
-    auto leaf = tree.cbeginLeaf();
-    if (!leaf)  return;
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    convertPointDataGridGroup(group, tree, pointOffsets, startOffset,
-        index, filter, inCoreOnly);
-}
+////////////////////////////////////////
 
 
 } // namespace points

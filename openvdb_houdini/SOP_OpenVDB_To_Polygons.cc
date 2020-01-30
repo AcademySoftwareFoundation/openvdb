@@ -557,7 +557,7 @@ getMaskFromGrid(const hvdb::GridCPtr& gridPtr, double isovalue = 0.0)
             maskGridPtr = gridPtr;
         } else {
             InteriorMaskOp op{isovalue};
-            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*gridPtr), *gridPtr, op);
+            gridPtr->apply<hvdb::AllGridTypes>(op);
             maskGridPtr = op.outGridPtr;
         }
     }
@@ -705,18 +705,8 @@ SOP_OpenVDB_To_Polygons::Cache::cookVDBSop(OP_Context& context)
             for (; vdbIt; ++vdbIt) {
 
                 if (boss.wasInterrupted()) break;
-                //GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
 
-                if (!GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher)) {
-
-                    if (vdbIt->getGrid().type() == openvdb::BoolGrid::gridType()) {
-
-                        openvdb::BoolGrid::ConstPtr gridPtr =
-                            openvdb::gridConstPtrCast<openvdb::BoolGrid>(vdbIt->getGridPtr());
-
-                        mesher(*gridPtr);
-                    }
-                }
+                hvdb::GEOvdbApply<hvdb::ScalarGridTypes>(**vdbIt, mesher);
 
                 copyMesh(*gdp, mesher, boss, usePolygonSoup,
                     keepVdbName ? vdbIt.getPrimitive()->getGridName() : nullptr);

@@ -1086,7 +1086,7 @@ public:
     using ValueType = typename TreeType::ValueType;
     using LeafNodeType = typename TreeType::LeafNodeType;
 
-    SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, bool* changedNodeMask)
+    SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, const bool* changedNodeMask)
         : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
     {
@@ -1096,13 +1096,17 @@ public:
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             if (mChangedNodeMask[n]) {
                 //seedFill(*mNodes[n]);
-                mChangedNodeMask[n] = scanFill(*mNodes[n]);
+                // Do not update the flag in mChangedNodeMask even if scanFill
+                // returns false. mChangedNodeMask is queried by neighboring
+                // accesses in ::SeedPoints which needs to know that this
+                // node has values propagated on a previous iteration.
+                scanFill(*mNodes[n]);
             }
         }
     }
 
     LeafNodeType    ** const mNodes;
-    bool             * const mChangedNodeMask;
+    const bool       * const mChangedNodeMask;
 };
 
 
@@ -1193,22 +1197,18 @@ public:
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            bool changedValue = false;
 
-            if (!mChangedNodeMask[n]) {
+            changedValue |= processZ(n, /*firstFace=*/true);
+            changedValue |= processZ(n, /*firstFace=*/false);
 
-                bool changedValue = false;
+            changedValue |= processY(n, /*firstFace=*/true);
+            changedValue |= processY(n, /*firstFace=*/false);
 
-                changedValue |= processZ(n, /*firstFace=*/true);
-                changedValue |= processZ(n, /*firstFace=*/false);
+            changedValue |= processX(n, /*firstFace=*/true);
+            changedValue |= processX(n, /*firstFace=*/false);
 
-                changedValue |= processY(n, /*firstFace=*/true);
-                changedValue |= processY(n, /*firstFace=*/false);
-
-                changedValue |= processX(n, /*firstFace=*/true);
-                changedValue |= processX(n, /*firstFace=*/false);
-
-                mNodeMask[n] = changedValue;
-            }
+            mNodeMask[n] = changedValue;
         }
     }
 
@@ -3020,10 +3020,16 @@ traceExteriorBoundaries(FloatTreeT& tree)
 {
     using ConnectivityTable = mesh_to_volume_internal::LeafNodeConnectivityTable<FloatTreeT>;
 
+    // Build a node connectivity table where each leaf node has an offset into a
+    // linearized list of nodes, and each leaf stores its six axis aligned neighbor
+    // offsets
     ConnectivityTable nodeConnectivity(tree);
 
     std::vector<size_t> zStartNodes, yStartNodes, xStartNodes;
 
+    // Store all nodes which do not have negative neighbors i.e. the nodes furthest
+    // in -X, -Y, -Z. We sweep from lowest coordinate positions +axis and then
+    // from the furthest positive coordinate positions -axis
     for (size_t n = 0; n < nodeConnectivity.size(); ++n) {
         if (ConnectivityTable::INVALID_OFFSET == nodeConnectivity.offsetsPrevX()[n]) {
             xStartNodes.push_back(n);
@@ -3039,6 +3045,9 @@ traceExteriorBoundaries(FloatTreeT& tree)
     }
 
     using SweepingOp = mesh_to_volume_internal::SweepExteriorSign<FloatTreeT>;
+
+    // Sweep the exterior value signs (make them negative) up until the voxel intersection
+    // with the isosurface. Do this in both lowest -> + and largest -> - directions
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, zStartNodes.size()),
         SweepingOp(SweepingOp::Z_AXIS, zStartNodes, nodeConnectivity));
@@ -3064,13 +3073,24 @@ traceExteriorBoundaries(FloatTreeT& tree)
 
     bool nodesUpdated = false;
     do {
+        // Perform per leaf node localized propagation of signs by looping over
+        // all voxels and checking to see if any of their neighbors (within the
+        // same leaf) are negative
         tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedFillExteriorSign<FloatTreeT>(
             nodeConnectivity.nodes(), changedNodeMaskA.get()));
 
+        // For each leaf, check its axis aligned neighbors and propagate any changes
+        // which occurred previously (in SeedFillExteriorSign OR in SyncVoxelMask) to
+        // the leaf faces. Note that this operation stores the propagated face results
+        // in a separate buffer (changedVoxelMask) to avoid writing to nodes being read
+        // from other threads. Additionally mark any leaf nodes which will absorb any
+        // changes from its neighbors in changedNodeMaskB
         tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(
             nodeConnectivity, changedNodeMaskA.get(), changedNodeMaskB.get(),
             changedVoxelMask.get()));
 
+        // Only nodes where a value was influenced by an adjacent node need to be
+        // processed on the next pass.
         changedNodeMaskA.swap(changedNodeMaskB);
 
         nodesUpdated = false;
@@ -3079,6 +3099,8 @@ traceExteriorBoundaries(FloatTreeT& tree)
             if (nodesUpdated) break;
         }
 
+        // Use the voxel mask updates in ::SeedPoints to actually assign the new values
+        // across leaf node faces
         if (nodesUpdated) {
             tbb::parallel_for(nodeRange, mesh_to_volume_internal::SyncVoxelMask<FloatTreeT>(
                 nodeConnectivity.nodes(), changedNodeMaskA.get(), changedVoxelMask.get()));

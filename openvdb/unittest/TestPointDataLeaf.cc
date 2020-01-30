@@ -495,8 +495,19 @@ TestPointDataLeaf::testAttributes()
 
     leaf.initializeAttributes(descrA, /*arrayLength=*/100);
 
+    TypedMetadata<int> defaultValue(7);
+    Metadata& baseDefaultValue = defaultValue;
+
     descrA = descrA->duplicateAppend("id", AttributeI::attributeType());
-    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("id"));
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("id"),
+        Index(1), true, &baseDefaultValue);
+
+    // note that the default value has not been added to the replacement descriptor,
+    // however the default value of the attribute is as expected
+    CPPUNIT_ASSERT_EQUAL(0,
+        leaf.attributeSet().descriptor().getDefaultValue<int>("id"));
+    CPPUNIT_ASSERT_EQUAL(7,
+        AttributeI::cast(*leaf.attributeSet().getConst("id")).get(0));
 
     CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
 

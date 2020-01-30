@@ -91,6 +91,8 @@ private:
 class OPENVDB_API StringMetaInserter
 {
 public:
+    using UniquePtr = std::unique_ptr<StringMetaInserter>;
+
     explicit StringMetaInserter(MetaMap& metadata);
 
     /// Returns @c true if key exists
@@ -151,6 +153,7 @@ class OPENVDB_API StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeHandle>;//SharedPtr<StringAttributeHandle>;
+    using UniquePtr = std::unique_ptr<StringAttributeHandle>;
 
     static Ptr create(const AttributeArray& array, const MetaMap& metadata, const bool preserveCompression = true);
 
@@ -183,6 +186,7 @@ class OPENVDB_API StringAttributeWriteHandle : public StringAttributeHandle
 {
 public:
     using Ptr = std::shared_ptr<StringAttributeWriteHandle>;//SharedPtr<StringAttributeWriteHandle>;
+    using UniquePtr = std::unique_ptr<StringAttributeWriteHandle>;
 
     static Ptr create(AttributeArray& array, const MetaMap& metadata, const bool expand = true);
 

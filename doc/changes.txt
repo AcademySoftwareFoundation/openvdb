@@ -2,15 +2,41 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.1</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>In Development</I>
+
+@par
+Improvements:
+- Added GroupWriteHandle::setUnsafe() for faster performance when the group
+  array is known to be in-core and non-uniform.
+- Improved the CMake build for the OpenVDB Houdini library on Windows.
+  <I>[Reported&nbsp;by&nbsp;Ian&nbsp;Woodward]</I>
+- Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
+- Add support for default value metadata when creating AttributeArrays or
+  appending to an AttributeSet.
 
 @par
 Bug fixes:
 - Fixed a bug where grids with no active values might return true when the
   method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to
   only return true if the grid contains any active values.
+- Fixed a sign propagation bug in @vdblink::tools::traceExteriorBoundaries()
+  tools::traceExteriorBoundaries@endlink used by @vdblink::tools::meshToVolume()
+  tools::meshToVolume@endlink. This could cause values to not be propagated across
+  node boundaries, leading to voxels incorrectly being marked as inside the
+  isosurface.
+  <I>[Contributed&nbsp;by&nbsp;Tristan&nbsp;Barback]</I>
+
+@par
+API changes:
+- Removed a number of deprecated point methods.
+
+@par
+Houdini:
+- Platonic SOP is now verbified.
+- Extend all SOP references to support VDB Points.
+
 
 @par
 Improvements:

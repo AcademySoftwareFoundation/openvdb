@@ -1948,7 +1948,7 @@ SOP_OpenVDB_Diagnostics::Cache::cookVDBSop(OP_Context& context)
             tests.setPrimitiveName(it.getPrimitiveName().toStdString());
             tests.setPrimitiveIndex(int(it.getIndex()));
 
-            GEOvdbProcessTypedGridTopology(**it, tests, /*makeUnique=*/false);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, tests, /*makeUnique=*/false);
 
             if (tests.replacementGrid()) {
                 hvdb::replaceVdbPrimitive(*gdp, tests.replacementGrid(), **it, true,
