@@ -58,6 +58,8 @@ jobs:
       run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: cd build && ctest -V
 
   testhou175:
     runs-on: ubuntu-16.04
@@ -69,6 +71,8 @@ jobs:
       run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: cd build && ctest -V
 
   testhou170:
     runs-on: ubuntu-16.04
@@ -80,6 +84,8 @@ jobs:
       run: ./ci/install_houdini.sh 17.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release OFF
+    - name: test
+      run: cd build && ctest -V
 
   testabi7noblosc:
     runs-on: ubuntu-16.04
@@ -102,6 +108,8 @@ jobs:
       run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
+    - name: test
+      run: cd build && ctest -V
 
   testhou180debug:
     runs-on: ubuntu-16.04

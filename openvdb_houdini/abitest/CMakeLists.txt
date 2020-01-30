@@ -65,3 +65,5 @@ target_link_libraries(openvdb_houdini_abi_test PUBLIC
   ${OPENVDB_LIB}
   ${OPENVDB_SESI_LIB}
 )
+
+add_test(vdb_abi_test openvdb_houdini_abi_test)
