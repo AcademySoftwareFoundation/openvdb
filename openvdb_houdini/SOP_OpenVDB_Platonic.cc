@@ -24,8 +24,9 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+
 protected:
-    OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
 };
 
@@ -106,6 +107,8 @@ Signed Distance Field:\n\
     hvdb::OpenVDBOpFactory("VDB Platonic",
         SOP_OpenVDB_Platonic::factory, parms, *table)
         .setNativeName("")
+        .setVerb(SOP_NodeVerb::COOK_GENERATOR,
+            []() { return new SOP_OpenVDB_Platonic::Cache; })
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
@@ -156,11 +159,9 @@ SOP_OpenVDB_Platonic::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Platonic::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Platonic::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-        hutil::ScopedInputLock lock(*this, context);
-        gdp->clearAndDestroy();
 
         const fpreal time = context.getTime();
 

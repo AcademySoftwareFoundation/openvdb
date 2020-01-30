@@ -713,7 +713,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(1);
 
             attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1,
-                                        /*constantStride=*/true, defaultValueTest.copy());
+                                        /*constantStride=*/true, defaultValueTest.copy().get());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -758,11 +758,19 @@ TestAttributeSet::testAttributeSet()
 
         AttributeSet attrSetB(descr1, /*arrayLength=*/50);
 
-        attrSetB.appendAttribute("test", AttributeI::attributeType());
+        TypedMetadata<int> defaultValue(7);
+        Metadata& baseDefaultValue = defaultValue;
+
+        attrSetB.appendAttribute("test", AttributeI::attributeType(),
+            Index(1), true, &baseDefaultValue);
         attrSetB.appendAttribute("id", AttributeL::attributeType());
         attrSetB.appendAttribute("test2", AttributeI::attributeType());
         attrSetB.appendAttribute("id2", AttributeL::attributeType());
         attrSetB.appendAttribute("test3", AttributeI::attributeType());
+
+        // check default value of "test" attribute has been applied
+        CPPUNIT_ASSERT_EQUAL(7, attrSetB.descriptor().getDefaultValue<int>("test"));
+        CPPUNIT_ASSERT_EQUAL(7, AttributeI::cast(*attrSetB.getConst("test")).get(0));
 
         descr1 = attrSetB.descriptorPtr();
 

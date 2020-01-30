@@ -176,7 +176,14 @@ public:
                                         const NamePair& type,
                                         const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
-                                        Metadata::Ptr defaultValue = Metadata::Ptr());
+                                        const Metadata* defaultValue = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Name& name,
+                                        const NamePair& type,
+                                        const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        Metadata::Ptr defaultValue);
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
@@ -185,7 +192,14 @@ public:
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
+                                        const Metadata* defaultValue = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
+                                        const size_t pos, const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
