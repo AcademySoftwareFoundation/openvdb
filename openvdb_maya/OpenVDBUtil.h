@@ -938,11 +938,7 @@ private:
 template<typename GridType, typename OpType, bool IsConst/*=false*/>
 struct GridProcessor {
     static inline void call(OpType& op, openvdb::GridBase::Ptr grid) {
-#ifdef _MSC_VER
-        op.operator()<GridType>(openvdb::gridPtrCast<GridType>(grid));
-#else
         op.template operator()<GridType>(openvdb::gridPtrCast<GridType>(grid));
-#endif
     }
 };
 
@@ -950,11 +946,7 @@ struct GridProcessor {
 template<typename GridType, typename OpType>
 struct GridProcessor<GridType, OpType, /*IsConst=*/true> {
     static inline void call(OpType& op, openvdb::GridBase::ConstPtr grid) {
-#ifdef _MSC_VER
-        op.operator()<GridType>(openvdb::gridConstPtrCast<GridType>(grid));
-#else
         op.template operator()<GridType>(openvdb::gridConstPtrCast<GridType>(grid));
-#endif
     }
 };
 

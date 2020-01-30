@@ -2858,21 +2858,13 @@ inline void
 InternalNode<ChildT, Log2Dim>::visitActiveBBox(BBoxOp& op) const
 {
     for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) {
-#ifdef _MSC_VER
-        op.operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), ChildNodeType::DIM));
-#else
         op.template operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), ChildNodeType::DIM));
-#endif
     }
     if (op.template descent<LEVEL>()) {
         for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->visitActiveBBox(op);
     } else {
         for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) {
-#ifdef _MSC_VER
-            op.operator()<LEVEL>(i->getNodeBoundingBox());
-#else
             op.template operator()<LEVEL>(i->getNodeBoundingBox());
-#endif
         }
     }
 }

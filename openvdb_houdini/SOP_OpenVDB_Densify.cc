@@ -137,8 +137,7 @@ SOP_OpenVDB_Densify::Cache::cookVDBSop(OP_Context& context)
                 throw std::runtime_error("processing was interrupted");
             }
 
-            GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, densifyOp);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, densifyOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

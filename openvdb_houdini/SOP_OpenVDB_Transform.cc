@@ -140,7 +140,7 @@ SOP_OpenVDB_Transform::SOP_OpenVDB_Transform(OP_Network* net,
 
 namespace {
 
-// Functor for use with GEOvdbProcessTypedGridVec3() to apply a transform
+// Functor for use with GEOvdbApply() to apply a transform
 // to the voxel values of vector-valued grids
 struct VecXformOp
 {
@@ -312,7 +312,7 @@ SOP_OpenVDB_Transform::Cache::cookVDBSop(OP_Context& context)
             {
                 // If (and only if) the grid is vector-valued, deep copy it,
                 // then apply the transform to each voxel's value.
-                GEOvdbProcessTypedGridVec3(*vdb, xformOp, /*makeUnique=*/true);
+                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, xformOp);
             }
         }
     } catch (std::exception& e) {

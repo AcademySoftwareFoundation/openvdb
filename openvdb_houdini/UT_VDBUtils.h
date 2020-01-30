@@ -213,11 +213,7 @@ template<typename GridType, typename OpType, typename GridBaseType>
 inline void
 callTypedGrid(GridBaseType &grid, OpType& op)
 {
-#ifdef _MSC_VER
-    op.operator()<GridType>(UTvdbGridCast<GridType>(grid));
-#else
     op.template operator()<GridType>(UTvdbGridCast<GridType>(grid));
-#endif
 }
 
 } // namespace UT_VDBUtils

@@ -181,6 +181,8 @@ target_link_libraries(openvdb_houdini PUBLIC
   ${OPENVDB_HOUDINI_DEPENDENT_LIBS}
 )
 
+target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
+
 if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
   set(RPATHS "")

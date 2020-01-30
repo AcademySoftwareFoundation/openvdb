@@ -124,7 +124,13 @@ public:
         assert(!tmp.empty());
         size_t midpoint = (tmp.size() - 1) >> 1;
         // Partially sort the vector until the median value is at the midpoint.
+#if !defined(_MSC_VER) || _MSC_VER < 1924
         std::nth_element(tmp.begin(), tmp.begin() + midpoint, tmp.end());
+#else
+        // Workaround MSVC bool warning C4804 unsafe use of type 'bool'
+        std::nth_element(tmp.begin(), tmp.begin() + midpoint, tmp.end(),
+                         std::less<ValueType>());
+#endif
         return tmp[midpoint];
     }
 
