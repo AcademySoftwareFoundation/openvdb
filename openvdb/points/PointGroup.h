@@ -521,18 +521,19 @@ inline void compactGroups(PointDataTree& tree)
         LeafManagerT leafManager(tree);
         tbb::parallel_for(leafManager.leafRange(), copy);
 
-        descriptor->setGroup(sourceName, targetOffset, /*checkValidOffset=*/true);
+        descriptor->setGroup(sourceName, targetOffset);
     }
 
     // drop unused attribute arrays
 
-    std::vector<size_t> indices = attributeSet.groupAttributeIndices();
+    const std::vector<size_t> indices = attributeSet.groupAttributeIndices();
 
     const size_t totalAttributesToDrop = descriptor->unusedGroups() / descriptor->groupBits();
 
     assert(totalAttributesToDrop <= indices.size());
 
-    std::vector<size_t> indicesToDrop(indices.end() - totalAttributesToDrop, indices.end());
+    const std::vector<size_t> indicesToDrop(indices.end() - totalAttributesToDrop,
+        indices.end());
 
     dropAttributes(tree, indicesToDrop);
 }

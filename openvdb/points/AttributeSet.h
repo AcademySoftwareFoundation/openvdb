@@ -394,7 +394,10 @@ public:
 
     /// Return @c true if group exists
     bool hasGroup(const Name& group) const;
-    /// Define a group name to offset mapping
+    /// @brief Define a group name to offset mapping
+    /// @param group group name
+    /// @param offset group offset
+    /// @param checkValidOffset throws if offset out-of-range or in-use
     void setGroup(const Name& group, const size_t offset,
         const bool checkValidOffset = false);
     /// Drop any mapping keyed by group name
@@ -440,8 +443,12 @@ public:
     /// Return the next empty group slot
     size_t nextUnusedGroupOffset() const;
 
-    /// Determine if a move is required to efficiently compact the data and store the
+    /// @brief Determine if a move is required to efficiently compact the data and store the
     /// source name, offset and the target offset in the input parameters
+    /// @param sourceName source name
+    /// @param sourceOffset source offset
+    /// @param targetOffset target offset
+    /// @return @c true if move is required to compact the data
     bool requiresGroupMove(Name& sourceName, size_t& sourceOffset, size_t& targetOffset) const;
 
     /// Return a unique name for an attribute array based on given name
