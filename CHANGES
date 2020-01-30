@@ -23,6 +23,7 @@ Version 7.1.0 - In Development
 
     API changes:
     - Removed a number of deprecated point methods.
+    - points::StringIndexType is now deprecated, use Index instead.
 
     Houdini:
     - Platonic SOP is now verbified.

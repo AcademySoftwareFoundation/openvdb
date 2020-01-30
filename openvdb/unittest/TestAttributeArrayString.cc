@@ -296,7 +296,7 @@ TestAttributeArrayString::testStringAttribute()
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
         AttributeArray& baseAttr(attr);
-        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<StringIndexType>()), baseAttr.valueType());
+        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<Index>()), baseAttr.valueType());
         CPPUNIT_ASSERT_EQUAL(Name("str"), baseAttr.codecType());
         CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.valueTypeSize());
         CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.storageTypeSize());

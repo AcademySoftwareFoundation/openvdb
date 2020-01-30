@@ -25,7 +25,8 @@ namespace points {
 ////////////////////////////////////////
 
 
-using StringIndexType = Index;
+// StringIndexType is now deprecated, use Index directly
+using StringIndexType OPENVDB_DEPRECATED = Index;
 
 
 namespace attribute_traits
@@ -100,8 +101,12 @@ public:
     /// Returns @c true if index exists
     bool hasIndex(Index index) const;
 
-    /// Insert the string into the metadata, hint is used if non-zero
-    /// Returns the chosen index which will match hint if not in use
+    /// @brief Insert the string into the metadata using the hint if non-zero
+    /// @param name the string to insert
+    /// @param hint requested index to use if non-zero and not already in use
+    /// @note the hint can be used to insert non-sequentially so as to avoid an
+    /// expensive re-indexing of string keys
+    /// @return the chosen index which will match hint if the hint was used
     Index insert(const Name& name, Index hint = Index(0));
 
     /// Reset the cache from the metadata
@@ -230,8 +235,8 @@ private:
     /// @note throws if name does not exist in cache
     Index getIndex(const Name& name) const;
 
-    StringMetaCache                                             mCache;
-    AttributeWriteHandle<Index, StringCodec<false>>   mWriteHandle;
+    StringMetaCache                                     mCache;
+    AttributeWriteHandle<Index, StringCodec<false>>     mWriteHandle;
 }; // class StringAttributeWriteHandle
 
 
