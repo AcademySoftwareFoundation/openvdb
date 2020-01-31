@@ -247,6 +247,20 @@ AttributeSet::groupIndex(const size_t offset) const
     return mDescr->groupIndex(offset);
 }
 
+std::vector<size_t>
+AttributeSet::groupAttributeIndices() const
+{
+    std::vector<size_t> indices;
+
+    for (const auto& namePos : mDescr->map()) {
+        const AttributeArray* array = this->getConst(namePos.first);
+        if (isGroup(*array)) {
+            indices.push_back(namePos.second);
+        }
+    }
+
+    return indices;
+}
 
 bool
 AttributeSet::isShared(size_t pos) const
@@ -969,9 +983,24 @@ AttributeSet::Descriptor::hasGroup(const Name& group) const
 }
 
 void
-AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
+AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset,
+    const bool checkValidOffset)
 {
-    if (!validName(group))  throw RuntimeError("Group name contains invalid characters - " + group);
+    if (!validName(group)) {
+        throw RuntimeError("Group name contains invalid characters - " + group);
+    }
+    if (checkValidOffset) {
+        // check offset is not out-of-range
+        if (offset >= this->availableGroups()) {
+            throw RuntimeError("Group offset is out-of-range - " + group);
+        }
+        // check offset is not already in use
+        for (const auto& namePos : mGroupMap) {
+            if (namePos.second == offset) {
+                throw RuntimeError("Group offset is already in use - " + group);
+            }
+        }
+    }
 
     mGroupMap[group] = offset;
 }
@@ -1066,13 +1095,10 @@ AttributeSet::Descriptor::groupIndex(const Name& group) const
     return this->groupIndex(offset);
 }
 
-
 AttributeSet::Descriptor::GroupIndex
 AttributeSet::Descriptor::groupIndex(const size_t offset) const
 {
     // extract all attribute array group indices
-
-    const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
 
     std::vector<size_t> groups;
     for (const auto& namePos : mNameMap) {
@@ -1081,15 +1107,95 @@ AttributeSet::Descriptor::groupIndex(const size_t offset) const
         }
     }
 
-    if (offset >= groups.size() * GROUP_BITS) {
+    if (offset >= groups.size() * this->groupBits()) {
         OPENVDB_THROW(LookupError, "Out of range group offset - " << offset << ".")
     }
 
     // adjust relative offset to find offset into the array vector
 
     std::sort(groups.begin(), groups.end());
-    return Util::GroupIndex(groups[offset / GROUP_BITS],
-                static_cast<uint8_t>(offset % GROUP_BITS));
+    return Util::GroupIndex(groups[offset / this->groupBits()],
+                static_cast<uint8_t>(offset % this->groupBits()));
+}
+
+size_t
+AttributeSet::Descriptor::availableGroups() const
+{
+    // the number of group attributes * number of bits per group
+
+    const size_t groupAttributes =
+        this->count(GroupAttributeArray::attributeType());
+
+    return groupAttributes * this->groupBits();
+}
+
+size_t
+AttributeSet::Descriptor::unusedGroups() const
+{
+    // compute total slots (one slot per bit of the group attributes)
+
+    const size_t availableGroups = this->availableGroups();
+
+    if (availableGroups == 0)   return 0;
+
+    // compute slots in use
+
+    const size_t usedGroups = mGroupMap.size();
+
+    return availableGroups - usedGroups;
+}
+
+bool
+AttributeSet::Descriptor::canCompactGroups() const
+{
+    // can compact if more unused groups than in one group attribute array
+
+    return this->unusedGroups() >= this->groupBits();
+}
+
+size_t
+AttributeSet::Descriptor::nextUnusedGroupOffset() const
+{
+    // build a list of group indices
+
+    std::vector<size_t> indices;
+    indices.reserve(mGroupMap.size());
+    for (const auto& namePos : mGroupMap) {
+        indices.push_back(namePos.second);
+    }
+
+    std::sort(indices.begin(), indices.end());
+
+    // return first index not present
+
+    size_t offset = 0;
+    for (const size_t& index : indices) {
+        if (index != offset)     break;
+        offset++;
+    }
+
+    return offset;
+}
+
+bool
+AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
+    size_t& sourceOffset, size_t& targetOffset) const
+{
+
+    targetOffset = this->nextUnusedGroupOffset();
+
+    for (const auto& namePos : mGroupMap) {
+
+        // move only required if source comes after the target
+
+        if (namePos.second >= targetOffset) {
+            sourceName = namePos.first;
+            sourceOffset = namePos.second;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool

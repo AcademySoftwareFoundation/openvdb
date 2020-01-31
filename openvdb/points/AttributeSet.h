@@ -28,6 +28,9 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 
+using GroupType = uint8_t;
+
+
 ////////////////////////////////////////
 
 
@@ -157,6 +160,9 @@ public:
     /// Return the group index from the offset of the group
     /// @note see offset description for groupOffset()
     Util::GroupIndex groupIndex(const size_t offset) const;
+
+    /// Return the indices of the attribute arrays which are group attribute arrays
+    std::vector<size_t> groupAttributeIndices() const;
 
     /// Return true if the attribute array stored at position @a pos is shared.
     bool isShared(size_t pos) const;
@@ -388,8 +394,12 @@ public:
 
     /// Return @c true if group exists
     bool hasGroup(const Name& group) const;
-    /// Define a group name to offset mapping
-    void setGroup(const Name& group, const size_t offset);
+    /// @brief Define a group name to offset mapping
+    /// @param group group name
+    /// @param offset group offset
+    /// @param checkValidOffset throws if offset out-of-range or in-use
+    void setGroup(const Name& group, const size_t offset,
+        const bool checkValidOffset = false);
     /// Drop any mapping keyed by group name
     void dropGroup(const Name& group);
     /// Clear all groups
@@ -415,6 +425,31 @@ public:
     /// Return the group index from the offset of the group
     /// @note see offset description for groupOffset()
     GroupIndex groupIndex(const size_t offset) const;
+
+    /// Return number of bits occupied by a group attribute array
+    static size_t groupBits() { return sizeof(GroupType) * CHAR_BIT; }
+
+    /// Return the total number of available groups
+    /// (group bits * number of group attributes)
+    size_t availableGroups() const;
+
+    /// Return the number of empty group slots which correlates to the number of groups
+    /// that can be stored without increasing the number of group attribute arrays
+    size_t unusedGroups() const;
+
+    /// Return @c true if there are sufficient empty slots to allow compacting
+    bool canCompactGroups() const;
+
+    /// Return the next empty group slot
+    size_t nextUnusedGroupOffset() const;
+
+    /// @brief Determine if a move is required to efficiently compact the data and store the
+    /// source name, offset and the target offset in the input parameters
+    /// @param sourceName source name
+    /// @param sourceOffset source offset
+    /// @param targetOffset target offset
+    /// @return @c true if move is required to compact the data
+    bool requiresGroupMove(Name& sourceName, size_t& sourceOffset, size_t& targetOffset) const;
 
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;

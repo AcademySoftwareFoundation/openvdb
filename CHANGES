@@ -28,6 +28,9 @@ Version 7.1.0 - In Development
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
 
+    Improvements:
+    - Added new group inspection methods to the AttributeSet::Descriptor.
+
 Version 7.0.0 - December 6, 2019
 
       Some changes in this release (see "ABI changes" below) alter

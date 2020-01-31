@@ -20,9 +20,6 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 
-using GroupType = uint8_t;
-
-
 ////////////////////////////////////////
 
 
