@@ -522,7 +522,7 @@ public:
     /// @endcode
     template<typename GridTypeListT, typename OpT>
     bool    apply(OpT& op) const
-                { return hasGrid() ? getConstGrid.apply<GridTypeListT>(op) : false; }
+                { return hasGrid() ? getConstGrid().apply<GridTypeListT>(op) : false; }
 
     /// @brief If this primitive's grid resolves to one of the listed grid types,
     /// invoke the functor @a op on the resolved grid.
