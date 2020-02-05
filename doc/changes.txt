@@ -15,6 +15,11 @@ Improvements:
 - Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
 - Add support for default value metadata when creating AttributeArrays or
   appending to an AttributeSet.
+- Added new group inspection methods to the
+  @vdblink::points::AttributeSet::Descriptor AttributeSet::Descriptor@endlink.
+- Introduced a @vdblink::points::StringMetaCache StringMetaCache@endlink class
+  for convenient string attribute metadata lookup and performed some minor
+  optimizations.
 
 @par
 Bug fixes:
@@ -31,17 +36,14 @@ Bug fixes:
 @par
 API changes:
 - Removed a number of deprecated point methods.
+- points::StringIndexType is now deprecated, use @vdblink::Index Index@endlink
+  instead.
 
 @par
 Houdini:
 - Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
 
-
-@par
-Improvements:
-- Added new group inspection methods to the
-  @vdblink::points::AttributeSet::Descriptor AttributeSet::Descriptor@endlink.
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par

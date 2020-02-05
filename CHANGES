@@ -11,6 +11,9 @@ Version 7.1.0 - In Development
     - Remove some logic for compilers older than Visual Studio 2019.
     - Add support for default value metadata when creating AttributeArrays or
       appending to an AttributeSet.
+    - Added new group inspection methods to the AttributeSet::Descriptor.
+    - Introduced a StringMetaCache class for convenient string attribute
+      metadata lookup and performed some minor optimizations.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -23,13 +26,12 @@ Version 7.1.0 - In Development
 
     API changes:
     - Removed a number of deprecated point methods.
+    - points::StringIndexType is now deprecated, use Index instead.
 
     Houdini:
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
 
-    Improvements:
-    - Added new group inspection methods to the AttributeSet::Descriptor.
 
 Version 7.0.0 - December 6, 2019
 
