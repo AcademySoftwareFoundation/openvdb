@@ -32,17 +32,28 @@ message(STATUS "----------------------------------------------------")
 # - TestABI uses headers from this version of OpenVDB
 # - main uses headers from the version of OpenVDB shipped with Houdini
 
-# Disable some compiler warnings in TBB and Half
+if(NOT DEFINED _HOUDINI_INCLUDE_DIR OR NOT DEFINED _HOUDINI_LIB_DIR)
+  message(FATAL_ERROR "The Houdini ABI Test requires the Houdini include "
+    "directory and lib directory variables to be defined"
+  )
+endif()
 
-add_compile_options(
-  -Wno-conversion
-  -Wno-shorten-64-to-32
+# Find libopenvdb_sesi library
+find_library(OPENVDB_SESI_LIB openvdb_sesi
+  ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
+  PATHS ${_HOUDINI_LIB_DIR}
 )
+
+if(NOT EXISTS ${OPENVDB_SESI_LIB})
+  message(FATAL_ERROR "The Houdini ABI Test is unable to locate libopenvdb_sesi "
+    "within the Houdini installation at: ${_HOUDINI_LIB_DIR}. "
+  )
+endif()
 
 # Create an object library that uses the Houdini OpenVDB headers
 
 add_library(TestABI OBJECT TestABI.cc)
-target_include_directories(TestABI PUBLIC ${OPENVDB_INCLUDEDIR})
+target_include_directories(TestABI SYSTEM PUBLIC ${_HOUDINI_INCLUDE_DIR})
 
 # Create the binary from this object library and the main object file
 

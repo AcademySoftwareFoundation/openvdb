@@ -299,30 +299,8 @@ if(NOT ILMBASE_LIBRARYDIR)
   set(ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR})
 endif()
 
-# OpenVDB
-
-if(NOT OPENVDB_INCLUDEDIR)
-  set(OPENVDB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
-endif()
-if(NOT OPENVDB_SESI_LIB)
-  # Full path to openvdb_sesi library
-  find_library(OPENVDB_SESI_LIB openvdb_sesi
-    ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
-    PATHS ${_HOUDINI_LIB_DIR}
-  )
-  if(NOT EXISTS ${OPENVDB_SESI_LIB})
-    message(WARNING "The OpenVDB Houdini CMake setup is unable to locate libopenvdb_sesi "
-      "within the Houdini installation at: ${_HOUDINI_LIB_DIR}. "
-      "This is needed for building the ABI tests."
-    )
-  endif()
-endif()
-
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
-
-unset(_HOUDINI_INCLUDE_DIR)
-unset(_HOUDINI_LIB_DIR)
 
 # Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
@@ -347,7 +325,6 @@ if(Houdini_VERSION VERSION_LESS 17)
 elseif(Houdini_VERSION VERSION_LESS 18)
   set(OPENVDB_HOUDINI_ABI 5)
 else()
-  # Anticipated ABI version for H18
   set(OPENVDB_HOUDINI_ABI 6)
 endif()
 
