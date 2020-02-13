@@ -1256,4 +1256,61 @@ TestAttributeSet::testAttributeSetGroups()
                 /*checkValidOffset=*/true), RuntimeError);
         }
     }
+
+    { // group index collision
+        Descriptor descr1;
+        Descriptor descr2;
+
+        // no groups - no collisions
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test1", 0);
+
+        // only one descriptor has groups - no collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr2.setGroup("test1", 0);
+
+        // both descriptors have same group - no collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test2", 1);
+        descr2.setGroup("test2", 2);
+
+        // test2 has different index - collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        descr2.setGroup("test2", 1);
+
+        // overwrite test2 value to remove collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        // overwrite test1 value to introduce collision
+        descr1.setGroup("test1", 4);
+
+        // first index has collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        // add some additional groups
+        descr1.setGroup("test0", 2);
+        descr2.setGroup("test0", 2);
+        descr1.setGroup("test9", 9);
+        descr2.setGroup("test9", 9);
+
+        // first index still has collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test1", 0);
+
+        // first index no longer has collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+    }
 }

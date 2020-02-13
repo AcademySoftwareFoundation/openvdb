@@ -453,6 +453,12 @@ public:
     /// @return @c true if move is required to compact the data
     bool requiresGroupMove(Name& sourceName, size_t& sourceOffset, size_t& targetOffset) const;
 
+    /// @brief Test if there are any group names shared by both descriptors which
+    /// have a different index
+    /// @param rhs the descriptor to compare with
+    /// @return @c true if an index collision exists
+    bool groupIndexCollision(const Descriptor& rhs) const;
+
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
 

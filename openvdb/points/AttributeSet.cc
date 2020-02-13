@@ -1212,6 +1212,36 @@ AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
 }
 
 bool
+AttributeSet::Descriptor::groupIndexCollision(const Descriptor& rhs) const
+{
+    const auto& groupMap = this->groupMap();
+    const auto& otherGroupMap = rhs.groupMap();
+
+    // iterate both group maps at the same time and find any keys that occur
+    // in both maps and test their values for equality
+
+    auto groupsIt1 = groupMap.cbegin();
+    auto groupsIt2 = otherGroupMap.cbegin();
+
+    while (groupsIt1 != groupMap.cend() && groupsIt2 != otherGroupMap.cend()) {
+        if (groupsIt1->first < groupsIt2->first) {
+            ++groupsIt1;
+        } else if (groupsIt1->first > groupsIt2->first) {
+            ++groupsIt2;
+        } else {
+            if (groupsIt1->second != groupsIt2->second) {
+                return true;
+            } else {
+                ++groupsIt1;
+                ++groupsIt2;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool
 AttributeSet::Descriptor::validName(const Name& name)
 {
     if (name.empty())   return false;
