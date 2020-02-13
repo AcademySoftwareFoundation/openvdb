@@ -20,6 +20,8 @@ Improvements:
 - Introduced a @vdblink::points::StringMetaCache StringMetaCache@endlink class
   for convenient string attribute metadata lookup and performed some minor
   optimizations.
+- Removed redundant floor in @vdblink::points::floatingPointToFixedPoint
+  floatingPointToFixedPoint@endlink.
 
 @par
 Bug fixes:
