@@ -24,6 +24,11 @@ Improvements:
   floatingPointToFixedPoint@endlink.
 
 @par
+New features:
+- Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
+  the tree is shared with another grid.
+
+@par
 Bug fixes:
 - Fixed a bug where grids with no active values might return true when the
   method <TT>evalActiveVoxelBoundingBox</TT> is called. The correct behavior is to

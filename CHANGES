@@ -16,6 +16,10 @@ Version 7.1.0 - In Development
       metadata lookup and performed some minor optimizations.
     - Removed redundant floor in points::floatingPointToFixedPoint.
 
+    New features:
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
       method evalActiveVoxelBoundingBox is called. The correct behavior is to
