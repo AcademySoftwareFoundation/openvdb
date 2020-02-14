@@ -14,7 +14,12 @@ Version 7.1.0 - In Development
     - Added new group inspection methods to the AttributeSet::Descriptor.
     - Introduced a StringMetaCache class for convenient string attribute
       metadata lookup and performed some minor optimizations.
+    - Removed redundant floor in points::floatingPointToFixedPoint.
     - CMake now checks the minimum supported MSVC compiler for Windows.
+
+    New features:
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the

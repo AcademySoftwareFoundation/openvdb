@@ -20,7 +20,14 @@ Improvements:
 - Introduced a @vdblink::points::StringMetaCache StringMetaCache@endlink class
   for convenient string attribute metadata lookup and performed some minor
   optimizations.
+- Removed redundant floor in @vdblink::points::floatingPointToFixedPoint
+  floatingPointToFixedPoint@endlink.
 - CMake now checks the minimum supported MSVC compiler for Windows.
+
+@par
+New features:
+- Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
+  the tree is shared with another grid.
 
 @par
 Bug fixes:
