@@ -22,6 +22,7 @@ Improvements:
   optimizations.
 - Removed redundant floor in @vdblink::points::floatingPointToFixedPoint
   floatingPointToFixedPoint@endlink.
+- CMake now checks the minimum supported MSVC compiler for Windows.
 
 @par
 New features:

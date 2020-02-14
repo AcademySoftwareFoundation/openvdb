@@ -15,6 +15,7 @@ Version 7.1.0 - In Development
     - Introduced a StringMetaCache class for convenient string attribute
       metadata lookup and performed some minor optimizations.
     - Removed redundant floor in points::floatingPointToFixedPoint.
+    - CMake now checks the minimum supported MSVC compiler for Windows.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
