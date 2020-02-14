@@ -31,6 +31,7 @@ public:
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testMonotonicity);
     CPPUNIT_TEST(testAttributes);
+    CPPUNIT_TEST(testSteal);
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIterators);
@@ -46,6 +47,7 @@ public:
     void testSetValue();
     void testMonotonicity();
     void testAttributes();
+    void testSteal();
     void testTopologyCopy();
     void testEquivalence();
     void testIterators();
@@ -631,6 +633,39 @@ TestPointDataLeaf::testAttributes()
     const Index64 memUsage = baseLeaf.memUsage() + leaf.attributeSet().memUsage();
 
     CPPUNIT_ASSERT_EQUAL(memUsage, leaf.memUsage());
+}
+
+
+void
+TestPointDataLeaf::testSteal()
+{
+    using AttributeVec3s = TypedAttributeArray<Vec3s>;
+    using Descriptor = AttributeSet::Descriptor;
+
+    // create a descriptor
+
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
+
+    // create a leaf and initialize attributes using this descriptor
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
+
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(1));
+
+    // steal the attribute set
+
+    std::unique_ptr<AttributeSet> attributeSet(leaf.stealAttributeSet());
+
+    CPPUNIT_ASSERT(attributeSet);
+    CPPUNIT_ASSERT_EQUAL(attributeSet->size(), size_t(1));
+
+    // ensure a new attribute set has been inserted in it's place
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
 }
 
 

@@ -319,6 +319,9 @@ public:
     /// Retrieve the attribute set.
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
+    /// @brief Steal the attribute set, a new, empty attribute set is inserted in it's place.
+    AttributeSet* stealAttributeSet();
+
     /// @brief Create a new attribute set. Existing attributes will be removed.
     void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
         const AttributeArray::ScopedRegistryLock* lock = nullptr);
@@ -744,6 +747,15 @@ public:
 ////////////////////////////////////////
 
 // PointDataLeafNode implementation
+
+template<typename T, Index Log2Dim>
+inline AttributeSet*
+PointDataLeafNode<T, Log2Dim>::stealAttributeSet()
+{
+    std::unique_ptr<AttributeSet> ptr(mAttributeSet.release());
+    mAttributeSet.reset(new AttributeSet);
+    return ptr.release();
+}
 
 template<typename T, Index Log2Dim>
 inline void
