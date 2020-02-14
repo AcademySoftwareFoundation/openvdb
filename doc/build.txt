@@ -224,6 +224,7 @@ DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
 Houdini  | 17.0              | 5           |
 Houdini  | 17.5              | 5           |
+Houdini  | 18.0              | 6           |
 Maya     | 2017              | Any         |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
@@ -241,7 +242,7 @@ OpenVDB components you wish to build.
 Package        | Description                                                     | OpenVDB Components |
 -------------- | --------------------------------------------------------------- | ------------------ |
 CMake          | Cross-platform family of tools designed to help build software  | All                |
-C++11 Compiler | Matching Houdini compiler and version                           | All                |
+C++14 Compiler | Matching Houdini compiler and version                           | All                |
 Boost          | Components: system, iostreams, python, thread                   | All                |
 CppUnit        | A unit testing framework module for C++                         | Unit Tests         |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
@@ -249,7 +250,7 @@ Doxygen        | Documentation generation from C++                              
 Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
 NumPy          | Scientific computing with Python                                | Optional (Python)  |
 
-At a minimum, boost, a matching C++11 compiler and CMake will be required. See
+At a minimum, boost, a matching C++14 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
 installing the above software. Note that as Blosc is provided as part of the
 Houdini installation `USE_BLOSC` should be left `ON`.
@@ -321,7 +322,7 @@ Supported versions of maya only ship with TBB.
 Package        | Description                                                       | OpenVDB Components               |
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
-C++11 Compiler | Matching Houdini compiler and version                             | All                              |
+C++14 Compiler | Matching Houdini compiler and version                             | All                              |
 Boost          | Components: system, iostreams, python, thread                     | All                              |
 IlmBase        | Used half precision floating points and EXR serialization support | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
@@ -335,7 +336,7 @@ NumPy          | Scientific computing with Python                               
 
 * See [blosc support](@ref buildBloscSupport)
 
-At a minimum, boost, a matching C++11 compiler, IlmBase, ZLIB, blosc and CMake
+At a minimum, boost, a matching C++14 compiler, IlmBase, ZLIB, blosc and CMake
 will be required. See the full [dependency list](@ref dependencies) for help
 with downloading and installing the above software.
 
