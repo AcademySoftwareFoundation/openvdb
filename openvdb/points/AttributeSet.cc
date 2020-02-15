@@ -365,6 +365,45 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 }
 
 
+AttributeArray::Ptr
+AttributeSet::removeAttribute(const Name& name)
+{
+    const size_t pos = this->find(name);
+    if (pos == INVALID_POS) return AttributeArray::Ptr();
+    return this->removeAttribute(pos);
+}
+
+
+AttributeArray::Ptr
+AttributeSet::removeAttribute(const size_t pos)
+{
+    if (pos >= mAttrs.size())     return AttributeArray::Ptr();
+
+    AttributeArray::Ptr array = mAttrs[pos];
+    assert(array);
+    mAttrs[pos].reset();
+
+    // safely drop the attribute and update the descriptor
+    std::vector<size_t> toDrop{pos};
+    this->dropAttributes(toDrop);
+
+    return array;
+}
+
+
+AttributeArray::Ptr
+AttributeSet::removeAttributeUnsafe(const size_t pos)
+{
+    if (pos >= mAttrs.size())     return AttributeArray::Ptr();
+
+    AttributeArray::Ptr array = mAttrs[pos];
+    assert(array);
+    mAttrs[pos].reset();
+
+    return array;
+}
+
+
 void
 AttributeSet::dropAttributes(const std::vector<size_t>& pos)
 {

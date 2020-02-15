@@ -201,6 +201,35 @@ public:
                                         const bool constantStride,
                                         const AttributeArray::ScopedRegistryLock* lock);
 
+    /// @brief Remove and return an attribute array by name
+    /// @param name the name of the attribute array to release
+    /// @details Detaches the attribute array from this attribute set and returns it.
+    /// This also updates the descriptor to remove the reference to the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    AttributeArray::Ptr removeAttribute(const Name& name);
+
+    /// @brief Remove and return an attribute array by index
+    /// @param pos the position index of the attribute to release
+    /// @details Detaches the attribute array from this attribute set and returns it.
+    /// This also updates the descriptor to remove the reference to the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    AttributeArray::Ptr removeAttribute(const size_t pos);
+
+    /// @brief Remove and return an attribute array by index (unsafe method)
+    /// @param pos the position index of the attribute to release
+    /// @details Detaches the attribute array from this attribute set and returns it.
+    /// In cases where the AttributeSet is due to be destroyed, a small performance
+    /// advantage can be gained by leaving the attribute array as a nullptr and not
+    /// updating the descriptor. However, this leaves the AttributeSet in an invalid
+    /// state making it unsafe to call any methods that implicitly derefence the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    /// @warning Only use this method if you're an expert and know the risks of not
+    /// updating the array of attributes or the descriptor.
+    AttributeArray::Ptr removeAttributeUnsafe(const size_t pos);
+
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
     void dropAttributes(const std::vector<size_t>& pos);
