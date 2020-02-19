@@ -1163,7 +1163,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, double *f, int stride, const UT_Vecto
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
             geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
             geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
@@ -1177,7 +1177,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, exint *f, int stride, const UT_Vector
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
             geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
             geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
@@ -3015,14 +3015,14 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
 
             openvdb::GridBase::Ptr grid = (*grids)[0];
             UT_ASSERT(grid);
-            if (grid) 
+            if (grid)
             {
                 // When we saved the grid, we auto-added metadata
                 // which isn't reflected by our primitive attributes.
                 // if any later node tries to sync the metadata from
                 // the vdb primitive, we'll gain extra data such as
                 // file_bbox
-                const char *file_metadata[] = 
+                const char *file_metadata[] =
                 {
                     "file_bbox_min",
                     "file_bbox_max",
