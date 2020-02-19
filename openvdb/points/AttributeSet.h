@@ -42,6 +42,7 @@ public:
 
     using Ptr                   = std::shared_ptr<AttributeSet>;
     using ConstPtr              = std::shared_ptr<const AttributeSet>;
+    using UniquePtr             = std::unique_ptr<AttributeSet>;
 
     class Descriptor;
 
@@ -203,23 +204,26 @@ public:
 
     /// @brief Remove and return an attribute array by name
     /// @param name the name of the attribute array to release
-    /// @details Detaches the attribute array from this attribute set and returns it.
-    /// This also updates the descriptor to remove the reference to the attribute array.
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a name is invalid, returns an empty shared pointer. This also updates the descriptor
+    /// to remove the reference to the attribute array.
     /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
     /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
     AttributeArray::Ptr removeAttribute(const Name& name);
 
     /// @brief Remove and return an attribute array by index
     /// @param pos the position index of the attribute to release
-    /// @details Detaches the attribute array from this attribute set and returns it.
-    /// This also updates the descriptor to remove the reference to the attribute array.
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a pos is invalid, returns an empty shared pointer. This also updates the descriptor
+    /// to remove the reference to the attribute array.
     /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
     /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
     AttributeArray::Ptr removeAttribute(const size_t pos);
 
     /// @brief Remove and return an attribute array by index (unsafe method)
     /// @param pos the position index of the attribute to release
-    /// @details Detaches the attribute array from this attribute set and returns it.
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a pos is invalid, returns an empty shared pointer.
     /// In cases where the AttributeSet is due to be destroyed, a small performance
     /// advantage can be gained by leaving the attribute array as a nullptr and not
     /// updating the descriptor. However, this leaves the AttributeSet in an invalid

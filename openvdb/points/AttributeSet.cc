@@ -379,9 +379,10 @@ AttributeSet::removeAttribute(const size_t pos)
 {
     if (pos >= mAttrs.size())     return AttributeArray::Ptr();
 
-    AttributeArray::Ptr array = mAttrs[pos];
+    assert(mAttrs[pos]);
+    AttributeArray::Ptr array;
+    std::swap(array, mAttrs[pos]);
     assert(array);
-    mAttrs[pos].reset();
 
     // safely drop the attribute and update the descriptor
     std::vector<size_t> toDrop{pos};
@@ -396,9 +397,10 @@ AttributeSet::removeAttributeUnsafe(const size_t pos)
 {
     if (pos >= mAttrs.size())     return AttributeArray::Ptr();
 
-    AttributeArray::Ptr array = mAttrs[pos];
+    assert(mAttrs[pos]);
+    AttributeArray::Ptr array;
+    std::swap(array, mAttrs[pos]);
     assert(array);
-    mAttrs[pos].reset();
 
     return array;
 }

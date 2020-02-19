@@ -658,7 +658,7 @@ TestPointDataLeaf::testSteal()
 
     // steal the attribute set
 
-    std::unique_ptr<AttributeSet> attributeSet(leaf.stealAttributeSet());
+    AttributeSet::UniquePtr attributeSet = leaf.stealAttributeSet();
 
     CPPUNIT_ASSERT(attributeSet);
     CPPUNIT_ASSERT_EQUAL(attributeSet->size(), size_t(1));
