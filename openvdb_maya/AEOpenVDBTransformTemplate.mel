@@ -10,7 +10,7 @@ global proc AEOpenVDBTransformTemplate( string $nodeAttr )
         editorTemplate -addControl "UniformScale";
         editorTemplate -addControl "InvertTransformation";
         editorTemplate -endLayout;
-	    editorTemplate -addExtraControls;
+        editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
 }

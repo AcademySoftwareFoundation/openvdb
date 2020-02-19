@@ -220,7 +220,7 @@ auto iterOn = leaf.beginIndexOn();
 auto iterOff = leaf.beginIndexOff();
 
 for (; iterOn; ++iterOn) {
-	Index32 index = *iterOn;
+    Index32 index = *iterOn;
 }
 @endcode
 
