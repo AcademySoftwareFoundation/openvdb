@@ -38,9 +38,8 @@ New features:
   @vdblink::points::AttributeSet::removeAttribute()
   AttributeSet::removeAttribute@endlink for releasing ownership of attribute
   data.
-- Added @vdblink::points::AttributeSet::Descriptor::groupIndexCollision()
-  AttributeSet::Descriptor::groupIndexCollision@endlink for detecting group
-  index collisions when attempting to merge two Descriptors.
+- Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
+  collisions when attempting to merge two Descriptors.
 
 @par
 Bug fixes:
@@ -73,8 +72,7 @@ API changes:
 - @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
   now returns a std::unique_ptr instead of a boost::scoped_array.
 - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
-  @vdblink::points::AttributeSet::Descriptor::unusedGroupOffset()
-  AttributeSet::Descriptor::unusedGroupOffset@endlink to allow for providing an
+  AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
   optional group offset hint.
 
 @par
