@@ -3,15 +3,27 @@
 set -e
 
 HOUDINI_MAJOR="$1"
-HOUPASS="$2"
+GOLD="$2"
+REQUIRE_SECRETS="$3"
+HOUDINI_CLIENT_ID="$4"
+HOUDINI_SECRET_KEY="$5"
 
-pip install --user future
-pip install --user lxml
-pip install --user mechanize
+if [ "$HOUDINI_CLIENT_ID" == "" ]; then
+    echo "HOUDINI_CLIENT_ID GitHub Action Secret needs to be set to install Houdini builds"
+    if [ "$REQUIRE_SECRETS" == "ON" ]; then
+        exit 1
+    fi
+fi
+if [ "$HOUDINI_SECRET_KEY" == "" ]; then
+    echo "HOUDINI_SECRET_KEY GitHub Action Secret needs to be set to install Houdini builds"
+    if [ "$REQUIRE_SECRETS" == "ON" ]; then
+        exit 1
+    fi
+fi
 
-export PYTHONPATH=${PYTHONPATH}:/usr/lib/python2.7/dist-packages
-# download and unpack latest houdini headers and libraries from daily-builds
-python ci/download_houdini.py $HOUDINI_MAJOR $HOUPASS
+pip install --user requests
+
+python ci/download_houdini.py $HOUDINI_MAJOR $GOLD $HOUDINI_CLIENT_ID $HOUDINI_SECRET_KEY
 
 tar -xzf hou.tar.gz
 ln -s houdini* hou

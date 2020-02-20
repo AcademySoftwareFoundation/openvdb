@@ -1,0 +1,138 @@
+
+name: FullBuild
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'cmake/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
+
+jobs:
+  houdinisecrets:
+    runs-on: ubuntu-16.04
+    steps:
+    - name: secret
+      run: |
+          if [ "$HOUDINI_CLIENT_ID" == "" ]; then
+            echo "HOUDINI_CLIENT_ID GitHub Action Secret needs to be set to test Houdini builds"
+            exit 1
+          fi
+          if [ "$HOUDINI_SECRET_KEY" == "" ]; then
+            echo "HOUDINI_SECRET_KEY GitHub Action Secret needs to be set to test Houdini builds"
+            exit 1
+          fi
+      env:
+        HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
+        HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
+
+  abi6:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Release 6 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  abi5:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2018
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Release 5 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  abi4:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2018
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Release 4 ON None
+    - name: test
+      run: cd build && ctest -V
+
+  houdini17_5:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: houdini
+      run: ./ci/install_houdini.sh 17.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Release OFF
+
+  abi7_noblosc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Release 7 OFF None
+    - name: test
+      run: cd build && ctest -V
+
+  houdini18_0_gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: houdini
+      run: ./ci/install_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+    - name: build
+      run: ./ci/build_houdini.sh g++ Release OFF
+
+  houdini18_0_debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: houdini
+      run: ./ci/install_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Debug OFF
+
+  abi7_gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh g++ Release 7 ON None
+
+  abi7_debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Debug 7 ON None
+
+  abi7_sse:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh clang++ Debug 7 ON SSE42
+    - name: test
+      run: cd build && ctest -V
