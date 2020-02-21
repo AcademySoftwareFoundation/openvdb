@@ -81,26 +81,26 @@ static const char *theDsFile = R"THEDSFILE(
         type    ordinal
         default { "nameclassandtype" }
         menu {
-            "nameclassandtype"  "Grid Name, Grid Class and Value Type"
-            "nameandclass"      "Grid Name and Grid Class"
-            "classandtype"      "Grid Class and Value Type"
+            "nameclassandtype"  "Name, VDB Class and Value Type"
+            "nameandclass"      "Name and VDB Class"
+            "classandtype"      "VDB Class and Value Type"
         }
     }
     parm {
-        name    "usereferencevdb"
-        label   "Use First Grid as Reference VDB Only"
+        name    "firstvdbisreference"
+        label   "First VDB Is Only for Reference"
         type    toggle
         default { "0" }
     }
     parm {
         name    "resample"
-        label   "Resample Grids"
+        label   "Resample VDBs"
         type    ordinal
         default { "first" }
         menu {
-            "first"         "To Match First Grid"
-            "highestres"    "To Match Highest-Res Grid"
-            "lowestres"     "To Match Lowest-Res Grid"
+            "first"         "To Match First VDB"
+            "highestres"    "To Match Highest-Res VDB"
+            "lowestres"     "To Match Lowest-Res VDB"
         }
         joinnext
     }
@@ -116,102 +116,107 @@ static const char *theDsFile = R"THEDSFILE(
         }
     }
     groupsimple {
-        name    "mergemodegroup"
-        label   "Merge Mode"
+        name    "mergeoperationgroup"
+        label   "Merge Operation"
 
         parm {
-            name    "fogmode"
-            label   "Fog Mode"
+            name    "op_fog"
+            label   "Fog VDBs"
             type    ordinal
             default { "add" }
             menu {
-                "none"          "None"
-                "add"           "Add"
-                "multiply"      "Multiply"
-                "maximum"       "Maximum"
-                "minimum"       "Minimum"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "add"               "Add"
+                "multiply"          "Multiply"
+                "maximum"           "Maximum"
+                "minimum"           "Minimum"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
             joinnext
         }
         parm {
-            name    "scalarmode"
-            label   "Scalar Mode"
+            name    "op_scalar"
+            label   "Scalar VDBs"
             type    ordinal
             default { "add" }
             menu {
-                "none"          "None"
-                "add"           "Add"
-                "multiply"      "Multiply"
-                "maximum"       "Maximum"
-                "minimum"       "Minimum"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "add"               "Add"
+                "multiply"          "Multiply"
+                "maximum"           "Maximum"
+                "minimum"           "Minimum"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
         }
         parm {
-            name    "distancemode"
-            label   "Distance Mode"
+            name    "op_sdf"
+            label   "SDF VDBs"
             type    ordinal
             default { "sdfunion" }
             menu {
-                "none"          "None"
-                "sdfunion"      "SDF Union"
-                "sdfintersect"  "SDF Intersect"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "sdfunion"          "SDF Union"
+                "sdfintersect"      "SDF Intersect"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
             joinnext
         }
         parm {
-            name    "vectormode"
-            label   "Vector Mode"
+            name    "op_vector"
+            label   "Vector VDBs"
             type    ordinal
             default { "add" }
             menu {
-                "none"          "None"
-                "add"           "Add"
-                "multiply"      "Multiply"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "add"               "Add"
+                "multiply"          "Multiply"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
         }
         parm {
-            name    "boolmode"
-            label   "Bool Mode"
+            name    "op_boolean"
+            label   "Boolean VDBs"
             type    ordinal
             default { "topounion" }
             menu {
-                "none"          "None"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
             joinnext
         }
         parm {
-            name    "pointsmode"
-            label   "Points Mode"
+            name    "op_points"
+            label   "VDB Points"
             type    ordinal
             default { "pointmerge" }
             menu {
-                "none"          "None"
-                "pointmerge"    "Merge"
-                "topounion"     "Activity Union"
-                "topointersect" "Activity Intersection"
+                "none"              "None"
+                "pointmerge"        "Merge"
+                "topounion"         "Activity Union"
+                "topointersect"     "Activity Intersection"
+                "topounionall"      "Activity Union All VDBs"
+                "topointersectall"  "Activity Intersection All VDBs"
             }
-        }
-        parm {
-            name        "useallgridsfortopo"
-            label       "Use all Grids for Activity Modes"
-            type        toggle
-            default     { "0" }
-            disablewhen "{ fogmode != topounion fogmode != topointersect scalarmode != topounion scalarmode != topointersect distancemode != topounion distancemode != topointersect vectormode != topounion vectormode != topointersect boolmode != topounion boolmode != topointersect pointsmode != topounion pointsmode != topointersect }"
         }
     }
     groupsimple {
         name    "postprocessgroup"
-        label   "Post Process"
+        label   "Post-Process"
 
         parm {
             name    "flood"
