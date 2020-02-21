@@ -52,7 +52,7 @@ class GEO_ConvertParms;
 typedef GEO_ConvertParms GU_ConvertParms;
 
 
-class GU_API GU_PrimVDB : public GEO_PrimVDB
+class OPENVDB_HOUDINI_API GU_PrimVDB : public GEO_PrimVDB
 {
 protected:
     /// NOTE: Primitives should not be deleted directly.  They are managed
@@ -141,7 +141,8 @@ public:
     /// @param src   if non-null, copy attributes and groups from this primitive
     /// @param name  if non-null, set the new primitive's @c name attribute to
     ///     this string; otherwise, if @a src is non-null, use its name
-    static GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
+    static SYS_FORCE_INLINE
+    GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
         const GEO_PrimVDB* src = NULL, const char* name = NULL)
     {
         return GU_PrimVDB::buildFromGridAdapter(gdp, &grid, src, name);
@@ -175,7 +176,8 @@ public:
     /// @param prim  the primitive to be populated with attributes
     /// @param grid  the grid whose metadata should be transferred
     /// @param gdp   the detail to which to transfer attributes
-    static void createGridAttrsFromMetadata(
+    static SYS_FORCE_INLINE
+    void createGridAttrsFromMetadata(
         const GEO_PrimVDB& prim,
         const openvdb::GridBase& grid,
         GEO_Detail& gdp)
@@ -189,7 +191,8 @@ public:
     /// @param element  the offset of the element
     /// @param meta_map the metadata that should be transferred
     /// @param gdp      the detail to which to transfer attributes
-    static void createAttrsFromMetadata(
+    static SYS_FORCE_INLINE
+    void createAttrsFromMetadata(
         GA_AttributeOwner owner,
         GA_Offset element,
         const openvdb::MetaMap& meta_map,
@@ -202,7 +205,8 @@ public:
     /// @param grid  the grid to be populated with metadata
     /// @param prim  the primitive whose attributes should be transferred
     /// @param gdp   the detail from which to retrieve primitive attributes
-    static void createMetadataFromGridAttrs(
+    static SYS_FORCE_INLINE
+    void createMetadataFromGridAttrs(
         openvdb::GridBase& grid,
         const GEO_PrimVDB& prim,
         const GEO_Detail& gdp)
@@ -215,7 +219,8 @@ public:
     /// @param owner     the type of element
     /// @param element   the offset of the element
     /// @param geo       the detail from which to retrieve primitive attributes
-    static void createMetadataFromAttrs(
+    static SYS_FORCE_INLINE
+    void createMetadataFromAttrs(
         openvdb::MetaMap& meta_map,
         GA_AttributeOwner owner,
         GA_Offset element,

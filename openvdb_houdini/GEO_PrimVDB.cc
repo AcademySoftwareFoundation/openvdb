@@ -52,6 +52,7 @@
 #include <GA/GA_Defragment.h>
 #include <GA/GA_ElementWrangler.h>
 #include <GA/GA_IntrinsicMacros.h>
+#include <GA/GA_LoadMap.h>
 #include <GA/GA_MergeMap.h>
 #include <GA/GA_PrimitiveJSON.h>
 #include <GA/GA_RangeMemberQuery.h>
@@ -71,6 +72,7 @@
 #include <openvdb/tools/Interpolation.h>
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/VectorTransformer.h>
+#include <openvdb/tools/Composite.h>
 
 #include <iostream>
 #include <stdexcept>
