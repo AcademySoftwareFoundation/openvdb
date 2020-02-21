@@ -20,7 +20,7 @@ class OPENVDB_API GridDescriptor
 {
 public:
     GridDescriptor();
-    GridDescriptor(const Name& name, const Name& gridType, bool saveFloatAsHalf = false);
+    GridDescriptor(const Name& name, const Name& gridType, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no);
     GridDescriptor(const GridDescriptor&) = default;
     GridDescriptor& operator=(const GridDescriptor&) = default;
     ~GridDescriptor();
@@ -33,7 +33,7 @@ public:
     void setInstanceParentName(const Name& name) { mInstanceParentName = name; }
     bool isInstance() const { return !mInstanceParentName.empty(); }
 
-    bool saveFloatAsHalf() const { return mSaveFloatAsHalf; }
+    StoredAsHalf saveFloatAsHalf() const { return mSaveFloatAsHalf; }
 
     void setGridPos(int64_t pos) { mGridPos = pos; }
     int64_t getGridPos() const { return mGridPos; }
@@ -89,7 +89,7 @@ private:
     /// The type of the grid
     Name mGridType;
     /// Are floats quantized to 16 bits on disk?
-    bool mSaveFloatAsHalf;
+    StoredAsHalf mSaveFloatAsHalf;
     /// Location in the stream where the grid data is stored
     int64_t mGridPos;
     /// Location in the stream where the grid blocks are stored

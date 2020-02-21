@@ -59,8 +59,8 @@ public:
     const void* backgroundPtr() const;
     void setBackgroundPtr(const void*);
 
-    bool halfFloat() const;
-    void setHalfFloat(bool);
+    StoredAsHalf halfFloat() const;
+    void setHalfFloat(StoredAsHalf);
 
     bool writeGridStats() const;
     void setWriteGridStats(bool);
@@ -223,10 +223,10 @@ OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
 
 /// @brief Return true if floating-point values should be quantized to 16 bits when writing
 /// to the given stream or promoted back from 16-bit to full precision when reading from it.
-OPENVDB_API bool getHalfFloat(std::ios_base&);
+OPENVDB_API StoredAsHalf getHalfFloat(std::ios_base&);
 /// @brief Specify whether floating-point values should be quantized to 16 bits when writing
 /// to the given stream or promoted back from 16-bit to full precision when reading from it.
-OPENVDB_API void setHalfFloat(std::ios_base&, bool);
+OPENVDB_API void setHalfFloat(std::ios_base&, StoredAsHalf);
 
 /// @brief Return a pointer to the background value of the grid
 /// currently being read from or written to the given stream.

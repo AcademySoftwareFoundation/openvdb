@@ -193,15 +193,15 @@ public:
     // I/O methods
     //
     /// Read in just the topology.
-    void readTopology(std::istream&, bool fromHalf = false);
+    void readTopology(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
     /// Write out just the topology.
-    void writeTopology(std::ostream&, bool toHalf = false) const;
+    void writeTopology(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
     /// Read in the topology and the origin.
-    void readBuffers(std::istream&, bool fromHalf = false);
-    void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
+    void readBuffers(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void readBuffers(std::istream& is, const CoordBBox&, StoredAsHalf fromHalf = StoredAsHalf::no);
     /// Write out the topology and the origin.
-    void writeBuffers(std::ostream&, bool toHalf = false) const;
+    void writeBuffers(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
     //
     // Accessor methods
@@ -945,7 +945,7 @@ LeafNode<ValueMask, Log2Dim>::offsetToGlobalCoord(Index n) const
 
 template<Index Log2Dim>
 inline void
-LeafNode<ValueMask, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
+LeafNode<ValueMask, Log2Dim>::readTopology(std::istream& is, StoredAsHalf /*fromHalf*/)
 {
     mBuffer.mData.load(is);
 }
@@ -953,7 +953,7 @@ LeafNode<ValueMask, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
 
 template<Index Log2Dim>
 inline void
-LeafNode<ValueMask, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
+LeafNode<ValueMask, Log2Dim>::writeTopology(std::ostream& os, StoredAsHalf /*toHalf*/) const
 {
     mBuffer.mData.save(os);
 }
@@ -961,7 +961,7 @@ LeafNode<ValueMask, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) c
 
 template<Index Log2Dim>
 inline void
-LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, StoredAsHalf fromHalf)
 {
     // Boolean LeafNodes don't currently implement lazy loading.
     // Instead, load the full buffer, then clip it.
@@ -979,7 +979,7 @@ LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& cli
 
 template<Index Log2Dim>
 inline void
-LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
+LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, StoredAsHalf /*fromHalf*/)
 {
     // Read in the value mask = buffer.
     mBuffer.mData.load(is);
@@ -990,7 +990,7 @@ LeafNode<ValueMask, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
 
 template<Index Log2Dim>
 inline void
-LeafNode<ValueMask, Log2Dim>::writeBuffers(std::ostream& os, bool /*toHalf*/) const
+LeafNode<ValueMask, Log2Dim>::writeBuffers(std::ostream& os, StoredAsHalf /*toHalf*/) const
 {
     // Write out the value mask = buffer.
     mBuffer.mData.save(os);

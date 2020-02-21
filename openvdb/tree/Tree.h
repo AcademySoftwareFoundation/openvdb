@@ -139,16 +139,16 @@ public:
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false);
+    virtual void readTopology(std::istream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no);
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const;
+    virtual void writeTopology(std::ostream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) const;
 
     /// Read all data buffers for this tree.
-    virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
+    virtual void readBuffers(std::istream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) = 0;
     /// Read all of this tree's data buffers that intersect the given bounding box.
-    virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
+    virtual void readBuffers(std::istream&, const CoordBBox&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) = 0;
     /// @brief Read all of this tree's data buffers that are not yet resident in memory
     /// (because delayed loading is in effect).
     /// @details If this tree was read from a memory-mapped file, this operation
@@ -156,7 +156,7 @@ public:
     /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
     virtual void readNonresidentBuffers() const = 0;
     /// Write out all the data buffers for this tree.
-    virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
+    virtual void writeBuffers(std::ostream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) const = 0;
 
     /// @brief Print statistics, memory usage and other information about this tree.
     /// @param os            a stream to which to write textual information
@@ -307,15 +307,15 @@ public:
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    void readTopology(std::istream&, bool saveFloatAsHalf = false) override;
+    void readTopology(std::istream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) override;
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const override;
+    void writeTopology(std::ostream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) const override;
     /// Read all data buffers for this tree.
-    void readBuffers(std::istream&, bool saveFloatAsHalf = false) override;
+    void readBuffers(std::istream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) override;
     /// Read all of this tree's data buffers that intersect the given bounding box.
-    void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
+    void readBuffers(std::istream&, const CoordBBox&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) override;
     /// @brief Read all of this tree's data buffers that are not yet resident in memory
     /// (because delayed loading is in effect).
     /// @details If this tree was read from a memory-mapped file, this operation
@@ -323,7 +323,7 @@ public:
     /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
     void readNonresidentBuffers() const override;
     /// Write out all data buffers for this tree.
-    void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
+    void writeBuffers(std::ostream&, StoredAsHalf saveFloatAsHalf = StoredAsHalf::no) const override;
 
     void print(std::ostream& os = std::cout, int verboseLevel = 1) const override;
 
@@ -1260,7 +1260,7 @@ struct Tree5 {
 
 
 inline void
-TreeBase::readTopology(std::istream& is, bool /*saveFloatAsHalf*/)
+TreeBase::readTopology(std::istream& is, StoredAsHalf /*saveFloatAsHalf*/)
 {
     int32_t bufferCount;
     is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
@@ -1269,7 +1269,7 @@ TreeBase::readTopology(std::istream& is, bool /*saveFloatAsHalf*/)
 
 
 inline void
-TreeBase::writeTopology(std::ostream& os, bool /*saveFloatAsHalf*/) const
+TreeBase::writeTopology(std::ostream& os, StoredAsHalf /*saveFloatAsHalf*/) const
 {
     int32_t bufferCount = 1;
     os.write(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
@@ -1399,7 +1399,7 @@ Tree<RootNodeType>::cbegin() const
 
 template<typename RootNodeType>
 void
-Tree<RootNodeType>::readTopology(std::istream& is, bool saveFloatAsHalf)
+Tree<RootNodeType>::readTopology(std::istream& is, StoredAsHalf saveFloatAsHalf)
 {
     this->clearAllAccessors();
     TreeBase::readTopology(is, saveFloatAsHalf);
@@ -1409,7 +1409,7 @@ Tree<RootNodeType>::readTopology(std::istream& is, bool saveFloatAsHalf)
 
 template<typename RootNodeType>
 void
-Tree<RootNodeType>::writeTopology(std::ostream& os, bool saveFloatAsHalf) const
+Tree<RootNodeType>::writeTopology(std::ostream& os, StoredAsHalf saveFloatAsHalf) const
 {
     TreeBase::writeTopology(os, saveFloatAsHalf);
     mRoot.writeTopology(os, saveFloatAsHalf);
@@ -1418,7 +1418,7 @@ Tree<RootNodeType>::writeTopology(std::ostream& os, bool saveFloatAsHalf) const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::readBuffers(std::istream &is, bool saveFloatAsHalf)
+Tree<RootNodeType>::readBuffers(std::istream &is, StoredAsHalf saveFloatAsHalf)
 {
     this->clearAllAccessors();
     mRoot.readBuffers(is, saveFloatAsHalf);
@@ -1427,7 +1427,7 @@ Tree<RootNodeType>::readBuffers(std::istream &is, bool saveFloatAsHalf)
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::readBuffers(std::istream &is, const CoordBBox& bbox, bool saveFloatAsHalf)
+Tree<RootNodeType>::readBuffers(std::istream &is, const CoordBBox& bbox, StoredAsHalf saveFloatAsHalf)
 {
     this->clearAllAccessors();
     mRoot.readBuffers(is, bbox, saveFloatAsHalf);
@@ -1447,7 +1447,7 @@ Tree<RootNodeType>::readNonresidentBuffers() const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
+Tree<RootNodeType>::writeBuffers(std::ostream &os, StoredAsHalf saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
 }

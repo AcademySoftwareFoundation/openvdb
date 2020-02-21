@@ -570,12 +570,12 @@ public:
     //
     // I/O
     //
-    bool writeTopology(std::ostream&, bool toHalf = false) const;
-    bool readTopology(std::istream&, bool fromHalf = false);
+    bool writeTopology(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
+    bool readTopology(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
 
-    void writeBuffers(std::ostream&, bool toHalf = false) const;
-    void readBuffers(std::istream&, bool fromHalf = false);
-    void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
+    void writeBuffers(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
+    void readBuffers(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void readBuffers(std::istream&, const CoordBBox&, StoredAsHalf fromHalf = StoredAsHalf::no);
 
 
     //
@@ -2251,13 +2251,15 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 
 template<typename ChildT>
 inline bool
-RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
+RootNode<ChildT>::writeTopology(std::ostream& os, StoredAsHalf toHalf) const
 {
-    if (!toHalf) {
+    if (toHalf == StoredAsHalf::no) {
         os.write(reinterpret_cast<const char*>(&mBackground), sizeof(ValueType));
     } else {
+#ifdef OPENVDB_WITH_OPENEXR_HALF
         ValueType truncatedVal = io::truncateRealToHalf(mBackground);
         os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueType));
+#endif
     }
     io::setGridBackgroundValuePtr(os, &mBackground);
 
@@ -2287,7 +2289,7 @@ RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
 
 template<typename ChildT>
 inline bool
-RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
+RootNode<ChildT>::readTopology(std::istream& is, StoredAsHalf fromHalf)
 {
     // Delete the existing tree.
     this->clear();
@@ -2393,7 +2395,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::writeBuffers(std::ostream& os, bool toHalf) const
+RootNode<ChildT>::writeBuffers(std::ostream& os, StoredAsHalf toHalf) const
 {
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) getChild(i).writeBuffers(os, toHalf);
@@ -2403,7 +2405,7 @@ RootNode<ChildT>::writeBuffers(std::ostream& os, bool toHalf) const
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::readBuffers(std::istream& is, bool fromHalf)
+RootNode<ChildT>::readBuffers(std::istream& is, StoredAsHalf fromHalf)
 {
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) getChild(i).readBuffers(is, fromHalf);
@@ -2413,7 +2415,7 @@ RootNode<ChildT>::readBuffers(std::istream& is, bool fromHalf)
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+RootNode<ChildT>::readBuffers(std::istream& is, const CoordBBox& clipBBox, StoredAsHalf fromHalf)
 {
     const Tile bgTile(mBackground, /*active=*/false);
 

@@ -48,7 +48,7 @@ namespace io
 template<>
 inline void
 readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destCount,
-                        const util::NodeMask<3>& /*valueMask*/, bool /*fromHalf*/)
+                        const util::NodeMask<3>& /*valueMask*/, StoredAsHalf /*fromHalf*/)
 {
     using compression::bloscDecompress;
 
@@ -109,7 +109,7 @@ template<>
 inline void
 writeCompressedValues(  std::ostream& os, PointDataIndex32* srcBuf, Index srcCount,
                         const util::NodeMask<3>& /*valueMask*/,
-                        const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/)
+                        const util::NodeMask<3>& /*childMask*/, StoredAsHalf /*toHalf*/)
 {
     using compression::bloscCompress;
 
@@ -493,14 +493,14 @@ public:
 
     // I/O methods
 
-    void readTopology(std::istream& is, bool fromHalf = false);
-    void writeTopology(std::ostream& os, bool toHalf = false) const;
+    void readTopology(std::istream& is, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void writeTopology(std::ostream& os, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
     Index buffers() const;
 
-    void readBuffers(std::istream& is, bool fromHalf = false);
-    void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
-    void writeBuffers(std::ostream& os, bool toHalf = false) const;
+    void readBuffers(std::istream& is, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void readBuffers(std::istream& is, const CoordBBox&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void writeBuffers(std::ostream& os, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
 
     Index64 memUsage() const;
@@ -1120,14 +1120,14 @@ PointDataLeafNode<T, Log2Dim>::setOffsetOnly(Index offset, const ValueType& val)
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
+PointDataLeafNode<T, Log2Dim>::readTopology(std::istream& is, StoredAsHalf fromHalf)
 {
     BaseLeaf::readTopology(is, fromHalf);
 }
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) const
+PointDataLeafNode<T, Log2Dim>::writeTopology(std::ostream& os, StoredAsHalf toHalf) const
 {
     BaseLeaf::writeTopology(os, toHalf);
 }
@@ -1146,14 +1146,14 @@ PointDataLeafNode<T, Log2Dim>::buffers() const
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
+PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, StoredAsHalf fromHalf)
 {
     this->readBuffers(is, CoordBBox::inf(), fromHalf);
 }
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*bbox*/, bool fromHalf)
+PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*bbox*/, StoredAsHalf fromHalf)
 {
     struct Local
     {
@@ -1329,7 +1329,7 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
+PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, StoredAsHalf toHalf) const
 {
     struct Local
     {

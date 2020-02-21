@@ -338,21 +338,27 @@ GridBase::setCreator(const std::string& creator)
 ////////////////////////////////////////
 
 
-bool
+StoredAsHalf
 GridBase::saveFloatAsHalf() const
 {
     if (Metadata::ConstPtr meta = (*this)[META_SAVE_HALF_FLOAT]) {
-        return meta->asBool();
+        if (meta->asBool()) {
+#ifdef OPENVDB_WITH_OPENEXR_HALF
+            return StoredAsHalf::yes;
+#else
+            throw std::runtime_error("half type not supported");
+#endif
+        }
     }
-    return false;
+    return StoredAsHalf::no;
 }
 
 
 void
-GridBase::setSaveFloatAsHalf(bool saveAsHalf)
+GridBase::setSaveFloatAsHalf(StoredAsHalf saveAsHalf)
 {
     this->removeMeta(META_SAVE_HALF_FLOAT);
-    this->insertMeta(META_SAVE_HALF_FLOAT, BoolMetadata(saveAsHalf));
+    this->insertMeta(META_SAVE_HALF_FLOAT, BoolMetadata(saveAsHalf != StoredAsHalf::no));
 }
 
 

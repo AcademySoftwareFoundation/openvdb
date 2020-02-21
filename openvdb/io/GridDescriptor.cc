@@ -28,14 +28,14 @@ const char* SEP = "\x1e"; // ASCII "record separator"
 
 
 GridDescriptor::GridDescriptor():
-    mSaveFloatAsHalf(false),
+    mSaveFloatAsHalf(StoredAsHalf::no),
     mGridPos(0),
     mBlockPos(0),
     mEndPos(0)
 {
 }
 
-GridDescriptor::GridDescriptor(const Name &name, const Name &type, bool half):
+GridDescriptor::GridDescriptor(const Name &name, const Name &type, StoredAsHalf half):
     mGridName(stripSuffix(name)),
     mUniqueName(name),
     mGridType(type),
@@ -56,7 +56,7 @@ GridDescriptor::writeHeader(std::ostream &os) const
     writeString(os, mUniqueName);
 
     Name gridType = mGridType;
-    if (mSaveFloatAsHalf) gridType += HALF_FLOAT_TYPENAME_SUFFIX;
+    if (mSaveFloatAsHalf != StoredAsHalf::no) gridType += HALF_FLOAT_TYPENAME_SUFFIX;
     writeString(os, gridType);
 
     writeString(os, mInstanceParentName);
@@ -80,7 +80,11 @@ GridDescriptor::read(std::istream &is)
     // Read in the grid type.
     mGridType = readString(is);
     if (boost::ends_with(mGridType, HALF_FLOAT_TYPENAME_SUFFIX)) {
-        mSaveFloatAsHalf = true;
+#ifdef OPENVDB_WITH_OPENEXR_HALF
+        mSaveFloatAsHalf = StoredAsHalf::yes;
+#else
+        throw std::runtime_error("half float not supported");
+#endif
         boost::erase_last(mGridType, HALF_FLOAT_TYPENAME_SUFFIX);
     }
 

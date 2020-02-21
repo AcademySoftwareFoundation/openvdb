@@ -448,11 +448,11 @@ public:
     //
     // I/O
     //
-    void writeTopology(std::ostream&, bool toHalf = false) const;
-    void readTopology(std::istream&, bool fromHalf = false);
-    void writeBuffers(std::ostream&, bool toHalf = false) const;
-    void readBuffers(std::istream&, bool fromHalf = false);
-    void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
+    void writeTopology(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
+    void readTopology(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void writeBuffers(std::ostream&, StoredAsHalf toHalf = StoredAsHalf::no) const;
+    void readBuffers(std::istream&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void readBuffers(std::istream&, const CoordBBox&, StoredAsHalf fromHalf = StoredAsHalf::no);
 
 
     //
@@ -2182,7 +2182,7 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) const
+InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, StoredAsHalf toHalf) const
 {
     mChildMask.save(os);
     mValueMask.save(os);
@@ -2207,7 +2207,7 @@ InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) cons
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
+InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, StoredAsHalf fromHalf)
 {
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
@@ -3021,7 +3021,7 @@ InternalNode<ChildT, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIt
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
+InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, StoredAsHalf toHalf) const
 {
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         iter->writeBuffers(os, toHalf);
@@ -3031,7 +3031,7 @@ InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
+InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, StoredAsHalf fromHalf)
 {
     for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
         iter->readBuffers(is, fromHalf);
@@ -3042,7 +3042,7 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
-    const CoordBBox& clipBBox, bool fromHalf)
+    const CoordBBox& clipBBox, StoredAsHalf fromHalf)
 {
     for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
         // Stream in the branch rooted at this child.

@@ -192,7 +192,7 @@ struct StreamMetadata::Impl
     uint32_t mCompression = COMPRESS_NONE;
     uint32_t mGridClass = GRID_UNKNOWN;
     const void* mBackgroundPtr = nullptr; ///< @todo use Metadata::Ptr?
-    bool mHalfFloat = false;
+    StoredAsHalf mHalfFloat = StoredAsHalf::no;
     bool mWriteGridStats = false;
     bool mSeekable = false;
     bool mCountingPasses = false;
@@ -258,7 +258,7 @@ VersionId       StreamMetadata::libraryVersion() const  { return mImpl->mLibrary
 uint32_t        StreamMetadata::compression() const     { return mImpl->mCompression; }
 uint32_t        StreamMetadata::gridClass() const       { return mImpl->mGridClass; }
 const void*     StreamMetadata::backgroundPtr() const   { return mImpl->mBackgroundPtr; }
-bool            StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
+StoredAsHalf    StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
 bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGridStats; }
 bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
 bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
@@ -277,7 +277,7 @@ void StreamMetadata::setLibraryVersion(VersionId v)     { mImpl->mLibraryVersion
 void StreamMetadata::setCompression(uint32_t c)         { mImpl->mCompression = c; }
 void StreamMetadata::setGridClass(uint32_t c)           { mImpl->mGridClass = c; }
 void StreamMetadata::setBackgroundPtr(const void* ptr)  { mImpl->mBackgroundPtr = ptr; }
-void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b; }
+void StreamMetadata::setHalfFloat(StoredAsHalf b)               { mImpl->mHalfFloat = b; }
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
@@ -294,7 +294,7 @@ StreamMetadata::str() const
         << "/" << fileVersion() << "\n";
     ostr << "class: " << GridBase::gridClassToString(static_cast<GridClass>(gridClass())) << "\n";
     ostr << "compression: " << compressionToString(compression()) << "\n";
-    ostr << "half_float: " << halfFloat() << "\n";
+    ostr << "half_float: " << (halfFloat() != StoredAsHalf::no) << "\n";
     ostr << "seekable: " << seekable() << "\n";
     ostr << "delayed_load_meta: " << delayedLoadMeta() << "\n";
     ostr << "pass: " << pass() << "\n";
@@ -359,7 +359,7 @@ struct PopulateDelayedLoadMetadataOp
         }
 
         const auto background = tree.background();
-        const bool saveFloatAsHalf = grid.saveFloatAsHalf();
+        const StoredAsHalf saveFloatAsHalf = grid.saveFloatAsHalf();
 
         tree::LeafManager<const TreeT> leafManager(tree);
 
@@ -375,7 +375,7 @@ struct PopulateDelayedLoadMetadataOp
                     size_t sizeBytes(8);
                     size_t compressedSize = io::writeCompressedValuesSize(
                         leaf.buffer().data(), LeafT::SIZE,
-                        leaf.valueMask(), maskCompressData.metadata, saveFloatAsHalf, compression);
+                        leaf.valueMask(), maskCompressData.metadata, compression, saveFloatAsHalf);
                     metadata.setCompressedSize(idx, compressedSize+sizeBytes);
                 }
             }
@@ -842,18 +842,25 @@ setGridClass(std::ios_base& strm, uint32_t cls)
 }
 
 
-bool
+StoredAsHalf
 getHalfFloat(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    return strm.iword(sStreamState.halfFloat) != 0;
+    if (strm.iword(sStreamState.halfFloat) != 0) {
+#ifdef OPENVDB_WITH_OPENEXR_HALF
+        return StoredAsHalf::yes;
+#else
+        throw std::runtime_error("half float not supported");
+#endif
+    }
+      return StoredAsHalf::no;
 }
 
 
 void
-setHalfFloat(std::ios_base& strm, bool halfFloat)
+setHalfFloat(std::ios_base& strm, StoredAsHalf halfFloat)
 {
-    strm.iword(sStreamState.halfFloat) = halfFloat; ///< @todo remove
+    strm.iword(sStreamState.halfFloat) = halfFloat != StoredAsHalf::no; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setHalfFloat(halfFloat);
     }

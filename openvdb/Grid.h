@@ -279,8 +279,8 @@ public:
 
     /// @brief Return @c true if this grid should be written out with floating-point
     /// voxel values (including components of vectors) quantized to 16 bits.
-    bool saveFloatAsHalf() const;
-    void setSaveFloatAsHalf(bool);
+    StoredAsHalf saveFloatAsHalf() const;
+    void setSaveFloatAsHalf(StoredAsHalf);
 
     /// @brief Return the class of volumetric data (level set, fog volume, etc.)
     /// that is stored in this grid.

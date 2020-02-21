@@ -343,27 +343,27 @@ public:
     /// @brief Read in just the topology.
     /// @param is        the stream from which to read
     /// @param fromHalf  if true, floating-point input values are assumed to be 16-bit
-    void readTopology(std::istream& is, bool fromHalf = false);
+    void readTopology(std::istream& is, StoredAsHalf fromHalf = StoredAsHalf::no);
     /// @brief Write out just the topology.
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
-    void writeTopology(std::ostream& os, bool toHalf = false) const;
+    void writeTopology(std::ostream& os, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
     /// @brief Read buffers from a stream.
     /// @param is        the stream from which to read
     /// @param fromHalf  if true, floating-point input values are assumed to be 16-bit
-    void readBuffers(std::istream& is, bool fromHalf = false);
+    void readBuffers(std::istream& is, StoredAsHalf fromHalf = StoredAsHalf::no);
     /// @brief Read buffers that intersect the given bounding box.
     /// @param is        the stream from which to read
     /// @param bbox      an index-space bounding box
     /// @param fromHalf  if true, floating-point input values are assumed to be 16-bit
-    void readBuffers(std::istream& is, const CoordBBox& bbox, bool fromHalf = false);
+    void readBuffers(std::istream& is, const CoordBBox& bbox, StoredAsHalf fromHalf = StoredAsHalf::no);
     /// @brief Write buffers to a stream.
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
-    void writeBuffers(std::ostream& os, bool toHalf = false) const;
+    void writeBuffers(std::ostream& os, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
-    size_t streamingSize(bool toHalf = false) const;
+    size_t streamingSize(StoredAsHalf toHalf = StoredAsHalf::no) const;
 
     //
     // Accessor methods
@@ -874,7 +874,7 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
-    inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+    inline void skipCompressedValues(bool seekable, std::istream&, StoredAsHalf fromHalf OPENVDB_DEFAULT_STORAGE_IF_NO_OPENEXR_HALF);
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
@@ -1281,7 +1281,7 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
+LeafNode<T, Log2Dim>::readTopology(std::istream& is, StoredAsHalf /*fromHalf*/)
 {
     mValueMask.load(is);
 }
@@ -1289,7 +1289,7 @@ LeafNode<T, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
+LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, StoredAsHalf /*toHalf*/) const
 {
     mValueMask.save(os);
 }
@@ -1301,7 +1301,7 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T,Log2Dim>::skipCompressedValues(bool seekable, std::istream& is, bool fromHalf)
+LeafNode<T,Log2Dim>::skipCompressedValues(bool seekable, std::istream& is, StoredAsHalf fromHalf)
 {
     if (seekable) {
         // Seek over voxel values.
@@ -1317,7 +1317,7 @@ LeafNode<T,Log2Dim>::skipCompressedValues(bool seekable, std::istream& is, bool 
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
+LeafNode<T,Log2Dim>::readBuffers(std::istream& is, StoredAsHalf fromHalf)
 {
     this->readBuffers(is, CoordBBox::inf(), fromHalf);
 }
@@ -1325,7 +1325,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, StoredAsHalf fromHalf)
 {
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
@@ -1394,8 +1394,10 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         const bool zipped = io::getDataCompression(is) & io::COMPRESS_ZIP;
         Buffer temp;
         for (int i = 1; i < numBuffers; ++i) {
-            if (fromHalf) {
+            if (fromHalf != StoredAsHalf::no) {
+#ifdef OPENVDB_WITH_OPENEXR_HALF
                 io::HalfReader<io::RealToHalf<T>::isReal, T>::read(is, temp.mData, SIZE, zipped);
+#endif
             } else {
                 io::readData<T>(is, temp.mData, SIZE, zipped);
             }
@@ -1409,7 +1411,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
+LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, StoredAsHalf toHalf) const
 {
     // Write out the value mask.
     mValueMask.save(os);

@@ -1481,9 +1481,9 @@ public:
 
     // I/O methods
 
-    void readBuffers(std::istream& is, bool fromHalf = false);
-    void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
-    void writeBuffers(std::ostream& os, bool toHalf = false) const;
+    void readBuffers(std::istream& is, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void readBuffers(std::istream& is, const CoordBBox&, StoredAsHalf fromHalf = StoredAsHalf::no);
+    void writeBuffers(std::ostream& os, StoredAsHalf toHalf = StoredAsHalf::no) const;
 
 
     Index64 memUsage() const;
@@ -1714,7 +1714,7 @@ PointIndexLeafNode<T, Log2Dim>::isEmpty(const CoordBBox& bbox) const
 
 template<typename T, Index Log2Dim>
 inline void
-PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
+PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, StoredAsHalf fromHalf)
 {
     BaseLeaf::readBuffers(is, fromHalf);
 
@@ -1728,7 +1728,7 @@ PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 
 template<typename T, Index Log2Dim>
 inline void
-PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& bbox, bool fromHalf)
+PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& bbox, StoredAsHalf fromHalf)
 {
     // Read and clip voxel values.
     BaseLeaf::readBuffers(is, bbox, fromHalf);
@@ -1763,7 +1763,7 @@ PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& b
 
 template<typename T, Index Log2Dim>
 inline void
-PointIndexLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
+PointIndexLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, StoredAsHalf toHalf) const
 {
     BaseLeaf::writeBuffers(os, toHalf);
 
