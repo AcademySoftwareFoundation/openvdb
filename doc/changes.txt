@@ -46,6 +46,8 @@ API changes:
 - Removed a number of deprecated point methods.
 - points::StringIndexType is now deprecated, use @vdblink::Index Index@endlink
   instead.
+- @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
+  now returns a std::unique_ptr instead of a boost::scoped_array.
 
 @par
 Houdini:
