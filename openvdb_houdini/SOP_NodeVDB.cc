@@ -767,4 +767,33 @@ OpenVDBOpFactory::setNativeName(const std::string& name)
     return *this;
 }
 
+
+int 
+SOP_NodeVDB::compareVersionString(const char* oldVersion, const char* nodeVersion);
+{
+    // The version of VDB is being compared here. 
+    // This is function is used in the SOP_OpenVDB_Scatter.cc file
+    // and based on the output, it is decided whether to enable
+    // compression or not.
+
+    openvdb::Name oldVersionStr(oldVersion);
+
+    bool old_version = false;
+    size_t spacePos = oldVersionStr.find_first_of(' ');
+    if (spacePos == std::string::npos) {
+        // no space in VDB versions prior to 6.2.0
+        old_version = true;
+    } else if (oldVersionStr.size() > 3 && oldVersionStr.substr(0,3) == "vdb") {
+        std::string vdbVersion = oldVersionStr.substr(3,spacePos-3);
+        // disable compression in VDB version 6.2.1 or earlier
+        if (UT_String::compareVersionString(vdbVersion.c_str(), "6.2.1") <= 0) {
+            old_version = true;
+        }
+    }
+
+    return old_version;
+
+}
+
+
 } // namespace openvdb_houdini

@@ -252,7 +252,7 @@ and usage examples.\n");
 }
 
 
-void
+/*void
 SOP_OpenVDB_Scatter::syncNodeVersion(const char* oldVersion, const char*, bool*)
 {
     // Since VDB 7.0.0, position compression is now set to 16-bit fixed point
@@ -279,6 +279,27 @@ SOP_OpenVDB_Scatter::syncNodeVersion(const char* oldVersion, const char*, bool*)
     }
 
     if (disableCompression) {
+        setInt("poscompression", 0, 0, 0);
+    }
+}*/
+
+
+void
+SOP_OpenVDB_Scatter::syncNodeVersion(const char* oldVersion, const char*, bool*)
+{
+    // Since VDB 7.0.0, position compression is now set to 16-bit fixed point
+    // by default. Detect if the VDB version that this node was created with
+    // was earlier than 7.0.0 and revert back to null compression if so to
+    // prevent potentially breaking older scenes.
+
+    // VDB version string prior to 6.2.0 - "17.5.204"
+    // VDB version string since 6.2.0 - "vdb6.2.0 houdini17.5.204"
+
+    openvdb::Name oldVersionStr(oldVersion);
+
+    bool old_version = SOP_NodeVDB::compareVersionString(oldVersionStr);
+    
+    if (old_version) {
         setInt("poscompression", 0, 0, 0);
     }
 }
