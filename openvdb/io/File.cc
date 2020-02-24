@@ -71,10 +71,20 @@ struct File::Impl
     static Index64 getDefaultCopyMaxBytes()
     {
         Index64 result = DEFAULT_COPY_MAX_BYTES;
+#if defined(_MSC_VER)
+        char* s;
+        _dupenv_s(&s, nullptr, "OPENVDB_DISABLE_DELAYED_LOAD");
+        if (s) {
+            char* endptr = nullptr;
+            result = std::strtoul(s, &endptr, /*base=*/10);
+            free(s);
+        }
+#else
         if (const char* s = std::getenv("OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES")) {
             char* endptr = nullptr;
             result = std::strtoul(s, &endptr, /*base=*/10);
         }
+#endif
         return result;
     }
 

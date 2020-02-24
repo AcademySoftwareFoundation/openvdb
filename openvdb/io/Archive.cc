@@ -1082,7 +1082,15 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
+#if defined(_MSC_VER)
+    char* value;
+    _dupenv_s(&value, nullptr, "OPENVDB_DISABLE_DELAYED_LOAD");
+    if (!value) return true;
+    free(value);
+    return false;
+#else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
+#endif
 }
 
 
