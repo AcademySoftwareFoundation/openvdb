@@ -15,8 +15,8 @@
 #include <unistd.h> // for access()
 #else
 #include <fstream> // for std::filebuf
-#include <cstdio> // for std::tmpnam_s(), L_tmpnam_s
 #endif
+#include <cstdio> // for tmpnam_s(), L_tmpnam_s, P_tmpdir
 #include <iostream>
 #include <sstream>
 #include <string>
