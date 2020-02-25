@@ -47,7 +47,9 @@ public:
     CPPUNIT_TEST(testHeader);
     CPPUNIT_TEST(testWriteGrid);
     CPPUNIT_TEST(testWriteMultipleGrids);
+#ifdef OPENVDB_USE_HALF
     CPPUNIT_TEST(testWriteFloatAsHalf);
+#endif
     CPPUNIT_TEST(testWriteInstancedGrids);
     CPPUNIT_TEST(testReadGridDescriptors);
     CPPUNIT_TEST(testGridNaming);
@@ -76,7 +78,9 @@ public:
     void testHeader();
     void testWriteGrid();
     void testWriteMultipleGrids();
+#ifdef OPENVDB_USE_HALF
     void testWriteFloatAsHalf();
+#endif
     void testWriteInstancedGrids();
     void testReadGridDescriptors();
     void testGridNaming();
@@ -434,6 +438,7 @@ TestFile::testWriteMultipleGrids()
 }
 
 
+#ifdef OPENVDB_USE_HALF
 void
 TestFile::testWriteFloatAsHalf()
 {
@@ -503,7 +508,7 @@ TestFile::testWriteFloatAsHalf()
         CPPUNIT_ASSERT_EQUAL(Vec3s(10, 10, 10), btree2.getValue(Coord(10, 10, 10)));
     }
 }
-
+#endif
 
 void
 TestFile::testWriteInstancedGrids()

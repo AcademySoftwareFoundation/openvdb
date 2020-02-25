@@ -56,7 +56,10 @@ GridDescriptor::writeHeader(std::ostream &os) const
     writeString(os, mUniqueName);
 
     Name gridType = mGridType;
-    if (mSaveFloatAsHalf) gridType += HALF_FLOAT_TYPENAME_SUFFIX;
+    if (mSaveFloatAsHalf) {
+        OPENVDB_THROW_IF_HALF_NOT_SUPPORTED();
+        gridType += HALF_FLOAT_TYPENAME_SUFFIX;
+    }
     writeString(os, gridType);
 
     writeString(os, mInstanceParentName);
@@ -80,6 +83,7 @@ GridDescriptor::read(std::istream &is)
     // Read in the grid type.
     mGridType = readString(is);
     if (boost::ends_with(mGridType, HALF_FLOAT_TYPENAME_SUFFIX)) {
+        OPENVDB_THROW_IF_HALF_NOT_SUPPORTED();
         mSaveFloatAsHalf = true;
         boost::erase_last(mGridType, HALF_FLOAT_TYPENAME_SUFFIX);
     }

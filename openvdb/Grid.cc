@@ -342,7 +342,10 @@ bool
 GridBase::saveFloatAsHalf() const
 {
     if (Metadata::ConstPtr meta = (*this)[META_SAVE_HALF_FLOAT]) {
-        return meta->asBool();
+        if (meta->asBool()) {
+            OPENVDB_THROW_IF_HALF_NOT_SUPPORTED();
+            return true;
+        }
     }
     return false;
 }

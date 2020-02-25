@@ -39,7 +39,9 @@ public:
 
     CPPUNIT_TEST_SUITE(TestTree);
     CPPUNIT_TEST(testChangeBackground);
+#ifdef OPENVDB_USE_HALF
     CPPUNIT_TEST(testHalf);
+#endif
     CPPUNIT_TEST(testValues);
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testSetValueOnly);
@@ -77,7 +79,9 @@ public:
     CPPUNIT_TEST_SUITE_END();
 
     void testChangeBackground();
+#ifdef OPENVDB_USE_HALF
     void testHalf();
+#endif
     void testValues();
     void testSetValue();
     void testSetValueOnly();
@@ -114,7 +118,9 @@ public:
     void testInternalNode();
 
 private:
+#ifdef OPENVDB_USE_HALF
     template<typename TreeType> void testWriteHalf();
+#endif
     template<typename TreeType> void doTestMerge(openvdb::MergePolicy);
     template<typename TreeTypeA, typename TreeTypeB> void doTestTopologyDifference();
 };
@@ -180,6 +186,8 @@ TestTree::testChangeBackground()
 }
 
 
+
+#ifdef OPENVDB_USE_HALF
 void
 TestTree::testHalf()
 {
@@ -261,7 +269,7 @@ TestTree::testWriteHalf()
             outHalf.str() == outDiff.str());
     }
 }
-
+#endif
 
 void
 TestTree::testValues()

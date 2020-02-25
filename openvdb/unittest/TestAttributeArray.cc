@@ -422,6 +422,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#ifdef OPENVDB_USE_HALF
         {
             // half is not registered by default, but for complete-ness
             TypedAttributeArray<half> typedAttr(size);
@@ -436,6 +437,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#endif // OPENVDB_USE_HALF
         {
             TypedAttributeArray<float> typedAttr(size);
             AttributeArray& attr(typedAttr);
@@ -528,6 +530,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
         {
+#ifdef OPENVDB_USE_HALF
             TypedAttributeArray<float, TruncateCodec> typedAttr(size);
             AttributeArray& attr(typedAttr);
             CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
@@ -539,6 +542,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsVector());
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+#endif // OPENVDB_USE_HALF
         }
 #endif
     }
@@ -704,14 +708,14 @@ TestAttributeArray::testAttributeArray()
                 CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
             }
         }
-
+#ifdef OPENVDB_USE_HALF
         { // Equality using an unregistered attribute type
             TypedAttributeArray<half> attr1(50);
             TypedAttributeArray<half> attr2(50);
 
             CPPUNIT_ASSERT(attr1 == attr2);
         }
-
+#endif
         // attribute array must not be uniform for compression
 
         attr.set(1, 7);
@@ -949,7 +953,7 @@ TestAttributeArray::testAttributeArrayCopy()
 
         CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
     }
-
+#ifdef OPENVDB_USE_HALF
     { // copy values between attribute arrays with different value types, but the same storage type
         // target half array
         TypedAttributeArray<half> targetTypedAttr1(size);
@@ -973,7 +977,7 @@ TestAttributeArray::testAttributeArrayCopy()
             CPPUNIT_ASSERT(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
         }
     }
-
+#endif
     { // out-of-range checking
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);

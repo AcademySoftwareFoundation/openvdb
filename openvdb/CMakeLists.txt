@@ -57,15 +57,17 @@ if(USE_EXR)
         "is deprecated and will be removed.")
     endif()
   endif()
-else()
+elseif(USE_HALF)
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
+if (USE_EXR)
+    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+      if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+        message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+          "is deprecated and will be removed.")
+      endif()
+    endif()
 endif()
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
