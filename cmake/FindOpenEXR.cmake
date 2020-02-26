@@ -288,13 +288,26 @@ if(OpenEXR_FOUND)
   set(OpenEXR_LIBRARIES ${OpenEXR_LIB_COMPONENTS})
 
   # We have to add both include and include/OpenEXR to the include
-  # path in case OpenEXR and IlmBase are installed separately
+  # path in case OpenEXR and IlmBase are installed separately.
+  #
+  # Make sure we get the absolute path to avoid issues where
+  # /usr/include/OpenEXR/../ is picked up and passed to gcc from cmake
+  # which won't correctly compute /usr/include as an implicit system
+  # dir if the path is relative:
+  #
+  # https://github.com/AcademySoftwareFoundation/openvdb/issues/632
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129
+
+  set(_OpenEXR_Parent_Dir "")
+  get_filename_component(_OpenEXR_Parent_Dir
+    ${OpenEXR_INCLUDE_DIR}/../ ABSOLUTE)
 
   set(OpenEXR_INCLUDE_DIRS)
   list(APPEND OpenEXR_INCLUDE_DIRS
-    ${OpenEXR_INCLUDE_DIR}/../
+    ${_OpenEXR_Parent_Dir}
     ${OpenEXR_INCLUDE_DIR}
   )
+  unset(_OpenEXR_Parent_Dir)
   set(OpenEXR_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER})
 
   set(OpenEXR_LIBRARY_DIRS "")
