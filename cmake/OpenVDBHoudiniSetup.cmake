@@ -328,7 +328,6 @@ if(Houdini_VERSION VERSION_LESS 17)
 elseif(Houdini_VERSION VERSION_LESS 18)
   set(OPENVDB_HOUDINI_ABI 5)
 else()
-  # Anticipated ABI version for H18
   set(OPENVDB_HOUDINI_ABI 6)
 endif()
 
