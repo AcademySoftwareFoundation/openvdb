@@ -28,6 +28,11 @@ Improvements:
 New features:
 - Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
   the tree is shared with another grid.
+- Added @vdblink::points::PointDataLeafNode::stealAttributeSet()
+  PointDataLeafNode::stealAttributeSet@endlink and
+  @vdblink::points::AttributeSet::removeAttribute()
+  AttributeSet::removeAttribute@endlink for releasing ownership of attribute
+  data.
 
 @par
 Bug fixes:
