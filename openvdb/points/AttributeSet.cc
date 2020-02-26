@@ -400,7 +400,6 @@ AttributeSet::removeAttributeUnsafe(const size_t pos)
     assert(mAttrs[pos]);
     AttributeArray::Ptr array;
     std::swap(array, mAttrs[pos]);
-    assert(array);
 
     return array;
 }
