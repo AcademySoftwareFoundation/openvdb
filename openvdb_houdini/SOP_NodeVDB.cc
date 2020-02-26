@@ -792,7 +792,6 @@ SOP_NodeVDB::compareVersionString(const char* oldVersion, const char* nodeVersio
     }
 
     return old_version;
-
 }
 
 
