@@ -859,6 +859,57 @@ TestAttributeSet::testAttributeSet()
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
 
+        { // remove attribute
+            AttributeSet attrSetC;
+            attrSetC.appendAttribute("test1", AttributeI::attributeType());
+            attrSetC.appendAttribute("test2", AttributeI::attributeType());
+            attrSetC.appendAttribute("test3", AttributeI::attributeType());
+            attrSetC.appendAttribute("test4", AttributeI::attributeType());
+            attrSetC.appendAttribute("test5", AttributeI::attributeType());
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(5));
+
+            { // remove test2
+                AttributeArray::Ptr array = attrSetC.removeAttribute(1);
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(4));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(4));
+
+            { // remove test5
+                AttributeArray::Ptr array = attrSetC.removeAttribute("test5");
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+
+            { // remove test3 unsafely
+                AttributeArray::Ptr array = attrSetC.removeAttributeUnsafe(1);
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            // array of attributes and descriptor are not updated
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+
+            const auto& nameToPosMap = attrSetC.descriptor().map();
+
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test1"), size_t(0));
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test3"), size_t(1)); // this array does not exist
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test4"), size_t(2));
+
+            CPPUNIT_ASSERT(attrSetC.getConst(0));
+            CPPUNIT_ASSERT(!attrSetC.getConst(1)); // this array does not exist
+            CPPUNIT_ASSERT(attrSetC.getConst(2));
+        }
+
         { // test duplicateDrop configures group mapping
             AttributeSet attrSetC;
 

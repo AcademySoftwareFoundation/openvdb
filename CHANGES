@@ -16,10 +16,14 @@ Version 7.1.0 - In Development
       metadata lookup and performed some minor optimizations.
     - Removed redundant floor in points::floatingPointToFixedPoint.
     - CMake now checks the minimum supported MSVC compiler for Windows.
+    - Add gitignore to repository root.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
       grid.
+    - Added PointDataLeafNode::stealAttributeSet() and
+      AttributeSet::removeAttribute() for releasing ownership of attribute
+      data.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -29,10 +33,15 @@ Version 7.1.0 - In Development
       tools::meshToVolume(). This could cause values to not be propagated across
       node boundaries, leading to voxels incorrectly being marked as inside the
       isosurface. [Contributed by Tristan Barback]
+    - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
+      compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
+      headers were installed to /usr/include.
 
     API changes:
     - Removed a number of deprecated point methods.
     - points::StringIndexType is now deprecated, use Index instead.
+    - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
+      a boost::scoped_array.
 
     Houdini:
     - Platonic SOP is now verbified.

@@ -319,6 +319,9 @@ public:
     /// Retrieve the attribute set.
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
+    /// @brief Steal the attribute set, a new, empty attribute set is inserted in it's place.
+    AttributeSet::UniquePtr stealAttributeSet();
+
     /// @brief Create a new attribute set. Existing attributes will be removed.
     void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
         const AttributeArray::ScopedRegistryLock* lock = nullptr);
@@ -598,7 +601,7 @@ public:
     using ValueAll  = typename BaseLeaf::ValueAll;
 
 private:
-    std::unique_ptr<AttributeSet> mAttributeSet;
+    AttributeSet::UniquePtr mAttributeSet;
     uint16_t mVoxelBufferSize = 0;
 
 protected:
@@ -744,6 +747,15 @@ public:
 ////////////////////////////////////////
 
 // PointDataLeafNode implementation
+
+template<typename T, Index Log2Dim>
+inline AttributeSet::UniquePtr
+PointDataLeafNode<T, Log2Dim>::stealAttributeSet()
+{
+    AttributeSet::UniquePtr ptr = std::make_unique<AttributeSet>();
+    std::swap(ptr, mAttributeSet);
+    return ptr;
+}
 
 template<typename T, Index Log2Dim>
 inline void
