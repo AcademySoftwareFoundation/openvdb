@@ -28,7 +28,7 @@ before_build:
   - vcpkg integrate install
 
   # - adjust the PATH so that the vdb_test executable picks up all of the dll's correctly
-  - set PATH=%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
+  - set PATH=C:\Python37-x64;%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
 
 build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
