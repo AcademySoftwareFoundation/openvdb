@@ -7,6 +7,8 @@ configuration: Release
 environment:
   CMAKE_GENERATOR: Visual Studio 15 2017 Win64
   VCPKG_DEFAULT_TRIPLET: x64-windows
+  PYTHONHOME: C:\Python37-x64
+  APPVEYOR_SAVE_CACHE_ON_ERROR: true
 
 os: Visual Studio 2017
 
@@ -28,7 +30,8 @@ before_build:
   - vcpkg integrate install
 
   # - adjust the PATH so that the vdb_test executable picks up all of the dll's correctly
-  - set PATH=C:\Python37-x64;%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
+  - set PYTHONPATH=%PYTHONHOME%
+  - set PATH=%PYTHONHOME%\Scritps;%PYTHONHOME%;%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
 
 build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
@@ -49,6 +52,7 @@ build_script:
     -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_UNITTESTS=ON \
     -DUSE_BLOSC=ON \
+    -DPython_ROOT_DIR=%PYTHONHOME% \
     ..
   - cmake --build . --parallel 4 --config %CONFIGURATION% --target install
 
