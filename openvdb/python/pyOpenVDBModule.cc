@@ -730,10 +730,6 @@ setProgramName(py::object nameObj, bool color)
 
 ////////////////////////////////////////
 
-// Use Windows only methods (_strdup); no POSIX.
-#if defined(_MSC_VER)
-#define strdup _strdup
-#endif
 
 // Descriptor for the openvdb::GridClass enum (for use with pyutil::StringEnum)
 struct GridClassDescr
