@@ -14,11 +14,21 @@ cache: c:\tools\vcpkg\installed\
 
 before_build:
   - cd C:\tools\vcpkg
-  - vcpkg install zlib blosc openexr tbb cppunit jemalloc
+  - vcpkg install zlib:x64-windows
+  - vcpkg install blosc:x64-windows
+  - vcpkg install openexr:x64-windows
+  - vcpkg install tbb:x64-windows
+  - vcpkg install boost-iostreams:x64-windows
+  - vcpkg install boost-system:x64-windows
+  - vcpkg install boost-any:x64-windows
+  - vcpkg install boost-algorithm:x64-windows
+  - vcpkg install boost-uuid:x64-windows
+  - vcpkg install boost-interprocess:x64-windows
+  - vcpkg install boost-python:x64-windows
   - vcpkg integrate install
 
   # - adjust the PATH so that the vdb_test executable picks up all of the dll's correctly
-  - set PATH=%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%;C:\Tools\vcpkg\installed\x64-windows\bin;C:\Libraries\boost_1_67_0\lib64-msvc-14.0
+  - set PATH=%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
 
 build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
@@ -38,8 +48,6 @@ build_script:
     -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_UNITTESTS=ON \
     -DUSE_BLOSC=ON \
-    -DBOOST_ROOT=C:\Libraries\boost_1_67_0 \
-    -DBOOST_LIBRARYDIR=C:\Libraries\boost_1_67_0\lib64-msvc-14.0 \
     ..
   - cmake --build . --parallel 4 --config %CONFIGURATION% --target install
 
