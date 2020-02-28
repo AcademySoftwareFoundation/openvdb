@@ -568,9 +568,9 @@ private:
 /// @note For performance reasons, this class uses copy-on-write for storing
 /// the Descriptor so any modification of the source Descriptor also requires
 /// a deep-copy for the data in this class to remain valid.
-class AttributeSet::Info {
+class OPENVDB_API AttributeSet::Info {
 public:
-    struct Array {
+    struct OPENVDB_API Array {
         Index stride = 1;
         bool constantStride = true;
         bool hidden = false;

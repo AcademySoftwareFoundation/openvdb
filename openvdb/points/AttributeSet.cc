@@ -1453,27 +1453,28 @@ AttributeSet::Info::merge(const Info&)
 void
 AttributeSet::Info::print(std::ostream& os) const
 {
-    os << "AttributeSet::Info:" << std::endl;
-    os << "\tAttributes: " << this->size() << " attribute(s)" << std::endl;
+    os << "AttributeSet::Info:\n";
+    os << "\tAttributes: " << this->size() << " attribute(s)\n";
     for (const auto& namePos : mDescriptor->map()) {
         const Name& name = namePos.first;
         size_t pos = namePos.second;
-        os << "\t\t[" << pos << "] \"" << name << "\" " << std::endl;
-        os << "\t\t\tType: " << mDescriptor->type(pos).first << " " << mDescriptor->type(pos).second << std::endl;
-        os << "\t\t\tDefaultValue: " << (mDescriptor->hasDefaultValue(name) ? "yes" : "no") << std::endl;
+        os << "\t\t[" << pos << "] \"" << name << "\" \n";
+        os << "\t\t\tType: " << mDescriptor->type(pos).first << " " << mDescriptor->type(pos).second << "\n";
+        os << "\t\t\tDefaultValue: " << (mDescriptor->hasDefaultValue(name) ? "yes" : "no") << "\n";
         const auto& arrayInfo = this->arrayInfo(pos);
-        os << "\t\t\tConstantStride: " << (arrayInfo.constantStride ? "yes" : "no") << std::endl;
-        os << "\t\t\tStride: " << arrayInfo.stride << std::endl;
-        os << "\t\t\tGroup: " << (arrayInfo.group ? "yes" : "no") << std::endl;
-        os << "\t\t\tString: " << (arrayInfo.string ? "yes" : "no") << std::endl;
-        os << "\t\t\tHidden: " << (arrayInfo.hidden ? "yes" : "no") << std::endl;
-        os << "\t\t\tTransient: " << (arrayInfo.transient ? "yes" : "no") << std::endl;
+        os << "\t\t\tConstantStride: " << (arrayInfo.constantStride ? "yes" : "no") << "\n";
+        os << "\t\t\tStride: " << arrayInfo.stride << "\n";
+        os << "\t\t\tGroup: " << (arrayInfo.group ? "yes" : "no") << "\n";
+        os << "\t\t\tString: " << (arrayInfo.string ? "yes" : "no") << "\n";
+        os << "\t\t\tHidden: " << (arrayInfo.hidden ? "yes" : "no") << "\n";
+        os << "\t\t\tTransient: " << (arrayInfo.transient ? "yes" : "no") << "\n";
     }
-    os << "\tGroups: " << mDescriptor->groupMap().size() << " group(s)" << std::endl;
+    os << "\tGroups: " << mDescriptor->groupMap().size() << " group(s)\n";
     for (const auto& namePos : mDescriptor->groupMap()) {
-        os << "\t\t[" << namePos.second << "] " << namePos.first << std::endl;
+        os << "\t\t[" << namePos.second << "] " << namePos.first << "\n";
     }
-    os << "\tMetadata: " << mDescriptor->getMetadata().metaCount() << " metadata element(s)" << std::endl;
+    os << "\tMetadata: " << mDescriptor->getMetadata().metaCount() << " metadata element(s)\n";
+    os << std::flush;
 }
 
 
