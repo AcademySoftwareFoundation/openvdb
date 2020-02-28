@@ -17,6 +17,8 @@ Version 7.1.0 - In Development
     - Removed redundant floor in points::floatingPointToFixedPoint.
     - CMake now checks the minimum supported MSVC compiler for Windows.
     - Add gitignore to repository root.
+    - CMake now only requires a CXX compiler.
+    - Improved the Windows README instructions and various MSVC warnings.
     - Various fixes to unary minus on unsigned compiler warnings.
     - The define _CRT_NONSTDC_NO_WARNINGS is now enabled by default with MSVC.
     - New CMake option OPENVDB_BUILD_PYTHON_UNITTESTS to disable or enable

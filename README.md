@@ -94,11 +94,23 @@ make install
 #### Windows
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
 
-It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
-variable to use 64-bit libraries by default.
+Note that the following commands have only been tested for 64bit systems/libraries.
+It is recommended to set the `VCPKG_DEFAULT_TRIPLET` environment variable to
+`x64-windows` to use 64-bit libraries by default. You will also require
+[Git](https://git-scm.com/downloads), [vcpkg](https://github.com/microsoft/vcpkg)
+and [CMake](https://cmake.org/download/) to be installed.
 
 ```
-vcpkg install boost zlib blosc openexr tbb
+vcpkg install zlib:x64-windows
+vcpkg install blosc:x64-windows
+vcpkg install openexr:x64-windows
+vcpkg install tbb:x64-windows
+vcpkg install boost-iostreams:x64-windows
+vcpkg install boost-system:x64-windows
+vcpkg install boost-any:x64-windows
+vcpkg install boost-algorithm:x64-windows
+vcpkg install boost-uuid:x64-windows
+vcpkg install boost-interprocess:x64-windows
 vcpkg integrate install
 ```
 ##### Building OpenVDB
@@ -107,7 +119,6 @@ git clone git@github.com:AcademySoftwareFoundation/openvdb.git
 cd openvdb
 mkdir build
 cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake ..
-make -j4
-make install
+cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -A x64 ..
+cmake --build . --parallel 4 --config Release --target install
 ```
