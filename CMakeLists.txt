@@ -43,7 +43,7 @@
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.3)
-project(OpenVDB)
+project(OpenVDB LANGUAGES CXX)
 
 ###### OpenVDB Build/Component Options
 
