@@ -99,7 +99,7 @@ else()
   )
 endif()
 
-if(OPENVDB_CORE_SHARED)
+if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
   #        boost shared libraries (more specifically libraries built with -fPIC).
   #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
@@ -186,19 +186,6 @@ if(TARGET TBB::tbbmalloc AND TARGET TBB::tbbmalloc_proxy)
 endif()
 
 ##########################################################################
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
-
-# @todo Should be target definitions
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
 
 ##### Core library configuration
 
@@ -403,25 +390,47 @@ endif()
 
 ##########################################################################
 
-# Configure c flags
+# Configure C flags
 
-set(OPENVDB_CORE_PRIVATE_DEFINES)
-set(OPENVDB_CORE_PUBLIC_DEFINES)
+if(WIN32)
+  # Because of implicit linking!
+  link_directories(${Boost_LIBRARY_DIR})
+  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+    add_definitions(-DBOOST_ALL_NO_LIB)
+  endif()
+endif()
 
 # Private defines (not inherited by dependent projects)
 
-list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_PRIVATE")
+list(APPEND OPENVDB_CORE_SHARED_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 if(USE_BLOSC)
-  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_USE_BLOSC")
+  list(APPEND OPENVDB_CORE_SHARED_PRIVATE_DEFINES -DOPENVDB_USE_BLOSC)
+  list(APPEND OPENVDB_CORE_STATIC_PRIVATE_DEFINES -DOPENVDB_USE_BLOSC)
 endif()
 
 # Public defines
+if(WIN32)
+  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+  #       used in PlatformConfig.h to configure EXR exports. Once this file
+  #       is completely removed, this define can be too
+  get_target_property(IS_ILMBASE_STATIC IlmBase::Half TYPE)
+  if(OPENEXR_USE_STATIC_LIBS OR IS_ILMBASE_STATIC)
+    list(APPEND OPENVDB_CORE_SHARED_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+    list(APPEND OPENVDB_CORE_STATIC_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+  endif()
+
+  list(APPEND OPENVDB_CORE_SHARED_PUBLIC_DEFINES -DOPENVDB_DLL)
+  list(APPEND OPENVDB_CORE_SHARED_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
+  list(APPEND OPENVDB_CORE_STATIC_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
+endif()
 
 if(USE_EXR)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR")
+  list(APPEND OPENVDB_CORE_SHARED_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
+  list(APPEND OPENVDB_CORE_STATIC_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_USE_LOG4CPLUS")
+  list(APPEND OPENVDB_CORE_SHARED_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
+  list(APPEND OPENVDB_CORE_STATIC_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
 endif()
 
 ##########################################################################
@@ -434,22 +443,23 @@ if(OPENVDB_CORE_STATIC)
     PRIVATE .
   )
 
-  target_compile_definitions(openvdb_static PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
-  target_compile_definitions(openvdb_static PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_static
+    PUBLIC ${OPENVDB_CORE_STATIC_PUBLIC_DEFINES}
+    PRIVATE ${OPENVDB_CORE_STATIC_PRIVATE_DEFINES}
+  )
+
+  target_link_libraries(openvdb_static
+    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+  )
 
   set_target_properties(openvdb_static
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
   )
 
   if(WIN32)
-    set_target_properties(openvdb_static
-      PROPERTIES PREFIX "lib"
-    )
+    set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
+    target_compile_options(openvdb_static PUBLIC /MT)
   endif()
-
-  target_link_libraries(openvdb_static
-    ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
 endif()
 
 # Configure shared build
@@ -460,8 +470,14 @@ if(OPENVDB_CORE_SHARED)
     PRIVATE .
   )
 
-  target_compile_definitions(openvdb_shared PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
-  target_compile_definitions(openvdb_shared PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_shared
+    PUBLIC ${OPENVDB_CORE_SHARED_PUBLIC_DEFINES}
+    PRIVATE ${OPENVDB_CORE_SHARED_PRIVATE_DEFINES}
+  )
+
+  target_link_libraries(openvdb_shared
+    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+  )
 
   set_target_properties(openvdb_shared
     PROPERTIES
@@ -470,9 +486,9 @@ if(OPENVDB_CORE_SHARED)
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
   )
 
-  target_link_libraries(openvdb_shared
-    ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
+  if(WIN32 AND USE_STATIC_DEPENDENCIES)
+    target_compile_options(openvdb_shared PUBLIC /MT)
+  endif()
 
   if(OPENVDB_ENABLE_RPATH)
     # @todo There is probably a better way to do this for imported targets
@@ -491,35 +507,24 @@ if(OPENVDB_CORE_SHARED)
   endif()
 endif()
 
-unset(OPENVDB_CORE_PRIVATE_DEFINES)
-unset(OPENVDB_CORE_PUBLIC_DEFINES)
-
 ##########################################################################
 
 # Installation
 
 if(OPENVDB_CORE_STATIC)
-  install(TARGETS
-    openvdb_static
-    DESTINATION
-    ${CMAKE_INSTALL_LIBDIR}
+  install(TARGETS openvdb_static
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 endif()
 
 if(OPENVDB_CORE_SHARED)
-  if(WIN32)
-    install(TARGETS
-      openvdb_shared
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime
-      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Runtime
-    )
-  else()
-    install(TARGETS
-      openvdb_shared
-      DESTINATION
-      ${CMAKE_INSTALL_LIBDIR}
-    )
-  endif()
+  install(TARGETS openvdb_shared
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
 endif()
 
 install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})

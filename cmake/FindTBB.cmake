@@ -228,9 +228,18 @@ else()
   endif()
 endif()
 
-if(UNIX AND TBB_USE_STATIC_LIBS)
-  set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+# Library suffix handling
+
+set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
+if(WIN32)
+  if(TBB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+else()
+  if(TBB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  endif()
 endif()
 
 set(Tbb_LIB_COMPONENTS "")
@@ -241,6 +250,19 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
   )
+
+  # Detect if DLL on windows
+  if(WIN32 AND NOT TBB_USE_STATIC_LIBS)
+    set(_TBB_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+    find_library(Tbb_${COMPONENT}_DLL ${COMPONENT}
+      ${_FIND_TBB_ADDITIONAL_OPTIONS}
+      PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
+      PATH_SUFFIXES bin
+    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_TMP})
+    unset(_TBB_TMP)
+  endif()
 
   # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
   # and correct the library name if so
@@ -267,10 +289,10 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   endif()
 endforeach()
 
-if(UNIX AND TBB_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-endif()
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set TBB_FOUND
@@ -287,11 +309,8 @@ find_package_handle_standard_args(TBB
 )
 
 if(TBB_FOUND)
-  set(Tbb_LIBRARIES
-    ${Tbb_LIB_COMPONENTS}
-  )
+  set(Tbb_LIBRARIES ${Tbb_LIB_COMPONENTS})
   set(Tbb_INCLUDE_DIRS ${Tbb_INCLUDE_DIR})
-  set(Tbb_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER})
 
   set(Tbb_LIBRARY_DIRS "")
   foreach(LIB ${Tbb_LIB_COMPONENTS})
@@ -303,11 +322,47 @@ if(TBB_FOUND)
   # Configure imported targets
 
   foreach(COMPONENT ${TBB_FIND_COMPONENTS})
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32 and a dll has been found, mark as shared.
+    # Otherwise infer from the file suffix
+    set(TBB_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(TBB_USE_STATIC_LIBS)
+      set(TBB_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(WIN32)
+      if(Tbb_${COMPONENT}_DLL)
+        set(TBB_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    elseif(UNIX)
+      get_filename_component(_TBB_${COMPONENT}_EXT ${Tbb_${COMPONENT}_LIBRARY} EXT)
+      if(_TBB_${COMPONENT}_EXT STREQUAL ".a")
+        set(TBB_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(_TBB_${COMPONENT}_EXT STREQUAL ".so" OR
+             _TBB_${COMPONENT}_EXT STREQUAL ".dylib")
+        set(TBB_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(Tbb_${COMPONENT}_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER})
+
+    # Add the TBB linking defines if the library is static on WIN32
+    if(WIN32)
+      if(${COMPONENT} STREQUAL tbb)
+        if(Tbb_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+          list(APPEND Tbb_${COMPONENT}_DEFINITIONS __TBB_NO_IMPLICIT_LINKAGE=1)
+        endif()
+      else() # tbbmalloc
+        if(Tbb_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+          list(APPEND Tbb_${COMPONENT}_DEFINITIONS __TBB_MALLOC_NO_IMPLICIT_LINKAGE=1)
+        endif()
+      endif()
+      list(REMOVE_DUPLICATES Tbb_${COMPONENT}_DEFINITIONS)
+    endif()
+
     if(NOT TARGET TBB::${COMPONENT})
-      add_library(TBB::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(TBB::${COMPONENT} ${TBB_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(TBB::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${Tbb_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${Tbb_DEFINITIONS}"
+        INTERFACE_COMPILE_DEFINITIONS "${Tbb_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}"
       )
     endif()

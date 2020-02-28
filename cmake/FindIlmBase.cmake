@@ -218,30 +218,30 @@ if(UNIX)
   list(INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
 endif()
 
-set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+# Library suffix handling
 
-# library suffix handling
+set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(_IlmBase_Version_Suffix "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}")
+
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.lib"
-  )
+  if(ILMBASE_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.lib")
 else()
   if(ILMBASE_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   else()
     if(APPLE)
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.dylib"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.dylib")
     else()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.so"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.so")
     endif()
   endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.a")
 endif()
+
+unset(_IlmBase_Version_Suffix)
 
 set(IlmBase_LIB_COMPONENTS "")
 
@@ -272,7 +272,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   endif()
 endforeach()
 
-# reset lib suffix
+# Reset library suffix
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 unset(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
@@ -315,7 +315,6 @@ if(IlmBase_FOUND)
     ${IlmBase_INCLUDE_DIR}
   )
   unset(_IlmBase_Parent_Dir)
-  set(IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
 
   set(IlmBase_LIBRARY_DIRS "")
   foreach(LIB ${IlmBase_LIB_COMPONENTS})
@@ -327,11 +326,41 @@ if(IlmBase_FOUND)
   # Configure imported targets
 
   foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32 and a dll has been found, mark as shared.
+    # Otherwise infer from the file suffix
+    set(ILMBASE_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(ILMBASE_USE_STATIC_LIBS)
+      set(ILMBASE_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(WIN32)
+      if(IlmBase_${COMPONENT}_DLL)
+        set(ILMBASE_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    elseif(UNIX)
+      get_filename_component(_ILMBASE_${COMPONENT}_EXT ${IlmBase_${COMPONENT}_LIBRARY} EXT)
+      if(${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".a")
+        set(ILMBASE_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".so" OR
+             ${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".dylib")
+        set(ILMBASE_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(IlmBase_${COMPONENT}_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
+
+    # Add the OPENEXR_DLL define if the library is not static on WIN32
+    if(WIN32)
+      if(NOT ILMBASE_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+        list(APPEND IlmBase_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
+      endif()
+      list(REMOVE_DUPLICATES IlmBase_${COMPONENT}_DEFINITIONS)
+    endif()
+
     if(NOT TARGET IlmBase::${COMPONENT})
-      add_library(IlmBase::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(IlmBase::${COMPONENT} ${ILMBASE_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(IlmBase::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${IlmBase_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${IlmBase_DEFINITIONS}"
+        INTERFACE_COMPILE_DEFINITIONS "${IlmBase_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}"
       )
     endif()

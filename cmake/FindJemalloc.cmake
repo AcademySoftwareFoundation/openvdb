@@ -118,14 +118,14 @@ list(APPEND _JEMALLOC_LIBRARYDIR_SEARCH_DIRS
 set(_JEMALLOC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "_dll.lib"
-  )
-elseif(UNIX)
   if(JEMALLOC_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      ".a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  else()
+    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_dll.lib")
+  endif()
+else()
+  if(JEMALLOC_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   endif()
 endif()
 
@@ -166,13 +166,28 @@ find_package_handle_standard_args(Jemalloc
 )
 
 if(Jemalloc_FOUND)
+  # Configure lib type. .lib on windows may refer to the lib portion of a
+  # dll, so we mark the lib as unknown unless USE_STATIC_LIBS is specified
+  set(JEMALLOC_LIB_TYPE UNKNOWN)
+  if(JEMALLOC_USE_STATIC_LIBS)
+    set(JEMALLOC_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_JEMALLOC_EXT ${Jemalloc_LIBRARY} EXT)
+    if(_JEMALLOC_EXT STREQUAL ".a")
+      set(JEMALLOC_LIB_TYPE STATIC)
+    elseif(_JEMALLOC_EXT STREQUAL ".so" OR
+           _JEMALLOC_EXT STREQUAL ".dylib")
+      set(JEMALLOC_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   set(Jemalloc_LIBRARIES ${Jemalloc_LIBRARY})
   set(Jemalloc_DEFINITIONS ${PC_Jemalloc_CFLAGS_OTHER})
 
   get_filename_component(Jemalloc_LIBRARY_DIRS ${Jemalloc_LIBRARY} DIRECTORY)
 
   if(NOT TARGET Jemalloc::jemalloc)
-    add_library(Jemalloc::jemalloc UNKNOWN IMPORTED)
+    add_library(Jemalloc::jemalloc ${JEMALLOC_LIB_TYPE} IMPORTED)
     set_target_properties(Jemalloc::jemalloc PROPERTIES
       IMPORTED_LOCATION "${Jemalloc_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${Jemalloc_DEFINITIONS}"

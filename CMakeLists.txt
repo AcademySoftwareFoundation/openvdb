@@ -89,6 +89,11 @@ know it to be required.]=] OFF)
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
+option(USE_STATIC_DEPENDENCIES [=[
+Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
+back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
+to ON, where XXX is the package name. On Windows, this has the important function of changing the default C Runtime
+Library (CRT) linkage to MT from MD for all projects.]=] OFF)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
@@ -382,7 +387,7 @@ endif()
 # Build type configuration - default to Release if none is set unless
 # code coverage is in use, in which case override to Debug
 
-if (OPENVDB_CODE_COVERAGE)
+if(OPENVDB_CODE_COVERAGE)
   message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
     "to Debug.")
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
@@ -552,6 +557,21 @@ elseif(OPENVDB_SIMD STREQUAL "SSE42")
 endif()
 
 #########################################################################
+
+# Configure our cmake modules to only search for static libraries
+
+if(USE_STATIC_DEPENDENCIES)
+  set(BLOSC_USE_STATIC_LIBS ON)
+  set(OPENEXR_USE_STATIC_LIBS ON)
+  set(ILMBASE_USE_STATIC_LIBS ON)
+  set(TBB_USE_STATIC_LIBS ON)
+  set(LOG4CPLUS_USE_STATIC_LIBS ON)
+  set(JEMALLOC_USE_STATIC_LIBS ON)
+  set(CPPUNIT_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC_LIBS ON)
+  # @todo  glfw needs custom support.
+  # set(GLFW_USE_STATIC_LIBS ON)
+endif()
 
 # Configure OpenVDB Library and ABI versions
 

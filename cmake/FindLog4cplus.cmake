@@ -160,10 +160,18 @@ list(APPEND _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
+# Library suffix handling
 
-if(UNIX AND LOG4CPLUS_USE_STATIC_LIBS)
-  set(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+set(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
+if(WIN32)
+  if(LOG4CPLUS_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+else()
+  if(LOG4CPLUS_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  endif()
 endif()
 
 # Build suffix directories
@@ -179,10 +187,23 @@ find_library(Log4cplus_LIBRARY log4cplus
   PATH_SUFFIXES ${LOG4CPLUS_PATH_SUFFIXES}
 )
 
-if(UNIX AND LOG4CPLUS_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+# Detect if DLL on windows
+if(WIN32 AND NOT LOG4CPLUS_USE_STATIC_LIBS)
+  set(_LOG4CPLUS_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+  find_library(Log4cplus_DLL ${COMPONENT}
+    ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
+    PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES bin
+  )
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_TMP})
+  unset(_LOG4CPLUS_TMP)
 endif()
+
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_LOG4CPLUS_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set Log4cplus_FOUND
@@ -198,6 +219,26 @@ find_package_handle_standard_args(Log4cplus
 )
 
 if(Log4cplus_FOUND)
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32 and a dll has been found, mark as shared.
+  # Otherwise infer from the file suffix
+  set(LOG4CPLUS_LIB_TYPE UNKNOWN)
+  if(LOG4CPLUS_USE_STATIC_LIBS)
+    set(LOG4CPLUS_LIB_TYPE STATIC)
+  elseif(WIN32)
+    if(Log4cplus_DLL)
+      set(LOG4CPLUS_LIB_TYPE SHARED)
+    endif()
+  elseif(UNIX)
+    get_filename_component(_LOG4CPLUS_EXT ${Log4cplus_LIBRARY} EXT)
+    if(_LOG4CPLUS_EXT STREQUAL ".a")
+      set(LOG4CPLUS_LIB_TYPE STATIC)
+    elseif(_LOG4CPLUS_EXT STREQUAL ".so" OR
+           _LOG4CPLUS_EXT STREQUAL ".dylib")
+      set(LOG4CPLUS_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   set(Log4cplus_LIBRARIES ${Log4cplus_LIBRARY})
   set(Log4cplus_INCLUDE_DIRS ${Log4cplus_INCLUDE_DIR})
   set(Log4cplus_DEFINITIONS ${PC_Log4cplus_CFLAGS_OTHER})
@@ -205,7 +246,7 @@ if(Log4cplus_FOUND)
   get_filename_component(Log4cplus_LIBRARY_DIRS ${Log4cplus_LIBRARY} DIRECTORY)
 
   if(NOT TARGET Log4cplus::log4cplus)
-    add_library(Log4cplus::log4cplus UNKNOWN IMPORTED)
+    add_library(Log4cplus::log4cplus ${LOG4CPLUS_LIB_TYPE} IMPORTED)
     set_target_properties(Log4cplus::log4cplus PROPERTIES
       IMPORTED_LOCATION "${Log4cplus_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${Log4cplus_DEFINITIONS}"

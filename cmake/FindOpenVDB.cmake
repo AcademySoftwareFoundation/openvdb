@@ -225,10 +225,18 @@ set(OPENVDB_PATH_SUFFIXES
   lib
 )
 
-# Static library setup
-if(UNIX AND OPENVDB_USE_STATIC_LIBS)
-  set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+# Library suffix handling
+
+set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
+if(WIN32)
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+else()
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  endif()
 endif()
 
 set(OpenVDB_LIB_COMPONENTS "")
@@ -249,10 +257,10 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   endif()
 endforeach()
 
-if(UNIX AND OPENVDB_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-endif()
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set OPENVDB_FOUND
@@ -300,7 +308,7 @@ if(NOT OpenVDB_FIND_QUIET)
 endif()
 
 # ------------------------------------------------------------------------
-#  Handle OpenVDB dependencies
+#  Handle OpenVDB dependencies and interface settings
 # ------------------------------------------------------------------------
 
 # Add standard dependencies
@@ -309,7 +317,7 @@ find_package(IlmBase REQUIRED COMPONENTS Half)
 find_package(TBB REQUIRED COMPONENTS tbb)
 find_package(ZLIB REQUIRED)
 
-if(NOT OPENVDB_USE_STATIC_LIBS)
+if(NOT OPENVDB_USE_STATIC_LIBS AND NOT Boost_USE_STATIC_LIBS)
   # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
   #        boost shared libraries (more specifically libraries built with -fPIC).
   #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
@@ -320,60 +328,68 @@ endif()
 
 find_package(Boost REQUIRED COMPONENTS iostreams system)
 
-# Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
-# which we can query for optional deps. This basically runs ldd/otoll/objdump
-# etc to track deps. We could use a vdb_config binary tools here to improve
-# this process
-
-include(GetPrerequisites)
-
-set(_EXCLUDE_SYSTEM_PREREQUISITES 1)
-set(_RECURSE_PREREQUISITES 0)
-set(_OPENVDB_PREREQUISITE_LIST)
-
-get_prerequisites(${OpenVDB_openvdb_LIBRARY}
-  _OPENVDB_PREREQUISITE_LIST
-  ${_EXCLUDE_SYSTEM_PREREQUISITES}
-  ${_RECURSE_PREREQUISITES}
-  ""
-  "${SYSTEM_LIBRARY_PATHS}"
-)
-
-unset(_EXCLUDE_SYSTEM_PREREQUISITES)
-unset(_RECURSE_PREREQUISITES)
-
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
-
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_EXR ${USE_EXR})
+set(_OPENVDB_DEFINITIONS)
 
-# Search for optional dependencies
+if(WIN32)
+  list(APPEND _OPENVDB_DEFINITIONS -D_WIN32 -DNOMINMAX)
+endif()
 
-foreach(PREREQUISITE ${_OPENVDB_PREREQUISITE_LIST})
-  set(_HAS_DEP)
-  get_filename_component(PREREQUISITE ${PREREQUISITE} NAME)
-
-  string(FIND ${PREREQUISITE} "blosc" _HAS_DEP)
-  if(NOT ${_HAS_DEP} EQUAL -1)
-    set(OpenVDB_USES_BLOSC ON)
+if(NOT OPENVDB_USE_STATIC_LIBS)
+  if(WIN32)
+    list(APPEND _OPENVDB_DEFINITIONS -DOPENVDB_DLL)
   endif()
 
-  string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
-  if(NOT ${_HAS_DEP} EQUAL -1)
-    set(OpenVDB_USES_LOG4CPLUS ON)
-  endif()
+  # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
+  # which we can query for optional deps. This basically runs ldd/otoll/objdump
+  # etc to track deps. We could use a vdb_config binary tools here to improve
+  # this process
+  include(GetPrerequisites)
 
-  string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
-  if(NOT ${_HAS_DEP} EQUAL -1)
-    set(OpenVDB_USES_EXR ON)
-  endif()
-endforeach()
+  set(_EXCLUDE_SYSTEM_PREREQUISITES 1)
+  set(_RECURSE_PREREQUISITES 0)
+  set(_OPENVDB_PREREQUISITE_LIST)
 
-unset(_OPENVDB_PREREQUISITE_LIST)
-unset(_HAS_DEP)
+  get_prerequisites(${OpenVDB_openvdb_LIBRARY}
+    _OPENVDB_PREREQUISITE_LIST
+    ${_EXCLUDE_SYSTEM_PREREQUISITES}
+    ${_RECURSE_PREREQUISITES}
+    ""
+    "${SYSTEM_LIBRARY_PATHS}"
+  )
+
+  unset(_EXCLUDE_SYSTEM_PREREQUISITES)
+  unset(_RECURSE_PREREQUISITES)
+
+  # Search for optional dependencies
+  foreach(PREREQUISITE ${_OPENVDB_PREREQUISITE_LIST})
+    set(_HAS_DEP)
+    get_filename_component(PREREQUISITE ${PREREQUISITE} NAME)
+
+    string(FIND ${PREREQUISITE} "blosc" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_BLOSC ON)
+    endif()
+
+    string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_LOG4CPLUS ON)
+    endif()
+
+    string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_EXR ON)
+    endif()
+  endforeach()
+
+  unset(_OPENVDB_PREREQUISITE_LIST)
+  unset(_HAS_DEP)
+endif()
 
 if(OpenVDB_USES_BLOSC)
   find_package(Blosc REQUIRED)
@@ -392,6 +408,16 @@ if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
+if(WIN32)
+  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+  #       used in PlatformConfig.h to configure EXR exports. Once this file
+  #       is completely removed, this define can be too
+  get_target_property(IS_ILMBASE_STATIC IlmBase::Half TYPE)
+  if(OPENEXR_USE_STATIC_LIBS OR IS_ILMBASE_STATIC)
+    list(APPEND _OPENVDB_DEFINITIONS -DOPENVDB_OPENEXR_STATICLIB)
+  endif()
+endif()
+
 # Set deps. Note that the order here is important. If we're building against
 # Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
 # users chosen namespaced headers are correctly prioritized. Otherwise other
@@ -404,7 +430,6 @@ set(_OPENVDB_VISIBLE_DEPENDENCIES
   IlmBase::Half
 )
 
-set(_OPENVDB_DEFINITIONS)
 if(OpenVDB_ABI)
   list(APPEND _OPENVDB_DEFINITIONS "-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI}")
 endif()
@@ -435,11 +460,13 @@ endif()
 
 set(_OPENVDB_HIDDEN_DEPENDENCIES)
 
-if(OpenVDB_USES_BLOSC)
-  list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
-endif()
+if(NOT OPENVDB_USE_STATIC_LIBS)
+  if(OpenVDB_USES_BLOSC)
+    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
+  endif()
 
-list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+endif()
 
 # ------------------------------------------------------------------------
 #  Configure imported target
@@ -463,11 +490,26 @@ endforeach()
 list(REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS)
 
 foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
+
+  set(OPENVDB_${COMPONENT}_LIB_TYPE UNKNOWN)
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(OPENVDB_${COMPONENT}_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_OPENVDB_${COMPONENT}_EXT
+      ${OpenVDB_${COMPONENT}_LIBRARY} EXT)
+    if(_OPENVDB_${COMPONENT}_EXT STREQUAL ".a")
+      set(OPENVDB_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(_OPENVDB_${COMPONENT}_EXT STREQUAL ".so" OR
+           _OPENVDB_${COMPONENT}_EXT STREQUAL ".dylib")
+      set(OPENVDB_${COMPONENT}_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   if(NOT TARGET OpenVDB::${COMPONENT})
-    add_library(OpenVDB::${COMPONENT} UNKNOWN IMPORTED)
+    add_library(OpenVDB::${COMPONENT} ${OPENVDB_${COMPONENT}_LIB_TYPE} IMPORTED)
     set_target_properties(OpenVDB::${COMPONENT} PROPERTIES
       IMPORTED_LOCATION "${OpenVDB_${COMPONENT}_LIBRARY}"
-      INTERFACE_COMPILE_OPTIONS "${OpenVDB_DEFINITIONS}"
+      INTERFACE_COMPILE_DEFINITIONS "${OpenVDB_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
       IMPORTED_LINK_DEPENDENT_LIBRARIES "${_OPENVDB_HIDDEN_DEPENDENCIES}" # non visible deps
       INTERFACE_LINK_LIBRARIES "${_OPENVDB_VISIBLE_DEPENDENCIES}" # visible deps (headers)

@@ -63,6 +63,9 @@ may be provided to tell this module where to look.
   Global list of library paths intended to be searched by and find_xxx call
 ``BLOSC_USE_STATIC_LIBS``
   Only search for static blosc libraries
+``BLOSC_USE_EXTERNAL_SOURCES``
+  Set to ON if Blosc has been built using external sources for LZ4, snappy,
+  zlib and zstd. Default is OFF.
 ``DISABLE_CMAKE_SEARCH_PATHS``
   Disable CMakes default search paths for find_xxx calls in this module
 
@@ -160,10 +163,18 @@ list(APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Static library setup
-if(UNIX AND BLOSC_USE_STATIC_LIBS)
-  set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+# Library suffix handling
+
+set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
+if(WIN32)
+  if(BLOSC_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+else()
+  if(BLOSC_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  endif()
 endif()
 
 set(BLOSC_PATH_SUFFIXES
@@ -171,16 +182,31 @@ set(BLOSC_PATH_SUFFIXES
   lib
 )
 
-find_library(Blosc_LIBRARY blosc
+# libblosc is the name of the blosc static lib on windows
+
+find_library(Blosc_LIBRARY blosc libblosc
   ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
   PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${BLOSC_PATH_SUFFIXES}
 )
 
-if(UNIX AND BLOSC_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+# Detect if DLL on windows
+if(WIN32 AND NOT BLOSC_USE_STATIC_LIBS)
+  set(_BLOSC_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+  find_library(Blosc_DLL ${COMPONENT}
+    ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
+    PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES bin
+  )
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_TMP})
+  unset(_BLOSC_TMP)
 endif()
+
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set Blosc_FOUND
@@ -196,6 +222,26 @@ find_package_handle_standard_args(Blosc
 )
 
 if(Blosc_FOUND)
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32 and a dll has been found, mark as shared.
+  # Otherwise infer from the file suffix
+  set(BLOSC_LIB_TYPE UNKNOWN)
+  if(BLOSC_USE_STATIC_LIBS)
+    set(BLOSC_LIB_TYPE STATIC)
+  elseif(WIN32)
+    if(Blosc_DLL)
+      set(BLOSC_LIB_TYPE SHARED)
+    endif()
+  elseif(UNIX)
+    get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
+    if(_BLOSC_EXT STREQUAL ".a")
+      set(BLOSC_LIB_TYPE STATIC)
+    elseif(_BLOSC_EXT STREQUAL ".so" OR
+           _BLOSC_EXT STREQUAL ".dylib")
+      set(BLOSC_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   set(Blosc_LIBRARIES ${Blosc_LIBRARY})
   set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
   set(Blosc_DEFINITIONS ${PC_Blosc_CFLAGS_OTHER})
@@ -203,12 +249,29 @@ if(Blosc_FOUND)
   get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY)
 
   if(NOT TARGET Blosc::blosc)
-    add_library(Blosc::blosc UNKNOWN IMPORTED)
+    add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
     set_target_properties(Blosc::blosc PROPERTIES
       IMPORTED_LOCATION "${Blosc_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${Blosc_DEFINITIONS}"
       INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
     )
+
+    # Blosc may optionally be compiled with external sources for
+    # lz4, snappy, zlib and zstd. Add them as interface libs if
+    # requested (there doesn't seem to be a way to figure this
+    # out automatically). Note that it's assumed these deps have
+    # been statically built if BLOSC_USE_STATIC_LIBS is ON so that
+    # zstd infers the correct name
+    if(BLOSC_USE_EXTERNAL_SOURCES)
+      set(ZSTD_LIB "zstd")
+      if(BLOSC_USE_STATIC_LIBS)
+        set(ZSTD_LIB "zstd_static")
+      endif()
+      set_target_properties(Blosc::blosc PROPERTIES
+        INTERFACE_LINK_DIRECTORIES "${Blosc_LIBRARY_DIRS}"
+        INTERFACE_LINK_LIBRARIES "lz4;snappy;zlib;${ZSTD_LIB}"
+      )
+    endif()
   endif()
 elseif(Blosc_FIND_REQUIRED)
   message(FATAL_ERROR "Unable to find Blosc")

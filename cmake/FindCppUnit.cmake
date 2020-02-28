@@ -155,14 +155,14 @@ list(APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
 set(_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "_dll.lib"
-  )
-elseif(UNIX)
   if(CPPUNIT_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      ".a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  else()
+    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_dll.lib")
+  endif()
+else()
+  if(CPPUNIT_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   endif()
 endif()
 
@@ -178,6 +178,19 @@ find_library(CppUnit_LIBRARY cppunit
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
 )
+
+# Detect if DLL on windows
+if(WIN32 AND NOT CPPUNIT_USE_STATIC_LIBS)
+  set(_CPPUNIT_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+  find_library(CppUnit_DLL ${COMPONENT}
+    ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
+    PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES bin
+  )
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CPPUNIT_TMP})
+  unset(_CPPUNIT_TMP)
+endif()
 
 # Reset library suffix
 
@@ -198,6 +211,26 @@ find_package_handle_standard_args(CppUnit
 )
 
 if(CppUnit_FOUND)
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32 and a dll has been found, mark as shared.
+  # Otherwise infer from the file suffix
+  set(CPPUNIT_LIB_TYPE UNKNOWN)
+  if(CPPUNIT_USE_STATIC_LIBS)
+    set(CPPUNIT_LIB_TYPE STATIC)
+  elseif(WIN32)
+    if(CppUnit_DLL)
+      set(CPPUNIT_LIB_TYPE SHARED)
+    endif()
+  elseif(UNIX)
+    get_filename_component(_CPPUNIT_EXT ${CppUnit_LIBRARY} EXT)
+    if(_CPPUNIT_EXT STREQUAL ".a")
+      set(CPPUNIT_LIB_TYPE STATIC)
+    elseif(_CPPUNIT_EXT STREQUAL ".so" OR
+           _CPPUNIT_EXT STREQUAL ".dylib")
+      set(CPPUNIT_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   set(CppUnit_LIBRARIES ${CppUnit_LIBRARY})
   set(CppUnit_INCLUDE_DIRS ${CppUnit_INCLUDE_DIR})
   set(CppUnit_DEFINITIONS ${PC_CppUnit_CFLAGS_OTHER})
@@ -205,7 +238,7 @@ if(CppUnit_FOUND)
   get_filename_component(CppUnit_LIBRARY_DIRS ${CppUnit_LIBRARY} DIRECTORY)
 
   if(NOT TARGET CppUnit::cppunit)
-    add_library(CppUnit::cppunit UNKNOWN IMPORTED)
+    add_library(CppUnit::cppunit ${CPPUNIT_LIB_TYPE} IMPORTED)
     set_target_properties(CppUnit::cppunit PROPERTIES
       IMPORTED_LOCATION "${CppUnit_LIBRARIES}"
       INTERFACE_COMPILE_DEFINITIONS "${CppUnit_DEFINITIONS}"

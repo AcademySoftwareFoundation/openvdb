@@ -211,30 +211,30 @@ if(UNIX )
   list(INSERT OPENEXR_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
 endif()
 
-set(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+# Library suffix handling
 
-# library suffix handling
+set(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(_OpenEXR_Version_Suffix "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}")
+
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.lib"
-  )
+  if(OPENEXR_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.lib")
 else()
   if(OPENEXR_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   else()
     if(APPLE)
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.dylib"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.dylib")
     else()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.so"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.so")
     endif()
   endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.a")
 endif()
+
+unset(_OpenEXR_Version_Suffix)
 
 set(OpenEXR_LIB_COMPONENTS "")
 
@@ -246,6 +246,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   )
   list(APPEND OpenEXR_LIB_COMPONENTS ${OpenEXR_${COMPONENT}_LIBRARY})
 
+  # Detect if DLL on windows
   if(WIN32 AND NOT OPENEXR_USE_STATIC_LIBS)
     set(_OPENEXR_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
@@ -265,7 +266,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   endif()
 endforeach()
 
-# reset lib suffix
+# Reset library suffix
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 unset(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
@@ -308,7 +309,6 @@ if(OpenEXR_FOUND)
     ${OpenEXR_INCLUDE_DIR}
   )
   unset(_OpenEXR_Parent_Dir)
-  set(OpenEXR_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER})
 
   set(OpenEXR_LIBRARY_DIRS "")
   foreach(LIB ${OpenEXR_LIB_COMPONENTS})
@@ -320,11 +320,41 @@ if(OpenEXR_FOUND)
   # Configure imported target
 
   foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
+    # Configure lib type. If ILMBASE_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32 and a dll has been found, mark as shared.
+    # Otherwise infer from the file suffix
+    set(OpenEXR_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(OPENEXR_USE_STATIC_LIBS)
+      set(OpenEXR_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(WIN32)
+      if(OpenEXR_${COMPONENT}_DLL)
+        set(OpenEXR_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    elseif(UNIX)
+      get_filename_component(_OpenEXR_${COMPONENT}_EXT ${OpenEXR_${COMPONENT}_LIBRARY} EXT)
+      if(${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".a")
+        set(OpenEXR_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".so" OR
+             ${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".dylib")
+        set(OpenEXR_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(OpenEXR_${COMPONENT}_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER})
+
+    # Add the OPENEXR_DLL define if the library is not static on WIN32
+    if(WIN32)
+      if(NOT OpenEXR_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+        list(APPEND OpenEXR_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
+      endif()
+      list(REMOVE_DUPLICATES OpenEXR_${COMPONENT}_DEFINITIONS)
+    endif()
+
     if(NOT TARGET OpenEXR::${COMPONENT})
-      add_library(OpenEXR::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(OpenEXR::${COMPONENT} ${OpenEXR_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(OpenEXR::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${OpenEXR_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${OpenEXR_DEFINITIONS}"
+        INTERFACE_COMPILE_DEFINITIONS "${OpenEXR_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${OpenEXR_INCLUDE_DIRS}"
       )
     endif()
