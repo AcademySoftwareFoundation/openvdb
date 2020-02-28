@@ -34,6 +34,9 @@ New features:
   @vdblink::points::AttributeSet::removeAttribute()
   AttributeSet::removeAttribute@endlink for releasing ownership of attribute
   data.
+- Add @vdblink::points::AttributeSet::Info AttributeSet::Info@endlink class
+  to collate array data from AttributeSet and AttributeArrays for easier
+  querying and AttributeSet construction.
 
 @par
 Bug fixes:
