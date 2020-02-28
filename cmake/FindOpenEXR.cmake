@@ -330,20 +330,20 @@ if(OpenEXR_FOUND)
       endif()
     endif()
 
-    set(OpenEXR_${COMPONENT}_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER})
+    set(OpenEXR_${COMPONENT}_DEFINITIONS)
 
     # Add the OPENEXR_DLL define if the library is not static on WIN32
     if(WIN32)
       if(NOT OpenEXR_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
         list(APPEND OpenEXR_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
       endif()
-      list(REMOVE_DUPLICATES OpenEXR_${COMPONENT}_DEFINITIONS)
     endif()
 
     if(NOT TARGET OpenEXR::${COMPONENT})
       add_library(OpenEXR::${COMPONENT} ${OpenEXR_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(OpenEXR::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${OpenEXR_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${PC_OpenEXR_CFLAGS_OTHER}"
         INTERFACE_COMPILE_DEFINITIONS "${OpenEXR_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${OpenEXR_INCLUDE_DIRS}"
       )

@@ -306,7 +306,7 @@ if(TBB_FOUND)
       endif()
     endif()
 
-    set(Tbb_${COMPONENT}_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER})
+    set(Tbb_${COMPONENT}_DEFINITIONS)
 
     # Add the TBB linking defines if the library is static on WIN32
     if(WIN32)
@@ -319,13 +319,13 @@ if(TBB_FOUND)
           list(APPEND Tbb_${COMPONENT}_DEFINITIONS __TBB_MALLOC_NO_IMPLICIT_LINKAGE=1)
         endif()
       endif()
-      list(REMOVE_DUPLICATES Tbb_${COMPONENT}_DEFINITIONS)
     endif()
 
     if(NOT TARGET TBB::${COMPONENT})
       add_library(TBB::${COMPONENT} ${TBB_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(TBB::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${Tbb_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${PC_Tbb_CFLAGS_OTHER}"
         INTERFACE_COMPILE_DEFINITIONS "${Tbb_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}"
       )

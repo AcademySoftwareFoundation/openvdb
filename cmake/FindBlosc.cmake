@@ -240,7 +240,6 @@ if(Blosc_FOUND)
 
   set(Blosc_LIBRARIES ${Blosc_LIBRARY})
   set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
-  set(Blosc_DEFINITIONS ${PC_Blosc_CFLAGS_OTHER})
 
   get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY)
 
@@ -248,7 +247,7 @@ if(Blosc_FOUND)
     add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
     set_target_properties(Blosc::blosc PROPERTIES
       IMPORTED_LOCATION "${Blosc_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${Blosc_DEFINITIONS}"
+      INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
       INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
     )
 

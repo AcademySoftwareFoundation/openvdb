@@ -196,7 +196,6 @@ if(Jemalloc_FOUND)
   endif()
 
   set(Jemalloc_LIBRARIES ${Jemalloc_LIBRARY})
-  set(Jemalloc_DEFINITIONS ${PC_Jemalloc_CFLAGS_OTHER})
 
   get_filename_component(Jemalloc_LIBRARY_DIRS ${Jemalloc_LIBRARY} DIRECTORY)
 
@@ -204,7 +203,7 @@ if(Jemalloc_FOUND)
     add_library(Jemalloc::jemalloc ${JEMALLOC_LIB_TYPE} IMPORTED)
     set_target_properties(Jemalloc::jemalloc PROPERTIES
       IMPORTED_LOCATION "${Jemalloc_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${Jemalloc_DEFINITIONS}"
+      INTERFACE_COMPILE_OPTIONS "${PC_Jemalloc_CFLAGS_OTHER}"
     )
   endif()
 elseif(Jemalloc_FIND_REQUIRED)

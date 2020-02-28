@@ -336,20 +336,20 @@ if(IlmBase_FOUND)
       endif()
     endif()
 
-    set(IlmBase_${COMPONENT}_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
+    set(IlmBase_${COMPONENT}_DEFINITIONS)
 
     # Add the OPENEXR_DLL define if the library is not static on WIN32
     if(WIN32)
       if(NOT ILMBASE_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
         list(APPEND IlmBase_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
       endif()
-      list(REMOVE_DUPLICATES IlmBase_${COMPONENT}_DEFINITIONS)
     endif()
 
     if(NOT TARGET IlmBase::${COMPONENT})
       add_library(IlmBase::${COMPONENT} ${ILMBASE_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(IlmBase::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${IlmBase_${COMPONENT}_LIBRARY}"
+        INTERFACE_COMPILE_OPTIONS "${PC_IlmBase_CFLAGS_OTHER}"
         INTERFACE_COMPILE_DEFINITIONS "${IlmBase_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}"
       )

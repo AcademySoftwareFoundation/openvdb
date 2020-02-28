@@ -229,7 +229,6 @@ if(CppUnit_FOUND)
 
   set(CppUnit_LIBRARIES ${CppUnit_LIBRARY})
   set(CppUnit_INCLUDE_DIRS ${CppUnit_INCLUDE_DIR})
-  set(CppUnit_DEFINITIONS ${PC_CppUnit_CFLAGS_OTHER})
 
   get_filename_component(CppUnit_LIBRARY_DIRS ${CppUnit_LIBRARY} DIRECTORY)
 
@@ -237,7 +236,7 @@ if(CppUnit_FOUND)
     add_library(CppUnit::cppunit ${CPPUNIT_LIB_TYPE} IMPORTED)
     set_target_properties(CppUnit::cppunit PROPERTIES
       IMPORTED_LOCATION "${CppUnit_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${CppUnit_DEFINITIONS}"
+      INTERFACE_COMPILE_OPTIONS "${PC_CppUnit_CFLAGS_OTHER}"
       INTERFACE_INCLUDE_DIRECTORIES "${CppUnit_INCLUDE_DIRS}"
     )
   endif()

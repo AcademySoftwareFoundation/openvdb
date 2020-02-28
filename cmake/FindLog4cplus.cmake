@@ -235,7 +235,6 @@ if(Log4cplus_FOUND)
 
   set(Log4cplus_LIBRARIES ${Log4cplus_LIBRARY})
   set(Log4cplus_INCLUDE_DIRS ${Log4cplus_INCLUDE_DIR})
-  set(Log4cplus_DEFINITIONS ${PC_Log4cplus_CFLAGS_OTHER})
 
   get_filename_component(Log4cplus_LIBRARY_DIRS ${Log4cplus_LIBRARY} DIRECTORY)
 
@@ -243,7 +242,7 @@ if(Log4cplus_FOUND)
     add_library(Log4cplus::log4cplus ${LOG4CPLUS_LIB_TYPE} IMPORTED)
     set_target_properties(Log4cplus::log4cplus PROPERTIES
       IMPORTED_LOCATION "${Log4cplus_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${Log4cplus_DEFINITIONS}"
+      INTERFACE_COMPILE_OPTIONS "${PC_Log4cplus_CFLAGS_OTHER}"
       INTERFACE_INCLUDE_DIRECTORIES "${Log4cplus_INCLUDE_DIRS}"
     )
   endif()
