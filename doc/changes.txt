@@ -26,6 +26,7 @@ Improvements:
 - Add gitignore to repository root.
 - CMake now only requires a CXX compiler.
 - Improved the Windows README instructions and various MSVC warnings.
+- Remove CMake warning when using GLFW 3.2+ on Debian.
 
 @par
 New features:
