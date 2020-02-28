@@ -7,8 +7,6 @@ configuration: Release
 environment:
   CMAKE_GENERATOR: Visual Studio 15 2017 Win64
   VCPKG_DEFAULT_TRIPLET: x64-windows
-  PYTHONHOME: C:\Python37-x64
-  APPVEYOR_SAVE_CACHE_ON_ERROR: true
 
 os: Visual Studio 2017
 
@@ -16,22 +14,11 @@ cache: c:\tools\vcpkg\installed\
 
 before_build:
   - cd C:\tools\vcpkg
-  - vcpkg install zlib:x64-windows
-  - vcpkg install blosc:x64-windows
-  - vcpkg install openexr:x64-windows
-  - vcpkg install tbb:x64-windows
-  - vcpkg install boost-iostreams:x64-windows
-  - vcpkg install boost-system:x64-windows
-  - vcpkg install boost-any:x64-windows
-  - vcpkg install boost-algorithm:x64-windows
-  - vcpkg install boost-uuid:x64-windows
-  - vcpkg install boost-interprocess:x64-windows
-  - vcpkg install boost-python:x64-windows
+  - vcpkg install zlib blosc openexr tbb cppunit jemalloc
   - vcpkg integrate install
 
   # - adjust the PATH so that the vdb_test executable picks up all of the dll's correctly
-  - set PYTHONPATH=%PYTHONHOME%
-  - set PATH=%PYTHONHOME%\Scritps;%PYTHONHOME%;%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%
+  - set PATH=%PATH%;%APPVEYOR_BUILD_FOLDER%\build\openvdb\%CONFIGURATION%;C:\Tools\vcpkg\installed\x64-windows\bin;C:\Libraries\boost_1_67_0\lib64-msvc-14.0
 
 build_script:
   - cd %APPVEYOR_BUILD_FOLDER%
@@ -49,7 +36,6 @@ build_script:
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_RENDER=ON \
     -DOPENVDB_BUILD_VDB_VIEW=OFF \
-    -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_UNITTESTS=ON \
     -DUSE_BLOSC=ON \
     -DPython_ROOT_DIR=%PYTHONHOME% \
