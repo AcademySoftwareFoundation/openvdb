@@ -145,6 +145,16 @@ set(OPENVDB_CORE_DEPENDENT_LIBS
   IlmBase::Half
 )
 
+if(WIN32)
+  # @todo Is this link_directories necessary?
+  link_directories(${Boost_LIBRARY_DIR})
+  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+      list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+        Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
+      )
+  endif()
+endif()
+
 if(USE_EXR)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
     IlmBase::IlmThread
@@ -391,14 +401,6 @@ endif()
 ##########################################################################
 
 # Configure C flags
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
 
 # Private defines (not inherited by dependent projects)
 
