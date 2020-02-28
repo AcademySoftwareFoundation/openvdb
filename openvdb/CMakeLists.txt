@@ -458,7 +458,9 @@ if(OPENVDB_CORE_STATIC)
 
   if(WIN32)
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
-    target_compile_options(openvdb_static PUBLIC /MT)
+    if(USE_WINDOWS_STATIC_RUNTIME)
+      target_compile_options(openvdb_static PUBLIC /MT)
+    endif()
   endif()
 endif()
 
@@ -486,7 +488,7 @@ if(OPENVDB_CORE_SHARED)
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
   )
 
-  if(WIN32 AND USE_STATIC_DEPENDENCIES)
+  if(WIN32 AND USE_WINDOWS_STATIC_RUNTIME)
     target_compile_options(openvdb_shared PUBLIC /MT)
   endif()
 

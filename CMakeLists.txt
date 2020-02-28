@@ -94,6 +94,9 @@ Only search for and use static libraries. If OFF the shared versions of requried
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
 to ON, where XXX is the package name. On Windows, this has the important function of changing the default C Runtime
 Library (CRT) linkage to MT from MD for all projects.]=] OFF)
+cmake_dependent_option(USE_WINDOWS_STATIC_RUNTIME
+  "Causes all projects to use the multithread, static version of the C run-time library. Defaults to the value "
+  "of USE_STATIC_DEPENDENCIES." ${USE_STATIC_DEPENDENCIES} "WIN32" OFF)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
