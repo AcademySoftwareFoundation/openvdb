@@ -84,6 +84,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -193,7 +194,7 @@ list(APPEND _OPENVDB_INCLUDE_SEARCH_DIRS
 find_path(OpenVDB_INCLUDE_DIR openvdb/version.h
   ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
   PATHS ${_OPENVDB_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 OPENVDB_VERSION_FROM_HEADER("${OpenVDB_INCLUDE_DIR}/openvdb/version.h"
@@ -218,13 +219,6 @@ list(APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Build suffix directories
-
-set(OPENVDB_PATH_SUFFIXES
-  lib64
-  lib
-)
-
 # Library suffix handling
 
 set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -246,7 +240,7 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
     ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
     PATHS ${_OPENVDB_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${OPENVDB_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
 

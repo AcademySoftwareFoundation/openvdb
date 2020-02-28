@@ -71,6 +71,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -124,7 +125,7 @@ list(APPEND _CPPUNIT_INCLUDE_SEARCH_DIRS
 find_path(CppUnit_INCLUDE_DIR cppunit/Portability.h
   ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${CppUnit_INCLUDE_DIR}/cppunit/Portability.h")
@@ -168,15 +169,10 @@ endif()
 
 # Build suffix directories
 
-set(CPPUNIT_PATH_SUFFIXES
-  lib64
-  lib
-)
-
 find_library(CppUnit_LIBRARY cppunit
   ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
   PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${CPPUNIT_PATH_SUFFIXES}
+  PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
 )
 
 # Detect if DLL on windows
@@ -186,7 +182,7 @@ if(WIN32 AND NOT CPPUNIT_USE_STATIC_LIBS)
   find_library(CppUnit_DLL ${COMPONENT}
     ${_FIND_CPPUNIT_ADDITIONAL_OPTIONS}
     PATHS ${_CPPUNIT_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES bin
+    PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
   )
   set(CMAKE_FIND_LIBRARY_SUFFIXES ${_CPPUNIT_TMP})
   unset(_CPPUNIT_TMP)

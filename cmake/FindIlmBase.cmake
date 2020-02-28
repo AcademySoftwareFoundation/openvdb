@@ -83,6 +83,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -165,7 +166,7 @@ list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
 find_path(IlmBase_INCLUDE_DIR IlmBaseConfig.h
   ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include/OpenEXR OpenEXR
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR include/OpenEXR OpenEXR
 )
 
 if(EXISTS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h")
@@ -207,17 +208,6 @@ list(APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Build suffix directories
-
-set(ILMBASE_PATH_SUFFIXES
-  lib64
-  lib
-)
-
-if(UNIX)
-  list(INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
-
 # Library suffix handling
 
 set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -249,7 +239,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   find_library(IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
   list(APPEND IlmBase_LIB_COMPONENTS ${IlmBase_${COMPONENT}_LIBRARY})
 
@@ -259,7 +249,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
     find_library(IlmBase_${COMPONENT}_DLL ${COMPONENT}
       ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
       PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES bin
+      PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
     )
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_TMP})
     unset(_ILMBASE_TMP)

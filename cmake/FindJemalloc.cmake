@@ -65,6 +65,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -132,21 +133,29 @@ endif()
 # Build suffix directories
 
 set(JEMALLOC_PATH_SUFFIXES
+  ${CMAKE_INSTALL_LIBDIR}
   lib64
   lib
 )
-
-# platform branching
-
-if(UNIX)
-  list(INSERT JEMALLOC_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
 
 find_library(Jemalloc_LIBRARY jemalloc
   ${_FIND_JEMALLOC_ADDITIONAL_OPTIONS}
   PATHS ${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}
   PATH_SUFFIXES ${JEMALLOC_PATH_SUFFIXES}
 )
+
+# Detect if DLL on windows
+if(WIN32 AND NOT JEMALLOC_USE_STATIC_LIBS)
+  set(_JEMALLOC_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
+  find_library(Jemalloc_DLL jemalloc
+    ${_FIND_JEMALLOC_ADDITIONAL_OPTIONS}
+    PATHS ${_JEMALLOC_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR}
+  )
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_JEMALLOC_TMP})
+  unset(_JEMALLOC_TMP)
+endif()
 
 # Reset library suffix
 
@@ -166,11 +175,16 @@ find_package_handle_standard_args(Jemalloc
 )
 
 if(Jemalloc_FOUND)
-  # Configure lib type. .lib on windows may refer to the lib portion of a
-  # dll, so we mark the lib as unknown unless USE_STATIC_LIBS is specified
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32 and a dll has been found, mark as shared.
+  # Otherwise infer from the file suffix
   set(JEMALLOC_LIB_TYPE UNKNOWN)
   if(JEMALLOC_USE_STATIC_LIBS)
     set(JEMALLOC_LIB_TYPE STATIC)
+  elseif(WIN32)
+    if(Jemalloc_DLL)
+      set(JEMALLOC_LIB_TYPE SHARED)
+    endif()
   elseif(UNIX)
     get_filename_component(_JEMALLOC_EXT ${Jemalloc_LIBRARY} EXT)
     if(_JEMALLOC_EXT STREQUAL ".a")

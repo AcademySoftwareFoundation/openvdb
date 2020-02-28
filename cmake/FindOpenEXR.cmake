@@ -79,6 +79,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -158,7 +159,7 @@ list(APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
 find_path(OpenEXR_INCLUDE_DIR OpenEXRConfig.h
   ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
   PATHS ${_OPENEXR_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES  include/OpenEXR OpenEXR
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR include/OpenEXR OpenEXR
 )
 
 if(EXISTS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h")
@@ -200,17 +201,6 @@ list(APPEND _OPENEXR_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Build suffix directories
-
-set(OPENEXR_PATH_SUFFIXES
-  lib64
-  lib
-)
-
-if(UNIX )
-  list(INSERT OPENEXR_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
-
 # Library suffix handling
 
 set(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -242,7 +232,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   find_library(OpenEXR_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
     PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${OPENEXR_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
   list(APPEND OpenEXR_LIB_COMPONENTS ${OpenEXR_${COMPONENT}_LIBRARY})
 
@@ -253,7 +243,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
     find_library(OpenEXR_${COMPONENT}_DLL ${COMPONENT}
       ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
       PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES bin
+      PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
     )
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENEXR_TMP})
     unset(_OPENEXR_TMP)
@@ -320,7 +310,7 @@ if(OpenEXR_FOUND)
   # Configure imported target
 
   foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
-    # Configure lib type. If ILMBASE_USE_STATIC_LIBS, we always assume a static
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
     # lib is in use. If win32 and a dll has been found, mark as shared.
     # Otherwise infer from the file suffix
     set(OpenEXR_${COMPONENT}_LIB_TYPE UNKNOWN)

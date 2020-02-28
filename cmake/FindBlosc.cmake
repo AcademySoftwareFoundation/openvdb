@@ -72,6 +72,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -125,7 +126,7 @@ list(APPEND _BLOSC_INCLUDE_SEARCH_DIRS
 find_path(Blosc_INCLUDE_DIR blosc.h
   ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
   PATHS ${_BLOSC_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${Blosc_INCLUDE_DIR}/blosc.h")
@@ -177,17 +178,12 @@ else()
   endif()
 endif()
 
-set(BLOSC_PATH_SUFFIXES
-  lib64
-  lib
-)
-
 # libblosc is the name of the blosc static lib on windows
 
 find_library(Blosc_LIBRARY blosc libblosc
   ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
   PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${BLOSC_PATH_SUFFIXES}
+  PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
 )
 
 # Detect if DLL on windows
@@ -197,7 +193,7 @@ if(WIN32 AND NOT BLOSC_USE_STATIC_LIBS)
   find_library(Blosc_DLL ${COMPONENT}
     ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
     PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES bin
+    PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
   )
   set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_TMP})
   unset(_BLOSC_TMP)

@@ -71,6 +71,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -124,7 +125,7 @@ list(APPEND _LOG4CPLUS_INCLUDE_SEARCH_DIRS
 find_path(Log4cplus_INCLUDE_DIR log4cplus/version.h
   ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${Log4cplus_INCLUDE_DIR}/log4cplus/version.h")
@@ -174,27 +175,20 @@ else()
   endif()
 endif()
 
-# Build suffix directories
-
-set(LOG4CPLUS_PATH_SUFFIXES
-  lib64
-  lib
-)
-
 find_library(Log4cplus_LIBRARY log4cplus
   ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
   PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${LOG4CPLUS_PATH_SUFFIXES}
+  PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
 )
 
 # Detect if DLL on windows
 if(WIN32 AND NOT LOG4CPLUS_USE_STATIC_LIBS)
   set(_LOG4CPLUS_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-  find_library(Log4cplus_DLL ${COMPONENT}
+  find_library(Log4cplus_DLL log4cplus
     ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
     PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES bin
+    PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
   )
   set(CMAKE_FIND_LIBRARY_SUFFIXES ${_LOG4CPLUS_TMP})
   unset(_LOG4CPLUS_TMP)

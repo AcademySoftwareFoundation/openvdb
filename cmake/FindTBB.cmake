@@ -77,6 +77,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -149,7 +150,7 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
 find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
   ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h")
@@ -191,43 +192,6 @@ list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-set(TBB_PATH_SUFFIXES
-  lib64
-  lib
-)
-
-# platform branching
-
-if(UNIX)
-  list(INSERT TBB_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
-
-if(APPLE)
-  if(TBB_FOR_CLANG)
-    list(INSERT TBB_PATH_SUFFIXES 0 lib/libc++)
-  endif()
-elseif(WIN32)
-  if(MSVC10)
-    set(TBB_VC_DIR vc10)
-  elseif(MSVC11)
-    set(TBB_VC_DIR vc11)
-  elseif(MSVC12)
-    set(TBB_VC_DIR vc12)
-  endif()
-  list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/${TBB_VC_DIR})
-else()
-  if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
-    if(TBB_MATCH_COMPILER_VERSION)
-      string(REGEX MATCHALL "[0-9]+" GCC_VERSION_COMPONENTS ${CMAKE_CXX_COMPILER_VERSION})
-      list(GET GCC_VERSION_COMPONENTS 0 GCC_MAJOR)
-      list(GET GCC_VERSION_COMPONENTS 1 GCC_MINOR)
-      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc${GCC_MAJOR}.${GCC_MINOR})
-    else()
-      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc4.4)
-    endif()
-  endif()
-endif()
-
 # Library suffix handling
 
 set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -248,7 +212,7 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   find_library(Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_TBB_ADDITIONAL_OPTIONS}
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
 
   # Detect if DLL on windows
@@ -258,7 +222,7 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     find_library(Tbb_${COMPONENT}_DLL ${COMPONENT}
       ${_FIND_TBB_ADDITIONAL_OPTIONS}
       PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES bin
+      PATH_SUFFIXES ${CMAKE_INSTALL_BINDIR} bin
     )
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_TMP})
     unset(_TBB_TMP)
