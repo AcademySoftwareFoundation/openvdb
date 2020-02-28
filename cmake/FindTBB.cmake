@@ -287,15 +287,11 @@ if(TBB_FOUND)
 
   foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-    # lib is in use. If win32 and a dll has been found, mark as shared.
-    # Otherwise infer from the file suffix
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
     set(TBB_${COMPONENT}_LIB_TYPE UNKNOWN)
     if(TBB_USE_STATIC_LIBS)
       set(TBB_${COMPONENT}_LIB_TYPE STATIC)
-    elseif(WIN32)
-      if(Tbb_${COMPONENT}_DLL)
-        set(TBB_${COMPONENT}_LIB_TYPE SHARED)
-      endif()
     elseif(UNIX)
       get_filename_component(_TBB_${COMPONENT}_EXT ${Tbb_${COMPONENT}_LIBRARY} EXT)
       if(_TBB_${COMPONENT}_EXT STREQUAL ".a")

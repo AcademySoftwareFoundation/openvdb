@@ -208,15 +208,11 @@ find_package_handle_standard_args(CppUnit
 
 if(CppUnit_FOUND)
   # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-  # lib is in use. If win32 and a dll has been found, mark as shared.
-  # Otherwise infer from the file suffix
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
   set(CPPUNIT_LIB_TYPE UNKNOWN)
   if(CPPUNIT_USE_STATIC_LIBS)
     set(CPPUNIT_LIB_TYPE STATIC)
-  elseif(WIN32)
-    if(CppUnit_DLL)
-      set(CPPUNIT_LIB_TYPE SHARED)
-    endif()
   elseif(UNIX)
     get_filename_component(_CPPUNIT_EXT ${CppUnit_LIBRARY} EXT)
     if(_CPPUNIT_EXT STREQUAL ".a")

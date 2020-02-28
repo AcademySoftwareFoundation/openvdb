@@ -317,15 +317,11 @@ if(IlmBase_FOUND)
 
   foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
     # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-    # lib is in use. If win32 and a dll has been found, mark as shared.
-    # Otherwise infer from the file suffix
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
     set(ILMBASE_${COMPONENT}_LIB_TYPE UNKNOWN)
     if(ILMBASE_USE_STATIC_LIBS)
       set(ILMBASE_${COMPONENT}_LIB_TYPE STATIC)
-    elseif(WIN32)
-      if(IlmBase_${COMPONENT}_DLL)
-        set(ILMBASE_${COMPONENT}_LIB_TYPE SHARED)
-      endif()
     elseif(UNIX)
       get_filename_component(_ILMBASE_${COMPONENT}_EXT ${IlmBase_${COMPONENT}_LIBRARY} EXT)
       if(${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".a")

@@ -311,15 +311,11 @@ if(OpenEXR_FOUND)
 
   foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
     # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-    # lib is in use. If win32 and a dll has been found, mark as shared.
-    # Otherwise infer from the file suffix
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
     set(OpenEXR_${COMPONENT}_LIB_TYPE UNKNOWN)
     if(OPENEXR_USE_STATIC_LIBS)
       set(OpenEXR_${COMPONENT}_LIB_TYPE STATIC)
-    elseif(WIN32)
-      if(OpenEXR_${COMPONENT}_DLL)
-        set(OpenEXR_${COMPONENT}_LIB_TYPE SHARED)
-      endif()
     elseif(UNIX)
       get_filename_component(_OpenEXR_${COMPONENT}_EXT ${OpenEXR_${COMPONENT}_LIBRARY} EXT)
       if(${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".a")

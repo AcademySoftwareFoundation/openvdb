@@ -214,15 +214,11 @@ find_package_handle_standard_args(Log4cplus
 
 if(Log4cplus_FOUND)
   # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-  # lib is in use. If win32 and a dll has been found, mark as shared.
-  # Otherwise infer from the file suffix
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
   set(LOG4CPLUS_LIB_TYPE UNKNOWN)
   if(LOG4CPLUS_USE_STATIC_LIBS)
     set(LOG4CPLUS_LIB_TYPE STATIC)
-  elseif(WIN32)
-    if(Log4cplus_DLL)
-      set(LOG4CPLUS_LIB_TYPE SHARED)
-    endif()
   elseif(UNIX)
     get_filename_component(_LOG4CPLUS_EXT ${Log4cplus_LIBRARY} EXT)
     if(_LOG4CPLUS_EXT STREQUAL ".a")

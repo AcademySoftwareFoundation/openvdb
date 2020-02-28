@@ -176,15 +176,11 @@ find_package_handle_standard_args(Jemalloc
 
 if(Jemalloc_FOUND)
   # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-  # lib is in use. If win32 and a dll has been found, mark as shared.
-  # Otherwise infer from the file suffix
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
   set(JEMALLOC_LIB_TYPE UNKNOWN)
   if(JEMALLOC_USE_STATIC_LIBS)
     set(JEMALLOC_LIB_TYPE STATIC)
-  elseif(WIN32)
-    if(Jemalloc_DLL)
-      set(JEMALLOC_LIB_TYPE SHARED)
-    endif()
   elseif(UNIX)
     get_filename_component(_JEMALLOC_EXT ${Jemalloc_LIBRARY} EXT)
     if(_JEMALLOC_EXT STREQUAL ".a")

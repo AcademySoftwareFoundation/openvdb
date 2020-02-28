@@ -477,7 +477,9 @@ endforeach()
 list(REMOVE_DUPLICATES OpenVDB_LIBRARY_DIRS)
 
 foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
-
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
   set(OPENVDB_${COMPONENT}_LIB_TYPE UNKNOWN)
   if(OPENVDB_USE_STATIC_LIBS)
     set(OPENVDB_${COMPONENT}_LIB_TYPE STATIC)

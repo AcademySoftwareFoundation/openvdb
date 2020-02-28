@@ -219,15 +219,11 @@ find_package_handle_standard_args(Blosc
 
 if(Blosc_FOUND)
   # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-  # lib is in use. If win32 and a dll has been found, mark as shared.
-  # Otherwise infer from the file suffix
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
   set(BLOSC_LIB_TYPE UNKNOWN)
   if(BLOSC_USE_STATIC_LIBS)
     set(BLOSC_LIB_TYPE STATIC)
-  elseif(WIN32)
-    if(Blosc_DLL)
-      set(BLOSC_LIB_TYPE SHARED)
-    endif()
   elseif(UNIX)
     get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
     if(_BLOSC_EXT STREQUAL ".a")
