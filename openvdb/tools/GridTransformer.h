@@ -281,11 +281,6 @@ decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
 {
     if (!math::isAffine(m)) return DECOMP_INVALID;
 
-    const auto posAngle = [](T angle) {
-        while (angle < T(0)) { angle += M_PI * 2.0; }
-        return angle;
-    };
-
     // This is the translation in world space
     translate = m.getTranslation();
     // Extract translation.
@@ -324,8 +319,9 @@ decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
             math::scale<math::Mat3<T> >(signedScale);
 
         if (xform.eq(rebuild)) {
-            const T maxAngle = math::Max(
-                posAngle(tmpAngle[0]), posAngle(tmpAngle[1]), posAngle(tmpAngle[2]));
+
+            const T maxAngle = std::max(std::abs(tmpAngle[0]),
+                std::max(std::abs(tmpAngle[1]), std::abs(tmpAngle[2])));
 
             if (!(minAngle < maxAngle)) { // Update if less or equal.
 
