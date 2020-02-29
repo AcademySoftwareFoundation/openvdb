@@ -38,6 +38,8 @@ Version 7.1.0 - In Development
     - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
       compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
       headers were installed to /usr/include.
+    - Fixed a rotation order bug in tools::local_util::decompose()
+      that caused it to fail to decompose some matrices.
 
     API changes:
     - Removed a number of deprecated point methods.
@@ -105,8 +107,6 @@ Version 7.0.0 - December 6, 2019
     - Fixed a Windows build issue in openvdb_render.
     - Fixed a non deterministic threading bug in tools::meshToVolume() during
       polygon voxelization which could result in different distance values.
-    - Fixed a rotation order bug in tools::local_util::decompose()
-      that caused it to fail to decompose some matrices.
 
     ABI changes:
     - OpFactory destructor is now virtual as of ABI=7

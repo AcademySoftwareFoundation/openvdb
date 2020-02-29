@@ -51,6 +51,8 @@ Bug fixes:
 - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
   compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
   headers were installed to /usr/include.
+- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
+  decompose@endlink utility that caused it to fail to decompose some matrices.
 
 @par
 API changes:
@@ -132,8 +134,6 @@ Bug fixes:
 - Fixed a non deterministic threading bug in @vdblink::tools::meshToVolume()
   mesh to volume@endlink during polygon voxelization which could result in
   different distance values.
-- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
-  decompose@endlink utility that caused it to fail to decompose some matrices.
 
 @anchor v7_0_0_ABI_changes
 @par
