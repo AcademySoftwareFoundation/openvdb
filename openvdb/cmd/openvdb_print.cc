@@ -13,42 +13,40 @@
 
 #include <openvdb/points/PointDataGrid.h>
 
-using namespace openvdb;
-using namespace openvdb::points;
-
 namespace {
 
 using StringVec = std::vector<std::string>;
 
 const char* INDENT = "   ";
 const char* gProgName = "";
-static const std::string sINDENT(INDENT);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
 struct PointStats{
-// Helper structs to collect point information
-struct PointAttrib{
-    Name name = "";
-    Name type = "";
-    Name codec = "";
-    Index64 index = 0;
-    bool isUniform = true;
-    bool isShared = false;
-    // flags
-    bool isHidden = false;
-    bool isTransient = false;
-    bool isStreaming = false;
-};
-struct Points{
+    using Index64 = openvdb::Index64;
+    using Name = openvdb::Name;
+    using GridBase  = openvdb::GridBase;
+    using AttributeSet = openvdb::points::AttributeSet;
+    using PointDataGrid = openvdb::points::PointDataGrid;
+
+    // proxy collect attributes not covered by AttributeSet::Info::Array
+    struct PointAttrib{
+        AttributeSet::Info::Array array;
+        Index64 index = 0;
+        bool shared = false;
+        bool uniform = true;
+        Name codec = "";
+        Name type = "";
+    };
+
     Index64 total = 0;
     Index64 active = 0;
     Index64 inactive = 0;
+    bool firstLeaf = true;
     std::map<Name, Index64> groups;
-    std::map<Name, PointAttrib> pointAttribs;
-};
+    std::map<Name, PointAttrib> attribs;
+
 
 static void
-inspectPoints(const openvdb::GridBase::ConstPtr grid, Points& points)
+inspectPoints(const openvdb::GridBase::ConstPtr grid, PointStats& pointStats)
 {
     PointDataGrid::ConstPtr inputGrid = GridBase::grid<PointDataGrid>(grid);
 
@@ -57,67 +55,70 @@ inspectPoints(const openvdb::GridBase::ConstPtr grid, Points& points)
         auto dptr = attrset.descriptorPtr();
         auto attrmap = dptr->map();
 
-        points.total += leafIter->pointCount();
-        points.active += leafIter->onPointCount();
-        points.inactive += leafIter->offPointCount();
+        pointStats.total += leafIter->pointCount();
+        pointStats.active += leafIter->onPointCount();
+        pointStats.inactive += leafIter->offPointCount();
 
         // groups
         auto grmap = dptr->groupMap();
 
         // Count points in groups
         for (auto it=grmap.begin(); it!=grmap.end(); ++it){
-            if(points.groups.find(it->first) == points.groups.end()){
-                points.groups[it->first] = 0;
+            if(pointStats.groups.find(it->first) == pointStats.groups.end()){
+                pointStats.groups[it->first] = 0;
             }
-            points.groups[it->first]+=leafIter->groupPointCount(it->first);
+            pointStats.groups[it->first]+=leafIter->groupPointCount(it->first);
         }
 
-        // Collect attribute info
+        // Collect attribute info - gather attributes info from the first leaf only.
+        // (Assume consistency across leaves).
+        AttributeSet::Info info(dptr);
+        if (!pointStats.firstLeaf) continue;
         for (auto it=attrmap.begin(); it!=attrmap.end(); ++it){
+            AttributeSet::Info::Array& arrInfo = info.arrayInfo(it->first);
+            auto attrArr = attrset.getConst(it->first /*name*/);
             PointAttrib pa{};
-            pa.name = it->first;
-            pa.index = it->second;
+            pa.array = std::move(arrInfo);
             pa.type = dptr->valueType(pa.index);
-            pa.isShared = attrset.isShared(pa.index);
-
-            auto attrArr = attrset.getConst(pa.name);
+            pa.index = it->second;
+            pa.shared = attrset.isShared(pa.index);
+            // pa.codec = dptr->valueType(pa.index);
             pa.codec = attrArr->codecType();
-            pa.isUniform = attrArr->isUniform();
-            pa.isHidden = attrArr->isHidden();
-            pa.isTransient = attrArr->isTransient();
-            pa.isStreaming = attrArr->isStreaming();
-            points.pointAttribs[pa.name] = pa;
+            pa.uniform = attrArr->isUniform();
+            pointStats.attribs[it->first] = pa;
         }
+        pointStats.firstLeaf = false;
     }
 }
 
 static void
-printPointStats(const Points& pointStats)
+printPointStats(const PointStats& pointStats)
 {
-        std::cout << "Total Point Count:\n"
-            << sINDENT << "total: " << pointStats.total << '\n'
-            << sINDENT << "active: " << pointStats.active  << '\n'
-            << sINDENT << "inactive: " << pointStats.inactive << '\n';
-        std::cout << "Point attributes:" << '\n';
-        for(auto it=pointStats.pointAttribs.begin(); it!=pointStats.pointAttribs.end(); ++it){
-            auto attr = it->second;
-            std::cout << "name: " << attr.name << '\n';
-            std::cout << sINDENT << "index: " << attr.index << '\n';
-            std::cout << sINDENT << "type: " << attr.type << '\n';
-            std::cout << sINDENT << "codec: " << attr.codec << '\n';
-            std::cout << sINDENT << "isUniform: " << attr.isUniform << '\n';
-            std::cout << sINDENT << "isShared: " << attr.isShared << '\n';
-            std::cout << sINDENT << "isHidden: " << attr.isHidden << '\n';
-            std::cout << sINDENT << "isTransient: " << attr.isTransient << '\n';
-            std::cout << sINDENT << "isStreaming: " << attr.isStreaming << '\n';
-          }
-        std::cout << "Point groups:" << '\n';
-        for (auto it=pointStats.groups.begin(); it!=pointStats.groups.end(); ++it){
-            std::cout << it->first << " " << it->second <<std::endl;
-        }
+    std::cout << "Total Point Count:\n"
+              << INDENT << "total: " << pointStats.total << '\n'
+              << INDENT << "active: " << pointStats.active  << '\n'
+              << INDENT << "inactive: " << pointStats.inactive << '\n';
+
+    std::cout << "Point attributes:" << '\n';
+    for(auto it=pointStats.attribs.begin(); it!=pointStats.attribs.end(); ++it){
+        auto attr = it->second;
+        std::cout << "  name: " << it->first << '\n';
+        std::cout << INDENT << "type: " << attr.type << '\n';
+        std::cout << INDENT << "codec: " << attr.codec << '\n';
+        std::cout << INDENT << "uniform: " << attr.uniform << '\n';
+        std::cout << INDENT << "shared: " << attr.shared << '\n';
+        std::cout << INDENT << "hidden: " << attr.array.hidden << '\n';
+        std::cout << INDENT << "transient: " << attr.array.transient << '\n';
+        std::cout << INDENT << "group: " << attr.array.group << '\n';
+        std::cout << INDENT << "string: " << attr.array.string << '\n';
+        std::cout << INDENT << "constantStride: " << attr.array.constantStride << '\n';
+    }
+    std::cout << "Point groups:" << '\n';
+    for (auto it=pointStats.groups.begin(); it!=pointStats.groups.end(); ++it){
+        std::cout << INDENT << it->first << ": " << it->second << '\n';
+    }
 }
 };
-#endif
 
 void
 usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
@@ -230,30 +231,27 @@ printLongListing(const StringVec& filenames)
             if (!str.empty()) std::cout << str << "\n";
         }
         std::cout << "\n";
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-        PointStats::Points pointStats;
-#endif
+
+        PointStats pointStats;
+
         // For each grid in the file...
         bool firstGrid = true;
         for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
-            if (openvdb::GridBase::ConstPtr grid = *it) {
+            const openvdb::GridBase::ConstPtr grid = *it;
+            if (grid) {
                 if (!firstGrid) std::cout << "\n\n";
                 std::cout << "Name: " << grid->getName() << std::endl;
                 grid->print(std::cout, /*verboseLevel=*/11);
                 firstGrid = false;
             }
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-            // Check for grid type, inspect points if this is a point grid
-            const openvdb::GridBase::ConstPtr grid = *it;
-            Name gridType = grid->type();
-            if (gridType.find("ptdata") != std::string::npos)
+
+            // Inspect points if this is a point grid
+            if (openvdb::GridBase::grid<openvdb::points::PointDataGrid>(grid))
                 PointStats::inspectPoints(grid, pointStats);
         }
-        // Print out point stats only if there are any points
-        if (pointStats.total != 0) PointStats::printPointStats(pointStats);
-#else
-        }
-#endif
+
+        PointStats::printPointStats(pointStats);
+
     }
 }
 
