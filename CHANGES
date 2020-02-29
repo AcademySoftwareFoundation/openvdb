@@ -1,12 +1,76 @@
 OpenVDB Version History
 =======================
 
-Version 7.0.0 - In development
+Version 7.1.0 - In Development
 
-    As of this release, a C++14 compiler is required and the oldest
-    supported Houdini version is 17.0.
+    Improvements:
+    - Added GroupWriteHandle::setUnsafe() for faster performance when the group
+      array is known to be in-core and non-uniform.
+    - Improved the CMake build for the OpenVDB Houdini library on Windows.
+      [Reported by Ian Woodward]
+    - Remove some logic for compilers older than Visual Studio 2019.
+    - Add support for default value metadata when creating AttributeArrays or
+      appending to an AttributeSet.
+    - Added new group inspection methods to the AttributeSet::Descriptor.
+    - Introduced a StringMetaCache class for convenient string attribute
+      metadata lookup and performed some minor optimizations.
+    - Removed redundant floor in points::floatingPointToFixedPoint.
+    - CMake now checks the minimum supported MSVC compiler for Windows.
+    - Add gitignore to repository root.
+    - CMake now only requires a CXX compiler.
+    - Improved the Windows README instructions and various MSVC warnings.
 
     New features:
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+    - Added PointDataLeafNode::stealAttributeSet() and
+      AttributeSet::removeAttribute() for releasing ownership of attribute
+      data.
+
+    Bug fixes:
+    - Fixed a bug where grids with no active values might return true when the
+      method evalActiveVoxelBoundingBox is called. The correct behavior is to
+      only return true if the grid contains any active values.
+    - Fixed a sign propagation bug in tools::traceExteriorBoundaries() used by
+      tools::meshToVolume(). This could cause values to not be propagated across
+      node boundaries, leading to voxels incorrectly being marked as inside the
+      isosurface. [Contributed by Tristan Barback]
+    - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
+      compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
+      headers were installed to /usr/include.
+
+    API changes:
+    - Removed a number of deprecated point methods.
+    - points::StringIndexType is now deprecated, use Index instead.
+    - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
+      a boost::scoped_array.
+
+    Houdini:
+    - Platonic SOP is now verbified.
+    - Extend all SOP references to support VDB Points.
+
+
+Version 7.0.0 - December 6, 2019
+
+      Some changes in this release (see "ABI changes" below) alter
+      the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones built into Houdini
+      up to and including Houdini 18.0. To preserve ABI compatibility,
+      when compiling OpenVDB or any dependent code define the macro
+      OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 5 for
+      Houdini 17.0 and 17.5 and 6 for Houdini 18.0.
+
+      As of this release, a C++14 compiler is required and the oldest
+      supported Houdini version is 17.0.
+
+    New features:
+    - LevelSetMeasure can now compute multiple types of curvatures (averge and total
+      Gaussian and mean curvature) as well as Euler characteristic and genus of
+      level set surfaces.
+    - Most stencil classes now have an intersection method that detcts the axial
+      directions of zero-crossings (as oppose to the existing boolean intersection test).
+    - The CurvatureStencil can now compute Gaussian and principal
+      curvatures (in addition to mean curvature).
     - Added Tree::nodeCount, which counts the number and type of nodes
       in a tree very efficiently.
     - Added new RootNode::addChild() and InternalNode::addChild() methods to
@@ -28,7 +92,9 @@ Version 7.0.0 - In development
       AVX compiler flags, this is switched off by default.
     - Made various small changes to improve Visual Studio compatiblity and
       deprecate some logic for compilers older than Visual Studio 2017.
-    - Standardized CMake install locations using GNUInstallDirs
+    - Standardized CMake install locations using GNUInstallDirs. Importantly,
+      this changes the default library installation folder from lib to lib64
+      on some 64-bit systems, or to lib/multiarch-tuple on Debian
       [Contributed by David Aguilar]
     - Added SIMD intrinsics to a few common NodeMask methods.
       [Contributed by Konstantin]

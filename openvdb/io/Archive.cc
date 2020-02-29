@@ -1002,9 +1002,6 @@ Archive::readHeader(std::istream& is)
 void
 Archive::writeHeader(std::ostream& os, bool seekable) const
 {
-    using boost::uint32_t;
-    using boost::int64_t;
-
     // 1) Write the magic number for VDB.
     int64_t magic = OPENVDB_MAGIC;
     os.write(reinterpret_cast<char*>(&magic), sizeof(int64_t));
@@ -1085,7 +1082,14 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
+#if defined(_MSC_VER)
+    char* s;
+    _dupenv_s(&s, nullptr, "OPENVDB_DISABLE_DELAYED_LOAD");
+    std::unique_ptr<char, decltype(std::free)*> sptr { s, std::free };
+    return !static_cast<bool>(sptr);
+#else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
+#endif
 }
 
 

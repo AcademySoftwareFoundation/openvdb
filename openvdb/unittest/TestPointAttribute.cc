@@ -122,11 +122,12 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // append an attribute, check descriptors are as expected, default value test
+        TypedMetadata<int> meta(10);
         appendAttribute<int>(tree,  "id",
                                 /*uniformValue*/0,
                                 /*stride=*/1,
                                 /*constantStride=*/true,
-                                /*defaultValue*/TypedMetadata<int>(10).copy(),
+                                /*defaultValue*/&meta,
                                 /*hidden=*/false, /*transient=*/false);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
@@ -259,11 +260,11 @@ TestPointAttribute::testAppendDrop()
 
     { // append attributes marked as hidden, transient, group and string
         appendAttribute<float>(tree, "testHidden", 0,
-            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), true, false);
+            /*stride=*/1, /*constantStride=*/true, nullptr, true, false);
         appendAttribute<float>(tree, "testTransient", 0,
-            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, true);
+            /*stride=*/1, /*constantStride=*/true, nullptr, false, true);
         appendAttribute<Name>(tree, "testString", "",
-            /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, false);
+            /*stride=*/1, /*constantStride=*/true, nullptr, false, false);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
@@ -308,7 +309,7 @@ TestPointAttribute::testRename()
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
     appendAttribute<float>(tree, "test1", 0,
-        /*stride=*/1, /*constantStride=*/true, defaultValue.copy());
+        /*stride=*/1, /*constantStride=*/true, &defaultValue);
     appendAttribute<int>(tree, "id");
     appendAttribute<float>(tree, "test2");
 

@@ -20,9 +20,6 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 
-using GroupType = uint8_t;
-
-
 ////////////////////////////////////////
 
 
@@ -76,6 +73,7 @@ class OPENVDB_API GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupHandle>;
+    using UniquePtr = std::unique_ptr<GroupHandle>;
 
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
@@ -104,10 +102,14 @@ class OPENVDB_API GroupWriteHandle : public GroupHandle
 {
 public:
     using Ptr = std::shared_ptr<GroupWriteHandle>;
+    using UniquePtr = std::unique_ptr<GroupWriteHandle>;
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
+    /// Set @a on at the given index @a n
     void set(Index n, bool on);
+    /// Set @a on at the given index @a n (assumes in-core and non-uniform)
+    void setUnsafe(Index n, bool on);
 
     /// @brief Set membership for the whole array and attempt to collapse
     ///

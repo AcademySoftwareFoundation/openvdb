@@ -536,11 +536,7 @@ private:
 template<typename ValueType, typename OpType>
 struct ArrayProcessor {
     static inline void call(OpType& op, const AttributeArray& array) {
-#ifdef _MSC_VER
-        op.operator()<ValueType>(array);
-#else
         op.template operator()<ValueType>(array);
-#endif
     }
 };
 
@@ -563,7 +559,7 @@ processTypedArray(const ArrayType& array, OpType& op)
     else if (array.template hasValueType<Vec3<float>>())        ArrayProcessor<Vec3<float>, OpType>::call(op, array);
     else if (array.template hasValueType<Vec3<double>>())       ArrayProcessor<Vec3<double>, OpType>::call(op, array);
     else if (array.template hasValueType<GroupType>())          ArrayProcessor<GroupType, OpType>::call(op, array);
-    else if (array.template hasValueType<StringIndexType>())    ArrayProcessor<StringIndexType, OpType>::call(op, array);
+    else if (array.template hasValueType<Index>())              ArrayProcessor<Index, OpType>::call(op, array);
     else if (array.template hasValueType<Mat3<float>>())        ArrayProcessor<Mat3<float>, OpType>::call(op, array);
     else if (array.template hasValueType<Mat3<double>>())       ArrayProcessor<Mat3<double>, OpType>::call(op, array);
     else if (array.template hasValueType<Mat4<float>>())        ArrayProcessor<Mat4<float>, OpType>::call(op, array);

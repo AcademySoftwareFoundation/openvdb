@@ -62,6 +62,17 @@ stages:
     - bash: ci/build.sh clang++ Release 4 ON None
     - bash: cd build && ctest -V; cd -
 
+  - job: testhou180
+    displayName: Houdini 18.0
+    pool:
+      vmImage: 'ubuntu-16.04'
+    container: aswf/ci-base:2019
+    timeoutInMinutes: 0
+    condition: variables['HOUPASS']
+    steps:
+    - bash: ci/install_houdini.sh 18.0 ${HOUPASS}
+    - bash: ci/build_houdini.sh clang++ Release ON
+
   - job: testhou175
     displayName: Houdini 17.5
     pool:
@@ -94,26 +105,26 @@ stages:
     - bash: ci/build.sh clang++ Release 7 OFF None
     - bash: cd build && ctest -V; cd -
 
-  - job: testhou175gcc
-    displayName: Houdini 17.5 (GCC)
+  - job: testhou180gcc
+    displayName: Houdini 18.0 (GCC)
     pool:
       vmImage: 'ubuntu-16.04'
-    container: aswf/ci-base:2018
+    container: aswf/ci-base:2019
     timeoutInMinutes: 0
     condition: variables['HOUPASS']
     steps:
-    - bash: ci/install_houdini.sh 17.5 ${HOUPASS}
+    - bash: ci/install_houdini.sh 18.0 ${HOUPASS}
     - bash: ci/build_houdini.sh g++ Release OFF
 
-  - job: testhou175debug
-    displayName: Houdini 17.5 (Debug Mode)
+  - job: testhou180debug
+    displayName: Houdini 18.0 (Debug Mode)
     pool:
       vmImage: 'ubuntu-16.04'
-    container: aswf/ci-base:2018
+    container: aswf/ci-base:2019
     timeoutInMinutes: 0
     condition: variables['HOUPASS']
     steps:
-    - bash: ci/install_houdini.sh 17.5 ${HOUPASS}
+    - bash: ci/install_houdini.sh 18.0 ${HOUPASS}
     - bash: ci/build_houdini.sh clang++ Debug OFF
 
   - job: testabi7gcc

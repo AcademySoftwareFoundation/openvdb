@@ -3348,11 +3348,7 @@ RootNode<ChildT>::visitActiveBBox(BBoxOp& op) const
         if (this->isChild(i) && descent) {
             this->getChild(i).visitActiveBBox(op);
         } else {
-#ifdef _MSC_VER
-            op.operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-#else
             op.template operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-#endif
         }
     }
 }

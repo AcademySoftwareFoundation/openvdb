@@ -51,6 +51,12 @@ TestGridBbox::testLeafBbox()
     CPPUNIT_ASSERT(tree.evalLeafBoundingBox(bbox));
     CPPUNIT_ASSERT_EQUAL(openvdb::Coord(-104,   -40,  -800), bbox.min());
     CPPUNIT_ASSERT_EQUAL(openvdb::Coord(104-1, 40-1, 808-1), bbox.max());
+
+    // Clear the tree without trimming.
+    tree.setValueOff(openvdb::Coord(  0,  9,   9));
+    tree.setValueOff(openvdb::Coord(100, 35, 800));
+    tree.setValueOff(openvdb::Coord(-100, -35, -800));
+    CPPUNIT_ASSERT(!tree.evalLeafBoundingBox(bbox));
 }
 
 
@@ -80,4 +86,13 @@ TestGridBbox::testGridBbox()
     CPPUNIT_ASSERT(tree.evalActiveVoxelBoundingBox(bbox));
     CPPUNIT_ASSERT_EQUAL(openvdb::Coord(-100,   -35,  -800), bbox.min());
     CPPUNIT_ASSERT_EQUAL(openvdb::Coord(100, 35, 800), bbox.max());
+
+    // Clear the tree without trimming.
+    tree.setValueOff(openvdb::Coord(  1,  0,   0));
+    tree.setValueOff(openvdb::Coord(  0, 12,   8));
+    tree.setValueOff(openvdb::Coord(  1, 35, 800));
+    tree.setValueOff(openvdb::Coord(100,  0,  16));
+    tree.setValueOff(openvdb::Coord(  1,  0,  16));
+    tree.setValueOff(openvdb::Coord(-100, -35, -800));
+    CPPUNIT_ASSERT(!tree.evalActiveVoxelBoundingBox(bbox));
 }

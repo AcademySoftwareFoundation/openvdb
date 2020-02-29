@@ -20,6 +20,7 @@ cmake \
     -DOPENVDB_BUILD_BINARIES=${EXTRAS} \
     -DOPENVDB_BUILD_PYTHON_MODULE=${EXTRAS} \
     -DOPENVDB_BUILD_UNITTESTS=${EXTRAS} \
+    -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
      ..
 
 # Can only build using one thread with GCC due to memory constraints

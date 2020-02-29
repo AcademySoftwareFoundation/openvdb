@@ -8,7 +8,7 @@
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
-project(OpenVDBMaya)
+project(OpenVDBMaya  LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)

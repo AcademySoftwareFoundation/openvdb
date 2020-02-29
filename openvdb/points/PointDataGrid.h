@@ -319,6 +319,9 @@ public:
     /// Retrieve the attribute set.
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
+    /// @brief Steal the attribute set, a new, empty attribute set is inserted in it's place.
+    AttributeSet::UniquePtr stealAttributeSet();
+
     /// @brief Create a new attribute set. Existing attributes will be removed.
     void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
         const AttributeArray::ScopedRegistryLock* lock = nullptr);
@@ -339,11 +342,19 @@ public:
     /// @param pos Index of the new attribute in the descriptor replacement.
     /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
     /// @param constantStride if @c false, stride is interpreted as total size of the array
+    /// @param metadata optional default value metadata
     /// @param lock an optional scoped registry lock to avoid contention
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
+                                        const Metadata* metadata = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
+                                        const size_t pos, const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -590,7 +601,7 @@ public:
     using ValueAll  = typename BaseLeaf::ValueAll;
 
 private:
-    std::unique_ptr<AttributeSet> mAttributeSet;
+    AttributeSet::UniquePtr mAttributeSet;
     uint16_t mVoxelBufferSize = 0;
 
 protected:
@@ -616,32 +627,6 @@ public:
 
 public:
 
-#if defined(_MSC_VER) && (_MSC_VER < 1914)
-    using ValueOnIter = typename BaseLeaf::ValueIter<
-        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
-    using ValueOnCIter = typename BaseLeaf::ValueIter<
-        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn>;
-    using ValueOffIter = typename BaseLeaf::ValueIter<
-        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff>;
-    using ValueOffCIter = typename BaseLeaf::ValueIter<
-        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff>;
-    using ValueAllIter = typename BaseLeaf::ValueIter<
-        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll>;
-    using ValueAllCIter = typename BaseLeaf::ValueIter<
-        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll>;
-    using ChildOnIter = typename BaseLeaf::ChildIter<
-        MaskOnIterator, PointDataLeafNode, ChildOn>;
-    using ChildOnCIter = typename BaseLeaf::ChildIter<
-        MaskOnIterator, const PointDataLeafNode, ChildOn>;
-    using ChildOffIter = typename BaseLeaf::ChildIter<
-        MaskOffIterator, PointDataLeafNode, ChildOff>;
-    using ChildOffCIter = typename BaseLeaf::ChildIter<
-        MaskOffIterator, const PointDataLeafNode, ChildOff>;
-    using ChildAllIter = typename BaseLeaf::DenseIter<
-        PointDataLeafNode, ValueType, ChildAll>;
-    using ChildAllCIter = typename BaseLeaf::DenseIter<
-        const PointDataLeafNode, const ValueType, ChildAll>;
-#else
     using ValueOnIter = typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
     using ValueOnCIter = typename BaseLeaf::template ValueIter<
@@ -666,7 +651,6 @@ public:
         PointDataLeafNode, ValueType, ChildAll>;
     using ChildAllCIter = typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll>;
-#endif
 
     using IndexVoxelIter    = IndexIter<ValueVoxelCIter, NullFilter>;
     using IndexAllIter      = IndexIter<ValueAllCIter, NullFilter>;
@@ -765,6 +749,15 @@ public:
 // PointDataLeafNode implementation
 
 template<typename T, Index Log2Dim>
+inline AttributeSet::UniquePtr
+PointDataLeafNode<T, Log2Dim>::stealAttributeSet()
+{
+    AttributeSet::UniquePtr ptr = std::make_unique<AttributeSet>();
+    std::swap(ptr, mAttributeSet);
+    return ptr;
+}
+
+template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
     const AttributeArray::ScopedRegistryLock* lock)
@@ -815,10 +808,23 @@ inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
                                                 const size_t pos, const Index strideOrTotalSize,
                                                 const bool constantStride,
+                                                const Metadata* metadata,
                                                 const AttributeArray::ScopedRegistryLock* lock)
 {
     return mAttributeSet->appendAttribute(
-        expected, replacement, pos, strideOrTotalSize, constantStride, lock);
+        expected, replacement, pos, strideOrTotalSize, constantStride, metadata, lock);
+}
+
+// deprecated
+template<typename T, Index Log2Dim>
+inline AttributeArray::Ptr
+PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
+                                                const size_t pos, const Index strideOrTotalSize,
+                                                const bool constantStride,
+                                                const AttributeArray::ScopedRegistryLock* lock)
+{
+    return this->appendAttribute(expected, replacement, pos,
+        strideOrTotalSize, constantStride, nullptr, lock);
 }
 
 template<typename T, Index Log2Dim>
