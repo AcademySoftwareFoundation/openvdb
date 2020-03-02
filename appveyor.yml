@@ -38,7 +38,8 @@ build_script:
     -DOPENVDB_BUILD_VDB_VIEW=OFF \
     -DOPENVDB_BUILD_UNITTESTS=ON \
     -DUSE_BLOSC=ON \
-    -DPython_ROOT_DIR=%PYTHONHOME% \
+    -DBOOST_ROOT=C:\Libraries\boost_1_67_0 \
+    -DBOOST_LIBRARYDIR=C:\Libraries\boost_1_67_0\lib64-msvc-14.0 \
     ..
   - cmake --build . --parallel 4 --config %CONFIGURATION% --target install
 
