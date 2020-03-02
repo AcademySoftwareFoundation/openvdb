@@ -1083,10 +1083,11 @@ bool
 Archive::isDelayedLoadingEnabled()
 {
 #if defined(_MSC_VER)
-    char* s;
-    _dupenv_s(&s, nullptr, "OPENVDB_DISABLE_DELAYED_LOAD");
-    std::unique_ptr<char, decltype(std::free)*> sptr { s, std::free };
-    return !static_cast<bool>(sptr);
+    char* value;
+    _dupenv_s(&value, nullptr, "OPENVDB_DISABLE_DELAYED_LOAD");
+    if (!value) return true;
+    free(value);
+    return false;
 #else
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
 #endif
