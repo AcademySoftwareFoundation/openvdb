@@ -501,6 +501,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   add_definitions(-DNOMINMAX)
   # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
   add_definitions(-DWIN32_LEAN_AND_MEAN)
+  # Disable non-secure CRT library function warnings
+  # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
+  #     compiler-warning-level-3-c4996?view=vs-2019#unsafe-crt-library-functions
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   if(NOT OPENVDB_CXX_STRICT)
     message(STATUS "Suppressing some noisy MSVC CXX warnings, "
       "set OPENVDB_CXX_STRICT=ON to re-enable them.")
