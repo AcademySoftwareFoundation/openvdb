@@ -20,6 +20,14 @@ Version 7.1.0 - In Development
     - CMake now only requires a CXX compiler.
     - Improved the Windows README instructions and various MSVC warnings.
     - Remove CMake warning when using GLFW 3.2+ on Debian.
+    - Various fixes to unary minus on unsigned compiler warnings.
+    - The define _CRT_NONSTDC_NO_WARNINGS is now enabled by default with MSVC.
+    - New CMake option OPENVDB_BUILD_PYTHON_UNITTESTS to disable or enable
+      the python module tests and fixed the required environment for them on
+      Windows. The python interpreter is no longer required by default if the
+      tests are disabled.
+    - Improved the CMake user messages when locating python and numpy.
+    - The python module extension is now .pyd on Windows.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
