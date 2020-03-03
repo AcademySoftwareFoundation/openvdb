@@ -26,6 +26,9 @@ Improvements:
 - Add gitignore to repository root.
 - CMake now only requires a CXX compiler.
 - Improved the Windows README instructions and various MSVC warnings.
+- Fixed some build issues with the Houdini plugin on Windows.
+- Standardized the library components install paths for the OpenVDB
+  Houdini shared library.
 
 @par
 New features:
