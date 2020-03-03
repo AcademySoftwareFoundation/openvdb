@@ -26,6 +26,7 @@ Improvements:
 - Add gitignore to repository root.
 - CMake now only requires a CXX compiler.
 - Improved the Windows README instructions and various MSVC warnings.
+- Remove CMake warning when using GLFW 3.2+ on Debian.
 - Various fixes to unary minus on unsigned compiler warnings.
 - The define <TT>_CRT_NONSTDC_NO_WARNINGS</TT> is now enabled by default
   with MSVC.

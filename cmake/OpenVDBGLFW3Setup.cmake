@@ -116,17 +116,12 @@ find_package_handle_standard_args(glfw3
 unset(glfw3_FIND_VERSION)
 
 # GLFW 3.1 does not export INTERFACE_LINK_LIBRARIES so detect this
-# and set the property ourselves
+# version and set the property ourselves
 # @todo investigate how this might apply for Mac OSX
 if(UNIX)
-  get_property(glfw3_HAS_INTERFACE_LINK_LIBRARIES
-    TARGET glfw
-    PROPERTY INTERFACE_LINK_LIBRARIES
-    SET
-  )
-  if (NOT glfw3_HAS_INTERFACE_LINK_LIBRARIES)
-    message(WARNING "GLFW does not have the INTERFACE_LINK_LIBRARIES property "
-      "set, so hard-coding to expect a dependency on X11. To use a different "
+  if(glfw3_VERSION VERSION_LESS 3.2)
+    message(WARNING "GLFW 3.1 does not set the INTERFACE_LINK_LIBRARIES property, "
+      "hard-coding to expect a dependency on X11. To use a different "
       "library dependency, consider upgrading to GLFW 3.2+ where this "
       "property is set by the CMake find package module for GLFW.")
     find_package(X11 REQUIRED)
