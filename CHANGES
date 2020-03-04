@@ -50,6 +50,8 @@ Version 7.1.0 - In Development
     - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
       compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
       headers were installed to /usr/include.
+    - Fixed a rotation order bug in tools::local_util::decompose()
+      that caused it to fail to decompose some matrices.
 
     API changes:
     - Removed a number of deprecated point methods.
