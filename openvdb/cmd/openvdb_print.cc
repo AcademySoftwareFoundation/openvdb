@@ -31,8 +31,6 @@ struct PointStats{
     struct PointAttrib{
         AttributeSet::Info::Array array;
         Index64 index = 0;
-        bool shared = false;
-        bool uniform = true;
         Name codec = "";
         Name type = "";
     };
@@ -81,10 +79,7 @@ inspectPoints(const openvdb::GridBase::ConstPtr grid, PointStats& pointStats)
             pa.array = std::move(arrInfo);
             pa.type = dptr->valueType(pa.index);
             pa.index = it->second;
-            pa.shared = attrset.isShared(pa.index);
-            // pa.codec = dptr->valueType(pa.index);
-            pa.codec = attrArr->codecType();
-            pa.uniform = attrArr->isUniform();
+            pa.codec = dptr->type(pa.index).second;
             pointStats.attribs[it->first] = pa;
         }
         pointStats.firstLeaf = false;
@@ -105,8 +100,6 @@ printPointStats(const PointStats& pointStats)
         std::cout << "  name: " << it->first << '\n';
         std::cout << INDENT << "type: " << attr.type << '\n';
         std::cout << INDENT << "codec: " << attr.codec << '\n';
-        std::cout << INDENT << "uniform: " << attr.uniform << '\n';
-        std::cout << INDENT << "shared: " << attr.shared << '\n';
         std::cout << INDENT << "hidden: " << attr.array.hidden << '\n';
         std::cout << INDENT << "transient: " << attr.array.transient << '\n';
         std::cout << INDENT << "group: " << attr.array.group << '\n';
