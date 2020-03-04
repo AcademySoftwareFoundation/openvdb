@@ -78,7 +78,7 @@ AttributeSet::AttributeSet(const Info& info, Index arrayLength,
         const Info::Array& arrayInfo = info.arrayInfo(pos);
         Metadata::ConstPtr metadata;
         if (hasMetadata)    metadata = meta["default:" + namePos.first];
-        bool constantStride = arrayInfo.constantStride;
+        const bool constantStride = arrayInfo.constantStride;
         const Index stride = arrayInfo.stride;
 
         // attempt to steal array from the existingAttributeSet
