@@ -28,6 +28,9 @@ Version 7.1.0 - In Development
       tests are disabled.
     - Improved the CMake user messages when locating python and numpy.
     - The python module extension is now .pyd on Windows.
+    - Fixed some build issues with the Houdini plugin on Windows.
+    - Standardized the library components install paths for the OpenVDB
+      Houdini shared library.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another

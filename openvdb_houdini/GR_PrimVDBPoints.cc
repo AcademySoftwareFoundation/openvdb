@@ -72,7 +72,7 @@ using namespace openvdb::points;
 
 
 /// Primitive Render Hook for VDB Points
-class OPENVDB_HOUDINI_API GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
+class GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
 {
 public:
     GUI_PrimVDBPointsHook() : GUI_PrimitiveHook("DWA VDB Points") { }
@@ -92,7 +92,7 @@ public:
 /// VDB Points primitive is found. This object can be persistent between
 /// renders, though display flag changes or navigating though SOPs can cause
 /// it to be deleted and recreated later.
-class OPENVDB_HOUDINI_API GR_PrimVDBPoints : public GR_Primitive
+class GR_PrimVDBPoints : public GR_Primitive
 {
 public:
     GR_PrimVDBPoints(const GR_RenderInfo *info,
