@@ -62,6 +62,7 @@ Version 7.1.0 - In Development
     Houdini:
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
+    - Combine SOP will not error in flatten-all mode if second has no grids.
 
 
 Version 7.0.0 - December 6, 2019

@@ -79,6 +79,7 @@ API changes:
 Houdini:
 - Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
+- Combine SOP will not error in flatten-all mode if second has no grids.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
