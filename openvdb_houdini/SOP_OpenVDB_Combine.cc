@@ -682,8 +682,10 @@ SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
                     }
                     break;
                 case COLL_FLATTEN_B_TO_A:
-                    aVdbVec.push_back(*aIt);
-                    bVdbVec.push_back(*bIt);
+                    if (*bIt) {
+                        aVdbVec.push_back(*aIt);
+                        bVdbVec.push_back(*bIt);
+                    }
                     for (++bIt; bIt; ++bIt) {
                         aVdbVec.push_back(nullptr);
                         bVdbVec.push_back(*bIt);

@@ -82,7 +82,9 @@ zipToStream(std::ostream& os, const char* data, size_t numBytes)
         os.write(reinterpret_cast<char*>(zippedData.get()), outZippedBytes);
     } else {
         // Write the size of the uncompressed data.
-        Int64 negBytes = -numBytes;
+        // numBytes expected to be <= the max value + 1 of a signed int64
+        assert(numBytes < size_t(std::numeric_limits<Int64>::max()));
+        Int64 negBytes = -Int64(numBytes);
         os.write(reinterpret_cast<char*>(&negBytes), 8);
         // Write the uncompressed data.
         os.write(reinterpret_cast<const char*>(data), numBytes);
@@ -197,6 +199,8 @@ void
 bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals)
 {
     const size_t inBytes = valSize * numVals;
+    // inBytes expected to be <= the max value + 1 of a signed int64
+    assert(inBytes < size_t(std::numeric_limits<Int64>::max()));
 
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);
@@ -210,7 +214,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
         OPENVDB_LOG_DEBUG(ostr.str());
 
         // Write the size of the uncompressed data.
-        Int64 negBytes = -inBytes;
+        Int64 negBytes = -Int64(inBytes);
         os.write(reinterpret_cast<char*>(&negBytes), 8);
         // Write the uncompressed data.
         os.write(reinterpret_cast<const char*>(data), inBytes);

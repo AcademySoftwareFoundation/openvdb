@@ -709,15 +709,16 @@ public:
 
         tree::ValueAccessor<const TreeType> acc(*mTree);
         Coord ijk;
+        const Int32 DIM = static_cast<Int32>(LeafNodeType::DIM);
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             const Coord& origin = mCoordinates[n];
-            offsetsNextX[n] = findNeighbourNode(acc, origin, Coord(LeafNodeType::DIM, 0, 0));
-            offsetsPrevX[n] = findNeighbourNode(acc, origin, Coord(-LeafNodeType::DIM, 0, 0));
-            offsetsNextY[n] = findNeighbourNode(acc, origin, Coord(0, LeafNodeType::DIM, 0));
-            offsetsPrevY[n] = findNeighbourNode(acc, origin, Coord(0, -LeafNodeType::DIM, 0));
-            offsetsNextZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, LeafNodeType::DIM));
-            offsetsPrevZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, -LeafNodeType::DIM));
+            offsetsNextX[n] = findNeighbourNode(acc, origin, Coord(DIM, 0, 0));
+            offsetsPrevX[n] = findNeighbourNode(acc, origin, Coord(-DIM, 0, 0));
+            offsetsNextY[n] = findNeighbourNode(acc, origin, Coord(0, DIM, 0));
+            offsetsPrevY[n] = findNeighbourNode(acc, origin, Coord(0, -DIM, 0));
+            offsetsNextZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, DIM));
+            offsetsPrevZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, -DIM));
         }
     }
 
@@ -825,11 +826,13 @@ public:
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
+        constexpr Int32 DIM = static_cast<Int32>(LeafNodeType::DIM);
+
         std::vector<LeafNodeType*>& nodes = mConnectivity->nodes();
 
         // Z Axis
         size_t idxA = 0, idxB = 1;
-        Index step = 1;
+        Int32 step = 1;
 
         const size_t* nextOffsets = mConnectivity->offsetsNextZ();
         const size_t* prevOffsets = mConnectivity->offsetsPrevZ();
@@ -838,7 +841,7 @@ public:
 
             idxA = 0;
             idxB = 2;
-            step = LeafNodeType::DIM;
+            step = DIM;
 
             nextOffsets = mConnectivity->offsetsNextY();
             prevOffsets = mConnectivity->offsetsPrevY();
@@ -847,7 +850,7 @@ public:
 
             idxA = 1;
             idxB = 2;
-            step = LeafNodeType::DIM * LeafNodeType::DIM;
+            step = DIM*DIM;
 
             nextOffsets = mConnectivity->offsetsNextX();
             prevOffsets = mConnectivity->offsetsPrevX();
@@ -855,20 +858,20 @@ public:
 
         Coord ijk(0, 0, 0);
 
-        int& a = ijk[idxA];
-        int& b = ijk[idxB];
+        Int32& a = ijk[idxA];
+        Int32& b = ijk[idxB];
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             size_t startOffset = mStartNodeIndices[n];
             size_t lastOffset = startOffset;
 
-            Index pos(0);
+            Int32 pos(0);
 
-            for (a = 0; a < int(LeafNodeType::DIM); ++a) {
-                for (b = 0; b < int(LeafNodeType::DIM); ++b) {
+            for (a = 0; a < DIM; ++a) {
+                for (b = 0; b < DIM; ++b) {
 
-                    pos =  LeafNodeType::coordToOffset(ijk);
+                    pos = static_cast<Int32>(LeafNodeType::coordToOffset(ijk));
                     size_t offset = startOffset;
 
                     // sweep in +axis direction until a boundary voxel is hit.
@@ -888,7 +891,7 @@ public:
 
                     // sweep in -axis direction until a boundary voxel is hit.
                     offset = lastOffset;
-                    pos += step * (LeafNodeType::DIM - 1);
+                    pos += step * (DIM - 1);
                     while ( offset != ConnectivityTable::INVALID_OFFSET &&
                             traceVoxelLine(*nodes[offset], pos, -step)) {
                         offset = prevOffsets[offset];
@@ -899,7 +902,7 @@ public:
     }
 
 
-    bool traceVoxelLine(LeafNodeType& node, Index pos, Index step) const {
+    bool traceVoxelLine(LeafNodeType& node, Int32 pos, const Int32 step) const {
 
         ValueType* data = node.buffer().data();
 
@@ -907,6 +910,7 @@ public:
 
         for (Index i = 0; i < LeafNodeType::DIM; ++i) {
 
+            assert(pos >= 0);
             ValueType& dist = data[pos];
 
             if (dist < ValueType(0.0)) {

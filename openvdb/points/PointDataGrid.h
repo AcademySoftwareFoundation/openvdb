@@ -319,6 +319,9 @@ public:
     /// Retrieve the attribute set.
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
+    /// @brief Steal the attribute set, a new, empty attribute set is inserted in it's place.
+    AttributeSet::UniquePtr stealAttributeSet();
+
     /// @brief Create a new attribute set. Existing attributes will be removed.
     void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
         const AttributeArray::ScopedRegistryLock* lock = nullptr);
@@ -339,11 +342,19 @@ public:
     /// @param pos Index of the new attribute in the descriptor replacement.
     /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
     /// @param constantStride if @c false, stride is interpreted as total size of the array
+    /// @param metadata optional default value metadata
     /// @param lock an optional scoped registry lock to avoid contention
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
+                                        const Metadata* metadata = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
+                                        const size_t pos, const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -590,7 +601,7 @@ public:
     using ValueAll  = typename BaseLeaf::ValueAll;
 
 private:
-    std::unique_ptr<AttributeSet> mAttributeSet;
+    AttributeSet::UniquePtr mAttributeSet;
     uint16_t mVoxelBufferSize = 0;
 
 protected:
@@ -738,6 +749,15 @@ public:
 // PointDataLeafNode implementation
 
 template<typename T, Index Log2Dim>
+inline AttributeSet::UniquePtr
+PointDataLeafNode<T, Log2Dim>::stealAttributeSet()
+{
+    AttributeSet::UniquePtr ptr = std::make_unique<AttributeSet>();
+    std::swap(ptr, mAttributeSet);
+    return ptr;
+}
+
+template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength,
     const AttributeArray::ScopedRegistryLock* lock)
@@ -788,10 +808,23 @@ inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
                                                 const size_t pos, const Index strideOrTotalSize,
                                                 const bool constantStride,
+                                                const Metadata* metadata,
                                                 const AttributeArray::ScopedRegistryLock* lock)
 {
     return mAttributeSet->appendAttribute(
-        expected, replacement, pos, strideOrTotalSize, constantStride, lock);
+        expected, replacement, pos, strideOrTotalSize, constantStride, metadata, lock);
+}
+
+// deprecated
+template<typename T, Index Log2Dim>
+inline AttributeArray::Ptr
+PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
+                                                const size_t pos, const Index strideOrTotalSize,
+                                                const bool constantStride,
+                                                const AttributeArray::ScopedRegistryLock* lock)
+{
+    return this->appendAttribute(expected, replacement, pos,
+        strideOrTotalSize, constantStride, nullptr, lock);
 }
 
 template<typename T, Index Log2Dim>

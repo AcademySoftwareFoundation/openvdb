@@ -59,7 +59,7 @@ inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid,
                     const PositionArrayT& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
+                    const Metadata* positionDefaultValue = nullptr);
 
 
 /// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
@@ -76,7 +76,7 @@ template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
+                    const Metadata* positionDefaultValue = nullptr);
 
 
 /// @brief  Stores point attribute data in an existing @c PointDataGrid attribute.
@@ -613,8 +613,10 @@ private:
 
 template<typename CompressionT, typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const math::Transform& xform, Metadata::Ptr positionDefaultValue)
+createPointDataGrid(const PointIndexGridT& pointIndexGrid,
+                    const PositionArrayT& positions,
+                    const math::Transform& xform,
+                    const Metadata* positionDefaultValue)
 {
     using PointDataTreeT        = typename PointDataGridT::TreeType;
     using LeafT                 = typename PointDataTree::LeafNodeType;
@@ -718,12 +720,14 @@ template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
                     const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue)
+                    const Metadata* positionDefaultValue)
 {
     const PointAttributeVector<ValueT> pointList(positions);
 
-    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, xform);
-    return createPointDataGrid<CompressionT, PointDataGridT>(*pointIndexGrid, pointList, xform, positionDefaultValue);
+    tools::PointIndexGrid::Ptr pointIndexGrid =
+        tools::createPointIndexGrid<tools::PointIndexGrid>(pointList, xform);
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        *pointIndexGrid, pointList, xform, positionDefaultValue);
 }
 
 
@@ -1027,6 +1031,40 @@ computeVoxelSize(  const PositionWrapper& positions,
     // truncate the voxel size for readability and return the value
 
     return Local::truncate(voxelSize, decimalPlaces);
+}
+
+
+////////////////////////////////////////
+
+
+// deprecated functions
+
+template<
+    typename CompressionT,
+    typename PointDataGridT,
+    typename PositionArrayT,
+    typename PointIndexGridT>
+OPENVDB_DEPRECATED
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const PointIndexGridT& pointIndexGrid,
+                    const PositionArrayT& positions,
+                    const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
+{
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        pointIndexGrid, positions, xform, positionDefaultValue.get());
+}
+
+
+template <typename CompressionT, typename PointDataGridT, typename ValueT>
+OPENVDB_DEPRECATED
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const std::vector<ValueT>& positions,
+                    const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
+{
+    return createPointDataGrid<CompressionT, PointDataGridT>(
+        positions, xform, positionDefaultValue.get());
 }
 
 

@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.1</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>In Development</I>
 
 @par
 Improvements:
@@ -13,6 +13,42 @@ Improvements:
 - Improved the CMake build for the OpenVDB Houdini library on Windows.
   <I>[Reported&nbsp;by&nbsp;Ian&nbsp;Woodward]</I>
 - Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
+- Add support for default value metadata when creating AttributeArrays or
+  appending to an AttributeSet.
+- Added new group inspection methods to the
+  @vdblink::points::AttributeSet::Descriptor AttributeSet::Descriptor@endlink.
+- Introduced a @vdblink::points::StringMetaCache StringMetaCache@endlink class
+  for convenient string attribute metadata lookup and performed some minor
+  optimizations.
+- Removed redundant floor in @vdblink::points::floatingPointToFixedPoint
+  floatingPointToFixedPoint@endlink.
+- CMake now checks the minimum supported MSVC compiler for Windows.
+- Add gitignore to repository root.
+- CMake now only requires a CXX compiler.
+- Improved the Windows README instructions and various MSVC warnings.
+- Remove CMake warning when using GLFW 3.2+ on Debian.
+- Various fixes to unary minus on unsigned compiler warnings.
+- The defines <TT>_CRT_NONSTDC_NO_WARNINGS</TT> and <TT>_CRT_SECURE_NO_WARNINGS</TT>
+  are now enabled by default with MSVC.
+- New CMake option <TT>OPENVDB_BUILD_PYTHON_UNITTESTS</TT> to disable or
+  enable the python module tests and fixed the required environment for them
+  on Windows. The python interpreter is no longer required by default if the
+  tests are disabled.
+- Improved the CMake user messages when locating python and numpy.
+- The python module extension is now .pyd on Windows.
+- Fixed some build issues with the Houdini plugin on Windows.
+- Standardized the library components install paths for the OpenVDB
+  Houdini shared library.
+
+@par
+New features:
+- Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
+  the tree is shared with another grid.
+- Added @vdblink::points::PointDataLeafNode::stealAttributeSet()
+  PointDataLeafNode::stealAttributeSet@endlink and
+  @vdblink::points::AttributeSet::removeAttribute()
+  AttributeSet::removeAttribute@endlink for releasing ownership of attribute
+  data.
 
 @par
 Bug fixes:
@@ -25,11 +61,25 @@ Bug fixes:
   node boundaries, leading to voxels incorrectly being marked as inside the
   isosurface.
   <I>[Contributed&nbsp;by&nbsp;Tristan&nbsp;Barback]</I>
+- Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
+  compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
+  headers were installed to /usr/include.
+- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
+  decompose@endlink utility that caused it to fail to decompose some matrices.
+
+@par
+API changes:
+- Removed a number of deprecated point methods.
+- points::StringIndexType is now deprecated, use @vdblink::Index Index@endlink
+  instead.
+- @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
+  now returns a std::unique_ptr instead of a boost::scoped_array.
 
 @par
 Houdini:
 - Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
+- Combine SOP will not error in flatten-all mode if second has no grids.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly

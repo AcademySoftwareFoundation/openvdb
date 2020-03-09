@@ -713,7 +713,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(1);
 
             attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1,
-                                        /*constantStride=*/true, defaultValueTest.copy());
+                                        /*constantStride=*/true, defaultValueTest.copy().get());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -758,11 +758,19 @@ TestAttributeSet::testAttributeSet()
 
         AttributeSet attrSetB(descr1, /*arrayLength=*/50);
 
-        attrSetB.appendAttribute("test", AttributeI::attributeType());
+        TypedMetadata<int> defaultValue(7);
+        Metadata& baseDefaultValue = defaultValue;
+
+        attrSetB.appendAttribute("test", AttributeI::attributeType(),
+            Index(1), true, &baseDefaultValue);
         attrSetB.appendAttribute("id", AttributeL::attributeType());
         attrSetB.appendAttribute("test2", AttributeI::attributeType());
         attrSetB.appendAttribute("id2", AttributeL::attributeType());
         attrSetB.appendAttribute("test3", AttributeI::attributeType());
+
+        // check default value of "test" attribute has been applied
+        CPPUNIT_ASSERT_EQUAL(7, attrSetB.descriptor().getDefaultValue<int>("test"));
+        CPPUNIT_ASSERT_EQUAL(7, AttributeI::cast(*attrSetB.getConst("test")).get(0));
 
         descr1 = attrSetB.descriptorPtr();
 
@@ -849,6 +857,57 @@ TestAttributeSet::testAttributeSet()
             CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+        }
+
+        { // remove attribute
+            AttributeSet attrSetC;
+            attrSetC.appendAttribute("test1", AttributeI::attributeType());
+            attrSetC.appendAttribute("test2", AttributeI::attributeType());
+            attrSetC.appendAttribute("test3", AttributeI::attributeType());
+            attrSetC.appendAttribute("test4", AttributeI::attributeType());
+            attrSetC.appendAttribute("test5", AttributeI::attributeType());
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(5));
+
+            { // remove test2
+                AttributeArray::Ptr array = attrSetC.removeAttribute(1);
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(4));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(4));
+
+            { // remove test5
+                AttributeArray::Ptr array = attrSetC.removeAttribute("test5");
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+
+            { // remove test3 unsafely
+                AttributeArray::Ptr array = attrSetC.removeAttributeUnsafe(1);
+                CPPUNIT_ASSERT(array);
+                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+            }
+
+            // array of attributes and descriptor are not updated
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+
+            const auto& nameToPosMap = attrSetC.descriptor().map();
+
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.size(), size_t(3));
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test1"), size_t(0));
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test3"), size_t(1)); // this array does not exist
+            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test4"), size_t(2));
+
+            CPPUNIT_ASSERT(attrSetC.getConst(0));
+            CPPUNIT_ASSERT(!attrSetC.getConst(1)); // this array does not exist
+            CPPUNIT_ASSERT(attrSetC.getConst(2));
         }
 
         { // test duplicateDrop configures group mapping
@@ -1071,6 +1130,15 @@ TestAttributeSet::testAttributeSetGroups()
 
         CPPUNIT_ASSERT_NO_THROW(attrSet.groupIndex(23));
         CPPUNIT_ASSERT_THROW(attrSet.groupIndex(24), LookupError);
+
+        // check group attribute indices (group attributes are appended with indices 3, 5, 7)
+
+        std::vector<size_t> groupIndices = attrSet.groupAttributeIndices();
+
+        CPPUNIT_ASSERT_EQUAL(size_t(3), groupIndices.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(3), groupIndices[0]);
+        CPPUNIT_ASSERT_EQUAL(size_t(5), groupIndices[1]);
+        CPPUNIT_ASSERT_EQUAL(size_t(7), groupIndices[2]);
     }
 
     { // group unique name
@@ -1104,5 +1172,132 @@ TestAttributeSet::testAttributeSetGroups()
         CPPUNIT_ASSERT(!descr->hasGroup("test"));
         CPPUNIT_ASSERT(descr->hasGroup("test1"));
         CPPUNIT_ASSERT(descr->hasGroup("test2"));
+    }
+
+    // typically 8 bits per group
+    CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT), Descriptor::groupBits());
+
+    { // unused groups and compaction
+        AttributeSet attrSet(Descriptor::create(AttributeVec3s::attributeType()));
+        attrSet.appendAttribute("group1", GroupAttributeArray::attributeType());
+        attrSet.appendAttribute("group2", GroupAttributeArray::attributeType());
+
+        Descriptor& descriptor = attrSet.descriptor();
+
+        Name sourceName;
+        size_t sourceOffset, targetOffset;
+
+        // no groups
+
+        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2), descriptor.unusedGroups());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+        CPPUNIT_ASSERT_EQUAL(false,
+            descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+        // add one group in first slot
+
+        descriptor.setGroup("test0", size_t(0));
+
+        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+        CPPUNIT_ASSERT_EQUAL(false,
+            descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+        descriptor.dropGroup("test0");
+
+        // add one group in a later slot of the first attribute
+
+        descriptor.setGroup("test7", size_t(7));
+
+        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+        // note that requiresGroupMove() is not particularly clever because it
+        // blindly recommends moving the group even if it ultimately remains in
+        // the same attribute
+        CPPUNIT_ASSERT_EQUAL(true,
+            descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+        CPPUNIT_ASSERT_EQUAL(Name("test7"), sourceName);
+        CPPUNIT_ASSERT_EQUAL(size_t(7), sourceOffset);
+        CPPUNIT_ASSERT_EQUAL(size_t(0), targetOffset);
+
+        descriptor.dropGroup("test7");
+
+        // this test assumes CHAR_BIT == 8 for convenience
+
+        if (CHAR_BIT == 8) {
+
+            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.availableGroups());
+
+            // add all but one group in the first attribute
+
+            descriptor.setGroup("test0", size_t(0));
+            descriptor.setGroup("test1", size_t(1));
+            descriptor.setGroup("test2", size_t(2));
+            descriptor.setGroup("test3", size_t(3));
+            descriptor.setGroup("test4", size_t(4));
+            descriptor.setGroup("test5", size_t(5));
+            descriptor.setGroup("test6", size_t(6));
+            // no test7
+
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroups());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+            CPPUNIT_ASSERT_EQUAL(false,
+                descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+            descriptor.setGroup("test7", size_t(7));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroups());
+            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+            CPPUNIT_ASSERT_EQUAL(false,
+                descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+            descriptor.setGroup("test8", size_t(8));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroups());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
+            CPPUNIT_ASSERT_EQUAL(false,
+                descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+            // out-of-order
+            descriptor.setGroup("test13", size_t(13));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroups());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
+            CPPUNIT_ASSERT_EQUAL(true,
+                descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+            CPPUNIT_ASSERT_EQUAL(Name("test13"), sourceName);
+            CPPUNIT_ASSERT_EQUAL(size_t(13), sourceOffset);
+            CPPUNIT_ASSERT_EQUAL(size_t(9), targetOffset);
+
+            descriptor.setGroup("test9", size_t(9));
+            descriptor.setGroup("test10", size_t(10));
+            descriptor.setGroup("test11", size_t(11));
+            descriptor.setGroup("test12", size_t(12));
+            descriptor.setGroup("test14", size_t(14));
+            descriptor.setGroup("test15", size_t(15), /*checkValidOffset=*/true);
+
+            // attempt to use an existing group offset
+            CPPUNIT_ASSERT_THROW(descriptor.setGroup("test1000", size_t(15),
+                /*checkValidOffset=*/true), RuntimeError);
+
+            CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroups());
+            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
+            CPPUNIT_ASSERT_EQUAL(false,
+                descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
+
+            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.availableGroups());
+
+            // attempt to use a group offset that is out-of-range
+            CPPUNIT_ASSERT_THROW(descriptor.setGroup("test16", size_t(16),
+                /*checkValidOffset=*/true), RuntimeError);
+        }
     }
 }

@@ -125,6 +125,7 @@ public:
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testStrided);
     CPPUNIT_TEST(testDelayedLoad);
+    CPPUNIT_TEST(testDefaultValue);
     CPPUNIT_TEST(testQuaternions);
     CPPUNIT_TEST(testMatrices);
     CPPUNIT_TEST(testProfile);
@@ -139,6 +140,7 @@ public:
     void testAttributeHandle();
     void testStrided();
     void testDelayedLoad();
+    void testDefaultValue();
     void testQuaternions();
     void testMatrices();
     void testProfile();
@@ -224,7 +226,7 @@ TestAttributeArray::testFixedPointConversion()
 namespace
 {
 // use a dummy factory as TypedAttributeArray::factory is private
-static AttributeArray::Ptr factoryInt(Index n, Index strideOrTotalSize, bool constantStride)
+static AttributeArray::Ptr factoryInt(Index n, Index strideOrTotalSize, bool constantStride, const Metadata*)
 {
     return TypedAttributeArray<int>::create(n, strideOrTotalSize, constantStride);
 }
@@ -2198,6 +2200,33 @@ TestAttributeArray::testDelayedLoad()
         std::remove(mappedFile->filename().c_str());
         std::remove(filename.c_str());
     }
+}
+
+
+void
+TestAttributeArray::testDefaultValue()
+{
+    using AttributeArrayF = TypedAttributeArray<float>;
+    using AttributeArrayI = TypedAttributeArray<int>;
+
+    AttributeArrayI::registerType();
+    AttributeArrayF::registerType();
+
+    TypedMetadata<float> defaultValue(5.4f);
+    Metadata& baseDefaultValue = defaultValue;
+
+    // default value is same value type
+
+    AttributeArray::Ptr attr =
+        AttributeArrayF::create(10, 1, true, &baseDefaultValue);
+    CPPUNIT_ASSERT(attr);
+    CPPUNIT_ASSERT_EQUAL(5.4f, AttributeArrayF::cast(*attr).get(0));
+
+    // default value is different value type, so not used
+
+    attr = AttributeArrayI::create(10, 1, true, &baseDefaultValue);
+    CPPUNIT_ASSERT(attr);
+    CPPUNIT_ASSERT_EQUAL(0, AttributeArrayI::cast(*attr).get(0));
 }
 
 
