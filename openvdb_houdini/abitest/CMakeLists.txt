@@ -50,15 +50,31 @@ if(NOT EXISTS ${OPENVDB_SESI_LIB})
   )
 endif()
 
-# Create an object library that uses the Houdini OpenVDB headers
+# Generate a new TestABIHoudini.cc source file from TestABI.cc,
+# this one uses the Houdini OpenVDB headers and libs and lives in the build directory
 
-add_library(TestABI OBJECT TestABI.cc)
-target_include_directories(TestABI SYSTEM PUBLIC ${_HOUDINI_INCLUDE_DIR})
+add_custom_command(
+  OUTPUT ${PROJECT_BINARY_DIR}/TestABIHoudini.cc
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/TestABI.cc
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/TestABI.cc ${PROJECT_BINARY_DIR}/TestABIHoudini.cc
+)
+
+# Create an object library from the generated TestABIHoudini.cc file
+# and set the include directories and add a HOUDINI variable
+
+add_library(TestABIHoudini OBJECT ${PROJECT_BINARY_DIR}/TestABIHoudini.cc)
+target_include_directories(TestABIHoudini SYSTEM PUBLIC ${_HOUDINI_INCLUDE_DIR})
+
+set_property(
+  SOURCE ${PROJECT_BINARY_DIR}/TestABIHoudini.cc
+  APPEND PROPERTY COMPILE_DEFINITIONS "HOUDINI;"
+)
 
 # Create the binary from this object library and the main object file
 
 add_executable(openvdb_houdini_abi_test
-  $<TARGET_OBJECTS:TestABI>
+  TestABI.cc
+  $<TARGET_OBJECTS:TestABIHoudini>
   main.cc
 )
 

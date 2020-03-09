@@ -3,17 +3,18 @@
 
 #include <openvdb/openvdb.h>
 
-#define ADD_DECLARE_SUFFIX(name) name ## TEST
-#define ADD_DEFINE_SUFFIX(name) name ## MAIN
-
+// include method declarations both inside and outside houdini namespace
 #include "TestABI.h"
+namespace houdini {
+#include "TestABI.h"
+} // namespace houdini
 
 int test()
 {
     {
         // verify the ABI matches
-        const std::string abiTest = getABI_TEST();
-        const std::string abiMain = getABI_MAIN();
+        const std::string abiTest = houdini::getABI();
+        const std::string abiMain = getABI();
         if (abiTest != abiMain) {
             std::stringstream ss;
             ss << "Error: Mismatching ABIs for ABI Test - "
@@ -22,24 +23,24 @@ int test()
         }
 
         // output a warning if the namespaces match
-        const std::string namespaceTest = getNamespace_TEST();
-        const std::string namespaceMain = getNamespace_MAIN();
+        const std::string namespaceTest = houdini::getNamespace();
+        const std::string namespaceMain = getNamespace();
         if (namespaceTest == namespaceMain) {
             std::cerr << "Warning: Namespace names match, "
                 << "so this test is not expected to fail." << std::endl;
         }
     }
 
-    { // check ABI from TEST to MAIN
-        void* grid = createGrid_TEST();
-        validateGrid_MAIN(grid);
-        cleanupGrid_TEST(grid);
+    { // check ABI from Houdini to non-Houdini
+        void* grid = houdini::createGrid();
+        validateGrid(grid);
+        houdini::cleanupGrid(grid);
     }
 
-    { // check ABI from MAIN to TEST
-        void* grid = createGrid_MAIN();
-        validateGrid_TEST(grid);
-        cleanupGrid_MAIN(grid);
+    { // check ABI from non-Houdini to Houdini
+        void* grid = createGrid();
+        houdini::validateGrid(grid);
+        cleanupGrid(grid);
     }
 
     return 0;
