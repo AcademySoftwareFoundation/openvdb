@@ -237,10 +237,13 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
         mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
         this->cook(leafs);
 
-        mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
-        this->cook(leafs);
+        // note that the order of the YZ passes are flipped to maintain backwards-compatibility
+        // with an indexing typo in the original logic
 
         mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
+        this->cook(leafs);
+
+        mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
         this->cook(leafs);
     }
 
@@ -265,10 +268,13 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
             mTask = std::bind(&Filter::doBoxX, std::placeholders::_1, std::placeholders::_2, w);
             this->cook(leafs);
 
-            mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
-            this->cook(leafs);
+            // note that the order of the YZ passes are flipped to maintain backwards-compatibility
+            // with an indexing typo in the original logic
 
             mTask = std::bind(&Filter::doBoxZ, std::placeholders::_1, std::placeholders::_2, w);
+            this->cook(leafs);
+
+            mTask = std::bind(&Filter::doBoxY, std::placeholders::_1, std::placeholders::_2, w);
             this->cook(leafs);
         }
     }
