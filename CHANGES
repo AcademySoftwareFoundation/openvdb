@@ -31,6 +31,7 @@ Version 7.1.0 - In Development
     - Fixed some build issues with the Houdini plugin on Windows.
     - Standardized the library components install paths for the OpenVDB
       Houdini shared library.
+    - Fixed an indexing typo in tools::Filter.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
