@@ -24,6 +24,9 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 
+#if defined(_WIN32)
+#include <GL/glew.h>
+#endif
 #include <GLFW/glfw3.h>
 
 namespace openvdb_viewer {
@@ -530,6 +533,11 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
 
     // Prepare window for rendering.
     glfwMakeContextCurrent(mWindow);
+
+    // This must come after glfwMakeContextCurrent
+    if (GLEW_OK != glewInit()) {
+        OPENVDB_LOG_ERROR("GLEW initialization failed");
+    }
 
     {
         // set up camera

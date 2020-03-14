@@ -14,6 +14,7 @@ project(OpenVDBBinaries LANGUAGES CXX)
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
+include(GNUInstallDirs)
 
 ###### OpenVDB Binary Component Options
 
@@ -94,7 +95,7 @@ if(OPENVDB_BUILD_VDB_PRINT)
     )
   endif()
 
-  install(TARGETS vdb_print DESTINATION bin)
+  install(TARGETS vdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -112,7 +113,7 @@ if(OPENVDB_BUILD_VDB_LOD)
     )
   endif()
 
-  install(TARGETS vdb_lod DESTINATION bin)
+  install(TARGETS vdb_lod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -153,7 +154,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
     unset(OPENVDB_RENDER_RPATHS)
   endif()
 
-  install(TARGETS vdb_render DESTINATION bin)
+  install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -163,56 +164,56 @@ endif()
 if(OPENVDB_BUILD_VDB_VIEW)
 
   # @todo improve the viewer header system
-
   file(GLOB VIEWER_SOURCE_FILES ../viewer/*.h)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
   file(COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
 
+  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
+  find_package(OpenGL REQUIRED)
+
   if(WIN32)
-    message(WARNING "Currently no CMake support for building vdb_view binary on Windows.")
-    # @todo
-    # find_package(GLEW REQUIRED)
-    # INCLUDE_DIRECTORIES ( SYSTEM ${GLEW_INCLUDE_DIR})
-  else()
-    find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
-    find_package(OpenGL REQUIRED)
-
-    # wraps find_package(glfw3) and sets the glfw target
-    include(OpenVDBGLFW3Setup)
-
-    set(VDB_VIEW_SOURCE_FILES
-      openvdb_view.cc
-      ../viewer/Camera.cc
-      ../viewer/ClipBox.cc
-      ../viewer/Font.cc
-      ../viewer/RenderModules.cc
-      ../viewer/Viewer.cc
-    )
-
-    add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
-
-    target_include_directories(vdb_view
-      PRIVATE ${CMAKE_BINARY_DIR}/dwa
-    )
-
-    target_link_libraries(vdb_view
-      ${OPENVDB_BINARIES_DEPENDENT_LIBS}
-      Boost::thread
-      OpenGL::GL
-      OpenGL::GLU
-      glfw
-    )
-
-    target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
-
-    if(OPENVDB_ENABLE_RPATH)
-      set_target_properties(vdb_view
-        PROPERTIES INSTALL_RPATH "${RPATHS}"
-      )
-    endif()
-
-    install(TARGETS vdb_view DESTINATION bin)
+    find_package(GLEW REQUIRED)
   endif()
+
+  # wraps find_package(glfw3) and sets the glfw target
+  include(OpenVDBGLFW3Setup)
+
+  set(VDB_VIEW_SOURCE_FILES
+    openvdb_view.cc
+    ../viewer/Camera.cc
+    ../viewer/ClipBox.cc
+    ../viewer/Font.cc
+    ../viewer/RenderModules.cc
+    ../viewer/Viewer.cc
+  )
+
+  add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
+
+  target_include_directories(vdb_view
+    PRIVATE ${CMAKE_BINARY_DIR}/dwa
+  )
+
+  target_link_libraries(vdb_view
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
+    Boost::thread
+    OpenGL::GL
+    OpenGL::GLU
+    glfw
+  )
+
+  if(WIN32)
+    target_link_libraries(vdb_view GLEW::GLEW)
+  endif()
+
+  target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
+
+  if(OPENVDB_ENABLE_RPATH)
+    set_target_properties(vdb_view
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+    )
+  endif()
+
+  install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 unset(RPATHS)
