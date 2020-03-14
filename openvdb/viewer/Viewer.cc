@@ -24,20 +24,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
 
-#ifdef OPENVDB_USE_GLFW_3
-//#define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
-#else // if !defined(OPENVDB_USE_GLFW_3)
-#if defined(__APPLE__) || defined(MACOSX)
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#else
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
-#include <GL/glfw.h>
-#endif // !defined(OPENVDB_USE_GLFW_3)
-
 
 namespace openvdb_viewer {
 
@@ -102,9 +89,7 @@ private:
     int mWheelPos;
     bool mShiftIsDown, mCtrlIsDown, mShowInfo;
     bool mInterrupt;
-#if GLFW_VERSION_MAJOR >= 3
     GLFWwindow* mWindow;
-#endif
 }; // class ViewerImpl
 
 
@@ -138,79 +123,43 @@ ThreadManager* sThreadMgr = nullptr;
 tbb::mutex sLock;
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 keyCB(GLFWwindow*, int key, int /*scancode*/, int action, int /*modifiers*/)
-#else
-void
-keyCB(int key, int action)
-#endif
 {
     if (sViewer) sViewer->keyCallback(key, action);
 }
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 mouseButtonCB(GLFWwindow*, int button, int action, int /*modifiers*/)
-#else
-void
-mouseButtonCB(int button, int action)
-#endif
 {
     if (sViewer) sViewer->mouseButtonCallback(button, action);
 }
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 mousePosCB(GLFWwindow*, double x, double y)
 {
     if (sViewer) sViewer->mousePosCallback(int(x), int(y));
 }
-#else
-void
-mousePosCB(int x, int y)
-{
-    if (sViewer) sViewer->mousePosCallback(x, y);
-}
-#endif
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 mouseWheelCB(GLFWwindow*, double /*xoffset*/, double yoffset)
 {
     if (sViewer) sViewer->mouseWheelCallback(int(yoffset));
 }
-#else
-void
-mouseWheelCB(int pos)
-{
-    if (sViewer) sViewer->mouseWheelCallback(pos);
-}
-#endif
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 windowSizeCB(GLFWwindow*, int width, int height)
-#else
-void
-windowSizeCB(int width, int height)
-#endif
 {
     if (sViewer) sViewer->windowSizeCallback(width, height);
 }
 
 
-#if GLFW_VERSION_MAJOR >= 3
 void
 windowRefreshCB(GLFWwindow*)
-#else
-void
-windowRefreshCB()
-#endif
 {
     if (sViewer) sViewer->windowRefreshCallback();
 }
@@ -260,12 +209,7 @@ init(const std::string& progName, bool background)
 void
 exit()
 {
-#if GLFW_VERSION_MAJOR >= 3
-    // Prior to GLFW 3, glfwTerminate() was called automatically from
-    // an atexit() function installed by glfwInit(), so this was not needed.
-    // But GLFW 3 does not register an atexit() function.
     glfwTerminate();
-#endif
 }
 
 
@@ -414,9 +358,7 @@ ViewerImpl::ViewerImpl()
     , mCtrlIsDown(false)
     , mShowInfo(true)
     , mInterrupt(false)
-#if GLFW_VERSION_MAJOR >= 3
     , mWindow(nullptr)
-#endif
 {
 }
 
@@ -427,14 +369,12 @@ ViewerImpl::init(const std::string& progName)
     mProgName = progName;
 
     if (!mDidInit) {
-#if GLFW_VERSION_MAJOR >= 3
         struct Local {
             static void errorCB(int error, const char* descr) {
                 OPENVDB_LOG_ERROR("GLFW Error " << error << ": " << descr);
             }
         };
         glfwSetErrorCallback(Local::errorCB);
-#endif
         if (glfwInit() == GL_TRUE) {
             OPENVDB_LOG_DEBUG_RUNTIME("initialized GLFW from thread "
                 << boost::this_thread::get_id());
@@ -463,7 +403,6 @@ ViewerImpl::getVersionString() const
 
     if (mDidInit) {
         ostr << ", " << "OpenGL: ";
-#if GLFW_VERSION_MAJOR >= 3
         std::shared_ptr<GLFWwindow> wPtr;
         GLFWwindow* w = mWindow;
         if (!w) {
@@ -475,22 +414,11 @@ ViewerImpl::getVersionString() const
                 << glfwGetWindowAttrib(w, GLFW_CONTEXT_VERSION_MINOR) << "."
                 << glfwGetWindowAttrib(w, GLFW_CONTEXT_REVISION);
         }
-#else
-        if (!glfwGetWindowParam(GLFW_OPENED)) {
-            if (glfwOpenWindow(100, 100, 8, 8, 8, 8, 24, 0, GLFW_WINDOW)) {
-                ostr << glGetString(GL_VERSION);
-                glfwCloseWindow();
-            }
-        } else {
-            ostr << glGetString(GL_VERSION);
-        }
-#endif
     }
     return ostr.str();
 }
 
 
-#if GLFW_VERSION_MAJOR >= 3
 bool
 ViewerImpl::open(int width, int height)
 {
@@ -528,43 +456,12 @@ ViewerImpl::open(int width, int height)
     }
     return (mWindow != nullptr);
 }
-#else // if GLFW_VERSION_MAJOR <= 2
-bool
-ViewerImpl::open(int width, int height)
-{
-    if (!glfwGetWindowParam(GLFW_OPENED)) {
-        if (!glfwOpenWindow(width, height,
-            8, 8, 8, 8,      // # of R,G,B, & A bits
-            32, 0,           // # of depth & stencil buffer bits
-            GLFW_WINDOW))    // either GLFW_WINDOW or GLFW_FULLSCREEN
-        {
-            return false;
-        }
-    }
-    glfwSetWindowTitle(mProgName.c_str());
-
-    BitmapFont13::initialize();
-
-    glfwSetKeyCallback(keyCB);
-    glfwSetMouseButtonCallback(mouseButtonCB);
-    glfwSetMousePosCallback(mousePosCB);
-    glfwSetMouseWheelCallback(mouseWheelCB);
-    glfwSetWindowSizeCallback(windowSizeCB);
-    glfwSetWindowRefreshCallback(windowRefreshCB);
-
-    return true;
-}
-#endif
 
 
 bool
 ViewerImpl::isOpen() const
 {
-#if GLFW_VERSION_MAJOR >= 3
     return (mWindow != nullptr);
-#else
-    return glfwGetWindowParam(GLFW_OPENED);
-#endif
 }
 
 
@@ -574,44 +471,31 @@ void
 ViewerImpl::interrupt()
 {
     mInterrupt = true;
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow) glfwSetWindowShouldClose(mWindow, true);
-#endif
 }
 
 
 void
 ViewerImpl::handleEvents()
 {
-#if GLFW_VERSION_MAJOR >= 3
     glfwPollEvents();
-#endif
 }
 
 
 void
 ViewerImpl::close()
 {
-#if GLFW_VERSION_MAJOR >= 3
     OPENVDB_LOG_DEBUG_RUNTIME("about to close window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
-#else
-    OPENVDB_LOG_DEBUG_RUNTIME("about to close window from thread "
-        << boost::this_thread::get_id());
-#endif
 
     mViewportModule.reset();
     mRenderModules.clear();
-#if GLFW_VERSION_MAJOR >= 3
     mCamera->setWindow(nullptr);
     GLFWwindow* win = mWindow;
     mWindow = nullptr;
     glfwDestroyWindow(win);
     OPENVDB_LOG_DEBUG_RUNTIME("destroyed window " << std::hex << win << std::dec
         << " from thread " << boost::this_thread::get_id());
-#else
-    glfwCloseWindow();
-#endif
 }
 
 
@@ -644,10 +528,8 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
     }
     mClipBox->setBBox(bbox);
 
-#if GLFW_VERSION_MAJOR >= 3
     // Prepare window for rendering.
     glfwMakeContextCurrent(mWindow);
-#endif
 
     {
         // set up camera
@@ -686,12 +568,8 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
 
     glfwSwapInterval(1);
 
-#if GLFW_VERSION_MAJOR >= 3
     OPENVDB_LOG_DEBUG_RUNTIME("starting to render in window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
-#else
-    OPENVDB_LOG_DEBUG_RUNTIME("starting to render from thread " << boost::this_thread::get_id());
-#endif
 
     mInterrupt = false;
     for (bool stop = false; !stop; ) {
@@ -712,29 +590,19 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
         sleep(0.01/*sec*/);
 
         // Exit if the Esc key is pressed or the window is closed.
-#if GLFW_VERSION_MAJOR >= 3
         handleEvents();
         stop = (mInterrupt || glfwWindowShouldClose(mWindow));
-#else
-        stop = (mInterrupt || glfwGetKey(GLFW_KEY_ESC) || !glfwGetWindowParam(GLFW_OPENED));
-#endif
     }
 
-#if GLFW_VERSION_MAJOR >= 3
     if (glfwGetCurrentContext() == mWindow) { ///< @todo not thread-safe
         // Detach this viewer's GL context.
         glfwMakeContextCurrent(nullptr);
         OPENVDB_LOG_DEBUG_RUNTIME("detached window " << std::hex << mWindow << std::dec
             << " from thread " << boost::this_thread::get_id());
     }
-#endif
 
-#if GLFW_VERSION_MAJOR >= 3
     OPENVDB_LOG_DEBUG_RUNTIME("finished rendering in window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
-#else
-    OPENVDB_LOG_DEBUG_RUNTIME("finished rendering from thread " << boost::this_thread::get_id());
-#endif
 }
 
 
@@ -744,11 +612,7 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
 void
 ViewerImpl::resize(int width, int height)
 {
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow) glfwSetWindowSize(mWindow, width, height);
-#else
-    glfwSetWindowSize(width, height);
-#endif
 }
 
 
@@ -758,12 +622,10 @@ ViewerImpl::resize(int width, int height)
 void
 ViewerImpl::render()
 {
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow == nullptr) return;
 
     // Prepare window for rendering.
     glfwMakeContextCurrent(mWindow);
-#endif
 
     mCamera->aim();
 
@@ -787,11 +649,7 @@ ViewerImpl::render()
         glColor3d(0.2, 0.2, 0.2);
 
         int width, height;
-#if GLFW_VERSION_MAJOR >= 3
         glfwGetFramebufferSize(mWindow, &width, &height);
-#else
-        glfwGetWindowSize(&width, &height);
-#endif
 
         BitmapFont13::print(10, height - 13 - 10, mGridInfo);
         BitmapFont13::print(10, height - 13 - 30, mTransformInfo);
@@ -934,11 +792,7 @@ ViewerImpl::updateCutPlanes(int wheelPos)
 void
 ViewerImpl::swapBuffers()
 {
-#if GLFW_VERSION_MAJOR >= 3
     glfwSwapBuffers(mWindow);
-#else
-    glfwSwapBuffers();
-#endif
 }
 
 
@@ -953,11 +807,7 @@ ViewerImpl::setWindowTitle(double fps)
         << (mGridName.empty() ? std::string("OpenVDB") : mGridName)
         << " (" << (mGridIdx + 1) << " of " << mGrids.size() << ") @ "
         << std::setprecision(1) << std::fixed << fps << " fps";
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow) glfwSetWindowTitle(mWindow, ss.str().c_str());
-#else
-    glfwSetWindowTitle(ss.str().c_str());
-#endif
 }
 
 
@@ -1065,17 +915,11 @@ ViewerImpl::keyCallback(int key, int action)
 {
     mCamera->keyCallback(key, action);
 
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow == nullptr) return;
     const bool keyPress = (glfwGetKey(mWindow, key) == GLFW_PRESS);
     /// @todo Should use "modifiers" argument to keyCB().
     mShiftIsDown = glfwGetKey(mWindow, GLFW_KEY_LEFT_SHIFT);
     mCtrlIsDown = glfwGetKey(mWindow, GLFW_KEY_LEFT_CONTROL);
-#else
-    const bool keyPress = glfwGetKey(key) == GLFW_PRESS;
-    mShiftIsDown = glfwGetKey(GLFW_KEY_LSHIFT);
-    mCtrlIsDown = glfwGetKey(GLFW_KEY_LCTRL);
-#endif
 
     if (keyPress) {
         switch (key) {
@@ -1106,11 +950,9 @@ ViewerImpl::keyCallback(int key, int action)
         case GLFW_KEY_RIGHT:
             showNextGrid();
             break;
-#if GLFW_VERSION_MAJOR >= 3
         case GLFW_KEY_ESCAPE:
             glfwSetWindowShouldClose(mWindow, true);
             break;
-#endif
         }
     }
 
@@ -1154,9 +996,7 @@ ViewerImpl::mousePosCallback(int x, int y)
 void
 ViewerImpl::mouseWheelCallback(int pos)
 {
-#if GLFW_VERSION_MAJOR >= 3
     pos += mWheelPos;
-#endif
     if (mClipBox->isActive()) {
         updateCutPlanes(pos);
     } else {

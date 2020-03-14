@@ -203,9 +203,7 @@ if(OPENVDB_BUILD_VDB_VIEW)
       glfw
     )
 
-    target_compile_definitions(vdb_view PRIVATE
-      "-DOPENVDB_USE_GLFW_3" "-DGL_GLEXT_PROTOTYPES=1"
-    )
+    target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
 
     if(OPENVDB_ENABLE_RPATH)
       set_target_properties(vdb_view
