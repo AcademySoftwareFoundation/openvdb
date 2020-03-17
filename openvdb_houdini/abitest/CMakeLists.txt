@@ -32,7 +32,7 @@ message(STATUS "----------------------------------------------------")
 # - TestABI uses headers from this version of OpenVDB
 # - main uses headers from the version of OpenVDB shipped with Houdini
 
-if(NOT DEFINED _HOUDINI_INCLUDE_DIR OR NOT DEFINED _HOUDINI_LIB_DIR)
+if(NOT DEFINED HOUDINI_INCLUDE_DIR OR NOT DEFINED HOUDINI_LIB_DIR)
   message(FATAL_ERROR "The Houdini ABI Test requires the Houdini include "
     "directory and lib directory variables to be defined"
   )
@@ -41,12 +41,12 @@ endif()
 # Find libopenvdb_sesi library
 find_library(OPENVDB_SESI_LIB openvdb_sesi
   ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
-  PATHS ${_HOUDINI_LIB_DIR}
+  PATHS ${HOUDINI_LIB_DIR}
 )
 
 if(NOT EXISTS ${OPENVDB_SESI_LIB})
   message(FATAL_ERROR "The Houdini ABI Test is unable to locate libopenvdb_sesi "
-    "within the Houdini installation at: ${_HOUDINI_LIB_DIR}. "
+    "within the Houdini installation at: ${HOUDINI_LIB_DIR}. "
   )
 endif()
 
@@ -63,12 +63,13 @@ add_custom_command(
 # and set the include directories and add a HOUDINI variable
 
 add_library(TestABIHoudini OBJECT ${PROJECT_BINARY_DIR}/TestABIHoudini.cc)
-target_include_directories(TestABIHoudini SYSTEM PUBLIC ${_HOUDINI_INCLUDE_DIR})
+target_include_directories(TestABIHoudini SYSTEM PUBLIC ${HOUDINI_INCLUDE_DIR})
+target_compile_options(TestABIHoudini PRIVATE -DHOUDINI)
 
-set_property(
-  SOURCE ${PROJECT_BINARY_DIR}/TestABIHoudini.cc
-  APPEND PROPERTY COMPILE_DEFINITIONS "HOUDINI;"
-)
+# set_property(
+#   SOURCE ${PROJECT_BINARY_DIR}/TestABIHoudini.cc
+#   APPEND PROPERTY COMPILE_DEFINITIONS "HOUDINI;"
+# )
 
 # Create the binary from this object library and the main object file
 
