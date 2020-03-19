@@ -534,10 +534,12 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
     // Prepare window for rendering.
     glfwMakeContextCurrent(mWindow);
 
+#if defined(_WIN32)
     // This must come after glfwMakeContextCurrent
     if (GLEW_OK != glewInit()) {
         OPENVDB_LOG_ERROR("GLEW initialization failed");
     }
+#endif
 
     {
         // set up camera
