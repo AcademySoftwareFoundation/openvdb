@@ -39,6 +39,7 @@ Improvements:
 - Fixed some build issues with the Houdini plugin on Windows.
 - Standardized the library components install paths for the OpenVDB
   Houdini shared library.
+- Add a new Houdini ABI test binary.
 
 @par
 New features:
