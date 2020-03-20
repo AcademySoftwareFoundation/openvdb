@@ -13,7 +13,7 @@ Version 7.1.0 - In Development
       metadata lookup and performed some minor optimizations.
     - Removed redundant floor in points::floatingPointToFixedPoint.
     - Add gitignore to repository root.
-    - Remove some logic for compilers older than Visual Studio 2019.
+    - Removed some logic for compilers older than Visual Studio 2019.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
