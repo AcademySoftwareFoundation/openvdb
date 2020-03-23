@@ -34,6 +34,10 @@ This will define the following variables:
   The version of the Houdini which was found.
 ``OPENVDB_HOUDINI_ABI``
   The ABI version that Houdini uses for it's own OpenVDB installation.
+``HOUDINI_INCLUDE_DIR``
+  The Houdini include directory.
+``HOUDINI_LIB_DIR``
+  The Houdini lib directory.
 
 A variety of variables will also be set from HoudiniConfig.cmake.
 
@@ -227,8 +231,8 @@ unset(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
 # Set Houdini lib and include directories
 
-set(_HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
-set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
+set(HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
+set(HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
@@ -242,17 +246,17 @@ set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
 # the zlib library
 
 if(NOT ZLIB_ROOT)
-  set(ZLIB_ROOT ${_HOUDINI_INCLUDE_DIR})
+  set(ZLIB_ROOT ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT ZLIB_LIBRARY)
   # Full path to zlib library - FindPackage ( ZLIB)
   find_library(ZLIB_LIBRARY z
     ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
-    PATHS ${_HOUDINI_LIB_DIR}
+    PATHS ${HOUDINI_LIB_DIR}
   )
   if(NOT EXISTS ${ZLIB_LIBRARY})
     message(WARNING "The OpenVDB Houdini CMake setup is unable to locate libz within "
-      "the Houdini installation at: ${_HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
+      "the Houdini installation at: ${HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
     )
   endif()
 endif()
@@ -260,50 +264,47 @@ endif()
 # TBB
 
 if(NOT TBB_INCLUDEDIR)
-  set(TBB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(TBB_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT TBB_LIBRARYDIR)
-  set(TBB_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(TBB_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Blosc
 
 if(NOT BLOSC_INCLUDEDIR)
-  set(BLOSC_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(BLOSC_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT BLOSC_LIBRARYDIR)
-  set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(BLOSC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Jemalloc
 
 if(NOT JEMALLOC_LIBRARYDIR)
-  set(JEMALLOC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(JEMALLOC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # OpenEXR
 
 if(NOT OPENEXR_INCLUDEDIR)
-  set(OPENEXR_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(OPENEXR_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT OPENEXR_LIBRARYDIR)
-  set(OPENEXR_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # IlmBase
 
 if(NOT ILMBASE_INCLUDEDIR)
-  set(ILMBASE_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(ILMBASE_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT ILMBASE_LIBRARYDIR)
-  set(ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(ILMBASE_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
-
-unset(_HOUDINI_INCLUDE_DIR)
-unset(_HOUDINI_LIB_DIR)
 
 # Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
