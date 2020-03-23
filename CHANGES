@@ -21,7 +21,8 @@ Version 7.1.0 - In Development
     - Improved the Windows README instructions and various MSVC warnings.
     - Remove CMake warning when using GLFW 3.2+ on Debian.
     - Various fixes to unary minus on unsigned compiler warnings.
-    - The define _CRT_NONSTDC_NO_WARNINGS is now enabled by default with MSVC.
+    - The defines _CRT_NONSTDC_NO_WARNINGS and _CRT_SECURE_NO_WARNINGS are now
+      enabled by default with MSVC.
     - New CMake option OPENVDB_BUILD_PYTHON_UNITTESTS to disable or enable
       the python module tests and fixed the required environment for them on
       Windows. The python interpreter is no longer required by default if the
@@ -31,7 +32,8 @@ Version 7.1.0 - In Development
     - Fixed some build issues with the Houdini plugin on Windows.
     - Standardized the library components install paths for the OpenVDB
       Houdini shared library.
-    - Fixed an indexing typo in tools::Filter.
+    - Add a new Houdini ABI test binary.
+    - Fixed an indexing typo in tools::Filter. [Contributed by Yuanming Hu]
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another

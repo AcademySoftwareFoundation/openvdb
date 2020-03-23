@@ -28,8 +28,8 @@ Improvements:
 - Improved the Windows README instructions and various MSVC warnings.
 - Remove CMake warning when using GLFW 3.2+ on Debian.
 - Various fixes to unary minus on unsigned compiler warnings.
-- The define <TT>_CRT_NONSTDC_NO_WARNINGS</TT> is now enabled by default
-  with MSVC.
+- The defines <TT>_CRT_NONSTDC_NO_WARNINGS</TT> and <TT>_CRT_SECURE_NO_WARNINGS</TT>
+  are now enabled by default with MSVC.
 - New CMake option <TT>OPENVDB_BUILD_PYTHON_UNITTESTS</TT> to disable or
   enable the python module tests and fixed the required environment for them
   on Windows. The python interpreter is no longer required by default if the
@@ -39,7 +39,9 @@ Improvements:
 - Fixed some build issues with the Houdini plugin on Windows.
 - Standardized the library components install paths for the OpenVDB
   Houdini shared library.
-- Fixed an indexing typo in @vdblink::tools::Filter tools::Filter@endlink.
+- Add a new Houdini ABI test binary.
+- Fixed an indexing typo in tools::Filter.
+  <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
 
 @par
 New features:

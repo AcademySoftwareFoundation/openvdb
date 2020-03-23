@@ -16,7 +16,7 @@
 #else
 #include <fstream> // for std::filebuf
 #endif
-#include <cstdio> // for tmpnam_s(), L_tmpnam_s, P_tmpdir
+#include <cstdio> // for std::tmpnam(), L_tmpnam, P_tmpdir
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -90,22 +90,21 @@ struct TempFile::TempFileImpl
     BufferType mBuffer;
     int mFileDescr;
 #else // _MSC_VER
-    // Use Windows only methods (tmpnam_s); no POSIX.
+    // Use only standard library routines; no POSIX.
 
     TempFileImpl(std::ostream& os) { this->init(os); }
 
     void init(std::ostream& os)
     {
-        char fnbuf[L_tmpnam_s];
-        errno_t err = tmpnam_s(fnbuf, L_tmpnam_s);
-        if (err) {
+        char fnbuf[L_tmpnam];
+        const char* filename = std::tmpnam(fnbuf);
+        if (!filename) {
             OPENVDB_THROW(IoError, "failed to generate name for temporary file");
         }
-
         /// @todo This is not safe, since another process could open a file
         /// with this name before we do.  Unfortunately, there is no safe,
         /// portable way to create a temporary file.
-        mPath = fnbuf;
+        mPath = filename;
 
         const std::ios_base::openmode mode = (std::ios_base::out | std::ios_base::binary);
         os.rdbuf(mBuffer.open(mPath.c_str(), mode));

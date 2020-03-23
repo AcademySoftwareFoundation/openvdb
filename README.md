@@ -111,7 +111,6 @@ vcpkg install boost-any:x64-windows
 vcpkg install boost-algorithm:x64-windows
 vcpkg install boost-uuid:x64-windows
 vcpkg install boost-interprocess:x64-windows
-vcpkg integrate install
 ```
 ##### Building OpenVDB
 ```
