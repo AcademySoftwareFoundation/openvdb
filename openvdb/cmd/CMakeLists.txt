@@ -81,6 +81,13 @@ endif()
 
 ##### VDB binaries
 
+add_executable(morph morph.cpp)
+target_link_libraries(morph ${OPENVDB_BINARIES_DEPENDENT_LIBS})
+if(OPENVDB_ENABLE_RPATH)
+  set_target_properties(morph PROPERTIES INSTALL_RPATH "${RPATHS}")
+endif()
+install(TARGETS morph DESTINATION bin)
+
 #### vdb_print
 
 if(OPENVDB_BUILD_VDB_PRINT)
