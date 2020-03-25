@@ -33,6 +33,7 @@ Version 7.1.0 - In Development
     - Standardized the library components install paths for the OpenVDB
       Houdini shared library.
     - Add a new Houdini ABI test binary.
+    - Fixed an indexing typo in tools::Filter. [Contributed by Yuanming Hu]
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another

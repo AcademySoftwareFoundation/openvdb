@@ -40,6 +40,8 @@ Improvements:
 - Standardized the library components install paths for the OpenVDB
   Houdini shared library.
 - Add a new Houdini ABI test binary.
+- Fixed an indexing typo in tools::Filter.
+  <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
 
 @par
 New features:
