@@ -297,6 +297,9 @@ ifdef MBSD
     else ifeq ($(DARWIN_OS_MAJOR_VER),18)
 	# Mojave
 	MACOSX_SDK := MacOSX10.14
+    else ifeq ($(DARWIN_OS_MAJOR_VER),19)
+	# Catalina
+	MACOSX_SDK := MacOSX10.15
     else
         $(error Unknown MacOSX Darwin major version $(DARWIN_OS_MAJOR_VER))
     endif
