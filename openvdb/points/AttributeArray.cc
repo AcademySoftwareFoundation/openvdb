@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file points/AttributeArray.cc
 
@@ -76,6 +49,48 @@ AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
 ////////////////////////////////////////
 
 // AttributeArray implementation
+
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 6
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+AttributeArray::AttributeArray(const AttributeArray& rhs)
+    : AttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
+{
+}
+
+
+AttributeArray::AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&)
+#else
+AttributeArray::AttributeArray(const AttributeArray& rhs)
+#endif
+    : mIsUniform(rhs.mIsUniform)
+    , mFlags(rhs.mFlags)
+    , mUsePagedRead(rhs.mUsePagedRead)
+    , mOutOfCore(rhs.mOutOfCore)
+    , mPageHandle()
+{
+    if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
+    else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
+}
+
+
+AttributeArray&
+AttributeArray::operator=(const AttributeArray& rhs)
+{
+    // if this AttributeArray has been partially read, zero the compressed bytes,
+    // so the page handle won't attempt to clean up invalid memory
+    if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
+    mIsUniform = rhs.mIsUniform;
+    mFlags = rhs.mFlags;
+    mUsePagedRead = rhs.mUsePagedRead;
+    mOutOfCore = rhs.mOutOfCore;
+    if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
+    else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
+    else                            mPageHandle.reset();
+    return *this;
+}
+#endif
 
 
 AttributeArray::Ptr
@@ -193,7 +208,3 @@ AttributeArray::operator==(const AttributeArray& other) const
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

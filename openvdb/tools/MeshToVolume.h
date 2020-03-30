@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file   MeshToVolume.h
 ///
@@ -1957,9 +1930,25 @@ struct VoxelizationData {
 
     unsigned char getNewPrimId() {
 
+        /// @warning Don't use parallel methods here!
+        /// The primIdTree is used as a "scratch" pad to mark visits for a given polygon
+        /// into voxels which it may contribute to. The tree is kept as lightweight as
+        /// possible and is reset when a maximum count or size is reached. A previous
+        /// bug here occurred due to the calling of tree methods with multi-threaded
+        /// implementations, resulting in nested parallelization and re-use of the TLS
+        /// from the initial task. This consequently resulted in non deterministic values
+        /// of mPrimCount on the return of the initial task, and could potentially end up
+        /// with a mPrimCount equal to that of the MaxPrimId. This is used as the background
+        /// value of the scratch tree.
+        /// @see jira.aswf.io/browse/OVDB-117, PR #564
+        /// @todo Consider profiling this operator with tree.clear() and Investigate the
+        /// chosen value of MaxPrimId
+
         if (mPrimCount == MaxPrimId || primIdTree.leafCount() > 1000) {
             mPrimCount = 0;
-            primIdTree.clear();
+            primIdTree.root().clear();
+            primIdTree.clearAllAccessors();
+            assert(mPrimCount == 0);
         }
 
         return mPrimCount++;
@@ -4225,7 +4214,3 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

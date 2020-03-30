@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 //
 /// @author Ken Museth
 ///
@@ -42,12 +15,13 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/math/FiniteDifference.h>
 #include <openvdb/math/Operators.h>
+#include <openvdb/math/Stencils.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <boost/math/constants/constants.hpp>//for Pi
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
+#include <tbb/parallel_invoke.h>
 #include <type_traits>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -57,11 +31,11 @@ namespace tools {
 /// @brief Return the surface area of a narrow-band level set.
 ///
 /// @param grid          a scalar, floating-point grid with one or more disjoint,
-///                      closed isosurfaces at the given @a isovalue
+///                      closed level set surfaces
 /// @param useWorldSpace if true the area is computed in
 ///                      world space units, else in voxel units.
 ///
-/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set.
+/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
 inline Real
 levelSetArea(const GridType& grid, bool useWorldSpace = true);
@@ -69,55 +43,50 @@ levelSetArea(const GridType& grid, bool useWorldSpace = true);
 /// @brief Return the volume of a narrow-band level set surface.
 ///
 /// @param grid          a scalar, floating-point grid with one or more disjoint,
-///                      closed isosurfaces at the given @a isovalue
+///                      closed level set surfaces
 /// @param useWorldSpace if true the volume is computed in
 ///                      world space units, else in voxel units.
 ///
-/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set.
+/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
 inline Real
 levelSetVolume(const GridType& grid, bool useWorldSpace = true);
 
-/// @brief Compute the surface area and volume of a narrow-band level set.
+/// @brief Return the Euler Characteristics of a narrow-band level set surface (possibly disconnected).
 ///
 /// @param grid          a scalar, floating-point grid with one or more disjoint,
-///                      closed isosurfaces at the given @a isovalue
-/// @param area          surface area of the level set
-/// @param volume        volume of the level set surface
-/// @param useWorldSpace if true the area and volume are computed in
-///                      world space units, else in voxel units.
+///                      closed level set surfaces
 ///
-/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set.
+/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline void
-levelSetMeasure(const GridType& grid, Real& area, Real& volume, bool useWorldSpace = true);
+inline int
+levelSetEulerCharacteristic(const GridType& grid);
 
-/// @brief Compute the surface area and volume of a narrow-band level set.
+/// @brief Return the genus of a narrow-band level set surface.
 ///
 /// @param grid          a scalar, floating-point grid with one or more disjoint,
-///                      closed isosurfaces at the given @a isovalue
-/// @param area          surface area of the level set
-/// @param volume        volume of the level set surface
-/// @param avgCurvature  average mean curvature of the level set surface
-/// @param useWorldSpace if true the area, volume and curvature are computed in
-///                      world space units, else in voxel units.
+///                      closed level set surfaces
+/// @warning The genus is only well defined for a single connected surface
 ///
-/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set.
+/// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline void
-levelSetMeasure(const GridType& grid, Real& area, Real& volume, Real& avgCurvature,
-                bool useWorldSpace = true);
+inline int
+levelSetGenus(const GridType& grid);
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Smeared-out and continuous Dirac Delta function.
 template<typename RealT>
 class DiracDelta
 {
 public:
+    // eps is the half-width of the dirac delta function in units of phi
     DiracDelta(RealT eps) : mC(0.5/eps), mD(2*boost::math::constants::pi<RealT>()*mC), mE(eps) {}
+    // values of the dirac delta function are in units of one over the units of phi
     inline RealT operator()(RealT phi) const { return math::Abs(phi) > mE ? 0 : mC*(1+cos(mD*phi)); }
 private:
     const RealT mC, mD, mE;
-};
+};// DiracDelta functor
 
 
 /// @brief Multi-threaded computation of surface area, volume and
@@ -135,22 +104,20 @@ public:
     using TreeType = typename GridType::TreeType;
     using ValueType = typename TreeType::ValueType;
     using ManagerType = typename tree::LeafManager<const TreeType>;
+
     static_assert(std::is_floating_point<ValueType>::value,
         "level set measure is supported only for scalar, floating-point grids");
 
     /// @brief Main constructor from a grid
     /// @param grid The level set to be measured.
     /// @param interrupt Optional interrupter.
-    /// @throw RuntimeError if the grid is not a level set.
+    /// @throw RuntimeError if the grid is not a level set or if it's empty.
     LevelSetMeasure(const GridType& grid, InterruptT* interrupt = nullptr);
 
-    LevelSetMeasure(ManagerType& leafs, Real Dx, InterruptT* interrupt);
-
     /// @brief Re-initialize using the specified grid.
-    void reinit(const GridType& grid);
-
-    /// @brief Re-initialize using the specified LeafManager and voxelSize.
-    void reinit(ManagerType& leafs, Real dx);
+    /// @param grid The level set to be measured.
+    /// @throw RuntimeError if the grid is not a level set or if it's empty.
+    void init(const GridType& grid);
 
     /// @brief Destructor
     virtual ~LevelSetMeasure() {}
@@ -162,77 +129,118 @@ public:
     /// @note A grain size of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mGrainSize = grainsize; }
 
-    /// @brief Compute the surface area and volume of the level
-    /// set. Use the last argument to specify the result in world or
-    /// voxel units.
-    /// @note This method is faster (about 3x) then the measure method
-    /// below that also computes the average mean-curvature.
-    void measure(Real& area, Real& volume, bool useWorldUnits = true);
+    /// @brief Compute the surface area of the level set.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real area(bool useWorldUnits = true);
 
-    /// @brief Compute the surface area, volume, and average
-    /// mean-curvature of the level set. Use the last argument to
-    /// specify the result in world or voxel units.
-    /// @note This method is slower (about 3x) then the measure method
-    /// above that only computes the area and volume.
-    void measure(Real& area, Real& volume, Real& avgMeanCurvature, bool useWorldUnits = true);
+    /// @brief Compute the volume of the level set surface.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real volume(bool useWorldUnits = true);
+
+    /// @brief Compute the total mean curvature of the level set surface.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real totMeanCurvature(bool useWorldUnits = true);
+
+    /// @brief Compute the total gaussian curvature of the level set surface.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real totGaussianCurvature(bool useWorldUnits = true);
+
+    /// @brief Compute the average mean curvature of the level set surface.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real avgMeanCurvature(bool useWorldUnits = true) {return this->totMeanCurvature(useWorldUnits) / this->area(useWorldUnits);}
+
+    /// @brief Compute the average gaussian curvature of the level set surface.
+    /// @param useWorldUnits Specifies if the result is in world or voxel units.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    Real avgGaussianCurvature(bool useWorldUnits = true) {return this->totGaussianCurvature(useWorldUnits) / this->area(useWorldUnits); }
+
+    /// @brief Compute the Euler characteristic of the level set surface.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    int eulerCharacteristic();
+
+    /// @brief Compute the genus of the level set surface.
+    /// @warning The genus is only well defined for a single connected surface.
+    /// @note Performs internal caching so only the initial call incurs actual computation.
+    int genus() { return 1 - this->eulerCharacteristic()/2;}
 
 private:
-    // disallow copy construction and copy by assignment!
-    LevelSetMeasure(const LevelSetMeasure&);// not implemented
-    LevelSetMeasure& operator=(const LevelSetMeasure&);// not implemented
-
-    const TreeType* mTree;
-    ManagerType*    mLeafs;
-    InterruptT*     mInterrupter;
-    double          mDx;
-    double*         mArray;
-    int             mGrainSize;
-
-    // @brief Return false if the process was interrupted
-    bool checkInterrupter();
 
     using LeafT = typename TreeType::LeafNodeType;
     using VoxelCIterT = typename LeafT::ValueOnCIter;
     using LeafRange = typename ManagerType::LeafRange;
     using LeafIterT = typename LeafRange::Iterator;
+    using ManagerPtr = std::unique_ptr<ManagerType>;
+    using BufferPtr  = std::unique_ptr<double[]>;
 
-    struct Measure2
+    // disallow copy construction and copy by assignment!
+    LevelSetMeasure(const LevelSetMeasure&);// not implemented
+    LevelSetMeasure& operator=(const LevelSetMeasure&);// not implemented
+
+    const GridType *mGrid;
+    ManagerPtr      mLeafs;
+    BufferPtr       mBuffer;
+    InterruptT     *mInterrupter;
+    double          mDx, mArea, mVolume, mTotMeanCurvature, mTotGausCurvature;
+    int             mGrainSize;
+    bool            mUpdateArea, mUpdateCurvature;
+
+    // @brief Return false if the process was interrupted
+    bool checkInterrupter();
+
+    struct MeasureArea
     {
-        Measure2(LevelSetMeasure* parent) : mParent(parent), mAcc(*mParent->mTree)
+        MeasureArea(LevelSetMeasure* parent) : mParent(parent), mStencil(*mParent->mGrid)
         {
+            if (parent->mInterrupter) parent->mInterrupter->start("Measuring area and volume of level set");
             if (parent->mGrainSize>0) {
                 tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
+            tbb::parallel_invoke([&](){parent->mArea   = parent->reduce(0);},
+                                 [&](){parent->mVolume = parent->reduce(1)/3.0;});
+            parent->mUpdateArea = false;
+            if (parent->mInterrupter) parent->mInterrupter->end();
         }
-        Measure2(const Measure2& other) : mParent(other.mParent), mAcc(*mParent->mTree) {}
+        MeasureArea(const MeasureArea& other) : mParent(other.mParent), mStencil(*mParent->mGrid) {}
         void operator()(const LeafRange& range) const;
         LevelSetMeasure* mParent;
-        typename GridT::ConstAccessor mAcc;
-    };
-    struct Measure3
+        mutable math::GradStencil<GridT, false> mStencil;
+    };// MeasureArea
+
+    struct MeasureCurvatures
     {
-        Measure3(LevelSetMeasure* parent) : mParent(parent), mAcc(*mParent->mTree)
+        MeasureCurvatures(LevelSetMeasure* parent) : mParent(parent), mStencil(*mParent->mGrid)
         {
+            if (parent->mInterrupter) parent->mInterrupter->start("Measuring curvatures of level set");
             if (parent->mGrainSize>0) {
                 tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
+            tbb::parallel_invoke([&](){parent->mTotMeanCurvature = parent->reduce(0);},
+                                 [&](){parent->mTotGausCurvature = parent->reduce(1);});
+            parent->mUpdateCurvature = false;
+            if (parent->mInterrupter) parent->mInterrupter->end();
         }
-        Measure3(const Measure3& other) : mParent(other.mParent), mAcc(*mParent->mTree) {}
+        MeasureCurvatures(const MeasureCurvatures& other) : mParent(other.mParent), mStencil(*mParent->mGrid) {}
         void operator()(const LeafRange& range) const;
         LevelSetMeasure* mParent;
-        typename GridT::ConstAccessor mAcc;
-    };
-    inline double reduce(double* first, double scale)
+        mutable math::CurvatureStencil<GridT, false> mStencil;
+    };// MeasureCurvatures
+
+    double reduce(int offset)
     {
-        double* last = first + mLeafs->leafCount();
-        tbb::parallel_sort(first, last);//reduces catastrophic cancellation
+        double *first = mBuffer.get() + offset*mLeafs->leafCount(), *last = first + mLeafs->leafCount();
+        tbb::parallel_sort(first, last);// mitigates catastrophic cancellation
         Real sum = 0.0;
         while(first != last) sum += *first++;
-        return scale * sum;
+        return sum;
     }
 
 }; // end of LevelSetMeasure class
@@ -241,41 +249,15 @@ private:
 template<typename GridT, typename InterruptT>
 inline
 LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
-    : mTree(&(grid.tree()))
-    , mLeafs(nullptr)
-    , mInterrupter(interrupt)
-    , mDx(grid.voxelSize()[0])
-    , mArray(nullptr)
+    : mInterrupter(interrupt)
     , mGrainSize(1)
 {
-    if (!grid.hasUniformVoxels()) {
-         OPENVDB_THROW(RuntimeError,
-             "The transform must have uniform scale for the LevelSetMeasure to function");
-    }
-    if (grid.getGridClass() != GRID_LEVEL_SET) {
-        OPENVDB_THROW(RuntimeError,
-            "LevelSetMeasure only supports level sets;"
-            " try setting the grid class to \"level set\"");
-    }
-}
-
-
-template<typename GridT, typename InterruptT>
-inline
-LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(
-    ManagerType& leafs, Real dx, InterruptT* interrupt)
-    : mTree(&(leafs.tree()))
-    , mLeafs(&leafs)
-    , mInterrupter(interrupt)
-    , mDx(dx)
-    , mArray(nullptr)
-    , mGrainSize(1)
-{
+    this->init(grid);
 }
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT>::reinit(const GridType& grid)
+LevelSetMeasure<GridT, InterruptT>::init(const GridType& grid)
 {
     if (!grid.hasUniformVoxels()) {
          OPENVDB_THROW(RuntimeError,
@@ -286,92 +268,62 @@ LevelSetMeasure<GridT, InterruptT>::reinit(const GridType& grid)
             "LevelSetMeasure only supports level sets;"
             " try setting the grid class to \"level set\"");
     }
-    mTree = &(grid.tree());
-    mLeafs = nullptr;
+    if (grid.empty()) {
+        OPENVDB_THROW(RuntimeError,
+            "LevelSetMeasure does not support empty grids;");
+    }
+    mGrid = &grid;
     mDx = grid.voxelSize()[0];
+    mLeafs  = std::make_unique<ManagerType>(mGrid->tree());
+    mBuffer = std::make_unique<double[]>(2*mLeafs->leafCount());
+    mUpdateArea = mUpdateCurvature = true;
 }
-
 
 template<typename GridT, typename InterruptT>
-inline void
-LevelSetMeasure<GridT, InterruptT>::reinit(ManagerType& leafs, Real dx)
+inline Real
+LevelSetMeasure<GridT, InterruptT>::area(bool useWorldUnits)
 {
-    mLeafs = &leafs;
-    mTree = &(leafs.tree());
-    mDx = dx;
+    if (mUpdateArea) {MeasureArea m(this);};
+    double area = mArea;
+    if (useWorldUnits) area *= math::Pow2(mDx);
+    return area;
 }
-
-////////////////////////////////////////
-
 
 template<typename GridT, typename InterruptT>
-inline void
-LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWorldUnits)
+inline Real
+LevelSetMeasure<GridT, InterruptT>::volume(bool useWorldUnits)
 {
-    if (mInterrupter) mInterrupter->start("Measuring level set");
-
-
-    const bool newLeafs = mLeafs == nullptr;
-    if (newLeafs) mLeafs = new ManagerType(*mTree);
-    const size_t leafCount = mLeafs->leafCount();
-    if (leafCount == 0) {
-        area = volume = 0;
-        return;
-    }
-    mArray = new double[2*leafCount];
-
-    Measure2 m(this);
-
-    const double dx = useWorldUnits ? mDx : 1.0;
-    area = this->reduce(mArray, math::Pow2(dx));
-    volume = this->reduce(mArray + leafCount, math::Pow3(dx) / 3.0);
-
-    if (newLeafs) {
-        delete mLeafs;
-        mLeafs = nullptr;
-    }
-    delete [] mArray;
-
-    if (mInterrupter) mInterrupter->end();
+    if (mUpdateArea) {MeasureArea m(this);};
+    double volume = mVolume;
+    if (useWorldUnits) volume *= math::Pow3(mDx) ;
+    return volume;
 }
-
 
 template<typename GridT, typename InterruptT>
-inline void
-LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume,
-                                            Real& avgMeanCurvature,
-                                            bool useWorldUnits)
+inline Real
+LevelSetMeasure<GridT, InterruptT>::totMeanCurvature(bool useWorldUnits)
 {
-    if (mInterrupter) mInterrupter->start("Measuring level set");
-
-    const bool newLeafs = mLeafs == nullptr;
-    if (newLeafs) mLeafs = new ManagerType(*mTree);
-    const size_t leafCount = mLeafs->leafCount();
-    if (leafCount == 0) {
-        area = volume = avgMeanCurvature = 0;
-        return;
-    }
-    mArray = new double[3*leafCount];
-
-    Measure3 m(this);
-
-    const double dx = useWorldUnits ? mDx : 1.0;
-    area = this->reduce(mArray, math::Pow2(dx));
-    volume = this->reduce(mArray + leafCount, math::Pow3(dx) / 3.0);
-    avgMeanCurvature = this->reduce(mArray + 2*leafCount, dx/area);
-
-    if (newLeafs) {
-        delete mLeafs;
-        mLeafs = nullptr;
-    }
-    delete [] mArray;
-
-    if (mInterrupter) mInterrupter->end();
+    if (mUpdateCurvature) {MeasureCurvatures m(this);};
+    return mTotMeanCurvature * (useWorldUnits ? mDx : 1);
 }
 
+template<typename GridT, typename InterruptT>
+inline Real
+LevelSetMeasure<GridT, InterruptT>::totGaussianCurvature(bool)
+{
+    if (mUpdateCurvature) {MeasureCurvatures m(this);};
+    return mTotGausCurvature;
+}
+
+template<typename GridT, typename InterruptT>
+inline int
+LevelSetMeasure<GridT, InterruptT>::eulerCharacteristic()
+{
+    const Real x = this->totGaussianCurvature(true) / (2.0*boost::math::constants::pi<Real>());
+    return int(math::Round( x ));
+}
 
 ///////////////////////// PRIVATE METHODS //////////////////////
-
 
 template<typename GridT, typename InterruptT>
 inline bool
@@ -387,71 +339,66 @@ LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::
-Measure2::operator()(const LeafRange& range) const
+MeasureArea::operator()(const LeafRange& range) const
 {
     using Vec3T = math::Vec3<ValueType>;
-    using Grad = math::ISGradient<math::CD_2ND>;
+    // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
     const Real invDx = 1.0/mParent->mDx;
-    const DiracDelta<Real> DD(1.5);
+    const DiracDelta<Real> DD(1.5);// dirac delta function is 3 voxel units wide
     const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         Real sumA = 0, sumV = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Real dd = DD(invDx * (*voxelIter));
             if (dd > 0.0) {
-                const Coord p = voxelIter.getCoord();
-                const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
-                sumA += dd * g.dot(g);
-                sumV += dd * g.dot(Vec3T(p.data()));
+                mStencil.moveTo(voxelIter);
+                const Coord& p = mStencil.getCenterCoord();// in voxel units
+                const Vec3T g  = mStencil.gradient();// in world units
+                sumA += dd*g.length();// \delta(\phi)*|\nabla\phi|
+                sumV += dd*(g[0]*Real(p[0]) + g[1]*Real(p[1]) + g[2]*Real(p[2]));// \delta(\phi)\vec{x}\cdot\nabla\phi
             }
         }
-        double* v = mParent->mArray + leafIter.pos();
-        *v = sumA;
-        v += leafCount;
-        *v = sumV;
+        double* ptr = mParent->mBuffer.get() + leafIter.pos();
+        *ptr = sumA;
+        ptr += leafCount;
+        *ptr = sumV;
     }
 }
 
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::
-Measure3::operator()(const LeafRange& range) const
+MeasureCurvatures::operator()(const LeafRange& range) const
 {
     using Vec3T = math::Vec3<ValueType>;
-    using Grad = math::ISGradient<math::CD_2ND>;
-    using Curv = math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>;
+    // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
-    const Real invDx = 1.0/mParent->mDx;
-    const DiracDelta<Real> DD(1.5);
-    ValueType alpha, beta;
+    const Real dx = mParent->mDx, dx2=dx*dx, invDx = 1.0/dx;
+    const DiracDelta<Real> DD(1.5);// dirac delta function is 3 voxel units wide
+    ValueType mean, gauss;
     const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-        Real sumA = 0, sumV = 0, sumC = 0;//reduce risk of catastrophic cancellation
+        Real sumM = 0, sumG = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Real dd = DD(invDx * (*voxelIter));
             if (dd > 0.0) {
-                const Coord p = voxelIter.getCoord();
-                const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
-                const Real dA = dd * g.dot(g);
-                sumA += dA;
-                sumV += dd * g.dot(Vec3T(p.data()));
-                Curv::result(mAcc, p, alpha, beta);
-                sumC += dA * alpha/(2*math::Pow2(beta))*invDx;
+                mStencil.moveTo(voxelIter);
+                const Vec3T g  = mStencil.gradient();
+                const Real dA  = dd*g.length();// \delta(\phi)*\delta(\phi)
+                mStencil.curvatures(mean, gauss);
+                sumM += dA*mean*dx;//   \delta(\phi)*\delta(\phi)*MeanCurvature
+                sumG += dA*gauss*dx2;// \delta(\phi)*\delta(\phi)*GaussCurvature
             }
         }
-        double* v = mParent->mArray + leafIter.pos();
-        *v = sumA;
-        v += leafCount;
-        *v = sumV;
-        v += leafCount;
-        *v = sumC;
+        double* ptr = mParent->mBuffer.get() + leafIter.pos();
+        *ptr = sumM;
+        ptr += leafCount;
+        *ptr = sumG;
     }
 }
 
-
 ////////////////////////////////////////
-
 
 //{
 /// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
@@ -459,12 +406,10 @@ Measure3::operator()(const LeafRange& range) const
 template<class GridT>
 inline
 typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
-doLevelSetArea(const GridT& grid, bool useWorldSpace)
+doLevelSetArea(const GridT& grid, bool useWorldUnits)
 {
-    Real area, volume;
     LevelSetMeasure<GridT> m(grid);
-    m.measure(area, volume, useWorldSpace);
-    return area;
+    return m.area(useWorldUnits);
 }
 
 template<class GridT>
@@ -479,17 +424,14 @@ doLevelSetArea(const GridT&, bool)
 /// @endcond
 //}
 
-
 template<class GridT>
 inline Real
-levelSetArea(const GridT& grid, bool useWorldSpace)
+levelSetArea(const GridT& grid, bool useWorldUnits)
 {
-    return doLevelSetArea<GridT>(grid, useWorldSpace);
+    return doLevelSetArea<GridT>(grid, useWorldUnits);
 }
 
-
 ////////////////////////////////////////
-
 
 //{
 /// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
@@ -497,12 +439,10 @@ levelSetArea(const GridT& grid, bool useWorldSpace)
 template<class GridT>
 inline
 typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
-doLevelSetVolume(const GridT& grid, bool useWorldSpace)
+doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 {
-    Real area, volume;
     LevelSetMeasure<GridT> m(grid);
-    m.measure(area, volume, useWorldSpace);
-    return volume;
+    return m.volume(useWorldUnits);
 }
 
 template<class GridT>
@@ -517,37 +457,34 @@ doLevelSetVolume(const GridT&, bool)
 /// @endcond
 //}
 
-
 template<class GridT>
 inline Real
-levelSetVolume(const GridT& grid, bool useWorldSpace)
+levelSetVolume(const GridT& grid, bool useWorldUnits)
 {
-    return doLevelSetVolume<GridT>(grid, useWorldSpace);
+    return doLevelSetVolume<GridT>(grid, useWorldUnits);
 }
 
-
 ////////////////////////////////////////
-
 
 //{
 /// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value>::type
-doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+doLevelSetEulerCharacteristic(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
-    m.measure(area, volume, useWorldSpace);
+    return m.eulerCharacteristic();
 }
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value>::type
-doLevelSetMeasure(const GridT&, Real&, Real&, bool)
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+doLevelSetEulerCharacteristic(const GridT&)
 {
     OPENVDB_THROW(TypeError,
-        "level set measure is supported only for scalar, floating-point grids");
+        "level set euler characteristic is supported only for scalar, floating-point grids");
 }
 
 /// @endcond
@@ -555,47 +492,68 @@ doLevelSetMeasure(const GridT&, Real&, Real&, bool)
 
 
 template<class GridT>
-inline void
-levelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
+inline int
+levelSetEulerCharacteristic(const GridT& grid)
 {
-    doLevelSetMeasure<GridT>(grid, area, volume, useWorldSpace);
+    return doLevelSetEulerCharacteristic(grid);
 }
 
-
 ////////////////////////////////////////
-
 
 //{
 /// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value>::type
-doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
-                  bool useWorldSpace)
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+doLevelSetEuler(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
-    m.measure(area, volume, avgCurvature, useWorldSpace);
+    return m.eulerCharacteristics();
+
 }
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value>::type
-doLevelSetMeasure(const GridT&, Real&, Real&, Real&, bool)
+typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+doLevelSetGenus(const GridT& grid)
+{
+    LevelSetMeasure<GridT> m(grid);
+    return m.genus();
+}
+
+template<class GridT>
+inline
+typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+doLevelSetGenus(const GridT&)
 {
     OPENVDB_THROW(TypeError,
-        "level set measure is supported only for scalar, floating-point grids");
+        "level set genus is supported only for scalar, floating-point grids");
 }
 
 /// @endcond
 //}
 
-
 template<class GridT>
-inline void
-levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature, bool useWorldSpace)
+inline int
+levelSetGenus(const GridT& grid)
 {
-    doLevelSetMeasure<GridT>(grid, area, volume, avgCurvature, useWorldSpace);
+    return doLevelSetGenus(grid);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+/// @deprecated Use the @a LevelSetMeasure class instead.
+template<class GridT>
+OPENVDB_DEPRECATED
+inline void
+levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
+                bool useWorldUnits = true)
+{
+    LevelSetMeasure<GridT> m(grid);
+    area = m.area(useWorldUnits);
+    volume = m.volume(useWorldUnits);
+    avgCurvature = m.avgMeanCurvature(useWorldUnits);
 }
 
 } // namespace tools
@@ -603,7 +561,3 @@ levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

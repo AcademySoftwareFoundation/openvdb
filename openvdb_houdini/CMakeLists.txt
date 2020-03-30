@@ -1,28 +1,5 @@
-# Copyright (c) DreamWorks Animation LLC
-#
-# All rights reserved. This software is distributed under the
-# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-#
-# Redistributions of source code must retain the above copyright
-# and license notice and the following restrictions and disclaimer.
-#
-# *     Neither the name of DreamWorks Animation nor the names of
-# its contributors may be used to endorse or promote products derived
-# from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-# LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
 #
 #[=======================================================================[
 
@@ -120,11 +97,14 @@ endif()
 set(OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
   CACHE PATH "Base install path for OpenVDB Houdini shared libraries, dsos and headers."
 )
+set(OPENVDB_HOUDINI_CONFIGDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/config")
+set(OPENVDB_HOUDINI_DSODIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso")
+set(OPENVDB_HOUDINI_INCLUDEDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
+set(OPENVDB_HOUDINI_LIBDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+set(OPENVDB_HOUDINI_PYTHONRC_DIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/python2.7libs")
+set(OPENVDB_HOUDINI_SCRIPTSDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts")
 
 message(STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}")
-
-set(OPENVDB_HOUDINI_PYTHONRC_DIR ${HOUDINI_INSTALL_LOCATION}/python2.7libs
-    CACHE PATH "Install path for the OpenVDB Houdini startup script")
 
 #########################################################################
 
@@ -214,7 +194,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Tbb_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
   else()
     list(APPEND ${OpenVDB_LIBRARY_DIRS})
   endif()
@@ -319,12 +299,14 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   # If the sesi tag needs removing, manually configure the compile
   # options for each DSO and replace the UT_DSO_TAGINFO define
 
-  if(NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG)
-    get_target_property(DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS)
-    string(REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
-    set_target_properties(${DSO_NAME}
-      PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
-    )
+  if(Houdini_VERSION VERSION_LESS 18)
+    if(NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG)
+      get_target_property(DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS)
+      string(REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
+      set_target_properties(${DSO_NAME}
+        PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
+      )
+    endif()
   endif()
 
   # Configure rpaths
@@ -335,12 +317,12 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   if(OPENVDB_ENABLE_RPATH)
     set(RPATHS)
     if(OPENVDB_BUILD_CORE)
-      list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+      list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
     else()
       list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
     endif()
 
-    list(APPEND RPATHS ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${OPENVDB_HOUDINI_LIBDIR})
 
     list(REMOVE_DUPLICATES RPATHS)
     set_target_properties(${DSO_NAME}
@@ -368,36 +350,36 @@ endif()
 install(DIRECTORY
   ${OPENVDB_HOUDINI_UTILS_DIR}
   ${OPENVDB_HOUDINI_LOCAL_DIR}
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/include
+  DESTINATION ${OPENVDB_HOUDINI_INCLUDEDIR}
 )
 
 install(TARGETS
   openvdb_houdini
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/lib
+  DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
 )
 
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   if(DSO_NAME MATCHES "VRAY_*")
     install(TARGETS
       ${DSO_NAME}
-      DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso/mantra
+      DESTINATION ${OPENVDB_HOUDINI_DSODIR}/mantra
     )
   else()
     install(TARGETS
       ${DSO_NAME}
-      DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso
+      DESTINATION ${OPENVDB_HOUDINI_DSODIR}
     )
   endif()
 endforeach()
 
 install(FILES
   SOP_OpenVDB.svg
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
+  DESTINATION ${OPENVDB_HOUDINI_CONFIGDIR}/Icons
 )
 
 install(FILES
   DW_OpenVDBRasterizePoints.cmd
-  DESTINATION ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
+  DESTINATION ${OPENVDB_HOUDINI_SCRIPTSDIR}/sop
 )
 
 if(OPENVDB_INSTALL_HOUDINI_PYTHONRC)

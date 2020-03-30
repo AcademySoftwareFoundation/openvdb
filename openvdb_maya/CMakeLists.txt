@@ -1,28 +1,5 @@
-# Copyright (c) DreamWorks Animation LLC
-#
-# All rights reserved. This software is distributed under the
-# Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-#
-# Redistributions of source code must retain the above copyright
-# and license notice and the following restrictions and disclaimer.
-#
-# *     Neither the name of DreamWorks Animation nor the names of
-# its contributors may be used to endorse or promote products derived
-# from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-# LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
 #
 #[=======================================================================[
 
@@ -60,18 +37,20 @@ message(STATUS "----------------------------------------------------" )
 
 if(NOT OPENVDB_MAYA_INSTALL_PREFIX)
   if(OPENVDB_MAYA_SUBDIR)
-    set(MAYA_INSTALL_LOCATION
-      ${CMAKE_INSTALL_PREFIX}/maya/${Maya_VERSION}
-    )
+    set(MAYA_INSTALL_LOCATION maya/${Maya_VERSION})
   else()
-    set(MAYA_INSTALL_LOCATION
-      ${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}
-    )
+    set(MAYA_INSTALL_LOCATION maya${Maya_VERSION})
   endif()
 endif()
 
 set(OPENVDB_MAYA_INSTALL_PREFIX ${MAYA_INSTALL_LOCATION}
   CACHE PATH "Base install path for OpenVDB Maya libraries and headers."
+)
+set(OPENVDB_MAYA_PLUGINS ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
+  CACHE PATH "Install path for OpenVDB Maya plugins"
+)
+set(OPENVDB_MAYA_SCRIPTS ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
+  CACHE PATH "Install path for OpenVDB Maya scripts"
 )
 
 message(STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}")
@@ -161,7 +140,7 @@ set_target_properties(openvdb_maya
 if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
@@ -175,21 +154,19 @@ endif()
 
 #########################################################################
 
-install(TARGETS
-  openvdb_maya
-  DESTINATION
-  ${OPENVDB_MAYA_INSTALL_PREFIX}/plug-ins
+install(TARGETS openvdb_maya
+  DESTINATION ${OPENVDB_MAYA_PLUGINS}
 )
 
-install(FILES
-  ${OPENVDB_MAYA_MODULE_MEL_FILES}
-  DESTINATION
-  ${OPENVDB_MAYA_INSTALL_PREFIX}/scripts
+install(FILES ${OPENVDB_MAYA_MODULE_MEL_FILES}
+  DESTINATION ${OPENVDB_MAYA_SCRIPTS}
 )
 
 if(OPENVDB_MAYA_INSTALL_MOD)
-  install(CODE
-    "FILE (WRITE ${OPENVDB_MAYA_INSTALL_PREFIX}/openvdb.mod \"+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n\")"
+  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb.mod
+    "+ openvdb any ${OPENVDB_MAYA_INSTALL_PREFIX}\n")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb.mod
+    DESTINATION ${OPENVDB_MAYA_INSTALL_PREFIX}
     COMPONENT Runtime
   )
 endif()

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
@@ -35,7 +8,7 @@
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <cppunit/extensions/HelperMacros.h>
-
+#include <openvdb/tools/LevelSetSphere.h>
 
 class TestMeanCurvature: public CppUnit::TestFixture
 {
@@ -49,8 +22,9 @@ public:
     CPPUNIT_TEST(testWSMeanCurvature);                    // MeanCurvature in World Space
     CPPUNIT_TEST(testWSMeanCurvatureStencil);
     CPPUNIT_TEST(testMeanCurvatureTool);                  // MeanCurvature tool
-    CPPUNIT_TEST(testMeanCurvatureMaskedTool);                  // MeanCurvature tool
-    CPPUNIT_TEST(testOldStyleStencils);                   // old stencil impl - deprecate
+    CPPUNIT_TEST(testMeanCurvatureMaskedTool);            // MeanCurvature tool
+    CPPUNIT_TEST(testCurvatureStencil);                   // CurvatureStencil
+    CPPUNIT_TEST(testIntersection);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -60,7 +34,8 @@ public:
     void testWSMeanCurvatureStencil();
     void testMeanCurvatureTool();
     void testMeanCurvatureMaskedTool();
-    void testOldStyleStencils();
+    void testCurvatureStencil();
+    void testIntersection();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMeanCurvature);
@@ -694,7 +669,7 @@ TestMeanCurvature::testMeanCurvatureMaskedTool()
 
 
 void
-TestMeanCurvature::testOldStyleStencils()
+TestMeanCurvature::testCurvatureStencil()
 {
     using namespace openvdb;
 
@@ -723,17 +698,113 @@ TestMeanCurvature::testOldStyleStencils()
         cs.moveTo(xyz);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, cs.meanCurvature(), 0.01);// 1/distance from center
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
-            1.0/4.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, cs.gaussianCurvature(), 0.01);// 1/distance^2 from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance^2 from center
+
+        float mean, gaussian;
+        cs.curvatures(mean, gaussian);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, mean, 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/16.0, gaussian, 0.01);// 1/distance^2 from center
+
+        auto principalCurvatures = cs.principalCurvatures();
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, principalCurvatures.first,  0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, principalCurvatures.second, 0.01);// 1/distance from center
 
         xyz.reset(12,16,10);//i.e. 10 voxel or 5 world units away from the center
         cs.moveTo(xyz);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, cs.meanCurvature(), 0.01);// 1/distance from center
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
             1.0/5.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/25.0, cs.gaussianCurvature(), 0.01);// 1/distance^2 from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            1.0/25.0, cs.gaussianCurvatureNormGrad(), 0.01);// 1/distance^2 from center
+
+        principalCurvatures = cs.principalCurvatures();
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, principalCurvatures.first,  0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, principalCurvatures.second, 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            1.0/5.0, principalCurvatures.first,  0.01);// 1/distance from center
+            CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            1.0/5.0, principalCurvatures.second, 0.01);// 1/distance from center
+
+        cs.curvaturesNormGrad(mean, gaussian);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/5.0, mean, 0.01);// 1/distance from center
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/25.0, gaussian, 0.01);// 1/distance^2 from center
+    }
+    {// test sparse level set sphere
+      const double percentage = 0.1/100.0;//i.e. 0.1%
+      const int dim = 256;
+
+      // sparse level set sphere
+      Vec3f C(0.35f, 0.35f, 0.35f);
+      Real r = 0.15, voxelSize = 1.0/(dim-1);
+      FloatGrid::Ptr sphere = tools::createLevelSetSphere<FloatGrid>(float(r), C, float(voxelSize));
+
+      math::CurvatureStencil<FloatGrid> cs(*sphere);
+      const Coord ijk = Coord::round(sphere->worldToIndex(Vec3d(0.35, 0.35, 0.35 + 0.15)));
+      const double radius = (sphere->indexToWorld(ijk)-Vec3d(0.35)).length();
+      //std::cerr << "\rRadius = " << radius << std::endl;
+      //std::cerr << "Index coord =" << ijk << std::endl;
+      cs.moveTo(ijk);
+
+      //std::cerr << "Mean curvature = "     << cs.meanCurvature()     << ", 1/r=" << 1.0/radius << std::endl;
+      //std::cerr << "Gaussian curvature = " << cs.gaussianCurvature() << ", 1/(r*r)=" << 1.0/(radius*radius) << std::endl;
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/radius,  cs.meanCurvature(), percentage*1.0/radius);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/(radius*radius),  cs.gaussianCurvature(), percentage*1.0/(radius*radius));
+      float mean, gauss;
+      cs.curvatures(mean, gauss);
+      //std::cerr << "Mean curvature = "     << mean     << ", 1/r=" << 1.0/radius << std::endl;
+      //std::cerr << "Gaussian curvature = " << gauss << ", 1/(r*r)=" << 1.0/(radius*radius) << std::endl;
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/radius,  mean, percentage*1.0/radius);
+      CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/(radius*radius),  gauss, percentage*1.0/(radius*radius));
     }
 }
 
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+void
+TestMeanCurvature::testIntersection()
+{
+  using namespace openvdb;
+  const Coord ijk(1,4,-9);
+  FloatGrid grid(0.0f);
+  auto acc = grid.getAccessor();
+  math::GradStencil<FloatGrid> stencil(grid);
+  acc.setValue(ijk,-1.0f);
+  int cases = 0;
+  for (int mx=0; mx<2; ++mx) {
+    acc.setValue(ijk.offsetBy(-1,0,0), mx ? 1.0f : -1.0f);
+    for (int px=0; px<2; ++px) {
+      acc.setValue(ijk.offsetBy(1,0,0), px ? 1.0f : -1.0f);
+      for (int my=0; my<2; ++my) {
+        acc.setValue(ijk.offsetBy(0,-1,0), my ? 1.0f : -1.0f);
+        for (int py=0; py<2; ++py) {
+          acc.setValue(ijk.offsetBy(0,1,0), py ? 1.0f : -1.0f);
+          for (int mz=0; mz<2; ++mz) {
+            acc.setValue(ijk.offsetBy(0,0,-1), mz ? 1.0f : -1.0f);
+            for (int pz=0; pz<2; ++pz) {
+              acc.setValue(ijk.offsetBy(0,0,1), pz ? 1.0f : -1.0f);
+              ++cases;
+              CPPUNIT_ASSERT_EQUAL(7, int(grid.activeVoxelCount()));
+              stencil.moveTo(ijk);
+              const size_t count = mx + px + my + py + mz + pz;// number of intersections
+              CPPUNIT_ASSERT(stencil.intersects() == (count > 0));
+              auto mask = stencil.intersectionMask();
+              CPPUNIT_ASSERT(mask.none() == (count == 0));
+              CPPUNIT_ASSERT(mask.any() == (count > 0));
+              CPPUNIT_ASSERT_EQUAL(count, mask.count());
+              CPPUNIT_ASSERT(mask.test(0) == mx);
+              CPPUNIT_ASSERT(mask.test(1) == px);
+              CPPUNIT_ASSERT(mask.test(2) == my);
+              CPPUNIT_ASSERT(mask.test(3) == py);
+              CPPUNIT_ASSERT(mask.test(4) == mz);
+              CPPUNIT_ASSERT(mask.test(5) == pz);
+            }//pz
+          }//mz
+        }//py
+      }//my
+    }//px
+  }//mx
+  CPPUNIT_ASSERT_EQUAL(64, cases);// = 2^6
+}//testIntersection

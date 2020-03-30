@@ -142,3 +142,4 @@ stages:
     timeoutInMinutes: 0
     steps:
     - bash: ci/build.sh g++ Release 7 ON SSE42
+    - bash: cd build && ctest -V; cd -

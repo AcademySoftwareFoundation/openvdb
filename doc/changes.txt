@@ -4,13 +4,37 @@
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.0.0</B> - <I>In development</I>
+<B>Version 7.0.0</B> - <I>December 6, 2019</I>
 
 @par
 <BLOCKQUOTE>
+Some changes in this release (see @ref v7_0_0_ABI_changes "ABI changes" below)
+alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
+the OpenVDB library, such as the ones built into Houdini up to and including
+Houdini&nbsp;18.
+To preserve ABI compatibility, when compiling OpenVDB or any dependent code
+define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
+for example, <I>N</I> is 5 for Houdini&nbsp;17.0 and&nbsp;17.5 and 6 for
+Houdini&nbsp;18.0.
+
 As of this release, a C++14 compiler is required and the oldest supported
 Houdini version is 17.0.
 </BLOCKQUOTE>
+
+@par
+New features:
+- @vdblink{tools::LevelSetMeasure, tools::LevelSetMeasure} can now compute multiple
+  types of curvatures (averge and total Gaussian and mean curvature) as well as
+  Euler characteristic and genus of level set surfaces.
+- Most stencil classes now have an intersection method that detcts the axial
+  directions of zero-crossings (as oppose to the existing boolean intersection test).
+- The @vdblink{math::CurvatureStencil, math::CurvatureStencil} can now compute
+  Gaussian and principal curvatures (in addition to mean curvature).
+- Added @vdblink{tree::Tree::nodeCount,Tree::nodeCount}, which counts
+  the number and type of nodes in a tree very efficiently.
+- Added new @vdblink::tree::RootNode::addChild() RootNode::addChild@endlink and
+  @vdblink::tree::InternalNode::addChild() InternalNode::addChild@endlink methods to
+  allow the insertion of child nodes directly.
 
 @par
 Improvements:
@@ -27,13 +51,25 @@ Improvements:
 - Replaced occurrences of boost::scoped_array with std::unique_ptr.
 - Added an OPENVDB_SIMD option to CMake to optionally define SSE4.2 and
   AVX compiler flags, this is switched off by default.
+- Made various small changes to improve Visual Studio compatiblity and
+  deprecate some logic for compilers older than Visual Studio&nbsp;2017.
+- Standardized CMake install locations using GNUInstallDirs. Importantly,
+  this changes the default library installation folder from lib to lib64
+  on some 64-bit systems, or to lib/multiarch-tuple on Debian
+  <I>[Contributed&nbsp;by&nbsp;David&nbsp;Aguilar]</I>
+- Added SIMD intrinsics to a few common NodeMask methods.
+  <I>[Contributed&nbsp;by&nbsp;Konstantin]</I>
 
 @par
 Bug fixes:
 - Fixed a bug in <TT>FindJemalloc.cmake</TT> where paths were not being handled
   correctly.
 - Fixed a Windows build issue in openvdb_render.
+- Fixed a non deterministic threading bug in @vdblink::tools::meshToVolume()
+  mesh to volume@endlink during polygon voxelization which could result in
+  different distance values.
 
+@anchor v7_0_0_ABI_changes
 @par
 ABI changes:
 - OpFactory destructor is now virtual as of ABI=7
@@ -43,12 +79,15 @@ ABI changes:
   @vdblink::GridBase::copyGridReplacingTransform() GridBase::copyGridReplacingTransform@endlink
   and @vdblink::GridBase::copyGridReplacingMetadataAndTransform()
   GridBase::copyGridReplacingMetadataAndTransform@endlink.
+- AttributeArray copy constructor is now thread-safe.
 
 @par
 API changes:
 - @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
   @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
   now return a std::unique_ptr instead of a boost::scoped_array.
+- @vdblink::points::AttributeArray::copyUncompressed() AttributeArray::copyUncompressed@endlink
+  is now deprecated.
 
 @par
 Python:
@@ -56,6 +95,7 @@ Python:
 - Added support for Boost versions 1.65 and later when building
   the Python module with NumPy support through CMake.
 - Improved CMake Python3 support.
+- The Python Module is now disabled by default in CMake.
 
 @par
 Houdini:
@@ -65,6 +105,10 @@ Houdini:
   inputs).
 - Threaded the population of point group memberships during conversion from
   Houdini geometry to OpenVDB Points
+- Added logic to the Rasterize&nbsp;Points SOP to suppress the output of
+  non-finite attribute values due to subnormal input densities.
+- Introduced a position compression option to the Scatter&nbsp;SOP for VDB
+  Points and default to 16-bit fixed point.
 
 
 @htmlonly <a name="v6_2_1_changes"></a>@endhtmlonly

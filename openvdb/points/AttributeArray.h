@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file points/AttributeArray.h
 ///
@@ -51,6 +24,7 @@
 #include <tbb/atomic.h>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <type_traits>
 
@@ -168,30 +142,8 @@ public:
         if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
     }
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-    AttributeArray(const AttributeArray& rhs)
-        : mIsUniform(rhs.mIsUniform)
-        , mFlags(rhs.mFlags)
-        , mUsePagedRead(rhs.mUsePagedRead)
-        , mOutOfCore(rhs.mOutOfCore)
-        , mPageHandle()
-    {
-        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
-        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
-    }
-    AttributeArray& operator=(const AttributeArray& rhs)
-    {
-        // if this AttributeArray has been partially read, zero the compressed bytes,
-        // so the page handle won't attempt to clean up invalid memory
-        if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
-        mIsUniform = rhs.mIsUniform;
-        mFlags = rhs.mFlags;
-        mUsePagedRead = rhs.mUsePagedRead;
-        mOutOfCore = rhs.mOutOfCore;
-        if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
-        else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
-        else                            mPageHandle.reset();
-        return *this;
-    }
+    AttributeArray(const AttributeArray& rhs);
+    AttributeArray& operator=(const AttributeArray& rhs);
 #else
     AttributeArray(const AttributeArray&) = default;
     AttributeArray& operator=(const AttributeArray&) = default;
@@ -200,11 +152,13 @@ public:
     AttributeArray& operator=(AttributeArray&&) = default;
 
     /// Return a copy of this attribute.
-    /// @note This method is thread-safe.
     virtual AttributeArray::Ptr copy() const = 0;
 
-    /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
-    /// @note This method is thread-safe.
+    /// Return a copy of this attribute.
+    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
+#ifndef _MSC_VER
+    OPENVDB_DEPRECATED
+#endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
     /// Return the number of elements in this array.
@@ -431,6 +385,10 @@ private:
 #endif
 
 protected:
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&);
+#endif
+
     /// @brief Specify whether this attribute has a constant stride or not.
     void setConstantStride(bool state);
 
@@ -623,9 +581,23 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Deep copy constructor.
-    /// @note not thread-safe, use TypedAttributeArray::copy() to ensure thread-safety
+    /// @note This method is thread-safe (as of ABI=7) for concurrently reading from the
+    /// source attribute array while being deep-copied. Specifically, this means that the
+    /// attribute array being deep-copied can be out-of-core and safely loaded in one thread
+    /// while being copied using this copy-constructor in another thread.
+    /// It is not thread-safe for write.
+    TypedAttributeArray(const TypedAttributeArray&);
+    /// Deep copy constructor.
+    /// @deprecated Use copy-constructor without unused bool parameter
+    OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
+#else
+    /// Deep copy constructor.
+    /// @note This method is not thread-safe for reading or writing, use
+    /// TypedAttributeArray::copy() to ensure thread-safety when reading concurrently.
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
+#endif
     /// Deep copy assignment operator.
     /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
@@ -642,7 +614,7 @@ public:
 
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
     /// @note This method is thread-safe.
-    AttributeArray::Ptr copyUncompressed() const override;
+    OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true);
@@ -824,6 +796,10 @@ protected:
 private:
     friend class ::TestAttributeArray;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+    TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
+#endif
+
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
@@ -853,7 +829,7 @@ private:
         return TypedAttributeArray::create(n, strideOrTotalSize, constantStride);
     }
 
-    static tbb::atomic<const NamePair*> sTypeName;
+    static std::unique_ptr<const NamePair> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
@@ -1167,7 +1143,7 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 // TypedAttributeArray implementation
 
 template<typename ValueType_, typename Codec_>
-tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
+std::unique_ptr<const NamePair> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 
 template<typename ValueType_, typename Codec_>
@@ -1198,9 +1174,23 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
+template<typename ValueType_, typename Codec_>
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+    : TypedAttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
+{
+}
+
+
+template<typename ValueType_, typename Codec_>
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs,
+    const tbb::spin_mutex::scoped_lock& lock)
+    : AttributeArray(rhs, lock)
+#else
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
     : AttributeArray(rhs)
+#endif
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
 #if OPENVDB_ABI_VERSION_NUMBER < 6
@@ -1243,10 +1233,11 @@ template<typename ValueType_, typename Codec_>
 inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
-    if (sTypeName == nullptr) {
-        NamePair* s = new NamePair(typeNameAsString<ValueType>(), Codec::name());
-        if (sTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
-    }
+    static std::once_flag once;
+    std::call_once(once, []()
+    {
+        sTypeName.reset(new NamePair(typeNameAsString<ValueType>(), Codec::name()));
+    });
     return *sTypeName;
 }
 
@@ -1306,7 +1297,9 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
+#if OPENVDB_ABI_VERSION_NUMBER < 7
     tbb::spin_mutex::scoped_lock lock(mMutex);
+#endif
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
@@ -1315,8 +1308,7 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 {
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-    return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this, /*decompress = */true));
+    return this->copy();
 }
 
 
@@ -2345,7 +2337,3 @@ AttributeArray& AttributeWriteHandle<ValueType, CodecType>::array()
 } // namespace openvdb
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
