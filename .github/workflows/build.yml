@@ -1,7 +1,7 @@
 
 name: Build
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   testabi7:
@@ -13,7 +13,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 7 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi6:
     runs-on: ubuntu-16.04
@@ -24,7 +24,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 6 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi5:
     runs-on: ubuntu-16.04
@@ -35,7 +35,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 5 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi4:
     runs-on: ubuntu-16.04
@@ -46,7 +46,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 4 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou180:
     runs-on: ubuntu-16.04
@@ -59,7 +59,7 @@ jobs:
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou175:
     runs-on: ubuntu-16.04
@@ -72,7 +72,7 @@ jobs:
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou170:
     runs-on: ubuntu-16.04
@@ -85,7 +85,7 @@ jobs:
     - name: build
       run: ./ci/build_houdini.sh clang++ Release OFF
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi7noblosc:
     runs-on: ubuntu-16.04
@@ -96,7 +96,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 7 OFF None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou180gcc:
     runs-on: ubuntu-16.04
@@ -109,7 +109,7 @@ jobs:
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou180debug:
     runs-on: ubuntu-16.04
@@ -149,7 +149,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Debug 7 ON SSE42
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testwindows2019:
     runs-on: windows-2019
@@ -171,4 +171,4 @@ jobs:
       run: ./ci/build_windows.sh "${VCPKG_INSTALLATION_ROOT}"
     - name: test
       shell: bash
-      run: cd build && ctest -V
+      run: ./ci/test.sh
