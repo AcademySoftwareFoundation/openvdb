@@ -44,6 +44,8 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
 - Added a USE_PKGCONFIG option to CMake to optionally disable use of pkg-config.
   <I>[Contributed&nbsp;by&nbsp;Kartik&nbsp;Shrivastava]</I>
+- Removed redundant null pointer checks.
+  <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 
 @par
 New features:
