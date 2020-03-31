@@ -15,7 +15,6 @@
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
-#include <UT/UT_Version.h>
 #include "SOP_VDBVerbUtils.h"
 #include <iosfwd>
 #include <string>

@@ -17,7 +17,6 @@
 #include <openvdb/tools/GridTransformer.h>
 
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 
 #include <sstream>
 #include <stdexcept>

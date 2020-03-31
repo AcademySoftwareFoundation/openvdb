@@ -12,7 +12,6 @@
 #include <openvdb/math/Math.h> // Tolerance and isApproxEqual
 #include <openvdb/tools/ValueTransformer.h>
 
-#include <UT/UT_Version.h>
 #include <UT/UT_Ramp.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>

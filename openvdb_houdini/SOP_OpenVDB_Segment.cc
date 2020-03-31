@@ -17,7 +17,6 @@
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
-#include <UT/UT_Version.h>
 
 #include <sstream>
 #include <stdexcept>

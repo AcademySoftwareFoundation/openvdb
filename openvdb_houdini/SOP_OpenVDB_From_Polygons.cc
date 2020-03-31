@@ -22,7 +22,6 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm> // for std::max()
 #include <sstream>

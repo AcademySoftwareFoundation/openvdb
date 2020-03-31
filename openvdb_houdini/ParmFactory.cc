@@ -1246,7 +1246,7 @@ del nt, _spareData, _spareDataDict\n");
                     }
                 }
             }
-        } catch (HOM_Error& err) {
+        } catch (HOM_Error&) {
         }
         return PY_Py_None();
     }

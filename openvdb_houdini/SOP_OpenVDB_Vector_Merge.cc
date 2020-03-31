@@ -20,7 +20,6 @@
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_String.h>
-#include <UT/UT_Version.h>
 #include <hboost/regex.hpp>
 #include <functional>
 #include <memory>

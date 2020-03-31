@@ -133,7 +133,8 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
 
             // Copy the source's visualization options.
             GEO_VolumeOptions visopt = src->getVisOptions();
-            vdb->setVisualization(visopt.myMode, visopt.myIso, visopt.myDensity, visopt.myLod);
+	    vdb->setVisualization(visopt.myMode, visopt.myIso, visopt.myDensity,
+				  visopt.myLod);
         }
 
         // Ensure that certain metadata exists (grid name, grid class, etc.).
@@ -168,12 +169,14 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
             if (grid->getGridClass() == openvdb::GRID_LEVEL_SET)
             {
                 vdb->setVisualization(GEO_VOLUMEVIS_ISO,
-                     vdb->getVisIso(), vdb->getVisDensity(), vdb->getVisLod());
+				      vdb->getVisIso(), vdb->getVisDensity(),
+				      vdb->getVisLod());
             }
             else
             {
                 vdb->setVisualization(GEO_VOLUMEVIS_SMOKE,
-                     vdb->getVisIso(), vdb->getVisDensity(), vdb->getVisLod());
+				      vdb->getVisIso(), vdb->getVisDensity(),
+				      vdb->getVisLod());
             }
         }
     }
@@ -427,7 +430,8 @@ GU_PrimVDB::buildFromPrimVolume(
     vol.getRes(rx, ry, rz);
     prim_vdb->setSpaceTransform(vol.getSpaceTransform(), UT_Vector3R(rx,ry,rz));
     prim_vdb->setVisualization(
-       vol.getVisualization(), vol.getVisIso(), vol.getVisDensity(), GEO_VOLUMEVISLOD_FULL);
+		vol.getVisualization(), vol.getVisIso(), vol.getVisDensity(),
+		GEO_VOLUMEVISLOD_FULL);
     return prim_vdb;
 }
 
@@ -484,37 +488,21 @@ GU_PrimVDB::expandBorderFromPrimVolume(const GEO_PrimVolume &vol, int pad)
 
 // The following code is for HDK only
 #ifndef SESI_OPENVDB
-
 // Static callback for our factory.
-static void
-guNewPrimVDB(
-    GA_Primitive **new_prims,
-    GA_Size nprimitives,
-    GA_Detail &gdp,
-    GA_Offset start_offset,
-    const GA_PrimitiveDefinition &def,
-    bool allowed_to_parallelize)
+static GA_Primitive*
+gu_newPrimVDB(GA_Detail &detail, GA_Offset offset,
+	const GA_PrimitiveDefinition &)
 {
-    if (allowed_to_parallelize && nprimitives >= 4*GA_PAGE_SIZE)
-    {
-        // Allocate them in parallel if we're allocating many.
-        // This is using the C++11 lambda syntax to make a functor.
-        UTparallelForLightItems(UT_BlockedRange<GA_Offset>(start_offset, start_offset+nprimitives),
-            [new_prims,&gdp,start_offset](const UT_BlockedRange<GA_Offset> &r){
-                GA_Offset primoff(r.begin());
-                GA_Primitive **pprims = new_prims+(primoff-start_offset);
-                GA_Offset endprimoff(r.end());
-                for ( ; primoff != endprimoff; ++primoff, ++pprims)
-                    *pprims = new GU_PrimVDB(static_cast<GU_Detail *>(&gdp), primoff);
-            });
-    }
-    else
-    {
-        // Allocate them serially if we're only allocating a few.
-        GA_Offset endprimoff(start_offset + nprimitives);
-        for (GA_Offset primoff(start_offset); primoff != endprimoff; ++primoff, ++new_prims)
-            *new_prims =  new GU_PrimVDB(static_cast<GU_Detail *>(&gdp), primoff);
-    }
+    return new GU_PrimVDB(static_cast<GU_Detail *>(&detail), offset);
+}
+
+static GA_Primitive*
+gaPrimitiveMergeConstructor(const GA_MergeMap &map,
+                            GA_Detail &dest_detail,
+                            GA_Offset dest_offset,
+                            const GA_Primitive &src_prim)
+{
+    return new GU_PrimVDB(map, dest_detail, dest_offset, static_cast<const GU_PrimVDB &>(src_prim));
 }
 
 static UT_Lock theInitPrimDefLock;
@@ -536,7 +524,7 @@ GU_PrimVDB::registerMyself(GA_PrimitiveFactory *factory)
 #endif
 
     theDefinition = factory->registerDefinition("VDB",
-        guNewPrimVDB, GA_FAMILY_NONE);
+        gu_newPrimVDB, GA_FAMILY_NONE);
 
 #if defined(__ICC)
     __pragma(warning(default:1711));
@@ -552,6 +540,7 @@ GU_PrimVDB::registerMyself(GA_PrimitiveFactory *factory)
 
     theDefinition->setLabel("Sparse Volumes (VDBs)");
     theDefinition->setHasLocalTransform(true);
+    theDefinition->setMergeConstructor(&gaPrimitiveMergeConstructor);
     registerIntrinsics(*theDefinition);
 
     // Register the GT tesselation too (now we know what type id we have)
@@ -1352,6 +1341,28 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
             }
         }
     }
+
+    // Enable this to do slow code path verification
+#if 0
+    for (int tuple_i = 0; tuple_i < TUPLE_SIZE; ++tuple_i) {
+	VoxelTileF* tile = tiles[tuple_i];
+	fpreal32* data = tile->rawData();
+	Coord xyz;
+	for (xyz[2] = 0; xyz[2] < tile_res[2]; ++xyz[2]) {
+	    for (xyz[1] = 0; xyz[1] < tile_res[1]; ++xyz[1]) {
+		for (xyz[0] = 0; xyz[0] < tile_res[0]; ++xyz[0]) {
+		    Coord ijk = beg + xyz;
+		    if (!compareVoxel(xyz, tile, data,
+				      acc.getValue(ijk), tuple_i)) {
+			UT_ASSERT(!"Voxels are different");
+			compareVoxel(xyz, tile, data,
+				     acc.getValue(ijk), tuple_i);
+		    }
+		}
+	    }
+	}
+    }
+#endif
 }
 
 template<typename TreeType, typename VolumeT, bool aligned>
@@ -2193,6 +2204,7 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
         }
 
         case GA_STORECLASS_INVALID: break;
+        case GA_STORECLASS_DICT: break;
         case GA_STORECLASS_OTHER: break;
         }
     }
