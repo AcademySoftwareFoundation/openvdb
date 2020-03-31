@@ -127,11 +127,12 @@ elseif(DEFINED ENV{TBB_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find Tbb
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_Tbb QUIET tbb)
 endif()
-pkg_check_modules(PC_Tbb QUIET tbb)
 
 # ------------------------------------------------------------------------
 #  Search for tbb include DIR
