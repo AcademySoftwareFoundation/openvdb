@@ -6,7 +6,7 @@
 
 #include <openvdb/version.h>
 #include <string>
-#include <tbb/tick_count.h>
+#include <chrono>
 #include <iostream>// for std::cerr
 #include <sstream>// for ostringstream
 #include <iomanip>// for setprecision
@@ -66,9 +66,10 @@ namespace util {
 class CpuTimer
 {
 public:
+    using ClockT = std::chrono::high_resolution_clock;
 
     /// @brief Initiate timer
-    CpuTimer(std::ostream& os = std::cerr) : mOutStream(os), mT0(tbb::tick_count::now()) {}
+    CpuTimer(std::ostream& os = std::cerr) : mOutStream(os), mT0(ClockT::now()) {}
 
     /// @brief Prints message and start timer.
     ///
@@ -78,7 +79,7 @@ public:
     /// @brief Start timer.
     ///
     /// @note Should normally be followed by a call to milliseconds() or stop(std::string)
-    inline void start() { mT0 = tbb::tick_count::now(); }
+    inline void start() { mT0 = ClockT::now(); }
 
     /// @brief Print message and start timer.
     ///
@@ -94,8 +95,8 @@ public:
     /// @note Combine this method with start() to get timing without any outputs.
     inline double milliseconds() const
     {
-        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
-        return 1000.0*dt.seconds();
+        std::chrono::duration<double, std::milli> duration = ClockT::now() - mT0;
+        return duration.count();
     }
 
     /// @brief Return Time difference in seconds since construction or start was called.
@@ -103,8 +104,8 @@ public:
     /// @note Combine this method with start() to get timing without any outputs.
     inline double seconds() const
     {
-        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
-        return dt.seconds();
+        std::chrono::duration<double> duration = ClockT::now() - mT0;
+        return duration.count();
     }
 
     /// @brief This method is identical to milliseconds() - deprecated
@@ -162,8 +163,8 @@ public:
     }
 
 private:
-    std::ostream&   mOutStream;
-    tbb::tick_count mT0;
+    std::ostream&       mOutStream;
+    ClockT::time_point  mT0;
 };// CpuTimer
 
 } // namespace util

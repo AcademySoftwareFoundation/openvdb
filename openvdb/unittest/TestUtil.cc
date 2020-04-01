@@ -3,7 +3,6 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <tbb/tbb_thread.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -136,23 +135,35 @@ TestUtil::testFormats()
 void
 TestUtil::testCpuTimer()
 {
-    const int expected = 159, tolerance = 20;//milliseconds
-    const tbb::tick_count::interval_t sec(expected/1000.0);
+    // std::this_thread::sleep_for() only guarantees that the time slept is no less
+    // than the requested time, which can be inaccurate, particularly on Windows,
+    // so use this more accurate, but non-asynchronous implementation for unit testing
+    auto sleep_for = [&](int ms) -> void
     {
-      openvdb::util::CpuTimer timer;
-      tbb::this_tbb_thread::sleep(sec);
-      const int actual1 = static_cast<int>(timer.milliseconds());
-      CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, actual1, tolerance);
-      tbb::this_tbb_thread::sleep(sec);
-      const int actual2 = static_cast<int>(timer.milliseconds());
-      CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
+        auto start = std::chrono::high_resolution_clock::now();
+        while (true) {
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now() - start);
+            if (duration.count() > ms)    return;
+        }
+    };
+
+    const int expected = 159, tolerance = 20;//milliseconds
+    {
+        openvdb::util::CpuTimer timer;
+        sleep_for(expected);
+        const int actual1 = static_cast<int>(timer.milliseconds());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, actual1, tolerance);
+        sleep_for(expected);
+        const int actual2 = static_cast<int>(timer.milliseconds());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
     }
     {
       openvdb::util::CpuTimer timer;
-      tbb::this_tbb_thread::sleep(sec);
+      sleep_for(expected);
       auto t1 = timer.restart();
-      tbb::this_tbb_thread::sleep(sec);
-      tbb::this_tbb_thread::sleep(sec);
+      sleep_for(expected);
+      sleep_for(expected);
       auto t2 = timer.restart();
       CPPUNIT_ASSERT_DOUBLES_EQUAL(2*t1, t2, tolerance);
     }
