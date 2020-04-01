@@ -21,6 +21,9 @@ Improvements:
   floatingPointToFixedPoint@endlink.
 - Add gitignore to repository root.
 - Removed some logic for compilers older than Visual Studio 2019.
+- Add a new Houdini ABI test binary.
+- Fixed an indexing typo in tools::Filter.
+  <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
 
 @par
 New features:
@@ -84,6 +87,8 @@ Build:
 - Fixed some build issues with the Houdini plugin on Windows.
 - Standardized the library components install paths for the OpenVDB
   Houdini shared library.
+- Added a USE_PKGCONFIG option to CMake to optionally disable use of pkg-config.
+  <I>[Contributed&nbsp;by&nbsp;Kartik&nbsp;Shrivastava]</I>
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly

@@ -57,6 +57,7 @@ option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
+option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
@@ -100,6 +101,7 @@ list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
+option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -182,6 +184,7 @@ mark_as_advanced(
   USE_LOG4CPLUS
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
+  OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI
@@ -321,7 +324,7 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
   set(USE_HOUDINI ON)
 endif()
 
@@ -352,6 +355,7 @@ if(NOT (
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
+    OPENVDB_BUILD_HOUDINI_ABITESTS OR
     OPENVDB_BUILD_MAYA_PLUGIN)
   )
   return()
@@ -661,6 +665,10 @@ endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
   add_subdirectory(openvdb_houdini)
+endif()
+
+if(OPENVDB_BUILD_HOUDINI_ABITESTS)
+  add_subdirectory(openvdb_houdini/abitest)
 endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
