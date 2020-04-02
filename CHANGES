@@ -16,7 +16,7 @@ Version 7.1.0 - In Development
     - Removed some logic for compilers older than Visual Studio 2019.
     - Add a new Houdini ABI test binary.
     - Fixed an indexing typo in tools::Filter. [Contributed by Yuanming Hu]
-      
+
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
       grid.
@@ -35,6 +35,7 @@ Version 7.1.0 - In Development
     - Fixed a rotation order bug in tools::local_util::decompose()
       that caused it to fail to decompose some matrices.
     - Fixed a bug where math::Quat::inverse() was not marked as const.
+      [Contributed by Michael Tao]
 
     API changes:
     - Removed a number of deprecated point methods.
