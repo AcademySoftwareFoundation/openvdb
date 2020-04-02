@@ -1912,7 +1912,7 @@ static void
 geo_calcMinVDB( GridType &grid,
                     fpreal &result)
 {
-    auto val = openvdb::tools::extrema(grid.beginValueOn());
+    auto val = openvdb::tools::extrema(grid.cbeginValueOn());
     result = val.min();
 }
 
@@ -1932,7 +1932,7 @@ static void
 geo_calcMaxVDB( GridType &grid,
                     fpreal &result)
 {
-    auto val = openvdb::tools::extrema(grid.beginValueOn());
+    auto val = openvdb::tools::extrema(grid.cbeginValueOn());
     result = val.max();
 }
 
@@ -1952,7 +1952,7 @@ static void
 geo_calcAvgVDB( GridType &grid,
                     fpreal &result)
 {
-    auto val = openvdb::tools::statistics(grid.beginValueOn());
+    auto val = openvdb::tools::statistics(grid.cbeginValueOn());
     result = val.avg();
 }
 
