@@ -35,6 +35,8 @@ Version 7.1.0 - In Development
       isosurface. [Contributed by Tristan Barback]
     - Fixed a rotation order bug in tools::local_util::decompose()
       that caused it to fail to decompose some matrices.
+    - Fixed a bug where math::Quat::inverse() was not marked as const.
+      [Contributed by Michael Tao]
 
     API changes:
     - Removed a number of deprecated point methods.

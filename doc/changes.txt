@@ -50,6 +50,9 @@ Bug fixes:
   <I>[Contributed&nbsp;by&nbsp;Tristan&nbsp;Barback]</I>
 - Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
   decompose@endlink utility that caused it to fail to decompose some matrices.
+- Fixed a bug where @vdblink::math::Quat::inverse() Quat::inverse@endlink was
+  not marked as const.
+  <I>[Contributed&nbsp;by&nbsp;Michael&nbsp;Tao]</I>
 
 @par
 API changes:
