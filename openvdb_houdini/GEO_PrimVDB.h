@@ -103,14 +103,14 @@ public:
     /// location
     void                indexToPos(int x, int y, int z, UT_Vector3 &pos) const;
     void                findexToPos(UT_Vector3 index, UT_Vector3 &pos) const;
-    void		indexToPos(exint x, exint y, exint z, UT_Vector3D &pos) const;
-    void		findexToPos(UT_Vector3D index, UT_Vector3D &pos) const;
+    void                indexToPos(exint x, exint y, exint z, UT_Vector3D &pos) const;
+    void                findexToPos(UT_Vector3D index, UT_Vector3D &pos) const;
 
     /// Convert a 3d position into the closest index value.
     void                posToIndex(UT_Vector3 pos, int &x, int &y, int &z) const;
     void                posToIndex(UT_Vector3 pos, UT_Vector3 &index) const;
-    void		posToIndex(UT_Vector3D pos, exint &x, exint &y, exint &z) const;
-    void		posToIndex(UT_Vector3D pos, UT_Vector3D &index) const;
+    void                posToIndex(UT_Vector3D pos, exint &x, exint &y, exint &z) const;
+    void                posToIndex(UT_Vector3D pos, UT_Vector3D &index) const;
 
     /// Evaluate the voxel value at the given world space position.
     /// Note that depending on the underlying VDB type, this may not
@@ -129,14 +129,14 @@ public:
     void                getValues(UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num) const;
     void                getValuesAtIndices(UT_Vector3 *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
 
-    void		getValues(double *f, int stride, const UT_Vector3D *pos, int num) const;
-    void		getValues(exint *f, int stride, const UT_Vector3D *pos, int num) const;
-    void		getValuesAtIndices(double *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
-    void		getValuesAtIndices(exint *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
+    void                getValues(double *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValues(exint *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValuesAtIndices(double *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
+    void                getValuesAtIndices(exint *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
 
     /// Vector grid variants.
-    void		getValues(UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num) const;
-    void		getValuesAtIndices(UT_Vector3D *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
+    void                getValues(UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValuesAtIndices(UT_Vector3D *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
 
     // Worldspace gradient at the given position
     UT_Vector3           getGradient(const UT_Vector3 &pos) const;
@@ -266,9 +266,9 @@ public:
     UT_Vector3           getVoxelSize() const;
 
     /// Compute useful aggregate properties of the volume.
-    fpreal		 calcMinimum() const;
-    fpreal		 calcMaximum() const;
-    fpreal		 calcAverage() const;
+    fpreal               calcMinimum() const;
+    fpreal               calcMaximum() const;
+    fpreal               calcAverage() const;
 
     /// VDBs may either be unbounded, or created with a specific frustum
     /// range.  The latter is important for tapered VDBs that otherwise
@@ -369,18 +369,18 @@ public:
     void                setVisualization(
                             GEO_VolumeVis vismode,
                             fpreal iso,
-			    fpreal density,
-			    GEO_VolumeVisLod lod = GEO_VOLUMEVISLOD_FULL)
+                            fpreal density,
+                            GEO_VolumeVisLod lod = GEO_VOLUMEVISLOD_FULL)
                         {
                             myVis.myMode = vismode;
                             myVis.myIso = iso;
                             myVis.myDensity = density;
-			    myVis.myLod = lod;
+                            myVis.myLod = lod;
                         }
     GEO_VolumeVis       getVisualization() const    { return myVis.myMode; }
     fpreal              getVisIso() const           { return myVis.myIso; }
     fpreal              getVisDensity() const       { return myVis.myDensity; }
-    GEO_VolumeVisLod	getVisLod() const	    { return myVis.myLod; }
+    GEO_VolumeVisLod    getVisLod() const           { return myVis.myLod; }
     /// @}
 
     /// Load the order from a JSON value
@@ -389,9 +389,9 @@ public:
     /// @{
     /// Save/Load vdb to a JSON stream
     bool                saveVDB(UT_JSONWriter &w, const GA_SaveMap &sm,
-				bool as_shmem = false) const;
+                                bool as_shmem = false) const;
     bool                loadVDB(UT_JSONParser &p,
-				bool as_shmem = false);
+                                bool as_shmem = false);
     /// @}
 
     bool                saveVisualization(
@@ -479,10 +479,10 @@ public:
     /// @brief Set this primitive's grid to a shallow copy of the given grid.
     /// @note Invalidates all previous getGrid() and getConstGrid() references
     SYS_FORCE_INLINE
-    void			setGrid(const openvdb::GridBase &grid, bool copyPosition=true)
+    void                        setGrid(const openvdb::GridBase &grid, bool copyPosition=true)
                                 {
                                     incrGridUniqueIds();
-				    myGridAccessor.setGrid(grid, *this, copyPosition);
+                                    myGridAccessor.setGrid(grid, *this, copyPosition);
                                 }
 
     /// @brief Return a reference to this primitive's grid metadata.
@@ -629,7 +629,7 @@ protected:
 
     /// @brief Replace this primitive's grid with a shallow copy
     /// of another primitive's grid.
-    void		copyGridFrom(const GEO_PrimVDB&, bool copyPosition=true);
+    void                copyGridFrom(const GEO_PrimVDB&, bool copyPosition=true);
 
     /// @brief GridAccessor manages access to a GEO_PrimVDB's grid.
     /// @details In keeping with OpenVDB library conventions, the grid
@@ -681,8 +681,8 @@ protected:
         // These accessors will ensure the transform's translate is set into
         // the vertex position.
         SYS_FORCE_INLINE
-	void	    setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim, bool copyPosition=true)
-			{ setGridAdapter(&grid, prim, copyPosition); }
+        void        setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim, bool copyPosition=true)
+                        { setGridAdapter(&grid, prim, copyPosition); }
         SYS_FORCE_INLINE
         void        setTransform(
                         const openvdb::math::Transform &xform,
@@ -707,7 +707,7 @@ protected:
                         GEO_PrimVDB &prim)
                         { setVertexPositionAdapter(&xform, prim); }
 
-	void	    setGridAdapter(const void* grid, GEO_PrimVDB&, bool copyPosition);
+        void        setGridAdapter(const void* grid, GEO_PrimVDB&, bool copyPosition);
         void        setTransformAdapter(const void* xform, GEO_PrimVDB&);
         void        setVertexPositionAdapter(const void* xform, GEO_PrimVDB&);
 

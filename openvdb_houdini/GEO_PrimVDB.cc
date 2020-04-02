@@ -81,7 +81,7 @@ using namespace UT::Literal;
 
 static const UT_StringHolder    theKWVertex = "vertex"_sh;
 static const UT_StringHolder    theKWVDB = "vdb"_sh;
-static const UT_StringHolder	theKWVDBShm = "vdbshm"_sh;
+static const UT_StringHolder    theKWVDBShm = "vdbshm"_sh;
 static const UT_StringHolder    theKWVDBVis = "vdbvis"_sh;
 
 
@@ -127,7 +127,7 @@ GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
     }
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0,
-			      GEO_VOLUMEVISLOD_FULL);
+                              GEO_VOLUMEVISLOD_FULL);
 }
 
 bool
@@ -778,12 +778,12 @@ geo_calcVolume(const GridType &grid, fpreal &volume)
 {
     bool calculated = false;
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-	try {
-	    volume = openvdb::tools::levelSetVolume(grid);
-	    calculated = true;
-	} catch (std::exception& /*e*/) {
-	    // do nothing
-	}
+        try {
+            volume = openvdb::tools::levelSetVolume(grid);
+            calculated = true;
+        } catch (std::exception& /*e*/) {
+            // do nothing
+        }
     }
 
     // Simply account for the total number of active voxels
@@ -807,12 +807,12 @@ geo_calcArea(const GridType &grid, fpreal &area)
 {
     bool calculated = false;
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-	try {
-	    area = openvdb::tools::levelSetArea(grid);
-	    calculated = true;
-	} catch (std::exception& /*e*/) {
-	    // do nothing
-	}
+        try {
+            area = openvdb::tools::levelSetArea(grid);
+            calculated = true;
+        } catch (std::exception& /*e*/) {
+            // do nothing
+        }
     }
 
     if (!calculated) {
@@ -1026,7 +1026,7 @@ template <typename GridType, typename T, typename IDX>
 static void
 geo_sampleGridMany(const GridType &grid,
                 T *f, int stride,
-		const IDX *pos,
+                const IDX *pos,
                 int num)
 {
     typename GridType::ConstAccessor accessor = grid.getAccessor();
@@ -1052,7 +1052,7 @@ template <typename GridType, typename T, typename IDX>
 static void
 geo_sampleBoolGridMany(const GridType &grid,
                 T *f, int stride,
-		const IDX *pos,
+                const IDX *pos,
                 int num)
 {
     typename GridType::ConstAccessor accessor = grid.getAccessor();
@@ -1078,7 +1078,7 @@ template <typename GridType, typename T, typename IDX>
 static void
 geo_sampleVecGridMany(const GridType &grid,
                 T *f, int stride,
-		const IDX *pos,
+                const IDX *pos,
                 int num)
 {
     typename GridType::ConstAccessor accessor = grid.getAccessor();
@@ -1162,13 +1162,13 @@ static void
 geoEvaluateVDBMany(const GEO_PrimVDB *vdb, double *f, int stride, const UT_Vector3D *pos, int num)
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
-	    geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
+            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
     UTvdbReturnBoolType(vdb->getStorageType(), 
-	    geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
+            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 
@@ -1176,13 +1176,13 @@ static void
 geoEvaluateVDBMany(const GEO_PrimVDB *vdb, exint *f, int stride, const UT_Vector3D *pos, int num)
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
-	    geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
+            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
     UTvdbReturnBoolType(vdb->getStorageType(), 
-	    geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
+            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 
@@ -1190,11 +1190,11 @@ static void
 geoEvaluateVDBMany(const GEO_PrimVDB *vdb, UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num)
 {
     UTvdbReturnVec3Type(vdb->getStorageType(),
-	    geo_sampleVecGridMany, vdb->getGrid(), f, stride, pos, num);
+            geo_sampleVecGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 
@@ -1427,7 +1427,7 @@ GEO_PrimVDB::posToIndex(UT_Vector3 pos, UT_Vector3 &index) const
 void
 GEO_PrimVDB::indexToPos(exint x, exint y, exint z, UT_Vector3D &pos) const
 {
-    openvdb::math::Vec3d		vpos;
+    openvdb::math::Vec3d                vpos;
 
     vpos = openvdb::math::Vec3d(x, y, z);
     vpos = getGrid().indexToWorld(vpos);
@@ -1437,7 +1437,7 @@ GEO_PrimVDB::indexToPos(exint x, exint y, exint z, UT_Vector3D &pos) const
 void
 GEO_PrimVDB::findexToPos(UT_Vector3D idx, UT_Vector3D &pos) const
 {
-    openvdb::math::Vec3d		vpos;
+    openvdb::math::Vec3d                vpos;
 
     vpos = openvdb::math::Vec3d(idx.x(), idx.y(), idx.z());
     vpos = getGrid().indexToWorld(vpos);
@@ -1449,7 +1449,7 @@ GEO_PrimVDB::posToIndex(UT_Vector3D pos, exint &x, exint &y, exint &z) const
 {
     openvdb::math::Vec3d vpos(pos.data());
     openvdb::math::Coord
-	coord = getGrid().transform().worldToIndexCellCentered(vpos);
+        coord = getGrid().transform().worldToIndexCellCentered(vpos);
     x = coord.x();
     y = coord.y();
     z = coord.z();
@@ -1458,7 +1458,7 @@ GEO_PrimVDB::posToIndex(UT_Vector3D pos, exint &x, exint &y, exint &z) const
 void
 GEO_PrimVDB::posToIndex(UT_Vector3D pos, UT_Vector3D &index) const
 {
-    openvdb::math::Vec3d		vpos;
+    openvdb::math::Vec3d                vpos;
 
     vpos = openvdb::math::Vec3d(pos.x(), pos.y(), pos.z());
     vpos = getGrid().worldToIndex(vpos);
@@ -1506,7 +1506,7 @@ template <typename GridType, typename T, typename IDX>
 static void
 geo_sampleIndexMany(const GridType &grid,
                 T *f, int stride,
-		const IDX *ix, const IDX *iy, const IDX *iz,
+                const IDX *ix, const IDX *iy, const IDX *iz,
                 int num)
 {
     typename GridType::ConstAccessor accessor = grid.getAccessor();
@@ -1529,7 +1529,7 @@ template <typename GridType, typename T, typename IDX>
 static void
 geo_sampleVecIndexMany(const GridType &grid,
                 T *f, int stride,
-		const IDX *ix, const IDX *iy, const IDX *iz,
+                const IDX *ix, const IDX *iy, const IDX *iz,
                 int num)
 {
     typename GridType::ConstAccessor accessor = grid.getAccessor();
@@ -1617,46 +1617,46 @@ geoEvaluateIndexVDBMany(const GEO_PrimVDB *vdb,
 
 static void
 geoEvaluateIndexVDBMany(const GEO_PrimVDB *vdb,
-		double *f, int stride,
-		const exint *ix, const exint *iy, const exint *iz,
-		int num)
+                double *f, int stride,
+                const exint *ix, const exint *iy, const exint *iz,
+                int num)
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
-	    geo_sampleIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
+            geo_sampleIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 
 static void
 geoEvaluateIndexVDBMany(const GEO_PrimVDB *vdb,
-		exint *f, int stride,
-		const exint *ix, const exint *iy, const exint *iz,
-		int num)
+                exint *f, int stride,
+                const exint *ix, const exint *iy, const exint *iz,
+                int num)
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
-	    geo_sampleIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
+            geo_sampleIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 
 static void
 geoEvaluateIndexVDBMany(const GEO_PrimVDB *vdb,
-		UT_Vector3D *f, int stride,
-		const exint *ix, const exint *iy, const exint *iz,
-		int num)
+                UT_Vector3D *f, int stride,
+                const exint *ix, const exint *iy, const exint *iz,
+                int num)
 {
     UTvdbReturnVec3Type(vdb->getStorageType(),
-	    geo_sampleVecIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
+            geo_sampleVecIndexMany, vdb->getGrid(), f, stride, ix, iy, iz, num);
     for (int i = 0; i < num; i++)
     {
-	*f = 0;
-	f += stride;
+        *f = 0;
+        f += stride;
     }
 }
 fpreal
@@ -1910,7 +1910,7 @@ GEO_PrimVDB::getVoxelSize() const
 template <typename GridType>
 static void
 geo_calcMinVDB( GridType &grid,
-		    fpreal &result)
+                    fpreal &result)
 {
     auto val = openvdb::tools::extrema(grid.beginValueOn());
     result = val.min();
@@ -1919,18 +1919,18 @@ geo_calcMinVDB( GridType &grid,
 fpreal
 GEO_PrimVDB::calcMinimum() const
 {
-    fpreal			value = SYS_FPREAL_MAX;
+    fpreal                      value = SYS_FPREAL_MAX;
     UTvdbCallScalarType( getStorageType(),
-			geo_calcMinVDB,
-			SYSconst_cast(getConstGrid()),
-			value);
+                        geo_calcMinVDB,
+                        SYSconst_cast(getConstGrid()),
+                        value);
     return value;
 }
 
 template <typename GridType>
 static void
 geo_calcMaxVDB( GridType &grid,
-		    fpreal &result)
+                    fpreal &result)
 {
     auto val = openvdb::tools::extrema(grid.beginValueOn());
     result = val.max();
@@ -1939,18 +1939,18 @@ geo_calcMaxVDB( GridType &grid,
 fpreal
 GEO_PrimVDB::calcMaximum() const
 {
-    fpreal			value = -SYS_FPREAL_MAX;
+    fpreal                      value = -SYS_FPREAL_MAX;
     UTvdbCallScalarType( getStorageType(),
-			geo_calcMaxVDB,
-			SYSconst_cast(getConstGrid()),
-			value);
+                        geo_calcMaxVDB,
+                        SYSconst_cast(getConstGrid()),
+                        value);
     return value;
 }
 
 template <typename GridType>
 static void
 geo_calcAvgVDB( GridType &grid,
-		    fpreal &result)
+                    fpreal &result)
 {
     auto val = openvdb::tools::statistics(grid.beginValueOn());
     result = val.avg();
@@ -1959,11 +1959,11 @@ geo_calcAvgVDB( GridType &grid,
 fpreal
 GEO_PrimVDB::calcAverage() const
 {
-    fpreal			value = 0;
+    fpreal                      value = 0;
     UTvdbCallScalarType( getStorageType(),
-			geo_calcAvgVDB,
-			SYSconst_cast(getConstGrid()),
-			value);
+                        geo_calcAvgVDB,
+                        SYSconst_cast(getConstGrid()),
+                        value);
     return value;
 }
 
@@ -2677,7 +2677,7 @@ public:
     {
         geo_TBJ_VERTEX,
         geo_TBJ_VDB,
-	geo_TBJ_VDB_SHMEM,
+        geo_TBJ_VDB_SHMEM,
         geo_TBJ_VDB_VISUALIZATION,
         geo_TBJ_ENTRIES
     };
@@ -2697,7 +2697,7 @@ public:
         {
             case geo_TBJ_VERTEX:            return theKWVertex;
             case geo_TBJ_VDB:               return theKWVDB;
-	    case geo_TBJ_VDB_SHMEM:	    return theKWVDBShm;
+            case geo_TBJ_VDB_SHMEM:         return theKWVDBShm;
             case geo_TBJ_VDB_VISUALIZATION: return theKWVDBVis;
             case geo_TBJ_ENTRIES:           break;
         }
@@ -2707,14 +2707,14 @@ public:
 
     virtual bool
     shouldSaveField(const GA_Primitive *prim, int i,
-		    const GA_SaveMap &sm) const
+                    const GA_SaveMap &sm) const
     {
-	bool is_shmem = sm.getOptions().hasOption("geo:sharedmemowner");
+        bool is_shmem = sm.getOptions().hasOption("geo:sharedmemowner");
         switch (i)
         {
             case geo_TBJ_VERTEX:            return true;
-	    case geo_TBJ_VDB:		    return !is_shmem;
-	    case geo_TBJ_VDB_SHMEM:	    return is_shmem;
+            case geo_TBJ_VDB:               return !is_shmem;
+            case geo_TBJ_VDB_SHMEM:         return is_shmem;
             case geo_TBJ_VDB_VISUALIZATION: return true;
             case geo_TBJ_ENTRIES:           break;
         }
@@ -2734,9 +2734,9 @@ public:
                 return w.jsonInt(int64(map.getVertexIndex(vtx)));
             }
             case geo_TBJ_VDB:
-		return vdb(pr)->saveVDB(w, map);
-	    case geo_TBJ_VDB_SHMEM:
-		return vdb(pr)->saveVDB(w, map, true);
+                return vdb(pr)->saveVDB(w, map);
+            case geo_TBJ_VDB_SHMEM:
+                return vdb(pr)->saveVDB(w, map, true);
             case geo_TBJ_VDB_VISUALIZATION:
                 return vdb(pr)->saveVisualization(w, map);
 
@@ -2766,8 +2766,8 @@ public:
             }
             case geo_TBJ_VDB:
                 return vdb(pr)->loadVDB(p);
-	    case geo_TBJ_VDB_SHMEM:
-		return vdb(pr)->loadVDB(p, true);
+            case geo_TBJ_VDB_SHMEM:
+                return vdb(pr)->loadVDB(p, true);
             case geo_TBJ_VDB_VISUALIZATION:
                 return vdb(pr)->loadVisualization(p, map);
 
@@ -2804,7 +2804,7 @@ public:
         {
             case geo_TBJ_VERTEX:
                 return (p0->getVertexOffset(0) == p1->getVertexOffset(0));
-	    case geo_TBJ_VDB_SHMEM:
+            case geo_TBJ_VDB_SHMEM:
             case geo_TBJ_VDB:
                 return false; // never save these tags as uniform
             case geo_TBJ_VDB_VISUALIZATION:
@@ -2861,72 +2861,72 @@ geoSetVDBStreamCompression(openvdb::io::Stream& vos, bool backwards_compatible)
 
 bool
 GEO_PrimVDB::saveVDB(UT_JSONWriter &w, const GA_SaveMap &sm,
-		     bool as_shmem) const
+                     bool as_shmem) const
 {
-    bool	ok = true;
+    bool        ok = true;
 
     try
     {
-	openvdb::GridCPtrVec grids;
-	grids.push_back(getConstGridPtr());
+        openvdb::GridCPtrVec grids;
+        grids.push_back(getConstGridPtr());
 
-	if (as_shmem)
-	{
-	    openvdb::MetaMap meta;
+        if (as_shmem)
+        {
+            openvdb::MetaMap meta;
 
-	    UT_String shmem_owner;
-	    sm.getOptions().importOption("geo:sharedmemowner", shmem_owner);
-	    if (!shmem_owner.isstring())
-		return false;
+            UT_String shmem_owner;
+            sm.getOptions().importOption("geo:sharedmemowner", shmem_owner);
+            if (!shmem_owner.isstring())
+                return false;
 
-	    // First do a pass to collect the final size
-	    SYS_SharedMemoryOutputStream os_count(NULL);
-	    {
-		openvdb::io::Stream vos(os_count);
-		geoSetVDBStreamCompression(vos, /*backwards_compatible*/false);
-		vos.write(grids, meta);
-	    }
+            // First do a pass to collect the final size
+            SYS_SharedMemoryOutputStream os_count(NULL);
+            {
+                openvdb::io::Stream vos(os_count);
+                geoSetVDBStreamCompression(vos, /*backwards_compatible*/false);
+                vos.write(grids, meta);
+            }
 
-	    // Create the shmem segment
-	    UT_WorkBuffer shmem_key;
-	    shmem_key.sprintf("%s:%p", shmem_owner.buffer(), this);
-	    UT_SharedMemoryManager &shmgr = UT_SharedMemoryManager::get();
-	    SYS_SharedMemory *shmem = shmgr.get(shmem_key.buffer());
-	    if (shmem->size() != os_count.size())
-		shmem->reset(os_count.size());
+            // Create the shmem segment
+            UT_WorkBuffer shmem_key;
+            shmem_key.sprintf("%s:%p", shmem_owner.buffer(), this);
+            UT_SharedMemoryManager &shmgr = UT_SharedMemoryManager::get();
+            SYS_SharedMemory *shmem = shmgr.get(shmem_key.buffer());
+            if (shmem->size() != os_count.size())
+                shmem->reset(os_count.size());
 
-	    // Save the vdb stream to the shmem segment
-	    SYS_SharedMemoryOutputStream os_shm(shmem);
-	    {
-		openvdb::io::Stream vos(os_shm);
-		geoSetVDBStreamCompression(vos, /*backwards_compatible*/false);
-		vos.write(grids, meta);
-	    }
+            // Save the vdb stream to the shmem segment
+            SYS_SharedMemoryOutputStream os_shm(shmem);
+            {
+                openvdb::io::Stream vos(os_shm);
+                geoSetVDBStreamCompression(vos, /*backwards_compatible*/false);
+                vos.write(grids, meta);
+            }
 
-	    // In the main json stream, just tag it with the shmem key
-	    ok = ok && w.jsonBeginArray();
-	    ok = ok && w.jsonKeyToken(geo_PrimVDBJSON::theSharedMemKey);
-	    ok = ok && w.jsonString(shmem->id());
-	    ok = ok && w.jsonEndArray();
-	}
-	else
-	{
-	    UT_JSONWriter::TiledStream os(w);
+            // In the main json stream, just tag it with the shmem key
+            ok = ok && w.jsonBeginArray();
+            ok = ok && w.jsonKeyToken(geo_PrimVDBJSON::theSharedMemKey);
+            ok = ok && w.jsonString(shmem->id());
+            ok = ok && w.jsonEndArray();
+        }
+        else
+        {
+            UT_JSONWriter::TiledStream os(w);
 
-	    openvdb::io::Stream vos(os);
-	    openvdb::MetaMap meta;
+            openvdb::io::Stream vos(os);
+            openvdb::MetaMap meta;
 
-	    geoSetVDBStreamCompression(
-		vos, UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
+            geoSetVDBStreamCompression(
+                vos, UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
 
-	    // Visual C++ requires a default meta object declared on the stack
-	    vos.write(grids, meta);
-	}
+            // Visual C++ requires a default meta object declared on the stack
+            vos.write(grids, meta);
+        }
     }
     catch (std::exception &e)
     {
-	std::cerr << "Save failure: " << e.what() << "\n";
-	ok = false;
+        std::cerr << "Save failure: " << e.what() << "\n";
+        ok = false;
     }
     return ok;
 }
@@ -2936,86 +2936,86 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
 {
     if (as_shmem)
     {
-	bool		array_error = false;
-	UT_WorkBuffer	key;
+        bool            array_error = false;
+        UT_WorkBuffer   key;
 
-	if (!p.parseBeginArray(array_error) || array_error)
-	    return false;
+        if (!p.parseBeginArray(array_error) || array_error)
+            return false;
 
-	if (!p.parseString(key))
-	    return false;
+        if (!p.parseString(key))
+            return false;
 
-	if (key != geo_PrimVDBJSON::theSharedMemKey)
-	    return false;
+        if (key != geo_PrimVDBJSON::theSharedMemKey)
+            return false;
 
-	UT_WorkBuffer	shmem_key;
-	if (!p.parseString(shmem_key))
-	    return false;
+        UT_WorkBuffer   shmem_key;
+        if (!p.parseString(shmem_key))
+            return false;
 
-	SYS_SharedMemory	*shmem = new SYS_SharedMemory(shmem_key.buffer(),
-	                	                              /*read_only*/true);
+        SYS_SharedMemory        *shmem = new SYS_SharedMemory(shmem_key.buffer(),
+                                                              /*read_only*/true);
 
-	if (shmem->size())
-	{
-	    try
-	    {
-		SYS_SharedMemoryInputStream	is_shm(*shmem);
-		openvdb::io::Stream		vis(is_shm, /*delayLoad*/false);
-		openvdb::GridPtrVecPtr		grids = vis.getGrids();
+        if (shmem->size())
+        {
+            try
+            {
+                SYS_SharedMemoryInputStream     is_shm(*shmem);
+                openvdb::io::Stream             vis(is_shm, /*delayLoad*/false);
+                openvdb::GridPtrVecPtr          grids = vis.getGrids();
 
-		int count = (grids ? grids->size() : 0);
-		if (count != 1)
-		{
-		    UT_String mesg;
-		    mesg.sprintf("expected to read 1 grid, got %d grid%s",
-			count, count == 1 ? "" : "s");
-		    throw std::runtime_error(mesg.nonNullBuffer());
-		}
+                int count = (grids ? grids->size() : 0);
+                if (count != 1)
+                {
+                    UT_String mesg;
+                    mesg.sprintf("expected to read 1 grid, got %d grid%s",
+                        count, count == 1 ? "" : "s");
+                    throw std::runtime_error(mesg.nonNullBuffer());
+                }
 
-		openvdb::GridBase::Ptr grid = (*grids)[0];
-		UT_ASSERT(grid);
-		if (grid) setGrid(*grid);
-	    }
-	    catch (std::exception &e)
-	    {
-		std::cerr << "Shared memory load failure: " << e.what() << "\n";
-		return false;
-	    }
-	}
-	else
-	{
-	    // If the shared memory was set to zero, it probably died while
-	    // the IFD stream was in transit. Create a dummy grid so that
-	    // mantra doesn't flip out like a ninja.
-	    openvdb::GridBase::Ptr grid = openvdb::FloatGrid::create(0);
-	    setGrid(*grid);
-	}
+                openvdb::GridBase::Ptr grid = (*grids)[0];
+                UT_ASSERT(grid);
+                if (grid) setGrid(*grid);
+            }
+            catch (std::exception &e)
+            {
+                std::cerr << "Shared memory load failure: " << e.what() << "\n";
+                return false;
+            }
+        }
+        else
+        {
+            // If the shared memory was set to zero, it probably died while
+            // the IFD stream was in transit. Create a dummy grid so that
+            // mantra doesn't flip out like a ninja.
+            openvdb::GridBase::Ptr grid = openvdb::FloatGrid::create(0);
+            setGrid(*grid);
+        }
 
-	if (!p.parseEndArray(array_error) || array_error)
-	    return false;
+        if (!p.parseEndArray(array_error) || array_error)
+            return false;
     }
     else
     {
-	try
-	{
-	    UT_JSONParser::TiledStream	is(p);
+        try
+        {
+            UT_JSONParser::TiledStream  is(p);
 
-	    openvdb::io::Stream		vis(is, /*delayLoad*/false);
+            openvdb::io::Stream         vis(is, /*delayLoad*/false);
 
-	    openvdb::GridPtrVecPtr	grids = vis.getGrids();
+            openvdb::GridPtrVecPtr      grids = vis.getGrids();
 
-	    int count = (grids ? grids->size() : 0);
-	    if (count != 1)
-	    {
-		UT_String mesg;
-		mesg.sprintf("expected to read 1 grid, got %d grid%s",
-		    count, count == 1 ? "" : "s");
-		throw std::runtime_error(mesg.nonNullBuffer());
-	    }
+            int count = (grids ? grids->size() : 0);
+            if (count != 1)
+            {
+                UT_String mesg;
+                mesg.sprintf("expected to read 1 grid, got %d grid%s",
+                    count, count == 1 ? "" : "s");
+                throw std::runtime_error(mesg.nonNullBuffer());
+            }
 
-	    openvdb::GridBase::Ptr grid = (*grids)[0];
-	    UT_ASSERT(grid);
-	    if (grid) 
+            openvdb::GridBase::Ptr grid = (*grids)[0];
+            UT_ASSERT(grid);
+            if (grid) 
             {
                 // When we saved the grid, we auto-added metadata
                 // which isn't reflected by our primitive attributes.
@@ -3038,12 +3038,12 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
                 }
                 setGrid(*grid);
             }
-	}
-	catch (std::exception &e)
-	{
-	    std::cerr << "Load failure: " << e.what() << "\n";
-	    return false;
-	}
+        }
+        catch (std::exception &e)
+        {
+            std::cerr << "Load failure: " << e.what() << "\n";
+            return false;
+        }
     }
     return true;
 }
@@ -3062,7 +3062,7 @@ UT_FSATable     theJVolumeViz(
     geo_JVOL_VISMODE,           "mode",
     geo_JVOL_VISISO,            "iso",
     geo_JVOL_VISDENSITY,        "density",
-    geo_JVOL_VISLOD,		"lod",
+    geo_JVOL_VISLOD,            "lod",
     -1,                         nullptr
 );
 
@@ -3086,8 +3086,8 @@ GEO_PrimVDB::saveVisualization(UT_JSONWriter &w, const GA_SaveMap &) const
     // Only save myLod when non-default so that it loads in older builds
     if (myVis.myLod != GEO_VOLUMEVISLOD_FULL)
     {
-	ok = ok && w.jsonKeyToken(theJVolumeViz.getToken(geo_JVOL_VISLOD));
-	ok = ok && w.jsonString(GEOgetVolumeVisLodToken(myVis.myLod));
+        ok = ok && w.jsonKeyToken(theJVolumeViz.getToken(geo_JVOL_VISLOD));
+        ok = ok && w.jsonString(GEOgetVolumeVisLodToken(myVis.myLod));
     }
 
     return ok && w.jsonEndMap();
@@ -3100,7 +3100,7 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
     GEO_VolumeVis               mode = myVis.myMode;
     fpreal                      iso = myVis.myIso;
     fpreal                      density = myVis.myDensity;
-    GEO_VolumeVisLod 		lod = myVis.myLod;
+    GEO_VolumeVisLod            lod = myVis.myLod;
     UT_WorkBuffer               key;
     fpreal64                    fval;
     bool                        foundmap=false, ok = true;
@@ -3128,11 +3128,11 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
                 if ((ok = p.parseReal(fval)))
                     density = fval;
                 break;
-	    case geo_JVOL_VISLOD:
-		if ((ok = p.parseString(key)))
-		    lod = GEOgetVolumeVisLodEnum(
-				key.buffer(), GEO_VOLUMEVISLOD_FULL);
-		break;
+            case geo_JVOL_VISLOD:
+                if ((ok = p.parseString(key)))
+                    lod = GEOgetVolumeVisLodEnum(
+                                key.buffer(), GEO_VOLUMEVISLOD_FULL);
+                break;
             default:
                 p.addWarning("Unexpected key for volume visualization: %s",
                         key.buffer());
@@ -3146,7 +3146,7 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
         ok = false;
     }
     if (ok)
-	setVisualization(mode, iso, density, lod);
+        setVisualization(mode, iso, density, lod);
     return ok;
 }
 
@@ -3207,8 +3207,8 @@ GEO_PrimVDB::getBBox(UT_BoundingBox *bbox) const
         // invalid bounding boxes and return false.
         if (vbox.min()[0] > vbox.max()[0])
         {
-	    bbox->makeInvalid();
-	    return false;
+            bbox->makeInvalid();
+            return false;
         }
 
         const math::Transform &xform = grid.transform();
@@ -3450,7 +3450,7 @@ namespace // anonymous
         geo_INTRINSIC_VOLUMEVISUALMODE,
         geo_INTRINSIC_VOLUMEVISUALDENSITY,
         geo_INTRINSIC_VOLUMEVISUALISO,
-	geo_INTRINSIC_VOLUMEVISUALLOD,
+        geo_INTRINSIC_VOLUMEVISUALLOD,
 
         geo_INTRINSIC_META_GRID_CLASS,
         geo_INTRINSIC_META_GRID_CREATOR,
@@ -3573,7 +3573,7 @@ namespace // anonymous
     const char *
     intrinsicVisualLod(const GEO_PrimVDB *p)
     {
-	return GEOgetVolumeVisLodToken(p->getVisLod());
+        return GEOgetVolumeVisLodToken(p->getVisLod());
     }
 
     openvdb::Metadata::ConstPtr
@@ -3696,7 +3696,7 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
     GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALISO,
             "volumevisualiso", getVisIso)
     GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALLOD,
-	    "volumevisuallod", intrinsicVisualLod)
+            "volumevisuallod", intrinsicVisualLod)
 
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CLASS)
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CREATOR)
