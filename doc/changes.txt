@@ -24,6 +24,8 @@ Improvements:
 - Add a new Houdini ABI test binary.
 - Fixed an indexing typo in tools::Filter.
   <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
+- Removed redundant null pointer checks.
+  <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 
 @par
 New features:

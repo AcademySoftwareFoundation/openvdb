@@ -1503,7 +1503,7 @@ struct DensityOp
     {
     }
 
-    ~DensityOp() { if (mNode) delete mNode; }
+    ~DensityOp() { delete mNode; }
 
     void beginNodeProcessing(const openvdb::Coord& origin, size_t nodeOffset)
     {

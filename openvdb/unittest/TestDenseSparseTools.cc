@@ -14,7 +14,7 @@ class TestDenseSparseTools: public CppUnit::TestCase
 {
 public:
     virtual void setUp();
-    virtual void tearDown() { if (mDense) delete mDense;}
+    virtual void tearDown() { delete mDense; }
 
     CPPUNIT_TEST_SUITE(TestDenseSparseTools);
     CPPUNIT_TEST(testExtractSparseFloatTree);
