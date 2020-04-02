@@ -143,11 +143,12 @@ elseif(DEFINED ENV{ILMBASE_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find IlmBase
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_IlmBase QUIET IlmBase)
 endif()
-pkg_check_modules(PC_IlmBase QUIET IlmBase)
 
 # ------------------------------------------------------------------------
 #  Search for IlmBase include DIR

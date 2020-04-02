@@ -136,11 +136,12 @@ elseif(DEFINED ENV{OPENEXR_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find OpenEXR
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_OpenEXR QUIET OpenEXR)
 endif()
-pkg_check_modules(PC_OpenEXR QUIET OpenEXR)
 
 # ------------------------------------------------------------------------
 #  Search for OpenEXR include DIR

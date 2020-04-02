@@ -6,35 +6,17 @@ Version 7.1.0 - In Development
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
       array is known to be in-core and non-uniform.
-    - Improved the CMake build for the OpenVDB Houdini library on Windows.
-      [Reported by Ian Woodward]
-    - Remove some logic for compilers older than Visual Studio 2019.
     - Add support for default value metadata when creating AttributeArrays or
       appending to an AttributeSet.
     - Added new group inspection methods to the AttributeSet::Descriptor.
     - Introduced a StringMetaCache class for convenient string attribute
       metadata lookup and performed some minor optimizations.
     - Removed redundant floor in points::floatingPointToFixedPoint.
-    - CMake now checks the minimum supported MSVC compiler for Windows.
     - Add gitignore to repository root.
-    - CMake now only requires a CXX compiler.
-    - Improved the Windows README instructions and various MSVC warnings.
-    - Remove CMake warning when using GLFW 3.2+ on Debian.
-    - Various fixes to unary minus on unsigned compiler warnings.
-    - The defines _CRT_NONSTDC_NO_WARNINGS and _CRT_SECURE_NO_WARNINGS are now
-      enabled by default with MSVC.
-    - New CMake option OPENVDB_BUILD_PYTHON_UNITTESTS to disable or enable
-      the python module tests and fixed the required environment for them on
-      Windows. The python interpreter is no longer required by default if the
-      tests are disabled.
-    - Improved the CMake user messages when locating python and numpy.
-    - The python module extension is now .pyd on Windows.
-    - Fixed some build issues with the Houdini plugin on Windows.
-    - Standardized the library components install paths for the OpenVDB
-      Houdini shared library.
+    - Removed some logic for compilers older than Visual Studio 2019.
     - Add a new Houdini ABI test binary.
     - Fixed an indexing typo in tools::Filter. [Contributed by Yuanming Hu]
-
+      
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
       grid.
@@ -50,9 +32,6 @@ Version 7.1.0 - In Development
       tools::meshToVolume(). This could cause values to not be propagated across
       node boundaries, leading to voxels incorrectly being marked as inside the
       isosurface. [Contributed by Tristan Barback]
-    - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
-      compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
-      headers were installed to /usr/include.
     - Fixed a rotation order bug in tools::local_util::decompose()
       that caused it to fail to decompose some matrices.
     - Fixed a bug where math::Quat::inverse() was not marked as const.
@@ -68,6 +47,30 @@ Version 7.1.0 - In Development
     - Extend all SOP references to support VDB Points.
     - Combine SOP will not error in flatten-all mode if second has no grids.
 
+    Build:
+    - Improved the CMake build for the OpenVDB Houdini library on Windows.
+      [Reported by Ian Woodward]
+    - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
+      compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
+      headers were installed to /usr/include.
+    - CMake now checks the minimum supported MSVC compiler for Windows.
+    - CMake now only requires a CXX compiler.
+    - Improved the Windows README instructions and various MSVC warnings.
+    - Remove CMake warning when using GLFW 3.2+ on Debian.
+    - Various fixes to unary minus on unsigned compiler warnings.
+    - The defines _CRT_NONSTDC_NO_WARNINGS and _CRT_SECURE_NO_WARNINGS are now
+      enabled by default with MSVC.
+    - New CMake option OPENVDB_BUILD_PYTHON_UNITTESTS to disable or enable
+      the python module tests and fixed the required environment for them on
+      Windows. The python interpreter is no longer required by default if the
+      tests are disabled.
+    - Improved the CMake user messages when locating python and numpy.
+    - The python module extension is now .pyd on Windows.
+    - Fixed some build issues with the Houdini plugin on Windows.
+    - Standardized the library components install paths for the OpenVDB
+      Houdini shared library.
+    - Added a USE_PKGCONFIG option to CMake to optionally disable use of
+      pkg-config. [Contributed by Kartik Shrivastava]
 
 Version 7.0.0 - December 6, 2019
 
