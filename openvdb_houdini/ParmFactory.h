@@ -27,7 +27,7 @@
     #define OPENVDB_HOUDINI_API
   #endif
 #else
-  #include <openvdb/Platform.h>
+  #include <openvdb/version.h>
 #endif
 #include <exception>
 #include <functional>
