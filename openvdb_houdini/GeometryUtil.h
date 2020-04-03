@@ -14,7 +14,6 @@
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm> // for std::max/min()
 #include <memory>

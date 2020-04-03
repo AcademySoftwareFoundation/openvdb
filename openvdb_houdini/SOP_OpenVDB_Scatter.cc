@@ -9,7 +9,6 @@
 /// global or local point density.
 
 #include <UT/UT_Assert.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_ParallelUtil.h> // for UTparallelForLightItems()
 #include <GA/GA_SplittableRange.h>
 #include <houdini_utils/ParmFactory.h>

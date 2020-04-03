@@ -15,7 +15,6 @@
 #include <openvdb/points/PointDataGrid.h>
 
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
 #include <GA/GA_Iterator.h>

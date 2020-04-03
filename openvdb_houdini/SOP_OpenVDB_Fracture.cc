@@ -26,7 +26,6 @@
 #include <GU/GU_ConvertParms.h>
 #include <UT/UT_Quaternion.h>
 #include <UT/UT_ValArray.h>
-#include <UT/UT_Version.h>
 
 #include <hboost/algorithm/string/join.hpp>
 #include <hboost/math/constants/constants.hpp>

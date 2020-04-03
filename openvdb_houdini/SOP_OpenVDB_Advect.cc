@@ -15,7 +15,6 @@
 #include <openvdb/tools/Interpolation.h>
 #include <openvdb/tools/VolumeAdvect.h>
 
-#include <UT/UT_Version.h>
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>

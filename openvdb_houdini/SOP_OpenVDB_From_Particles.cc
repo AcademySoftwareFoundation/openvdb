@@ -26,7 +26,6 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Assert.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm>
 #include <cmath>

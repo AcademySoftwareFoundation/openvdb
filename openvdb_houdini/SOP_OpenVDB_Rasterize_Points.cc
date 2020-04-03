@@ -21,7 +21,6 @@
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/Prune.h>
 
-#include <UT/UT_Version.h>
 #include <CH/CH_Manager.h>
 #include <CVEX/CVEX_Context.h>
 #include <CVEX/CVEX_Value.h>

@@ -18,7 +18,6 @@
 #include <GA/GA_SplittableRange.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_UniquePtr.h>
 
 #include <tbb/blocked_range.h>

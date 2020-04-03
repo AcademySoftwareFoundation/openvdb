@@ -12,10 +12,8 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <stdexcept>
 #include <string>
-
 
 
 namespace hvdb = openvdb_houdini;

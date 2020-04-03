@@ -22,7 +22,6 @@
 #include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
