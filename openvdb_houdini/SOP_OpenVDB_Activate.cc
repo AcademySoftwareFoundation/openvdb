@@ -85,16 +85,9 @@ public:
                                  evalFloat("size", 2, t)); }
 
         openvdb::Coord MINPOS(fpreal t)
-            { return openvdb::Coord(evalInt("min", 0, t),
-                                    evalInt("min", 1, t),
-                                    evalInt("min", 2, t)); }
+            { return openvdb::Coord(evalVec3i("min", t)); }
         openvdb::Coord MAXPOS(fpreal t)
-            { return openvdb::Coord(evalInt("max", 0, t),
-                                    evalInt("max", 1, t),
-                                    evalInt("max", 2, t)); }
-
-        int         EXPAND(double t)
-        { return evalInt("expand", 0, t); }
+            { return openvdb::Coord(evalVec3i("max", t)); }
     };
 protected:
              SOP_VDBActivate(OP_Network *net, const char *name, OP_Operator *entry);
@@ -148,7 +141,8 @@ newSopOperator(OP_OperatorTable *table)
     items.push_back(PRM_Default(0, "Fill SDF"));
     parms.add(hutil::ParmFactory(PRM_SWITCHER_EXCLUSIVE, "regiontype", "Region Type")
               .setDefault(items)
-              .setVectorSize(items.size()));
+              .setVectorSize(static_cast<int>(items.size()))
+              );
 
     parms.add(hutil::ParmFactory(PRM_XYZ, "center", "Center")
               .setVectorSize(3)
@@ -523,7 +517,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 
                 case REGIONTYPE_EXPAND:         // Dilate
                 {
-                    int         dilation = evalInt("expand", 0, t);
+                    int         dilation = static_cast<int>(evalInt("expand", 0, t));
 
                     if (dilation > 0)
                     {
