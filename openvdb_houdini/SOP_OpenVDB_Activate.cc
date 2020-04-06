@@ -132,18 +132,9 @@ newSopOperator(OP_OperatorTable *table)
                 .setDefault(PRMoneDefaults));
 
     // Match REGIONTYPE
-    std::vector<PRM_Default> items;
-    items.push_back(PRM_Default(2, "Position"));
-    items.push_back(PRM_Default(2, "Voxel"));
-    items.push_back(PRM_Default(1, "Expand"));
-    items.push_back(PRM_Default(2, "Reference"));
-    items.push_back(PRM_Default(0, "Deactivate"));
-    items.push_back(PRM_Default(0, "Fill SDF"));
-    parms.add(hutil::ParmFactory(PRM_SWITCHER_EXCLUSIVE, "regiontype", "Region Type")
-              .setDefault(items)
-              .setVectorSize(static_cast<int>(items.size()))
-              );
+    parms.beginExclusiveSwitcher("regiontype", "Region Type");
 
+    parms.addFolder("Position");
     parms.add(hutil::ParmFactory(PRM_XYZ, "center", "Center")
               .setVectorSize(3)
               .setDefault(PRMzeroDefaults));
@@ -151,6 +142,7 @@ newSopOperator(OP_OperatorTable *table)
               .setVectorSize(3)
               .setDefault(PRMzeroDefaults));
 
+    parms.addFolder("Voxel");
     parms.add(hutil::ParmFactory(PRM_XYZ, "min", "Min")
               .setVectorSize(3)
               .setDefault(PRMzeroDefaults));
@@ -158,15 +150,22 @@ newSopOperator(OP_OperatorTable *table)
               .setVectorSize(3)
               .setDefault(PRMzeroDefaults));
 
+    parms.addFolder("Expand");
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5));
 
+    parms.addFolder("Reference");
     parms.add(hutil::ParmFactory(PRM_STRING, "boundgroup", "Bound Group")
               .setChoiceList(&hutil::PrimGroupMenuInput2));
-
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usevdb", "Activate Using VDBs")
                 .setDefault(PRMzeroDefaults));
+
+    parms.addFolder("Deactivate");
+
+    parms.addFolder("Fill SDF");
+
+    parms.endSwitcher();
 
     // Prune toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Tolerance")
