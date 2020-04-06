@@ -59,7 +59,7 @@ public:
 
     bool         updateParmsFlags() override;
 
-    static OP_Node       *myConstructor(OP_Network*, const char *, OP_Operator*);
+    static OP_Node       *factory(OP_Network*, const char *, OP_Operator*);
 
     class Cache: public SOP_VDBCacheOptions
     {
@@ -180,7 +180,7 @@ newSopOperator(OP_OperatorTable *table)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
 
     hvdb::OpenVDBOpFactory("VDB Activate",
-        SOP_VDBActivate::myConstructor, parms, *table)
+        SOP_VDBActivate::factory, parms, *table)
         .addInput("VDBs to Activate")
         .addOptionalInput("Bounds to Activate")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_VDBActivate::Cache; })
@@ -220,7 +220,7 @@ SOP_VDBActivate::SOP_VDBActivate(OP_Network *net,
 {}
 
 OP_Node *
-SOP_VDBActivate::myConstructor(OP_Network *net,
+SOP_VDBActivate::factory(OP_Network *net,
                                const char *name,
                                OP_Operator *entry)
 {
