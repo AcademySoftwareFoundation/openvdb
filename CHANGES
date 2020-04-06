@@ -50,6 +50,8 @@ Version 7.1.0 - In Development
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
     - Combine SOP will not error in flatten-all mode if second has no grids.
+    - Changed the label (but not the opname) of Resize Narrow Band SOP to match
+      the corresponding native Houdini SOP. The new label is Activate SDF.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.

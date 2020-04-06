@@ -69,6 +69,9 @@ Houdini:
 - Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
 - Combine SOP will not error in flatten-all mode if second has no grids.
+- Changed the label (but not the opname) of
+  Resize&nbsp;Narrow&nbsp;Band&nbsp;SOP to match the corresponding native
+  Houdini SOP. The new label is Activate&nbsp;SDF.
 
 @par
 Build:
