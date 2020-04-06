@@ -13,7 +13,6 @@
 #include <openvdb/tools/Filter.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <algorithm>
 #include <iostream>
 #include <sstream>

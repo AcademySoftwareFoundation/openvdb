@@ -21,7 +21,6 @@
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <functional>
 #include <stdexcept>
 #include <string>

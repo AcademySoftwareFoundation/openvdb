@@ -22,7 +22,6 @@
 
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>

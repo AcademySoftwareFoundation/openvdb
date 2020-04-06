@@ -111,16 +111,16 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testhou180debug:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2019
-    steps:
-    - uses: actions/checkout@v1
-    - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Debug OFF
+  # testhou180debug:
+  #   runs-on: ubuntu-16.04
+  #   container:
+  #     image: aswf/ci-base:2019
+  #   steps:
+  #   - uses: actions/checkout@v1
+  #   - name: houdini
+  #     run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+  #   - name: build
+  #     run: ./ci/build_houdini.sh clang++ Debug OFF
 
   testabi7gcc:
     runs-on: ubuntu-16.04
@@ -163,6 +163,14 @@ jobs:
         echo "::add-path::%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\bin"
         echo "::add-path::%BOOST_ROOT%\bin"
         echo "::add-path::${{github.workspace}}\build\openvdb\Release"
+    - name: update_vcpkg
+      shell: bash
+      run: |
+        # temporarily update vcpkg to fix tbb port
+        cd C:\vcpkg
+        git fetch
+        git checkout 97302ca1729eac9917c8a8977667601453795c90
+        bootstrap-vcpkg.bat
     - name: install
       shell: bash
       run: ./ci/install_windows.sh

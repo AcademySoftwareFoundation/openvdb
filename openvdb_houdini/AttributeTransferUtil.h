@@ -18,7 +18,6 @@
 #include <GA/GA_SplittableRange.h>
 #include <GEO/GEO_PrimPolySoup.h>
 #include <SYS/SYS_Types.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::floor()

@@ -11,7 +11,6 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <set>
 #include <sstream>
 #include <stdexcept>

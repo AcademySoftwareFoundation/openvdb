@@ -12,7 +12,6 @@
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_UniquePtr.h>
-#include <UT/UT_Version.h>
 
 #include <memory>
 #include <stdexcept>

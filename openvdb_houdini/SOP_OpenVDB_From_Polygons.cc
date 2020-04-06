@@ -22,7 +22,6 @@
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm> // for std::max()
 #include <sstream>
@@ -46,7 +45,7 @@ evalAttrType(const UT_String& attrStr, UT_String& attrName, int& attrClass)
 {
     std::string str = attrStr.toStdString();
 
-    const size_t idx = str.find_first_of(".");
+    const size_t idx = str.find_first_of('.');
     if (idx == std::string::npos) return false;
 
     attrName = str.substr(idx + 1, str.size() - 1);

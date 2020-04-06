@@ -13,6 +13,7 @@
 #include <openvdb/util/PagedArray.h>
 #include <openvdb/util/Formats.h>
 
+#include <chrono>
 #include <iostream>
 
 //#define BENCHMARK_PAGED_ARRAY
@@ -159,13 +160,13 @@ TestUtil::testCpuTimer()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2*expected, actual2, tolerance);
     }
     {
-      openvdb::util::CpuTimer timer;
-      sleep_for(expected);
-      auto t1 = timer.restart();
-      sleep_for(expected);
-      sleep_for(expected);
-      auto t2 = timer.restart();
-      CPPUNIT_ASSERT_DOUBLES_EQUAL(2*t1, t2, tolerance);
+        openvdb::util::CpuTimer timer;
+        sleep_for(expected);
+        auto t1 = timer.restart();
+        sleep_for(expected);
+        sleep_for(expected);
+        auto t2 = timer.restart();
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2*t1, t2, tolerance);
     }
 }
 
