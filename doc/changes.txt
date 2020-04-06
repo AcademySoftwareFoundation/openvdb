@@ -53,6 +53,8 @@ Bug fixes:
 - Fixed a bug where @vdblink::math::Quat::inverse() Quat::inverse@endlink was
   not marked as const.
   <I>[Contributed&nbsp;by&nbsp;Michael&nbsp;Tao]</I>
+- Fixed a bug in the unit test for util::CpuTimer on Windows by using a more
+  accurate sleep implementation.
 
 @par
 API changes:
