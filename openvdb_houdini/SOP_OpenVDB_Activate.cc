@@ -113,7 +113,9 @@ newSopOperator(OP_OperatorTable *table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
               .setHelpText("Specify a subset of the input VDB grids to be processed.")
-              .setChoiceList(&hutil::PrimGroupMenuInput1));
+              .setChoiceList(&hutil::PrimGroupMenuInput1)
+              .setTooltip("The vdb primitives to change the active region in.")
+              .setDocumentation("The vdb primitives to change the active region in."));
 
     // Match OPERATION
     const char* operations[] = {
@@ -125,67 +127,203 @@ newSopOperator(OP_OperatorTable *table)
     };
     parms.add(hutil::ParmFactory(PRM_ORD, "operation", "Operation")
               .setDefault(PRMzeroDefaults)
-              .setChoiceListItems(PRM_CHOICELIST_SINGLE, operations));
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, operations)
+              .setTooltip("The vdb's current region is combined with the specified region in one of several ways.")
+              .setDocumentation(
+R"(The vdb's current region is combined with the specified region
+in one of several ways.
+
+Union:
+    All voxels that lie in the specified region will
+    be activated.  Other voxels will retain their original
+    activation states.
+
+Intersect:
+    Any voxel not in the specified region will be deactivated
+    and set to the background value.
+
+A - B:
+    Any voxel that is in the specified region will be deactivated
+    and set to the background value.
+
+Copy:
+    If a voxel is outside the specified region, it is set
+    to inactive and the background value.  If it is inside,
+    it is marked as active.)"));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setvalue", "Write Value")
                 .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
                 .setDefault(PRMoneDefaults));
     parms.add(hutil::ParmFactory(PRM_FLT, "value", "Value")
-                .setDefault(PRMoneDefaults));
+                .setDefault(PRMoneDefaults)
+                .setTooltip("In the Union and Copy modes, when voxels are marked active they can also be initialized to a constant value.")
+                .setDocumentation(
+R"(In the Union and Copy modes, when voxels are marked active they can also be
+initialized to a constant value.  This will be done to all voxels that are
+made active by the specification - including those that were already
+active.
+
+Thus, the Voxel Coordinats option will have the effect of setting a cube
+area to a constant value.)"));
 
     // Match REGIONTYPE
     parms.beginExclusiveSwitcher("regiontype", "Region Type");
 
     parms.addFolder("Position");
+/*
+    This defines a cube in SOP space.  Any voxel that touches this
+    cube will be part of the selected region.
+*/
     parms.add(hutil::ParmFactory(PRM_XYZ, "center", "Center")
               .setVectorSize(3)
-              .setDefault(PRMzeroDefaults));
+              .setDefault(PRMzeroDefaults)
+              .setTooltip("This defines a cube in SOP space.")
+              .setDocumentation(
+R"(This defines a cube in SOP space.  Any voxel that touches this cube will be part of the selected region.)"));
+
     parms.add(hutil::ParmFactory(PRM_XYZ, "size", "Size")
               .setVectorSize(3)
-              .setDefault(PRMzeroDefaults));
+              .setDefault(PRMzeroDefaults)
+              .setTooltip("This defines a cube in SOP space.")
+              .setDocumentation(
+R"(This defines a cube in SOP space.  Any voxel that touches this cube will be part of the selected region.)"));
 
     parms.addFolder("Voxel");
+/*
+    Defines minimum and maximum values of a box in voxel-coordinates.  This is
+    an inclusive range, so includes the maximum voxel.
+*/
     parms.add(hutil::ParmFactory(PRM_XYZ, "min", "Min")
               .setVectorSize(3)
-              .setDefault(PRMzeroDefaults));
+              .setDefault(PRMzeroDefaults)
+              .setTooltip("Defines minimum and maximum values of a box in voxel-coordinates.")
+              .setDocumentation(
+R"(Defines minimum values of a box in voxel-coordinates.  This is
+an inclusive range, so includes the maximum voxel.)"));
     parms.add(hutil::ParmFactory(PRM_XYZ, "max", "Max")
               .setVectorSize(3)
-              .setDefault(PRMzeroDefaults));
+              .setDefault(PRMzeroDefaults)
+              .setTooltip("Defines minimum and maximum values of a box in voxel-coordinates.")
+              .setDocumentation(
+R"(Defines maximum values of a box in voxel-coordinates.  This is
+an inclusive range, so includes the maximum voxel.)"));
 
     parms.addFolder("Expand");
+/*
+    Expand the active area by the specified number of voxels.  Does not support
+    operation or setting of values.
+*/
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
                 .setDefault(PRMoneDefaults)
-                .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5));
+                .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
+                .setTooltip("Expand the active area by the specified number of voxels.")
+                .setDocumentation(
+R"(Expand the active area by the specified number of voxels.  Does not support
+operation or setting of values.)"));
+
 
     parms.addFolder("Reference");
+/*
+    Uses the second input to determine the selected region.
+*/
     parms.add(hutil::ParmFactory(PRM_STRING, "boundgroup", "Bound Group")
-              .setChoiceList(&hutil::PrimGroupMenuInput2));
+              .setChoiceList(&hutil::PrimGroupMenuInput2)
+              .setTooltip("Which primitives of the second input contribute to the bounding box computation.")
+              .setDocumentation(
+R"(Which primitives of the second input contribute to the bounding box
+computation.)"));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usevdb", "Activate Using VDBs")
-                .setDefault(PRMzeroDefaults));
+                .setDefault(PRMzeroDefaults)
+                .setTooltip("If turned on, only VDBs are used for activation.")
+                .setDocumentation(
+R"(If turned on, only VDBs are used for activation.  They will activate
+wherever they themselves are already active.  This can be used to
+transfer the active region from one VDB to another, even if they are
+not aligned.
+
+If turned off, the bounding box of the chosen primitives are used
+instead and activated as if they were specified as World Positions.)"));
 
     parms.addFolder("Deactivate");
+/*
+    Any voxels that have the background value will be deactivated.  This
+    is useful for cleaning up the result of an operation that may
+    have speculatively activated a large band of voxels, but may
+    not have placed non-background values in all of them.
+
+    For example, you may have a VDB Activate before a Volume VOP
+    with Expand turned on to ensure you have room to displace the volume.
+    Then when you are done, you can use one with Deactivate to free
+    up the voxels you didn't need to use.
+*/
 
     parms.addFolder("Fill SDF");
+/*
+    Any voxels that are inside the SDF will be marked active.  If they
+    were previously inactive, they will be set to the negative-background
+    values.   Tiles will remain sparse in this process.
+*/
 
     parms.endSwitcher();
 
     // Prune toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Tolerance")
         .setDefault(PRMoneDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("This tolerance is used to detect constant regions and collapse them.")
+        .setDocumentation(
+R"(After building the VDB grid there may be undetected constant tiles.
+This tolerance is used to detect constant regions and collapse them.
+Such areas that are within the background value will also be marked
+inactive.)"));
 
     // Pruning tolerance slider
     parms.add(hutil::ParmFactory(
         PRM_FLT_J, "tolerance", "Prune Tolerance")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setTooltip("This tolerance is used to detect constant regions and collapse them.")
+        .setDocumentation(
+R"(After building the VDB grid there may be undetected constant tiles.
+This tolerance is used to detect constant regions and collapse them.
+Such areas that are within the background value will also be marked
+inactive.)"));
 
     hvdb::OpenVDBOpFactory("VDB Activate",
         SOP_VDBActivate::factory, parms, *table)
         .addInput("VDBs to Activate")
         .addOptionalInput("Bounds to Activate")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_VDBActivate::Cache; })
-        ;
+        .setDocumentation(
+R"(#icon: COMMON/openvdb
+#tags: vdb
+
+= OpenVDB Activate =
+
+"""Activates voxel regions of a VDB for further processing."""
+
+[Include:volume_types]
+
+Many volume operations, such as Volume Mix and Volume VOP, only process
+active voxels in the sparse volume.  This can be a problem if you know a
+certain area in space will evaluate to a non-zero value, but it is
+inactive in your original volume.
+
+The VDB Activate SOP provides tools for manipulating this active region.
+It can also fill the newly added regions to a constant value, useful
+for interactively determining what is changing.
+
+TIP: To see the current active region, you can use the VDB Visualize SOP
+     and set it to Tree Nodes, Disabled; Active Constant Tiles, Wireframe Box;
+     and Active Voxels, Wireframe Box.
+
+@related
+
+- [Node:sop/vdb]
+- [Node:sop/vdbactivatesdf]
+- [Node:sop/volumevop]
+- [Node:sop/volumemix]
+)");
 }
 
 bool
