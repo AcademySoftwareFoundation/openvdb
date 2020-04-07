@@ -7,6 +7,8 @@
 ///
 /// @brief Activate VDBs according to various rules
 
+// OpenVDB and Houdini use different relative directories, but SESI_OPENVDB
+// is not yet defined at this point.
 #if 1
   #include <houdini_utils/ParmFactory.h>
   #include <openvdb_houdini/Utils.h>
