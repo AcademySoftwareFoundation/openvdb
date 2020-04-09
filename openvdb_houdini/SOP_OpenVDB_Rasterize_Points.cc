@@ -104,7 +104,7 @@ getMaskGeoBBox(const GU_Detail * geoPt)
 {
     if (geoPt) {
         UT_BoundingBox box;
-        geoPt->computeQuickBounds(box);
+        geoPt->getBBox(&box);
 
         UT_SharedPtr<openvdb::BBoxd> bbox(new openvdb::BBoxd());
         bbox->min()[0] = box.xmin();

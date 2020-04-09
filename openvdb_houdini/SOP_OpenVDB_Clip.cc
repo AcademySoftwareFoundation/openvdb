@@ -576,7 +576,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 }
             } else {
                 UT_BoundingBox box;
-                maskGeo->computeQuickBounds(box);
+                maskGeo->getBBox(&box);
 
                 clipBox.min()[0] = box.xmin();
                 clipBox.min()[1] = box.ymin();
