@@ -502,7 +502,7 @@ public:
     }
 
     /// returns inverse of this
-    Quat inverse(T tolerance = T(0))
+    Quat inverse(T tolerance = T(0)) const
     {
         T d = mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3];
         if( isApproxEqual(d, T(0.0), tolerance) )

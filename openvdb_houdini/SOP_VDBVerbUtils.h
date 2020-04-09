@@ -9,7 +9,6 @@
 #ifndef OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 
-#include <UT/UT_Version.h>
 #include <GOP/GOP_Manager.h>
 #include <SOP/SOP_NodeParmsOptions.h> // for SOP_NodeCacheOptions
 #include <openvdb/Types.h>

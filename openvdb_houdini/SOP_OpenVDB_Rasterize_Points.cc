@@ -21,7 +21,6 @@
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/Prune.h>
 
-#include <UT/UT_Version.h>
 #include <CH/CH_Manager.h>
 #include <CVEX/CVEX_Context.h>
 #include <CVEX/CVEX_Value.h>
@@ -1503,7 +1502,7 @@ struct DensityOp
     {
     }
 
-    ~DensityOp() { if (mNode) delete mNode; }
+    ~DensityOp() { delete mNode; }
 
     void beginNodeProcessing(const openvdb::Coord& origin, size_t nodeOffset)
     {

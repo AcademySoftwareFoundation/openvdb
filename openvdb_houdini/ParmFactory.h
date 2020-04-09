@@ -10,7 +10,6 @@
 #ifndef HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 #define HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 
-#include <UT/UT_Version.h>
 #include <GA/GA_Attribute.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <OP/OP_Operator.h>
@@ -27,7 +26,7 @@
     #define OPENVDB_HOUDINI_API
   #endif
 #else
-  #include <openvdb/Platform.h>
+  #include <openvdb/version.h>
 #endif
 #include <exception>
 #include <functional>

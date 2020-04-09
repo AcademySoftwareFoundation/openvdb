@@ -11,7 +11,6 @@
 #include <openvdb_houdini/UT_VDBTools.h> // for GridTransformOp, et al.
 #include <openvdb_houdini/Utils.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>

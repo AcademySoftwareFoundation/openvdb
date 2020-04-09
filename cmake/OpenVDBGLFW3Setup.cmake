@@ -68,10 +68,12 @@ endif()
 # Additionally try and use pkconfig to find glfw, though we only use
 # pkg-config to re-direct to the cmake. In other words, glfw's cmake is
 # expected to be installed
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_glfw3 QUIET glfw3)
 endif()
-pkg_check_modules(PC_glfw3 QUIET glfw3)
 
 if(PC_glfw3_FOUND)
   foreach(DIR ${PC_glfw3_LIBRARY_DIRS})

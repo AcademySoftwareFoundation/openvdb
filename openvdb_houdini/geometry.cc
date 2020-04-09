@@ -7,7 +7,6 @@
 #include "geometry.h"
 
 #include <GU/GU_PrimPoly.h>
-#include <UT/UT_Version.h>
 
 namespace houdini_utils {
 

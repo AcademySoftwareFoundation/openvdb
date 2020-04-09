@@ -1,7 +1,7 @@
 
 name: Build
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   testabi7:
@@ -13,7 +13,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 7 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi6:
     runs-on: ubuntu-16.04
@@ -24,7 +24,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 6 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi5:
     runs-on: ubuntu-16.04
@@ -35,7 +35,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 5 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testabi4:
     runs-on: ubuntu-16.04
@@ -46,7 +46,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 4 ON None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou180:
     runs-on: ubuntu-16.04
@@ -58,6 +58,8 @@ jobs:
       run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: ./ci/test.sh
 
   testhou175:
     runs-on: ubuntu-16.04
@@ -69,6 +71,8 @@ jobs:
       run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: ./ci/test.sh
 
   testhou170:
     runs-on: ubuntu-16.04
@@ -80,6 +84,8 @@ jobs:
       run: ./ci/install_houdini.sh 17.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release OFF
+    - name: test
+      run: ./ci/test.sh
 
   testabi7noblosc:
     runs-on: ubuntu-16.04
@@ -90,7 +96,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Release 7 OFF None
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testhou180gcc:
     runs-on: ubuntu-16.04
@@ -102,17 +108,19 @@ jobs:
       run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
+    - name: test
+      run: ./ci/test.sh
 
-  testhou180debug:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2019
-    steps:
-    - uses: actions/checkout@v1
-    - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Debug OFF
+  # testhou180debug:
+  #   runs-on: ubuntu-16.04
+  #   container:
+  #     image: aswf/ci-base:2019
+  #   steps:
+  #   - uses: actions/checkout@v1
+  #   - name: houdini
+  #     run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+  #   - name: build
+  #     run: ./ci/build_houdini.sh clang++ Debug OFF
 
   testabi7gcc:
     runs-on: ubuntu-16.04
@@ -141,7 +149,7 @@ jobs:
     - name: build
       run: ./ci/build.sh clang++ Debug 7 ON SSE42
     - name: test
-      run: cd build && ctest -V
+      run: ./ci/test.sh
 
   testwindows2019:
     runs-on: windows-2019
@@ -155,6 +163,14 @@ jobs:
         echo "::add-path::%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\bin"
         echo "::add-path::%BOOST_ROOT%\bin"
         echo "::add-path::${{github.workspace}}\build\openvdb\Release"
+    - name: update_vcpkg
+      shell: bash
+      run: |
+        # temporarily update vcpkg to fix tbb port
+        cd C:\vcpkg
+        git fetch
+        git checkout 97302ca1729eac9917c8a8977667601453795c90
+        bootstrap-vcpkg.bat
     - name: install
       shell: bash
       run: ./ci/install_windows.sh
@@ -163,4 +179,4 @@ jobs:
       run: ./ci/build_windows.sh "${VCPKG_INSTALLATION_ROOT}"
     - name: test
       shell: bash
-      run: cd build && ctest -V
+      run: ./ci/test.sh
