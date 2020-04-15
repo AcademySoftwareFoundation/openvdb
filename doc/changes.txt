@@ -26,6 +26,8 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
 - Removed redundant null pointer checks.
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
+- Added support for vdb_view on Windows. Requires GLEW.
+- Removed support for GLFW&nbsp;2.
 
 @par
 New features:
