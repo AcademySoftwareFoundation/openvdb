@@ -321,7 +321,7 @@ inline void appendAttribute(PointDataTreeT& tree,
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
         strideOrTotalSize, constantStride, defaultValue, hidden, transient);
 
-    if (!math::isExactlyEqual(uniformValue, Default<ValueType>::value())) {
+    if (!defaultValue || !math::isExactlyEqual(uniformValue, defaultValue->value())) {
         MetadataStorage<PointDataTreeT, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
