@@ -148,8 +148,8 @@ public:
     AttributeArray(const AttributeArray&) = default;
     AttributeArray& operator=(const AttributeArray&) = default;
 #endif
-    AttributeArray(AttributeArray&&) = default;
-    AttributeArray& operator=(AttributeArray&&) = default;
+    AttributeArray(AttributeArray&&) = delete;
+    AttributeArray& operator=(AttributeArray&&) = delete;
 
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
