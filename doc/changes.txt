@@ -74,6 +74,11 @@ Houdini:
 - Changed the label (but not the opname) of
   Resize&nbsp;Narrow&nbsp;Band&nbsp;SOP to match the corresponding native
   Houdini SOP. The new label is Activate&nbsp;SDF.
+- Fixed a bug by using @c GEO_Detail::getBBox() instead of
+  @c GEO_Detail::computeQuickBounds() as the latter was incorrectly using the
+  point of the VDB when computing bounding box. SOPs affected include Clip,
+  Fill, Points Group, Rasterize Points, Read, Remove Divergence.
+  <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 
 @par
 Build:
