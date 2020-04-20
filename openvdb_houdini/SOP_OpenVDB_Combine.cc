@@ -19,7 +19,6 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <algorithm> // for std::min()
 #include <cctype> // for isspace()
 #include <iomanip>
@@ -682,8 +681,10 @@ SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
                     }
                     break;
                 case COLL_FLATTEN_B_TO_A:
-                    aVdbVec.push_back(*aIt);
-                    bVdbVec.push_back(*bIt);
+                    if (*bIt) {
+                        aVdbVec.push_back(*aIt);
+                        bVdbVec.push_back(*bIt);
+                    }
                     for (++bIt; bIt; ++bIt) {
                         aVdbVec.push_back(nullptr);
                         bVdbVec.push_back(*bIt);

@@ -11,6 +11,8 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointDelete.h>
 
+#include <UT/UT_Version.h>
+
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/PointUtils.h>
 #include <openvdb_houdini/Utils.h>

@@ -26,7 +26,6 @@
 #include <GU/GU_PrimPolySoup.h>
 #include <SYS/SYS_Math.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_VoxelArray.h>
 #include <UT/UT_UniquePtr.h>
 

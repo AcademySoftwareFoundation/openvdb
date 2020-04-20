@@ -10,9 +10,6 @@
 Improvements:
 - Added GroupWriteHandle::setUnsafe() for faster performance when the group
   array is known to be in-core and non-uniform.
-- Improved the CMake build for the OpenVDB Houdini library on Windows.
-  <I>[Reported&nbsp;by&nbsp;Ian&nbsp;Woodward]</I>
-- Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
 - Add support for default value metadata when creating AttributeArrays or
   appending to an AttributeSet.
 - Added new group inspection methods to the
@@ -20,6 +17,27 @@ Improvements:
 - Introduced a @vdblink::points::StringMetaCache StringMetaCache@endlink class
   for convenient string attribute metadata lookup and performed some minor
   optimizations.
+- Removed redundant floor in @vdblink::points::floatingPointToFixedPoint
+  floatingPointToFixedPoint@endlink.
+- Add gitignore to repository root.
+- Removed some logic for compilers older than Visual Studio 2019.
+- Add a new Houdini ABI test binary.
+- Fixed an indexing typo in tools::Filter.
+  <I>[Contributed&nbsp;by&nbsp;Yuanming&nbsp;Hu]</I>
+- Removed redundant null pointer checks.
+  <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
+- Added support for vdb_view on Windows. Requires GLEW.
+- Removed support for GLFW&nbsp;2.
+
+@par
+New features:
+- Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
+  the tree is shared with another grid.
+- Added @vdblink::points::PointDataLeafNode::stealAttributeSet()
+  PointDataLeafNode::stealAttributeSet@endlink and
+  @vdblink::points::AttributeSet::removeAttribute()
+  AttributeSet::removeAttribute@endlink for releasing ownership of attribute
+  data.
 
 @par
 Bug fixes:
@@ -32,17 +50,57 @@ Bug fixes:
   node boundaries, leading to voxels incorrectly being marked as inside the
   isosurface.
   <I>[Contributed&nbsp;by&nbsp;Tristan&nbsp;Barback]</I>
+- Fixed a rotation order bug in the @vdblink::tools::local_util::decompose()
+  decompose@endlink utility that caused it to fail to decompose some matrices.
+- Fixed a bug where @vdblink::math::Quat::inverse() Quat::inverse@endlink was
+  not marked as const.
+  <I>[Contributed&nbsp;by&nbsp;Michael&nbsp;Tao]</I>
+- Fixed a bug in the unit test for util::CpuTimer on Windows by using a more
+  accurate sleep implementation.
 
 @par
 API changes:
 - Removed a number of deprecated point methods.
 - points::StringIndexType is now deprecated, use @vdblink::Index Index@endlink
   instead.
+- @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
+  now returns a std::unique_ptr instead of a boost::scoped_array.
 
 @par
 Houdini:
 - Platonic SOP is now verbified.
 - Extend all SOP references to support VDB Points.
+- Combine SOP will not error in flatten-all mode if second has no grids.
+- Changed the label (but not the opname) of
+  Resize&nbsp;Narrow&nbsp;Band&nbsp;SOP to match the corresponding native
+  Houdini SOP. The new label is Activate&nbsp;SDF.
+
+@par
+Build:
+- Improved the CMake build for the OpenVDB Houdini library on Windows.
+  <I>[Reported&nbsp;by&nbsp;Ian&nbsp;Woodward]</I>
+- Remove some logic for compilers older than Visual&nbsp;Studio&nbsp;2019.
+- Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
+  compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
+  headers were installed to /usr/include.
+- CMake now checks the minimum supported MSVC compiler for Windows.
+- CMake now only requires a CXX compiler.
+- Improved the Windows README instructions and various MSVC warnings.
+- Remove CMake warning when using GLFW 3.2+ on Debian.
+- Various fixes to unary minus on unsigned compiler warnings.
+- The defines <TT>_CRT_NONSTDC_NO_WARNINGS</TT> and <TT>_CRT_SECURE_NO_WARNINGS</TT>
+  are now enabled by default with MSVC.
+- New CMake option <TT>OPENVDB_BUILD_PYTHON_UNITTESTS</TT> to disable or
+  enable the python module tests and fixed the required environment for them
+  on Windows. The python interpreter is no longer required by default if the
+  tests are disabled.
+- Improved the CMake user messages when locating python and numpy.
+- The python module extension is now .pyd on Windows.
+- Fixed some build issues with the Houdini plugin on Windows.
+- Standardized the library components install paths for the OpenVDB
+  Houdini shared library.
+- Added a USE_PKGCONFIG option to CMake to optionally disable use of pkg-config.
+  <I>[Contributed&nbsp;by&nbsp;Kartik&nbsp;Shrivastava]</I>
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly

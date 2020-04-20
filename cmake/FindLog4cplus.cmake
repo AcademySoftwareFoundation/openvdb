@@ -102,11 +102,12 @@ elseif(DEFINED ENV{LOG4CPLUS_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find log4cplus
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_Log4cplus QUIET log4cplus)
 endif()
-pkg_check_modules(PC_Log4cplus QUIET log4cplus)
 
 # ------------------------------------------------------------------------
 #  Search for Log4cplus include DIR

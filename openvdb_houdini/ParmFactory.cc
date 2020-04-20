@@ -1246,7 +1246,7 @@ del nt, _spareData, _spareDataDict\n");
                     }
                 }
             }
-        } catch (HOM_Error& err) {
+        } catch (HOM_Error&) {
         }
         return PY_Py_None();
     }
@@ -1443,7 +1443,7 @@ OpFactory::setMaxInputs(unsigned n) { mImpl->mMaxSources = n; return *this; }
 OpFactory&
 OpFactory::setObsoleteParms(const ParmList& parms)
 {
-    if (mImpl->mObsoleteParms != nullptr) delete mImpl->mObsoleteParms;
+    delete mImpl->mObsoleteParms;
     mImpl->mObsoleteParms = parms.get();
     return *this;
 }

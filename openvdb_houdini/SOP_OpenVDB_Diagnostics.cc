@@ -16,7 +16,6 @@
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetTracker.h> // LevelSetTracker::normalize
 
-#include <UT/UT_Version.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_UniquePtr.h>
 #include <PRM/PRM_Parm.h>

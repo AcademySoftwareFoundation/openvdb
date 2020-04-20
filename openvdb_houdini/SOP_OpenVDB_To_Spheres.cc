@@ -20,7 +20,6 @@
 #include <PRM/PRM_Parm.h>
 #include <GA/GA_PageIterator.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 
 #include <hboost/algorithm/string/join.hpp>
 

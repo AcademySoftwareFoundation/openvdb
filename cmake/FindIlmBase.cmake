@@ -143,11 +143,12 @@ elseif(DEFINED ENV{ILMBASE_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find IlmBase
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_IlmBase QUIET IlmBase)
 endif()
-pkg_check_modules(PC_IlmBase QUIET IlmBase)
 
 # ------------------------------------------------------------------------
 #  Search for IlmBase include DIR
@@ -295,13 +296,26 @@ if(IlmBase_FOUND)
   set(IlmBase_LIBRARIES ${IlmBase_LIB_COMPONENTS})
 
   # We have to add both include and include/OpenEXR to the include
-  # path in case OpenEXR and IlmBase are installed separately
+  # path in case OpenEXR and IlmBase are installed separately.
+  #
+  # Make sure we get the absolute path to avoid issues where
+  # /usr/include/OpenEXR/../ is picked up and passed to gcc from cmake
+  # which won't correctly compute /usr/include as an implicit system
+  # dir if the path is relative:
+  #
+  # https://github.com/AcademySoftwareFoundation/openvdb/issues/632
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129
+
+  set(_IlmBase_Parent_Dir "")
+  get_filename_component(_IlmBase_Parent_Dir
+    ${IlmBase_INCLUDE_DIR}/../ ABSOLUTE)
 
   set(IlmBase_INCLUDE_DIRS)
   list(APPEND IlmBase_INCLUDE_DIRS
-    ${IlmBase_INCLUDE_DIR}/../
+    ${_IlmBase_Parent_Dir}
     ${IlmBase_INCLUDE_DIR}
   )
+  unset(_IlmBase_Parent_Dir)
   set(IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
 
   set(IlmBase_LIBRARY_DIRS "")

@@ -5,20 +5,8 @@
 
 #include <cmath>
 
-#ifdef OPENVDB_USE_GLFW_3
 #define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
-#else // if !defined(OPENVDB_USE_GLFW_3)
-#if defined(__APPLE__) || defined(MACOSX)
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#else
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
-#include <GL/glfw.h>
-#endif // !defined(OPENVDB_USE_GLFW_3)
-
 
 namespace openvdb_viewer {
 
@@ -49,9 +37,7 @@ Camera::Camera()
     , mNeedsDisplay(true)
     , mMouseXPos(0.0)
     , mMouseYPos(0.0)
-#if GLFW_VERSION_MAJOR >= 3
     , mWindow(nullptr)
-#endif
 {
 }
 
@@ -95,17 +81,11 @@ Camera::setTarget(const openvdb::Vec3d& p, double dist)
 void
 Camera::aim()
 {
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow == nullptr) return;
-#endif
 
     // Get the window size
     int width, height;
-#if GLFW_VERSION_MAJOR >= 3
     glfwGetFramebufferSize(mWindow, &width, &height);
-#else
-    glfwGetWindowSize(&width, &height);
-#endif
 
     // Make sure that height is non-zero to avoid division by zero
     height = std::max(1, height);
@@ -153,12 +133,8 @@ Camera::aim()
 void
 Camera::keyCallback(int key, int)
 {
-#if GLFW_VERSION_MAJOR >= 3
     if (mWindow == nullptr) return;
     int state = glfwGetKey(mWindow, key);
-#else
-    int state = glfwGetKey(key);
-#endif
     switch (state) {
         case GLFW_PRESS:
             switch(key) {

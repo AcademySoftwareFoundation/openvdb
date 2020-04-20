@@ -17,7 +17,6 @@
 #include <openvdb/tools/Morphology.h>
 
 #include <OBJ/OBJ_Camera.h>
-#include <UT/UT_Version.h>
 
 #include <cmath> // for std::floor()
 #include <stdexcept>

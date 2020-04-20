@@ -43,7 +43,7 @@
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.3)
-project(OpenVDB)
+project(OpenVDB LANGUAGES CXX)
 
 ###### OpenVDB Build/Component Options
 
@@ -57,6 +57,7 @@ option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
+option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
@@ -100,6 +101,7 @@ list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
+option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -182,6 +184,7 @@ mark_as_advanced(
   USE_LOG4CPLUS
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_SOPS
+  OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI
@@ -321,7 +324,7 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
   set(USE_HOUDINI ON)
 endif()
 
@@ -352,6 +355,7 @@ if(NOT (
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
+    OPENVDB_BUILD_HOUDINI_ABITESTS OR
     OPENVDB_BUILD_MAYA_PLUGIN)
   )
   return()
@@ -468,7 +472,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-fdiagnostics-color=always)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION})
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION)
     message(FATAL_ERROR "Insufficient ICC version. Minimum required is "
       "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
     )
@@ -480,6 +484,11 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     endif()
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_MSVC_VERSION)
+    message(FATAL_ERROR "Insufficient MSVC version. Minimum required is "
+      "\"${MINIMUM_MSVC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
+  )
+  endif()
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_MSVC_VERSION)
     if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
       message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
@@ -496,6 +505,14 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   add_definitions(-DNOMINMAX)
   # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
   add_definitions(-DWIN32_LEAN_AND_MEAN)
+  # Disable non-secure CRT library function warnings
+  # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
+  #     compiler-warning-level-3-c4996?view=vs-2019#unsafe-crt-library-functions
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  # Disable POSIX function name warnings
+  # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
+  #     compiler-warning-level-3-c4996?view=vs-2019#posix-function-names
+  add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
   if(NOT OPENVDB_CXX_STRICT)
     message(STATUS "Suppressing some noisy MSVC CXX warnings, "
       "set OPENVDB_CXX_STRICT=ON to re-enable them.")
@@ -648,6 +665,10 @@ endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
   add_subdirectory(openvdb_houdini)
+endif()
+
+if(OPENVDB_BUILD_HOUDINI_ABITESTS)
+  add_subdirectory(openvdb_houdini/abitest)
 endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)

@@ -102,11 +102,12 @@ elseif(DEFINED ENV{CPPUNIT_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find cppunit
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_CppUnit QUIET cppunit)
 endif()
-pkg_check_modules(PC_CppUnit QUIET cppunit)
 
 # ------------------------------------------------------------------------
 #  Search for CppUnit include DIR

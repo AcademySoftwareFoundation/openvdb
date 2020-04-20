@@ -22,7 +22,6 @@
 
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>
@@ -657,8 +656,11 @@ and usage examples.\n");
 
         } else if (OP_TYPE_RESIZE == op) {
 
-            hvdb::OpenVDBOpFactory("VDB Resize Narrow Band",
+            hvdb::OpenVDBOpFactory("VDB Activate SDF",
                 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand, parms, *table)
+#ifndef SESI_OPENVDB
+                .setInternalName("DW_OpenVDBResizeNarrowBand")
+#endif
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process")
                 .setVerb(SOP_NodeVerb::COOK_INPLACE, cacheAllocator)
