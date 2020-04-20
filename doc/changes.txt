@@ -55,6 +55,10 @@ Bug fixes:
   <I>[Contributed&nbsp;by&nbsp;Michael&nbsp;Tao]</I>
 - Fixed a bug in the unit test for util::CpuTimer on Windows by using a more
   accurate sleep implementation.
+- Fixed a bug where the requested uniform value of an
+  @vdblink::points::AttributeArray AttributeArray@endlink was not being applied
+  on attribute creation if the default attribute value was not the default
+  value for that value type.
 
 @par
 API changes:
