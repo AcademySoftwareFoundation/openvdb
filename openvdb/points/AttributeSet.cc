@@ -1231,6 +1231,13 @@ AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
     return offset;
 }
 
+// deprecated
+size_t
+AttributeSet::Descriptor::nextUnusedGroupOffset() const
+{
+    return this->unusedGroupOffset();
+}
+
 bool
 AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
     size_t& sourceOffset, size_t& targetOffset) const

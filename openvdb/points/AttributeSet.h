@@ -478,6 +478,9 @@ public:
     /// @return index of an offset or size_t max if no available group offsets
     size_t unusedGroupOffset(size_t hint = std::numeric_limits<size_t>::max()) const;
 
+    OPENVDB_DEPRECATED
+    size_t nextUnusedGroupOffset() const;
+
     /// @brief Determine if a move is required to efficiently compact the data and store the
     /// source name, offset and the target offset in the input parameters
     /// @param sourceName source name
