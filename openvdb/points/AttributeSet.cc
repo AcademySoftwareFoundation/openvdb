@@ -5,6 +5,7 @@
 
 #include "AttributeSet.h"
 #include "AttributeGroup.h"
+#include "AttributeArrayString.h"
 
 #include <algorithm> // std::equal
 #include <string>
@@ -57,67 +58,74 @@ namespace {
 // AttributeSet implementation
 
 
-AttributeSet::AttributeSet()
-    : mDescr(new Descriptor())
+AttributeSet::AttributeSet(const Info& info, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock,
+    AttributeSet* existingAttributeSet)
+    : mDescr(info.descriptorPtr())
+    , mAttrs(info.size())
 {
+    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
+    if (!lock) {
+        localLock.reset(new AttributeArray::ScopedRegistryLock);
+        lock = localLock.get();
+    }
+
+    const MetaMap& meta = mDescr->getMetadata();
+    bool hasMetadata = meta.metaCount();
+
+    for (const auto& namePos : mDescr->map()) {
+        const size_t& pos = namePos.second;
+        const Info::Array& arrayInfo = info.arrayInfo(pos);
+        Metadata::ConstPtr metadata;
+        if (hasMetadata)    metadata = meta["default:" + namePos.first];
+        const bool constantStride = arrayInfo.constantStride;
+        const Index stride = arrayInfo.stride;
+
+        // attempt to steal array from the existingAttributeSet
+
+        size_t existingPos = existingAttributeSet ?
+            existingAttributeSet->find(namePos.first) : INVALID_POS;
+
+        // can only steal if array has been found and stride and size match
+
+        AttributeArray::Ptr array;
+        if (existingPos != INVALID_POS) {
+            array = existingAttributeSet->removeAttributeUnsafe(existingPos);
+            // if array stride or size does not match, need to create a new array
+            if (array->stride() != stride || array->size() != arrayLength) {
+                array.reset();
+            }
+        }
+
+        if (!array) {
+            array = AttributeArray::create(mDescr->type(pos), arrayLength,
+                stride, constantStride, metadata.get(), lock);
+        }
+
+        // transfer hidden and transient flags
+        if (arrayInfo.hidden)       array->setHidden(true);
+        if (arrayInfo.transient)    array->setTransient(true);
+
+        mAttrs[pos] = array;
+    }
+    // delete the contents of the existing attribute set
+    if (existingAttributeSet) {
+        existingAttributeSet->clear();
+    }
 }
 
 
 AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
     const AttributeArray::ScopedRegistryLock* lock)
-    : mDescr(attrSet.descriptorPtr())
-    , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
+    : AttributeSet(Info(attrSet), arrayLength, lock)
 {
-    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
-    if (!lock) {
-        localLock.reset(new AttributeArray::ScopedRegistryLock);
-        lock = localLock.get();
-    }
-
-    const MetaMap& meta = mDescr->getMetadata();
-    bool hasMetadata = meta.metaCount();
-
-    for (const auto& namePos : mDescr->map()) {
-        const size_t& pos = namePos.second;
-        Metadata::ConstPtr metadata;
-        if (hasMetadata)    metadata = meta["default:" + namePos.first];
-        const AttributeArray* existingArray = attrSet.getConst(pos);
-        const bool constantStride = existingArray->hasConstantStride();
-        const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
-
-        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
-            stride, constantStride, metadata.get(), lock);
-
-        // transfer hidden and transient flags
-        if (existingArray->isHidden())      array->setHidden(true);
-        if (existingArray->isTransient())   array->setTransient(true);
-
-        mAttrs[pos] = array;
-    }
 }
 
 
 AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
     const AttributeArray::ScopedRegistryLock* lock)
-    : mDescr(descr)
-    , mAttrs(descr->size(), AttributeArray::Ptr())
+    : AttributeSet(Info(descr), arrayLength, lock)
 {
-    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
-    if (!lock) {
-        localLock.reset(new AttributeArray::ScopedRegistryLock);
-        lock = localLock.get();
-    }
-
-    const MetaMap& meta = mDescr->getMetadata();
-    bool hasMetadata = meta.metaCount();
-
-    for (const auto& namePos : mDescr->map()) {
-        const size_t& pos = namePos.second;
-        Metadata::ConstPtr metadata;
-        if (hasMetadata)    metadata = meta["default:" + namePos.first];
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
-            /*stride=*/1, /*constantStride=*/true, metadata.get(), lock);
-    }
 }
 
 
@@ -125,6 +133,14 @@ AttributeSet::AttributeSet(const AttributeSet& rhs)
     : mDescr(rhs.mDescr)
     , mAttrs(rhs.mAttrs)
 {
+}
+
+
+void
+AttributeSet::clear()
+{
+    mDescr = std::make_shared<Descriptor>();
+    mAttrs.clear();
 }
 
 
@@ -1353,8 +1369,117 @@ AttributeSet::Descriptor::read(std::istream& is)
 }
 
 
+////////////////////////////////////////
+
+// AttributeSet::Info implementation
+
+
+AttributeSet::Info::Info(const AttributeSet::Descriptor::Ptr& descriptor)
+    : mDescriptor(descriptor)
+    , mArrayInfo(descriptor->size(), Array())
+{
+}
+
+
+AttributeSet::Info::Info(const AttributeSet& attributeSet)
+    : AttributeSet::Info(attributeSet.descriptorPtr())
+{
+    for (const auto& namePos : mDescriptor->map()) {
+        size_t idx = namePos.second;
+        const AttributeArray* existingArray = attributeSet.getConst(idx);
+
+        // set the array metadata
+
+        Array& info = mArrayInfo[idx];
+        info.constantStride = existingArray->hasConstantStride();
+        info.stride = info.constantStride ? existingArray->stride() : existingArray->dataSize();
+        info.hidden = existingArray->isHidden();
+        info.transient = existingArray->isTransient();
+        info.group = isGroup(*existingArray);
+        info.string = isString(*existingArray);
+    }
+}
+
+
+AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(const Name& name)
+{
+    size_t idx = mDescriptor->find(name);
+    if (idx == INVALID_POS) {
+        OPENVDB_THROW(LookupError, "ArrayInfo name not found.")
+    }
+    return mArrayInfo[idx];
+}
+
+
+const AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(const Name& name) const
+{
+    size_t idx = mDescriptor->find(name);
+    if (idx == INVALID_POS) {
+        OPENVDB_THROW(LookupError, "ArrayInfo name not found.")
+    }
+    return mArrayInfo[idx];
+}
+
+
+AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(size_t idx)
+{
+    if (idx >= mArrayInfo.size()) {
+        OPENVDB_THROW(LookupError, "ArrayInfo index out-of-range.")
+    }
+    return mArrayInfo[idx];
+}
+
+
+const AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(size_t idx) const
+{
+    if (idx >= mArrayInfo.size()) {
+        OPENVDB_THROW(LookupError, "ArrayInfo index out-of-range.")
+    }
+    return mArrayInfo[idx];
+}
+
+
+void
+AttributeSet::Info::merge(const Info&)
+{
+    OPENVDB_THROW(NotImplementedError, "Merging not implemented yet")
+}
+
+
+void
+AttributeSet::Info::print(std::ostream& os) const
+{
+    os << "AttributeSet::Info:\n";
+    os << "\tAttributes: " << this->size() << " attribute(s)\n";
+    for (const auto& namePos : mDescriptor->map()) {
+        const Name& name = namePos.first;
+        size_t pos = namePos.second;
+        os << "\t\t[" << pos << "] \"" << name << "\" \n";
+        os << "\t\t\tType: " << mDescriptor->type(pos).first << " " << mDescriptor->type(pos).second << "\n";
+        os << "\t\t\tDefaultValue: " << (mDescriptor->hasDefaultValue(name) ? "yes" : "no") << "\n";
+        const auto& arrayInfo = this->arrayInfo(pos);
+        os << "\t\t\tConstantStride: " << (arrayInfo.constantStride ? "yes" : "no") << "\n";
+        os << "\t\t\tStride: " << arrayInfo.stride << "\n";
+        os << "\t\t\tGroup: " << (arrayInfo.group ? "yes" : "no") << "\n";
+        os << "\t\t\tString: " << (arrayInfo.string ? "yes" : "no") << "\n";
+        os << "\t\t\tHidden: " << (arrayInfo.hidden ? "yes" : "no") << "\n";
+        os << "\t\t\tTransient: " << (arrayInfo.transient ? "yes" : "no") << "\n";
+    }
+    os << "\tGroups: " << mDescriptor->groupMap().size() << " group(s)\n";
+    for (const auto& namePos : mDescriptor->groupMap()) {
+        os << "\t\t[" << namePos.second << "] " << namePos.first << "\n";
+    }
+    os << "\tMetadata: " << mDescriptor->getMetadata().metaCount() << " metadata element(s)\n";
+    os << std::flush;
+}
+
 
 ////////////////////////////////////////
+
 
 
 } // namespace points

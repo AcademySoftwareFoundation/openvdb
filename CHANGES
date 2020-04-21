@@ -26,6 +26,8 @@ Version 7.1.0 - In Development
     - Added PointDataLeafNode::stealAttributeSet() and
       AttributeSet::removeAttribute() for releasing ownership of attribute
       data.
+    - Add AttributeSet::Info class to collate array data from AttributeSet and
+      AttributeArrays for easier querying and AttributeSet construction.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
