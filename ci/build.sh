@@ -9,12 +9,6 @@ BLOSC="$1"; shift
 SIMD="$1"; shift
 CMAKE_EXTRA="$@"
 
-CXX_STRICT=ON
-if [ $(uname -s) == "Darwin" ]; then
-    echo "Disabling compiler warnings on MacOS"
-    CXX_STRICT=OFF
-fi
-
 mkdir build
 cd build
 cmake \
@@ -23,7 +17,6 @@ cmake \
     -DOPENVDB_ABI_VERSION_NUMBER=${ABI} \
     -DOPENVDB_USE_DEPRECATED_ABI=ON \
     -DUSE_BLOSC=${BLOSC} \
-    -DOPENVDB_CXX_STRICT=${CXX_STRICT} \
     -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_UNITTESTS=ON \
     -DOPENVDB_BUILD_BINARIES=ON \

@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 ON None
+      run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -22,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 6 ON None
+      run: ./ci/build.sh clang++ Release 6 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -33,7 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 5 ON None
+      run: ./ci/build.sh clang++ Release 5 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -44,7 +44,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 4 ON None
+      run: ./ci/build.sh clang++ Release 4 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -94,7 +94,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 OFF None
+      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -129,7 +129,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh g++ Release 7 ON None
+      run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
 
   testabi7debug:
     runs-on: ubuntu-16.04
@@ -138,7 +138,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Debug 7 ON None
+      run: ./ci/build.sh clang++ Debug 7 ON None -DOPENVDB_CXX_STRICT=ON
 
   testabi7sse:
     runs-on: ubuntu-16.04
@@ -147,7 +147,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Debug 7 ON SSE42
+      run: ./ci/build.sh clang++ Debug 7 ON SSE42 -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -190,7 +190,13 @@ jobs:
       run: ./ci/install_macos.sh
     - name: build
       shell: bash
-      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DPython_ROOT_DIR=/usr/local/opt/python@3.8
+      # brew boost-python installs a "Keg-only" version of python which is
+      # not insatlled to PATH. Until this becomes the default, we must
+      # manually provide the location of the require python installation
+      # See https://formulae.brew.sh/formula/python@3.8
+      # Also need to disable compiler warnings for ABI 6 and above due to
+      # the version of clang installed
+      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DPython_ROOT_DIR=/usr/local/opt/python@3.8 -DOPENVDB_CXX_STRICT=OFF
     - name: test
       shell: bash
       run: ./ci/test.sh
