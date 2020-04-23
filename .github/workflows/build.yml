@@ -138,7 +138,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Debug 7 ON None -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh clang++ DebugNoInfo 7 ON None -DOPENVDB_CXX_STRICT=ON
 
   testabi7sse:
     runs-on: ubuntu-16.04
@@ -147,7 +147,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Debug 7 ON SSE42 -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
