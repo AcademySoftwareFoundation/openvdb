@@ -9,9 +9,7 @@
 
 #include <openvdb/Types.h>
 
-#ifdef OPENVDB_USE_GLFW_3
 struct GLFWwindow; // forward declaration
-#endif
 
 
 namespace openvdb_viewer {
@@ -21,9 +19,7 @@ class Camera
 public:
     Camera();
 
-#ifdef OPENVDB_USE_GLFW_3
     void setWindow(GLFWwindow* w) { mWindow = w; }
-#endif
 
     void aim();
 
@@ -54,9 +50,7 @@ private:
     bool mMouseDown, mStartTumbling, mZoomMode, mChanged, mNeedsDisplay;
     double mMouseXPos, mMouseYPos;
 
-#ifdef OPENVDB_USE_GLFW_3
     GLFWwindow* mWindow;
-#endif
 
     static const double sDeg2rad;
 }; // class Camera

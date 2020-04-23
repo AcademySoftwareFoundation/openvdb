@@ -131,9 +131,6 @@ GLFW_INCL_DIR := /rel/third_party/glfw/glfw-3.0.1/include
 # The directory containing libglfw
 GLFW_LIB_DIR := /rel/third_party/glfw/glfw-3.0.1/lib
 GLFW_LIB := -lglfw
-# The major version number of the GLFW library
-# (header filenames changed between GLFW 2 and 3, so this must be specified explicitly)
-GLFW_MAJOR_VERSION := 3
 
 # The version of Python for which to build the OpenVDB module
 # (leave blank if Python is unavailable)
@@ -255,9 +252,6 @@ abi := $(strip $(abi))
 ifneq (,$(abi))
     CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
     CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
-endif
-ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
-    CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 ifeq (yes,$(strip $(strict)))
