@@ -45,18 +45,6 @@ set(OPENVDB_BINARIES_DEPENDENT_LIBS
 
 ##########################################################################
 
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
-
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
-
 # rpath handling
 
 set(RPATHS "")

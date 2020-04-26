@@ -40,19 +40,6 @@ set(OPENVDB_TEST_DEPENDENT_LIBS
 
 ##########################################################################
 
-if(WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-  add_definitions(-DBOOST_ALL_NO_LIB)
-endif()
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-endif()
-
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
-
 ##### VDB unit tests
 
 set(UNITTEST_SOURCE_FILES

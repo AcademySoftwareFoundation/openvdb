@@ -99,7 +99,7 @@ else()
   )
 endif()
 
-if(OPENVDB_CORE_SHARED)
+if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
   #        boost shared libraries (more specifically libraries built with -fPIC).
   #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
@@ -145,6 +145,14 @@ set(OPENVDB_CORE_DEPENDENT_LIBS
   IlmBase::Half
 )
 
+if(WIN32)
+  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+      list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+        Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
+      )
+  endif()
+endif()
+
 if(USE_EXR)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
     IlmBase::IlmThread
@@ -186,19 +194,6 @@ if(TARGET TBB::tbbmalloc AND TARGET TBB::tbbmalloc_proxy)
 endif()
 
 ##########################################################################
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
-
-# @todo Should be target definitions
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
 
 ##### Core library configuration
 
@@ -403,25 +398,30 @@ endif()
 
 ##########################################################################
 
-# Configure c flags
-
-set(OPENVDB_CORE_PRIVATE_DEFINES)
-set(OPENVDB_CORE_PUBLIC_DEFINES)
+# Configure (static and shared lib) C flags
 
 # Private defines (not inherited by dependent projects)
-
-list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_PRIVATE")
+list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 if(USE_BLOSC)
-  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES "-DOPENVDB_USE_BLOSC")
+  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_USE_BLOSC)
 endif()
 
 # Public defines
-
+if(WIN32)
+  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+  #       used in PlatformConfig.h to configure EXR exports. Once this file
+  #       is completely removed, this define can be too
+  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
+  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+  endif()
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
+endif()
 if(USE_EXR)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_TOOLS_RAYTRACER_USE_EXR")
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES "-DOPENVDB_USE_LOG4CPLUS")
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
 endif()
 
 ##########################################################################
@@ -434,22 +434,22 @@ if(OPENVDB_CORE_STATIC)
     PRIVATE .
   )
 
-  target_compile_definitions(openvdb_static PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
-  target_compile_definitions(openvdb_static PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_static
+    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES}
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
+  )
+
+  target_link_libraries(openvdb_static
+    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+  )
 
   set_target_properties(openvdb_static
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
   )
 
   if(WIN32)
-    set_target_properties(openvdb_static
-      PROPERTIES PREFIX "lib"
-    )
+    set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
-
-  target_link_libraries(openvdb_static
-    ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
 endif()
 
 # Configure shared build
@@ -460,18 +460,20 @@ if(OPENVDB_CORE_SHARED)
     PRIVATE .
   )
 
-  target_compile_definitions(openvdb_shared PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES})
-  target_compile_definitions(openvdb_shared PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_shared
+    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_DLL
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
+  )
+
+  target_link_libraries(openvdb_shared
+    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+  )
 
   set_target_properties(openvdb_shared
     PROPERTIES
       OUTPUT_NAME ${OPENVDB_SHARED_LIBRARY_NAME}
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-  )
-
-  target_link_libraries(openvdb_shared
-    ${OPENVDB_CORE_DEPENDENT_LIBS}
   )
 
   if(OPENVDB_ENABLE_RPATH)
@@ -490,9 +492,6 @@ if(OPENVDB_CORE_SHARED)
     )
   endif()
 endif()
-
-unset(OPENVDB_CORE_PRIVATE_DEFINES)
-unset(OPENVDB_CORE_PUBLIC_DEFINES)
 
 ##########################################################################
 
