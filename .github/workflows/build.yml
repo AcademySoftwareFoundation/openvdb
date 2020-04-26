@@ -164,12 +164,7 @@ jobs:
         echo "::add-path::${{github.workspace}}\build\openvdb\Release"
     - name: update_vcpkg
       shell: bash
-      run: |
-        # temporarily update vcpkg to fix tbb port
-        cd C:\vcpkg
-        git fetch
-        git checkout 97302ca1729eac9917c8a8977667601453795c90
-        bootstrap-vcpkg.bat
+      run: cd C:\vcpkg && git pull
     - name: install
       shell: bash
       run: ./ci/install_windows.sh
