@@ -9,9 +9,12 @@ BLOSC="$1"; shift
 SIMD="$1"; shift
 CMAKE_EXTRA="$@"
 
+# DebugNoInfo is a custom CMAKE_BUILD_TYPE - no optimizations, no symbols, asserts enabled
+
 mkdir build
 cd build
 cmake \
+    -DCMAKE_CXX_FLAGS_DebugNoInfo="" \
     -DCMAKE_CXX_COMPILER=${COMPILER} \
     -DCMAKE_BUILD_TYPE=${RELEASE} \
     -DOPENVDB_ABI_VERSION_NUMBER=${ABI} \
