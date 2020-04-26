@@ -12,6 +12,10 @@ cd -
 
 mkdir build
 cd build
+
+# print version
+cmake --version
+
 cmake \
     -DCMAKE_CXX_COMPILER=${COMPILER} \
     -DCMAKE_BUILD_TYPE=${RELEASE} \

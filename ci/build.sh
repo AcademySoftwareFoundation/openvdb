@@ -13,6 +13,10 @@ CMAKE_EXTRA="$@"
 
 mkdir build
 cd build
+
+# print version
+cmake --version
+
 cmake \
     -DCMAKE_CXX_FLAGS_DebugNoInfo="" \
     -DCMAKE_CXX_COMPILER=${COMPILER} \

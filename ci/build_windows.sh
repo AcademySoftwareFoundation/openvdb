@@ -11,6 +11,9 @@ cd build
 #  https://github.com/actions/virtual-environments/issues/687
 #  https://github.com/actions/virtual-environments/blob/master/images/win/Windows2019-Readme.md
 
+# print version
+cmake --version
+
 cmake \
   -G "Visual Studio 16 2019" -A x64 \
   -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}\scripts\buildsystems\vcpkg.cmake" \
