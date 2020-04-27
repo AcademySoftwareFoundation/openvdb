@@ -113,6 +113,18 @@ Build:
 - Added missing TBB, OpenEXR and IlmBase defines for static builds on
   Windows through the relevant FindPackage modules.
 - Improved the logic in FindOpenVDB for static builds.
+- Added an option <TT>BLOSC_USE_EXTERNAL_SOURCES</TT> to FindBlosc to include
+  blosc dependencies as interface libraries.
+- Added a root CMake option <TT>USE_STATIC_DEPENDENCIES</TT> to force CMake to
+  only locate static libraries on UNIX. On Windows, if enabled, located
+  libraries are assumed to be static.
+- Added support for <TT>CMAKE_MSVC_RUNTIME_LIBRARY</TT> for compilers that
+  target the MSVC ABI. Requires CMake 3.15 or greater.
+- Fixed an issue where <TT>OPENVDB_OPENEXR_STATICLIB</TT> was not being defined
+  and <TT>OPENEXR_DLL</TT> was being defined when linking against static builds
+  of OpenEXR/IlmBase on Windows.
+- Improved the behaviour of boost implicit linking with the
+  Boost::disable_autolinking target.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
