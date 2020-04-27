@@ -54,8 +54,6 @@ The following cache variables may also be set:
   The directory containing ``OpenEXR/config-auto.h``.
 ``OpenEXR_{COMPONENT}_LIBRARY``
   Individual component libraries for OpenEXR
-``OpenEXR_{COMPONENT}_DLL``
-  Individual component dlls for OpenEXR on Windows.
 
 Hints
 ^^^^^
@@ -79,6 +77,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -159,7 +158,7 @@ list(APPEND _OPENEXR_INCLUDE_SEARCH_DIRS
 find_path(OpenEXR_INCLUDE_DIR OpenEXRConfig.h
   ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
   PATHS ${_OPENEXR_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES  include/OpenEXR OpenEXR
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR include/OpenEXR OpenEXR
 )
 
 if(EXISTS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h")
@@ -201,41 +200,30 @@ list(APPEND _OPENEXR_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Build suffix directories
-
-set(OPENEXR_PATH_SUFFIXES
-  lib64
-  lib
-)
-
-if(UNIX )
-  list(INSERT OPENEXR_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
+# Library suffix handling
 
 set(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(_OpenEXR_Version_Suffix "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}")
 
-# library suffix handling
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.lib"
-  )
+  if(OPENEXR_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.lib")
 else()
   if(OPENEXR_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   else()
     if(APPLE)
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.dylib"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.dylib")
     else()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}.so"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.so")
     endif()
   endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_OpenEXR_Version_Suffix}.a")
 endif()
+
+unset(_OpenEXR_Version_Suffix)
 
 set(OpenEXR_LIB_COMPONENTS "")
 
@@ -243,21 +231,9 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   find_library(OpenEXR_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
     PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${OPENEXR_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
   list(APPEND OpenEXR_LIB_COMPONENTS ${OpenEXR_${COMPONENT}_LIBRARY})
-
-  if(WIN32 AND NOT OPENEXR_USE_STATIC_LIBS)
-    set(_OPENEXR_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-    find_library(OpenEXR_${COMPONENT}_DLL ${COMPONENT}
-      ${_FIND_OPENEXR_ADDITIONAL_OPTIONS}
-      PATHS ${_OPENEXR_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES bin
-    )
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENEXR_TMP})
-    unset(_OPENEXR_TMP)
-  endif()
 
   if(OpenEXR_${COMPONENT}_LIBRARY)
     set(OpenEXR_${COMPONENT}_FOUND TRUE)
@@ -266,7 +242,7 @@ foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
   endif()
 endforeach()
 
-# reset lib suffix
+# Reset library suffix
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 unset(_OPENEXR_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
@@ -309,7 +285,6 @@ if(OpenEXR_FOUND)
     ${OpenEXR_INCLUDE_DIR}
   )
   unset(_OpenEXR_Parent_Dir)
-  set(OpenEXR_DEFINITIONS ${PC_OpenEXR_CFLAGS_OTHER})
 
   set(OpenEXR_LIBRARY_DIRS "")
   foreach(LIB ${OpenEXR_LIB_COMPONENTS})
@@ -321,11 +296,37 @@ if(OpenEXR_FOUND)
   # Configure imported target
 
   foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
+    set(OpenEXR_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(OPENEXR_USE_STATIC_LIBS)
+      set(OpenEXR_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(UNIX)
+      get_filename_component(_OpenEXR_${COMPONENT}_EXT ${OpenEXR_${COMPONENT}_LIBRARY} EXT)
+      if(${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".a")
+        set(OpenEXR_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".so" OR
+             ${_OpenEXR_${COMPONENT}_EXT} STREQUAL ".dylib")
+        set(OpenEXR_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(OpenEXR_${COMPONENT}_DEFINITIONS)
+
+    # Add the OPENEXR_DLL define if the library is not static on WIN32
+    if(WIN32)
+      if(NOT OpenEXR_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+        list(APPEND OpenEXR_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
+      endif()
+    endif()
+
     if(NOT TARGET OpenEXR::${COMPONENT})
-      add_library(OpenEXR::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(OpenEXR::${COMPONENT} ${OpenEXR_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(OpenEXR::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${OpenEXR_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${OpenEXR_DEFINITIONS}"
+        INTERFACE_COMPILE_OPTIONS "${PC_OpenEXR_CFLAGS_OTHER}"
+        INTERFACE_COMPILE_DEFINITIONS "${OpenEXR_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${OpenEXR_INCLUDE_DIRS}"
       )
     endif()

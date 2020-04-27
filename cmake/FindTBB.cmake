@@ -77,6 +77,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -150,7 +151,7 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
 find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
   ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h")
@@ -192,46 +193,18 @@ list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-set(TBB_PATH_SUFFIXES
-  lib64
-  lib
-)
+# Library suffix handling
 
-# platform branching
+set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-if(UNIX)
-  list(INSERT TBB_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
-
-if(APPLE)
-  if(TBB_FOR_CLANG)
-    list(INSERT TBB_PATH_SUFFIXES 0 lib/libc++)
+if(WIN32)
+  if(TBB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
   endif()
-elseif(WIN32)
-  if(MSVC10)
-    set(TBB_VC_DIR vc10)
-  elseif(MSVC11)
-    set(TBB_VC_DIR vc11)
-  elseif(MSVC12)
-    set(TBB_VC_DIR vc12)
-  endif()
-  list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/${TBB_VC_DIR})
 else()
-  if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
-    if(TBB_MATCH_COMPILER_VERSION)
-      string(REGEX MATCHALL "[0-9]+" GCC_VERSION_COMPONENTS ${CMAKE_CXX_COMPILER_VERSION})
-      list(GET GCC_VERSION_COMPONENTS 0 GCC_MAJOR)
-      list(GET GCC_VERSION_COMPONENTS 1 GCC_MINOR)
-      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc${GCC_MAJOR}.${GCC_MINOR})
-    else()
-      list(INSERT TBB_PATH_SUFFIXES 0 lib/intel64/gcc4.4)
-    endif()
+  if(TBB_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   endif()
-endif()
-
-if(UNIX AND TBB_USE_STATIC_LIBS)
-  set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
 set(Tbb_LIB_COMPONENTS "")
@@ -240,7 +213,7 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   find_library(Tbb_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_TBB_ADDITIONAL_OPTIONS}
     PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${TBB_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
 
   # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
@@ -268,10 +241,10 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   endif()
 endforeach()
 
-if(UNIX AND TBB_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-endif()
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set TBB_FOUND
@@ -288,11 +261,8 @@ find_package_handle_standard_args(TBB
 )
 
 if(TBB_FOUND)
-  set(Tbb_LIBRARIES
-    ${Tbb_LIB_COMPONENTS}
-  )
+  set(Tbb_LIBRARIES ${Tbb_LIB_COMPONENTS})
   set(Tbb_INCLUDE_DIRS ${Tbb_INCLUDE_DIR})
-  set(Tbb_DEFINITIONS ${PC_Tbb_CFLAGS_OTHER})
 
   set(Tbb_LIBRARY_DIRS "")
   foreach(LIB ${Tbb_LIB_COMPONENTS})
@@ -304,11 +274,43 @@ if(TBB_FOUND)
   # Configure imported targets
 
   foreach(COMPONENT ${TBB_FIND_COMPONENTS})
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
+    set(TBB_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(TBB_USE_STATIC_LIBS)
+      set(TBB_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(UNIX)
+      get_filename_component(_TBB_${COMPONENT}_EXT ${Tbb_${COMPONENT}_LIBRARY} EXT)
+      if(_TBB_${COMPONENT}_EXT STREQUAL ".a")
+        set(TBB_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(_TBB_${COMPONENT}_EXT STREQUAL ".so" OR
+             _TBB_${COMPONENT}_EXT STREQUAL ".dylib")
+        set(TBB_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(Tbb_${COMPONENT}_DEFINITIONS)
+
+    # Add the TBB linking defines if the library is static on WIN32
+    if(WIN32)
+      if(${COMPONENT} STREQUAL tbb)
+        if(Tbb_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+          list(APPEND Tbb_${COMPONENT}_DEFINITIONS __TBB_NO_IMPLICIT_LINKAGE=1)
+        endif()
+      else() # tbbmalloc
+        if(Tbb_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+          list(APPEND Tbb_${COMPONENT}_DEFINITIONS __TBB_MALLOC_NO_IMPLICIT_LINKAGE=1)
+        endif()
+      endif()
+    endif()
+
     if(NOT TARGET TBB::${COMPONENT})
-      add_library(TBB::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(TBB::${COMPONENT} ${TBB_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(TBB::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${Tbb_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${Tbb_DEFINITIONS}"
+        INTERFACE_COMPILE_OPTIONS "${PC_Tbb_CFLAGS_OTHER}"
+        INTERFACE_COMPILE_DEFINITIONS "${Tbb_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}"
       )
     endif()
