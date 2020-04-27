@@ -238,9 +238,7 @@ if(Blosc_FOUND)
     # Blosc may optionally be compiled with external sources for
     # lz4, snappy, zlib and zstd. Add them as interface libs if
     # requested (there doesn't seem to be a way to figure this
-    # out automatically). Note that it's assumed these deps have
-    # been statically built if BLOSC_USE_STATIC_LIBS is ON so that
-    # zstd infers the correct name
+    # out automatically).
     if(BLOSC_USE_EXTERNAL_SOURCES)
       set_target_properties(Blosc::blosc PROPERTIES
         INTERFACE_LINK_DIRECTORIES "${Blosc_LIBRARY_DIRS}"
