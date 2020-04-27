@@ -349,7 +349,7 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
         if (clip) {
             if (const GU_Detail* clipGeo = inputGeo(0)) {
                 UT_BoundingBox box;
-                clipGeo->computeQuickBounds(box);
+                clipGeo->getBBox(&box);
                 clipBBox.min()[0] = box.xmin();
                 clipBBox.min()[1] = box.ymin();
                 clipBBox.min()[2] = box.zmin();
