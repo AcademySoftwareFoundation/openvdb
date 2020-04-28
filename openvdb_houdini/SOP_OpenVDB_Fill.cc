@@ -364,7 +364,7 @@ SOP_OpenVDB_Fill::Cache::cookVDBSop(OP_Context& context)
                 openvdb::BBoxd bbox;
                 if (const GU_Detail* refGeo = inputGeo(1)) {
                     UT_BoundingBox b;
-                    refGeo->computeQuickBounds(b);
+                    refGeo->getBBox(&b);
                     if (!b.isValid()) {
                         throw std::runtime_error("no reference geometry found");
                     }

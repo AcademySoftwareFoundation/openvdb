@@ -872,7 +872,7 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
             if (colliderTypeStr == "bbox") {
                 // Use the bounding box of the reference geometry as a collider.
                 UT_BoundingBox box;
-                colliderGeo->computeQuickBounds(box);
+                colliderGeo->getBBox(&box);
                 parms.colliderBBox.min() = openvdb::Vec3d(box.xmin(), box.ymin(), box.zmin());
                 parms.colliderBBox.max() = openvdb::Vec3d(box.xmax(), box.ymax(), box.zmax());
                 parms.colliderType = CT_BBOX;
