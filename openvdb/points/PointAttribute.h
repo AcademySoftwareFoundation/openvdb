@@ -321,7 +321,13 @@ inline void appendAttribute(PointDataTreeT& tree,
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
         strideOrTotalSize, constantStride, defaultValue, hidden, transient);
 
-    if (!defaultValue || !math::isExactlyEqual(uniformValue, defaultValue->value())) {
+    // if the uniform value is equal to either the default value provided
+    // through the metadata argument or the default value for this value type,
+    // it is not necessary to perform the collapse
+
+    const bool uniformIsDefault = math::isExactlyEqual(uniformValue,
+            bool(defaultValue) ? defaultValue->value() : Default<ValueType>::value());
+    if (!uniformIsDefault) {
         MetadataStorage<PointDataTreeT, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
