@@ -26,6 +26,8 @@ Version 7.1.0 - In Development
     - Added PointDataLeafNode::stealAttributeSet() and
       AttributeSet::removeAttribute() for releasing ownership of attribute
       data.
+    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
+      group index collisions when attempting to merge two Descriptors.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -47,6 +49,9 @@ Version 7.1.0 - In Development
     - points::StringIndexType is now deprecated, use Index instead.
     - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
       a boost::scoped_array.
+    - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
+      AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
+      optional group offset hint.
 
     Houdini:
     - Platonic SOP is now verbified.
