@@ -612,7 +612,7 @@ SOP_OpenVDB_Points_Group::Cache::evalGroupParms(
                 refGdp->enlargeBoundingBox(box, range);
             }
             else {
-                refGdp->computeQuickBounds(box);
+                refGdp->getBBox(&box);
             }
 
             parms.mBBox.min()[0] = box.xmin();

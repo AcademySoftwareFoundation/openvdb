@@ -69,6 +69,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -123,7 +124,7 @@ list(APPEND _BLOSC_INCLUDE_SEARCH_DIRS
 find_path(Blosc_INCLUDE_DIR blosc.h
   ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
   PATHS ${_BLOSC_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
 if(EXISTS "${Blosc_INCLUDE_DIR}/blosc.h")
@@ -161,27 +162,32 @@ list(APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Static library setup
-if(UNIX AND BLOSC_USE_STATIC_LIBS)
-  set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+# Library suffix handling
+
+set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
+if(WIN32)
+  if(BLOSC_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+else()
+  if(BLOSC_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+  endif()
 endif()
 
-set(BLOSC_PATH_SUFFIXES
-  lib64
-  lib
-)
+# libblosc is the name of the blosc static lib on windows
 
-find_library(Blosc_LIBRARY blosc
+find_library(Blosc_LIBRARY blosc libblosc
   ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
   PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${BLOSC_PATH_SUFFIXES}
+  PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
 )
 
-if(UNIX AND BLOSC_USE_STATIC_LIBS)
-  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-  unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-endif()
+# Reset library suffix
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 
 # ------------------------------------------------------------------------
 #  Cache and set Blosc_FOUND
@@ -197,17 +203,32 @@ find_package_handle_standard_args(Blosc
 )
 
 if(Blosc_FOUND)
+  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+  # lib is in use. If win32, we can't mark the import .libs as shared, so
+  # these are always marked as UNKNOWN. Otherwise, infer from extension.
+  set(BLOSC_LIB_TYPE UNKNOWN)
+  if(BLOSC_USE_STATIC_LIBS)
+    set(BLOSC_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
+    if(_BLOSC_EXT STREQUAL ".a")
+      set(BLOSC_LIB_TYPE STATIC)
+    elseif(_BLOSC_EXT STREQUAL ".so" OR
+           _BLOSC_EXT STREQUAL ".dylib")
+      set(BLOSC_LIB_TYPE SHARED)
+    endif()
+  endif()
+
   set(Blosc_LIBRARIES ${Blosc_LIBRARY})
   set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
-  set(Blosc_DEFINITIONS ${PC_Blosc_CFLAGS_OTHER})
 
   get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY)
 
   if(NOT TARGET Blosc::blosc)
-    add_library(Blosc::blosc UNKNOWN IMPORTED)
+    add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
     set_target_properties(Blosc::blosc PROPERTIES
       IMPORTED_LOCATION "${Blosc_LIBRARIES}"
-      INTERFACE_COMPILE_DEFINITIONS "${Blosc_DEFINITIONS}"
+      INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
       INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
     )
   endif()

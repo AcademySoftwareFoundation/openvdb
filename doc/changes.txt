@@ -78,6 +78,11 @@ Houdini:
 - Changed the label (but not the opname) of
   Resize&nbsp;Narrow&nbsp;Band&nbsp;SOP to match the corresponding native
   Houdini SOP. The new label is Activate&nbsp;SDF.
+- Fixed a bug by using @c GEO_Detail::getBBox() instead of
+  @c GEO_Detail::computeQuickBounds() as the latter was incorrectly using the
+  point of the VDB when computing bounding box. SOPs affected include Clip,
+  Fill, Points Group, Rasterize Points, Read, Remove Divergence.
+  <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 
 @par
 Build:
@@ -105,6 +110,13 @@ Build:
   Houdini shared library.
 - Added a USE_PKGCONFIG option to CMake to optionally disable use of pkg-config.
   <I>[Contributed&nbsp;by&nbsp;Kartik&nbsp;Shrivastava]</I>
+- Standardized the dependency search paths in FindPackage modules using
+  GNU install paths.
+- Added better library type detection of dependencies through FindPackage
+  modules on UNIX.
+- Added missing TBB, OpenEXR and IlmBase defines for static builds on
+  Windows through the relevant FindPackage modules.
+- Improved the logic in FindOpenVDB for static builds.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
