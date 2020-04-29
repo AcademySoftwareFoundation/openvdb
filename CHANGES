@@ -41,6 +41,9 @@ Version 7.1.0 - In Development
       [Contributed by Michael Tao]
     - Fixed a bug in the unit test for util::CpuTimer on Windows by using a
       more accurate sleep implementation.
+    - Fixed a bug where the requested uniform value of an AttributeArray was
+      not being applied on attribute creation if the default attribute value
+      was not the default value for that value type.
 
     API changes:
     - Removed a number of deprecated point methods.
