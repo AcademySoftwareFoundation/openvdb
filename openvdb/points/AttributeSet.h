@@ -473,7 +473,12 @@ public:
     /// Return @c true if there are sufficient empty slots to allow compacting
     bool canCompactGroups() const;
 
-    /// Return the next empty group slot
+    /// @brief Return a group offset that is not in use
+    /// @param hint if provided, request a specific offset as a hint
+    /// @return index of an offset or size_t max if no available group offsets
+    size_t unusedGroupOffset(size_t hint = std::numeric_limits<size_t>::max()) const;
+
+    OPENVDB_DEPRECATED
     size_t nextUnusedGroupOffset() const;
 
     /// @brief Determine if a move is required to efficiently compact the data and store the
@@ -483,6 +488,12 @@ public:
     /// @param targetOffset target offset
     /// @return @c true if move is required to compact the data
     bool requiresGroupMove(Name& sourceName, size_t& sourceOffset, size_t& targetOffset) const;
+
+    /// @brief Test if there are any group names shared by both descriptors which
+    /// have a different index
+    /// @param rhs the descriptor to compare with
+    /// @return @c true if an index collision exists
+    bool groupIndexCollision(const Descriptor& rhs) const;
 
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;

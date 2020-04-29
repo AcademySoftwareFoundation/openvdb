@@ -1190,7 +1190,9 @@ TestAttributeSet::testAttributeSetGroups()
         // no groups
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(1)));
+        CPPUNIT_ASSERT_EQUAL(size_t(5), descriptor.unusedGroupOffset(/*hint=*/size_t(5)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         CPPUNIT_ASSERT_EQUAL(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1200,7 +1202,9 @@ TestAttributeSet::testAttributeSetGroups()
         descriptor.setGroup("test0", size_t(0));
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset());
+        // hint already in use
+        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(0)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         CPPUNIT_ASSERT_EQUAL(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1212,7 +1216,10 @@ TestAttributeSet::testAttributeSetGroups()
         descriptor.setGroup("test7", size_t(7));
 
         CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.nextUnusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
+        CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroupOffset(/*hint=*/size_t(6)));
+        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset(/*hint=*/size_t(7)));
+        CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset(/*hint=*/size_t(8)));
         CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
         // note that requiresGroupMove() is not particularly clever because it
         // blindly recommends moving the group even if it ultimately remains in
@@ -1243,7 +1250,7 @@ TestAttributeSet::testAttributeSetGroups()
             // no test7
 
             CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1251,7 +1258,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test7", size_t(7));
 
             CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1259,7 +1266,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test8", size_t(8));
 
             CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1268,7 +1275,7 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test13", size_t(13));
 
             CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(true,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1288,7 +1295,7 @@ TestAttributeSet::testAttributeSetGroups()
                 /*checkValidOffset=*/true), RuntimeError);
 
             CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.nextUnusedGroupOffset());
+            CPPUNIT_ASSERT_EQUAL(std::numeric_limits<size_t>::max(), descriptor.unusedGroupOffset());
             CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
             CPPUNIT_ASSERT_EQUAL(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1299,5 +1306,62 @@ TestAttributeSet::testAttributeSetGroups()
             CPPUNIT_ASSERT_THROW(descriptor.setGroup("test16", size_t(16),
                 /*checkValidOffset=*/true), RuntimeError);
         }
+    }
+
+    { // group index collision
+        Descriptor descr1;
+        Descriptor descr2;
+
+        // no groups - no collisions
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test1", 0);
+
+        // only one descriptor has groups - no collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr2.setGroup("test1", 0);
+
+        // both descriptors have same group - no collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test2", 1);
+        descr2.setGroup("test2", 2);
+
+        // test2 has different index - collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        descr2.setGroup("test2", 1);
+
+        // overwrite test2 value to remove collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+
+        // overwrite test1 value to introduce collision
+        descr1.setGroup("test1", 4);
+
+        // first index has collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        // add some additional groups
+        descr1.setGroup("test0", 2);
+        descr2.setGroup("test0", 2);
+        descr1.setGroup("test9", 9);
+        descr2.setGroup("test9", 9);
+
+        // first index still has collision
+        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+
+        descr1.setGroup("test1", 0);
+
+        // first index no longer has collision
+        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
+        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
     }
 }
