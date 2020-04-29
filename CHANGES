@@ -99,6 +99,10 @@ Version 7.1.0 - In Development
     - Added missing TBB, OpenEXR and IlmBase defines for static builds on
       Windows through the relevant FindPackage modules.
     - Improved the logic in FindOpenVDB for static builds.
+    - Fixed a compiler warning on Apple Clang 11.0 where the AttributeArray
+      move constructor was being implicitly deleted despite being marked
+      default.
+
 
 Version 7.0.0 - December 6, 2019
 

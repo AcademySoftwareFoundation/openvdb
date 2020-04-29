@@ -124,6 +124,9 @@ Build:
 - Added missing TBB, OpenEXR and IlmBase defines for static builds on
   Windows through the relevant FindPackage modules.
 - Improved the logic in FindOpenVDB for static builds.
+- Fixed a compiler warning on Apple Clang 11.0 where the
+  @vdblink::points::AttributeArray AttributeArray@endlink move constructor was
+  being implicitly deleted despite being marked default.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
