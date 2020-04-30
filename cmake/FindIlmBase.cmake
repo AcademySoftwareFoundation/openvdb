@@ -324,7 +324,7 @@ if(IlmBase_FOUND)
     # Add the OPENEXR_DLL define if the library is not static on WIN32
     if(WIN32)
       if(NOT ILMBASE_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
-        list(APPEND IlmBase_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
+        list(APPEND IlmBase_${COMPONENT}_DEFINITIONS OPENEXR_DLL)
       endif()
     endif()
 

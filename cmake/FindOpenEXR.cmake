@@ -317,7 +317,7 @@ if(OpenEXR_FOUND)
     # Add the OPENEXR_DLL define if the library is not static on WIN32
     if(WIN32)
       if(NOT OpenEXR_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
-        list(APPEND OpenEXR_${COMPONENT}_DEFINITIONS -DOPENEXR_DLL)
+        list(APPEND OpenEXR_${COMPONENT}_DEFINITIONS OPENEXR_DLL)
       endif()
     endif()
 
