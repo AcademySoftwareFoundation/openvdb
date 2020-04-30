@@ -26,6 +26,8 @@ Version 7.1.0 - In Development
     - Added PointDataLeafNode::stealAttributeSet() and
       AttributeSet::removeAttribute() for releasing ownership of attribute
       data.
+    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
+      group index collisions when attempting to merge two Descriptors.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -41,12 +43,18 @@ Version 7.1.0 - In Development
       [Contributed by Michael Tao]
     - Fixed a bug in the unit test for util::CpuTimer on Windows by using a
       more accurate sleep implementation.
+    - Fixed a bug where the requested uniform value of an AttributeArray was
+      not being applied on attribute creation if the default attribute value
+      was not the default value for that value type.
 
     API changes:
     - Removed a number of deprecated point methods.
     - points::StringIndexType is now deprecated, use Index instead.
     - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
       a boost::scoped_array.
+    - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
+      AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
+      optional group offset hint.
 
     Houdini:
     - Platonic SOP is now verbified.
@@ -91,6 +99,9 @@ Version 7.1.0 - In Development
     - Added missing TBB, OpenEXR and IlmBase defines for static builds on
       Windows through the relevant FindPackage modules.
     - Improved the logic in FindOpenVDB for static builds.
+    - Fixed a compiler warning on Apple Clang 11.0 where the AttributeArray
+      move constructor was being implicitly deleted despite being marked
+      default.
     - Added an option BLOSC_USE_EXTERNAL_SOURCES to FindBlosc to include blosc
       dependencies as interface libraries.
     - Added a root CMake option USE_STATIC_DEPENDENCIES to force CMake to
@@ -103,6 +114,7 @@ Version 7.1.0 - In Development
       OpenEXR/IlmBase on Windows.
     - Improved the behaviour of boost implicit linking with the
       Boost::disable_autolinking target.
+
 
 Version 7.0.0 - December 6, 2019
 

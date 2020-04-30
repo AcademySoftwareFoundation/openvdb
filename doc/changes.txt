@@ -38,6 +38,9 @@ New features:
   @vdblink::points::AttributeSet::removeAttribute()
   AttributeSet::removeAttribute@endlink for releasing ownership of attribute
   data.
+- Added @vdblink::points::AttributeSet::Descriptor::groupIndexCollision()
+  AttributeSet::Descriptor::groupIndexCollision@endlink for detecting group
+  index collisions when attempting to merge two Descriptors.
 
 @par
 Bug fixes:
@@ -57,6 +60,10 @@ Bug fixes:
   <I>[Contributed&nbsp;by&nbsp;Michael&nbsp;Tao]</I>
 - Fixed a bug in the unit test for util::CpuTimer on Windows by using a more
   accurate sleep implementation.
+- Fixed a bug where the requested uniform value of an
+  @vdblink::points::AttributeArray AttributeArray@endlink was not being applied
+  on attribute creation if the default attribute value was not the default
+  value for that value type.
 
 @par
 API changes:
@@ -65,6 +72,10 @@ API changes:
   instead.
 - @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
   now returns a std::unique_ptr instead of a boost::scoped_array.
+- Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
+  @vdblink::points::AttributeSet::Descriptor::unusedGroupOffset()
+  AttributeSet::Descriptor::unusedGroupOffset@endlink to allow for providing an
+  optional group offset hint.
 
 @par
 Houdini:
@@ -113,6 +124,9 @@ Build:
 - Added missing TBB, OpenEXR and IlmBase defines for static builds on
   Windows through the relevant FindPackage modules.
 - Improved the logic in FindOpenVDB for static builds.
+- Fixed a compiler warning on Apple Clang 11.0 where the
+  @vdblink::points::AttributeArray AttributeArray@endlink move constructor was
+  being implicitly deleted despite being marked default.
 - Added an option <TT>BLOSC_USE_EXTERNAL_SOURCES</TT> to FindBlosc to include
   blosc dependencies as interface libraries.
 - Added a root CMake option <TT>USE_STATIC_DEPENDENCIES</TT> to force CMake to
