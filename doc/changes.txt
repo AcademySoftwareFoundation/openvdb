@@ -64,6 +64,8 @@ Bug fixes:
   @vdblink::points::AttributeArray AttributeArray@endlink was not being applied
   on attribute creation if the default attribute value was not the default
   value for that value type.
+- Fixed a bug where a Houdini SOP's verb would not be correctly associated
+  with the corresponding node if the node's internal name was changed.
 
 @par
 API changes:

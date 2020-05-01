@@ -46,6 +46,8 @@ Version 7.1.0 - In Development
     - Fixed a bug where the requested uniform value of an AttributeArray was
       not being applied on attribute creation if the default attribute value
       was not the default value for that value type.
+    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
+      with the corresponding node if the node's internal name was changed.
 
     API changes:
     - Removed a number of deprecated point methods.
