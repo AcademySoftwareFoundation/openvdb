@@ -165,7 +165,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
     set(Boost_USE_STATIC_LIBS OFF)
   endif()
 
-  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
   find_package(OpenGL REQUIRED)
 
   if(WIN32)
@@ -192,7 +191,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
 
   target_link_libraries(vdb_view
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
-    Boost::thread
     OpenGL::GL
     OpenGL::GLU
     glfw

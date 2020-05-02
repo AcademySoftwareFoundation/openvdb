@@ -41,7 +41,7 @@ OpenVDB Core Library    | CMake, C++14 compiler, IlmBase::Half, TBB::tbb, ZLIB, 
 OpenVDB Print           | Core Library dependencies                                                            | -
 OpenVDB LOD             | Core Library dependencies                                                            | -
 OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
-OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, Boost::thread, GLEW**                      | -
+OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
 OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
 OpenVDB Documentation   | Doxygen                                                                              | -
@@ -63,7 +63,7 @@ IlmBase        | 2.2     | 2.2         | Used half precision floating points and
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 2017 U6 | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.61    | 1.61        | Components: system, iostreams, python, thread, numpy              | Y       | Y        | https://www.boost.org
+Boost          | 1.61    | 1.61        | Components: system, iostreams, python, numpy                      | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
 NumPy          | 1.12.1  | 1.12.1      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
@@ -111,7 +111,6 @@ apt-get install zlibc                   # zlib
 apt-get install libboost-system-dev     # Boost::system
 apt-get install libboost-iostreams-dev  # Boost::iostream
 apt-get install libboost-python-dev     # Boost::python
-apt-get install libboost-thread-dev     # Boost::thread
 apt-get install libboost-numpy-dev      # Boost::numpy
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
