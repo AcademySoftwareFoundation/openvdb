@@ -32,6 +32,12 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
+
 # Configure grammar target
 
 set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
@@ -80,7 +86,6 @@ endif()
 #########################################################################
 
 # Configure LLVM
-set(MINIMUM_LLVM_VERSION 5.0.0)
 
 find_package(LLVM REQUIRED)
 find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
@@ -93,9 +98,11 @@ else()
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
-if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
-  message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
-    "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
+if(MINIMUM_LLVM_VERSION)
+  if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
+    message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
+      "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
+  endif()
 endif()
 
 message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE_VERSION}\", "
@@ -191,9 +198,9 @@ else()
 endif()
 
 set(OPENVDB_AX_CORE_DEPENDENT_LIBS
-  OpenVDB::openvdb
-  Boost::random
+  ${OPENVDB_LIB}
   ${LLVM_LIBS}
+  Boost::random
 )
 
 ##########################################################################
