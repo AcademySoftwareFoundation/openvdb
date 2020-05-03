@@ -150,12 +150,6 @@ endif()
 #### vdb_view
 
 if(OPENVDB_BUILD_VDB_VIEW)
-
-  # @todo improve the viewer header system
-  file(GLOB VIEWER_SOURCE_FILES ../viewer/*.h)
-  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
-  file(COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
-
   if(NOT Boost_USE_STATIC_LIBS)
     # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
     #        boost shared libraries (more specifically libraries built with -fPIC).
@@ -184,10 +178,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
   )
 
   add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
-
-  target_include_directories(vdb_view
-    PRIVATE ${CMAKE_BINARY_DIR}/dwa
-  )
 
   target_link_libraries(vdb_view
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
