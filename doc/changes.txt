@@ -31,6 +31,7 @@ Improvements:
 - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
 - vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
   unknown exception.
+- Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
 
 @par
 New features:

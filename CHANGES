@@ -22,6 +22,8 @@ Version 7.1.0 - In Development
     - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
     - vdb_view, vdb_print and vdb_render now use std::terminate() when catching
       an unknown exception.
+    - Removed Boost::thread as a dependency of vdb_view in favour of
+      std::thread.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
