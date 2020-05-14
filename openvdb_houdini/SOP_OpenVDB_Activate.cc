@@ -407,8 +407,12 @@ sopDoPrune(GridType &grid, bool doprune, double tolerance)
     // No matter what, axe inactive voxels.
     openvdb::tools::pruneInactive(grid.tree());
     // Optionally prune live tiles
-    if (doprune)
-        grid.tree().prune(ValueT(openvdb::zeroVal<ValueT>() + tolerance));
+    if (doprune) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        const auto value = openvdb::zeroVal<ValueT>() + tolerance;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        grid.tree().prune(static_cast<ValueT>(value));
+    }
 }
 
 // The result of the union of active regions goes into grid_a
