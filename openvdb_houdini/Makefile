@@ -285,6 +285,7 @@ HOUDINI_SOP_SCRIPT_NAMES := \
 HOUDINI_SOP_SRC_NAMES := \
     GR_PrimVDBPoints.cc \
     SHOP_OpenVDB_Points.cc \
+    SOP_OpenVDB_Activate.cc \
     SOP_OpenVDB_Advect.cc \
     SOP_OpenVDB_Advect_Points.cc \
     SOP_OpenVDB_Analysis.cc \
