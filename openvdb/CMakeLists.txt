@@ -146,6 +146,11 @@ set(OPENVDB_CORE_DEPENDENT_LIBS
 )
 
 if(WIN32)
+  # Boost headers contain #pragma commands on Windows which causes Boost
+  # libraries to be linked in automatically. Custom boost installations
+  # may find that these naming conventions don't always match and can
+  # cause linker errors. This option disables this feature of Boost. Note
+  # -DBOOST_ALL_NO_LIB can also be provided manually.
   if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
       list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
         Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
