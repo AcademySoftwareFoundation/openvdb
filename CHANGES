@@ -102,6 +102,18 @@ Version 7.1.0 - In Development
     - Fixed a compiler warning on Apple Clang 11.0 where the AttributeArray
       move constructor was being implicitly deleted despite being marked
       default.
+    - Added an option BLOSC_USE_EXTERNAL_SOURCES to FindBlosc to include blosc
+      dependencies as interface libraries.
+    - Added a root CMake option USE_STATIC_DEPENDENCIES to force CMake to
+      only locate static libraries on UNIX. On Windows, if enabled, located
+      libraries are assumed to be static.
+    - Added support for CMAKE_MSVC_RUNTIME_LIBRARY for compilers that target
+      the MSVC ABI. Requires CMake 3.15 or greater.
+    - Fixed an issue where OPENVDB_OPENEXR_STATICLIB was not being defined and
+      OPENEXR_DLL was being defined when linking against static builds of
+      OpenEXR/IlmBase on Windows.
+    - Improved the behaviour of boost implicit linking with the
+      Boost::disable_autolinking target.
 
 
 Version 7.0.0 - December 6, 2019

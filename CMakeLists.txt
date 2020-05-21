@@ -43,6 +43,13 @@
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.3)
+
+# CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
+# from CMake 3.15 and above. Must come before project().
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+
 project(OpenVDB LANGUAGES CXX)
 
 ###### OpenVDB Build/Component Options
@@ -90,6 +97,11 @@ know it to be required.]=] OFF)
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
+option(USE_STATIC_DEPENDENCIES [=[
+Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
+back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
+to ON, where XXX is the package name. On Windows this behaviour is less strict, with any located libraries assumed
+to be static. ]=] OFF)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
@@ -269,6 +281,37 @@ elseif(CMAKE_CXX_STANDARD LESS ${MINIMUM_CXX_STANDARD})
     "Required is at least \"${MINIMUM_CXX_STANDARD}\" (found ${CMAKE_CXX_STANDARD})")
 endif()
 
+# Configure MS Runtime
+
+if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
+  message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
+elseif(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "" CACHE STRING
+    "Select the MSVC runtime library for use by compilers targeting the MSVC ABI.
+    Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug MultiThreadedDebugDLL.
+    If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL." FORCE)
+endif()
+if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
+  message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+
+  # Configure Boost library varient on Windows
+  if(NOT Boost_USE_STATIC_RUNTIME)
+    set(Boost_USE_STATIC_RUNTIME OFF)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
+      set(Boost_USE_STATIC_RUNTIME ON)
+    endif()
+  endif()
+  if(NOT Boost_USE_DEBUG_RUNTIME)
+    set(Boost_USE_DEBUG_RUNTIME OFF)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
+      set(Boost_USE_DEBUG_RUNTIME ON)
+    endif()
+  endif()
+endif()
+
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -386,7 +429,7 @@ endif()
 # Build type configuration - default to Release if none is set unless
 # code coverage is in use, in which case override to Debug
 
-if (OPENVDB_CODE_COVERAGE)
+if(OPENVDB_CODE_COVERAGE)
   message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
     "to Debug.")
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
@@ -564,6 +607,21 @@ elseif(OPENVDB_SIMD STREQUAL "SSE42")
 endif()
 
 #########################################################################
+
+# Configure our cmake modules to only search for static libraries
+
+if(USE_STATIC_DEPENDENCIES)
+  set(BLOSC_USE_STATIC_LIBS ON)
+  set(OPENEXR_USE_STATIC_LIBS ON)
+  set(ILMBASE_USE_STATIC_LIBS ON)
+  set(TBB_USE_STATIC_LIBS ON)
+  set(LOG4CPLUS_USE_STATIC_LIBS ON)
+  set(JEMALLOC_USE_STATIC_LIBS ON)
+  set(CPPUNIT_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC_LIBS ON)
+  # @todo  glfw needs custom support.
+  # set(GLFW_USE_STATIC_LIBS ON)
+endif()
 
 # Configure OpenVDB Library and ABI versions
 
