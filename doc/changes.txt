@@ -28,6 +28,9 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 - Added support for vdb_view on Windows. Requires GLEW.
 - Removed support for GLFW&nbsp;2.
+- vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
+- vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
+  unknown exception.
 
 @par
 New features:
@@ -64,6 +67,9 @@ Bug fixes:
   @vdblink::points::AttributeArray AttributeArray@endlink was not being applied
   on attribute creation if the default attribute value was not the default
   value for that value type.
+- Fixed a compiler error when using C++17 by changing std::unexpected() to
+  std::terminate().
+  <I>[Contributed&nbsp;by&nbsp;Mark&nbsp;Sisson]</I>
 
 @par
 API changes:

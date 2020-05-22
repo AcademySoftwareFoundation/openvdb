@@ -19,6 +19,9 @@ Version 7.1.0 - In Development
     - Removed redundant null pointer checks. [Contributed by Kuba Roth]
     - Added support for vdb_view on Windows. Requires GLEW.
     - Removed support for GLFW 2.
+    - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
+    - vdb_view, vdb_print and vdb_render now use std::terminate() when catching
+      an unknown exception.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
@@ -46,6 +49,9 @@ Version 7.1.0 - In Development
     - Fixed a bug where the requested uniform value of an AttributeArray was
       not being applied on attribute creation if the default attribute value
       was not the default value for that value type.
+    - Fixed a compiler error when using C++17 by changing std::unexpected() to
+      std::terminate().
+      [Contributed by Mark Sisson]
 
     API changes:
     - Removed a number of deprecated point methods.
