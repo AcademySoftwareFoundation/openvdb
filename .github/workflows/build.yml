@@ -1,7 +1,27 @@
 
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'cmake/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'cmake/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
 
 jobs:
   testabi7:
