@@ -685,6 +685,7 @@ main(int argc, char *argv[])
         retcode = EXIT_FAILURE;
     } catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
+        std::terminate();
     }
 
     return retcode;
