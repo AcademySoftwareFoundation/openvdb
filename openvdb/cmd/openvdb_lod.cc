@@ -351,7 +351,7 @@ main(int argc, char *argv[])
     }
     catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
-        std::unexpected();
+        std::terminate();
     }
 
     return exitStatus;
