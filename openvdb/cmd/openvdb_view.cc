@@ -159,11 +159,15 @@ main(int argc, char *argv[])
         openvdb_viewer::exit();
 
     } catch (const char* s) {
-        OPENVDB_LOG_ERROR(s);
+        OPENVDB_LOG_FATAL(s);
         status = EXIT_FAILURE;
     } catch (std::exception& e) {
-        OPENVDB_LOG_ERROR(e.what());
+        OPENVDB_LOG_FATAL(e.what());
         status = EXIT_FAILURE;
+    } catch (...) {
+        OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
+        std::terminate();
     }
+
     return status;
 }
