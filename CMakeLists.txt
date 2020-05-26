@@ -690,10 +690,6 @@ endif()
 # The ABI is a global target definition, applicable to all components, so just add it
 # via add_definitions()
 
-if(OpenVDB_ABI EQUAL 3)
-  add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
-endif()
-
 add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 message(STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
 

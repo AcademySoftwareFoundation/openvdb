@@ -3,6 +3,8 @@ OpenVDB Version History
 
 Version 7.1.0 - In Development
 
+      As of this release, support for grid ABI=4 has been removed.
+
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
       array is known to be in-core and non-uniform.
@@ -120,6 +122,8 @@ Version 7.1.0 - In Development
       OpenEXR/IlmBase on Windows.
     - Improved the behaviour of boost implicit linking with the
       Boost::disable_autolinking target.
+    - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
+      macros.
 
 
 Version 7.0.0 - December 6, 2019

@@ -166,9 +166,7 @@ TestPointScatter::testUniformPointScatter()
 
     auto points = points::uniformPointScatter(grid, total);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     CPPUNIT_ASSERT_EQUAL(Index64(0), points->tree().activeTileCount());
-#endif
     CPPUNIT_ASSERT_EQUAL(Index32(1), points->tree().leafCount());
     CPPUNIT_ASSERT(Index64(NUM_VALUES) > points->tree().activeVoxelCount());
     CPPUNIT_ASSERT_EQUAL(total, pointCount(points->tree()));
@@ -413,9 +411,7 @@ TestPointScatter::testDenseUniformPointScatter()
 
     const Index64 expectedCount = Index64(pointsPerVoxel * (NUM_VALUES + 1));
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     CPPUNIT_ASSERT_EQUAL(Index64(0), points->tree().activeTileCount());
-#endif
     CPPUNIT_ASSERT_EQUAL(Index32(2), points->tree().leafCount());
     CPPUNIT_ASSERT_EQUAL(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     CPPUNIT_ASSERT_EQUAL(expectedCount, pointCount(points->tree()));
@@ -586,9 +582,7 @@ TestPointScatter::testNonUniformPointScatter()
 
     const Index64 expectedCount = Index64(pointsPerVoxel * (NUM_VALUES + 1));
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     CPPUNIT_ASSERT_EQUAL(Index64(0), points->tree().activeTileCount());
-#endif
     CPPUNIT_ASSERT_EQUAL(Index32(2), points->tree().leafCount());
     CPPUNIT_ASSERT_EQUAL(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     CPPUNIT_ASSERT_EQUAL(expectedCount, pointCount(points->tree()));
