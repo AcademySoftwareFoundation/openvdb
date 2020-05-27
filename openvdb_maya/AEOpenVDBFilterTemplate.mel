@@ -8,7 +8,7 @@ global proc AEOpenVDBFilterTemplate( string $nodeAttr )
         editorTemplate -addControl "Iterations";
         editorTemplate -addControl "Offset";
         editorTemplate -endLayout;
-	    editorTemplate -addExtraControls;
+        editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
 }

@@ -1,0 +1,34 @@
+
+name: Docs
+
+on:
+  push:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'doc/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'doc/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
+
+jobs:
+  doxygen:
+    runs-on: ubuntu-16.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: install
+      run: ./ci/install_doxygen.sh
+    - name: build
+      run: ./ci/build_docs.sh
