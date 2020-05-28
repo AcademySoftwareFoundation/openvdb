@@ -112,6 +112,16 @@ public:
         return ostr;
     }
 
+    /// Direct access to the internal data
+    T* asPointer() { return mm; }
+    const T* asPointer() const { return mm; }
+
+    //@{
+    /// Array style reference to ith row
+    T* operator[](int i) { return &(mm[i*SIZE]); }
+    const T* operator[](int i) const { return &(mm[i*SIZE]); }
+    //@}
+
     void write(std::ostream& os) const {
         os.write(reinterpret_cast<const char*>(&mm), sizeof(T)*SIZE*SIZE);
     }
@@ -1010,6 +1020,62 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
     positive_hermitian = unitary.transpose() * input;
     return true;
+}
+
+////////////////////////////////////////
+
+/// @return true if m0 < m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+bool operator<(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p < *m1p;
+    }
+    return *m0p < *m1p;
+}
+
+/// @return true if m0 > m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+bool operator>(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p > *m1p;
+    }
+    return *m0p > *m1p;
+}
+
+/// @return the absolute value of the given Mat.
+template<unsigned SIZE, typename T>
+Mat<SIZE, T>
+Abs(const Mat<SIZE, T>& in)
+{
+    Mat<SIZE, T> out;
+    const T* ip = in.asPointer();
+    T* op = out.asPointer();
+    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) *op = math::Abs(*ip);
+    return out;
+}
+
+/// @brief  explicit component-wise adder for matrices
+template<unsigned SIZE, typename Type1, typename Type2>
+inline Mat<SIZE, Type1>
+cwiseAdd(const Mat<SIZE, Type1>& v, const Type2 s)
+{
+    Mat<SIZE, Type1> out;
+    const Type1* ip = v.asPointer();
+    Type1* op = out.asPointer();
+    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
 }
 
 } // namespace math

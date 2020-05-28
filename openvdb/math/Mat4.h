@@ -178,17 +178,6 @@ public:
         return Vec4<T>((*this)(0,j), (*this)(1,j), (*this)(2,j), (*this)(3,j));
     }
 
-    //@{
-    /// Array style reference to ith row
-    /// e.g.    m[1][3] = 4;
-    T* operator[](int i) { return &(MyBase::mm[i<<2]); }
-    const T* operator[](int i) const { return &(MyBase::mm[i<<2]); }
-    //@}
-
-    /// Direct access to the internal data
-    T* asPointer() {return MyBase::mm;}
-    const T* asPointer() const {return MyBase::mm;}
-
     /// Alternative indexed reference to the elements
     /// Note that the indices are row first and column second.
     /// e.g.    m(0,0) = 1;
@@ -1329,6 +1318,14 @@ inline bool hasTranslation(const Mat4<T>& m) {
     return (m.row(3) != Vec4<T>(0, 0, 0, 1));
 }
 
+/// @brief  explicit component-wise adder for matrices
+template<typename Type1, typename Type2>
+inline Mat4<Type1>
+cwiseAdd(const Mat4<Type1>& v, const Type2 s)
+{
+    const Mat<4u, Type1>& base = v;
+    return cwiseAdd(base, s);
+}
 
 using Mat4s = Mat4<float>;
 using Mat4d = Mat4<double>;

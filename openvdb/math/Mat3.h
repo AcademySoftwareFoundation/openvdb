@@ -178,20 +178,6 @@ public:
         return Vec3<T>((*this)(0,j), (*this)(1,j), (*this)(2,j));
     } // rowColumnTest
 
-    // NB: The following two methods were changed to
-    // work around a gccWS5 compiler issue related to strict
-    // aliasing (see FX-475).
-
-    //@{
-    /// Array style reference to ith row
-    /// e.g.    m[1][2] = 4;
-    T* operator[](int i) { return &(MyBase::mm[i*3]); }
-    const T* operator[](int i) const { return &(MyBase::mm[i*3]); }
-    //@}
-
-    T* asPointer() {return MyBase::mm;}
-    const T* asPointer() const {return MyBase::mm;}
-
     /// Alternative indexed reference to the elements
     /// Note that the indices are row first and column second.
     /// e.g.    m(0,0) = 1;
@@ -811,6 +797,14 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     return false;
 }
 
+/// @brief  explicit component-wise adder for matrices
+template<typename Type1, typename Type2>
+inline Mat3<Type1>
+cwiseAdd(const Mat3<Type1>& v, const Type2 s)
+{
+    const Mat<3, Type1>& base = v;
+    return cwiseAdd(base, s);
+}
 
 using Mat3s = Mat3<float>;
 using Mat3d = Mat3<double>;

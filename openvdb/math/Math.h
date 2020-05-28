@@ -62,6 +62,8 @@ template<> inline std::string zeroVal<std::string>() { return ""; }
 /// Return the @c bool value that corresponds to zero.
 template<> inline bool zeroVal<bool>() { return false; }
 
+namespace math {
+
 /// @todo These won't be needed if we eliminate StringGrids.
 //@{
 /// @brief Needed to support the <tt>(zeroVal<ValueType>() + val)</tt> idiom
@@ -72,8 +74,14 @@ inline std::string operator+(const std::string& s, float) { return s; }
 inline std::string operator+(const std::string& s, double) { return s; }
 //@}
 
-
-namespace math {
+/// @brief  Componentwise adder for POD types.
+template<typename Type1, typename Type2>
+inline auto cwiseAdd(const Type1& v, const Type2 s)
+{
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    return v + s;
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+}
 
 /// @brief Return the unary negation of the given value.
 /// @note A negative<T>() specialization must be defined for each ValueType T
@@ -830,7 +838,6 @@ Truncate(Type x, unsigned int digits)
     Type tenth = Pow(10,digits);
     return RoundDown(x*tenth+0.5)/tenth;
 }
-
 
 ////////////////////////////////////////
 
