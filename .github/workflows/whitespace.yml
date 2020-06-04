@@ -10,7 +10,7 @@ on:
       - 'tsc/meetings/**'
 
 jobs:
-  # Search the git repository for any trailing spaces
+  # Search the git repository for any trailing spaces excluding meeting notes
   trailingspaces:
     runs-on: ubuntu-16.04
     steps:
@@ -18,7 +18,7 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n -I -E '^.+[ ]+$' -- './*'
+          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*'
           test $? -eq 1
 
   # Search for any tabs excluding Makefiles, meeting notes, image files and a few others
