@@ -120,6 +120,8 @@ Version 7.1.0 - In Development
       OpenEXR/IlmBase on Windows.
     - Improved the behaviour of boost implicit linking with the
       Boost::disable_autolinking target.
+    - Added support for importing pyopenvdb and openvdb_houdini through the
+      FindOpenVDB CMake module
 
 
 Version 7.0.0 - December 6, 2019
