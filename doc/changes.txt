@@ -145,6 +145,8 @@ Build:
   of OpenEXR/IlmBase on Windows.
 - Improved the behaviour of boost implicit linking with the
   Boost::disable_autolinking target.
+- Added support for importing pyopenvdb and openvdb_houdini through the
+  FindOpenVDB CMake module
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
