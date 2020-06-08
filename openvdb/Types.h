@@ -316,6 +316,70 @@ namespace internal {
 
 // Implementation details of TypeList
 
+struct NullType {};
+
+// Get a particular element
+
+// resolve if Idx is out-of-range
+template<typename ListT, size_t Idx, bool Valid> struct TSResolveElementImpl;
+template<typename... Ts, size_t Idx>
+struct TSResolveElementImpl<TypeList<Ts...>, Idx, true> {
+    using type = typename std::tuple_element<Idx, std::tuple<Ts...>>::type;
+};
+template<typename... Ts, size_t Idx>
+struct TSResolveElementImpl<TypeList<Ts...>, Idx, false> {
+    using type = NullType;
+};
+
+template<typename ListT, size_t Idx> struct TSGetElementImpl;
+
+template<typename... Ts, size_t Idx>
+struct TSGetElementImpl<TypeList<Ts...>, Idx> {
+private:
+    static constexpr bool Valid =
+        Idx < sizeof...(Ts) && sizeof...(Ts) > 0;
+public:
+    using type = typename TSResolveElementImpl<TypeList<Ts...>, Idx, Valid>::type;
+};
+
+
+// Check a type exists in a TypeList
+template <typename ListT, typename T, size_t Idx=0>
+struct TSHasTypeImpl;
+
+template <typename T>
+struct TSHasTypeImpl<TypeList<>, T> {
+    static constexpr bool Value = false;
+    static constexpr int64_t Index = -1;
+};
+
+template <typename U, typename T, typename... Ts, size_t Idx>
+struct TSHasTypeImpl<TypeList<U, Ts...>, T, Idx> :
+    TSHasTypeImpl<TypeList<Ts...>, T, Idx+1> {};
+
+template <typename T, typename... Ts, size_t Idx>
+struct TSHasTypeImpl<TypeList<T, Ts...>, T, Idx>
+{
+    static constexpr bool Value = true;
+    static constexpr int64_t Index = static_cast<int64_t>(Idx);
+};
+
+
+// // Remove any duplicate types from a TypeList
+// template <typename T, typename... Ts>
+// struct TSMakeUniqueImpl {
+//     using type = T;
+// };
+
+// template <typename... Ts, typename U, typename... Us>
+// struct TSMakeUniqueImpl<TypeList<Ts...>, U, Us...> {
+//     using type =
+//         typename std::conditional<(std::is_same<U, Ts>::value || ...),
+//            typename TSMakeUniqueImpl<TypeList<Ts...>, Us...>::type,
+//            typename TSMakeUniqueImpl<TypeList<Ts..., U>, Us...>::type >::type;
+// };
+
+
 template<typename ListT, typename... Ts> struct TSAppendImpl;
 
 // Append zero or more types.
@@ -371,6 +435,64 @@ struct TSRemoveImpl<ListT, TypeList<Ts...>> {
 };
 
 
+// Remove the first element
+// @note Much cheaper to instantiate than TSRemoveIndicesImpl
+template<typename T>
+struct TSRemoveFirstImpl {
+    using type = TypeList<>;
+};
+
+template<typename T, typename... Ts>
+struct TSRemoveFirstImpl<TypeList<T, Ts...>> {
+    using type = TypeList<Ts...>;
+};
+
+
+// Remove the last element
+// @note Cheaper to instantiate than TSRemoveIndicesImpl
+template<typename T>
+struct TSRemoveLastImpl { using type = TypeList<>; };
+template<typename T>
+struct TSRemoveLastImpl<TypeList<T>> : TSRemoveLastImpl<T> {};
+
+template<typename T, typename... Ts>
+struct TSRemoveLastImpl<TypeList<T, Ts...>>
+{
+    using type =
+        typename TypeList<T>::template
+            Append<typename TSRemoveLastImpl<TypeList<Ts...>>::type>;
+};
+
+
+template<typename T, size_t First, size_t Last, size_t Idx=0>
+struct TSRemoveIndicesImpl;
+
+template<size_t First, size_t Last, size_t Idx>
+struct TSRemoveIndicesImpl<TypeList<>, First, Last, Idx> {
+     using type = TypeList<>;
+};
+
+template<typename T, size_t First, size_t Last, size_t Idx>
+struct TSRemoveIndicesImpl<TypeList<T>, First, Last, Idx>
+{
+private:
+    static constexpr bool Remove = Idx >= First && Idx <= Last;
+public:
+    using type = typename std::conditional<Remove, TypeList<>,  TypeList<T>>::type;
+};
+
+template<typename T, typename... Ts, size_t First, size_t Last, size_t Idx>
+struct TSRemoveIndicesImpl<TypeList<T, Ts...>, First, Last, Idx>
+{
+private:
+    static constexpr bool Remove = Idx >= First && Idx <= Last;
+    using NextList = typename TSRemoveIndicesImpl<TypeList<Ts...>, First, Last, Idx+1>::type;
+    using ThisList = typename std::conditional<Remove, TypeList<>,  TypeList<T>>::type;
+public:
+    using type = typename ThisList::template Append<NextList>;
+};
+
+
 template<typename OpT> inline void TSForEachImpl(OpT) {}
 template<typename OpT, typename T, typename... Ts>
 inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
@@ -390,6 +512,60 @@ struct TypeList
 {
     /// The type of this list
     using Self = TypeList;
+
+    /// @brief The number of types in the type list
+    static constexpr size_t Size = sizeof...(Ts);
+
+    /// @brief Access a particular element of this type list. If the index
+    ///        is out of range, internal::NullType is returned.
+    template<size_t N>
+    using Get = typename internal::TSGetElementImpl<Self, N>::type;
+    using Front = Get<0>;
+    using Back = Get<Size-1>;
+
+    /// @brief True if this list contains a signle given type, false otherwise
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = openvdb::TypeList<float, double>;
+    /// }
+    /// {
+    ///     const bool HasInt32 = openvdb::TypeList<IntTypes>::Contains<Int32>; // true
+    ///     const bool HasInt32 = openvdb::TypeList<RealTypes>::Contains<Int32>; // false
+    /// }
+    /// @endcode
+    template<typename T>
+    static constexpr bool Contains = internal::TSHasTypeImpl<Self, T>::Value;
+
+    /// @brief Returns the index of the first found element of the given type, -1 if
+    /// no matching element exists.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = openvdb::TypeList<float, double>;
+    /// }
+    /// {
+    ///     const int64_t L1 = openvdb::TypeList<IntTypes>::Index<Int32>; // 1
+    ///     const int64_t L2 = openvdb::TypeList<RealTypes>::Index<Int32>; // -1
+    /// }
+    /// @endcode
+    template<typename T>
+    static constexpr int64_t Index = internal::TSHasTypeImpl<Self, T>::Index;
+
+    /// @brief Remove any duplicate types from this TypeList by rotating the
+    /// next valid type left (maintains the order of other types).
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using Types = openvdb::TypeList<Int16, Int32, Int16, float, float, Int64>;
+    /// }
+    /// {
+    ///     using UniqueTypes = Types::Unique; // <Int16, Int32, float, Int64>
+    /// }
+    /// @endcode
+    // using Unique = typename internal::TSMakeUniqueImpl<TypeList<>, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
     /// @details Example:
@@ -419,6 +595,53 @@ struct TypeList
     /// @endcode
     template<typename... TypesToRemove>
     using Remove = typename internal::TSRemoveImpl<Self, TypesToRemove...>::type;
+
+    /// @brief Remove the first element of this type list. Has no effect if the
+    ///        type list is already empty.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using EmptyTypes = openvdb::TypeList<>;
+    /// }
+    /// {
+    ///     IntTypes::PopFront; // openvdb::TypeList<Int32, Int64>;
+    ///     EmptyTypes::PopFront; // openvdb::TypeList<>;
+    /// }
+    /// @endcode
+    using PopFront = typename internal::TSRemoveFirstImpl<Self>::type;
+
+    /// @brief Remove the last element of this type list. Has no effect if the
+    ///        type list is already empty.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using IntTypes = openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using EmptyTypes = openvdb::TypeList<>;
+    /// }
+    /// {
+    ///     IntTypes::PopBack; // openvdb::TypeList<Int16, Int32>;
+    ///     EmptyTypes::PopBack; // openvdb::TypeList<>;
+    /// }
+    /// @endcode
+    using PopBack = typename internal::TSRemoveLastImpl<Self>::type;
+
+    /// @brief Return a new lsit with types removed by their location within the list.
+    ///        If First is equal to Last, a single element is removed (if it exists).
+    ///        If First is greater than Last, the list remains unmodified.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using NumericTypes = openvdb::TypeList<float, double, Int16, Int32, Int64>;
+    /// }
+    /// {
+    ///     using IntTypes = NumericTypes::RemoveByIndex<0,1>; // openvdb::TypeList<float, double>;
+    ///     using RealTypes = NumericTypes::RemoveByIndex<2,4>; // openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RemoveFloat = NumericTypes::RemoveByIndex<0,0>; // openvdb::TypeList<double, Int16, Int32, Int64>;
+    /// }
+    /// @endcode
+    template <size_t First, size_t Last>
+    using RemoveByIndex = typename internal::TSRemoveIndicesImpl<Self, First, Last>::type;
 
     /// @brief Invoke a templated, unary functor on a value of each type in this list.
     /// @details Example:
