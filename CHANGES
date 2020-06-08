@@ -24,6 +24,8 @@ Version 7.1.0 - In Development
     - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
     - vdb_view, vdb_print and vdb_render now use std::terminate() when catching
       an unknown exception.
+    - Removed Boost::thread as a dependency of vdb_view in favour of
+      std::thread.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
@@ -122,6 +124,8 @@ Version 7.1.0 - In Development
       OpenEXR/IlmBase on Windows.
     - Improved the behaviour of boost implicit linking with the
       Boost::disable_autolinking target.
+    - Added support for importing pyopenvdb and openvdb_houdini through the
+      FindOpenVDB CMake module
     - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
       macros.
 

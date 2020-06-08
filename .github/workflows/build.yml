@@ -1,7 +1,27 @@
 
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'cmake/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - '.github/**'
+      - 'CMakeLists.txt'
+      - 'ci/**'
+      - 'cmake/**'
+      - 'openvdb/**'
+      - 'openvdb_houdini/**'
 
 jobs:
   testabi7:
@@ -14,6 +34,8 @@ jobs:
       run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
 
   testabi6:
     runs-on: ubuntu-16.04

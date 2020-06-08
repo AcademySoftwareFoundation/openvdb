@@ -36,6 +36,7 @@ Improvements:
 - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
 - vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
   unknown exception.
+- Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
 
 @par
 New features:
@@ -46,9 +47,8 @@ New features:
   @vdblink::points::AttributeSet::removeAttribute()
   AttributeSet::removeAttribute@endlink for releasing ownership of attribute
   data.
-- Added @vdblink::points::AttributeSet::Descriptor::groupIndexCollision()
-  AttributeSet::Descriptor::groupIndexCollision@endlink for detecting group
-  index collisions when attempting to merge two Descriptors.
+- Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
+  collisions when attempting to merge two Descriptors.
 
 @par
 Bug fixes:
@@ -84,8 +84,7 @@ API changes:
 - @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
   now returns a std::unique_ptr instead of a boost::scoped_array.
 - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
-  @vdblink::points::AttributeSet::Descriptor::unusedGroupOffset()
-  AttributeSet::Descriptor::unusedGroupOffset@endlink to allow for providing an
+  AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
   optional group offset hint.
 
 @par
@@ -150,6 +149,8 @@ Build:
   of OpenEXR/IlmBase on Windows.
 - Improved the behaviour of boost implicit linking with the
   Boost::disable_autolinking target.
+- Added support for importing pyopenvdb and openvdb_houdini through the
+  FindOpenVDB CMake module
 - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
   macros.
 

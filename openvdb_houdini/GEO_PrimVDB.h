@@ -363,7 +363,7 @@ public:
     /// Visualization accessors
     /// @{
     const GEO_VolumeOptions &getVisOptions() const  { return myVis; }
-    void                     setVisOptions(const GEO_VolumeOptions &vis) 
+    void                     setVisOptions(const GEO_VolumeOptions &vis)
     { setVisualization(vis.myMode, vis.myIso, vis.myDensity, vis.myLod); }
 
     void                setVisualization(
