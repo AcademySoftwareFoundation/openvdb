@@ -11,9 +11,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/RayTracer.h>
-
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/split.hpp>
+#include <openvdb/util/Name.h>
 
 #ifdef OPENVDB_USE_EXR
 #include <OpenEXR/ImfChannelList.h>
@@ -118,7 +116,7 @@ struct RenderOpts
         if (shader != "diffuse" && shader != "matte" && shader != "normal" && shader != "position"){
             return "expected diffuse, matte, normal or position shader, got \"" + shader + "\"";
         }
-        if (!boost::starts_with(camera, "ortho") && !boost::starts_with(camera, "persp")) {
+        if (!openvdb::string::starts_with(camera, "ortho") && !openvdb::string::starts_with(camera, "persp")) {
             return "expected perspective or orthographic camera, got \"" + camera + "\"";
         }
         if (compression != "none" && compression != "rle" && compression != "zip") {
@@ -252,15 +250,15 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 inline void isExtensionSupported(const std::string& fname)
 {
     // .ppm always supported
-    if (boost::iends_with(fname, ".ppm")) return;
-    else if (boost::iends_with(fname, ".exr"))
+    if (openvdb::string::ends_with(fname, ".ppm")) return;
+    else if (openvdb::string::ends_with(fname, ".exr"))
     {
 #ifndef OPENVDB_USE_EXR
         OPENVDB_THROW(openvdb::RuntimeError,
             "vdb_render has not been compiled with .exr support.");
 #endif
     }
-    else if (boost::iends_with(fname, ".png"))
+    else if (openvdb::string::ends_with(fname, ".png"))
     {
 #ifndef OPENVDB_USE_PNG
         OPENVDB_THROW(openvdb::RuntimeError,
@@ -280,7 +278,7 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     using RGBA = openvdb::tools::Film::RGBA;
 
     std::string filename = fname;
-    if (!boost::iends_with(filename, ".exr")) filename += ".exr";
+    if (!openvdb::string::ends_with(filename, ".exr")) filename += ".exr";
 
     if (opts.verbose) {
         std::cout << gProgName << ": writing " << filename << "..." << std::endl;
@@ -431,10 +429,10 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     tools::Film film(opts.width, opts.height);
 
     std::unique_ptr<tools::BaseCamera> camera;
-    if (boost::starts_with(opts.camera, "persp")) {
+    if (openvdb::string::starts_with(opts.camera, "persp")) {
         camera.reset(new tools::PerspectiveCamera(film, opts.rotate, opts.translate,
             opts.focal, opts.aperture, opts.znear, opts.zfar));
-    } else if (boost::starts_with(opts.camera, "ortho")) {
+    } else if (openvdb::string::starts_with(opts.camera, "ortho")) {
         camera.reset(new tools::OrthographicCamera(film, opts.rotate, opts.translate,
             opts.frame, opts.znear, opts.zfar));
     } else {
@@ -511,15 +509,15 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         std::cout << ostr.str() << std::endl;
     }
 
-    if (boost::iends_with(imgFilename, ".ppm")) {
+    if (openvdb::string::ends_with(imgFilename, ".ppm")) {
         // Save as PPM (fast, but large file size).
         std::string filename = imgFilename;
         filename.erase(filename.size() - 4); // strip .ppm extension
         film.savePPM(filename);
-    } else if (boost::iends_with(imgFilename, ".exr")) {
+    } else if (openvdb::string::ends_with(imgFilename, ".exr")) {
         // Save as EXR (slow, but small file size).
         saveEXR(imgFilename, film, opts);
-    } else if (boost::iends_with(imgFilename, ".png")) {
+    } else if (openvdb::string::ends_with(imgFilename, ".png")) {
         PngWriter png;
         png.write(imgFilename, film);
     } else {
@@ -532,7 +530,7 @@ void
 strToSize(const std::string& s, size_t& x, size_t& y)
 {
     std::vector<std::string> elems;
-    boost::split(elems, s, boost::algorithm::is_any_of(",x"));
+    openvdb::string::split(elems, s, std::set<char>{',','x'});
     const size_t numElems = elems.size();
     if (numElems > 0) x = size_t(std::max(0, atoi(elems[0].c_str())));
     if (numElems > 1) y = size_t(std::max(0, atoi(elems[1].c_str())));
@@ -544,7 +542,7 @@ strToVec(const std::string& s)
 {
     std::vector<double> result;
     std::vector<std::string> elems;
-    boost::split(elems, s, boost::algorithm::is_any_of(","));
+    openvdb::string::split(elems, s, ',');
     for (size_t i = 0, N = elems.size(); i < N; ++i) {
         result.push_back(atof(elems[i].c_str()));
     }

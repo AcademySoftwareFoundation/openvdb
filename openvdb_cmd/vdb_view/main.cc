@@ -4,10 +4,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/io/Stream.h>
 #include "Viewer.h"
-#include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
-#include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -119,19 +115,9 @@ main(int argc, char *argv[])
                 // Preserve the behavior of the deprecated -d option.
                 std::cout << viewer.getVersionString() << std::endl;
             } else {
-                // Print OpenGL and GLFW versions.
-                std::ostringstream ostr;
-                ostr << viewer.getVersionString(); // returns comma-separated list of versions
-                const std::string s = ostr.str();
-                std::vector<std::string> elems;
-                boost::split(elems, s, boost::algorithm::is_any_of(","));
-                for (size_t i = 0; i < elems.size(); ++i) {
-                    boost::trim(elems[i]);
-                    // Don't print the OpenVDB library version again.
-                    if (!boost::starts_with(elems[i], "OpenVDB:")) {
-                        std::cout << elems[i] << std::endl;
-                    }
-                }
+                // Print GLFW and OpenGL versions.
+                std::cout << viewer.getGLFWVersionString() << std::endl;
+                std::cout << viewer.getOpenGLVersionString() << std::endl;
             }
             if (!hasInput && numFiles == 0) return EXIT_SUCCESS;
         }

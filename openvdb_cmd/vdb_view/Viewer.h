@@ -51,6 +51,8 @@ public:
 
     /// Return a string with version number information.
     std::string getVersionString() const;
+    std::string getOpenGLVersionString() const;
+    std::string getGLFWVersionString() const;
 
 private:
     friend Viewer init(const std::string&, bool);

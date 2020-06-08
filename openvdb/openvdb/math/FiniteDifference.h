@@ -7,12 +7,11 @@
 #define OPENVDB_MATH_FINITEDIFFERENCE_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/util/Name.h>
 #include "Math.h"
 #include "Coord.h"
 #include "Vec3.h"
 #include <string>
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/trim.hpp>
 
 #ifdef DWA_OPENVDB
 #include <simd/Simd.h>
@@ -80,8 +79,8 @@ stringToDScheme(const std::string& s)
     DScheme ret = UNKNOWN_DS;
 
     std::string str = s;
-    boost::trim(str);
-    boost::to_lower(str);
+    openvdb::string::trim(str);
+    openvdb::string::to_lower(str);
 
     if (str == dsSchemeToString(CD_2NDT)) {
         ret = CD_2NDT;
@@ -194,8 +193,8 @@ stringToBiasedGradientScheme(const std::string& s)
     BiasedGradientScheme ret = UNKNOWN_BIAS;
 
     std::string str = s;
-    boost::trim(str);
-    boost::to_lower(str);
+    openvdb::string::trim(str);
+    openvdb::string::to_lower(str);
 
     if (str == biasedGradientSchemeToString(FIRST_BIAS)) {
         ret = FIRST_BIAS;
@@ -259,8 +258,8 @@ stringToTemporalIntegrationScheme(const std::string& s)
     TemporalIntegrationScheme ret = UNKNOWN_TIS;
 
     std::string str = s;
-    boost::trim(str);
-    boost::to_lower(str);
+    openvdb::string::trim(str);
+    openvdb::string::to_lower(str);
 
     if (str == temporalIntegrationSchemeToString(TVD_RK1)) {
         ret = TVD_RK1;
