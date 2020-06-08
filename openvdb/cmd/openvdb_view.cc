@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb_viewer/Viewer.h>
+#include "../viewer/Viewer.h"
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
 #include <boost/algorithm/string/split.hpp>

@@ -21,8 +21,8 @@
 #include <sstream>
 #include <vector>
 #include <limits>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread/thread.hpp>
+#include <thread>
+#include <chrono>
 
 #if defined(_WIN32)
 #include <GL/glew.h>
@@ -111,7 +111,7 @@ private:
 
     tbb::atomic<bool> mRedisplay;
     bool mClose, mHasThread;
-    boost::thread mThread;
+    std::thread mThread;
     openvdb::GridCPtrVec mGrids;
 };
 
@@ -221,7 +221,7 @@ exit()
 
 Viewer::Viewer()
 {
-    OPENVDB_LOG_DEBUG_RUNTIME("constructed Viewer from thread " << boost::this_thread::get_id());
+    OPENVDB_LOG_DEBUG_RUNTIME("constructed Viewer from thread " << std::this_thread::get_id());
 }
 
 
@@ -295,7 +295,7 @@ ThreadManager::view(const openvdb::GridCPtrVec& gridList)
     mRedisplay = true;
 
     if (!mHasThread) {
-        mThread = boost::thread(doViewTask, this);
+        mThread = std::thread(doViewTask, this);
         mHasThread = true;
     }
 }
@@ -380,7 +380,7 @@ ViewerImpl::init(const std::string& progName)
         glfwSetErrorCallback(Local::errorCB);
         if (glfwInit() == GL_TRUE) {
             OPENVDB_LOG_DEBUG_RUNTIME("initialized GLFW from thread "
-                << boost::this_thread::get_id());
+                << std::this_thread::get_id());
             mDidInit = true;
         } else {
             OPENVDB_LOG_ERROR("GLFW initialization failed");
@@ -437,7 +437,7 @@ ViewerImpl::open(int width, int height)
             width, height, mProgName.c_str(), /*monitor=*/nullptr, /*share=*/nullptr);
 
         OPENVDB_LOG_DEBUG_RUNTIME("created window " << std::hex << mWindow << std::dec
-            << " from thread " << boost::this_thread::get_id());
+            << " from thread " << std::this_thread::get_id());
 
         if (mWindow != nullptr) {
             // Temporarily make the new window the current context, then create a font.
@@ -489,7 +489,7 @@ void
 ViewerImpl::close()
 {
     OPENVDB_LOG_DEBUG_RUNTIME("about to close window " << std::hex << mWindow << std::dec
-        << " from thread " << boost::this_thread::get_id());
+        << " from thread " << std::this_thread::get_id());
 
     mViewportModule.reset();
     mRenderModules.clear();
@@ -498,7 +498,7 @@ ViewerImpl::close()
     mWindow = nullptr;
     glfwDestroyWindow(win);
     OPENVDB_LOG_DEBUG_RUNTIME("destroyed window " << std::hex << win << std::dec
-        << " from thread " << boost::this_thread::get_id());
+        << " from thread " << std::this_thread::get_id());
 }
 
 
@@ -579,7 +579,7 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
     glfwSwapInterval(1);
 
     OPENVDB_LOG_DEBUG_RUNTIME("starting to render in window " << std::hex << mWindow << std::dec
-        << " from thread " << boost::this_thread::get_id());
+        << " from thread " << std::this_thread::get_id());
 
     mInterrupt = false;
     for (bool stop = false; !stop; ) {
@@ -608,11 +608,11 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
         // Detach this viewer's GL context.
         glfwMakeContextCurrent(nullptr);
         OPENVDB_LOG_DEBUG_RUNTIME("detached window " << std::hex << mWindow << std::dec
-            << " from thread " << boost::this_thread::get_id());
+            << " from thread " << std::this_thread::get_id());
     }
 
     OPENVDB_LOG_DEBUG_RUNTIME("finished rendering in window " << std::hex << mWindow << std::dec
-        << " from thread " << boost::this_thread::get_id());
+        << " from thread " << std::this_thread::get_id());
 }
 
 
@@ -686,7 +686,7 @@ ViewerImpl::sleep(double secs)
 {
     secs = fabs(secs);
     int isecs = int(secs);
-    boost::this_thread::sleep(boost::posix_time::seconds(isecs));
+    std::this_thread::sleep_for(std::chrono::seconds(isecs));
 }
 
 
