@@ -681,7 +681,7 @@ if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVD
       "are deprecated and will soon be removed.")
   else()
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 to ON to suppress this error.")
   endif()
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_5)
