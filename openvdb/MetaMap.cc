@@ -72,7 +72,6 @@ MetaMap::readMeta(std::istream &is)
             metadata->read(is);
             insertMeta(name, *metadata);
         } else {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
             UnknownMetadata metadata(typeName);
             metadata.read(is); // read raw bytes into an array
             // only add unknown metadata to the grid if not temporary,
@@ -81,12 +80,6 @@ MetaMap::readMeta(std::istream &is)
             if (!temporary) {
                 insertMeta(name, metadata);
             }
-#else
-            OPENVDB_LOG_WARN("cannot read metadata \"" << name
-                << "\" of unregistered type \"" << typeName << "\"");
-            UnknownMetadata metadata;
-            metadata.read(is);
-#endif
         }
     }
 }

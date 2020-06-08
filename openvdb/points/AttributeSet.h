@@ -298,7 +298,6 @@ private:
 
 
 /// A container for ABI=5 to help ease introduction of upcoming features
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
 namespace future {
     class Container
     {
@@ -306,7 +305,6 @@ namespace future {
         std::vector<std::shared_ptr<Element>> mElements;
     };
 }
-#endif
 
 
 ////////////////////////////////////////
@@ -540,15 +538,11 @@ private:
     std::vector<NamePair>       mTypes;
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     // as this change is part of an ABI change, there's no good reason to reduce the reserved
     // space aside from keeping the memory size of an AttributeSet the same for convenience
     // (note that this assumes a typical three-pointer implementation for std::vector)
     future::Container           mFutureContainer;   // occupies 3 reserved slots
     int64_t                     mReserved[5];       // for future use
-#else
-    int64_t                     mReserved[8];       // for future use
-#endif
 }; // class Descriptor
 
 } // namespace points

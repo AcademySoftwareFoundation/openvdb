@@ -88,8 +88,6 @@ protected:
 };
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
-
 /// @brief Subclass to hold raw data of an unregistered type
 class OPENVDB_API UnknownMetadata: public Metadata
 {
@@ -116,27 +114,6 @@ private:
     Name mTypeName;
     ByteVec mBytes;
 };
-
-#else // if OPENVDB_ABI_VERSION_NUMBER < 5
-
-/// @brief Subclass to read (and ignore) data of an unregistered type
-class OPENVDB_API UnknownMetadata: public Metadata
-{
-public:
-    UnknownMetadata() {}
-    Name typeName() const override { return "<unknown>"; }
-    Metadata::Ptr copy() const override { OPENVDB_THROW(TypeError, "Metadata has unknown type"); }
-    void copy(const Metadata&) override {OPENVDB_THROW(TypeError, "Destination has unknown type");}
-    std::string str() const override { return "<unknown>"; }
-    bool asBool() const override { return false; }
-    Index32 size() const override { return 0; }
-
-protected:
-    void readValue(std::istream&, Index32 numBytes) override;
-    void writeValue(std::ostream&) const override;
-};
-
-#endif
 
 
 /// @brief Templated metadata class to hold specific types.

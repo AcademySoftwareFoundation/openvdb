@@ -180,7 +180,6 @@ TestDelayedLoadMetadata::test()
 
     // when read as unknown metadata should be treated as temporary metadata
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     {
         metadata.clear();
         metadata.resizeMask(size_t(1));
@@ -211,5 +210,4 @@ TestDelayedLoadMetadata::test()
             CPPUNIT_ASSERT_EQUAL(size_t(0), newMetamap.metaCount());
         }
     }
-#endif
 }
