@@ -84,8 +84,9 @@ public:
     using IndexType = PointIndexType;
 
     static constexpr Index bits = 1 + (3 * BucketLog2Dim);
-    using VoxelOffsetType = typename std::conditional<(bits <= 16),
-        int16_t, typename std::conditional<(bits <= 32), int32_t, int64_t>::type>::type;
+    // signed, so if bits is exactly 16, int32 is required
+    using VoxelOffsetType = typename std::conditional<(bits < 16),
+        int16_t, typename std::conditional<(bits < 32), int32_t, int64_t>::type>::type;
 
     using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
 
@@ -274,8 +275,9 @@ template<typename PointIndexType, Index BucketLog2Dim>
 struct VoxelOrderOp
 {
     static constexpr Index bits = 1 + (3 * BucketLog2Dim);
-    using VoxelOffsetType = typename std::conditional<(bits <= 16),
-        int16_t, typename std::conditional<(bits <= 32), int32_t, int64_t>::type>::type;
+    // signed, so if bits is exactly 16, int32 is required
+    using VoxelOffsetType = typename std::conditional<(bits < 16),
+        int16_t, typename std::conditional<(bits < 32), int32_t, int64_t>::type>::type;
 
     using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
     using IndexArray = std::unique_ptr<PointIndexType[]>;

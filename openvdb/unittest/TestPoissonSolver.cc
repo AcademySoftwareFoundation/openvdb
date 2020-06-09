@@ -7,7 +7,6 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
-#include <openvdb/math/FiniteDifference.h>
 #include <openvdb/math/ConjGradient.h> // for JacobiPreconditioner
 #include <openvdb/tools/Composite.h> // for csgDifference/Union/Intersection
 #include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
