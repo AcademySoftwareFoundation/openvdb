@@ -465,4 +465,79 @@ TestTypes::testTypeList()
 
     using T13 = T8::Remove<TypeList<char, int>>;
     CPPUNIT_ASSERT_EQUAL(std::string("bdfl"), typeSetAsString<T13>());
+
+    /// Compile time tests of TypeList
+    /// @note  static_assert with no message requires C++17
+
+    using IntTypes = TypeList<Int16, Int32, Int64>;
+    using EmptyList = TypeList<>;
+
+    // Contains
+    static_assert(IntTypes::Contains<Int16>, "");
+    static_assert(IntTypes::Contains<Int32>, "");
+    static_assert(IntTypes::Contains<Int64>, "");
+    static_assert(!IntTypes::Contains<float>, "");
+
+    // Index
+    static_assert(IntTypes::Index<Int16> == 0, "");
+    static_assert(IntTypes::Index<Int32> == 1, "");
+    static_assert(IntTypes::Index<Int64> == 2, "");
+    static_assert(IntTypes::Index<float> == -1, "");
+
+    // Get
+    static_assert(std::is_same<IntTypes::Get<0>, Int16>::value, "");
+    static_assert(std::is_same<IntTypes::Get<1>, Int32>::value, "");
+    static_assert(std::is_same<IntTypes::Get<2>, Int64>::value, "");
+    static_assert(std::is_same<IntTypes::Get<3>,  internal::NullType>::value, "");
+    static_assert(std::is_same<IntTypes::Get<-1>, internal::NullType>::value, "");
+    static_assert(!std::is_same<IntTypes::Get<3>, void>::value, "");
+    static_assert(!std::is_same<IntTypes::Get<-1>, void>::value, "");
+
+    // Unique
+    static_assert(std::is_same<IntTypes::Unique, IntTypes>::value, "");
+    static_assert(std::is_same<EmptyList::Unique, EmptyList>::value, "");
+
+    // Front/Back
+    static_assert(std::is_same<IntTypes::Front, Int16>::value, "");
+    static_assert(std::is_same<IntTypes::Back, Int64>::value, "");
+
+    // PopFront/PopBack
+    static_assert(std::is_same<IntTypes::PopFront, TypeList<Int32, Int64>>::value, "");
+    static_assert(std::is_same<IntTypes::PopBack, TypeList<Int16, Int32>>::value, "");
+
+    // RemoveByIndex
+    static_assert(std::is_same<IntTypes::RemoveByIndex<0,0>, IntTypes::PopFront>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<2,2>, IntTypes::PopBack>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<0,2>, EmptyList>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value, "");
+
+    // invalid indices do nothing
+    static_assert(std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<-1,-2>, IntTypes>::value, "");
+    // although first <= last, index arguments are unsigned
+    static_assert(std::is_same<IntTypes::RemoveByIndex<-1,0>, IntTypes>::value, "");
+
+    //
+
+    // Test methods on an empty list
+    static_assert(!EmptyList::Contains<Int16>, "");
+    static_assert(EmptyList::Index<Int16> == -1, "");
+    static_assert(std::is_same<EmptyList::Get<0>, internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::Front, internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::Back, internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::PopFront, EmptyList>::value, "");
+    static_assert(std::is_same<EmptyList::PopBack, EmptyList>::value, "");
+    static_assert(std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value, "");
+
+    //
+
+    // Test some methods on lists with duplicate types
+    using DulplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
+    using DulplicateRealTypes = TypeList<float, float, float, float>;
+    static_assert(DulplicateIntTypes::Index<Int16> == 1, "");
+    static_assert(std::is_same<DulplicateIntTypes::Unique, TypeList<Int32, Int16, Int64>>::value, "");
+    static_assert(std::is_same<DulplicateRealTypes::Unique, TypeList<float>>::value, "");
 }

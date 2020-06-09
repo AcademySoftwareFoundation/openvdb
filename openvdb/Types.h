@@ -347,8 +347,8 @@ public:
 template <typename ListT, typename T, size_t Idx=0>
 struct TSHasTypeImpl;
 
-template <typename T>
-struct TSHasTypeImpl<TypeList<>, T> {
+template <typename T, size_t Idx>
+struct TSHasTypeImpl<TypeList<>, T, Idx> {
     static constexpr bool Value = false;
     static constexpr int64_t Index = -1;
 };
@@ -365,19 +365,20 @@ struct TSHasTypeImpl<TypeList<T, Ts...>, T, Idx>
 };
 
 
-// // Remove any duplicate types from a TypeList
-// template <typename T, typename... Ts>
-// struct TSMakeUniqueImpl {
-//     using type = T;
-// };
+// Remove any duplicate types from a TypeList (find first and drop rest)
+template <typename T, typename... Ts>
+struct TSMakeUniqueImpl {
+    using type = T;
+};
 
-// template <typename... Ts, typename U, typename... Us>
-// struct TSMakeUniqueImpl<TypeList<Ts...>, U, Us...> {
-//     using type =
-//         typename std::conditional<(std::is_same<U, Ts>::value || ...),
-//            typename TSMakeUniqueImpl<TypeList<Ts...>, Us...>::type,
-//            typename TSMakeUniqueImpl<TypeList<Ts..., U>, Us...>::type >::type;
-// };
+template <typename... Ts, typename U, typename... Us>
+struct TSMakeUniqueImpl<TypeList<Ts...>, U, Us...>
+{
+    using type = typename std::conditional<
+        TSHasTypeImpl<TypeList<Ts...>, U>::Value,
+        typename TSMakeUniqueImpl<TypeList<Ts...>, Us...>::type,
+        typename TSMakeUniqueImpl<TypeList<Ts..., U>, Us...>::type  >::type;
+};
 
 
 template<typename ListT, typename... Ts> struct TSAppendImpl;
@@ -523,7 +524,7 @@ struct TypeList
     using Front = Get<0>;
     using Back = Get<Size-1>;
 
-    /// @brief True if this list contains a signle given type, false otherwise
+    /// @brief True if this list contains the given type, false otherwise
     /// @details Example:
     /// @code
     /// {
@@ -531,8 +532,8 @@ struct TypeList
     ///     using RealTypes = openvdb::TypeList<float, double>;
     /// }
     /// {
-    ///     const bool HasInt32 = openvdb::TypeList<IntTypes>::Contains<Int32>; // true
-    ///     const bool HasInt32 = openvdb::TypeList<RealTypes>::Contains<Int32>; // false
+    ///     openvdb::TypeList<IntTypes>::Contains<Int32>; // true
+    ///     openvdb::TypeList<RealTypes>::Contains<Int32>; // false
     /// }
     /// @endcode
     template<typename T>
@@ -547,7 +548,7 @@ struct TypeList
     ///     using RealTypes = openvdb::TypeList<float, double>;
     /// }
     /// {
-    ///     const int64_t L1 = openvdb::TypeList<IntTypes>::Index<Int32>; // 1
+    ///     const int64_t L1 = openvdb::TypeList<IntTypes>::Index<Int32>;  // 1
     ///     const int64_t L2 = openvdb::TypeList<RealTypes>::Index<Int32>; // -1
     /// }
     /// @endcode
@@ -565,7 +566,7 @@ struct TypeList
     ///     using UniqueTypes = Types::Unique; // <Int16, Int32, float, Int64>
     /// }
     /// @endcode
-    // using Unique = typename internal::TSMakeUniqueImpl<TypeList<>, Ts...>::type;
+    using Unique = typename internal::TSMakeUniqueImpl<TypeList<>, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
     /// @details Example:
@@ -626,7 +627,7 @@ struct TypeList
     /// @endcode
     using PopBack = typename internal::TSRemoveLastImpl<Self>::type;
 
-    /// @brief Return a new lsit with types removed by their location within the list.
+    /// @brief Return a new list with types removed by their location within the list.
     ///        If First is equal to Last, a single element is removed (if it exists).
     ///        If First is greater than Last, the list remains unmodified.
     /// @details Example:
@@ -635,8 +636,8 @@ struct TypeList
     ///     using NumericTypes = openvdb::TypeList<float, double, Int16, Int32, Int64>;
     /// }
     /// {
-    ///     using IntTypes = NumericTypes::RemoveByIndex<0,1>; // openvdb::TypeList<float, double>;
-    ///     using RealTypes = NumericTypes::RemoveByIndex<2,4>; // openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using IntTypes = NumericTypes::RemoveByIndex<0,1>; // openvdb::TypeList<Int16, Int32, Int64>;
+    ///     using RealTypes = NumericTypes::RemoveByIndex<2,4>; // openvdb::TypeList<float, double>;
     ///     using RemoveFloat = NumericTypes::RemoveByIndex<0,0>; // openvdb::TypeList<double, Int16, Int32, Int64>;
     /// }
     /// @endcode
