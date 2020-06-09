@@ -489,9 +489,7 @@ TestTypes::testTypeList()
     static_assert(std::is_same<IntTypes::Get<1>, Int32>::value, "");
     static_assert(std::is_same<IntTypes::Get<2>, Int64>::value, "");
     static_assert(std::is_same<IntTypes::Get<3>,  internal::NullType>::value, "");
-    static_assert(std::is_same<IntTypes::Get<-1>, internal::NullType>::value, "");
     static_assert(!std::is_same<IntTypes::Get<3>, void>::value, "");
-    static_assert(!std::is_same<IntTypes::Get<-1>, void>::value, "");
 
     // Unique
     static_assert(std::is_same<IntTypes::Unique, IntTypes>::value, "");
@@ -516,9 +514,6 @@ TestTypes::testTypeList()
     // invalid indices do nothing
     static_assert(std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value, "");
     static_assert(std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<-1,-2>, IntTypes>::value, "");
-    // although first <= last, index arguments are unsigned
-    static_assert(std::is_same<IntTypes::RemoveByIndex<-1,0>, IntTypes>::value, "");
 
     //
 
