@@ -77,6 +77,7 @@ namespace math {
 
 
 /// @brief  Pi constant taken from Boost to match old behaviour
+/// @note   Available in C++20
 template <typename T> inline constexpr T pi() { return 3.141592653589793238462643383279502884e+00; }
 template <> inline constexpr float pi() { return 3.141592653589793238462643383279502884e+00F; }
 template <> inline constexpr double pi() { return 3.141592653589793238462643383279502884e+00; }
