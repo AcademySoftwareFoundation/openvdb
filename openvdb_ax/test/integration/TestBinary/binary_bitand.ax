@@ -1,0 +1,5 @@
+
+long@testlong = 2l & 3l;
+int@testint = 2 & 3;
+short@testshort = 2s & 3s;
+bool@testbool = true & false;

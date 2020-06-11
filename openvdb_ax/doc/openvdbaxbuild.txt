@@ -1,0 +1,109 @@
+/**
+<div style="width:800px;text-align:justify;">
+
+@page openvdbaxbuild OpenVDB AX
+
+@section vdbaxbuildcontents Contents
+- @ref vdbaxcomponents
+- @ref vdbaxdependencies
+  - @ref depDependencyTable
+  - @ref depUsingAptGet
+  - @ref depUsingHomebrew
+- @ref vdbaxbuild
+
+@section vdbaxcomponents OpenVDB AX Components
+@par
+See the [OpenVDB Component Table](https://www.openvdb.org/documentation/doxygen/dependencies.html#depComponents)
+for a list of indirect dependencies through OpenVDB.
+@par
+Component                 | Requirements                                             |
+------------------------- | -------------------------------------------------------- |
+OpenVDB AX Library        | OpenVDB Core Library, LLVM, Boost::random                |
+OpenVDB AX Binary         | OpenVDB AX Library dependencies                          |
+OpenVDB AX Python         | OpenVDB AX Library dependencies, OpenVDB Python Library  |
+OpenVDB AX Houdini        | OpenVDB AX Library dependencies, OpenVDB Houdini Library |
+OpenVDB AX Grammar        | Bison, Flex                                              |
+OpenVDB AX Unit Tests     | OpenVDB AX Library dependencies, CppUnit                 |
+OpenVDB AX Documentation  | Doxygen                                                  |
+
+@section vdbaxdependencies OpenVDB AX Dependencies
+@par
+OpenVDB AX depends on the OpenVDB Core library and thus indirectly requires its
+dependencies as listed in the [OpenVDB Dependency Table.](https://www.openvdb.org/documentation/doxygen/dependencies.html#depDependencyTable)
+The dependencies listed below are additionally specific to OpenVDB AX.
+
+@subsection depDependencyTable Dependency Table
+
+Package        | Minimum | Recommended | Description                        | apt-get | Homebrew | Source
+-------------- | ------- | ----------- | ---------------------------------- | ------- | -------- | ------
+LLVM           | 5.0.0   | 8.0.0       | Target-independent code generation | Y       | Y        | https://llvm.org/
+Boost          | 1.61    | 1.61        | Components: random                 | Y       | Y        | https://www.boost.org
+Bison*         | 3.0.0   | 3.0.5       | General-purpose parser generator   | Y       | Y        | https://www.gnu.org/software/gcc
+Flex*          | 2.6     | 2.6.4       | Fast lexical analyzer generator    | Y       | Y        | https://github.com/westes/flex
+
+ - @b Note - Bison and Flex are only required for re-generation of the AX
+ grammar which is not typically necessary for the majority of users.
+
+@subsection depUsingAptGet Using UNIX apt-get
+@par
+The following commands demonstrate how to install OpenVDB AX dependencies on
+UNIX through apt-get. Note that your chosen llvm version can be selected by
+replacing the version number in the dev package name.
+@par
+@code{.sh}
+#!/bin/bash
+apt-get install llvm-8-dev        # LLVM 8
+apt-get install boost-random-dev  # Boost::random
+apt-get install bison             # Bison
+apt-get install flex              # Flex
+@endcode
+
+@subsection depUsingHomebrew Using Homebrew
+@par
+The following commands demonstrate how to install OpenVDB AX dependencies
+through homebrew. Note that your chosen llvm version can be selected by
+replacing the version number after the @b `@` symbol. If no version number is
+supplied, homebrew will install the latest version available.
+@par
+@code{.sh}
+#!/bin/bash
+brew install llvm@8  # LLVM 8
+brew install boost   # Boost
+brew install bison   # Bison
+brew install flex    # Flex
+@endcode
+
+
+@section vdbaxbuild Building OpenVDB AX
+@par
+OpenVDB AX's build system is heavily based on the existing infrastructure in
+OpenVDB. To this end, it's encouraged that users wishing to build OpenVDB AX
+from source read the [OpenVDB build documentation](https://www.openvdb.org/documentation/doxygen/build)
+which also describes the process of installing OpenVDB and its required
+dependencies.
+@par
+In addition, the following CMake variables can be used to enable or disable
+OpenVDB AX Components.
+@par
+Component                  | CMake Variable                   | Default  |
+-------------------------- | -------------------------------- | -------- |
+OpenVDB AX Library         | OPENVDB_BUILD_AX                 | ON       |
+OpenVDB AX Binary          | OPENVDB_BUILD_AX_BINARIES        | ON       |
+OpenVDB AX Python          | OPENVDB_BUILD_AX_PYTHON_MODULE   | OFF      |
+OpenVDB AX Houdini         | OPENVDB_BUILD_AX_HOUDINI_PLUGIN  | OFF      |
+OpenVDB AX Grammar         | OPENVDB_BUILD_AX_GRAMMAR         | OFF      |
+OpenVDB AX Unit Tests      | OPENVDB_BUILD_AX_UNITTESTS       | OFF      |
+OpenVDB AX Documentation   | OPENVDB_BUILD_AX_DOCS            | OFF      |
+@par
+A typical build command, from the root directory of the OpenVDB AX repository
+may look as follows:
+@par
+@code{.sh}
+mkdir build
+cd build
+cmake -DOPENVDB_BUILD_AX=ON ../
+make -j4 install
+@endcode
+
+</div>
+*/

@@ -1,0 +1,17 @@
+
+int@test1 = 2;
+int local1 = 2;
+int@test2 = local1;
+int@test3 =
+    int@test4 =
+        int@test2;
+int local3,
+      local2 = 3;
+int@test5 =
+    local3 =
+        local2;
+int@test6 = 3,
+     int@test7 = 2;
+int@test8 = 3;
+int@test8 = 2;
+

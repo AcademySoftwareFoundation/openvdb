@@ -1,0 +1,6 @@
+float@test1 = float(bool@testbool);
+float@test2 = float(short@testshort);
+float@test3 = float(int@testint);
+float@test4 = float(long@testlong);
+float@test5 = float(double@testdouble);
+

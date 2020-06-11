@@ -1,0 +1,9 @@
+
+long@testlong1 = 2l << 3l;
+long@testlong2 = 3l << 2l;
+int@testint1 = 2 << 3;
+int@testint2 = 3 << 2;
+short@testshort1 = 2s << 3s;
+short@testshort2 = 3s << 2s;
+bool@testbool1 = true << false;
+bool@testbool2 = false << true;

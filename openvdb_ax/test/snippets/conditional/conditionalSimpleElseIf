@@ -1,0 +1,9 @@
+int@int_test = 2;
+bool@bool_test = false;
+
+if(int@int_test == 0) ;
+else if (int@int_test == 1) ;
+else if (int@int_test == 2) bool@bool_test = true;
+else
+
+int@int_test = 0;

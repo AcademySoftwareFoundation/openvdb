@@ -1,0 +1,7 @@
+long local = 2l;
+int@testint = local;
+short@testshort = local;
+bool@testbool = local;
+double@testdouble = local;
+float@testfloat = local;
+

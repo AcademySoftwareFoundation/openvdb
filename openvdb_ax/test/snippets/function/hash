@@ -1,0 +1,5 @@
+
+long@test1 = hash("");
+long@test2 = hash("0");
+long@test3 = hash("abc");
+long@test4 = hash("123");

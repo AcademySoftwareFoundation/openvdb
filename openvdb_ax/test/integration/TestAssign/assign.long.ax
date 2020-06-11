@@ -1,0 +1,17 @@
+
+long@test1 = 2l;
+long local1 = 2l;
+long@test2 = local1;
+long@test3 =
+    long@test4 =
+        long@test2;
+long local3,
+      local2 = 3l;
+long@test5 =
+    local3 =
+        local2;
+long@test6 = 3l,
+     long@test7 = 2l;
+long@test8 = 3l;
+long@test8 = 2l;
+

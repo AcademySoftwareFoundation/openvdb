@@ -1,0 +1,91 @@
+// for loop
+{
+    vec3f v = 0.0f;
+    for(int i = 0; i < 3; ++i) {
+        v[i] = i + 1;
+    }
+    vec3f@loop_test1 = v;
+}
+
+// for loop without initial statement
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    for(; i < 3; ++i) {
+        v[i] = i + 1;
+    }
+    vec3f@loop_test2 = v;
+}
+
+// for loop without iteration statement
+{
+    vec3f v = 0.0f;
+    int i = 1;
+    for(int i = 0; i < 3;) {
+        v[i] = i + 1;
+        i++;
+    }
+    vec3f@loop_test3 = v;
+}
+
+// for loop false condition
+{
+    vec3f v = 0.0f;
+    for(int i = 0; i < 0; ++i) {
+        v[i] = i + 1;
+    }
+    vec3f@loop_test15 = v;
+}
+
+// nested for loop
+{
+    mat3f mat = 0.0f;
+    for(int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            mat[i,j] = i * 3 + j + 1;
+        }
+    }
+    mat3f@loop_test18 = mat;
+}
+
+// for loop multi expressions
+{
+    int j = 0;
+    for(int i = 0; i < 3; ++i, ++j) {}
+    int@loop_test22 = j;
+}
+
+// for loop declaration condition
+{
+    int j = 0;
+    for (int i = 5; int k = floor(i - 1); --i) j++;
+
+    int@loop_test23 = j;
+}
+
+// for loop multi expression condition
+{
+    int j = 0;
+    int k = 0;
+    int l = 1;
+    for (int i = 5; k != 0, l--; --i) j++;
+
+    int@loop_test25 = j;
+}
+
+// for loop multi expression initial
+{
+    int i = 0;
+    int j = 0;
+    for (i -= 10, j += 4; i < 10; i += j) {
+        j *= 2;
+        int@loop_test27 = i + j;
+    };
+}
+
+// for loop multi declaration initial
+{
+    for (int i = 0, j = 10; i < 10; ++i) {
+        int@loop_test30 = i + j;
+    };
+}

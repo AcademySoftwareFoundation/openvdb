@@ -1,0 +1,19 @@
+
+bool@test1 = 2l < 3l;
+bool@test2 = 3l < 2l;
+bool@test3 = 3l < 3l;
+bool@test4 = 2 < 3;
+bool@test5 = 3 < 2;
+bool@test6 = 3 < 3;
+bool@test7 = 2s < 3s;
+bool@test8 = 3s < 2s;
+bool@test9 = 3s < 3s;
+bool@test10 = true < false;
+bool@test11 = false < true;
+bool@test12 = false < false;
+bool@test13 = 1.1 < 2.3;
+bool@test14 = 2.3 < 1.1;
+bool@test15 = 2.3 < 2.3;
+bool@test16 = 1.1f < 2.3f;
+bool@test17 = 2.3f < 1.1f;
+bool@test18 = 2.3f < 2.3f;

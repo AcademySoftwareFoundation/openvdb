@@ -1,0 +1,2 @@
+double@test1 = atan2(1.0, 1.0);
+float@test2 = atan2(1.0f, 1.0f);

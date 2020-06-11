@@ -1,0 +1,13 @@
+bool@bool_test = false;
+
+if (false) {}
+else
+{
+	if (false) ;
+	else if (true) {
+		if (true)
+		{
+			bool@bool_test = true;
+		}
+	}
+}

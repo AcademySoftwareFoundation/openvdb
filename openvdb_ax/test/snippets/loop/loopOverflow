@@ -1,0 +1,8 @@
+mat4d m1=0;
+vec3f v1=1;
+for (int i = 0; i < 10000000; ++i) {
+    // 10000000 x alloca inside of loop
+    mat4d m2 = m1;
+    // sret function, 10000000 x alloca of result
+    vec3f v2 = normalize(v1);
+}

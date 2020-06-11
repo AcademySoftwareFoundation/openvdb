@@ -1,0 +1,9 @@
+float a_float;
+int a_int;
+
+short a_short = 1s;
+int b_int = 5;
+long a_long = 3l;
+
+float b_float = 0.2f;
+double a_double = 0.3;

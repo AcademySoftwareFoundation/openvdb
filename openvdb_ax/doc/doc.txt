@@ -1,0 +1,56 @@
+/**
+<div style="width:800px;text-align:justify;">
+
+@mainpage OpenVDB AX
+
+@section overview Overview
+@par
+<b>OpenVDB AX</b> is an open source C++ library that provides a powerful and
+easy way of interacting with OpenVDB volume and point data. The software strives
+to provide a concise, fast, highly parallalisable and portable solution to
+performing custom manipulation of OpenVDB data via an expression language: AX.
+AX expressions are JIT-compiled and used in combination with a multi-threaded
+execution framework, specifically designed for VDB, that in many cases rival
+custom C++ operators.
+@par
+<b>OpenVDB AX is currently in BETA</b>. This predominately means that the C++
+API is subject to change without backward compatible guarantees.
+@par
+The software is currently hosted on <A HREF="https://github.com/dneg/openvdb_ax">github</A>
+and has a variety of releases for download.
+
+@subsection docs Documentation
+@par
+The doxygen documentation provide information on both AX as a language and the
+developer documentation for OpenVDB AX as a C++ API. There are two main sections:
+@par
+ - The @subpage ax "AX Language Documentation" provides useful information for front-end users looking for documentation on the AX Language.
+ - The @subpage openvdbaxbuild "Building OpenVDB AX" provides build instructions and requirements.
+ - The @subpage openvdbax "OpenVDB AX Documentation" provides API and other C++ specific software information for developers.
+@par
+Some additional quick links to useful subsections of the documentation are also
+provided:
+@par
+ - @subpage axexamples "Code Examples" for examples of OpenVDB AX in action.
+ - @subpage axfunctionlist "AX Functions" for a list of all available AX functions.
+ - @subpage vdbaxbuild "Building OpenVDB AX" for information on building <b>OpenVDB AX</b>.
+
+@subsection contact Contact
+@par
+<b>OpenVDB AX</b> is maintained by <A HREF="https://www.dneg.com/">DNEG</A>
+and currently supported by:
+- Nick Avramoussis
+- Richard Jones
+@par
+Please contact us on openvdbax@dneg.com if you have any questions.
+@par
+Other notable contributors include:
+- Francisco Gochez
+- Matthew Warner
+- Dan Bailey
+- Todd Keeler
+- James Bird
+- Harry Biddle
+
+</div>
+*/

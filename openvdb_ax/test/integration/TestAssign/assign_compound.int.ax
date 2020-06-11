@@ -1,0 +1,20 @@
+
+int@test1 += 2;
+int@test2 -= 2;
+int@test3 *= 2;
+int@test4 /= 2;
+int@test5 %= 2;
+int@test6 <<= 2;
+int@test7 >>= 2;
+int@test8 &= 2;
+int@test9 ^= 2;
+int@test10 |= 2;
+
+int local1 = 2,
+      local2 = 3;
+
+local1 += local2;
+int@test11 = local1;
+int@test12 += int@test13;
+int@test14 += local2;
+

@@ -1,0 +1,43 @@
+// while loop
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    while(i < 3) {
+        v[i] = i+1;
+        i++;
+    }
+    vec3f@loop_test9 = v;
+}
+
+// while loop false condition
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    while(false) {
+        v[i] = i + 1;
+    }
+    vec3f@loop_test16 = v;
+}
+
+// while loop multi expression false condition
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    while(true, true, true, false) {
+        v[i] = i + 1;
+    }
+    vec3f@loop_test28 = v;
+}
+
+// while loop declaration condition
+{
+    int k = 1;
+    float j = 1.1f;
+    while(int i = floor(j)) {
+        k++;
+        j--;
+
+    }
+    int@loop_test31 = k;
+}
+

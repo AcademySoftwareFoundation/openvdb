@@ -1,0 +1,55 @@
+
+mat3f@test1[0] = mat3f@test2[4];
+mat3f@test2[1] = mat3f@test1[0];
+mat3f@test1[2] = mat3f@test2[5];
+mat3f@test2[3] = mat3f@test1[6];
+mat3f@test1[4] = mat3f@test2[3];
+mat3f@test2[5] = mat3f@test1[1];
+mat3f@test1[6] = mat3f@test2[7];
+mat3f@test2[7] = mat3f@test1[8];
+mat3f@test1[8] = mat3f@test2[2];
+
+mat3f@test3[0,0] = mat3f@test4[1,1];
+mat3f@test4[0,1] = mat3f@test3[0,0];
+mat3f@test3[0,2] = mat3f@test4[1,2];
+mat3f@test4[1,0] = mat3f@test3[2,0];
+mat3f@test3[1,1] = mat3f@test4[1,0];
+mat3f@test4[1,2] = mat3f@test3[0,1];
+mat3f@test3[2,0] = mat3f@test4[2,1];
+mat3f@test4[2,1] = mat3f@test3[2,2];
+mat3f@test3[2,2] = mat3f@test4[0,2];
+
+mat4f@test5[0] =  mat4f@test6[15];
+mat4f@test6[1] =  mat4f@test5[0];
+mat4f@test5[2] =  mat4f@test6[11];
+mat4f@test6[3] =  mat4f@test5[6];
+mat4f@test5[4] =  mat4f@test6[13];
+mat4f@test6[5] =  mat4f@test5[1];
+mat4f@test5[6] =  mat4f@test6[10];
+mat4f@test6[7] =  mat4f@test5[8];
+mat4f@test5[8] =  mat4f@test6[2];
+mat4f@test6[9] =  mat4f@test5[7];
+mat4f@test5[10] = mat4f@test6[14];
+mat4f@test6[11] = mat4f@test5[3];
+mat4f@test5[12] = mat4f@test6[4];
+mat4f@test6[13] = mat4f@test5[12];
+mat4f@test5[14] = mat4f@test6[5];
+mat4f@test6[15] = mat4f@test5[9];
+
+mat4f@test7[0,0] = mat4f@test8[3,3];
+mat4f@test8[0,1] = mat4f@test7[0,0];
+mat4f@test7[0,2] = mat4f@test8[2,3];
+mat4f@test8[0,3] = mat4f@test7[1,2];
+mat4f@test7[1,0] = mat4f@test8[3,1];
+mat4f@test8[1,1] = mat4f@test7[0,1];
+mat4f@test7[1,2] = mat4f@test8[2,2];
+mat4f@test8[1,3] = mat4f@test7[2,0];
+mat4f@test7[2,0] = mat4f@test8[0,2];
+mat4f@test8[2,1] = mat4f@test7[1,3];
+mat4f@test7[2,2] = mat4f@test8[3,2];
+mat4f@test8[2,3] = mat4f@test7[0,3];
+mat4f@test7[3,0] = mat4f@test8[1,0];
+mat4f@test8[3,1] = mat4f@test7[3,0];
+mat4f@test7[3,2] = mat4f@test8[1,1];
+mat4f@test8[3,3] = mat4f@test7[2,1];
+    

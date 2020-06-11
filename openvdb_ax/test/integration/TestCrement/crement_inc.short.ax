@@ -1,0 +1,7 @@
+
+short@test1 = ++short@test2;
+short@test3 = short@test4++;
+short@test5 = (short@test6++, short@test7++, ++short@test6);
+short@test8 = (++short@test6, ++short@test7, short@test6++);
+++short@test9 = short@test9;
+

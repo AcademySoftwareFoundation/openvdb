@@ -1,0 +1,7 @@
+bool local = true;
+long@testlong = local;
+int@testint = local;
+short@testshort = local;
+double@testdouble = local;
+float@testfloat = local;
+

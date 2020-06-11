@@ -1,0 +1,8 @@
+int@test1 = abs(-3);
+int@test2 = abs(3);
+int@test3 = abs(0);
+long@test4 = abs(-2147483649l);
+float@test5 = abs(0.3f);
+float@test6 = abs(-0.3f);
+double@test7 = abs(1.79769e+308);
+double@test8 = abs(-1.79769e+308);
