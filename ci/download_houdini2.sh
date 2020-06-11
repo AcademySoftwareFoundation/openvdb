@@ -9,11 +9,11 @@ HOUDINI_SECRET_KEY="$5"
 
 if [ "$HOUDINI_CLIENT_ID" == "" ]; then
     echo "HOUDINI_CLIENT_ID GitHub Action Secret needs to be set to install Houdini builds"
-    exit 1
+    exit 0
 fi
 if [ "$HOUDINI_SECRET_KEY" == "" ]; then
     echo "HOUDINI_SECRET_KEY GitHub Action Secret needs to be set to install Houdini builds"
-    exit 1
+    exit 0
 fi
 
 pip install --user requests

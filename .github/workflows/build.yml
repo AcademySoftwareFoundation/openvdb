@@ -61,8 +61,14 @@ jobs:
       image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
     - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini2.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
