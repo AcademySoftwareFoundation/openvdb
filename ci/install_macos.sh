@@ -9,7 +9,6 @@ brew install openexr
 brew install boost
 brew install boost-python3 # also installs the dependent python version
 brew install cppunit
-brew install c-blosc
 brew install tbb
 brew install zlib
 brew install glfw

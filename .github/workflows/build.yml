@@ -205,6 +205,9 @@ jobs:
     - name: install
       shell: bash
       run: ./ci/install_macos.sh
+    - name: install
+      shell: bash
+      run: ./ci/install_blosc.sh 1.5.0
     - name: build
       shell: bash
       # brew boost-python installs a "Keg-only" version of python which is
