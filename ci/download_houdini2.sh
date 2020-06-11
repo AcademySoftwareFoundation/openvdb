@@ -41,6 +41,7 @@ cp -r dsolib/libopenvdb_sesi* ../hou/dsolib/.
 cp -r dsolib/libblosc* ../hou/dsolib/.
 cp -r dsolib/libhboost* ../hou/dsolib/.
 cp -r dsolib/libz* ../hou/dsolib/.
+cp -r dsolib/libbz2* ../hou/dsolib/.
 cp -r dsolib/libtbb* ../hou/dsolib/.
 cp -r dsolib/libHalf* ../hou/dsolib/.
 cp -r dsolib/libjemalloc* ../hou/dsolib/.
