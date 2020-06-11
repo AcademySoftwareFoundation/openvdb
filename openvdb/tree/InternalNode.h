@@ -108,11 +108,7 @@ public:
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                  const ValueType& offValue, const ValueType& onValue, TopologyCopy);
 
-#if OPENVDB_ABI_VERSION_NUMBER < 5
-    virtual ~InternalNode();
-#else
     ~InternalNode();
-#endif
 
 protected:
     using MaskOnIterator = typename NodeMaskType::OnIterator;

@@ -59,17 +59,6 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testabi4:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2018
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ Release 4 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-
   testhou180:
     runs-on: ubuntu-16.04
     container:
@@ -93,19 +82,6 @@ jobs:
       run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
-    - name: test
-      run: ./ci/test.sh
-
-  testhou170:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2018
-    steps:
-    - uses: actions/checkout@v1
-    - name: houdini
-      run: ./ci/install_houdini.sh 17.0 ${{ secrets.HOUPASS }}
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Release OFF
     - name: test
       run: ./ci/test.sh
 
@@ -229,6 +205,9 @@ jobs:
     - name: install
       shell: bash
       run: ./ci/install_macos.sh
+    - name: install
+      shell: bash
+      run: ./ci/install_blosc.sh 1.5.0
     - name: build
       shell: bash
       # brew boost-python installs a "Keg-only" version of python which is

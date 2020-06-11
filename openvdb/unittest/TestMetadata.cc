@@ -122,7 +122,6 @@ TestMetadata::testCustomMetadata()
     // Unregister Vec3I metadata.
     Metadata::clearRegistry();
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     {
         std::istringstream istr(ostr.str(), std::ios_base::binary);
 
@@ -149,7 +148,6 @@ TestMetadata::testCustomMetadata()
         const auto* ptr = reinterpret_cast<const uint8_t*>(&expected);
         CPPUNIT_ASSERT(UnknownMetadata::ByteVec(ptr, ptr + sizeof(expected)) == meta.value());
     }
-#endif
 
     Vec3IMetadata::registerType();
 
