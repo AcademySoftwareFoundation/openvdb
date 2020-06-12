@@ -153,6 +153,8 @@ Build:
   FindOpenVDB CMake module
 - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
   macros.
+- Fixed a few GCC compiler warnings by adding override keywords.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
