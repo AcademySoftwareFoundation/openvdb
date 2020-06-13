@@ -23,6 +23,8 @@ jobs:
       run: ./ci/install_houdini2.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: ./ci/test.sh
     - name: write_houdini_cache
       uses: actions/cache@v2
       with:
