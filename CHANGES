@@ -128,6 +128,8 @@ Version 7.1.0 - In Development
       FindOpenVDB CMake module
     - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
       macros.
+    - Fixed a few GCC compiler warnings by adding override keywords.
+      [Contributed by Edward Lam]
 
 
 Version 7.0.0 - December 6, 2019
