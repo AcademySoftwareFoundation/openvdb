@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <cppunit/extensions/HelperMacros.h>
+#include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <functional> // for std::ref()
 #include <string>
@@ -514,6 +515,7 @@ TestTypes::testTypeList()
     static_assert(std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value, "");
     static_assert(std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value, "");
     static_assert(std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value, "");
+    static_assert(std::is_same<IntTypes::RemoveByIndex<0,10>, EmptyList>::value, "");
 
     // invalid indices do nothing
     static_assert(std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value, "");
@@ -541,4 +543,22 @@ TestTypes::testTypeList()
     static_assert(DulplicateIntTypes::Index<Int16> == 1, "");
     static_assert(std::is_same<DulplicateIntTypes::Unique, TypeList<Int32, Int16, Int64>>::value, "");
     static_assert(std::is_same<DulplicateRealTypes::Unique, TypeList<float>>::value, "");
+
+    //
+
+    // Tests on VDB grid node chains - reverse node chains from leaf->root
+    using Tree4Float = openvdb::tree::Tree4<float, 5, 4, 3>::Type; // usually the same as FloatTree
+    using NodeChainT = Tree4Float::RootNodeType::NodeChainType;
+
+    // Expected types
+    using LeafT = openvdb::tree::LeafNode<float, 3>;
+    using IternalT1 = openvdb::tree::InternalNode<LeafT, 4>;
+    using IternalT2 = openvdb::tree::InternalNode<IternalT1, 5>;
+    using RootT = openvdb::tree::RootNode<IternalT2>;
+
+    static_assert(std::is_same<NodeChainT::Get<0>, LeafT>::value, "");
+    static_assert(std::is_same<NodeChainT::Get<1>, IternalT1>::value, "");
+    static_assert(std::is_same<NodeChainT::Get<2>, IternalT2>::value, "");
+    static_assert(std::is_same<NodeChainT::Get<3>, RootT>::value, "");
+    static_assert(std::is_same<NodeChainT::Get<4>, internal::NullType>::value, "");
 }
