@@ -208,7 +208,7 @@ struct StreamMetadata::Impl
     bool mCountingPasses = false;
     uint32_t mPass = 0;
     MetaMap mGridMetadata;
-    AuxDataMap mAuxData;
+    MetaMap mAuxData;
     bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
@@ -279,8 +279,8 @@ MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMet
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 uint32_t        StreamMetadata::__test() const          { return mImpl->mTest; }
 
-StreamMetadata::AuxDataMap& StreamMetadata::auxData() { return mImpl->mAuxData; }
-const StreamMetadata::AuxDataMap& StreamMetadata::auxData() const { return mImpl->mAuxData; }
+MetaMap& StreamMetadata::auxData() { return mImpl->mAuxData; }
+const MetaMap& StreamMetadata::auxData() const { return mImpl->mAuxData; }
 
 void StreamMetadata::setFileVersion(uint32_t v)         { mImpl->mFileVersion = v; }
 void StreamMetadata::setLibraryVersion(VersionId v)     { mImpl->mLibraryVersion = v; }
@@ -310,7 +310,7 @@ StreamMetadata::str() const
     ostr << "pass: " << pass() << "\n";
     ostr << "counting_passes: " << countingPasses() << "\n";
     ostr << "write_grid_stats_metadata: " << writeGridStats() << "\n";
-    if (!auxData().empty()) ostr << auxData();
+    if (auxData().metaCount() > 0) ostr << auxData();
     if (gridMetadata().metaCount() != 0) {
         ostr << "grid_metadata:\n" << gridMetadata().str(/*indent=*/"    ");
     }
@@ -327,17 +327,6 @@ operator<<(std::ostream& os, const StreamMetadata& meta)
 
 
 namespace {
-
-template<typename T>
-inline bool
-writeAsType(std::ostream& os, const boost::any& val)
-{
-    if (val.type() == typeid(T)) {
-        os << boost::any_cast<T>(val);
-        return true;
-    }
-    return false;
-}
 
 struct PopulateDelayedLoadMetadataOp
 {
@@ -407,37 +396,6 @@ bool populateDelayedLoadMetadata(DelayedLoadMetadata& metadata,
 }
 
 } // unnamed namespace
-
-std::ostream&
-operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
-{
-    for (StreamMetadata::AuxDataMap::const_iterator it = auxData.begin(), end = auxData.end();
-        it != end; ++it)
-    {
-        os << it->first << ": ";
-        // Note: boost::any doesn't support serialization.
-        const boost::any& val = it->second;
-        if (!writeAsType<int32_t>(os, val)
-            && !writeAsType<int64_t>(os, val)
-            && !writeAsType<int16_t>(os, val)
-            && !writeAsType<int8_t>(os, val)
-            && !writeAsType<uint32_t>(os, val)
-            && !writeAsType<uint64_t>(os, val)
-            && !writeAsType<uint16_t>(os, val)
-            && !writeAsType<uint8_t>(os, val)
-            && !writeAsType<float>(os, val)
-            && !writeAsType<double>(os, val)
-            && !writeAsType<long double>(os, val)
-            && !writeAsType<bool>(os, val)
-            && !writeAsType<std::string>(os, val)
-            && !writeAsType<const char*>(os, val))
-        {
-            os << val.type().name() << "(...)";
-        }
-        os << "\n";
-    }
-    return os;
-}
 
 
 ////////////////////////////////////////
