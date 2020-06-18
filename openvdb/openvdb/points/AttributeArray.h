@@ -27,7 +27,7 @@
 #include <mutex>
 #include <string>
 #include <type_traits>
-
+#include <cstring> // std::memcpy
 
 class TestAttributeArray;
 
