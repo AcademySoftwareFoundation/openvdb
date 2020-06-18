@@ -26,6 +26,8 @@ Version 7.1.0 - In Development
       an unknown exception.
     - Removed Boost::thread as a dependency of vdb_view in favour of
       std::thread.
+    - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+      the latter in favour of new openvdb math constants for pi
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
