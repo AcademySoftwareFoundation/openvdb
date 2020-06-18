@@ -9,11 +9,11 @@ HOUDINI_SECRET_KEY="$5"
 
 if [ "$HOUDINI_CLIENT_ID" == "" ]; then
     echo "HOUDINI_CLIENT_ID GitHub Action Secret needs to be set to install Houdini builds"
-    exit 1
+    exit 0
 fi
 if [ "$HOUDINI_SECRET_KEY" == "" ]; then
     echo "HOUDINI_SECRET_KEY GitHub Action Secret needs to be set to install Houdini builds"
-    exit 1
+    exit 0
 fi
 
 pip install --user requests
@@ -41,6 +41,7 @@ cp -r dsolib/libopenvdb_sesi* ../hou/dsolib/.
 cp -r dsolib/libblosc* ../hou/dsolib/.
 cp -r dsolib/libhboost* ../hou/dsolib/.
 cp -r dsolib/libz* ../hou/dsolib/.
+cp -r dsolib/libbz2* ../hou/dsolib/.
 cp -r dsolib/libtbb* ../hou/dsolib/.
 cp -r dsolib/libHalf* ../hou/dsolib/.
 cp -r dsolib/libjemalloc* ../hou/dsolib/.

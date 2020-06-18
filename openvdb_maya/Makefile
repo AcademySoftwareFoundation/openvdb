@@ -127,7 +127,6 @@ CXXFLAGS += -std=c++11
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 abi := $(strip $(abi))
 ifneq (,$(abi))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
     CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:

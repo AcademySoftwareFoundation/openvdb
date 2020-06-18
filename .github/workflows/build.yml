@@ -5,25 +5,34 @@ on:
   push:
     branches:
       - '*'
-    paths:
-      - '.github/**'
-      - 'CMakeLists.txt'
-      - 'ci/**'
-      - 'cmake/**'
-      - 'openvdb/**'
-      - 'openvdb_houdini/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb/doc/**'
+      - 'openvdb_maya/**'
+      - '**/*.md'
   pull_request:
     branches:
       - '*'
-    paths:
-      - '.github/**'
-      - 'CMakeLists.txt'
-      - 'ci/**'
-      - 'cmake/**'
-      - 'openvdb/**'
-      - 'openvdb_houdini/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb/doc/**'
+      - 'openvdb_maya/**'
+      - '**/*.md'
 
 jobs:
+  testvfx2021:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2021
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
+    - name: test
+      run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
+
   testabi7:
     runs-on: ubuntu-16.04
     container:
@@ -59,25 +68,20 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testabi4:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2018
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ Release 4 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-
   testhou180:
     runs-on: ubuntu-16.04
     container:
       image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
     - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini2.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -93,19 +97,6 @@ jobs:
       run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
-    - name: test
-      run: ./ci/test.sh
-
-  testhou170:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2018
-    steps:
-    - uses: actions/checkout@v1
-    - name: houdini
-      run: ./ci/install_houdini.sh 17.0 ${{ secrets.HOUPASS }}
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Release OFF
     - name: test
       run: ./ci/test.sh
 
@@ -229,6 +220,9 @@ jobs:
     - name: install
       shell: bash
       run: ./ci/install_macos.sh
+    - name: install
+      shell: bash
+      run: ./ci/install_blosc.sh 1.5.0
     - name: build
       shell: bash
       # brew boost-python installs a "Keg-only" version of python which is

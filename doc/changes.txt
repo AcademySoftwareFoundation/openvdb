@@ -7,6 +7,11 @@
 <B>Version 7.1.0</B> - <I>In Development</I>
 
 @par
+<BLOCKQUOTE>
+As of this release, support for grid ABI=4 has been removed.
+</BLOCKQUOTE>
+
+@par
 Improvements:
 - Added GroupWriteHandle::setUnsafe() for faster performance when the group
   array is known to be in-core and non-uniform.
@@ -146,6 +151,10 @@ Build:
   Boost::disable_autolinking target.
 - Added support for importing pyopenvdb and openvdb_houdini through the
   FindOpenVDB CMake module
+- Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
+  macros.
+- Fixed a few GCC compiler warnings by adding override keywords.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
