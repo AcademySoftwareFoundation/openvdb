@@ -469,6 +469,7 @@ struct FloatThrowOnCopy
     explicit FloatThrowOnCopy(float _value): value(_value) { }
 
     FloatThrowOnCopy(const FloatThrowOnCopy&) { throw openvdb::RuntimeError("No Copy"); }
+    FloatThrowOnCopy& operator=(const FloatThrowOnCopy&) = default;
 
     T operator+(const float rhs) const { return T(value + rhs); }
     T operator-() const { return T(-value); }
