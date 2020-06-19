@@ -37,6 +37,8 @@ Improvements:
 - vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
   unknown exception.
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
+- Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+  the latter in favour of new openvdb math constants for pi
 
 @par
 New features:
