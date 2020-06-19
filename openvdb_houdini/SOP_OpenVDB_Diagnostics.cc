@@ -20,14 +20,6 @@
 #include <UT/UT_UniquePtr.h>
 #include <PRM/PRM_Parm.h>
 
-#ifdef SESI_OPENVDB
-  #include <hboost/mpl/at.hpp>
-  namespace boostmpl = hboost::mpl;
-#else
-  #include <boost/mpl/at.hpp>
-  namespace boostmpl = boost::mpl;
-#endif
-
 #include <memory>
 #include <string>
 #include <sstream>
@@ -201,7 +193,7 @@ struct Visitor
     using LeafNodeType = typename TreeType::LeafNodeType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     using BoolTreePtr = typename BoolTreeType::Ptr;
