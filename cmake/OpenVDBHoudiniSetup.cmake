@@ -328,8 +328,10 @@ if(Houdini_VERSION VERSION_LESS 17)
   set(OPENVDB_HOUDINI_ABI 4)
 elseif(Houdini_VERSION VERSION_LESS 18)
   set(OPENVDB_HOUDINI_ABI 5)
-else()
+elseif(Houdini_VERSION VERSION_LESS 18.5)
   set(OPENVDB_HOUDINI_ABI 6)
+else()
+  set(OPENVDB_HOUDINI_ABI 7)
 endif()
 
 # ------------------------------------------------------------------------

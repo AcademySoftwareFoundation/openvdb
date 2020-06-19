@@ -38,24 +38,33 @@ class GEO_VDBTranslator : public GEO_IOTranslator
 {
 public:
              GEO_VDBTranslator() {}
-    virtual ~GEO_VDBTranslator() {}
+            ~GEO_VDBTranslator() override {}
 
-    virtual GEO_IOTranslator *duplicate() const;
+    GEO_IOTranslator   *duplicate() const override;
 
-    virtual const char *formatName() const;
+    const char         *formatName() const override;
 
-    virtual int         checkExtension(const char *name);
-    virtual void        getFileExtensions(UT_StringArray &extensions) const;
+    int                 checkExtension(const char *name) override;
+    void                getFileExtensions(
+                            UT_StringArray &extensions) const override;
 
-    virtual int         checkMagicNumber(unsigned magic);
+    int                 checkMagicNumber(unsigned magic) override;
 
-    virtual bool        fileStat(const char *filename,
-                                GA_Stat &stat,
-                                uint level);
+    bool                fileStat(
+                            const char *filename,
+                            GA_Stat &stat,
+                            uint level) override;
 
-    virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
-    virtual GA_Detail::IOStatus fileSave(const GEO_Detail *gdp, std::ostream &os);
-    virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, const char *fname);
+    GA_Detail::IOStatus fileLoad(
+                            GEO_Detail *gdp,
+                            UT_IStream &is,
+                            bool ate_magic) override;
+    GA_Detail::IOStatus fileSave(
+                            const GEO_Detail *gdp,
+                            std::ostream &os) override;
+    GA_Detail::IOStatus fileSaveToFile(
+                            const GEO_Detail *gdp,
+                            const char *fname) override;
 };
 
 GEO_IOTranslator *

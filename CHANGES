@@ -26,6 +26,8 @@ Version 7.1.0 - In Development
       an unknown exception.
     - Removed Boost::thread as a dependency of vdb_view in favour of
       std::thread.
+    - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+      the latter in favour of new openvdb math constants for pi
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
@@ -128,6 +130,8 @@ Version 7.1.0 - In Development
       FindOpenVDB CMake module
     - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
       macros.
+    - Fixed a few GCC compiler warnings by adding override keywords.
+      [Contributed by Edward Lam]
 
 
 Version 7.0.0 - December 6, 2019

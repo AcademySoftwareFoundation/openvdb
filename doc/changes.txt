@@ -37,6 +37,8 @@ Improvements:
 - vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
   unknown exception.
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
+- Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+  the latter in favour of new openvdb math constants for pi
 
 @par
 New features:
@@ -153,6 +155,8 @@ Build:
   FindOpenVDB CMake module
 - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
   macros.
+- Fixed a few GCC compiler warnings by adding override keywords.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
