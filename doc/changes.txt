@@ -39,6 +39,14 @@ Improvements:
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
 - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
   the latter in favour of new openvdb math constants for pi
+- Removed usage of boost/mpl/*.hpp methods in favour of new template
+  meta-programming methods on the @vdblink::TypeList TypeList@endlink struct.
+  This now supports get, front, back, contains, index, unique, popback, popfront
+  and range removal of types.
+- Changed the @vdblink::tree::NodeChain tree::NodeChain@endlink implementation
+  to use an @vdblink::TypeList TypeList@endlink rather than a boost::mpl::vector
+  and updated all usage of @vdblink::tree::NodeChain tree::NodeChain@endlink
+  accordingly.
 
 @par
 New features:
