@@ -684,7 +684,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     GA_ROAttributeRef attrRef;
     int attrClass = POINT_ATTR;
     const GU_Detail* meshGdp = this->getInputLastGeo(0, time);
-    for (int i = 1, N = evalInt("numattrib", 0, time); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("numattrib", 0, time)); i <= N; ++i) {
         bool isVector = true;
         if (meshGdp) {
             isVector = false;
