@@ -56,6 +56,8 @@ jobs:
       run: ./ci/build.sh clang++ Release 6 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
 
   testabi5:
     runs-on: ubuntu-16.04
@@ -67,6 +69,8 @@ jobs:
       run: ./ci/build.sh clang++ Release 5 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
 
   testhou180:
     runs-on: ubuntu-16.04
