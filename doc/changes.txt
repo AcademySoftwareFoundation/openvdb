@@ -1771,7 +1771,7 @@ Houdini:
   for large numbers (tens to hundreds of millions) of particles.
 - Added edge-adjacent (6+12=18 neighbors) and vertex-adjacent (6+12+8=26
   neighbors) dilation algorithms to
-  @vdblink::tools::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
+  @vdblink::tools::morphology::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
   The default dilation pattern is still face-adjacent (6&nbsp;neighbors).
 - Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
   for fast construction of linear arrays of tree nodes for use in multithreaded

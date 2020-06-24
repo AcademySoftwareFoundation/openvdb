@@ -292,8 +292,8 @@ TestTools::testDilateVoxels()
                     tree1.setValue(ijk, 1.0f);
                     CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
                     CPPUNIT_ASSERT(tree1.isValueOn(ijk));
-                    openvdb::tools::Morphology<Tree543f> m(tree1);
-                    m.dilateVoxels6();
+                    openvdb::tools::morphology::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels(1, openvdb::tools::NN_FACE);
                     for (int i=-1; i<=1; ++i) {
                         for (int j=-1; j<=1; ++j) {
                             for (int k=-1; k<=1; ++k) {
@@ -324,8 +324,8 @@ TestTools::testDilateVoxels()
                     tree1.setValue(ijk, 1.0f);
                     CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
                     CPPUNIT_ASSERT(tree1.isValueOn(ijk));
-                    openvdb::tools::Morphology<Tree543f> m(tree1);
-                    m.dilateVoxels18();
+                    openvdb::tools::morphology::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels(1, openvdb::tools::NN_FACE_EDGE);
                     for (int i=-1; i<=1; ++i) {
                         for (int j=-1; j<=1; ++j) {
                             for (int k=-1; k<=1; ++k) {
@@ -356,8 +356,8 @@ TestTools::testDilateVoxels()
                     tree1.setValue(ijk, 1.0f);
                     CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
                     CPPUNIT_ASSERT(tree1.isValueOn(ijk));
-                    openvdb::tools::Morphology<Tree543f> m(tree1);
-                    m.dilateVoxels26();
+                    openvdb::tools::morphology::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels(1, openvdb::tools::NN_FACE_EDGE_VERTEX);
                     for (int i=-1; i<=1; ++i) {
                         for (int j=-1; j<=1; ++j) {
                             for (int k=-1; k<=1; ++k) {
