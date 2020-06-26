@@ -120,11 +120,13 @@ A global list of library paths to additionally use into when searching for depen
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
-  set(CONCURRENT_MALLOC Auto CACHE STRING
-    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
-    Although not required, it is strongly recommended to use a concurrent memory allocator.
-    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
-    in which case Tbbmalloc is used." FORCE
+  set(CONCURRENT_MALLOC None CACHE STRING
+    "Explicitly link the Core OpenVDB builds against a particular concurrent malloc library.
+    Options are: None Auto Jemalloc Tbbmalloc. Note that this choice should usually be deffered
+    to your downstream application. Although not required, it is strongly recommended to use a
+    concurrent memory allocator. Has no effect if OPENVDB_BUILD_CORE is false. The 'Auto' option
+    implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable, in which case Tbbmalloc
+    is used." FORCE
   )
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
