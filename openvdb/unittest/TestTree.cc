@@ -1588,6 +1588,59 @@ TestTree::testTopologyUnion()
         }
     }
 
+    { // test preservation of source tiles
+        using LeafT = openvdb::BoolTree::LeafNodeType;
+        using InternalT1 = openvdb::BoolTree::RootNodeType::NodeChainType::Get<1>;
+        using InternalT2 = openvdb::BoolTree::RootNodeType::NodeChainType::Get<2>;
+        openvdb::BoolTree tree0, tree1;
+        const openvdb::Coord xyz(0);
+
+        tree0.addTile(1, xyz, true, true); // leaf level tile
+        tree1.touchLeaf(xyz)->setValueOn(0); // single leaf
+        tree0.topologyUnion(tree1, true); // single tile
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.nonLeafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree0.activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(LeafT::NUM_VOXELS), tree0.activeVoxelCount());
+
+        tree1.addTile(1, xyz + openvdb::Coord(8), true, true); // leaf + tile
+        tree0.topologyUnion(tree1, true); // two tiles
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.nonLeafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(2), tree0.activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(LeafT::NUM_VOXELS*2), tree0.activeVoxelCount());
+
+        // internal node level
+        tree0.clear();
+        tree0.addTile(2, xyz, true, true);
+        tree0.topologyUnion(tree1, true); // all topology in tree1 is already active. no change
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), tree0.nonLeafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree0.activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(InternalT1::NUM_VOXELS), tree0.activeVoxelCount());
+
+        // internal node level
+        tree0.clear();
+        tree0.addTile(3, xyz, true, true);
+        tree0.topologyUnion(tree1, true);
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree0.nonLeafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree0.activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(InternalT2::NUM_VOXELS), tree0.activeVoxelCount());
+
+        // larger tile in tree1 still forces child topology tree0
+        tree0.clear();
+        tree1.clear();
+        tree0.addTile(1, xyz, true, true);
+        tree1.addTile(2, xyz, true, true);
+        tree0.topologyUnion(tree1, true);
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.nonLeafCount());
+        openvdb::Index64 tiles = openvdb::Index64(InternalT1::DIM) / InternalT1::getChildDim();
+        tiles = tiles * tiles * tiles;
+        CPPUNIT_ASSERT_EQUAL(tiles, tree0.activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(InternalT1::NUM_VOXELS), tree0.activeVoxelCount());
+    }
 }// testTopologyUnion
 
 void
