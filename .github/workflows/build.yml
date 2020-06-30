@@ -84,6 +84,9 @@ jobs:
         path: hou
         key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
         restore-keys: vdb1-houdini18_0-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
     - name: houdini
       run: ./ci/install_houdini2.sh
     - name: build
