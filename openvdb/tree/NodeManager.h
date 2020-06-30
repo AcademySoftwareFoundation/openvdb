@@ -139,7 +139,7 @@ public:
     }
 
     template<typename NodeOp>
-    void foreach(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreach(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         NodeTransformer<NodeOp> transform(op);
         transform.run(this->nodeRange(grainSize), threaded);
@@ -158,18 +158,22 @@ private:
     template<typename NodeOp>
     struct NodeTransformer
     {
-        NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp)
+        NodeTransformer(NodeOp& nodeOp) : mNodeOp(nodeOp)
         {
         }
         void run(const NodeRange& range, bool threaded = true)
         {
             threaded ? tbb::parallel_for(range, *this) : (*this)(range);
         }
+        void operator()(const NodeRange& range)
+        {
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
+        }
         void operator()(const NodeRange& range) const
         {
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
         }
-        const NodeOp mNodeOp;
+        NodeOp mNodeOp;
     };// NodeList::NodeTransformer
 
     // Private struct of NodeList that performs parallel_reduce
@@ -247,14 +251,14 @@ public:
     }
 
     template<typename NodeOp>
-    void foreachBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
         mNext.foreachBottomUp(op, threaded, grainSize);
         mList.foreach(op, threaded, grainSize);
     }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachTopDown(NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
         mNext.foreachTopDown(op, threaded, grainSize);
@@ -305,13 +309,13 @@ public:
     Index64 nodeCount(Index) const { return mList.nodeCount(); }
 
     template<typename NodeOp>
-    void foreachBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
     }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachTopDown(NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
     }
@@ -440,14 +444,14 @@ public:
     ///
     /// @endcode
     template<typename NodeOp>
-    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mChain.foreachBottomUp(op, threaded, grainSize);
         op(mRoot);
     }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mChain.foreachTopDown(op, threaded, grainSize);
