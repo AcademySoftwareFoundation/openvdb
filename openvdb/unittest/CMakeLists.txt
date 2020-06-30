@@ -101,6 +101,7 @@ set(UNITTEST_SOURCE_FILES
   TestMat4Metadata.cc
   TestMath.cc
   TestMeanCurvature.cc
+  TestMerge.cc
   TestMeshToVolume.cc
   TestMetadata.cc
   TestMetadataIO.cc
