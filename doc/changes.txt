@@ -165,6 +165,11 @@ Build:
   macros.
 - Fixed a few GCC compiler warnings by adding override keywords.
   <I>[Contributed by Edward&nbsp;Lam]</I>
+- jemalloc/tbbmalloc are no longer linked into library artifacts of the
+  OpenVDB CMake build. The @c CONCURRENT_MALLOC CMake option now only applies
+  to the executables.
+- Introduced a new @c OpenVDB::openvdb_je interface target through the
+  FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
