@@ -120,13 +120,13 @@ A global list of library paths to additionally use into when searching for depen
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
-  set(CONCURRENT_MALLOC None CACHE STRING
-    "Explicitly link the Core OpenVDB builds against a particular concurrent malloc library.
-    Options are: None Auto Jemalloc Tbbmalloc. Note that this choice should usually be deffered
-    to your downstream application. Although not required, it is strongly recommended to use a
-    concurrent memory allocator. Has no effect if OPENVDB_BUILD_CORE is false. The 'Auto' option
-    implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable, in which case Tbbmalloc
-    is used." FORCE
+  set(CONCURRENT_MALLOC Auto CACHE STRING
+    "Explicitly link the OpenVDB executables against a particular concurrent malloc library.
+    Options are: None Auto Jemalloc Tbbmalloc. Although not required, it is strongly recommended
+    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES is false. Auto
+    is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable, in which
+    case Tbbmalloc is used. Note that this is not linked into library builds and defers this
+    choice to downstream applications via explicit CMake targets." FORCE
   )
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
@@ -589,11 +589,18 @@ unset(HAS_AVAILABLE_WARNINGS)
 # * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
 #   of injecting into the Windows runtime to replace the system allocator.
 
-if(CONCURRENT_MALLOC STREQUAL "Auto")
+if(OPENVDB_BUILD_BINARIES AND CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    set(CONCURRENT_MALLOC "Jemalloc")
+    find_package(Jemalloc QUIET)
+    if(NOT TARGET Jemalloc::jemalloc)
+      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+        It is recommended to use Jemalloc for optimum performance.")
+      set(CONCURRENT_MALLOC "Tbbmalloc")
+    else()
+      set(CONCURRENT_MALLOC "Jemalloc")
+    endif()
   endif()
 endif()
 
