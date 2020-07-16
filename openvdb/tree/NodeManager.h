@@ -30,6 +30,11 @@ namespace tree {
 template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
 class NodeManager;
 
+// Produce linear arrays of all tree nodes lazily, to facilitate efficient threading
+// of topology-changing workflows.
+template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
+class DynamicNodeManager;
+
 
 ////////////////////////////////////////
 
@@ -263,6 +268,14 @@ public:
         mNext.foreachTopDown(op, threaded, grainSize);
     }
 
+    template<typename NodeOp, typename ParentT>
+    void foreachTopDown(NodeOp& op, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        this->rebuildList(parent);
+        mList.foreach(op, threaded, grainSize);
+        mNext.foreachTopDown(op, parent, threaded, grainSize);
+    }
+
     template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
@@ -275,6 +288,14 @@ public:
     {
         mList.reduce(op, threaded, grainSize);
         mNext.reduceTopDown(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp, typename ParentT>
+    void reduceTopDown(NodeOp& op, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        this->rebuildList(parent);
+        mList.reduce(op, threaded, grainSize);
+        mNext.reduceTopDown(op, parent, threaded, grainSize);
     }
 
 private:
@@ -327,6 +348,13 @@ public:
         mList.foreach(op, threaded, grainSize);
     }
 
+    template<typename NodeOp, typename ParentT>
+    void foreachTopDown(NodeOp& op, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        this->rebuild(parent);
+        mList.foreach(op, threaded, grainSize);
+    }
+
     template<typename NodeOp>
     void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
     {
@@ -336,6 +364,13 @@ public:
     template<typename NodeOp>
     void reduceTopDown(NodeOp& op, bool threaded, size_t grainSize)
     {
+        mList.reduce(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp, typename ParentT>
+    void reduceTopDown(NodeOp& op, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        this->rebuild(parent);
         mList.reduce(op, threaded, grainSize);
     }
 
@@ -553,6 +588,66 @@ protected:
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
 };// NodeManager class
+
+
+////////////////////////////////////////////
+
+
+/// @brief To facilitate threading over the nodes of a tree, cache
+/// node pointers lazily in linear arrays, one for each level of the tree.
+///
+/// @details For a top-down operation, this implementation caches the nodes of
+/// the tree for each level of the tree just prior to performing the parallel
+/// for or parallel reduce operation on that level of the tree. This is mainly
+/// designed to be used in cases where an operation modifies the tree below the
+/// current level of execution.
+///
+/// For a bottom-up operation, this implementation caches the nodes of the tree
+/// just prior to performing the parallel for or parallel reduce operation on
+/// the whole tree. This is mainly provided for consistency and only represents
+/// a minor convenience to avoid having to explicitly rebuild the nodes of the
+/// tree after each bottom-up operation when performing topology-changing
+/// modifications to the tree in-between.
+///
+/// This implementation works with trees of any depth, but optimized
+/// specializations are provided for the most typical tree depths.
+template<typename TreeOrLeafManagerT, Index _LEVELS>
+class DynamicNodeManager : public NodeManager<TreeOrLeafManagerT, _LEVELS>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, _LEVELS>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+
+    template<typename NodeOp>
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        NodeManagerT::foreachBottomUp(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mChain.foreachTopDown(op, this->mRoot, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        NodeManagerT::reduceBottomUp(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mChain.reduceTopDown(op, this->mRoot, threaded, grainSize);
+    }
+};
 
 
 ////////////////////////////////////////////
@@ -1055,6 +1150,256 @@ protected:
 private:
     NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<4>
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with no caching of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 0> : public NodeManager<TreeOrLeafManagerT, 0>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, 0>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+}; // DynamicNodeManager<0>
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with one level of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 1> : public NodeManager<TreeOrLeafManagerT, 1>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, 1>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+
+    template<typename NodeOp>
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.foreach(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.reduce(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.reduce(op, threaded, grainSize);
+    }
+}; // DynamicNodeManager<1>
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with two levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 2> : public NodeManager<TreeOrLeafManagerT, 2>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, 2>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+
+    template<typename NodeOp>
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.foreach(op, threaded, grainSize);
+        this->mList1.foreach(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.foreach(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.reduce(op, threaded, grainSize);
+        this->mList1.reduce(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.reduce(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.reduce(op, threaded, grainSize);
+    }
+};  // DynamicNodeManager<2>
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with three levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 3> : public NodeManager<TreeOrLeafManagerT, 3>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, 3>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+
+    template<typename NodeOp>
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.foreach(op, threaded, grainSize);
+        this->mList1.foreach(op, threaded, grainSize);
+        this->mList2.foreach(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList2.clear();
+        this->mRoot.getNodes(this->mList2);
+        this->mList2.foreach(op, threaded, grainSize);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.foreach(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.reduce(op, threaded, grainSize);
+        this->mList1.reduce(op, threaded, grainSize);
+        this->mList2.reduce(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList2.clear();
+        this->mRoot.getNodes(this->mList2);
+        this->mList2.reduce(op, threaded, grainSize);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.reduce(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.reduce(op, threaded, grainSize);
+    }
+};  // DynamicNodeManager<3>
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with four levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 4> : public NodeManager<TreeOrLeafManagerT, 4>
+{
+public:
+    using NodeManagerT = NodeManager<TreeOrLeafManagerT, 4>;
+
+    DynamicNodeManager(TreeOrLeafManagerT& tree)
+        : NodeManagerT(tree, /*initialize=*/false) { }
+
+    template<typename NodeOp>
+    void foreachBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.foreach(op, threaded, grainSize);
+        this->mList1.foreach(op, threaded, grainSize);
+        this->mList2.foreach(op, threaded, grainSize);
+        this->mList3.foreach(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void foreachTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList3.clear();
+        this->mRoot.getNodes(this->mList3);
+        this->mList3.foreach(op, threaded, grainSize);
+        this->mList2.clear();
+        this->mRoot.getNodes(this->mList2);
+        this->mList2.foreach(op, threaded, grainSize);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.foreach(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        this->rebuild();
+        this->mList0.reduce(op, threaded, grainSize);
+        this->mList1.reduce(op, threaded, grainSize);
+        this->mList2.reduce(op, threaded, grainSize);
+        this->mList3.reduce(op, threaded, grainSize);
+        op(this->mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(this->mRoot);
+        this->mList3.clear();
+        this->mRoot.getNodes(this->mList3);
+        this->mList3.reduce(op, threaded, grainSize);
+        this->mList2.clear();
+        this->mRoot.getNodes(this->mList2);
+        this->mList2.reduce(op, threaded, grainSize);
+        this->mList1.clear();
+        this->mRoot.getNodes(this->mList1);
+        this->mList1.reduce(op, threaded, grainSize);
+        this->mList0.clear();
+        this->mRoot.getNodes(this->mList0);
+        this->mList0.reduce(op, threaded, grainSize);
+    }
+}; // DynamicNodeManager<4>
+
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
