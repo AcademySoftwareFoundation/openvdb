@@ -234,8 +234,7 @@ public:
     template<typename ParentT>
     void rebuild(ParentT& parent)
     {
-        mList.clear();
-        parent.getNodes(mList);
+        this->rebuildList(parent);
         for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.rebuild(mList(i));
     }
 
@@ -272,6 +271,14 @@ public:
     {
         mList.reduce(op, threaded, grainSize);
         mNext.reduceTopDown(op, threaded, grainSize);
+    }
+
+private:
+    template<typename ParentT>
+    void rebuildList(ParentT& parent)
+    {
+        mList.clear();
+        parent.getNodes(mList);
     }
 
 protected:
@@ -362,7 +369,8 @@ public:
     using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -529,6 +537,12 @@ public:
     //@}
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool initialize)
+        : mRoot(tree.root())
+    {
+        if (initialize)  mChain.init(mRoot, tree);
+    }
+
     RootNodeType& mRoot;
     NodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
 
@@ -549,7 +563,8 @@ public:
     using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static const Index LEVELS = 0;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -581,6 +596,9 @@ public:
     void reduceTopDown(NodeOp& op, bool, size_t) { op(mRoot); }
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool /*initialize*/)
+        : mRoot(tree.root()) { }
+
     RootNodeType& mRoot;
 
 private:
@@ -601,16 +619,8 @@ public:
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
-    {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            mRoot.getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -660,6 +670,20 @@ public:
     }
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool initialize)
+        : mRoot(tree.root())
+    {
+        if (initialize) {
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+                tree.getNodes(mList0);
+            } else {
+                mRoot.getNodes(mList0);
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+
     using NodeT1 = RootNodeType;
     using NodeT0 = typename NodeT1::ChildNodeType;
     using ListT0 = NodeList<NodeT0>;
@@ -685,18 +709,8 @@ public:
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
-    {
-        mRoot.getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -758,6 +772,22 @@ public:
     }
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool initialize)
+        : mRoot(tree.root())
+    {
+        if (initialize) {
+            mRoot.getNodes(mList1);
+
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+                tree.getNodes(mList0);
+            } else {
+                for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+
     using NodeT2 = RootNodeType;
     using NodeT1 = typename NodeT2::ChildNodeType; // upper level
     using NodeT0 = typename NodeT1::ChildNodeType; // lower level
@@ -787,19 +817,8 @@ public:
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
-    {
-        mRoot.getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -867,6 +886,23 @@ public:
     }
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool initialize)
+        : mRoot(tree.root())
+    {
+        if (initialize) {
+            mRoot.getNodes(mList2);
+            for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+                tree.getNodes(mList0);
+            } else {
+                for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+
     using NodeT3 = RootNodeType;
     using NodeT2 = typename NodeT3::ChildNodeType; // upper level
     using NodeT1 = typename NodeT2::ChildNodeType; // mid level
@@ -899,20 +935,8 @@ public:
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
-    {
-        mRoot.getNodes(mList3);
-        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
+    NodeManager(TreeOrLeafManagerT& tree)
+        : NodeManager(tree, /*initialize=*/true) { }
 
     virtual ~NodeManager() {}
 
@@ -989,6 +1013,24 @@ public:
     }
 
 protected:
+    NodeManager(TreeOrLeafManagerT& tree, bool initialize)
+        : mRoot(tree.root())
+    {
+        if (initialize) {
+            mRoot.getNodes(mList3);
+            for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
+            for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+                tree.getNodes(mList0);
+            } else {
+                for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+
     using NodeT4 = RootNodeType;
     using NodeT3 = typename NodeT4::ChildNodeType; // upper level
     using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
