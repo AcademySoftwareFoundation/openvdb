@@ -44,6 +44,8 @@ Version 7.1.0 - In Development
       data.
     - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
       group index collisions when attempting to merge two Descriptors.
+    - Added a DynamicNodeManager class that can be used for efficient
+      multi-threading of topology-changing workflows.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the

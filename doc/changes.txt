@@ -59,6 +59,9 @@ New features:
   data.
 - Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
   collisions when attempting to merge two Descriptors.
+- Added a @vdblink::tree::DynamicNodeManager DynamicNodeManager@endlink class
+  that can be used for efficient multi-threading of topology-changing
+  workflows.
 
 @par
 Bug fixes:
