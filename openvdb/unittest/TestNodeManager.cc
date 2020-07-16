@@ -17,9 +17,11 @@ public:
 
     CPPUNIT_TEST_SUITE(TestNodeManager);
     CPPUNIT_TEST(testAll);
+    CPPUNIT_TEST(testDynamic);
     CPPUNIT_TEST_SUITE_END();
 
     void testAll();
+    void testDynamic();
 };
 
 
@@ -123,6 +125,25 @@ TestNodeManager::testAll()
         CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager.nodeCount());
     }
 
+    {// test DynamicNodeManager
+        openvdb::tree::DynamicNodeManager<FloatTree> manager(tree);
+
+        // nodes are not stored on node manager construction
+        CPPUNIT_ASSERT_EQUAL(Index64(0), manager.nodeCount());
+
+        // test the map reduce functionality
+        NodeCountOp<FloatTree> bottomUpOp;
+        NodeCountOp<FloatTree> topDownOp;
+        manager.reduceBottomUp(bottomUpOp);
+        manager.reduceTopDown(topDownOp);
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager.nodeCount(i));
+        }
+        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager.nodeCount());
+    }
+
     {// test LeafManager constructor
         typedef openvdb::tree::LeafManager<FloatTree> LeafManagerT;
         LeafManagerT manager1(tree);
@@ -150,4 +171,124 @@ TestNodeManager::testAll()
         CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager2.nodeCount());
     }
 
+}
+
+namespace {
+
+template<typename TreeT>
+struct ExpandOp
+{
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    ExpandOp() = default;
+
+    // do nothing for the root node
+    void operator()(RootT&) const { }
+
+    // count the internal and leaf nodes
+    template<typename NodeT>
+    void operator()(NodeT& node) const
+    {
+        for (auto iter = node.cbeginValueAll(); iter; ++iter) {
+            const openvdb::Coord ijk = iter.getCoord();
+            if (ijk.x() < 256 && ijk.y() < 256 && ijk.z() < 256) {
+                node.addChild(new typename NodeT::ChildNodeType(iter.getCoord(), NodeT::LEVEL, true));
+            }
+        }
+    }
+
+    void operator()(LeafT& leaf) const
+    {
+        for (auto iter = leaf.beginValueAll(); iter; ++iter) {
+            iter.setValue(iter.pos());
+        }
+    }
+};// ExpandOp
+
+template<typename TreeT>
+struct SumOp {
+    using RootT = typename TreeT::RootNodeType;
+
+    SumOp() = default;
+    SumOp(const SumOp&, tbb::split): totalCount(0) { }
+    void join(const SumOp& other)
+    {
+        totalCount += other.totalCount;
+    }
+    // do nothing for the root node
+    void operator()(const typename TreeT::RootNodeType&) { }
+    // count the internal and leaf nodes
+    template<typename NodeT>
+    void operator()(const NodeT& node)
+    {
+        for (auto iter = node.cbeginValueAll(); iter; ++iter) {
+            totalCount += *iter;
+        }
+    }
+    openvdb::Index64 totalCount = openvdb::Index64(0);
+};// SumOp
+
+}//unnamed namespace
+
+void
+TestNodeManager::testDynamic()
+{
+    using openvdb::Coord;
+    using openvdb::Index32;
+    using openvdb::Index64;
+    using openvdb::Int32Tree;
+
+    using RootNodeType = Int32Tree::RootNodeType;
+    using Internal1NodeType = RootNodeType::ChildNodeType;
+
+    Int32Tree sourceTree(0);
+
+    auto child =
+        std::make_unique<Internal1NodeType>(Coord(0, 0, 0), /*value=*/1.0f);
+
+    CPPUNIT_ASSERT(sourceTree.root().addChild(child.release()));
+    CPPUNIT_ASSERT_EQUAL(Index32(0), sourceTree.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index32(2), sourceTree.nonLeafCount());
+
+    ExpandOp<Int32Tree> expandOp;
+
+    { // use NodeManager::foreachTopDown
+        Int32Tree tree(sourceTree);
+        openvdb::tree::NodeManager<Int32Tree> manager(tree);
+        CPPUNIT_ASSERT_EQUAL(Index64(1), manager.nodeCount());
+        manager.foreachTopDown(expandOp);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+
+        // first level has been expanded, but node manager cache does not include the new nodes
+        SumOp<Int32Tree> sumOp;
+        manager.reduceBottomUp(sumOp);
+        CPPUNIT_ASSERT_EQUAL(Index64(32760), sumOp.totalCount);
+    }
+
+    { // use DynamicNodeManager::foreachBottomUp
+        Int32Tree tree(sourceTree);
+        openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
+        CPPUNIT_ASSERT_EQUAL(Index64(0), manager.nodeCount());
+        manager.foreachBottomUp(expandOp);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+
+        // first level has been expanded, node manager cache will include the new nodes
+        SumOp<Int32Tree> sumOp;
+        manager.reduceBottomUp(sumOp);
+        CPPUNIT_ASSERT_EQUAL(Index64(98296), sumOp.totalCount);
+    }
+
+    { // use DynamicNodeManager::foreachTopDown
+        Int32Tree tree(sourceTree);
+        openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
+        CPPUNIT_ASSERT_EQUAL(Index64(0), manager.nodeCount());
+        manager.foreachTopDown(expandOp);
+        CPPUNIT_ASSERT_EQUAL(Index32(32768), tree.leafCount());
+
+        // all levels have been expanded
+        SumOp<Int32Tree> sumOp;
+        manager.reduceTopDown(sumOp);
+        CPPUNIT_ASSERT_EQUAL(Index64(4286611448), sumOp.totalCount);
+    }
 }
