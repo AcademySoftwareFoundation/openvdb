@@ -15,6 +15,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
+#include "Merge.h"
 #include "ValueTransformer.h" // for transformValues()
 #include "Prune.h"// for prune
 #include "SignedFloodFill.h" // for signedFloodFill()
@@ -722,6 +723,27 @@ struct CopyOp
 };
 /// @endcond
 
+template <typename TreeT>
+inline void validateLevelSet(const TreeT& tree, const std::string& gridName = std::string(""))
+{
+    using ValueT = typename TreeT::ValueType;
+    const ValueT zero = zeroVal<ValueT>();
+    if (!(tree.background() > zero)) {
+        std::stringstream ss;
+        ss << "expected grid ";
+        if (!gridName.empty()) ss << gridName << " ";
+        ss << "outside value > 0, got " << tree.background();
+        OPENVDB_THROW(ValueError, ss.str());
+    }
+    if (!(-tree.background() < zero)) {
+        std::stringstream ss;
+        ss << "expected grid ";
+        if (!gridName.empty()) ss << gridName << " ";
+        ss << "inside value < 0, got " << -tree.background();
+        OPENVDB_THROW(ValueError, ss.str());
+    }
+}
+
 } // namespace composite
 
 
@@ -891,7 +913,7 @@ public:
         }
         if (!(mBInside < zero)) {
             OPENVDB_THROW(ValueError,
-                "expected grid B outside value < 0, got " << mBOutside);
+                "expected grid B inside value < 0, got " << mBInside);
         }
     }
 
@@ -1129,8 +1151,11 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
-    CsgUnionVisitor<TreeT> visitor(aTree, bTree);
-    aTree.visit2(bTree, visitor);
+    composite::validateLevelSet(aTree, "A");
+    composite::validateLevelSet(bTree, "B");
+    CsgUnionMergeOp<TreeT> op{&bTree};
+    tree::DynamicNodeManager<TreeT> nodeManager(aTree);
+    nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
 }
 
