@@ -135,11 +135,14 @@ Version 7.1.0 - In Development
       Boost::disable_autolinking target.
     - Added support for importing pyopenvdb and openvdb_houdini through the
       FindOpenVDB CMake module
-    - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
-      macros.
+    - Removed the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE macros.
     - Fixed a few GCC compiler warnings by adding override keywords.
       [Contributed by Edward Lam]
-
+    - jemalloc/tbbmalloc are no longer linked into library artifacts of the
+      OpenVDB CMake build. The CONCURRENT_MALLOC CMake option now only applies
+      to the executables.
+    - Introduced a new OpenVDB::openvdb_je interface target through the
+      FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
 
 Version 7.0.0 - December 6, 2019
 
