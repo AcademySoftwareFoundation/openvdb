@@ -123,10 +123,11 @@ if(NOT CONCURRENT_MALLOC)
   set(CONCURRENT_MALLOC Auto CACHE STRING
     "Explicitly link the OpenVDB executables against a particular concurrent malloc library.
     Options are: None Auto Jemalloc Tbbmalloc. Although not required, it is strongly recommended
-    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES is false. Auto
-    is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable, in which
-    case Tbbmalloc is used. Note that this is not linked into library builds and defers this
-    choice to downstream applications via explicit CMake targets." FORCE
+    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES and
+    OPENVDB_BUILD_UNITTESTS are false. Auto is the default and implies Jemalloc, unless USE_MAYA
+    is ON or Jemalloc is unavailable, in which case Tbbmalloc is used. Note that this is not
+    linked into library builds and defers this choice to downstream applications via explicit
+    CMake targets." FORCE
   )
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
@@ -589,7 +590,7 @@ unset(HAS_AVAILABLE_WARNINGS)
 # * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
 #   of injecting into the Windows runtime to replace the system allocator.
 
-if(OPENVDB_BUILD_BINARIES AND CONCURRENT_MALLOC STREQUAL "Auto")
+if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
