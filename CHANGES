@@ -44,6 +44,9 @@ Version 7.1.0 - In Development
       data.
     - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
       group index collisions when attempting to merge two Descriptors.
+    - Added RootNode::childCount(), InternalNode::childCount() and
+      LeafNode::childCount() to count the number of immediate child nodes that
+      exist below the current node.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
