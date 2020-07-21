@@ -110,6 +110,8 @@ Houdini:
   point of the VDB when computing bounding box. SOPs affected include Clip,
   Fill, Points Group, Rasterize Points, Read, Remove Divergence.
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
+- OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+  it might be stuck hidden if the input hasn't cooked.
 
 @par
 Build:
