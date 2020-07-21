@@ -86,6 +86,8 @@ Version 7.1.0 - In Development
       point of the VDB when computing bounding box. SOPs affected include Clip,
       Fill, Points Group, Rasterize Points, Read, Remove Divergence.
       [Contributed by Kuba Roth]
+    - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+      it might be stuck hidden if the input hasn't cooked.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
