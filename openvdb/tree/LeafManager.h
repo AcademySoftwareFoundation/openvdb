@@ -16,9 +16,11 @@
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/tree/RootNode.h> // for NodeChain
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+#include <deque>
 #include <functional>
 #include <type_traits>
 
@@ -237,7 +239,7 @@ public:
     /// of corresponding leaf node buffers.
     void rebuild(bool serial=false)
     {
-        this->initLeafArray();
+        this->initLeafArray(serial);
         this->initAuxBuffers(serial);
     }
     //@{
@@ -272,10 +274,10 @@ public:
     void removeAuxBuffers() { this->rebuildAuxBuffers(0); }
 
     /// @brief Remove the auxiliary buffers and rebuild the leaf array.
-    void rebuildLeafArray()
+    void rebuildLeafArray(bool serial = false)
     {
         this->removeAuxBuffers();
-        this->initLeafArray();
+        this->initLeafArray(serial);
     }
 
     /// @brief Return the total number of allocated auxiliary buffers.
@@ -622,19 +624,48 @@ public:
 
 private:
 
-    // This a simple wrapper for a c-style array so it mimics the api
-    // of a std container, e.g. std::vector or std::deque, and can be
-    // passed to Tree::getNodes().
-    struct MyArray {
-        using value_type = LeafType*;//required by Tree::getNodes
-        value_type* ptr;
-        MyArray(value_type* array) : ptr(array) {}
-        void push_back(value_type leaf) { *ptr++ = leaf; }//required by Tree::getNodes
-    };
-
-    void initLeafArray()
+    void initLeafArray(bool serial = false)
     {
-        const size_t leafCount = mTree->leafCount();
+        // Build an array of all nodes that have leaf nodes as their immediate children
+
+        using NodeChainT = typename NodeChain<RootNodeType, RootNodeType::LEVEL>::Type;
+        using NonConstLeafParentT = typename NodeChainT::template Get</*Level=*/1>;
+        using LeafParentT = typename CopyConstness<TreeType, NonConstLeafParentT>::Type;
+
+        std::deque<LeafParentT*> leafParents;
+        mTree->getNodes(leafParents);
+
+        // Compute the leaf counts for each node
+
+        std::vector<Index32> leafCounts;
+        if (serial) {
+            leafCounts.reserve(leafParents.size());
+            for (LeafParentT* leafParent : leafParents) {
+                leafCounts.push_back(leafParent->childCount());
+            }
+        } else {
+            leafCounts.resize(leafParents.size());
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, leafParents.size(), /*grainsize=*/64),
+                [&](tbb::blocked_range<size_t>& range)
+                {
+                    for (size_t i = range.begin(); i < range.end(); i++) {
+                        leafCounts[i] = leafParents[i]->childCount();
+                    }
+                }
+            );
+        }
+
+        // Turn leaf counts into a cumulative histogram and obtain total leaf count
+
+        for (size_t i = 1; i < leafCounts.size(); i++) {
+            leafCounts[i] += leafCounts[i-1];
+        }
+
+        const size_t leafCount = leafCounts.empty() ? 0 : leafCounts.back();
+
+        // Allocate (or deallocate) the leaf pointer array
+
         if (leafCount != mLeafCount) {
             if (leafCount > 0) {
                 mLeafPtrs.reset(new LeafType*[leafCount]);
@@ -645,8 +676,34 @@ private:
             }
             mLeafCount = leafCount;
         }
-        MyArray a(mLeafs);
-        mTree->getNodes(a);
+
+        if (mLeafCount == 0)    return;
+
+        // Populate the leaf node pointers
+
+        if (serial) {
+            LeafType** leafPtr = mLeafs;
+            for (LeafParentT* leafParent : leafParents) {
+                for (auto iter = leafParent->beginChildOn(); iter; ++iter) {
+                    *leafPtr++ = &iter.getValue();
+                }
+            }
+        } else {
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, leafParents.size()),
+                [&](tbb::blocked_range<size_t>& range)
+                {
+                    size_t i = range.begin();
+                    LeafType** leafPtr = mLeafs;
+                    if (i > 0)  leafPtr += leafCounts[i-1];
+                    for ( ; i < range.end(); i++) {
+                        for (auto iter = leafParents[i]->beginChildOn(); iter; ++iter) {
+                            *leafPtr++ = &iter.getValue();
+                        }
+                    }
+                }
+            );
+        }
     }
 
     void initAuxBuffers(bool serial)
