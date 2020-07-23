@@ -224,11 +224,11 @@ public:
 
     void clear() { mList.clear(); mNext.clear(); }
 
-    template<typename ParentT, typename TreeOrLeafManagerT>
-    void init(ParentT& parent, TreeOrLeafManagerT& tree)
+    template<typename ParentT>
+    void init(ParentT& parent)
     {
         parent.getNodes(mList);
-        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.init(mList(i), tree);
+        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.init(mList(i));
     }
 
     template<typename ParentT>
@@ -298,7 +298,7 @@ public:
     void clear() { mList.clear(); }
 
     template<typename ParentT>
-    void rebuild(ParentT& parent) { mList.clear(); parent.getNodes(mList); }
+    void rebuild(ParentT& parent) { mList.clear(); this->init(parent); }
 
     Index64 nodeCount() const { return mList.nodeCount(); }
 
@@ -328,16 +328,10 @@ public:
         mList.reduce(op, threaded, grainSize);
     }
 
-    template<typename ParentT, typename TreeOrLeafManagerT>
-    void init(ParentT& parent, TreeOrLeafManagerT& tree)
+    template<typename ParentT>
+    void init(ParentT& parent)
     {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT::LEVEL == 0) {
-            tree.getNodes(mList);
-        } else {
-            parent.getNodes(mList);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        parent.getNodes(mList);
     }
 protected:
     NodeList<NodeT> mList;
@@ -362,7 +356,7 @@ public:
     using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot); }
 
     virtual ~NodeManager() {}
 
@@ -603,13 +597,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            mRoot.getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild();
     }
 
     virtual ~NodeManager() {}
@@ -687,15 +675,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild();
     }
 
     virtual ~NodeManager() {}
@@ -789,16 +769,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild();
     }
 
     virtual ~NodeManager() {}
@@ -901,17 +872,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList3);
-        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild();
     }
 
     virtual ~NodeManager() {}
