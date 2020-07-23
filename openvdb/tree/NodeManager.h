@@ -9,7 +9,6 @@
 /// allowing for efficient threading and bottom-up processing.
 ///
 /// @note A NodeManager can be constructed from a Tree or LeafManager.
-/// The latter is slightly more efficient since the cached leaf nodes will be reused.
 
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
@@ -41,22 +40,124 @@ template<typename NodeT>
 class NodeList
 {
 public:
-    using value_type = NodeT*;
-    using ListT = std::deque<value_type>;
+    NodeList() = default;
 
-    NodeList() {}
+    NodeT& operator()(size_t n) const { assert(n<mNodeCount); return *(mNodes[n]); }
 
-    void push_back(NodeT* node) { mList.push_back(node); }
+    NodeT*& operator[](size_t n) { assert(n<mNodeCount); return mNodes[n]; }
 
-    NodeT& operator()(size_t n) const { assert(n<mList.size()); return *(mList[n]); }
+    Index64 nodeCount() const { return mNodeCount; }
 
-    NodeT*& operator[](size_t n) { assert(n<mList.size()); return mList[n]; }
+    void clear()
+    {
+        mNodePtrs.reset();
+        mNodes = nullptr;
+        mNodeCount = 0;
+    }
 
-    Index64 nodeCount() const { return mList.size(); }
+    // initialize this node list from the provided root node
+    template <typename RootT>
+    void initRootChildren(RootT& root)
+    {
+        // Allocate (or deallocate) the node pointer array
 
-    void clear() { mList.clear(); }
+        size_t nodeCount = root.childCount();
 
-    void resize(size_t n) { mList.resize(n); }
+        if (nodeCount != mNodeCount) {
+            if (nodeCount > 0) {
+                mNodePtrs.reset(new NodeT*[nodeCount]);
+                mNodes = mNodePtrs.get();
+            } else {
+                mNodePtrs.reset();
+                mNodes = nullptr;
+            }
+            mNodeCount = nodeCount;
+        }
+
+        if (mNodeCount == 0)    return;
+
+        // Populate the node pointers
+
+        NodeT** nodePtr = mNodes;
+        for (auto iter = root.beginChildOn(); iter; ++iter) {
+            *nodePtr++ = &iter.getValue();
+        }
+    }
+
+    // initialize this node list from another node list containing the parent nodes
+    template <typename ParentsT>
+    void initNodeChildren(ParentsT& parents, bool serial = false)
+    {
+        // Compute the node counts for each node
+
+        std::vector<Index32> nodeCounts;
+        if (serial) {
+            nodeCounts.reserve(parents.nodeCount());
+            for (size_t i = 0; i < parents.nodeCount(); i++) {
+                nodeCounts.push_back(parents(i).childCount());
+            }
+        } else {
+            nodeCounts.resize(parents.nodeCount());
+            tbb::parallel_for(
+                tbb::blocked_range<Index64>(0, parents.nodeCount(), /*grainsize=*/64),
+                [&](tbb::blocked_range<Index64>& range)
+                {
+                    for (Index64 i = range.begin(); i < range.end(); i++) {
+                        nodeCounts[i] = parents(i).childCount();
+                    }
+                }
+            );
+        }
+
+        // Turn node counts into a cumulative histogram and obtain total node count
+
+        for (size_t i = 1; i < nodeCounts.size(); i++) {
+            nodeCounts[i] += nodeCounts[i-1];
+        }
+
+        const size_t nodeCount = nodeCounts.empty() ? 0 : nodeCounts.back();
+
+        // Allocate (or deallocate) the node pointer array
+
+        if (nodeCount != mNodeCount) {
+            if (nodeCount > 0) {
+                mNodePtrs.reset(new NodeT*[nodeCount]);
+                mNodes = mNodePtrs.get();
+            } else {
+                mNodePtrs.reset();
+                mNodes = nullptr;
+            }
+            mNodeCount = nodeCount;
+        }
+
+        if (mNodeCount == 0)    return;
+
+        // Populate the node pointers
+
+        if (serial) {
+            NodeT** nodePtr = mNodes;
+            for (size_t i = 0; i < parents.nodeCount(); i++) {
+                for (auto iter = parents(i).beginChildOn(); iter; ++iter) {
+                    *nodePtr++ = &iter.getValue();
+                }
+            }
+        } else {
+            tbb::parallel_for(
+                tbb::blocked_range<Index64>(0, parents.nodeCount()),
+                [&](tbb::blocked_range<Index64>& range)
+                {
+                    Index64 i = range.begin();
+                    NodeT** nodePtr = mNodes;
+                    if (i > 0)  nodePtr += nodeCounts[i-1];
+                    for ( ; i < range.end(); i++) {
+                        for (auto iter = parents(i).beginChildOn(); iter; ++iter) {
+                            *nodePtr++ = &iter.getValue();
+                        }
+                    }
+                }
+            );
+        }
+    }
 
     class NodeRange
     {
@@ -203,7 +304,9 @@ private:
 
 
 protected:
-    ListT mList;
+    size_t mNodeCount = 0;
+    std::unique_ptr<NodeT*[]> mNodePtrs;
+    NodeT** mNodes = nullptr;
 };// NodeList
 
 
@@ -224,19 +327,18 @@ public:
 
     void clear() { mList.clear(); mNext.clear(); }
 
-    template<typename ParentT>
-    void init(ParentT& parent)
+    template <typename RootT>
+    void initRootChildren(RootT& root, bool serial = false)
     {
-        parent.getNodes(mList);
-        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.init(mList(i));
+        mList.initRootChildren(root);
+        mNext.initNodeChildren(mList, serial);
     }
 
-    template<typename ParentT>
-    void rebuild(ParentT& parent)
+    template<typename ParentsT>
+    void initNodeChildren(ParentsT& parents, bool serial = false)
     {
-        mList.clear();
-        parent.getNodes(mList);
-        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.rebuild(mList(i));
+        mList.initNodeChildren(parents);
+        mNext.initNodeChildren(mList, serial);
     }
 
     Index64 nodeCount() const { return mList.nodeCount() + mNext.nodeCount(); }
@@ -297,8 +399,11 @@ public:
     /// @brief Clear all the cached tree nodes
     void clear() { mList.clear(); }
 
-    template<typename ParentT>
-    void rebuild(ParentT& parent) { mList.clear(); this->init(parent); }
+    template <typename RootT>
+    void initRootChildren(RootT& root, bool /*serial*/ = false) { mList.initRootChildren(root); }
+
+    template<typename ParentsT>
+    void initNodeChildren(ParentsT& parents, bool serial = false) { mList.initNodeChildren(parents, serial); }
 
     Index64 nodeCount() const { return mList.nodeCount(); }
 
@@ -328,11 +433,6 @@ public:
         mList.reduce(op, threaded, grainSize);
     }
 
-    template<typename ParentT>
-    void init(ParentT& parent)
-    {
-        parent.getNodes(mList);
-    }
 protected:
     NodeList<NodeT> mList;
 };// NodeManagerLink class
@@ -356,7 +456,11 @@ public:
     using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot); }
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false)
+        : mRoot(tree.root())
+    {
+        this->rebuild(serial);
+    }
 
     virtual ~NodeManager() {}
 
@@ -365,7 +469,7 @@ public:
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() { mChain.rebuild(mRoot); }
+    void rebuild(bool serial = false) { mChain.initRootChildren(mRoot, serial); }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -543,7 +647,7 @@ public:
     using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static const Index LEVELS = 0;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
+    NodeManager(TreeOrLeafManagerT& tree, bool /*serial*/ = false) : mRoot(tree.root()) { }
 
     virtual ~NodeManager() {}
 
@@ -552,7 +656,7 @@ public:
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() {}
+    void rebuild(bool /*serial*/ = false) { }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -595,9 +699,10 @@ public:
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false)
+        : mRoot(tree.root())
     {
-        this->rebuild();
+        this->rebuild(serial);
     }
 
     virtual ~NodeManager() {}
@@ -607,7 +712,7 @@ public:
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() { mList0.clear(); mRoot.getNodes(mList0); }
+    void rebuild(bool /*serial*/ = false) { mList0.initRootChildren(mRoot); }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -673,9 +778,9 @@ public:
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        this->rebuild();
+        this->rebuild(serial);
     }
 
     virtual ~NodeManager() {}
@@ -685,11 +790,10 @@ public:
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList1.initRootChildren(mRoot);
+        mList0.initNodeChildren(mList1, serial);
     }
 
     /// @brief Return a reference to the root node.
@@ -767,9 +871,9 @@ public:
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        this->rebuild();
+        this->rebuild(serial);
     }
 
     virtual ~NodeManager() {}
@@ -779,12 +883,11 @@ public:
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList2.initRootChildren(mRoot);
+        mList1.initNodeChildren(mList2, serial);
+        mList0.initNodeChildren(mList1, serial);
     }
 
     /// @brief Return a reference to the root node.
@@ -870,25 +973,24 @@ public:
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        this->rebuild();
+        this->rebuild(serial);
     }
 
     virtual ~NodeManager() {}
 
     /// @brief Clear all the cached tree nodes
-    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear; }
+    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList3);
-        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList3.initRootChildren(mRoot);
+        mList2.initNodeChildren(mList3, serial);
+        mList1.initNodeChildren(mList2, serial);
+        mList0.initNodeChildren(mList1, serial);
     }
 
     /// @brief Return a reference to the root node.
