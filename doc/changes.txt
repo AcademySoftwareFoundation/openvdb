@@ -7,6 +7,11 @@
 <B>Version 7.1.0</B> - <I>In Development</I>
 
 @par
+<BLOCKQUOTE>
+As of this release, support for grid ABI=4 has been removed.
+</BLOCKQUOTE>
+
+@par
 Improvements:
 - Added GroupWriteHandle::setUnsafe() for faster performance when the group
   array is known to be in-core and non-uniform.
@@ -28,6 +33,20 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 - Added support for vdb_view on Windows. Requires GLEW.
 - Removed support for GLFW&nbsp;2.
+- vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
+- vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
+  unknown exception.
+- Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
+- Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+  the latter in favour of new openvdb math constants for pi
+- Removed usage of boost/mpl/*.hpp methods in favour of new template
+  meta-programming methods on the @vdblink::TypeList TypeList@endlink struct.
+  This now supports get, front, back, contains, index, unique, popback, popfront
+  and range removal of types.
+- Changed the @vdblink::tree::NodeChain tree::NodeChain@endlink implementation
+  to use an @vdblink::TypeList TypeList@endlink rather than a boost::mpl::vector
+  and updated all usage of @vdblink::tree::NodeChain tree::NodeChain@endlink
+  accordingly.
 
 @par
 New features:
@@ -38,9 +57,8 @@ New features:
   @vdblink::points::AttributeSet::removeAttribute()
   AttributeSet::removeAttribute@endlink for releasing ownership of attribute
   data.
-- Added @vdblink::points::AttributeSet::Descriptor::groupIndexCollision()
-  AttributeSet::Descriptor::groupIndexCollision@endlink for detecting group
-  index collisions when attempting to merge two Descriptors.
+- Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
+  collisions when attempting to merge two Descriptors.
 
 @par
 Bug fixes:
@@ -64,6 +82,9 @@ Bug fixes:
   @vdblink::points::AttributeArray AttributeArray@endlink was not being applied
   on attribute creation if the default attribute value was not the default
   value for that value type.
+- Fixed a compiler error when using C++17 by changing std::unexpected() to
+  std::terminate().
+  <I>[Contributed&nbsp;by&nbsp;Mark&nbsp;Sisson]</I>
 - Fixed a bug where a Houdini SOP's verb would not be correctly associated
   with the corresponding node if the node's internal name was changed.
 
@@ -75,8 +96,7 @@ API changes:
 - @vdblink{tools::PointPartitioner::voxelOffsets(),PointPartitioner::voxelOffsets}
   now returns a std::unique_ptr instead of a boost::scoped_array.
 - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
-  @vdblink::points::AttributeSet::Descriptor::unusedGroupOffset()
-  AttributeSet::Descriptor::unusedGroupOffset@endlink to allow for providing an
+  AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
   optional group offset hint.
 
 @par
@@ -92,6 +112,8 @@ Houdini:
   point of the VDB when computing bounding box. SOPs affected include Clip,
   Fill, Points Group, Rasterize Points, Read, Remove Divergence.
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
+- OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+  it might be stuck hidden if the input hasn't cooked.
 
 @par
 Build:
@@ -129,6 +151,29 @@ Build:
 - Fixed a compiler warning on Apple Clang 11.0 where the
   @vdblink::points::AttributeArray AttributeArray@endlink move constructor was
   being implicitly deleted despite being marked default.
+- Added an option <TT>BLOSC_USE_EXTERNAL_SOURCES</TT> to FindBlosc to include
+  blosc dependencies as interface libraries.
+- Added a root CMake option <TT>USE_STATIC_DEPENDENCIES</TT> to force CMake to
+  only locate static libraries on UNIX. On Windows, if enabled, located
+  libraries are assumed to be static.
+- Added support for <TT>CMAKE_MSVC_RUNTIME_LIBRARY</TT> for compilers that
+  target the MSVC ABI. Requires CMake 3.15 or greater.
+- Fixed an issue where <TT>OPENVDB_OPENEXR_STATICLIB</TT> was not being defined
+  and <TT>OPENEXR_DLL</TT> was being defined when linking against static builds
+  of OpenEXR/IlmBase on Windows.
+- Improved the behaviour of boost implicit linking with the
+  Boost::disable_autolinking target.
+- Added support for importing pyopenvdb and openvdb_houdini through the
+  FindOpenVDB CMake module
+- Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
+  macros.
+- Fixed a few GCC compiler warnings by adding override keywords.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
+- jemalloc/tbbmalloc are no longer linked into library artifacts of the
+  OpenVDB CMake build. The @c CONCURRENT_MALLOC CMake option now only applies
+  to the executables.
+- Introduced a new @c OpenVDB::openvdb_je interface target through the
+  FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly

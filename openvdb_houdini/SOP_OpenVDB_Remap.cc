@@ -20,14 +20,6 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#ifdef SESI_OPENVDB
-  #include <hboost/mpl/at.hpp>
-  namespace boostmpl = hboost::mpl;
-#else
-  #include <boost/mpl/at.hpp>
-  namespace boostmpl = boost::mpl;
-#endif
-
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -177,7 +169,7 @@ evalMinMax(const TreeType& tree,
     { // eval first tiles
         using RootNodeType = typename TreeType::RootNodeType;
         using NodeChainType = typename RootNodeType::NodeChainType;
-        using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
+        using InternalNodeType = typename NodeChainType::template Get<1>;
 
         std::vector<const InternalNodeType*> nodes;
         tree.getNodes(nodes);
@@ -220,7 +212,7 @@ deactivateBackgroundValues(TreeType& tree)
     { // eval first tiles
         using RootNodeType = typename TreeType::RootNodeType;
         using NodeChainType = typename RootNodeType::NodeChainType;
-        using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
+        using InternalNodeType = typename NodeChainType::template Get<1>;
 
         std::vector<InternalNodeType*> nodes;
         tree.getNodes(nodes);

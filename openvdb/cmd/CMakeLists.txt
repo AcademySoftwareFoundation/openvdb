@@ -34,6 +34,9 @@ message(STATUS "----------------------------------------------------")
 # Collect lib dependencies shared by all binaries
 
 if(NOT OPENVDB_BUILD_CORE)
+  # @note  Could also use the openvdb_je target here, but we just opt to
+  # handle the value of CONCURRENT_MALLOC outside of this branching for
+  # both cases
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
@@ -43,19 +46,15 @@ set(OPENVDB_BINARIES_DEPENDENT_LIBS
   ${OPENVDB_LIB}
 )
 
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
+
 ##########################################################################
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
-
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
 
 # rpath handling
 
@@ -162,12 +161,6 @@ endif()
 #### vdb_view
 
 if(OPENVDB_BUILD_VDB_VIEW)
-
-  # @todo improve the viewer header system
-  file(GLOB VIEWER_SOURCE_FILES ../viewer/*.h)
-  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
-  file(COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
-
   if(NOT Boost_USE_STATIC_LIBS)
     # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
     #        boost shared libraries (more specifically libraries built with -fPIC).
@@ -177,7 +170,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
     set(Boost_USE_STATIC_LIBS OFF)
   endif()
 
-  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
   find_package(OpenGL REQUIRED)
 
   if(WIN32)
@@ -198,13 +190,8 @@ if(OPENVDB_BUILD_VDB_VIEW)
 
   add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
 
-  target_include_directories(vdb_view
-    PRIVATE ${CMAKE_BINARY_DIR}/dwa
-  )
-
   target_link_libraries(vdb_view
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
-    Boost::thread
     OpenGL::GL
     OpenGL::GLU
     glfw

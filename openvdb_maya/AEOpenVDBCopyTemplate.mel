@@ -10,7 +10,7 @@ global proc AEOpenVDBCopyTemplate( string $nodeAttr )
             -annotation "Shallow copy selected grids form the B input."
             -addControl "GridsFromB";
         editorTemplate -endLayout;
-	    editorTemplate -addExtraControls;
+        editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
 }

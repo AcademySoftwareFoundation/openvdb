@@ -58,25 +58,17 @@
         #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR VERSION_NUMBER
     #endif
 #else
-    // Older versions of the library used the macros OPENVDB_2_ABI_COMPATIBLE
-    // and OPENVDB_3_ABI_COMPATIBLE.  For now, continue to support them.
-    #if defined OPENVDB_2_ABI_COMPATIBLE ///< @todo deprecated
-        #define OPENVDB_ABI_VERSION_NUMBER 2
-    #elif defined OPENVDB_3_ABI_COMPATIBLE ///< @todo deprecated
-        #define OPENVDB_ABI_VERSION_NUMBER 3
-    #else
-        #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
-    #endif
+    #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
 #endif
 
 // If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue a message
 // directive. Note that an error is also set in openvdb.cc which enforces stricter
 // behavior during compilation of the library. Both can be optionally suppressed
-// by defining OPENVDB_USE_DEPRECATED_ABI.
-#ifndef OPENVDB_USE_DEPRECATED_ABI
-    #if OPENVDB_ABI_VERSION_NUMBER == 4
-        PRAGMA(message("NOTE: ABI = 4 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
-            "to suppress this message"))
+// by defining OPENVDB_USE_DEPRECATED_ABI_<VERSION>.
+#ifndef OPENVDB_USE_DEPRECATED_ABI_5
+    #if OPENVDB_ABI_VERSION_NUMBER == 5
+        PRAGMA(message("NOTE: ABI = 5 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_5 "
+            "suppresses this message"))
     #endif
 #endif
 

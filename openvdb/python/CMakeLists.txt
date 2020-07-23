@@ -156,7 +156,7 @@ if(USE_NUMPY)
   endif()
 endif()
 
-if(TARGET openvdb_shared)
+if(TARGET openvdb_shared AND NOT Boost_USE_STATIC_LIBS)
   # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
   #        boost shared libraries (more specifically libraries built with -fPIC).
   #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html

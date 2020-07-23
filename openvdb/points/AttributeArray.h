@@ -101,7 +101,6 @@ public:
     enum Flag {
         TRANSIENT = 0x1,            /// by default not written to disk
         HIDDEN = 0x2,               /// hidden from UIs or iterators
-        OUTOFCORE = 0x4,            /// data not yet loaded from disk (deprecated flag as of ABI=5)
         CONSTANTSTRIDE = 0x8,       /// stride size does not vary in the array
         STREAMING = 0x10,           /// streaming mode collapses attributes when first accessed
         PARTIALREAD = 0x20          /// data has been partially read (compressed bytes is used)
@@ -130,11 +129,7 @@ public:
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     AttributeArray(): mPageHandle() { mOutOfCore = 0; }
-#else
-    AttributeArray(): mPageHandle() {}
-#endif
     virtual ~AttributeArray()
     {
         // if this AttributeArray has been partially read, zero the compressed bytes,
@@ -410,9 +405,7 @@ protected:
     size_t mCompressedBytes = 0;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     tbb::atomic<Index32> mOutOfCore; // interpreted as bool
-#endif
     compression::PageHandle::Ptr mPageHandle;
 
 #else // #if OPENVDB_ABI_VERSION_NUMBER < 6
@@ -1663,11 +1656,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::isOutOfCore() const
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     return mOutOfCore;
-#else
-    return (mFlags & OUTOFCORE);
-#endif
 }
 
 
@@ -1675,12 +1664,7 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setOutOfCore(const bool b)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     mOutOfCore = b;
-#else
-    if (b) mFlags = static_cast<uint8_t>(mFlags | OUTOFCORE);
-    else   mFlags = static_cast<uint8_t>(mFlags & ~OUTOFCORE);
-#endif
 }
 
 
@@ -1888,11 +1872,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
         OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     uint8_t flags(mFlags);
-#else
-    uint8_t flags(mFlags & uint8_t(~OUTOFCORE));
-#endif
     uint8_t serializationFlags(0);
     Index size(mSize);
     Index stride(mStrideOrTotalSize);
@@ -2027,11 +2007,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool /*compression*/
 
     // clear all write and out-of-core flags
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     self->mOutOfCore = false;
-#else
-    self->mFlags &= uint8_t(~OUTOFCORE);
-#endif
 }
 
 

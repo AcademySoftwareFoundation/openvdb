@@ -591,7 +591,7 @@ struct VDBUniformScatter : public BaseScatter
         }
     }
 
-    void print(const std::string &name, std::ostream& os = std::cout) const
+    void print(const std::string &name, std::ostream& os = std::cout) const override
     {
         os << "Uniformly scattered ";
         BaseScatter::print(name, os);
@@ -636,7 +636,7 @@ struct VDBDenseUniformScatter : public BaseScatter
         }
     }
 
-    void print(const std::string &name, std::ostream& os = std::cout) const
+    void print(const std::string &name, std::ostream& os = std::cout) const override
     {
         os << "Dense uniformly scattered ";
         BaseScatter::print(name, os);
@@ -681,7 +681,7 @@ struct VDBNonUniformScatter : public BaseScatter
         }
     }
 
-    void print(const std::string &name, std::ostream& os = std::cout) const
+    void print(const std::string &name, std::ostream& os = std::cout) const override
     {
         os << "Non-uniformly scattered ";
         BaseScatter::print(name, os);

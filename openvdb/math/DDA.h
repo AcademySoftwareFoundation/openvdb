@@ -16,7 +16,6 @@
 #include <openvdb/Types.h>
 #include <iostream> // for std::ostream
 #include <limits> // for std::numeric_limits<Type>::max()
-#include <boost/mpl/at.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -145,7 +144,7 @@ template<typename TreeT, int NodeLevel>
 struct LevelSetHDDA
 {
     using ChainT = typename TreeT::RootNodeType::NodeChainType;
-    using NodeT = typename boost::mpl::at<ChainT, boost::mpl::int_<NodeLevel> >::type;
+    using NodeT = typename ChainT::template Get<NodeLevel>;
 
     template <typename TesterT>
     static bool test(TesterT& tester)
@@ -190,7 +189,7 @@ class VolumeHDDA
 public:
 
     using ChainT = typename TreeT::RootNodeType::NodeChainType;
-    using NodeT = typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type;
+    using NodeT = typename ChainT::template Get<ChildNodeLevel>;
     using TimeSpanT = typename RayT::TimeSpan;
 
     VolumeHDDA() {}

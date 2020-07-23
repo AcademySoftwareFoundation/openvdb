@@ -63,6 +63,9 @@ may be provided to tell this module where to look.
   Global list of library paths intended to be searched by and find_xxx call
 ``BLOSC_USE_STATIC_LIBS``
   Only search for static blosc libraries
+``BLOSC_USE_EXTERNAL_SOURCES``
+  Set to ON if Blosc has been built using external sources for LZ4, snappy,
+  zlib and zstd. Default is OFF.
 ``DISABLE_CMAKE_SEARCH_PATHS``
   Disable CMakes default search paths for find_xxx calls in this module
 
@@ -231,6 +234,17 @@ if(Blosc_FOUND)
       INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
       INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
     )
+
+    # Blosc may optionally be compiled with external sources for
+    # lz4, snappy, zlib and zstd. Add them as interface libs if
+    # requested (there doesn't seem to be a way to figure this
+    # out automatically).
+    if(BLOSC_USE_EXTERNAL_SOURCES)
+      set_target_properties(Blosc::blosc PROPERTIES
+        INTERFACE_LINK_DIRECTORIES "${Blosc_LIBRARY_DIRS}"
+        INTERFACE_LINK_LIBRARIES "lz4;snappy;zlib;zstd"
+      )
+    endif()
   endif()
 elseif(Blosc_FIND_REQUIRED)
   message(FATAL_ERROR "Unable to find Blosc")

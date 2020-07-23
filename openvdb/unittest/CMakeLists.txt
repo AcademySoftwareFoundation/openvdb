@@ -26,6 +26,9 @@ message(STATUS "----------------------------------------------------")
 # Collect lib dependencies
 
 if(NOT OPENVDB_BUILD_CORE)
+  # @note  Could also use the openvdb_je target here, but we just opt to
+  # handle the value of CONCURRENT_MALLOC outside of this branching for
+  # both cases
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
@@ -38,20 +41,15 @@ set(OPENVDB_TEST_DEPENDENT_LIBS
   CppUnit::cppunit
 )
 
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
+
 ##########################################################################
-
-if(WIN32 AND OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-  add_definitions(-DBOOST_ALL_NO_LIB)
-endif()
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-endif()
-
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
 
 ##### VDB unit tests
 
