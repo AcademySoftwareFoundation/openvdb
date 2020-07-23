@@ -47,6 +47,9 @@ Improvements:
   to use an @vdblink::TypeList TypeList@endlink rather than a boost::mpl::vector
   and updated all usage of @vdblink::tree::NodeChain tree::NodeChain@endlink
   accordingly.
+- Threaded the construction of
+  @vdblink::tree::LeafManager tree::LeafManager@endlink and
+  @vdblink::tree::NodeManager tree::NodeManager@endlink.
 
 @par
 New features:
@@ -100,6 +103,8 @@ API changes:
 - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
   AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
   optional group offset hint.
+- LeafManager::getNodes() is now deprecated as this is no longer used in
+  NodeManager construction.
 
 @par
 Houdini:

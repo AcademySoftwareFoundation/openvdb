@@ -35,6 +35,7 @@ Version 7.1.0 - In Development
     - Changed the tree::NodeChain implementation to use an openvdb::TypeList
       rather than a boost::mpl::vector and updated all usage of tree::NodeChain
       accordingly.
+    - Threaded the construction of tree::LeafManager and tree::NodeManager.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
@@ -77,6 +78,8 @@ Version 7.1.0 - In Development
     - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
       AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
       optional group offset hint.
+    - LeafManager::getNodes() is now deprecated as this is no longer used in
+      NodeManager construction.
 
     Houdini:
     - Platonic SOP is now verbified.
