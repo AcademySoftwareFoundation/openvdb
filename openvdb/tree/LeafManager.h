@@ -192,10 +192,6 @@ public:
         , mLeafCount(0)
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
-        , mLeafs(nullptr)
-        , mAuxBuffers(nullptr)
-        , mTask(nullptr)
-        , mIsMaster(true)
     {
         this->rebuild(serial);
     }
@@ -209,10 +205,8 @@ public:
         , mLeafCount(end-begin)
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
-        , mLeafs(new LeafType*[mLeafCount])
-        , mAuxBuffers(nullptr)
-        , mTask(nullptr)
-        , mIsMaster(true)
+        , mLeafPtrs(new LeafType*[mLeafCount])
+        , mLeafs(mLeafPtrs.get())
     {
         size_t n = mLeafCount;
         LeafType **target = mLeafs, **source = begin;
@@ -231,17 +225,10 @@ public:
         , mLeafs(other.mLeafs)
         , mAuxBuffers(other.mAuxBuffers)
         , mTask(other.mTask)
-        , mIsMaster(false)
     {
     }
 
-    virtual ~LeafManager()
-    {
-        if (mIsMaster) {
-            delete [] mLeafs;
-            delete [] mAuxBuffers;
-        }
-    }
+    virtual ~LeafManager() { }
 
     /// @brief (Re)initialize by resizing (if necessary) and repopulating the leaf array
     /// and by deleting existing auxiliary buffers and allocating new ones.
@@ -649,8 +636,13 @@ private:
     {
         const size_t leafCount = mTree->leafCount();
         if (leafCount != mLeafCount) {
-            delete [] mLeafs;
-            mLeafs = (leafCount == 0) ? nullptr : new LeafType*[leafCount];
+            if (leafCount > 0) {
+                mLeafPtrs.reset(new LeafType*[leafCount]);
+                mLeafs = mLeafPtrs.get();
+            } else {
+                mLeafPtrs.reset();
+                mLeafs = nullptr;
+            }
             mLeafCount = leafCount;
         }
         MyArray a(mLeafs);
@@ -661,8 +653,13 @@ private:
     {
         const size_t auxBufferCount = mLeafCount * mAuxBuffersPerLeaf;
         if (auxBufferCount != mAuxBufferCount) {
-            delete [] mAuxBuffers;
-            mAuxBuffers = (auxBufferCount == 0) ? nullptr : new NonConstBufferType[auxBufferCount];
+            if (auxBufferCount > 0) {
+                mAuxBufferPtrs.reset(new NonConstBufferType[auxBufferCount]);
+                mAuxBuffers = mAuxBufferPtrs.get();
+            } else {
+                mAuxBufferPtrs.reset();
+                mAuxBuffers = nullptr;
+            }
             mAuxBufferCount = auxBufferCount;
         }
         this->syncAllBuffers(serial);
@@ -745,14 +742,14 @@ private:
     template<typename LeafOp>
     struct LeafReducer
     {
-        LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp), mOwnsOp(false)
+        LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp)
         {
         }
         LeafReducer(const LeafReducer &other, tbb::split)
-            : mLeafOp(new LeafOp(*(other.mLeafOp), tbb::split())), mOwnsOp(true)
+            : mLeafOpPtr(std::make_unique<LeafOp>(*(other.mLeafOp), tbb::split()))
+            , mLeafOp(mLeafOpPtr.get())
         {
         }
-        ~LeafReducer() { if (mOwnsOp) delete mLeafOp; }
         void run(const LeafRange& range, bool threaded)
         {
             threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
@@ -763,8 +760,8 @@ private:
             for (typename LeafRange::Iterator it = range.begin(); it; ++it) op(*it, it.pos());
         }
         void join(const LeafReducer& other) { mLeafOp->join(*(other.mLeafOp)); }
-        LeafOp *mLeafOp;
-        const bool mOwnsOp;
+        std::unique_ptr<LeafOp> mLeafOpPtr;
+        LeafOp *mLeafOp = nullptr;
     };// LeafReducer
 
     // Helper class to compute a prefix sum of offsets to active voxels
@@ -790,12 +787,13 @@ private:
 
     using FuncType = typename std::function<void (LeafManager*, const RangeType&)>;
 
-    TreeType*            mTree;
-    size_t               mLeafCount, mAuxBufferCount, mAuxBuffersPerLeaf;
-    LeafType**           mLeafs;//array of LeafNode pointers
-    NonConstBufferType*  mAuxBuffers;//array of auxiliary buffers
-    FuncType             mTask;
-    const bool           mIsMaster;
+    TreeType*                           mTree;
+    size_t                              mLeafCount, mAuxBufferCount, mAuxBuffersPerLeaf;
+    std::unique_ptr<LeafType*[]>        mLeafPtrs;
+    LeafType**                          mLeafs = nullptr;//array of LeafNode pointers
+    std::unique_ptr<NonConstBufferType[]> mAuxBufferPtrs;
+    NonConstBufferType*                 mAuxBuffers = nullptr;//array of auxiliary buffers
+    FuncType                            mTask = nullptr;
 };//end of LeafManager class
 
 
