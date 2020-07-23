@@ -23,6 +23,7 @@ public:
     CPPUNIT_TEST(testIsConstant);
     CPPUNIT_TEST(testMedian);
     CPPUNIT_TEST(testFill);
+    CPPUNIT_TEST(testCount);
     CPPUNIT_TEST_SUITE_END();
 
     void testBuffer();
@@ -38,6 +39,7 @@ public:
     void testIsConstant();
     void testMedian();
     void testFill();
+    void testCount();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeaf);
@@ -532,4 +534,27 @@ TestLeaf::testFill()
     auto clippedBBox = leaf.getNodeBoundingBox();
     clippedBBox.intersect(bbox);
     CPPUNIT_ASSERT_EQUAL(int(clippedBBox.volume()), int(leaf.onVoxelCount()));
+}
+
+void
+TestLeaf::testCount()
+{
+    using namespace openvdb;
+    const Coord origin(-9, -2, -8);
+    tree::LeafNode<float, 3> leaf(origin, 1.0f, false);
+
+    CPPUNIT_ASSERT_EQUAL(Index(3), leaf.log2dim());
+    CPPUNIT_ASSERT_EQUAL(Index(8), leaf.dim());
+    CPPUNIT_ASSERT_EQUAL(Index(512), leaf.size());
+    CPPUNIT_ASSERT_EQUAL(Index(512), leaf.numValues());
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.getLevel());
+    CPPUNIT_ASSERT_EQUAL(Index(1), leaf.getChildDim());
+    CPPUNIT_ASSERT_EQUAL(Index(1), leaf.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.nonLeafCount());
+    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.childCount());
+
+    std::vector<Index> dims;
+    leaf.getNodeLog2Dims(dims);
+    CPPUNIT_ASSERT_EQUAL(size_t(1), dims.size());
+    CPPUNIT_ASSERT_EQUAL(Index(3), dims[0]);
 }

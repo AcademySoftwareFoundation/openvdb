@@ -59,6 +59,10 @@ New features:
   data.
 - Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
   collisions when attempting to merge two Descriptors.
+- Added @vdblink{tree::RootNode::childCount,RootNode::childCount},
+  @vdblink{tree::InternalNode::childCount,InternalNode::childCount} and
+  @vdblink{tree::LeafNode::childCount,LeafNode::childCount} to count
+  the number of immediate child nodes that exist below the current node.
 
 @par
 Bug fixes:
