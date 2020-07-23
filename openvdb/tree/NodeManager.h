@@ -169,21 +169,21 @@ private:
         {
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
         }
-        const NodeOp mNodeOp;
+        const NodeOp& mNodeOp;
     };// NodeList::NodeTransformer
 
     // Private struct of NodeList that performs parallel_reduce
     template<typename NodeOp>
     struct NodeReducer
     {
-        NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp), mOwnsOp(false)
+        NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp)
         {
         }
-        NodeReducer(const NodeReducer& other, tbb::split) :
-            mNodeOp(new NodeOp(*(other.mNodeOp), tbb::split())), mOwnsOp(true)
+        NodeReducer(const NodeReducer& other, tbb::split)
+            : mNodeOpPtr(std::make_unique<NodeOp>(*(other.mNodeOp), tbb::split()))
+            , mNodeOp(mNodeOpPtr.get())
         {
         }
-        ~NodeReducer() { if (mOwnsOp) delete mNodeOp; }
         void run(const NodeRange& range, bool threaded = true)
         {
             threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
@@ -197,8 +197,8 @@ private:
         {
             mNodeOp->join(*(other.mNodeOp));
         }
-        NodeOp *mNodeOp;
-        const bool mOwnsOp;
+        std::unique_ptr<NodeOp> mNodeOpPtr;
+        NodeOp *mNodeOp = nullptr;
     };// NodeList::NodeReducer
 
 
