@@ -296,7 +296,9 @@ TestStreamCompression::testBlosc()
 
         for (int i = 0; i < uncompressedCount; i++)     values.push_back(i*10000);
 
-        std::random_shuffle(values.begin(), values.end());
+        std::random_device rng;
+        std::mt19937 urng(rng());
+        std::shuffle(values.begin(), values.end(), urng);
 
         std::unique_ptr<int[]> uncompressedBuffer(new int[values.size()]);
 
