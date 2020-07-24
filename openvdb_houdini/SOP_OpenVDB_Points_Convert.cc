@@ -799,6 +799,45 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
         gdp->clearAndDestroy();
 
         const GU_Detail* ptGeo = inputGeo(0, context);
+        GU_Detail nonConstDetail; // tmp storage of unpacked geo
+        const GU_Detail* detail;  // ptr to geo to convert; either ptGeo or nonConstDetail
+
+        boss.start();
+
+        // Unpack any packed primitives
+
+        std::unique_ptr<GA_PrimitiveGroup> packgroup(ptGeo->newDetachedPrimitiveGroup());
+
+        for (GA_Iterator it(ptGeo->getPrimitiveRange()); !it.atEnd(); ++it) {
+            GA_Offset offset = *it;
+            const GA_Primitive* primitive = ptGeo->getPrimitive(offset);
+            if (!primitive || !GU_PrimPacked::isPackedPrimitive(*primitive)) continue;
+
+            const GU_PrimPacked* packedPrimitive = static_cast<const GU_PrimPacked*>(primitive);
+            packedPrimitive->unpack(nonConstDetail);
+            packgroup->addOffset(offset);
+        }
+
+        if (packgroup->entries() == 0) {
+            // If no packed geometry was converted, avoid the merge by
+            // simply using the original geometry
+            detail = ptGeo;
+        }
+        else {
+            // Convert the prim group to points - we have to use mergePoints
+            // instead of mergePrims to make sure we merge points that are not
+            // associated with any primitive
+            GA_PointGroup pointsWithPackedPrims(*ptGeo);
+            pointsWithPackedPrims.GA_ElementGroup::operator|=(*packgroup);
+
+            // Merge everything except the geo associated with prims we've just unpacked
+            nonConstDetail.mergePoints(*ptGeo, GA_Range(pointsWithPackedPrims, /*invert*/true));
+            detail = &nonConstDetail;
+        }
+
+        packgroup.reset();
+
+        // Configure the transform
 
         const auto transformMode = evalInt("transform", 0, time);
 
@@ -816,7 +855,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
         if (transformMode == TRANSFORM_TARGET_POINTS) {
             const int pointsPerVoxel = static_cast<int>(evalInt("pointspervoxel", 0, time));
             const float voxelSize =
-                hvdb::computeVoxelSizeFromHoudini(*ptGeo, pointsPerVoxel,
+                hvdb::computeVoxelSizeFromHoudini(*detail, pointsPerVoxel,
                     matrix, /*rounding*/ 5, boss);
 
             matrix.preScale(Vec3d(voxelSize) / math::getScale(matrix));
@@ -827,39 +866,10 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
             transform = Transform::createLinearTransform(matrix);
         }
 
+        // Convert
+
         UT_String attrName;
         openvdb_houdini::AttributeInfoMap attributes;
-
-        GU_Detail nonConstDetail;
-        const GU_Detail* detail;
-
-        // unpack any packed primitives
-
-        boss.start();
-
-        for (GA_Iterator it(ptGeo->getPrimitiveRange()); !it.atEnd(); ++it)
-        {
-            GA_Offset offset = *it;
-
-            const GA_Primitive* primitive = ptGeo->getPrimitive(offset);
-            if (!primitive || !GU_PrimPacked::isPackedPrimitive(*primitive)) continue;
-
-            const GU_PrimPacked* packedPrimitive = static_cast<const GU_PrimPacked*>(primitive);
-
-            packedPrimitive->unpack(nonConstDetail);
-        }
-
-        if (ptGeo->getNumPoints() > 0 && nonConstDetail.getNumPoints() == 0) {
-            // only unpacked points exist so just use the input gdp
-
-            detail = ptGeo;
-        }
-        else {
-            // merge unpacked and packed point data
-
-            nonConstDetail.mergePoints(*ptGeo);
-            detail = &nonConstDetail;
-        }
 
         if (evalInt("mode", 0, time) != 0) {
             // Transfer point attributes.
