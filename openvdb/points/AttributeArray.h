@@ -1222,9 +1222,11 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 
         if (this->validData()) {
             this->allocate();
-            std::memcpy(this->newDataAsByteArray(), rhs.newDataAsByteArray(), this->arrayMemUsage());
+            std::memcpy(this->data(), rhs.data(), this->arrayMemUsage());
         }
     }
+
+    return *this;
 }
 
 

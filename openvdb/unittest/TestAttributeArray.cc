@@ -313,6 +313,27 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_THROW(typedAttr.get(100), openvdb::IndexError);
     }
 
+    { // test copy constructor and copy assignment operator
+        AttributeArrayD attr1(10);
+        AttributeArrayD attr2(5);
+
+        attr1.set(9, 4.6);
+
+        // copy constructor
+
+        AttributeArrayD attr3(attr1);
+
+        CPPUNIT_ASSERT_EQUAL(Index(10), attr3.size());
+        CPPUNIT_ASSERT_EQUAL(4.6, attr3.get(9));
+
+        // copy assignment operator
+
+        attr2 = attr1;
+
+        CPPUNIT_ASSERT_EQUAL(Index(10), attr2.size());
+        CPPUNIT_ASSERT_EQUAL(4.6, attr2.get(9));
+    }
+
 #ifdef NDEBUG
     { // test setUnsafe and getUnsafe on uniform arrays
         AttributeArrayD::Ptr attr(new AttributeArrayD(50));
