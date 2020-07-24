@@ -116,6 +116,9 @@ Houdini:
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
 - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
   it might be stuck hidden if the input hasn't cooked.
+- OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require input
+  geometry to have been cooked to offer a choice of attributes, the user may
+  now also type in a value.
 
 @par
 Build:
