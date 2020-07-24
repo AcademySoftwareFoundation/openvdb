@@ -1198,7 +1198,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
 {
     if (this->validData()) {
         this->allocate();
-        std::memcpy(this->data(), rhs.data(), this->arrayMemUsage());
+        std::memcpy(static_cast<void*>(this->data()), rhs.data(), this->arrayMemUsage());
     }
 }
 
@@ -1222,7 +1222,7 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 
         if (this->validData()) {
             this->allocate();
-            std::memcpy(this->data(), rhs.data(), this->arrayMemUsage());
+            std::memcpy(static_cast<void*>(this->data()), rhs.data(), this->arrayMemUsage());
         }
     }
 
