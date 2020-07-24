@@ -537,13 +537,8 @@ public:
         transform.run(this->leafRange(grainSize), threaded);
     }
 
-
-    /// @brief Insert pointers to nodes of the specified type into the array.
-    /// @details The type of node pointer is defined by the type
-    /// ArrayT::value_type. If the node type is a LeafNode the nodes
-    /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array)
+    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array)
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
@@ -560,12 +555,8 @@ public:
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    /// @brief Insert node pointers of the specified type into the array.
-    /// @details The type of node pointer is defined by the type
-    /// ArrayT::value_type. If the node type is a LeafNode the nodes
-    /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array) const
+    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array) const
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
