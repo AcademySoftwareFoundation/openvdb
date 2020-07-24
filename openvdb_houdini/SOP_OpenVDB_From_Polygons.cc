@@ -685,11 +685,11 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     GA_ROAttributeRef attrRef;
     int attrClass = POINT_ATTR;
     const GU_Detail* meshGdp = this->getInputLastGeo(0, time);
-    if (meshGdp) {
-        for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
-
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
+        bool isVector = true;
+        if (meshGdp) {
+            isVector = false;
             evalStringInst("attribute#", &i, attrStr, 0, time);
-            bool isVector = false;
 
             if (attrStr.length() != 0 && evalAttrType(attrStr, attrName, attrClass)) {
 
@@ -717,10 +717,10 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
                     }
                 }
             }
-
-            changed |= enableParmInst("vecType#", &i, isVector);
-            changed |= setVisibleStateInst("vecType#", &i, isVector);
         }
+
+        changed |= enableParmInst("vectype#", &i, isVector);
+        changed |= setVisibleStateInst("vectype#", &i, isVector);
     }
     return changed;
 }

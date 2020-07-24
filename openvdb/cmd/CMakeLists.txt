@@ -34,6 +34,9 @@ message(STATUS "----------------------------------------------------")
 # Collect lib dependencies shared by all binaries
 
 if(NOT OPENVDB_BUILD_CORE)
+  # @note  Could also use the openvdb_je target here, but we just opt to
+  # handle the value of CONCURRENT_MALLOC outside of this branching for
+  # both cases
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
@@ -42,6 +45,14 @@ endif()
 set(OPENVDB_BINARIES_DEPENDENT_LIBS
   ${OPENVDB_LIB}
 )
+
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
 
 ##########################################################################
 

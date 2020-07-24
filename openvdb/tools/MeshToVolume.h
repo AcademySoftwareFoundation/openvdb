@@ -35,10 +35,6 @@
 #include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
 
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/int.hpp>
-#include <boost/mpl/size.hpp>
-
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()
 #include <deque>
@@ -1817,7 +1813,7 @@ releaseLeafNodes(TreeType& tree)
 {
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     std::vector<InternalNodeType*> nodes;
     tree.getNodes(nodes);
@@ -3801,8 +3797,8 @@ MeshToVoxelEdgeData::GenEdgeData::join(GenEdgeData& rhs)
 {
     using RootNodeType = TreeType::RootNodeType;
     using NodeChainType = RootNodeType::NodeChainType;
-    static_assert(boost::mpl::size<NodeChainType>::value > 1, "expected tree height > 1");
-    using InternalNodeType = boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
+    static_assert(NodeChainType::Size > 1, "expected tree height > 1");
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     Coord ijk;
     Index offset;
