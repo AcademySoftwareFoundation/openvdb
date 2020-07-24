@@ -36,8 +36,8 @@ public:
         OP_ERROR cookVDBSop(OP_Context&) override;
     private:
         template<typename GridT>
-        bool process(hvdb::GridCPtr maskGrid, 
-            hvdb::GU_PrimVDB* lsPrim, 
+        bool process(hvdb::GridCPtr maskGrid,
+            hvdb::GU_PrimVDB* lsPrim,
             fpreal time);
     }; // class Cache
 
@@ -66,23 +66,52 @@ newSopOperator(OP_OperatorTable* table)
     // Modes
     parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Operation")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
-            "dilate",   "Dilate SDF",
-            "mask",     "Extrapolate SDF Into Mask",
-            "convert",  "Convert Scalar VDB Into SDF" ///< @todo move to Convert SOP
+            "dilate",    "Dilate SDF",
+            "mask",      "Extrapolate SDF Into Mask",
+            "convert",   "Convert Scalar VDB Into SDF", ///< @todo move to Convert SOP
+            "correct",   "Correct Approximate SDF", // by solving the Eikonal equation
+            "fogext",    "Extend Scalar VDB",
+            "sdfext",    "Extend SDF",
+            "fogsdfext", "Convert Scalar VDB Into SDF and Compute Extension",
+            "sdfsdfext", "Correct Approximate SDF and Compute Extension"
         })
         .setDefault("dilate")
         .setDocumentation(
             "The operation to perform\n\n"
             "Dilate SDF:\n"
-            "    Extrapolate a narrow-band signed distance field.\n"
+            "    Dilates an existing signed distance filed by a specified \n"
+            "    number of voxels.\n"
             "Extrapolate SDF Into Mask:\n"
-            "    Extrapolate a signed distance field into the active voxels of a mask.\n"
+            "    Expand/extrapolate an existing signed distance fild into\n"
+            "    a mask.\n"
             "Convert Scalar VDB Into SDF:\n"
-            "    Compute a signed distance field for an isosurface\n"
-            "    of a given scalar field. Active input voxels with\n"
-            "    scalar values above the given isoValue will have\n"
-            "    NEGATIVE distance values on output, i.e.\n"
-            "    they are assumed to be INSIDE the uso-surface."));
+            "    Converts a scalar fog volume into a signed distance\n"
+            "    function. Active input voxels with scalar values above\n"
+            "    the given isoValue will have NEGATIVE distance\n"
+            "    values on output, i.e. they are assumed to be INSIDE\n"
+            "    the iso-surface.\n"
+            "Correct Approximate SDF:\n"
+            "    Given an existing approximate SDF it solves the Eikonal\n"
+            "    equation for all its active voxels. Active input voxels\n"
+            "    with a signed distance value above the given isoValue\n"
+            "    will have POSITIVE distance values on output, i.e. they are\n"
+            "    assumed to be OUTSIDE the iso-surface.\n"
+            "Extend Scalar VDB:\n"
+            "     Computes the extension of a scalar field, defined by the\n"
+            "     specified functor, off an iso-surface from an input\n"
+            "     FOG volume.\n"
+            "Extend SDF:\n"
+            "    Computes the extension of a scalar field, defined by the\n"
+            "    specified functor, off an iso-surface from an input\n"
+            "    SDF volume.\n"
+            "Convert Scalar VDB Into SDF and Compute Extension:\n"
+            "    Computes the signed distance field and the extension of a\n"
+            "    scalar field, defined by the specified functor, off an\n"
+            "    iso-surface from an input FOG volume.\n"
+            "Correct Approximate SDF and Compute Extension:\n"
+            "    Computes the signed distance field and the extension of a\n"
+            "    scalar field, defined by the specified functor, off an\n"
+            "    iso-surface from an input SDF volume."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -91,7 +120,7 @@ newSopOperator(OP_OperatorTable* table)
             "A VDB volume whose active voxels are to be used as a mask"
             " (see [specifying volumes|/model/volumes#group])"));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "tiles", "Ignore Active Tiles")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "ignoretiles", "Ignore Active Tiles")
         .setDefault(PRMzeroDefaults)
         .setTooltip("Ignore active tiles in scalar field and mask VDBs.")
         .setDocumentation(
@@ -107,7 +136,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("The number of voxels by which to dilate the level set narrow band"));
 
     // Dilation Pattern
-    parms.add(hutil::ParmFactory(PRM_STRING, "nn", "Dilation Pattern")
+    parms.add(hutil::ParmFactory(PRM_STRING, "pattern", "Dilation Pattern")
          .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "NN6",  "Faces",
             "NN18", "Faces and Edges",
@@ -169,9 +198,9 @@ SOP_OpenVDB_Extrapolate::updateParmsFlags()
     evalString(str, "mode", 0, 0);
     changed |= enableParm("mask", str == "mask");
     changed |= enableParm("dilate", str == "dilate");
-    changed |= enableParm("nn", str == "dilate");
+    changed |= enableParm("pattern", str == "dilate");
     changed |= enableParm("isovalue", str == "convert");
-    changed |= enableParm("tiles", str != "dilate");
+    changed |= enableParm("ignoretiles", str != "dilate");
     return changed;
 }
 
@@ -230,29 +259,44 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     hvdb::GU_PrimVDB* lsPrim,
     fpreal time)
 {
-    typename GridT::Ptr outGrid; 
     typename GridT::ConstPtr inGrid = openvdb::gridConstPtrCast<GridT>(lsPrim->getConstGridPtr());
+    typename GridT::Ptr outGrid;
 
     UT_String mode;
     evalString(mode, "mode", 0, time);
     const int nSweeps = static_cast<int>(evalInt("sweeps", 0, time));
+    const float isoValue = evalFloat("isovalue", 0, time);
 
     using namespace openvdb::tools;
     if (mode == "mask") {
-        FastSweepMaskOp<GridT> op(inGrid, evalInt("tiles", 0, time), nSweeps);
+        FastSweepMaskOp<GridT> op(inGrid, evalInt("ignoretiles", 0, time), nSweeps);
         UTvdbProcessTypedGridTopology(UTvdbGetGridType(*maskGrid), *maskGrid, op);
         outGrid = op.outGrid;
     } else if (mode == "dilate") {
         UT_String str;
-        evalString(str, "nn", 0, time);
+        evalString(str, "pattern", 0, time);
         const NearestNeighbors nn =
             (str == "NN18") ? NN_FACE_EDGE : ((str == "NN26") ? NN_FACE_EDGE_VERTEX : NN_FACE);
         outGrid = dilateSdf(*inGrid, static_cast<int>(evalInt("dilate", 0, time)), nn, nSweeps);
     } else if (mode == "convert") {
-        // TODO: Confirm that convert is meant to be used for fogToSdf. Previously, the API call
-        // is maskSDF(*outGrid, evalFloat("isovalue", 0, time), evalInt("tiles", 0, time), nSweeps);
-        outGrid = fogToSdf(*inGrid, evalFloat("isovalue", 0, time), nSweeps);
+        outGrid = fogToSdf(*inGrid, isoValue, nSweeps);
         lsPrim->setVisualization(GEO_VOLUMEVIS_ISO, lsPrim->getVisIso(), lsPrim->getVisDensity());
+    } else if (mode == "correct") {
+        outGrid = sdfToSdf(*inGrid, isoValue, nSweeps);
+    } else if (mode == "fogext") {
+        // TODO: op
+        // outGrid = fogToExt(*inGrid, op, isoValue, nSweeps);
+    } else if (mode == "sdfext") {
+        // TODO: op
+        // outGrid = sdfToExt(*inGrid, op,i isoValue, nSweeps);
+    } else if (mode == "fogsdfext") {
+        // TODO: op
+        // std::array<typename GridT::Ptr, 2>
+        // fogToSdfAndExt(*inGrid, op, isoValue, nSweeps);
+    } else if (mode == "sdfsdfext") {
+        // TODO: op
+        // std::array<typename GridT::Ptr, 2>
+        // sdfToSdfAndExt(*inGrid, op, isoValue, nSweeps);
     }
 
     // Replace the original VDB primitive with a new primitive that contains
