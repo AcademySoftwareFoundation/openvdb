@@ -543,7 +543,7 @@ public:
     /// ArrayT::value_type. If the node type is a LeafNode the nodes
     /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array)
+    OPENVDB_DEPRECATED void getNodes(ArrayT& array)
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
@@ -565,7 +565,7 @@ public:
     /// ArrayT::value_type. If the node type is a LeafNode the nodes
     /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array) const
+    OPENVDB_DEPRECATED void getNodes(ArrayT& array) const
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
