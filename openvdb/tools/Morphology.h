@@ -539,12 +539,12 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
                 if (auto original = tree.probeConstLeaf(leaf.origin())) {
                     nodemask ^= original->getValueMask();
                 }
-                else if (nodemask.isOn()) {
+                else {
                     // should never have a dense leaf if it didn't exist in the
-                    // original tree, however it is possible if dilateVoxels()
-                    // calls topologyUnion. Active tiles may be voxelised if
-                    // they are dilated into. Turn them off
-                    nodemask.setOff();
+                    // original tree (it was previous possible when dilateVoxels()
+                    // called topologyUnion without the preservation of active
+                    // tiles)
+                    assert(!nodemask.isOn());
                 }
             }
         });
@@ -751,10 +751,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
             if (prune) tools::prune(subtree, zeroVal<typename MaskTreeT::ValueType>(), threaded);
             // copy final topology onto dest. If mask exists, then this
             // has already been handled by the above subtree merges
-            // @warning This will expand any overlapping active tiles in the
-            // source tree if there exists corresponding child topology in
-            // the subtree
-            if (!mask) mManager.tree().topologyUnion(subtree);
+            if (!mask) mManager.tree().topologyUnion(subtree, /*preserve-active-tiles*/true);
         }
     }
 
@@ -1090,7 +1087,7 @@ inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
             dilateActiveLeafValues(topology, iterations, nn, threaded);
         }
 
-        tree.topologyUnion(topology);
+        tree.topologyUnion(topology, /*preserve-active-tiles*/true);
         AdapterT::sync(treeOrLeafM);
     }
     else if (mode == EXPAND_TILES) {
