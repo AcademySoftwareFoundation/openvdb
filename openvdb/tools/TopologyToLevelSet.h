@@ -13,7 +13,7 @@
 #define OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
 
 #include "LevelSetFilter.h"
-#include "Morphology.h" // for erodeVoxels and dilateActiveValues
+#include "Morphology.h" // for erodeActiveLeafValues and dilateActiveValues
 #include "SignedFloodFill.h"
 
 #include <openvdb/Grid.h>
@@ -90,7 +90,10 @@ template<typename TreeT>
 struct ErodeOp
 {
     ErodeOp(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const { erodeVoxels( *tree, size); }
+    void operator()() const {
+        erodeActiveLeafValues( *tree, size);
+        pruneInactive(*tree);
+    }
     TreeT* tree;
     const int size;
 };
@@ -207,7 +210,8 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 
     // Morphological closing operation.
     dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES );
-    erodeVoxels( maskTree, closingSteps );
+    erodeActiveLeafValues( maskTree, closingSteps );
+    pruneInactive(maskTree);
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.

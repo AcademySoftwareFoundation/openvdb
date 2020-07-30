@@ -795,7 +795,7 @@ struct MultiResGrid<TreeType>::FractionOp
     void operator()(const tbb::blocked_range<PoolIterT>& range) const
     {
         for (PoolIterT it=range.begin(); it!=range.end(); ++it) {
-            tools::dilateVoxels( *it, 1, NN_FACE_EDGE_VERTEX);
+            tools::dilateActiveLeafValues( *it, 1, NN_FACE_EDGE_VERTEX);
         }
     }
     void operator()(const Range2 &r) const

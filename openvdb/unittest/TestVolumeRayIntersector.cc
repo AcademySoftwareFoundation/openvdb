@@ -244,7 +244,7 @@ TestVolumeRayIntersector::testAll()
 
         FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
-        tools::dilateVoxels(grid->tree());
+        tools::dilateActiveLeafValues(grid->tree());
         tools::VolumeRayIntersector<FloatGrid> inter(*grid);
 
         //std::cerr << "BBox = " << inter.bbox() << std::endl;
@@ -262,7 +262,7 @@ TestVolumeRayIntersector::testAll()
 
         FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
-        tools::dilateVoxels(grid->tree());
+        tools::dilateActiveLeafValues(grid->tree());
         tools::VolumeRayIntersector<FloatGrid> inter(*grid);
 
         //GridPtrVec grids;

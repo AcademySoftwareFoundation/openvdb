@@ -19,7 +19,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include "Interpolation.h"// for Sampler
 #include "VelocityFields.h" // for VelocityIntegrator
-#include "Morphology.h"//for dilateActiveValues and dilateVoxels
+#include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for prune
 #include "Statistics.h" // for extrema
 #include <functional>
