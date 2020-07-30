@@ -83,19 +83,17 @@ enum TilePolicy { IGNORE_TILES, EXPAND_TILES, PRESERVE_TILES };
 /// @brief Topologically dilate all active values (i.e. both voxels
 ///   and tiles) in a tree using one of three nearest neighbor
 ///   connectivity patterns.
-/// @details If the input is not a MaskTree and threaded is true OR if
-///   tiles are being preserve, this algorithm copies the input tree
-///   topology onto a MaskTree, performs the dilation on the mask and
-///   copies the resulting topology back. This algorithm guarantees
-///   topology preservation (non-pruned leaf nodes will persists) EXCEPT
-///   for direct MaskTree dilation. MaskTree dilation is optimised for
-///   performance and may replace existing leaf nodes i.e. any held leaf
-///   node pointers may become invalid. See the Morphology class for more
-///   granular control.
+/// @details If the input is not a MaskTree OR if tiles are being
+///   preserved, this algorithm will copy the input tree topology onto a
+///   MaskTree, performs the dilation on the mask and copies the resulting
+///   topology back. This algorithm guarantees topology preservation
+///   (non-pruned leaf nodes will persists) EXCEPT for direct MaskTree
+///   dilation. MaskTree dilation is optimised for performance and may
+///   replace existing leaf nodes i.e. any held leaf node pointers may
+///   become invalid. See the Morphology class for more granular control.
 /// @note This method is fully multi-threaded and support active tiles,
 ///   however only the PRESERVE_TILES policy ensures a pruned topology.
-///   Consider calling a variant of tools::prune to collapse dense nodes.
-/// @note The values of any voxels are unchanged.
+///   The values of any voxels are unchanged.
 ///
 /// @param tree          tree or leaf manager to be dilated. The leaf
 ///                      manager will be synchronized with the result.
@@ -117,18 +115,16 @@ inline void dilateActiveValues(TreeOrLeafManagerT& tree,
 /// @brief Topologically erode all active values (i.e. both voxels
 ///   and tiles) in a tree using one of three nearest neighbor
 ///   connectivity patterns.
-/// @details If tiles are being preserve, this algorithm copies the input
+/// @details If tiles are being preserve, this algorithm will copy the input
 ///   tree topology onto a MaskTree, performs the erosion on the mask and
 ///   intersects the resulting topology back. This algorithm guarantees
 ///   topology preservation (non-pruned leaf nodes will persists). See the
 ///   Morphology class for more granular control.
 /// @note This method is fully multi-threaded and support active tiles,
 ///   however only the PRESERVE_TILES policy ensures a pruned topology.
-///   Consider calling a variant of tools::prune to collapse empty nodes.
-/// @note The values of any voxels are unchanged.
-/// @note Erosion by NN_FACE neighbours is usually faster than other
-///   neighbour schemes. NN_FACE_EDGE and NN_FACE_EDGE_VERTEX operate at
-///   comparable dilation speeds.
+///   The values of any voxels are unchanged. Erosion by NN_FACE neighbours
+///   is usually faster than other neighbour schemes. NN_FACE_EDGE and
+///   NN_FACE_EDGE_VERTEX operate at comparable dilation speeds.
 ///
 /// @param tree          tree or leaf manager to be eroded. The leaf
 ///                      manager will be synchronized with the result.
@@ -150,10 +146,9 @@ inline void erodeActiveValues(TreeOrLeafManagerT& tree,
 /// @brief Topologically dilate all leaf-level active voxels in a tree
 ///   using one of three nearest neighbor connectivity patterns.
 /// @warning This method ignores active tiles
-/// @note The values of any voxels are unchanged.
-/// @note This method does not prune the resulting topology. It is
-///   recommended you call a variant of tools::prune afterwards to
-///   collapse dense nodes.
+/// @note The values of any voxels are unchanged. This method does not
+///   prune the resulting topology. It is recommended you call a variant
+///   of tools::prune afterwards to collapse dense nodes.
 ///
 /// @param tree          tree to be dilated
 /// @param iterations    number of iterations to apply the dilation
@@ -171,10 +166,9 @@ inline void dilateActiveLeafValues(TreeOrLeafManagerT& tree,
 /// @brief Topologically erode all leaf-level active voxels in a tree
 ///   using one of three nearest neighbor connectivity patterns.
 /// @warning This method ignores active tiles
-/// @note The values of any voxels are unchanged.
-/// @note This method does not prune the resulting topology. It is
-///   recommended you call a variant of tools::prune afterwards to
-///   remove or collapse empty nodes.
+/// @note The values of any voxels are unchanged. This method does not
+///   prune the resulting topology. It is recommended you call a variant
+///   of tools::prune afterwards to collapse dense nodes.
 ///
 /// @param tree          tree to be eroded
 /// @param iterations    number of iterations to apply the erosion
@@ -1057,51 +1051,64 @@ inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
 
     if (iterations <= 0) return;
 
+    // If IGNORE_TILES, always call through to dilateActiveLeafValues
+    if (mode == IGNORE_TILES) {
+        dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
+        return;
+    }
+
+    // The following branching optimises from the different tree types
+    // and TilePolicy combinations
+
     auto& tree = AdapterT::get(treeOrLeafM);
 
-    // If the tree TreeType being dilated is not a MaskTree, always copy
-    // the topology over onto a MaskTree, perform the required dilation
-    // and copy the final topology back. The multi-threaded implementation
-    // splits the tree into subtrees across threads which may allocate
-    // multiple overlapping leaf buffers of the source ValueType. This
-    // technique avoid this unnecessary allocation and correctly preserves
-    // the tree topology.
-    //
-    // Note that we also always use a mask if the tile policy is PRESERVE_TILES
-    // due to the way the underlying dilation only works on voxels.
-    // @todo Investigate tile based dilation
-    const bool useMaskDilation = (mode == PRESERVE_TILES) ||
-        (!std::is_same<TreeT, MaskT>::value && threaded);
+    // If the input is a mask tree, don't copy the topology - voxelize
+    // it directly and let the morphology class directly steal/prune
+    // its nodes
+    constexpr bool isMask = std::is_same<TreeT, MaskT>::value;
 
-    if (useMaskDilation) {
-        MaskT topology;
-        topology.topologyUnion(tree);
-        if (mode != IGNORE_TILES) topology.voxelizeActiveTiles();
-
+    if (isMask || mode == EXPAND_TILES) {
+        tree.voxelizeActiveTiles();
+        AdapterT::sync(treeOrLeafM);
         if (mode == PRESERVE_TILES) {
-            morphology::Morphology<MaskT> morph(topology);
+            morphology::Morphology<TreeT> morph(treeOrLeafM);
             morph.setThreaded(threaded);
             morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/true);
         }
         else {
-            dilateActiveLeafValues(topology, iterations, nn, threaded);
+            assert(mode == EXPAND_TILES);
+            dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
         }
+        return;
+    }
 
-        tree.topologyUnion(topology, /*preserve-active-tiles*/true);
-        AdapterT::sync(treeOrLeafM);
-    }
-    else if (mode == EXPAND_TILES) {
-        // if expanding, voxelize everything first
-        tree.voxelizeActiveTiles();
-        AdapterT::sync(treeOrLeafM);
-        dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
-    }
-    else {
-        assert(mode == IGNORE_TILES);
-        // ignoring tiles. They might be dilated into but they
-        // will not contribute dilation to the final topology
-        dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
-    }
+    // If the tree TreeType being dilated is not a MaskTree, always copy
+    // the topology over onto a MaskTree, perform the required dilation
+    // and copy the final topology back. This technique avoids unnecessary
+    // allocation with tile expansion and correctly preserves the tree
+    // topology.
+    //
+    // Note that we also always use a mask if the tile policy is PRESERVE_TILES
+    // due to the way the underlying dilation only works on voxels.
+    // @todo Investigate tile based dilation
+    assert(mode == PRESERVE_TILES);
+
+    MaskT topology;
+    topology.topologyUnion(tree);
+    topology.voxelizeActiveTiles();
+
+    morphology::Morphology<MaskT> morph(topology);
+    morph.setThreaded(threaded);
+    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/true);
+
+    tree.topologyUnion(topology, /*preserve-tiles*/true);
+    topology.clear();
+
+    // @note  this is necessary to match the behaviour of mask tree dilation
+    //        where  source partial leaf nodes that become dense are also
+    //        converted into tiles, not simply newly created dense nodes
+    tools::prune(tree, zeroVal<typename TreeT::ValueType>(), threaded);
+    AdapterT::sync(treeOrLeafM);
 }
 
 
@@ -1127,6 +1134,8 @@ inline void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
         topology.topologyUnion(tree);
         topology.voxelizeActiveTiles();
         erodeActiveLeafValues(topology, iterations, nn, threaded);
+        // prune to ensure topologyIntersection does not expand tiles
+        // which have not been changed
         tools::prune(topology, zeroVal<typename MaskT::ValueType>(), threaded);
         tree.topologyIntersection(topology);
         AdapterT::sync(treeOrLeafM);
@@ -1159,6 +1168,7 @@ inline void dilateActiveLeafValues(TreeOrLeafManagerT& treeOrLeafM,
     if (iterations <= 0) return;
     morphology::Morphology<TreeType> morph(treeOrLeafM);
     morph.setThreaded(threaded);
+    // This will also sync the leaf manager
     morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
 }
 

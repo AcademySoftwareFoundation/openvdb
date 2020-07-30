@@ -94,6 +94,7 @@ set(UNITTEST_SOURCE_FILES
   TestMetadata.cc
   TestMetadataIO.cc
   TestMetaMap.cc
+  TestMorphology.cc
   TestMultiResGrid.cc
   TestName.cc
   TestNodeIterator.cc
