@@ -844,7 +844,7 @@ SOP_OpenVDB_To_Polygons::Cache::referenceMeshing(
 
         openvdb::tools::pruneInactive(*maskTree);
 
-        openvdb::tools::dilateVoxels(*maskTree, 2);
+        openvdb::tools::dilateActiveLeafValues(*maskTree, 2);
 
         mesher.setAdaptivityMask(maskTree);
     }
