@@ -480,8 +480,8 @@ TestMorphology<TreeT, NN>::testMorphActiveValues()
             // Check actual values around center node faces
             CPPUNIT_ASSERT(tree.probeConstLeaf(Coord(0)));
             CPPUNIT_ASSERT(tree.probeConstLeaf(Coord(0))->isDense());
-            for (int i = 0; i < leafDim; ++i) {
-                for (int j = 0; j < leafDim; ++j) {
+            for (int i = 0; i < int(leafDim); ++i) {
+                for (int j = 0; j < int(leafDim); ++j) {
                     CheckActiveNeighbours(tree, {i,j,0}, 0);
                     CheckActiveNeighbours(tree, {i,0,j}, 0);
                     CheckActiveNeighbours(tree, {0,i,j}, 0);
@@ -531,8 +531,8 @@ TestMorphology<TreeT, NN>::testMorphActiveValues()
             // Check actual values around center node faces
             CPPUNIT_ASSERT(!tree.probeConstLeaf(Coord(0)));
             CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
-            for (int i = 0; i < leafDim; ++i) {
-                for (int j = 0; j < leafDim; ++j) {
+            for (int i = 0; i < int(leafDim); ++i) {
+                for (int j = 0; j < int(leafDim); ++j) {
                     CheckActiveNeighbours(tree, {i,j,0}, 0);
                     CheckActiveNeighbours(tree, {i,0,j}, 0);
                     CheckActiveNeighbours(tree, {0,i,j}, 0);
@@ -587,8 +587,8 @@ TestMorphology<TreeT, NN>::testMorphActiveValues()
             CPPUNIT_ASSERT_EQUAL(Index32(offsets), tree.leafCount());
             CPPUNIT_ASSERT(!tree.probeConstLeaf(Coord(0)));
             CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
-            for (int i = 0; i < leafDim; ++i) {
-                for (int j = 0; j < leafDim; ++j) {
+            for (int i = 0; i < int(leafDim); ++i) {
+                for (int j = 0; j < int(leafDim); ++j) {
                     CheckActiveNeighbours(tree, {i,j,0}, 0);
                     CheckActiveNeighbours(tree, {i,0,j}, 0);
                     CheckActiveNeighbours(tree, {0,i,j}, 0);
