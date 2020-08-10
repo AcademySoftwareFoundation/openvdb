@@ -469,6 +469,7 @@ struct FloatThrowOnCopy
     explicit FloatThrowOnCopy(float _value): value(_value) { }
 
     FloatThrowOnCopy(const FloatThrowOnCopy&) { throw openvdb::RuntimeError("No Copy"); }
+    FloatThrowOnCopy& operator=(const FloatThrowOnCopy&) = default;
 
     T operator+(const float rhs) const { return T(value + rhs); }
     T operator-() const { return T(-value); }
@@ -3002,11 +3003,13 @@ TestTree::testRootNode()
     { // test inserting child nodes directly and indirectly
         RootNodeType root(0.0f);
         CPPUNIT_ASSERT(root.empty());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), root.childCount());
 
         // populate the tree by inserting the two leaf nodes containing c0 and c1
         root.touchLeaf(c0);
         root.touchLeaf(c1);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), root.getTableSize());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), root.childCount());
         CPPUNIT_ASSERT(!root.hasActiveTiles());
 
         { // verify c0 and c1 are the root node coordinates
@@ -3029,6 +3032,7 @@ TestTree::testRootNode()
             root.addChild(child);
         }
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), root.getTableSize());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), root.childCount());
 
         { // verify the coordinates of the root node children
             auto rootIter = root.cbeginChildOn();
@@ -3049,6 +3053,7 @@ TestTree::testRootNode()
         root.addTile(c0, /*value=*/1.0f, /*state=*/true);
         root.addTile(c1, /*value=*/2.0f, /*state=*/true);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), root.getTableSize());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), root.childCount());
         CPPUNIT_ASSERT(root.hasActiveTiles());
         ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, root.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(2.0f, root.getValue(c1));
@@ -3062,6 +3067,7 @@ TestTree::testRootNode()
 
         // verify active tiles have been replaced by child nodes
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), root.getTableSize());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), root.childCount());
         CPPUNIT_ASSERT(!root.hasActiveTiles());
 
         { // verify the coordinates of the root node children
@@ -3092,6 +3098,7 @@ TestTree::testInternalNode()
         internalNode.touchLeaf(c3);
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), internalNode.childCount());
         CPPUNIT_ASSERT(!internalNode.hasActiveTiles());
 
         { // verify c0 and c1 are the root node coordinates
@@ -3108,12 +3115,14 @@ TestTree::testInternalNode()
         std::vector<ChildType*> children;
         internalNode.stealNodes(children, 0.0f, false);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), internalNode.childCount());
 
         // insert the root node children directly
         for (ChildType* child : children) {
             internalNode.addChild(child);
         }
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(2), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(2), internalNode.childCount());
 
         { // verify the coordinates of the root node children
             auto childIter = internalNode.cbeginChildOn();
@@ -3127,16 +3136,19 @@ TestTree::testInternalNode()
         InternalNodeType internalNode(c1, 0.0f);
         CPPUNIT_ASSERT(!internalNode.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), internalNode.childCount());
 
         // add a tile
         internalNode.addTile(openvdb::Index(0), /*value=*/1.0f, /*state=*/true);
         CPPUNIT_ASSERT(internalNode.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), internalNode.childCount());
 
         // replace the tile with a child node
         CPPUNIT_ASSERT(internalNode.addChild(new ChildType(c1, 2.0f)));
         CPPUNIT_ASSERT(!internalNode.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), internalNode.leafCount());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), internalNode.childCount());
         CPPUNIT_ASSERT_EQUAL(c1, internalNode.cbeginChildOn().getCoord());
         ASSERT_DOUBLES_EXACTLY_EQUAL(2.0f, internalNode.cbeginChildOn()->getValue(0));
 

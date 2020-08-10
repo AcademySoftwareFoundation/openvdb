@@ -26,6 +26,15 @@ Version 7.1.0 - In Development
       an unknown exception.
     - Removed Boost::thread as a dependency of vdb_view in favour of
       std::thread.
+    - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+      the latter in favour of new openvdb math constants for pi
+    - Removed usage of boost/mpl/*.hpp methods in favour of new template
+      meta-programming methods on the openvdb::TypeList struct. This now
+      supports get, front, back, contains, index, unique, popback, popfront
+      and range removal of types.
+    - Changed the tree::NodeChain implementation to use an openvdb::TypeList
+      rather than a boost::mpl::vector and updated all usage of tree::NodeChain
+      accordingly.
 
     New features:
     - Added Grid::isTreeUnique() to tell if the tree is shared with another
@@ -35,6 +44,9 @@ Version 7.1.0 - In Development
       data.
     - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
       group index collisions when attempting to merge two Descriptors.
+    - Added RootNode::childCount(), InternalNode::childCount() and
+      LeafNode::childCount() to count the number of immediate child nodes that
+      exist below the current node.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -77,6 +89,11 @@ Version 7.1.0 - In Development
       point of the VDB when computing bounding box. SOPs affected include Clip,
       Fill, Points Group, Rasterize Points, Read, Remove Divergence.
       [Contributed by Kuba Roth]
+    - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+      it might be stuck hidden if the input hasn't cooked.
+    - OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require
+      input geometry to have been cooked to offer a choice of attributes,
+      the user may now also type in a value.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
@@ -126,9 +143,14 @@ Version 7.1.0 - In Development
       Boost::disable_autolinking target.
     - Added support for importing pyopenvdb and openvdb_houdini through the
       FindOpenVDB CMake module
-    - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
-      macros.
-
+    - Removed the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE macros.
+    - Fixed a few GCC compiler warnings by adding override keywords.
+      [Contributed by Edward Lam]
+    - jemalloc/tbbmalloc are no longer linked into library artifacts of the
+      OpenVDB CMake build. The CONCURRENT_MALLOC CMake option now only applies
+      to the executables.
+    - Introduced a new OpenVDB::openvdb_je interface target through the
+      FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
 
 Version 7.0.0 - December 6, 2019
 

@@ -37,6 +37,16 @@ Improvements:
 - vdb_view, vdb_print and vdb_render now use std::terminate() when catching an
   unknown exception.
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
+- Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+  the latter in favour of new openvdb math constants for pi
+- Removed usage of boost/mpl/*.hpp methods in favour of new template
+  meta-programming methods on the @vdblink::TypeList TypeList@endlink struct.
+  This now supports get, front, back, contains, index, unique, popback, popfront
+  and range removal of types.
+- Changed the @vdblink::tree::NodeChain tree::NodeChain@endlink implementation
+  to use an @vdblink::TypeList TypeList@endlink rather than a boost::mpl::vector
+  and updated all usage of @vdblink::tree::NodeChain tree::NodeChain@endlink
+  accordingly.
 
 @par
 New features:
@@ -49,6 +59,10 @@ New features:
   data.
 - Added AttributeSet::Descriptor::groupIndexCollision for detecting group index
   collisions when attempting to merge two Descriptors.
+- Added @vdblink{tree::RootNode::childCount,RootNode::childCount},
+  @vdblink{tree::InternalNode::childCount,InternalNode::childCount} and
+  @vdblink{tree::LeafNode::childCount,LeafNode::childCount} to count
+  the number of immediate child nodes that exist below the current node.
 
 @par
 Bug fixes:
@@ -100,6 +114,11 @@ Houdini:
   point of the VDB when computing bounding box. SOPs affected include Clip,
   Fill, Points Group, Rasterize Points, Read, Remove Divergence.
   <I>[Contributed&nbsp;by&nbsp;Kuba&nbsp;Roth]</I>
+- OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+  it might be stuck hidden if the input hasn't cooked.
+- OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require input
+  geometry to have been cooked to offer a choice of attributes, the user may
+  now also type in a value.
 
 @par
 Build:
@@ -153,6 +172,13 @@ Build:
   FindOpenVDB CMake module
 - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
   macros.
+- Fixed a few GCC compiler warnings by adding override keywords.
+  <I>[Contributed by Edward&nbsp;Lam]</I>
+- jemalloc/tbbmalloc are no longer linked into library artifacts of the
+  OpenVDB CMake build. The @c CONCURRENT_MALLOC CMake option now only applies
+  to the executables.
+- Introduced a new @c OpenVDB::openvdb_je interface target through the
+  FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly

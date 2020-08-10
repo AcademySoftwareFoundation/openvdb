@@ -25,6 +25,8 @@ IMPORTED Targets
 
 ``OpenVDB::openvdb``
   The core openvdb library target.
+``OpenVDB::openvdb_je``
+  The core openvdb library target with jemalloc.
 ``OpenVDB::pyopenvdb``
   The openvdb python library target.
 ``OpenVDB::openvdb_houdini``
@@ -123,6 +125,7 @@ endif()
 
 set(_OPENVDB_COMPONENT_LIST
   openvdb
+  openvdb_je
   pyopenvdb
   openvdb_ax
   openvdb_houdini
@@ -151,10 +154,10 @@ endif()
 
 # always make sure openvdb is picked up as a component i.e.
 # find_package(OpenVDB COMPONENTS pyopenvdb) results in both
-# openvdb and pyopenvdb targets
-if(NOT openvdb IN_LIST OpenVDB_FIND_COMPONENTS)
-  list(APPEND OpenVDB_FIND_COMPONENTS openvdb)
-endif()
+# openvdb and pyopenvdb targets. Also make sure it appears
+# first in the component lists.
+list(INSERT OpenVDB_FIND_COMPONENTS 0 openvdb)
+list(REMOVE_DUPLICATES OpenVDB_FIND_COMPONENTS)
 
 # Set _OPENVDB_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
 # are prioritised over the legacy capitalized XXX_ROOT variables for matching
@@ -357,16 +360,19 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES ${OPENVDB_PYTHON_PATH_SUFFIXES}
     )
     set(CMAKE_FIND_LIBRARY_PREFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_PREFIXES})
-  else()
+  elseif(${COMPONENT} STREQUAL "openvdb" OR
+         ${COMPONENT} STREQUAL "openvdb_houdini")
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
       PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
       PATH_SUFFIXES ${OPENVDB_LIB_PATH_SUFFIXES}
     )
+  elseif(${COMPONENT} STREQUAL "openvdb_je")
+    # alias to the result of openvdb which should be handled first
+    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
   endif()
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
-
   if(OpenVDB_${COMPONENT}_LIBRARY)
     set(OpenVDB_${COMPONENT}_FOUND TRUE)
   else()
@@ -646,6 +652,10 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
 endif()
 
+if(openvdb_je IN_LIST OpenVDB_FIND_COMPONENTS)
+  find_package(Jemalloc REQUIRED)
+endif()
+
 # ------------------------------------------------------------------------
 #  Configure imported targets
 # ------------------------------------------------------------------------
@@ -687,6 +697,16 @@ if(NOT TARGET OpenVDB::openvdb)
     INTERFACE_LINK_LIBRARIES "${_OPENVDB_VISIBLE_DEPENDENCIES}" # visible deps (headers)
     INTERFACE_COMPILE_FEATURES cxx_std_14
   )
+endif()
+
+# OpenVDB::openvdb_je
+
+if(OpenVDB_openvdb_je_LIBRARY)
+  if(NOT TARGET OpenVDB::openvdb_je)
+    add_library(OpenVDB::openvdb_je INTERFACE IMPORTED)
+    target_link_libraries(OpenVDB::openvdb_je INTERFACE OpenVDB::openvdb)
+    target_link_libraries(OpenVDB::openvdb_je INTERFACE Jemalloc::jemalloc)
+  endif()
 endif()
 
 # OpenVDB::pyopenvdb
