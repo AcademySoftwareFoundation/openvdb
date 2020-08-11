@@ -151,6 +151,8 @@ Version 7.1.0 - In Development
       to the executables.
     - Introduced a new OpenVDB::openvdb_je interface target through the
       FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
+    - CMake build fix for the vdb_render binary on Windows when building
+      statically and using OpenEXR 2.5
 
 Version 7.0.0 - December 6, 2019
 

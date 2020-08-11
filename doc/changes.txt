@@ -179,6 +179,8 @@ Build:
   to the executables.
 - Introduced a new @c OpenVDB::openvdb_je interface target through the
   FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
+- CMake build fix for the vdb_render binary on Windows when building
+  statically and using OpenEXR 2.5
 
 
 @htmlonly <a name="v7_0_0_changes"></a>@endhtmlonly
