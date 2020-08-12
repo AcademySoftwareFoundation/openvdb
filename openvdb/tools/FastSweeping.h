@@ -1528,7 +1528,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
   //} else {
   //    return std::make_pair(createGrid<FogGridT>(std::numeric_limits<typename FogGridT::ValueType>::max()),
   //                          createGrid<typename FogGridT::template ValueConverter<ExtValueT>::Type>(background));
-  }
+  //}
   return std::make_pair(fs.sdfGrid(), fs.extGrid());
 }
 
