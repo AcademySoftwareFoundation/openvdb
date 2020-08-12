@@ -80,9 +80,10 @@ namespace tools {
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grid!
 ///
-/// @warning  Returns an empty grid with the background value set to infinity if the
-///           iso-surface does not intersect any active voxels or if it intersects
-///           any active tiles in @a fogGrid.
+/// @warning If @a isoValue does not intersect any active values in
+///          @a fogGrid then the returned grid has all its active values set to
+///          plus or minus infinity, depending on if the input values are larger or
+///          smaller than @a isoValue.
 template<typename GridT>
 typename GridT::Ptr
 fogToSdf(const GridT &fogGrid,
@@ -112,9 +113,10 @@ fogToSdf(const GridT &fogGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grid!
 ///
-/// @warning  Returns an empty grid with the background value set to infinity if the
-///           iso-surface does not intersect any active voxels or if it intersects
-///           any active tiles in @a sdfGrid.
+/// @warning If @a isoValue does not intersect any active values in
+///          @a sdfGrid then the returned grid has all its active values set to
+///          plus or minus infinity, depending on if the input values are larger or
+///          smaller than @a isoValue.
 template<typename GridT>
 typename GridT::Ptr
 sdfToSdf(const GridT &sdfGrid,
@@ -150,9 +152,9 @@ sdfToSdf(const GridT &sdfGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grid!
 ///
-/// @warning  Returns an empty grid with the specified background value if the
-///           iso-surface does not intersect any active voxels or if it intersects
-///           any active tiles in @a fogGrid.
+/// @warning If @a isoValue does not intersect any active values in
+///          @a fogGrid then the returned grid has all its active values set to
+///          @a background.
 template<typename FogGridT, typename ExtOpT, typename ExtValueT>
 typename FogGridT::template ValueConverter<ExtValueT>::Type::Ptr
 fogToExt(const FogGridT &fogGrid,
@@ -188,9 +190,9 @@ fogToExt(const FogGridT &fogGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grid!
 ///
-/// @warning  Returns an empty grid with the specified background value if the
-///           iso-surface does not intersect any active voxels or if it intersects
-///           any active tiles in @a sdfGrid.
+/// @warning If @a isoValue does not intersect any active values in
+///          @a sdfGrid then the returned grid has all its active values set to
+///          @a background.
 template<typename SdfGridT, typename ExtOpT, typename ExtValueT>
 typename SdfGridT::template ValueConverter<ExtValueT>::Type::Ptr
 sdfToExt(const SdfGridT &sdfGrid,
@@ -227,10 +229,12 @@ sdfToExt(const SdfGridT &sdfGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grids!
 ///
-/// @warning  Returns a pair of empty grids with the background values set to respectively
-///           infinity (for the sdf) and @a background (for the extension field) if the
-///           iso-surface does not intersect any active voxels or if it intersects any
-///           active tiles in @a fogGrid.
+/// @warning If @isoValue does not intersect any active values in
+///          @a fogGrid then a pair of the following grids is returned: The first
+///          is a signed distance grid with its active values set to plus or minus
+///          infinity depending of whether its input values are above or below @a isoValue.
+///          The second grid, which represents the extension field, has all its active
+///          values set to @a background.
 template<typename FogGridT, typename ExtOpT, typename ExtValueT>
 std::pair<typename FogGridT::Ptr, typename FogGridT::template ValueConverter<ExtValueT>::Type::Ptr>
 fogToSdfAndExt(const FogGridT &fogGrid,
@@ -267,10 +271,12 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grids!
 ///
-/// @warning  Returns a pair of empty grids with the background values set to respectively
-///           infinity (for the sdf) and @a background (for the extension field) if the
-///           iso-surface does not intersect any active voxels or if it intersects any
-///           active tiles in @a sdfGrid.
+/// @warning If @isoValue does not intersect any active values in
+///          @a sdfGrid then a pair of the following grids is returned: The first
+///          is a signed distance grid with its active values set to plus or minus
+///          infinity depending of whether its input values are above or below @a isoValue.
+///          The second grid, which represents the extension field, has all its active
+///          values set to @a background.
 template<typename SdfGridT, typename ExtOpT, typename ExtValueT>
 std::pair<typename SdfGridT::Ptr, typename SdfGridT::template ValueConverter<ExtValueT>::Type::Ptr>
 sdfToSdfAndExt(const SdfGridT &sdfGrid,
@@ -884,33 +890,33 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
                 const SdfValueT value = *voxelIter;
                 const bool isAbove = value > isoValue;
                 if (!voxelIter.isValueOn()) {// inactive voxels
-                  sdf[voxelIter.pos()] = isAbove ? above : -above;
-                } else {// active voxels
-                  const Coord ijk = voxelIter.getCoord();
-                  stencil.moveTo(ijk, value);
-                  const auto mask = stencil.intersectionMask( isoValue );
-                  if (mask.none()) {// most common case
                     sdf[voxelIter.pos()] = isAbove ? above : -above;
-                  } else {// compute distance to iso-surface
-                    // disable boundary voxels from the mask tree
-                    sweepMaskAcc.setValueOff(ijk);
-                    const SdfValueT delta = value - isoValue;//offset relative to iso-value
-                    if (math::isApproxZero(delta)) {//voxel is on the iso-surface
-                      sdf[voxelIter.pos()] = 0;
-                    } else {//voxel is neighboring the iso-surface
-                      SdfValueT sum = 0;
-                      for (int i=0; i<6;) {
-                        SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
-                        if (mask.test(i++)) d = math::Abs(delta/(value-stencil.getValue(i)));
-                        if (mask.test(i++)) {
-                          d2 = math::Abs(delta/(value-stencil.getValue(i)));
-                          if (d2 < d) d = d2;
-                        }
-                        if (d < std::numeric_limits<SdfValueT>::max()) sum += 1/(d*d);
-                      }
-                      sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum) : -h / math::Sqrt(sum);
-                    }// voxel is neighboring the iso-surface
-                  }// intersecting voxels
+                } else {// active voxels
+                    const Coord ijk = voxelIter.getCoord();
+                    stencil.moveTo(ijk, value);
+                    const auto mask = stencil.intersectionMask( isoValue );
+                    if (mask.none()) {// most common case
+                        sdf[voxelIter.pos()] = isAbove ? above : -above;
+                    } else {// compute distance to iso-surface
+                        // disable boundary voxels from the mask tree
+                        sweepMaskAcc.setValueOff(ijk);
+                        const SdfValueT delta = value - isoValue;//offset relative to iso-value
+                        if (math::isApproxZero(delta)) {//voxel is on the iso-surface
+                            sdf[voxelIter.pos()] = 0;
+                        } else {//voxel is neighboring the iso-surface
+                            SdfValueT sum = 0;
+                            for (int i=0; i<6;) {
+                                SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
+                                if (mask.test(i++)) d = math::Abs(delta/(value-stencil.getValue(i)));
+                                if (mask.test(i++)) {
+                                    d2 = math::Abs(delta/(value-stencil.getValue(i)));
+                                    if (d2 < d) d = d2;
+                                }
+                                if (d < std::numeric_limits<SdfValueT>::max()) sum += 1/(d*d);
+                            }
+                            sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum) : -h / math::Sqrt(sum);
+                        }// voxel is neighboring the iso-surface
+                    }// intersecting voxels
                 }// active voxels
             }// loop over voxels
         }// loop over leaf nodes
@@ -1020,50 +1026,50 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                 const SdfValueT value = *voxelIter;
                 const bool isAbove = value > isoValue;
                 if (!voxelIter.isValueOn()) {// inactive voxels
-                  sdf[voxelIter.pos()] = isAbove ? above : -above;
-                } else {// active voxels
-                  const Coord ijk = voxelIter.getCoord();
-                  stencil.moveTo(ijk, value);
-                  const auto mask = stencil.intersectionMask( isoValue );
-                  if (mask.none()) {// no zero-crossing neighbors, most common case
                     sdf[voxelIter.pos()] = isAbove ? above : -above;
-                  } else {// compute distance to iso-surface
-                    // disable boundary voxels from the mask tree
-                    sweepMaskAcc.setValueOff(ijk);
-                    const SdfValueT delta = value - isoValue;//offset relative to iso-value
-                    if (math::isApproxZero(delta)) {//voxel is on the iso-surface
-                      sdf[voxelIter.pos()] = 0;
-                      ext[voxelIter.pos()] = ExtValueT(op(xform.indexToWorld(ijk)));
-                    } else {//voxel is neighboring the iso-surface
-                      SdfValueT sum1 = 0;
-                      ExtValueT sum2 = zeroVal<ExtValueT>();
-                      for (int n=0, i=0; i<6;) {
-                        SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
-                        if (mask.test(i++)) {
-                          d = math::Abs(delta/(value-stencil.getValue(i)));
-                          n = i - 1;
-                        }
-                        if (mask.test(i++)) {
-                          d2 = math::Abs(delta/(value-stencil.getValue(i)));
-                          if (d2 < d) {
-                            d = d2;
-                            n = i - 1;
-                          }
-                        }
-                        if (d < std::numeric_limits<SdfValueT>::max()) {
-                          d2 = 1/(d*d);
-                          sum1 += d2;
-                          const Vec3R xyz(
-                              static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
-                              static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
-                              static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
-                          sum2 += d2*ExtValueT(op(xform.indexToWorld(xyz)));
-                        }
-                      }//look over six cases
-                      ext[voxelIter.pos()] = (SdfValueT(1) / sum1) * sum2;
-                      sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1);
-                    }// voxel is neighboring the iso-surface
-                  }// intersecting voxels
+                } else {// active voxels
+                    const Coord ijk = voxelIter.getCoord();
+                    stencil.moveTo(ijk, value);
+                    const auto mask = stencil.intersectionMask( isoValue );
+                    if (mask.none()) {// no zero-crossing neighbors, most common case
+                        sdf[voxelIter.pos()] = isAbove ? above : -above;
+                        // the ext grid already has its active values set to the bakground value
+                    } else {// compute distance to iso-surface
+                        // disable boundary voxels from the mask tree
+                        sweepMaskAcc.setValueOff(ijk);
+                        const SdfValueT delta = value - isoValue;//offset relative to iso-value
+                        if (math::isApproxZero(delta)) {//voxel is on the iso-surface
+                            sdf[voxelIter.pos()] = 0;
+                            ext[voxelIter.pos()] = ExtValueT(op(xform.indexToWorld(ijk)));
+                        } else {//voxel is neighboring the iso-surface
+                            SdfValueT sum1 = 0;
+                            ExtValueT sum2 = zeroVal<ExtValueT>();
+                            for (int n=0, i=0; i<6;) {
+                                SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
+                                if (mask.test(i++)) {
+                                    d = math::Abs(delta/(value-stencil.getValue(i)));
+                                    n = i - 1;
+                                }
+                                if (mask.test(i++)) {
+                                    d2 = math::Abs(delta/(value-stencil.getValue(i)));
+                                    if (d2 < d) {
+                                        d = d2;
+                                        n = i - 1;
+                                    }
+                                }
+                                if (d < std::numeric_limits<SdfValueT>::max()) {
+                                    d2 = 1/(d*d);
+                                    sum1 += d2;
+                                    const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
+                                                    static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
+                                                    static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
+                                    sum2 += d2*ExtValueT(op(xform.indexToWorld(xyz)));
+                                }
+                            }//look over six cases
+                            ext[voxelIter.pos()] = (SdfValueT(1) / sum1) * sum2;
+                            sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1);
+                        }// voxel is neighboring the iso-surface
+                    }// intersecting voxels
                 }// active voxels
             }// loop over voxels
         }// loop over leaf nodes
@@ -1360,8 +1366,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                     update = d1.v + h;
                     if (update <= d2.v) {
                         if (update < absV) {
-                          value = sign * update;
-                          if (acc2) acc2->setValue(ijk, acc2->getValue(d1(ijk)));//update ext?
+                            value = sign * update;
+                            if (acc2) acc2->setValue(ijk, acc2->getValue(d1(ijk)));//update ext?
                         }//update sdf?
                         continue;
                     }// one neighbor case
@@ -1375,15 +1381,15 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                         update = SdfValueT(0.5) * (d1.v + d2.v + std::sqrt(D));
                         if (update > d2.v && update <= d3.v) {
                             if (update < absV) {
-                              value = sign * update;
-                              if (acc2) {
-                                d1.v -= update;
-                                d2.v -= update;
-                                // affine combination of two neighboring extension values
-                                const SdfValueT w = SdfValueT(1)/(d1.v+d2.v);
-                                acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                       d2.v*acc2->getValue(d2(ijk))));
-                              }//update ext?
+                                value = sign * update;
+                                if (acc2) {
+                                    d1.v -= update;
+                                    d2.v -= update;
+                                    // affine combination of two neighboring extension values
+                                    const SdfValueT w = SdfValueT(1)/(d1.v+d2.v);
+                                    acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
+                                                           d2.v*acc2->getValue(d2(ijk))));
+                                }//update ext?
                             }//update sdf?
                             continue;
                         }//test for two neighbor case
@@ -1399,17 +1405,17 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                         update = SdfValueT(1.0/3.0) * (d123 + std::sqrt(D));//always passes test
                         //if (update > d3.v) {//disabled due to round-off errors
                         if (update < absV) {
-                          value = sign * update;
-                          if (acc2) {
-                            d1.v -= update;
-                            d2.v -= update;
-                            d3.v -= update;
-                            // affine combination of three neighboring extension values
-                            const SdfValueT w = SdfValueT(1)/(d1.v+d2.v+d3.v);
-                            acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                   d2.v*acc2->getValue(d2(ijk)) +
-                                                   d3.v*acc2->getValue(d3(ijk))));
-                          }//update ext?
+                            value = sign * update;
+                            if (acc2) {
+                                d1.v -= update;
+                                d2.v -= update;
+                                d3.v -= update;
+                                // affine combination of three neighboring extension values
+                                const SdfValueT w = SdfValueT(1)/(d1.v+d2.v+d3.v);
+                                acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
+                                                       d2.v*acc2->getValue(d2(ijk)) +
+                                                       d3.v*acc2->getValue(d3(ijk))));
+                            }//update ext?
                         }//update sdf?
                     }//test for non-negative determinant
                 }//loop over coordinates
@@ -1463,9 +1469,6 @@ fogToSdf(const GridT &fogGrid,
 {
     FastSweeping<GridT> fs;
     if (fs.initSdf(fogGrid, isoValue, /*isInputSdf*/false)) fs.sweep(nIter);
-    //} else {
-    //  return createGrid<GridT>(std::numeric_limits<typename GridT::ValueType>::max());
-    //}
     return fs.sdfGrid();
 }
 
@@ -1477,9 +1480,6 @@ sdfToSdf(const GridT &sdfGrid,
 {
     FastSweeping<GridT> fs;
     if (fs.initSdf(sdfGrid, isoValue, /*isInputSdf*/true)) fs.sweep(nIter);
-    //} else {
-    //  return createGrid<GridT>(std::numeric_limits<typename GridT::ValueType>::max());
-    //}
     return fs.sdfGrid();
 }
 
@@ -1493,9 +1493,6 @@ fogToExt(const FogGridT &fogGrid,
 {
   FastSweeping<FogGridT, ExtValueT> fs;
   if (fs.initExt(fogGrid, op, background, isoValue, /*isInputSdf*/false)) fs.sweep(nIter);
-  //} else {
-  //    return createGrid<typename FogGridT::template ValueConverter<ExtValueT>::Type>(background);
-  //}
   return fs.extGrid();
 }
 
@@ -1509,9 +1506,6 @@ sdfToExt(const SdfGridT &sdfGrid,
 {
   FastSweeping<SdfGridT> fs;
   if (fs.initExt(sdfGrid, op, background, isoValue, /*isInputSdf*/true)) fs.sweep(nIter);
-  //} else {
-  //    return createGrid<typename SdfGridT::template ValueConverter<ExtValueT>::Type>(background);
-  //}
   return fs.extGrid();
 }
 
@@ -1525,10 +1519,6 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 {
   FastSweeping<FogGridT, ExtValueT> fs;
   if (fs.initExt(fogGrid, op, background, isoValue, /*isInputSdf*/false)) fs.sweep(nIter);
-  //} else {
-  //    return std::make_pair(createGrid<FogGridT>(std::numeric_limits<typename FogGridT::ValueType>::max()),
-  //                          createGrid<typename FogGridT::template ValueConverter<ExtValueT>::Type>(background));
-  //}
   return std::make_pair(fs.sdfGrid(), fs.extGrid());
 }
 
@@ -1542,10 +1532,6 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
 {
   FastSweeping<SdfGridT, ExtValueT> fs;
   if (fs.initExt(sdfGrid, op, background, isoValue, /*isInputSdf*/true)) fs.sweep(nIter);
-  //} else {
-  //    return std::make_pair(createGrid<SdfGridT>(std::numeric_limits<typename SdfGridT::ValueType>::max()),
-  //                          createGrid<typename SdfGridT::template ValueConverter<ExtValueT>::Type>(background));
-  //}
   return std::make_pair(fs.sdfGrid(), fs.extGrid());
 }
 
