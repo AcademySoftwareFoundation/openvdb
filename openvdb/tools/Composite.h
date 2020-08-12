@@ -891,7 +891,7 @@ public:
         }
         if (!(mBInside < zero)) {
             OPENVDB_THROW(ValueError,
-                "expected grid B outside value < 0, got " << mBOutside);
+                "expected grid B inside value < 0, got " << mBInside);
         }
     }
 
@@ -1077,7 +1077,7 @@ struct CsgDiffVisitor: public CsgVisitorBase<TreeType>
         ValueT bValue = zeroVal<ValueT>();
         typename IterT::ChildNodeType* bChild = bIter.probeChild(bValue);
         if (!bChild && bValue < zeroVal<ValueT>()) {
-            // B is an inside tile.  Make A an inside tile and stop traversing this branch.
+            // B is an inside tile.  Make A an outside tile and stop traversing this branch.
             aIter.setValue(this->mAOutside);
             aIter.setValueOn(bIter.isValueOn());
             delete aChild;
