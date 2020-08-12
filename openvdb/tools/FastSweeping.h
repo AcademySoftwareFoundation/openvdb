@@ -229,7 +229,7 @@ sdfToExt(const SdfGridT &sdfGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grids!
 ///
-/// @warning If @isoValue does not intersect any active values in
+/// @warning If @a isoValue does not intersect any active values in
 ///          @a fogGrid then a pair of the following grids is returned: The first
 ///          is a signed distance grid with its active values set to plus or minus
 ///          infinity depending of whether its input values are above or below @a isoValue.
@@ -271,7 +271,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 ///          active tiles in the input grid will be converted to active voxels
 ///          in the output grids!
 ///
-/// @warning If @isoValue does not intersect any active values in
+/// @warning If @a isoValue does not intersect any active values in
 ///          @a sdfGrid then a pair of the following grids is returned: The first
 ///          is a signed distance grid with its active values set to plus or minus
 ///          infinity depending of whether its input values are above or below @a isoValue.
