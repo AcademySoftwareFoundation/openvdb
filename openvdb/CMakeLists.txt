@@ -296,6 +296,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/Dense.h
   tools/DenseSparseTools.h
   tools/Diagnostics.h
+  tools/FastSweeping.h
   tools/Filter.h
   tools/FindActiveValues.h
   tools/GridOperators.h

@@ -147,10 +147,19 @@ if(EXISTS "${Blosc_INCLUDE_DIR}/blosc.h")
   )
   string(STRIP "${_blosc_version_minor_string}" Blosc_VERSION_MINOR)
 
+  file(STRINGS "${Blosc_INCLUDE_DIR}/blosc.h"
+     _blosc_version_release_string REGEX "#define BLOSC_VERSION_RELEASE +[0-9]+ "
+  )
+  string(REGEX REPLACE "#define BLOSC_VERSION_RELEASE +([0-9]+).*$" "\\1"
+    _blosc_version_release_string "${_blosc_version_release_string}"
+  )
+  string(STRIP "${_blosc_version_release_string}" Blosc_VERSION_RELEASE)
+
   unset(_blosc_version_major_string)
   unset(_blosc_version_minor_string)
+  unset(_blosc_version_release_string)
 
-  set(Blosc_VERSION ${Blosc_VERSION_MAJOR}.${Blosc_VERSION_MINOR})
+  set(Blosc_VERSION ${Blosc_VERSION_MAJOR}.${Blosc_VERSION_MINOR}.${Blosc_VERSION_RELEASE})
 endif()
 
 # ------------------------------------------------------------------------
