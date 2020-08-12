@@ -215,8 +215,9 @@ mark_as_advanced(
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
-# to. The minimum version must be at least 1.5. Previous versions are incompatible.
-set(MINIMUM_BLOSC_VERSION 1.5)
+# to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
+# Later versions (including 1.5.4), can be buggy on certain platforms.
+set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 5)
