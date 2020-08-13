@@ -15,10 +15,12 @@ public:
     CPPUNIT_TEST_SUITE(TestVolumeExecutable);
     CPPUNIT_TEST(testConstructionDestruction);
     CPPUNIT_TEST(testCreateMissingGrids);
+    CPPUNIT_TEST(testTreeExecutionLevel);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
     void testCreateMissingGrids();
+    void testTreeExecutionLevel();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeExecutable);
@@ -53,7 +55,7 @@ TestVolumeExecutable::testConstructionDestruction()
     openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
         openvdb::ax::AttributeRegistry::create(tree);
     openvdb::ax::VolumeExecutable::Ptr volumeExecutable
-        (new openvdb::ax::VolumeExecutable(E, C, emptyReg, nullptr, {}));
+        (new openvdb::ax::VolumeExecutable(C, E, emptyReg, nullptr, {}));
 
     CPPUNIT_ASSERT_EQUAL(2, int(wE.use_count()));
     CPPUNIT_ASSERT_EQUAL(2, int(wC.use_count()));
@@ -79,12 +81,16 @@ TestVolumeExecutable::testCreateMissingGrids()
     openvdb::ax::VolumeExecutable::Ptr executable =
         compiler->compile<openvdb::ax::VolumeExecutable>("@a=v@b.x;");
 
+    executable->setCreateMissing(false);
+    executable->setValueIterator(openvdb::ax::VolumeExecutable::IterType::ON);
+
     openvdb::GridPtrVec grids;
-    CPPUNIT_ASSERT_THROW(executable->execute(grids, openvdb::ax::VolumeExecutable::IterType::ON, false),
-        openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(executable->execute(grids), openvdb::LookupError);
     CPPUNIT_ASSERT(grids.empty());
 
-    executable->execute(grids, openvdb::ax::VolumeExecutable::IterType::ON, true);
+    executable->setCreateMissing(true);
+    executable->setValueIterator(openvdb::ax::VolumeExecutable::IterType::ON);
+    executable->execute(grids);
 
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform();
@@ -99,5 +105,76 @@ TestVolumeExecutable::testCreateMissingGrids()
     CPPUNIT_ASSERT(grids[1]->isType<openvdb::FloatGrid>());
     CPPUNIT_ASSERT(grids[1]->empty());
     CPPUNIT_ASSERT(grids[1]->transform() == *defaultTransform);
+}
+
+void
+TestVolumeExecutable::testTreeExecutionLevel()
+{
+    openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
+    openvdb::ax::VolumeExecutable::Ptr executable =
+        compiler->compile<openvdb::ax::VolumeExecutable>("f@test = 1.0f;");
+
+    using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
+    using NodeT1 = openvdb::FloatGrid::Accessor::NodeT1;
+    using NodeT2 = openvdb::FloatGrid::Accessor::NodeT2;
+
+    openvdb::FloatGrid test;
+    test.setName("test");
+
+    // NodeT0 tile
+    test.tree().addTile(1, openvdb::Coord(0), -2.0f, /*active*/true);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT0::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(-2.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    // default is leaf nodes, expect no change
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT0::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(-2.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    executable->setTreeExecutionLevel(1);
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT0::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(1.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    // NodeT1 tile
+    test.tree().addTile(2, openvdb::Coord(0), -2.0f, /*active*/true);
+    // level is set to 1, expect no change
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT1::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(-2.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    executable->setTreeExecutionLevel(2);
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT1::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(1.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    // NodeT2 tile
+    test.tree().addTile(3, openvdb::Coord(0), -2.0f, /*active*/true);
+    // level is set to 2, expect no change
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT2::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(-2.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    executable->setTreeExecutionLevel(3);
+    executable->execute(test);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), test.tree().leafCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), test.tree().activeTileCount());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index64(NodeT2::NUM_VOXELS), test.tree().activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(1.0f, test.tree().getValue(openvdb::Coord(0)));
+
+    // test higher values throw
+    CPPUNIT_ASSERT_THROW(executable->setTreeExecutionLevel(4), openvdb::RuntimeError);
 }
 

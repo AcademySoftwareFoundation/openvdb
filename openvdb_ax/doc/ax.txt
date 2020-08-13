@@ -139,14 +139,14 @@ geometry to @b `0.0f`.
 @par
 For OpenVDB Points, this kernel is run over every point in an OpenVDB Points
 Grid. In simple pseudo code:
-@code{.c}
+@code{.unparsed}
 foreach(point in pointgrid)
     run_ax_kernel(point)
 done()
 @endcode
 Where @b `pointgrid` is a single Point Data Grid. For OpenVDB volumes the kernel
 is run over each voxel in a provided grid:
-@code{.c}
+@code{.unparsed}
 foreach(grid in grids)
     foreach(voxel IN grid)
         run_ax_kernel(voxel)
@@ -589,8 +589,10 @@ Diagonal matrix construction. Each diagonal component of the left hand side
 matrix is set to to the right hand side scalar. All other components are zero
 initialized i.e.
 @code{.c}
+mat3f a;
+int dim = 3, b = 1;
 for (int i = 0; i < dim; ++i)
-    a[i] = ((i % (dim+1) == 0) ? b : 0;
+    a[i] = (i % (dim+1) == 0) ? b : 0;
 @endcode
 Where `a` is the matrix, `dim` is the dimension of the matrix (e.g. 3 for
 `mat3f`) and `b` is the scalar. If the scalar type does not match element type
@@ -1706,9 +1708,9 @@ a supported explicit cast. It has the form:
 Where @b `func` is a function name @b or a valid explicit cast typename. Explicit
 casts are only supported for @ref axscalars "scalar types". For example:
 @code{.c}
-int a = int(1.1f); // valid
-vec3f b = vec3f(1); // invalid
-a = int(b.x); // valid
+int a = int(1.1f);
+vec3f b = 1.0f;
+a = int(b.x);
 @endcode
 @par
 Whilst explicit casts take only a single argument, the operator itself supports
@@ -2027,7 +2029,7 @@ value.
 When transforms differ, AX performs coordinate transformations from the source
 VDB to the target VDB. Using some simple pseudo code, we can represent each
 voxel's coordinate query:
-@code
+@code{.unparsed}
 foreach(ActiveVoxel in surface)
     SurfaceIndexSpaceCoord = ActiveVoxel.indexSpaceCoordinate();
     SurfaceWorldSpaceCoord = surface.transformToWorld(SurfaceIndexSpaceCoord);

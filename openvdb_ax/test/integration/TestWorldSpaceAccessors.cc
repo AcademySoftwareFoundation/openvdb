@@ -3,6 +3,8 @@
 
 #include "TestHarness.h"
 
+#include <openvdb_ax/ax.h>
+
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointConversion.h>
@@ -48,7 +50,9 @@ TestWorldSpaceAccessors::testWorldSpaceAssign()
 
     // @note  snippet moves all points to a single leaf node
     CPPUNIT_ASSERT_EQUAL(openvdb::points::pointCount(*tree), openvdb::Index64(4));
-    CPPUNIT_ASSERT_NO_THROW(unittest_util::wrapExecution(*grid, "test/snippets/worldspace/worldSpaceAssign"));
+
+    const std::string code = unittest_util::loadText("test/snippets/worldspace/worldSpaceAssign");
+    CPPUNIT_ASSERT_NO_THROW(openvdb::ax::run(code.c_str(), *grid));
 
     // Tree is modified if points are moved
     tree = &(grid->tree());
@@ -127,7 +131,8 @@ TestWorldSpaceAccessors::testWorldSpaceAssignComponent()
     const openvdb::Index64 originalCount = pointCount(tree);
     CPPUNIT_ASSERT(originalCount > 0);
 
-    CPPUNIT_ASSERT_NO_THROW(unittest_util::wrapExecution(*grid, "test/snippets/worldspace/worldSpaceAssignComponent"));
+    const std::string code = unittest_util::loadText("test/snippets/worldspace/worldSpaceAssignComponent");
+    CPPUNIT_ASSERT_NO_THROW(openvdb::ax::run(code.c_str(), *grid));
 
     // test that P_original has the world-space value of the P attribute prior to running this snippet.
     // test that P_new has the expected world-space P value

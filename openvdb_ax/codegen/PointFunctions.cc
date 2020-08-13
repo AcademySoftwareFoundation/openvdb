@@ -38,6 +38,16 @@ namespace codegen {
 namespace
 {
 
+/// @todo  Provide more framework for functions such that they can only
+///        be registered against compatible code generators.
+inline void verifyContext(const llvm::Function* const F, const std::string& name)
+{
+    if (!F || F->getName() != "ax.compute.point") {
+        OPENVDB_THROW(AXCompilerError, "Function \"" << name << "\" cannot be called for "
+            "the current target. This function only runs on OpenVDB Point Grids.");
+    }
+}
+
 /// @brief  Retrieve a group handle from an expected vector of handles using the offset
 ///         pointed to by the engine data. Note that HandleT should only ever be a GroupHandle
 ///         or GroupWriteHandle object
@@ -116,8 +126,7 @@ inline FunctionGroup::Ptr axingroup(const FunctionOptions& op)
     {
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(compute->getName() == "ax.compute.point");
+        verifyContext(compute, "ingroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
@@ -211,8 +220,7 @@ inline FunctionGroup::Ptr axaddtogroup(const FunctionOptions& op)
     {
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(compute->getName() == "ax.compute.point");
+        verifyContext(compute, "addtogroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
@@ -252,8 +260,7 @@ inline FunctionGroup::Ptr axremovefromgroup(const FunctionOptions& op)
     {
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(compute->getName() == "ax.compute.point");
+        verifyContext(compute, "removefromgroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");

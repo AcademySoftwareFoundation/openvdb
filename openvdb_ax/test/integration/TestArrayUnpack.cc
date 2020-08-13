@@ -45,7 +45,7 @@ vec4@test5[0] = vec4@test6[2];
 vec4@test5[3] = vec4@test5[1];
 vec4@test5[2] = vec4@test6[3];
 vec4@test6[1] = vec4@test6[0];
-    )";
+)";
 
     auto generate = [&](const auto& suffixes) {
         for (const auto& s : suffixes) {
@@ -170,7 +170,7 @@ mat4@test7[3,0] = mat4@test8[1,0];
 mat4@test8[3,1] = mat4@test7[3,0];
 mat4@test7[3,2] = mat4@test8[1,1];
 mat4@test8[3,3] = mat4@test7[2,1];
-    )";
+)";
 
     auto generate = [&](const auto& suffixes) {
         for (const auto& s : suffixes) {

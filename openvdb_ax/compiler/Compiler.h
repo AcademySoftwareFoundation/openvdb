@@ -19,16 +19,11 @@
 #include <openvdb_ax/compiler/CompilerOptions.h>
 #include <openvdb_ax/compiler/CustomData.h>
 
-#include <functional>
 #include <memory>
 
 // forward
 namespace llvm {
-
-class Module;
 class LLVMContext;
-class ExecutionEngine;
-
 }
 
 namespace openvdb {
@@ -61,19 +56,14 @@ public:
     using Ptr = std::shared_ptr<Compiler>;
     using UniquePtr = std::unique_ptr<Compiler>;
 
-    /// @brief Construct a compiler object with given settings and parser
+    /// @brief Construct a compiler object with given settings
     /// @param options CompilerOptions object with various settings
-    /// @param parser Function that takes a string and returns an AST.  By default this will
-    ///        be the standard parser (ast::parse) function.  This function is used when calling
-    ///        compile on a string
-    Compiler(const CompilerOptions& options = CompilerOptions(),
-             const std::function<ast::Tree::Ptr(const char*)>& parser = ast::parse);
+    Compiler(const CompilerOptions& options = CompilerOptions());
 
     ~Compiler() = default;
 
     /// @brief Static method for creating Compiler objects
-    static UniquePtr create(const CompilerOptions& options = CompilerOptions(),
-                            const std::function<ast::Tree::Ptr(const char*)>& parser = ast::parse);
+    static UniquePtr create(const CompilerOptions& options = CompilerOptions());
 
     /// @brief Compile/build a given AST into an executable object of the given type.
     /// @param syntaxTree An abstract syntax tree to compile
@@ -93,15 +83,13 @@ public:
     ///        allows one to reference data held elsewhere, such as inside of a DCC, from inside
     ///        the AX code
     /// @param compilerErrors A vector of strings where errors are inserted into
-    /// @details The parser provided at the compiler's construction is used to convert the string
-    ///          into an AST.
     template <typename ExecutableT>
     typename ExecutableT::Ptr
     compile(const std::string& code,
             const CustomData::Ptr data = CustomData::Ptr(),
             std::vector<std::string>* compilerErrors = nullptr)
     {
-        ast::Tree::Ptr syntaxTree = mParser(code.c_str());
+        ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
         return compile<ExecutableT>(*syntaxTree, data, compilerErrors);
     }
 
@@ -114,10 +102,8 @@ public:
     void setFunctionRegistry(std::unique_ptr<codegen::FunctionRegistry>&& functionRegistry);
 
 private:
-
     std::shared_ptr<llvm::LLVMContext> mContext;
     const CompilerOptions mCompilerOptions;
-    const std::function<ast::Tree::Ptr(const char*)> mParser;
     std::shared_ptr<codegen::FunctionRegistry> mFunctionRegistry;
 };
 

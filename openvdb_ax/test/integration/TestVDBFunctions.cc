@@ -2,8 +2,15 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "TestHarness.h"
+#include "util.h"
 
+#include <openvdb_ax/ax.h>
+#include <openvdb_ax/codegen/Types.h>
+#include <openvdb_ax/codegen/Functions.h>
+#include <openvdb_ax/codegen/FunctionRegistry.h>
+#include <openvdb_ax/codegen/FunctionTypes.h>
 #include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/compiler/VolumeExecutable.h>
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointConversion.h>
@@ -21,6 +28,7 @@ public:
     CPPUNIT_TEST(getvoxelpws);
     CPPUNIT_TEST(ingroupOrder);
     CPPUNIT_TEST(ingroup);
+    CPPUNIT_TEST(testValidContext);
     CPPUNIT_TEST_SUITE_END();
 
     void addremovefromgroup();
@@ -29,6 +37,7 @@ public:
     void getvoxelpws();
     void ingroupOrder();
     void ingroup();
+    void testValidContext();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVDBFunctions);
@@ -70,7 +79,8 @@ TestVDBFunctions::addremovefromgroup()
     openvdb::points::appendGroup(dataTree, "existingTestGroup2");
     openvdb::points::setGroup(dataTree, "existingTestGroup2", false);
 
-    unittest_util::wrapExecution(*dataGrid, "test/snippets/vdb_functions/addremovefromgroup");
+    const std::string code = unittest_util::loadText("test/snippets/vdb_functions/addremovefromgroup");
+    openvdb::ax::run(code.c_str(), *dataGrid);
 
     auto leafIter = dataTree.cbeginLeaf();
 
@@ -177,12 +187,12 @@ TestVDBFunctions::getcoord()
         ++i;
     }
 
-    // convert to GridBase::Ptr to call wrapExecution
+    // convert to GridBase::Ptr
     openvdb::GridPtrVec testGridsBase(3);
-
     std::copy(testGrids.begin(), testGrids.end(), testGridsBase.begin());
 
-    unittest_util::wrapExecution(testGridsBase, "test/snippets/vdb_functions/getcoord");
+    const std::string code = unittest_util::loadText("test/snippets/vdb_functions/getcoord");
+    openvdb::ax::run(code.c_str(), testGridsBase);
 
     // each grid has 3 active voxels.  These vectors hold the expected values of those voxels
     // for each grid
@@ -356,4 +366,83 @@ TestVDBFunctions::ingroup()
     }
 }
 
+void
+TestVDBFunctions::testValidContext()
+{
+    std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
+    openvdb::ax::Compiler compiler;
+    openvdb::ax::FunctionOptions ops;
+    ops.mLazyFunctions = false;
+
+    /// Generate code which calls the given function
+    auto generate = [&C](const openvdb::ax::codegen::Function::Ptr F,
+                         const std::string& name) -> std::string
+    {
+        std::vector<llvm::Type*> types;
+        F->types(types, *C);
+
+        std::string code;
+        std::string args;
+        size_t idx = 0;
+        for (auto T : types) {
+            const std::string axtype =
+                openvdb::ax::ast::tokens::typeStringFromToken(
+                    openvdb::ax::codegen::tokenFromLLVMType(T));
+            code += axtype + " local" + std::to_string(idx) + ";\n";
+            args += "local" + std::to_string(idx) + ",";
+        }
+
+        // remove last ","
+        if (!args.empty()) args.pop_back();
+        code += name + "(" + args + ");";
+        return code;
+    };
+
+
+    /// Test Volumes fails when trying to call Point Functions
+    {
+        openvdb::ax::codegen::FunctionRegistry::UniquePtr
+            registry(new openvdb::ax::codegen::FunctionRegistry);
+        openvdb::ax::codegen::insertVDBPointFunctions(*registry, &ops);
+
+        for (auto& func : registry->map()) {
+            // Don't check internal functions
+            if (func.second.isInternal()) continue;
+
+            const openvdb::ax::codegen::FunctionGroup::Ptr ptr = func.second.function();
+            CPPUNIT_ASSERT(ptr);
+            const auto& signatures = ptr->list();
+            CPPUNIT_ASSERT(!signatures.empty());
+
+            const std::string code = generate(signatures.front(), func.first);
+
+            CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
+                compiler.compile<openvdb::ax::VolumeExecutable>(code),
+                openvdb::AXCompilerError);
+        }
+    }
+
+    /// Test Points fails when trying to call Volume Functions
+    {
+        openvdb::ax::codegen::FunctionRegistry::UniquePtr
+            registry(new openvdb::ax::codegen::FunctionRegistry);
+        openvdb::ax::codegen::insertVDBVolumeFunctions(*registry, &ops);
+
+        for (auto& func : registry->map()) {
+            // Don't check internal functions
+            if (func.second.isInternal()) continue;
+
+            const openvdb::ax::codegen::FunctionGroup::Ptr ptr = func.second.function();
+            CPPUNIT_ASSERT(ptr);
+            const auto& signatures = ptr->list();
+            CPPUNIT_ASSERT(!signatures.empty());
+
+            const std::string code = generate(signatures.front(), func.first);
+
+            CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
+                compiler.compile<openvdb::ax::PointExecutable>(code),
+                openvdb::AXCompilerError);
+        }
+    }
+}
 

@@ -117,6 +117,7 @@ find_package(Boost REQUIRED COMPONENTS random)
 #########################################################################
 
 set(OPENVDB_AX_LIBRARY_SOURCE_FILES
+  ax.cc
   ast/AST.cc
   ast/PrintTree.cc
   ast/Scanners.cc
@@ -282,7 +283,7 @@ if(OPENVDB_AX_SHARED)
   endif()
 endif()
 
-install(FILES Exceptions.h version.h DESTINATION include/openvdb_ax/)
+install(FILES ax.h Exceptions.h version.h DESTINATION include/openvdb_ax/)
 install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION include/openvdb_ax/ast)
 install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION include/openvdb_ax/codegen)
 install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION include/openvdb_ax/compiler)

@@ -1535,7 +1535,7 @@ float@test1 = var;
     mHarness.addAttributes<float>(names, {30.0f, 1.0f, -10.0f, -15.0f, 50.0f, 50.0f, 1.0f});
 
     std::vector<std::string> warnings;
-    this->execute("assign_scoped.float.ax", nullptr, &warnings);
+    this->execute("assign_scoped.float.ax", nullptr, &warnings, false);
     CPPUNIT_ASSERT(!warnings.empty());
 }
 

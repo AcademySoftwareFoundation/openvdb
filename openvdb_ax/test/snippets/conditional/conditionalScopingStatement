@@ -1,16 +1,16 @@
 int@int_test = 0;
 
 if(true) {
-	if (true) {
-		int@int_test = 1;
-	}
-	else if(true) {
-		int@int_test = 2;
-	}
-	else {
-		int@int_test = 3;
-	}
+    if (true) {
+        int@int_test = 1;
+    }
+    else if(true) {
+        int@int_test = 2;
+    }
+    else {
+        int@int_test = 3;
+    }
 }
 else {
-	int@int_test = 4;
+    int@int_test = 4;
 }

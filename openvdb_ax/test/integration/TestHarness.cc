@@ -38,7 +38,9 @@ void wrapExecution(openvdb::points::PointDataGrid& grid,
     const std::string code = loadText(codeFileName);
     ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
     PointExecutable::Ptr executable = compiler.compile<PointExecutable>(*syntaxTree, data, warnings);
-    executable->execute(grid, group, createMissing);
+    executable->setCreateMissing(createMissing);
+    if (group) executable->setGroupExecution(*group);
+    executable->execute(grid);
 }
 
 void wrapExecution(openvdb::GridPtrVec& grids,
@@ -54,7 +56,9 @@ void wrapExecution(openvdb::GridPtrVec& grids,
     const std::string code = loadText(codeFileName);
     ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
     VolumeExecutable::Ptr executable = compiler.compile<VolumeExecutable>(*syntaxTree, data, warnings);
-    executable->execute(grids, VolumeExecutable::IterType::ON, createMissing);
+    executable->setCreateMissing(createMissing);
+    executable->setValueIterator(VolumeExecutable::IterType::ON);
+    executable->execute(grids);
 }
 
 void AXTestHarness::addInputGroups(const std::vector<std::string> &names,

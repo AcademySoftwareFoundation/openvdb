@@ -30,6 +30,22 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace codegen {
 
+
+namespace {
+
+/// @todo  Provide more framework for functions such that they can only
+///        be registered against compatible code generators.
+inline void verifyContext(const llvm::Function* const F, const std::string& name)
+{
+    if (!F || F->getName() != "ax.compute.voxel") {
+        OPENVDB_THROW(AXCompilerError, "Function \"" << name << "\" cannot be called for "
+            "the current target. This function only runs on OpenVDB Grids (not OpenVDB Point Grids).");
+    }
+}
+
+}
+
+
 inline FunctionGroup::Ptr axgetvoxelpws(const FunctionOptions& op)
 {
     static auto generate = [](const std::vector<llvm::Value*>&,
@@ -37,8 +53,7 @@ inline FunctionGroup::Ptr axgetvoxelpws(const FunctionOptions& op)
     {
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(compute->getName() == "ax.compute.voxel");
+        verifyContext(compute, "getvoxelpws");
         llvm::Value* coordws = extractArgument(compute, "coord_ws");
         assert(coordws);
         return coordws;
@@ -63,8 +78,7 @@ inline FunctionGroup::Ptr axgetcoord(const FunctionOptions& op)
     {
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(compute->getName() == "ax.compute.voxel");
+        verifyContext(compute, (Index == 0 ? "getcoordx" : Index == 1 ? "getcoordy" : "getcoordz"));
         llvm::Value* coordis = extractArgument(compute, "coord_is");
         assert(coordis);
         return B.CreateLoad(B.CreateConstGEP2_64(coordis, 0, Index));
@@ -93,6 +107,7 @@ inline FunctionGroup::Ptr axsetvoxel(const FunctionOptions& op)
             <typename std::remove_pointer
                 <decltype(value)>::type>::type;
         using GridType = typename openvdb::BoolGrid::ValueConverter<ValueType>::Type;
+        using RootNodeType = typename GridType::TreeType::RootNodeType;
         using AccessorType = typename GridType::Accessor;
 
         assert(accessor);
@@ -101,7 +116,41 @@ inline FunctionGroup::Ptr axsetvoxel(const FunctionOptions& op)
         // set value only to avoid changing topology
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
         AccessorType* const accessorPtr = static_cast<AccessorType* const>(accessor);
-        accessorPtr->setValueOnly(*ijk, *value);
+
+        // Check the depth to avoid creating voxel topology for higher levels
+        // @todo  As this option is not configurable outside of the executable, we
+        // should be able to avoid this branching by setting the depth as a global
+        const int depth = accessorPtr->getValueDepth(*ijk);
+        if (depth == static_cast<int>(RootNodeType::LEVEL)) {
+            accessorPtr->setValueOnly(*ijk, *value);
+        }
+        else {
+            // If the current depth is not the maximum (i.e voxel/leaf level) then
+            // we're iterating over tiles of an internal node (NodeT0 is the leaf level).
+            // We can't call setValueOnly or other variants as this will forcer voxel
+            // topology to be created. Whilst the VolumeExecutables runs in such a
+            // way that this is safe, it's not desriable; we just want to change the
+            // tile value. There is no easy way to do this; we have to set a new tile
+            // with the same active state.
+            // @warning This code assume that getValueDepth() is always called to force
+            // a node cache.
+            using NodeT1 = typename AccessorType::NodeT1;
+            using NodeT2 = typename AccessorType::NodeT2;
+            if (NodeT1* node = accessorPtr->template getNode<NodeT1>()) {
+                const openvdb::Index index = node->coordToOffset(*ijk);
+                assert(node->isChildMaskOff(index));
+                node->addTile(index, *value, node->isValueOn(index));
+            }
+            else if (NodeT2* node = accessorPtr->template getNode<NodeT2>()) {
+                const openvdb::Index index = node->coordToOffset(*ijk);
+                assert(node->isChildMaskOff(index));
+                node->addTile(index, *value, node->isValueOn(index));
+            }
+            else {
+                const int level = RootNodeType::LEVEL - depth;
+                accessorPtr->addTile(level, *ijk, *value, accessorPtr->isValueOn(*ijk));
+            }
+        }
     };
 
     static auto setvoxelstr =

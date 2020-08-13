@@ -52,4 +52,4 @@ mat4d@test7[3,0] = mat4d@test8[1,0];
 mat4d@test8[3,1] = mat4d@test7[3,0];
 mat4d@test7[3,2] = mat4d@test8[1,1];
 mat4d@test8[3,3] = mat4d@test7[2,1];
-    
+

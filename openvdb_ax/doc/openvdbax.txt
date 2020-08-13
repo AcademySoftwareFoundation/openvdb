@@ -68,7 +68,7 @@ There are important consequences to registering custom types - other default
 installations of OpenVDB <b>will not be able to read your files</b> unless
 compiled with similar instantiations.
 @par
-@code{.c}
+@code{.cpp}
 openvdb::initialize(); // standard init of vdb
 openvdb::ax::initialize(); // standard init of ax
 // Define a Vec4I grid type from the openvdb::math::Vec4<int32_t> class.

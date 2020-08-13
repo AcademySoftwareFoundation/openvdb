@@ -10,4 +10,4 @@ vec4i@test5[0] = vec4i@test6[2];
 vec4i@test5[3] = vec4i@test5[1];
 vec4i@test5[2] = vec4i@test6[3];
 vec4i@test6[1] = vec4i@test6[0];
-    
+

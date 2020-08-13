@@ -698,21 +698,18 @@ struct PointDefaultModifier :
 
 /////////////////////////////////////////////////////////////////////////////
 
-Compiler::Compiler(const CompilerOptions& options,
-                   const std::function<ast::Tree::Ptr(const char*)>& parser)
+Compiler::Compiler(const CompilerOptions& options)
     : mContext()
     , mCompilerOptions(options)
-    , mParser(parser)
     , mFunctionRegistry()
 {
     mContext.reset(new llvm::LLVMContext);
     mFunctionRegistry = codegen::createDefaultRegistry(&options.mFunctionOptions);
 }
 
-Compiler::UniquePtr Compiler::create(const CompilerOptions &options,
-                                     const std::function<ast::Tree::Ptr (const char *)> &parser)
+Compiler::UniquePtr Compiler::create(const CompilerOptions &options)
 {
-    UniquePtr compiler(new Compiler(options, parser));
+    UniquePtr compiler(new Compiler(options));
     return compiler;
 }
 
@@ -808,8 +805,12 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     }
 
     // create final executable object
-    PointExecutable::Ptr executable(new PointExecutable(executionEngine, mContext, registry, validCustomData,
-        functionMap));
+    PointExecutable::Ptr
+        executable(new PointExecutable(mContext,
+            executionEngine,
+            registry,
+            validCustomData,
+            functionMap));
     return executable;
 }
 
@@ -877,7 +878,10 @@ Compiler::compile<VolumeExecutable>(const ast::Tree& syntaxTree,
 
     // create final executable object
     VolumeExecutable::Ptr
-        executable(new VolumeExecutable(executionEngine, mContext, registry, validCustomData,
+        executable(new VolumeExecutable(mContext,
+            executionEngine,
+            registry,
+            validCustomData,
             functionMap));
     return executable;
 }
