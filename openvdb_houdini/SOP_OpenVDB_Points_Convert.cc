@@ -828,7 +828,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
             // instead of mergePrims to make sure we merge points that are not
             // associated with any primitive
             GA_PointGroup pointsWithPackedPrims(*ptGeo);
-            pointsWithPackedPrims.GA_ElementGroup::operator|=(*packgroup);
+            pointsWithPackedPrims.combine(packgroup.get());
 
             // Merge everything except the geo associated with prims we've just unpacked
             nonConstDetail.mergePoints(*ptGeo, GA_Range(pointsWithPackedPrims, /*invert*/true));
