@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.1.0</B> - <I>In Development</I>
+<B>Version 7.1.0</B> - <I>August 13, 2020</I>
 
 @par
 <BLOCKQUOTE>
@@ -13,20 +13,29 @@ As of this release, support for grid ABI=4 has been removed.
 
 @par
 New features:
-- Added a novel parallel sparse @vdblink::tools::FastSweeping tools::FastSweeping@endlink class that outperforms our existing
-  techniques for computing signed distance fields in addition to supporting velocity extension.
-- Added @vdblink::tools::fogToSdf tools::fogToSdf@endlink which converts a scalar (fog) volume into a signed distance.
-- Added @vdblink::tools::sdfToSdf tools::sdfToSdf@endlink which re-normalizes a signed distance field;
-- Added @vdblink::tools::fogToExt tools::fogToExt@endlink which extends an arbitrary field (e.g. velocity) off the
-  iso-surface of a scalar (fog) volume.
-- Added @vdblink::tools::sdfToExt tools::sdfToExt@endlink which extends an arbitrary field (e.g. velocity) off the
-  iso-surface of a signed distance field.
-- Added @vdblink::tools::fogToSdfAndExt tools::fogToSdfAndExt@endlink which computes a signed distance and extends an
-  arbitrary field (e.g. velocity) off the iso-surface of a signed distance field.
-- Added @vdblink::tools::fogToSdfAndExt tools::fogToSdfAndExt@endlink which re-normalizes a signed distance and extends an
-  arbitrary field (e.g. velocity) off the iso-surface of a signed distance field.
-- Added @vdblink::tools::dilateSdf tools::dilateSdf@endlink which dilates a signed distance field.
-- Added @vdblink::tools::maskSdf tools::maskSdf@endlink which extends an existing signed distance into a user-defined mask.
+- Added a novel parallel sparse
+  @vdblink::tools::FastSweeping tools::FastSweeping@endlink class that
+  outperforms our existing techniques for computing signed distance fields in
+  addition to supporting velocity extension.
+- Added @vdblink::tools::fogToSdf tools::fogToSdf@endlink which converts a
+  scalar (fog) volume into a signed distance.
+- Added @vdblink::tools::sdfToSdf tools::sdfToSdf@endlink which re-normalizes a
+  signed distance field;
+- Added @vdblink::tools::fogToExt tools::fogToExt@endlink which extends an
+  arbitrary field (e.g. velocity) off the iso-surface of a scalar (fog) volume.
+- Added @vdblink::tools::sdfToExt tools::sdfToExt@endlink which extends an
+  arbitrary field (e.g. velocity) off the iso-surface of a signed distance
+  field.
+- Added @vdblink::tools::fogToSdfAndExt tools::fogToSdfAndExt@endlink which
+  computes a signed distance and extends an arbitrary field (e.g. velocity) off
+  the iso-surface of a signed distance field.
+- Added @vdblink::tools::fogToSdfAndExt tools::fogToSdfAndExt@endlink which
+  re-normalizes a signed distance and extends an arbitrary
+  field (e.g. velocity) off the iso-surface of a signed distance field.
+- Added @vdblink::tools::dilateSdf tools::dilateSdf@endlink which dilates a
+  signed distance field.
+- Added @vdblink::tools::maskSdf tools::maskSdf@endlink which extends an
+  existing signed distance into a user-defined mask.
 - Added @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink to tell if
   the tree is shared with another grid.
 - Added @vdblink::points::PointDataLeafNode::stealAttributeSet()
