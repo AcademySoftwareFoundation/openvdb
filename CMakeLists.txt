@@ -70,6 +70,7 @@ option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
 option(OPENVDB_BUILD_AX_DOCS "Build the OpenVDB AX documentation" OFF)
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
+option(OPENVDB_BUILD_AX_HOUDINI_PLUGIN "Build the AX Houdini plugin" OFF)
 
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
@@ -377,7 +378,9 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR
+   OPENVDB_BUILD_HOUDINI_ABITESTS OR
+   OPENVDB_BUILD_AX_HOUDINI_PLUGIN)
   set(USE_HOUDINI ON)
 endif()
 
@@ -412,6 +415,7 @@ if(NOT (
     OPENVDB_BUILD_AX OR
     OPENVDB_BUILD_AX_BINARIES OR
     OPENVDB_BUILD_AX_UNITTESTS OR
+    OPENVDB_BUILD_AX_HOUDINI_PLUGIN OR
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
@@ -677,14 +681,16 @@ endif()
 if(WIN32)
   if(OPENVDB_BUILD_AX OR
      OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
+     OPENVDB_BUILD_AX_UNITTESTS OR
+     OPENVDB_BUILD_AX_HOUDINI_PLUGIN)
     message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
   endif()
 endif()
 
 if(NOT OPENVDB_BUILD_AX AND
    (OPENVDB_BUILD_AX_BINARIES OR
-    OPENVDB_BUILD_AX_UNITTESTS))
+    OPENVDB_BUILD_AX_UNITTESTS OR
+    OPENVDB_BUILD_AX_HOUDINI_PLUGIN))
   find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
 endif()
 
@@ -771,6 +777,10 @@ endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
   add_subdirectory(openvdb_houdini)
+endif()
+
+if(OPENVDB_BUILD_AX_HOUDINI_PLUGIN)
+  add_subdirectory(openvdb_ax_houdini)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_ABITESTS)
