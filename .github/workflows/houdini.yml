@@ -18,9 +18,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: download_houdini
-      run: ./ci/download_houdini2.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+      run: ./ci/download_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -38,9 +38,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: download_houdini
-      run: ./ci/download_houdini2.sh 17.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+      run: ./ci/download_houdini.sh 17.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test

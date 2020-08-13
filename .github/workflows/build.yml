@@ -88,7 +88,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -110,7 +110,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -143,7 +143,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
     - name: test
@@ -165,7 +165,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Debug OFF
     - name: test
