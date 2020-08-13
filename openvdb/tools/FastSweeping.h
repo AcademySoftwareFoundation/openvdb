@@ -14,7 +14,7 @@
 ///          named FastSweeping.
 ///
 /// @note    Solves the (simplified) Eikonal Eq: @f$|\nabla \phi|^2 = 1@f$ and
-///          performs velocity extension,  @f$\nable f\nabla \phi = 0@f$, both
+///          performs velocity extension,  @f$\nabla f\nabla \phi = 0@f$, both
 ///          by means of the fast sweeping algorithm detailed in:
 ///          "A Fast Sweeping Method For Eikonal Equations"
 ///          by H. Zhao, Mathematics of Computation, Vol 74(230), pp 603-627, 2004
