@@ -6,6 +6,13 @@
 @par
 <B>Version 7.1.1</B> - <I>In Development</I>
 
+@par
+Houdini:
+- Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
+  transform was ignoring the contents of packed geometry.
+- Fixed a bug in the OpenVDB Points Convert SOP where points representing
+  packed geometry were also being converted.
+
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
