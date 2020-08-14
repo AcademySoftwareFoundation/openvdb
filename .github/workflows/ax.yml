@@ -50,3 +50,55 @@ jobs:
       - name: install_llvm
         if: steps.llvm_cache.outputs.cache-hit != 'true'
         run: ./ci/install_llvm.sh ${{ matrix.llvm }} ${{ env.LLVM_DIR }}
+      - name: install_libedit
+        run: yum -y install libedit-devel
+      # Build
+      - name: build
+        run: |
+          ./ci/build_ax.sh \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+            -DLLVM_DIR=${{ env.LLVM_DIR }}
+      # Tests
+      - name: test
+        run: cd build && ctest -V
+      - name: test_doxygen_examples
+        run: ./ci/extract_test_examples.sh
+
+  macos-core:
+    runs-on: macos-10.15
+    name: macos-compiler:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    env:
+      CXX: ${{ matrix.compiler }}
+    strategy:
+      matrix:
+        compiler: ['g++', 'clang++']
+        build: ['Release']
+        llvm: ['6','7','8','9','10']
+        # Debug builds
+        include:
+          - compiler: 'g++'
+            build: 'Debug'
+            llvm: '8'
+          - compiler: 'clang++'
+            build: 'Debug'
+            llvm: '8'
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      # Setup
+      - name: install_deps
+        run: ./ci/install_macos_ax.sh ${{ matrix.llvm }}
+      - name: install_openvdb
+        run: ./ci/install_openvdb.sh 7.0.0 $HOME/openvdb-7.0.0-${{ matrix.compiler }}
+      # Build
+      - name: build
+        run: |
+          ./ci/build_ax.sh \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+            -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm \
+            -DOPENVDB_ROOT=$HOME/openvdb-7.0.0-${{ matrix.compiler }}
+      # Tests
+      - name: test
+        run: cd build && ctest -V
+      - name: test_doxygen_examples
+        run: ./ci/extract_test_examples.sh
