@@ -750,11 +750,11 @@ if(OPENVDB_BUILD_AX)
 endif()
 
 if(OPENVDB_BUILD_AX_BINARIES)
-  add_subdirectory(openvdb_ax/cmd)
+  add_subdirectory(openvdb_ax/openvdb_ax/cmd)
 endif()
 
 if(OPENVDB_BUILD_AX_UNITTESTS)
-  add_subdirectory(openvdb_ax/test)
+  add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)
