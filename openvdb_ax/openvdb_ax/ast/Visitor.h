@@ -17,8 +17,8 @@
 #include "Tokens.h"
 #include "Literals.h"
 
-#include <openvdb_ax/version.h>
-#include <openvdb_ax/ast/AST.h>
+#include "../version.h"
+#include "../ast/AST.h"
 
 #include <type_traits>
 

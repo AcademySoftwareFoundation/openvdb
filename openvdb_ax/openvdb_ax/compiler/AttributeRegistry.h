@@ -16,9 +16,9 @@
 #ifndef OPENVDB_AX_COMPILER_TARGET_REGISTRY_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_TARGET_REGISTRY_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Tokens.h>
-#include <openvdb_ax/ast/Scanners.h>
+#include "../ast/AST.h"
+#include "../ast/Tokens.h"
+#include "../ast/Scanners.h"
 
 #include <unordered_map>
 

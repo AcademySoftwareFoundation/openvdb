@@ -14,8 +14,8 @@
 
 #include "Types.h"
 
-#include <openvdb_ax/ast/Tokens.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../ast/Tokens.h"
+#include "../Exceptions.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>

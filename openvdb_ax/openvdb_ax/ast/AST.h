@@ -30,8 +30,7 @@
 
 #include "Tokens.h"
 #include "Literals.h"
-
-#include <openvdb_ax/version.h>
+#include "../version.h"
 
 #include <memory>
 #include <utility>

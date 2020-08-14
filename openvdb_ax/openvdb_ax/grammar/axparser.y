@@ -13,8 +13,8 @@
     #include <vector>
 
     #include <openvdb/Platform.h> // for OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-    #include <openvdb_ax/ast/AST.h>
-    #include <openvdb_ax/ast/Tokens.h>
+    #include "AST.h"
+    #include "Tokens.h"
 
     /// @note  Bypasses bison conversion warnings in yyparse
     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN

@@ -10,10 +10,10 @@
 #include "Types.h"
 #include "Utils.h"
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Tokens.h>
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../ast/AST.h"
+#include "../ast/Tokens.h"
+#include "../compiler/CustomData.h"
+#include "../Exceptions.h"
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/CallingConv.h>

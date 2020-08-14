@@ -5,8 +5,8 @@
 #include "util.h"
 
 #include <openvdb/points/PointConversion.h>
-#include <openvdb_ax/compiler/PointExecutable.h>
-#include <openvdb_ax/compiler/VolumeExecutable.h>
+#include "../compiler/PointExecutable.h"
+#include "../compiler/VolumeExecutable.h"
 
 namespace unittest_util
 {

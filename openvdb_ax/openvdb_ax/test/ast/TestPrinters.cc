@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/PrintTree.h>
+#include "../ast/AST.h"
+#include "../ast/PrintTree.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 

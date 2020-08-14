@@ -13,12 +13,11 @@
 
 #include "FunctionRegistry.h"
 #include "FunctionTypes.h"
-
 #include "SymbolTable.h"
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Visitor.h>
-#include <openvdb_ax/compiler/CompilerOptions.h>
+#include "../ast/AST.h"
+#include "../ast/Visitor.h"
+#include "../compiler/CompilerOptions.h"
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/IR/BasicBlock.h>

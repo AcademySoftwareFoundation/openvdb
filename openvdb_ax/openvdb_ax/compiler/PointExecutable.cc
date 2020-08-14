@@ -7,12 +7,12 @@
 
 #include <openvdb/Types.h>
 
-#include <openvdb_ax/Exceptions.h>
+#include "../Exceptions.h"
 
 // @TODO refactor so we don't have to include PointComputeGenerator.h,
 // but still have the functions defined in one place
-#include <openvdb_ax/codegen/PointComputeGenerator.h>
-#include <openvdb_ax/compiler/LeafLocalData.h>
+#include "../codegen/PointComputeGenerator.h"
+#include "../compiler/LeafLocalData.h"
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointAttribute.h>

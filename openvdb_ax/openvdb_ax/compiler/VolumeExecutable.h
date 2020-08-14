@@ -12,8 +12,8 @@
 #ifndef OPENVDB_AX_COMPILER_VOLUME_EXECUTABLE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_VOLUME_EXECUTABLE_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/compiler/AttributeRegistry.h>
+#include "../compiler/CustomData.h"
+#include "../compiler/AttributeRegistry.h"
 
 #include <openvdb/Grid.h>
 

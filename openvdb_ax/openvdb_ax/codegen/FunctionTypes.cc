@@ -8,7 +8,7 @@
 #include "Types.h"
 #include "Utils.h"
 
-#include <openvdb_ax/Exceptions.h>
+#include "../Exceptions.h"
 
 #include <openvdb/util/Name.h>
 

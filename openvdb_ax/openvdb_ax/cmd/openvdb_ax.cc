@@ -9,15 +9,15 @@
 ///   run and analyze AX code.
 ///
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Scanners.h>
-#include <openvdb_ax/ast/PrintTree.h>
-#include <openvdb_ax/codegen/Functions.h>
-#include <openvdb_ax/compiler/Compiler.h>
-#include <openvdb_ax/compiler/AttributeRegistry.h>
-#include <openvdb_ax/compiler/CompilerOptions.h>
-#include <openvdb_ax/compiler/PointExecutable.h>
-#include <openvdb_ax/compiler/VolumeExecutable.h>
+#include "../ast/AST.h"
+#include "../ast/Scanners.h"
+#include "../ast/PrintTree.h"
+#include "../codegen/Functions.h"
+#include "../compiler/Compiler.h"
+#include "../compiler/AttributeRegistry.h"
+#include "../compiler/CompilerOptions.h"
+#include "../compiler/PointExecutable.h"
+#include "../compiler/VolumeExecutable.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/util/logging.h>

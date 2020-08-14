@@ -7,11 +7,11 @@
 
 #include "TestHarness.h"
 
-#include <openvdb_ax/test/util.h>
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/math/OpenSimplexNoise.h>
-#include <openvdb_ax/compiler/PointExecutable.h>
-#include <openvdb_ax/compiler/VolumeExecutable.h>
+#include "../test/util.h"
+#include "../compiler/CustomData.h"
+#include "../math/OpenSimplexNoise.h"
+#include "../compiler/PointExecutable.h"
+#include "../compiler/VolumeExecutable.h"
 
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/util/CpuTimer.h>

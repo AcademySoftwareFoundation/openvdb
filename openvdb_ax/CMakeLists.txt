@@ -137,6 +137,11 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   openvdb_ax/math/OpenSimplexNoise.cc
   )
 
+set_source_files_properties(${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+  PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/openvdb_ax/ast)
+set_source_files_properties(${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
+  PROPERTIES INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/openvdb_ax/ast)
+
 set(OPENVDB_AX_AST_INCLUDE_FILES
   openvdb_ax/ast/AST.h
   openvdb_ax/ast/Literals.h
@@ -216,7 +221,7 @@ if(OPENVDB_AX_STATIC)
 
   target_include_directories(openvdb_ax_static
     PUBLIC .
-    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+    PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
   )
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
@@ -242,7 +247,7 @@ if(OPENVDB_AX_SHARED)
 
   target_include_directories(openvdb_ax_shared
     PUBLIC .
-    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+    PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
   )
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}

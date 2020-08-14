@@ -11,9 +11,9 @@
 #ifndef OPENVDB_AX_CODEGEN_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_TYPES_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/ast/Tokens.h>
-#include <openvdb_ax/ast/Literals.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../ast/Tokens.h"
+#include "../ast/Literals.h"
+#include "../Exceptions.h"
 
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>

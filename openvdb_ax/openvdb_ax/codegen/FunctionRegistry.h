@@ -15,8 +15,8 @@
 #include "FunctionTypes.h"
 #include "Types.h"
 
-#include <openvdb_ax/version.h>
-#include <openvdb_ax/compiler/CompilerOptions.h>
+#include "../version.h"
+#include "../compiler/CompilerOptions.h"
 
 #include <unordered_map>
 

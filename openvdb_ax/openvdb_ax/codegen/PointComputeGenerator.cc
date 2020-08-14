@@ -10,8 +10,8 @@
 #include "Types.h"
 #include "Utils.h"
 
-#include <openvdb_ax/Exceptions.h>
-#include <openvdb_ax/ast/Scanners.h>
+#include "../Exceptions.h"
+#include "../ast/Scanners.h"
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/BasicBlock.h>

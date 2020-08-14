@@ -4,7 +4,6 @@
 /// @file ast/PrintTree.cc
 
 #include "PrintTree.h"
-
 #include "AST.h"
 #include "Tokens.h"
 #include "Visitor.h"

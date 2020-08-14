@@ -10,8 +10,8 @@
 #ifndef OPENVDB_AX_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Tokens.h>
+#include "../ast/AST.h"
+#include "../ast/Tokens.h"
 #include <openvdb/Types.h>
 
 #include <memory>

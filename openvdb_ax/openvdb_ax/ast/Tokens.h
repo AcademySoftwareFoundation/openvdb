@@ -13,8 +13,8 @@
 #define OPENVDB_AX_AST_TOKENS_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb_ax/version.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../version.h"
+#include "../Exceptions.h"
 #include <stdexcept>
 
 namespace openvdb {

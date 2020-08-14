@@ -5,11 +5,11 @@
 
 #include "VolumeExecutable.h"
 
-#include <openvdb_ax/Exceptions.h>
+#include "../Exceptions.h"
 
 // @TODO refactor so we don't have to include VolumeComputeGenerator.h,
 // but still have the functions defined in one place
-#include <openvdb_ax/codegen/VolumeComputeGenerator.h>
+#include "../codegen/VolumeComputeGenerator.h"
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>

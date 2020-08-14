@@ -4,13 +4,13 @@
 #include "TestHarness.h"
 #include "util.h"
 
-#include <openvdb_ax/ax.h>
-#include <openvdb_ax/codegen/Types.h>
-#include <openvdb_ax/codegen/Functions.h>
-#include <openvdb_ax/codegen/FunctionRegistry.h>
-#include <openvdb_ax/codegen/FunctionTypes.h>
-#include <openvdb_ax/compiler/PointExecutable.h>
-#include <openvdb_ax/compiler/VolumeExecutable.h>
+#include "../ax.h"
+#include "../codegen/Types.h"
+#include "../codegen/Functions.h"
+#include "../codegen/FunctionRegistry.h"
+#include "../codegen/FunctionTypes.h"
+#include "../compiler/PointExecutable.h"
+#include "../compiler/VolumeExecutable.h"
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointConversion.h>

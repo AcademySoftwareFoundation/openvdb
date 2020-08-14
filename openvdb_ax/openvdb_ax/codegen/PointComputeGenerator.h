@@ -17,7 +17,7 @@
 #include "Types.h"
 #include "Utils.h"
 
-#include <openvdb_ax/compiler/AttributeRegistry.h>
+#include "../compiler/AttributeRegistry.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

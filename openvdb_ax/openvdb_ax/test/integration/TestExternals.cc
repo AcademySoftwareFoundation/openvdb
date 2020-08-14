@@ -4,10 +4,10 @@
 #include "CompareGrids.h"
 #include "TestHarness.h"
 
-#include <openvdb_ax/test/util.h>
+#include "../test/util.h"
 
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../compiler/CustomData.h"
+#include "../Exceptions.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 

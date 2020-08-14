@@ -15,9 +15,9 @@
 #ifndef OPENVDB_AX_COMPILER_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/compiler/CompilerOptions.h>
-#include <openvdb_ax/compiler/CustomData.h>
+#include "../ast/AST.h"
+#include "../compiler/CompilerOptions.h"
+#include "../compiler/CustomData.h"
 
 #include <memory>
 

@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb_ax/compiler/Compiler.h>
-#include <openvdb_ax/compiler/PointExecutable.h>
+#include "../compiler/Compiler.h"
+#include "../compiler/PointExecutable.h"
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>

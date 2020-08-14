@@ -12,7 +12,7 @@
 #ifndef OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/version.h>
+#include "../version.h"
 
 #include <llvm/IR/Value.h>
 

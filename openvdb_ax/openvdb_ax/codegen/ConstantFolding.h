@@ -11,7 +11,7 @@
 #ifndef OPENVDB_AX_CODEGEN_CONSTANT_FOLDING_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_CONSTANT_FOLDING_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/codegen/Types.h>
+#include "../codegen/Types.h"
 
 #include <llvm/IR/Constants.h>
 

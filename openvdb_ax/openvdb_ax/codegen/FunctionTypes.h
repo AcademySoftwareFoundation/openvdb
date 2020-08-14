@@ -66,9 +66,9 @@
 #ifndef OPENVDB_AX_CODEGEN_FUNCTION_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_FUNCTION_TYPES_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/codegen/Types.h>
-#include <openvdb_ax/codegen/Utils.h> // isValidCast
-#include <openvdb_ax/codegen/ConstantFolding.h>
+#include "../codegen/Types.h"
+#include "../codegen/Utils.h" // isValidCast
+#include "../codegen/ConstantFolding.h"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>

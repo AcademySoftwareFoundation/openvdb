@@ -11,7 +11,7 @@
 #ifndef OPENVDB_AX_AST_LITERALS_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AST_LITERALS_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/version.h>
+#include "../version.h"
 
 #include <limits>
 #include <string>

@@ -12,14 +12,14 @@
 
 #include "Functions.h"
 
-#include <openvdb_ax/version.h>
-#include <openvdb_ax/Exceptions.h>
-#include <openvdb_ax/math/OpenSimplexNoise.h>
-#include <openvdb_ax/compiler/CompilerOptions.h>
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/codegen/FunctionTypes.h>
-#include <openvdb_ax/codegen/Types.h>
-#include <openvdb_ax/codegen/Utils.h>
+#include "../version.h"
+#include "../Exceptions.h"
+#include "../math/OpenSimplexNoise.h"
+#include "../compiler/CompilerOptions.h"
+#include "../compiler/CustomData.h"
+#include "../codegen/FunctionTypes.h"
+#include "../codegen/Types.h"
+#include "../codegen/Utils.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/random/mersenne_twister.hpp>

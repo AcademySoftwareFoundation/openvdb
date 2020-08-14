@@ -7,7 +7,7 @@
 #include "Functions.h"
 #include "FunctionTypes.h"
 
-#include <openvdb_ax/Exceptions.h>
+#include "../Exceptions.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

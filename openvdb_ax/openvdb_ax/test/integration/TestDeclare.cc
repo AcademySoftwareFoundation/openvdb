@@ -3,7 +3,7 @@
 
 #include "TestHarness.h"
 
-#include <openvdb_ax/test/util.h>
+#include "../test/util.h"
 
 #include <openvdb/Exceptions.h>
 

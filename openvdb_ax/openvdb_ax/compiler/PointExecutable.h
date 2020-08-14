@@ -12,8 +12,8 @@
 #ifndef OPENVDB_AX_COMPILER_POINT_EXECUTABLE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_POINT_EXECUTABLE_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/compiler/CustomData.h>
-#include <openvdb_ax/compiler/AttributeRegistry.h>
+#include "../compiler/CustomData.h"
+#include "../compiler/AttributeRegistry.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>

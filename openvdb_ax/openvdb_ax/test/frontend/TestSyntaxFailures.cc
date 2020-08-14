@@ -3,8 +3,8 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb_ax/compiler/Compiler.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../compiler/Compiler.h"
+#include "../Exceptions.h"
 
 #include <string>
 #include <vector>

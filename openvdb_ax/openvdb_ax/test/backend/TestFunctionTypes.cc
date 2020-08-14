@@ -3,7 +3,7 @@
 
 #include "util.h"
 
-#include <openvdb_ax/codegen/FunctionTypes.h>
+#include "../codegen/FunctionTypes.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 

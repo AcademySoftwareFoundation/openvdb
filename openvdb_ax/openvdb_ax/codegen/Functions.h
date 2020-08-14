@@ -13,8 +13,8 @@
 #ifndef OPENVDB_AX_CODEGEN_GENERIC_FUNCTIONS_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_GENERIC_FUNCTIONS_HAS_BEEN_INCLUDED
 
-#include <openvdb_ax/compiler/CompilerOptions.h>
-#include <openvdb_ax/codegen/FunctionRegistry.h>
+#include "../compiler/CompilerOptions.h"
+#include "../codegen/FunctionRegistry.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

@@ -8,11 +8,11 @@
 #include "PointExecutable.h"
 #include "VolumeExecutable.h"
 
-#include <openvdb_ax/ast/Scanners.h>
-#include <openvdb_ax/codegen/Functions.h>
-#include <openvdb_ax/codegen/PointComputeGenerator.h>
-#include <openvdb_ax/codegen/VolumeComputeGenerator.h>
-#include <openvdb_ax/Exceptions.h>
+#include "../ast/Scanners.h"
+#include "../codegen/Functions.h"
+#include "../codegen/PointComputeGenerator.h"
+#include "../codegen/VolumeComputeGenerator.h"
+#include "../Exceptions.h"
 
 #include <openvdb/Exceptions.h>
 
