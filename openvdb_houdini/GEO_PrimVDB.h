@@ -16,7 +16,6 @@
  * COMMENTS:    Custom VDB primitive.
  */
 
-#include <UT/UT_Version.h>
 
 // Using the native OpenVDB Primitive shipped with Houdini is strongly recommended,
 // as there is no guarantee that this code will be kept in sync with Houdini.
@@ -38,7 +37,6 @@ using ::GEO_PrimVDB;
 #define __HDK_GEO_PrimVDB__
 
 #include <GEO/GEO_Primitive.h>
-#include <GEO/GEO_Vertex.h>
 #include <GEO/GEO_VolumeOptions.h>
 #include <GA/GA_Defines.h>
 
@@ -46,7 +44,6 @@ using ::GEO_PrimVDB;
 
 #include <UT/UT_BoundingBox.h>
 #include "UT_VDBUtils.h"
-#include <UT/UT_Version.h>
 
 #include <openvdb/Platform.h>
 #include <openvdb/openvdb.h>
@@ -79,8 +76,7 @@ public:
     virtual void        reverse();
     virtual UT_Vector3  computeNormal() const;
     virtual void        copyPrimitive(const GEO_Primitive *src);
-    virtual void        copyUnwiredForMerge(const GA_Primitive *src,
-                                            const GA_MergeMap &map);
+    virtual void        copySubclassData(const GA_Primitive *source);
 
     using GEO_Primitive::getVertexOffset;
     using GEO_Primitive::getPointOffset;
@@ -107,10 +103,14 @@ public:
     /// location
     void                indexToPos(int x, int y, int z, UT_Vector3 &pos) const;
     void                findexToPos(UT_Vector3 index, UT_Vector3 &pos) const;
+    void                indexToPos(exint x, exint y, exint z, UT_Vector3D &pos) const;
+    void                findexToPos(UT_Vector3D index, UT_Vector3D &pos) const;
 
     /// Convert a 3d position into the closest index value.
     void                posToIndex(UT_Vector3 pos, int &x, int &y, int &z) const;
     void                posToIndex(UT_Vector3 pos, UT_Vector3 &index) const;
+    void                posToIndex(UT_Vector3D pos, exint &x, exint &y, exint &z) const;
+    void                posToIndex(UT_Vector3D pos, UT_Vector3D &index) const;
 
     /// Evaluate the voxel value at the given world space position.
     /// Note that depending on the underlying VDB type, this may not
@@ -119,6 +119,7 @@ public:
     fpreal              getValueAtIndexF(int ix, int iy, int iz) const;
     UT_Vector3D         getValueV3(const UT_Vector3 &pos) const;
     UT_Vector3D         getValueAtIndexV3(int ix, int iy, int iz) const;
+
     void                getValues(float *f, int stride, const UT_Vector3 *pos, int num) const;
     void                getValues(int *f, int stride, const UT_Vector3 *pos, int num) const;
     void                getValuesAtIndices(float *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
@@ -127,6 +128,15 @@ public:
     /// Vector grid variants.
     void                getValues(UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num) const;
     void                getValuesAtIndices(UT_Vector3 *f, int stride, const int *ix, const int *iy, const int *iz, int num) const;
+
+    void                getValues(double *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValues(exint *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValuesAtIndices(double *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
+    void                getValuesAtIndices(exint *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
+
+    /// Vector grid variants.
+    void                getValues(UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num) const;
+    void                getValuesAtIndices(UT_Vector3D *f, int stride, const exint *ix, const exint *iy, const exint *iz, int num) const;
 
     // Worldspace gradient at the given position
     UT_Vector3           getGradient(const UT_Vector3 &pos) const;
@@ -143,9 +153,11 @@ public:
                             bool normalize = false) const;
 
     /// Get the storage type of the grid
+    SYS_FORCE_INLINE
     UT_VDBType          getStorageType() const
                                 { return myGridAccessor.getStorageType(); }
     /// Get the tuple size, usually 1 or 3
+    SYS_FORCE_INLINE
     int                 getTupleSize() const
                             { return UTvdbGetGridTupleSize(getStorageType()); }
 
@@ -253,6 +265,11 @@ public:
     /// Returns the length of the voxel when you take an x, y, and z step
     UT_Vector3           getVoxelSize() const;
 
+    /// Compute useful aggregate properties of the volume.
+    fpreal               calcMinimum() const;
+    fpreal               calcMaximum() const;
+    fpreal               calcAverage() const;
+
     /// VDBs may either be unbounded, or created with a specific frustum
     /// range.  The latter is important for tapered VDBs that otherwise
     /// have a singularity at the camera location.  Tools can use the
@@ -346,19 +363,24 @@ public:
     /// Visualization accessors
     /// @{
     const GEO_VolumeOptions &getVisOptions() const  { return myVis; }
+    void                     setVisOptions(const GEO_VolumeOptions &vis)
+    { setVisualization(vis.myMode, vis.myIso, vis.myDensity, vis.myLod); }
 
     void                setVisualization(
                             GEO_VolumeVis vismode,
                             fpreal iso,
-                            fpreal density)
+                            fpreal density,
+                            GEO_VolumeVisLod lod = GEO_VOLUMEVISLOD_FULL)
                         {
                             myVis.myMode = vismode;
                             myVis.myIso = iso;
                             myVis.myDensity = density;
+                            myVis.myLod = lod;
                         }
     GEO_VolumeVis       getVisualization() const    { return myVis.myMode; }
     fpreal              getVisIso() const           { return myVis.myIso; }
     fpreal              getVisDensity() const       { return myVis.myDensity; }
+    GEO_VolumeVisLod    getVisLod() const           { return myVis.myLod; }
     /// @}
 
     /// Load the order from a JSON value
@@ -366,8 +388,10 @@ public:
 
     /// @{
     /// Save/Load vdb to a JSON stream
-    bool                saveVDB(UT_JSONWriter &w) const;
-    bool                loadVDB(UT_JSONParser &p);
+    bool                saveVDB(UT_JSONWriter &w, const GA_SaveMap &sm,
+                                bool as_shmem = false) const;
+    bool                loadVDB(UT_JSONParser &p,
+                                bool as_shmem = false);
     /// @}
 
     bool                saveVisualization(
@@ -394,11 +418,13 @@ public:
     /// the volume's size. Negative values will be ignored.
     fpreal      calcPositiveDensity() const;
 
+    SYS_FORCE_INLINE
     bool        hasGrid() const { return myGridAccessor.hasGrid(); }
 
     /// @brief If this primitive's grid's voxel data (i.e., its tree)
     /// is shared, replace the tree with a deep copy of itself that is
     /// not shared with anyone else.
+    SYS_FORCE_INLINE
     void                        makeGridUnique()
                                     { myGridAccessor.makeGridUnique(); }
 
@@ -409,15 +435,18 @@ public:
 
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
+    SYS_FORCE_INLINE
     const openvdb::GridBase &   getConstGrid() const
                                     { return myGridAccessor.getConstGrid(*this); }
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
+    SYS_FORCE_INLINE
     const openvdb::GridBase &   getGrid() const
                                     { return getConstGrid(); }
     /// @brief Return a reference to this primitive's grid.
     /// @note Calling setGrid() invalidates all references previously returned.
     /// @warning Call makeGridUnique() before modifying the grid's voxel data.
+    SYS_FORCE_INLINE
     openvdb::GridBase &         getGrid()
                                 {
                                     incrGridUniqueIds();
@@ -427,17 +456,20 @@ public:
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
+    SYS_FORCE_INLINE
     openvdb::GridBase::ConstPtr getConstGridPtr() const
                                     { return myGridAccessor.getConstGridPtr(*this); }
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
+    SYS_FORCE_INLINE
     openvdb::GridBase::ConstPtr getGridPtr() const
                                     { return getConstGridPtr(); }
     /// @brief Return a shared pointer to this primitive's grid.
     /// @note Calling setGrid() causes the grid to which the shared pointer
     /// refers to be disassociated with this primitive.
     /// @warning Call makeGridUnique() before modifying the grid's voxel data.
+    SYS_FORCE_INLINE
     openvdb::GridBase::Ptr      getGridPtr()
                                 {
                                     incrGridUniqueIds();
@@ -446,10 +478,11 @@ public:
 
     /// @brief Set this primitive's grid to a shallow copy of the given grid.
     /// @note Invalidates all previous getGrid() and getConstGrid() references
-    void                        setGrid(const openvdb::GridBase &grid)
+    SYS_FORCE_INLINE
+    void                        setGrid(const openvdb::GridBase &grid, bool copyPosition=true)
                                 {
                                     incrGridUniqueIds();
-                                    myGridAccessor.setGrid(grid, *this);
+                                    myGridAccessor.setGrid(grid, *this, copyPosition);
                                 }
 
     /// @brief Return a reference to this primitive's grid metadata.
@@ -462,6 +495,7 @@ public:
                                     { return getConstGrid(); }
     /// @brief Return a reference to this primitive's grid metadata.
     /// @note Calling setGrid() invalidates all references previously returned.
+    SYS_FORCE_INLINE
     openvdb::MetaMap&           getMetadata()
                                 {
                                     incrMetadataUniqueId();
@@ -511,7 +545,7 @@ public:
     /// @endcode
     template<typename GridTypeListT, typename OpT>
     bool    apply(OpT& op) const
-                { return hasGrid() ? getConstGrid.apply<GridTypeListT>(op) : false; }
+                { return hasGrid() ? getConstGrid().apply<GridTypeListT>(op) : false; }
 
     /// @brief If this primitive's grid resolves to one of the listed grid types,
     /// invoke the functor @a op on the resolved grid.
@@ -595,7 +629,7 @@ protected:
 
     /// @brief Replace this primitive's grid with a shallow copy
     /// of another primitive's grid.
-    void                copyGridFrom(const GEO_PrimVDB&);
+    void                copyGridFrom(const GEO_PrimVDB&, bool copyPosition=true);
 
     /// @brief GridAccessor manages access to a GEO_PrimVDB's grid.
     /// @details In keeping with OpenVDB library conventions, the grid
@@ -610,38 +644,46 @@ protected:
     /// - ensures that the primitive's transform and the grid's transform
     ///   are in sync (specifically, the translation component, which is
     ///   stored independently as a vertex offset).
-    class GridAccessor
+    class OPENVDB_HOUDINI_API GridAccessor
     {
     public:
+        SYS_FORCE_INLINE
         GridAccessor() : myStorageType(UT_VDB_INVALID)
             { }
 
+        SYS_FORCE_INLINE
         void clear()
         {
             myGrid.reset();
             myStorageType = UT_VDB_INVALID;
         }
 
+        SYS_FORCE_INLINE
         openvdb::GridBase &
         getGrid(const GEO_PrimVDB &prim)
             { updateGridTranslates(prim); return *myGrid; }
 
+        SYS_FORCE_INLINE
         const openvdb::GridBase &
         getConstGrid(const GEO_PrimVDB &prim) const
             { updateGridTranslates(prim); return *myGrid; }
 
+        SYS_FORCE_INLINE
         openvdb::GridBase::Ptr
         getGridPtr(const GEO_PrimVDB &prim)
             { updateGridTranslates(prim); return myGrid; }
 
+        SYS_FORCE_INLINE
         openvdb::GridBase::ConstPtr
         getConstGridPtr(const GEO_PrimVDB &prim) const
             { updateGridTranslates(prim); return myGrid; }
 
         // These accessors will ensure the transform's translate is set into
         // the vertex position.
-        void        setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim)
-                        { setGridAdapter(&grid, prim); }
+        SYS_FORCE_INLINE
+        void        setGrid(const openvdb::GridBase& grid, GEO_PrimVDB& prim, bool copyPosition=true)
+                        { setGridAdapter(&grid, prim, copyPosition); }
+        SYS_FORCE_INLINE
         void        setTransform(
                         const openvdb::math::Transform &xform,
                         GEO_PrimVDB &prim)
@@ -650,17 +692,22 @@ protected:
         void            makeGridUnique();
         bool            isGridUnique() const;
 
+        SYS_FORCE_INLINE
         UT_VDBType      getStorageType() const { return myStorageType; }
+
+        SYS_FORCE_INLINE
         bool            hasGrid() const { return myGrid != 0; }
 
     private:
         void        updateGridTranslates(const GEO_PrimVDB &prim) const;
+
+        SYS_FORCE_INLINE
         void        setVertexPosition(
                         const openvdb::math::Transform &xform,
                         GEO_PrimVDB &prim)
                         { setVertexPositionAdapter(&xform, prim); }
 
-        void        setGridAdapter(const void* grid, GEO_PrimVDB&);
+        void        setGridAdapter(const void* grid, GEO_PrimVDB&, bool copyPosition);
         void        setTransformAdapter(const void* xform, GEO_PrimVDB&);
         void        setVertexPositionAdapter(const void* xform, GEO_PrimVDB&);
 
@@ -711,12 +758,7 @@ inline void
 callTypedGrid(GEO_PrimVDB& prim, OpType& op)
 {
     prim.makeGridUnique();
-
-#ifdef _MSC_VER
-    op.operator()<GridType>(*(UTverify_cast<GridType*>(&prim.getGrid())));
-#else
     op.template operator()<GridType>(*(UTverify_cast<GridType*>(&prim.getGrid())));
-#endif
 }
 
 // Overload of callTypedGrid() for GridBaseType = const GEO_PrimVDB
@@ -724,11 +766,7 @@ template<typename GridType, typename OpType>
 inline void
 callTypedGrid(const GEO_PrimVDB& prim, OpType& op)
 {
-#ifdef _MSC_VER
-    op.operator()<GridType>(*(UTverify_cast<const GridType*>(&prim.getConstGrid())));
-#else
     op.template operator()<GridType>(*(UTverify_cast<const GridType*>(&prim.getConstGrid())));
-#endif
 }
 
 } // namespace UT_VDBUtils

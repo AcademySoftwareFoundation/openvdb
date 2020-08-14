@@ -19,7 +19,6 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <algorithm> // for std::min()
 #include <cctype> // for isspace()
 #include <iomanip>
@@ -682,8 +681,10 @@ SOP_OpenVDB_Combine::Cache::cookVDBSop(OP_Context& context)
                     }
                     break;
                 case COLL_FLATTEN_B_TO_A:
-                    aVdbVec.push_back(*aIt);
-                    bVdbVec.push_back(*bIt);
+                    if (*bIt) {
+                        aVdbVec.push_back(*aIt);
+                        bVdbVec.push_back(*bIt);
+                    }
                     for (++bIt; bIt; ++bIt) {
                         aVdbVec.push_back(nullptr);
                         bVdbVec.push_back(*bIt);
@@ -950,11 +951,11 @@ struct SOP_OpenVDB_Combine::DispatchOp
 
     DispatchOp(SOP_OpenVDB_Combine::CombineOp& op): combineOp(&op) {}
 
-    template<typename BGridT> void operator()(typename BGridT::ConstPtr);
+    template<typename BGridT> void operator()(const BGridT&);
 }; // struct DispatchOp
 
 
-// Helper class for use with UTvdbProcessTypedGrid()
+// Helper class for use with GridBase::apply()
 struct SOP_OpenVDB_Combine::CombineOp
 {
     SOP_OpenVDB_Combine::Cache* self;
@@ -967,7 +968,7 @@ struct SOP_OpenVDB_Combine::CombineOp
 
     CombineOp(): self(nullptr) {}
 
-    // Functor for use with UTvdbProcessTypedGridScalar() to return
+    // Functor for use with GridBase::apply() to return
     // a scalar grid's background value as a floating-point quantity
     struct BackgroundOp {
         double value;
@@ -979,7 +980,7 @@ struct SOP_OpenVDB_Combine::CombineOp
     static double getScalarBackgroundValue(const hvdb::Grid& baseGrid)
     {
         BackgroundOp bgOp;
-        UTvdbProcessTypedGridScalar(UTvdbGetGridType(baseGrid), baseGrid, bgOp);
+        baseGrid.apply<hvdb::NumericGridTypes>(bgOp);
         return bgOp.value;
     }
 
@@ -1405,7 +1406,7 @@ struct SOP_OpenVDB_Combine::CombineOp
     }
 
     template<typename AGridT>
-    void operator()(typename AGridT::ConstPtr)
+    void operator()(const AGridT&)
     {
         const bool
             needA = needAGrid(op),
@@ -1417,8 +1418,7 @@ struct SOP_OpenVDB_Combine::CombineOp
         } else {
             DispatchOp<AGridT> dispatcher(*this);
             // Dispatch on the B grid's type.
-            int success = UTvdbProcessTypedGridTopology(
-                UTvdbGetGridType(*bBaseGrid), bBaseGrid, dispatcher);
+            int success = bBaseGrid->apply<hvdb::VolumeGridTypes>(dispatcher);
             if (!success) {
                 std::ostringstream ostr;
                 ostr << "grid " << bGridName << " has unsupported type " << bBaseGrid->type();
@@ -1432,7 +1432,7 @@ struct SOP_OpenVDB_Combine::CombineOp
 template<typename AGridT>
 template<typename BGridT>
 void
-SOP_OpenVDB_Combine::DispatchOp<AGridT>::operator()(typename BGridT::ConstPtr)
+SOP_OpenVDB_Combine::DispatchOp<AGridT>::operator()(const BGridT&)
 {
     combineOp->combineDifferentTypes<AGridT, BGridT>();
 }
@@ -1494,8 +1494,10 @@ SOP_OpenVDB_Combine::Cache::combineGrids(
     compOp.bGridName = bGridName;
     compOp.interrupt = hvdb::Interrupter();
 
-    int success = UTvdbProcessTypedGridTopology(
-        UTvdbGetGridType(needA ? *aGrid : *bGrid), aGrid, compOp);
+    int success = false;
+    if (needA || UTvdbGetGridType(*aGrid) == UTvdbGetGridType(*bGrid)) {
+        success = aGrid->apply<hvdb::VolumeGridTypes>(compOp);
+    }
     if (!success || !compOp.outGrid) {
         std::ostringstream ostr;
         if (aGrid->type() == bGrid->type()) {

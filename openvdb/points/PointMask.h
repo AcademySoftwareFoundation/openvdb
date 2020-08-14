@@ -392,42 +392,6 @@ convertPointsToMask(
 ////////////////////////////////////////
 
 
-// deprecated functions
-
-
-template <typename PointDataGridT,
-          typename MaskT = typename PointDataGridT::template ValueConverter<bool>::Type>
-OPENVDB_DEPRECATED
-inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::value,
-    typename MaskT::Ptr>::type
-convertPointsToMask(const PointDataGridT& grid,
-                    const std::vector<Name>& includeGroups,
-                    const std::vector<Name>& excludeGroups)
-{
-    auto leaf = grid.tree().cbeginLeaf();
-    if (!leaf)  return MaskT::create();
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    return convertPointsToMask(grid, filter);
-}
-
-
-template <typename PointDataGridT,
-          typename MaskT = typename PointDataGridT::template ValueConverter<bool>::Type>
-OPENVDB_DEPRECATED
-inline typename std::enable_if<std::is_same<typename MaskT::ValueType, bool>::value,
-    typename MaskT::Ptr>::type
-convertPointsToMask(const PointDataGridT& grid,
-                    const openvdb::math::Transform& transform,
-                    const std::vector<Name>& includeGroups,
-                    const std::vector<Name>& excludeGroups)
-{
-    auto leaf = grid.tree().cbeginLeaf();
-    if (!leaf)  return MaskT::create();
-    MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-    return convertPointsToMask(grid, transform, filter);
-}
-
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

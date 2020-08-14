@@ -15,11 +15,6 @@
 #include <openvdb/math/BBox.h>
 #include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
 #include <openvdb/version.h>
-#include <boost/mpl/contains.hpp>
-#include <boost/mpl/vector.hpp>//for boost::mpl::vector
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/push_back.hpp>
-#include <boost/mpl/size.hpp>
 #include <tbb/parallel_for.h>
 #include <map>
 #include <set>
@@ -52,7 +47,7 @@ public:
 
     /// NodeChainType is a list of this tree's node types, from LeafNodeType to RootNode.
     using NodeChainType = typename NodeChain<RootNode, LEVEL>::Type;
-    static_assert(boost::mpl::size<NodeChainType>::value == LEVEL + 1,
+    static_assert(NodeChainType::Size == LEVEL + 1,
         "wrong number of entries in RootNode node chain");
 
     /// @brief ValueConverter<T>::Type is the type of a RootNode having the same
@@ -484,6 +479,7 @@ public:
 
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
+    Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -971,7 +967,7 @@ private:
 ////////////////////////////////////////
 
 
-/// @brief NodeChain<RootNodeType, RootNodeType::LEVEL>::Type is a boost::mpl::vector
+/// @brief NodeChain<RootNodeType, RootNodeType::LEVEL>::Type is a openvdb::TypeList
 /// that lists the types of the nodes of the tree rooted at RootNodeType in reverse order,
 /// from LeafNode to RootNode.
 /// @details For example, if RootNodeType is
@@ -980,7 +976,7 @@ private:
 /// @endcode
 /// then NodeChain::Type is
 /// @code
-/// boost::mpl::vector<
+/// openvdb::TypeList<
 ///     LeafNode,
 ///     InternalNode<LeafNode>,
 ///     InternalNode<InternalNode<LeafNode> >,
@@ -989,18 +985,18 @@ private:
 ///
 /// @note Use the following to get the Nth node type, where N=0 is the LeafNodeType:
 /// @code
-/// boost::mpl::at<NodeChainType, boost::mpl::int_<N> >::type
+/// NodeChainType::Get<N>;
 /// @endcode
 template<typename HeadT, int HeadLevel>
 struct NodeChain {
     using SubtreeT = typename NodeChain<typename HeadT::ChildNodeType, HeadLevel-1>::Type;
-    using Type = typename boost::mpl::push_back<SubtreeT, HeadT>::type;
+    using Type = typename SubtreeT::template Append<HeadT>;
 };
 
 /// Specialization to terminate NodeChain
 template<typename HeadT>
 struct NodeChain<HeadT, /*HeadLevel=*/1> {
-    using Type = typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type;
+    using Type = TypeList<typename HeadT::ChildNodeType, HeadT>;
 };
 
 
@@ -1548,6 +1544,14 @@ RootNode<ChildT>::nonLeafCount() const
         }
     }
     return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::childCount() const
+{
+    return this->getChildCount();
 }
 
 
@@ -2859,8 +2863,8 @@ RootNode<ChildT>::getNodes(ArrayT& array)
         "argument to getNodes() must be a pointer array");
     using NodeType = typename std::remove_pointer<NodePtr>::type;
     using NonConstNodeType = typename std::remove_const<NodeType>::type;
-    using result = typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type;
-    static_assert(result::value, "can't extract non-const nodes from a const tree");
+    static_assert(NodeChainType::template Contains<NonConstNodeType>,
+        "can't extract non-const nodes from a const tree");
     using ArrayChildT = typename std::conditional<
         std::is_const<NodeType>::value, const ChildT, ChildT>::type;
 
@@ -2889,8 +2893,8 @@ RootNode<ChildT>::getNodes(ArrayT& array) const
     static_assert(std::is_const<NodeType>::value,
         "argument to getNodes() must be an array of const node pointers");
     using NonConstNodeType = typename std::remove_const<NodeType>::type;
-    using result = typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type;
-    static_assert(result::value, "can't extract non-const nodes from a const tree");
+    static_assert(NodeChainType::template Contains<NonConstNodeType>,
+        "can't extract non-const nodes from a const tree");
 
     for (MapCIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
         if (const ChildNodeType *child = iter->second.child) {
@@ -2917,8 +2921,8 @@ RootNode<ChildT>::stealNodes(ArrayT& array, const ValueType& value, bool state)
         "argument to stealNodes() must be a pointer array");
     using NodeType = typename std::remove_pointer<NodePtr>::type;
     using NonConstNodeType = typename std::remove_const<NodeType>::type;
-    using result = typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type;
-    static_assert(result::value, "can't extract non-const nodes from a const tree");
+    static_assert(NodeChainType::template Contains<NonConstNodeType>,
+        "can't extract non-const nodes from a const tree");
     using ArrayChildT = typename std::conditional<
         std::is_const<NodeType>::value, const ChildT, ChildT>::type;
 
@@ -3348,11 +3352,7 @@ RootNode<ChildT>::visitActiveBBox(BBoxOp& op) const
         if (this->isChild(i) && descent) {
             this->getChild(i).visitActiveBBox(op);
         } else {
-#ifdef _MSC_VER
-            op.operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-#else
             op.template operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-#endif
         }
     }
 }

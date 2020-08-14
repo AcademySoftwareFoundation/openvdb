@@ -22,7 +22,6 @@
 #include <CH/CH_Manager.h> // for CHgetEvalTime
 #include <PRM/PRM_SpareData.h>
 #include <SOP/SOP_Node.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
@@ -471,13 +470,14 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
 
     // empty metadata if default is zero
-    Metadata::Ptr defaultValue;
     if (!math::isZero<ValueType>(value)) {
-        defaultValue = TypedMetadata<ValueType>(value).copy();
+        TypedMetadata<ValueType> defaultValue(value);
+        appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(),
+            stride, /*constantstride=*/true, &defaultValue);
+    } else {
+        appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(),
+            stride, /*constantstride=*/true);
     }
-
-    appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(),
-        stride, /*constantstride=*/true, defaultValue);
 
     HoudiniAttribute houdiniAttribute(*attribute);
     populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniAttribute>(

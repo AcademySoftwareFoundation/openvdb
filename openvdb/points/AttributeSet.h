@@ -28,6 +28,9 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 
+using GroupType = uint8_t;
+
+
 ////////////////////////////////////////
 
 
@@ -39,6 +42,7 @@ public:
 
     using Ptr                   = std::shared_ptr<AttributeSet>;
     using ConstPtr              = std::shared_ptr<const AttributeSet>;
+    using UniquePtr             = std::unique_ptr<AttributeSet>;
 
     class Descriptor;
 
@@ -158,6 +162,9 @@ public:
     /// @note see offset description for groupOffset()
     Util::GroupIndex groupIndex(const size_t offset) const;
 
+    /// Return the indices of the attribute arrays which are group attribute arrays
+    std::vector<size_t> groupAttributeIndices() const;
+
     /// Return true if the attribute array stored at position @a pos is shared.
     bool isShared(size_t pos) const;
     /// @brief  If the attribute array stored at position @a pos is shared,
@@ -170,7 +177,14 @@ public:
                                         const NamePair& type,
                                         const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
-                                        Metadata::Ptr defaultValue = Metadata::Ptr());
+                                        const Metadata* defaultValue = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Name& name,
+                                        const NamePair& type,
+                                        const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        Metadata::Ptr defaultValue);
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
@@ -179,7 +193,46 @@ public:
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
                                         const size_t pos, const Index strideOrTotalSize = 1,
                                         const bool constantStride = true,
+                                        const Metadata* defaultValue = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
+
+    OPENVDB_DEPRECATED
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
+                                        const size_t pos, const Index strideOrTotalSize,
+                                        const bool constantStride,
+                                        const AttributeArray::ScopedRegistryLock* lock);
+
+    /// @brief Remove and return an attribute array by name
+    /// @param name the name of the attribute array to release
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a name is invalid, returns an empty shared pointer. This also updates the descriptor
+    /// to remove the reference to the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    AttributeArray::Ptr removeAttribute(const Name& name);
+
+    /// @brief Remove and return an attribute array by index
+    /// @param pos the position index of the attribute to release
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a pos is invalid, returns an empty shared pointer. This also updates the descriptor
+    /// to remove the reference to the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    AttributeArray::Ptr removeAttribute(const size_t pos);
+
+    /// @brief Remove and return an attribute array by index (unsafe method)
+    /// @param pos the position index of the attribute to release
+    /// @details Detaches the attribute array from this attribute set and returns it, if
+    /// @a pos is invalid, returns an empty shared pointer.
+    /// In cases where the AttributeSet is due to be destroyed, a small performance
+    /// advantage can be gained by leaving the attribute array as a nullptr and not
+    /// updating the descriptor. However, this leaves the AttributeSet in an invalid
+    /// state making it unsafe to call any methods that implicitly derefence the attribute array.
+    /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
+    /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
+    /// @warning Only use this method if you're an expert and know the risks of not
+    /// updating the array of attributes or the descriptor.
+    AttributeArray::Ptr removeAttributeUnsafe(const size_t pos);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -245,7 +298,6 @@ private:
 
 
 /// A container for ABI=5 to help ease introduction of upcoming features
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
 namespace future {
     class Container
     {
@@ -253,7 +305,6 @@ namespace future {
         std::vector<std::shared_ptr<Element>> mElements;
     };
 }
-#endif
 
 
 ////////////////////////////////////////
@@ -374,8 +425,12 @@ public:
 
     /// Return @c true if group exists
     bool hasGroup(const Name& group) const;
-    /// Define a group name to offset mapping
-    void setGroup(const Name& group, const size_t offset);
+    /// @brief Define a group name to offset mapping
+    /// @param group group name
+    /// @param offset group offset
+    /// @param checkValidOffset throws if offset out-of-range or in-use
+    void setGroup(const Name& group, const size_t offset,
+        const bool checkValidOffset = false);
     /// Drop any mapping keyed by group name
     void dropGroup(const Name& group);
     /// Clear all groups
@@ -401,6 +456,42 @@ public:
     /// Return the group index from the offset of the group
     /// @note see offset description for groupOffset()
     GroupIndex groupIndex(const size_t offset) const;
+
+    /// Return number of bits occupied by a group attribute array
+    static size_t groupBits() { return sizeof(GroupType) * CHAR_BIT; }
+
+    /// Return the total number of available groups
+    /// (group bits * number of group attributes)
+    size_t availableGroups() const;
+
+    /// Return the number of empty group slots which correlates to the number of groups
+    /// that can be stored without increasing the number of group attribute arrays
+    size_t unusedGroups() const;
+
+    /// Return @c true if there are sufficient empty slots to allow compacting
+    bool canCompactGroups() const;
+
+    /// @brief Return a group offset that is not in use
+    /// @param hint if provided, request a specific offset as a hint
+    /// @return index of an offset or size_t max if no available group offsets
+    size_t unusedGroupOffset(size_t hint = std::numeric_limits<size_t>::max()) const;
+
+    OPENVDB_DEPRECATED
+    size_t nextUnusedGroupOffset() const;
+
+    /// @brief Determine if a move is required to efficiently compact the data and store the
+    /// source name, offset and the target offset in the input parameters
+    /// @param sourceName source name
+    /// @param sourceOffset source offset
+    /// @param targetOffset target offset
+    /// @return @c true if move is required to compact the data
+    bool requiresGroupMove(Name& sourceName, size_t& sourceOffset, size_t& targetOffset) const;
+
+    /// @brief Test if there are any group names shared by both descriptors which
+    /// have a different index
+    /// @param rhs the descriptor to compare with
+    /// @return @c true if an index collision exists
+    bool groupIndexCollision(const Descriptor& rhs) const;
 
     /// Return a unique name for an attribute array based on given name
     const Name uniqueName(const Name& name) const;
@@ -447,15 +538,11 @@ private:
     std::vector<NamePair>       mTypes;
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     // as this change is part of an ABI change, there's no good reason to reduce the reserved
     // space aside from keeping the memory size of an AttributeSet the same for convenience
     // (note that this assumes a typical three-pointer implementation for std::vector)
     future::Container           mFutureContainer;   // occupies 3 reserved slots
     int64_t                     mReserved[5];       // for future use
-#else
-    int64_t                     mReserved[8];       // for future use
-#endif
 }; // class Descriptor
 
 } // namespace points

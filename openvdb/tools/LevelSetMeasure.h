@@ -17,7 +17,6 @@
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Stencils.h>
 #include <openvdb/util/NullInterrupter.h>
-#include <boost/math/constants/constants.hpp>//for Pi
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
 #include <tbb/parallel_invoke.h>
@@ -81,7 +80,7 @@ class DiracDelta
 {
 public:
     // eps is the half-width of the dirac delta function in units of phi
-    DiracDelta(RealT eps) : mC(0.5/eps), mD(2*boost::math::constants::pi<RealT>()*mC), mE(eps) {}
+    DiracDelta(RealT eps) : mC(0.5/eps), mD(2*math::pi<RealT>()*mC), mE(eps) {}
     // values of the dirac delta function are in units of one over the units of phi
     inline RealT operator()(RealT phi) const { return math::Abs(phi) > mE ? 0 : mC*(1+cos(mD*phi)); }
 private:
@@ -319,7 +318,7 @@ template<typename GridT, typename InterruptT>
 inline int
 LevelSetMeasure<GridT, InterruptT>::eulerCharacteristic()
 {
-    const Real x = this->totGaussianCurvature(true) / (2.0*boost::math::constants::pi<Real>());
+    const Real x = this->totGaussianCurvature(true) / (2.0*math::pi<Real>());
     return int(math::Round( x ));
 }
 

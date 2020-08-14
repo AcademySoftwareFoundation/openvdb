@@ -8,12 +8,13 @@
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
-project(OpenVDBBinaries)
+project(OpenVDBBinaries LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
+include(GNUInstallDirs)
 
 ###### OpenVDB Binary Component Options
 
@@ -33,6 +34,9 @@ message(STATUS "----------------------------------------------------")
 # Collect lib dependencies shared by all binaries
 
 if(NOT OPENVDB_BUILD_CORE)
+  # @note  Could also use the openvdb_je target here, but we just opt to
+  # handle the value of CONCURRENT_MALLOC outside of this branching for
+  # both cases
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
@@ -42,19 +46,15 @@ set(OPENVDB_BINARIES_DEPENDENT_LIBS
   ${OPENVDB_LIB}
 )
 
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
+
 ##########################################################################
-
-if(WIN32)
-  # Because of implicit linking!
-  link_directories(${Boost_LIBRARY_DIR})
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-  endif()
-endif()
-
-if(WIN32)
-  add_definitions(-D_WIN32 -DNOMINMAX -DOPENVDB_DLL)
-endif()
 
 # rpath handling
 
@@ -94,7 +94,7 @@ if(OPENVDB_BUILD_VDB_PRINT)
     )
   endif()
 
-  install(TARGETS vdb_print DESTINATION bin)
+  install(TARGETS vdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -112,7 +112,7 @@ if(OPENVDB_BUILD_VDB_LOD)
     )
   endif()
 
-  install(TARGETS vdb_lod DESTINATION bin)
+  install(TARGETS vdb_lod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -120,7 +120,7 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread)
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
@@ -136,6 +136,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
+    IlmBase::Imath
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 
@@ -153,7 +154,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
     unset(OPENVDB_RENDER_RPATHS)
   endif()
 
-  install(TARGETS vdb_render DESTINATION bin)
+  install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 ##########################################################################
@@ -161,60 +162,55 @@ endif()
 #### vdb_view
 
 if(OPENVDB_BUILD_VDB_VIEW)
+  if(NOT Boost_USE_STATIC_LIBS)
+    # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
+    #        boost shared libraries (more specifically libraries built with -fPIC).
+    #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
+    #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
+    set(BUILD_SHARED_LIBS ON)
+    set(Boost_USE_STATIC_LIBS OFF)
+  endif()
 
-  # @todo improve the viewer header system
-
-  file(GLOB VIEWER_SOURCE_FILES ../viewer/*.h)
-  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
-  file(COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer)
+  find_package(OpenGL REQUIRED)
 
   if(WIN32)
-    message(WARNING "Currently no CMake support for building vdb_view binary on Windows.")
-    # @todo
-    # find_package(GLEW REQUIRED)
-    # INCLUDE_DIRECTORIES ( SYSTEM ${GLEW_INCLUDE_DIR})
-  else()
-    find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS thread)
-    find_package(OpenGL REQUIRED)
-
-    # wraps find_package(glfw3) and sets the glfw target
-    include(OpenVDBGLFW3Setup)
-
-    set(VDB_VIEW_SOURCE_FILES
-      openvdb_view.cc
-      ../viewer/Camera.cc
-      ../viewer/ClipBox.cc
-      ../viewer/Font.cc
-      ../viewer/RenderModules.cc
-      ../viewer/Viewer.cc
-    )
-
-    add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
-
-    target_include_directories(vdb_view
-      PRIVATE ${CMAKE_BINARY_DIR}/dwa
-    )
-
-    target_link_libraries(vdb_view
-      ${OPENVDB_BINARIES_DEPENDENT_LIBS}
-      Boost::thread
-      OpenGL::GL
-      OpenGL::GLU
-      glfw
-    )
-
-    target_compile_definitions(vdb_view PRIVATE
-      "-DOPENVDB_USE_GLFW_3" "-DGL_GLEXT_PROTOTYPES=1"
-    )
-
-    if(OPENVDB_ENABLE_RPATH)
-      set_target_properties(vdb_view
-        PROPERTIES INSTALL_RPATH "${RPATHS}"
-      )
-    endif()
-
-    install(TARGETS vdb_view DESTINATION bin)
+    find_package(GLEW REQUIRED)
   endif()
+
+  # wraps find_package(glfw3) and sets the glfw target
+  include(OpenVDBGLFW3Setup)
+
+  set(VDB_VIEW_SOURCE_FILES
+    openvdb_view.cc
+    ../viewer/Camera.cc
+    ../viewer/ClipBox.cc
+    ../viewer/Font.cc
+    ../viewer/RenderModules.cc
+    ../viewer/Viewer.cc
+  )
+
+  add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
+
+  target_link_libraries(vdb_view
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
+    OpenGL::GL
+    OpenGL::GLU
+    glfw
+  )
+
+  if(WIN32)
+    target_link_libraries(vdb_view GLEW::GLEW)
+  endif()
+
+  target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
+
+  if(OPENVDB_ENABLE_RPATH)
+    set_target_properties(vdb_view
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+    )
+  endif()
+
+  install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 unset(RPATHS)

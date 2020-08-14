@@ -181,9 +181,7 @@ ifeq (yes,$(has_log4cplus))
 endif
 abi := $(strip $(abi))
 ifneq (,$(abi))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
     CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
-    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
     HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
 endif
 ifdef MBSD
@@ -285,6 +283,7 @@ HOUDINI_SOP_SCRIPT_NAMES := \
 HOUDINI_SOP_SRC_NAMES := \
     GR_PrimVDBPoints.cc \
     SHOP_OpenVDB_Points.cc \
+    SOP_OpenVDB_Activate.cc \
     SOP_OpenVDB_Advect.cc \
     SOP_OpenVDB_Advect_Points.cc \
     SOP_OpenVDB_Analysis.cc \

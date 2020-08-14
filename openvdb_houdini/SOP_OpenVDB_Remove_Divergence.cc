@@ -17,7 +17,6 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_StringArray.h>
-#include <UT/UT_Version.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 #include <GA/GA_Handle.h>
@@ -732,8 +731,7 @@ removeDivergenceWithColliderGrid(SolverParms& parms, const BoundaryOpType& bound
         if (parms.colliderType == CT_BBOX) {
             op.correctVelocity(BBoxConstAccessor(parms));
         } else {
-            UTvdbProcessTypedGridTopology(
-                UTvdbGetGridType(*parms.colliderGrid), *parms.colliderGrid, op);
+            parms.colliderGrid->apply<hvdb::VolumeGridTypes>(op);
         }
     }
 
@@ -798,8 +796,7 @@ processGrid(SolverParms& parms)
             // If a dynamic collider grid was supplied, its active values define
             // the velocities of solid obstacles.
             ColliderDispatchOp<VelocityGridType> op(parms);
-            success = UTvdbProcessTypedGridVec3(
-                UTvdbGetGridType(*parms.colliderGrid), *parms.colliderGrid, op);
+            success = parms.colliderGrid->apply<hvdb::Vec3GridTypes>(op);
             if (success) success = op.success;
             break;
         }
@@ -875,7 +872,7 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
             if (colliderTypeStr == "bbox") {
                 // Use the bounding box of the reference geometry as a collider.
                 UT_BoundingBox box;
-                colliderGeo->computeQuickBounds(box);
+                colliderGeo->getBBox(&box);
                 parms.colliderBBox.min() = openvdb::Vec3d(box.xmin(), box.ymin(), box.zmin());
                 parms.colliderBBox.max() = openvdb::Vec3d(box.xmax(), box.ymax(), box.zmax());
                 parms.colliderType = CT_BBOX;
@@ -891,7 +888,7 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                     if (colliderIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         // If the collider grid is a level set, extract an interior mask from it.
                         LevelSetMaskOp op;
-                        if (GEOvdbProcessTypedGridScalar(**colliderIt, op)) {
+                        if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**colliderIt, op)) {
                             parms.colliderGrid = op.outputGrid;
                         }
                     }
@@ -934,8 +931,7 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
                         parms.colliderType = CT_STATIC;
                         ColliderMaskOp op;
                         op.mask = ColliderMaskGrid::create();
-                        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*parms.colliderGrid),
-                            *parms.colliderGrid, op);
+                        parms.colliderGrid->apply<hvdb::AllGridTypes>(op);
                         parms.colliderGrid = op.mask;
                     }
                 }

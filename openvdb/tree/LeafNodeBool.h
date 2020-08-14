@@ -1589,18 +1589,10 @@ LeafNode<bool, Log2Dim>::visitActiveBBox(BBoxOp& op) const
 {
     if (op.template descent<LEVEL>()) {
         for (ValueOnCIter i=this->cbeginValueOn(); i; ++i) {
-#ifdef _MSC_VER
-            op.operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
-#else
             op.template operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
-#endif
         }
     } else {
-#ifdef _MSC_VER
-        op.operator()<LEVEL>(this->getNodeBoundingBox());
-#else
         op.template operator()<LEVEL>(this->getNodeBoundingBox());
-#endif
     }
 }
 

@@ -411,8 +411,9 @@ struct MaskClipOp
         if (mask) {
             // Dispatch on the mask grid type, now that the source grid type is resolved.
             MaskClipDispatchOp<GridType> op(grid, inside);
-            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op);
-            outputGrid = op.outputGrid;
+            if (mask->apply<hvdb::AllGridTypes>(op)) {
+                outputGrid = op.outputGrid;
+            }
         }
     }
 
@@ -548,7 +549,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         // If the mask grid is a level set, extract an interior mask from it.
                         LevelSetMaskOp op;
-                        GEOvdbProcessTypedGridScalar(**maskIt, op);
+                        hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**maskIt, op);
                         maskGrid = op.outputGrid;
                     } else {
                         maskGrid = maskIt->getConstGridPtr();
@@ -568,17 +569,14 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                             "nonuniform padding is not supported for mask clipping");
                     }
                     if (const int dilation = int(std::round(paddingInVoxels[0]))) {
-                        const auto maskType = UTvdbGetGridType(*maskGrid);
                         DilatedMaskOp op{dilation};
-                        if (!UTvdbProcessTypedGridTopology(maskType, *maskGrid, op)) {
-                            UTvdbProcessTypedGridPoint(maskType, *maskGrid, op);
-                        }
+                        maskGrid->apply<hvdb::AllGridTypes>(op);
                         if (op.maskGrid) maskGrid = op.maskGrid;
                     }
                 }
             } else {
                 UT_BoundingBox box;
-                maskGeo->computeQuickBounds(box);
+                maskGeo->getBBox(&box);
 
                 clipBox.min()[0] = box.xmin();
                 clipBox.min()[1] = box.ymin();
@@ -616,7 +614,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
 
             if (maskGrid) {
                 MaskClipOp op{maskGrid, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     addWarning(SOP_MESSAGE,
@@ -624,7 +622,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 }
             } else if (useCamera) {
                 FrustumClipOp op{mFrustum, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     addWarning(SOP_MESSAGE,
@@ -632,7 +630,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 }
             } else {
                 BBoxClipOp op{clipBox, inside};
-                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all Houdini-supported grid types
+                if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
                     if (inside) {

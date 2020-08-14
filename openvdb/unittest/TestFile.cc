@@ -669,10 +669,8 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     CPPUNIT_ASSERT(density.get() != nullptr);
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     CPPUNIT_ASSERT(density->unallocatedLeafCount() > 0);
     CPPUNIT_ASSERT_EQUAL(density->leafCount(), density->unallocatedLeafCount());
-#endif
     grid = findGridByName(*grids, "density_copy");
     CPPUNIT_ASSERT(grid.get() != nullptr);
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
@@ -1912,7 +1910,6 @@ TestFile::testMultiPassIO()
         CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
         CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
     }
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     {
         // Verify that when using multi-pass and bbox clipping that each leaf node
         // is still being read before being clipped
@@ -1930,7 +1927,6 @@ TestFile::testMultiPassIO()
         ++leafIter;
         CPPUNIT_ASSERT(!leafIter); // second leaf node has now been clipped
     }
-#endif
 
     // Clear the pass data.
     writePasses.clear();

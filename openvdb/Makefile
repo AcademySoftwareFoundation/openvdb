@@ -425,11 +425,7 @@ ifeq (yes,$(has_log4cplus))
 endif
 abi := $(strip $(abi))
 ifneq (,$(abi))
-    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE  # TODO: deprecated
     CXXFLAGS += -DOPENVDB_ABI_VERSION_NUMBER=$(abi)
-endif
-ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
-    CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 ifeq (yes,$(strip $(strict)))

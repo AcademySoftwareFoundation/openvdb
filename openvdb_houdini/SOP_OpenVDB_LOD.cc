@@ -286,7 +286,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGridTopology(**it, op);
+                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -322,7 +322,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGridTopology(**it, op);
+                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -347,7 +347,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                GEOvdbProcessTypedGridTopology(**it, op);
+                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 

@@ -26,6 +26,7 @@ public:
     CPPUNIT_TEST(testTransformVec3SPoint);
     CPPUNIT_TEST(testTransformVec3DBox);
     CPPUNIT_TEST(testResampleToMatch);
+    CPPUNIT_TEST(testDecomposition);
     CPPUNIT_TEST_SUITE_END();
 
     void testTransformBoolPoint()
@@ -48,6 +49,7 @@ public:
         { transformGrid<openvdb::Vec3DGrid, openvdb::tools::BoxSampler>(); }
 
     void testResampleToMatch();
+    void testDecomposition();
 
 private:
     template<typename GridType, typename Sampler> void transformGrid();
@@ -237,3 +239,72 @@ TestGridTransformer::testResampleToMatch()
         }
     }
 }
+
+
+////////////////////////////////////////
+
+
+void
+TestGridTransformer::testDecomposition()
+{
+    using namespace openvdb;
+    using tools::local_util::decompose;
+
+    {
+        Vec3d s, r, t;
+        auto m = Mat4d::identity();
+        CPPUNIT_ASSERT(decompose(m, s, r, t));
+        m(1, 3) = 1.0; // add a perspective component
+        // Verify that decomposition fails for perspective transforms.
+        CPPUNIT_ASSERT(!decompose(m, s, r, t));
+    }
+
+    const auto rad = [](double deg) { return deg * M_PI / 180.0; };
+
+    const Vec3d ix(1, 0, 0), iy(0, 1, 0), iz(0, 0, 1);
+
+    const auto translation = { Vec3d(0), Vec3d(100, 0, -100), Vec3d(-50, 100, 250) };
+    const auto scale = { 1.0, 0.25, -0.25, -1.0, 10.0, -10.0 };
+    const auto angle = { rad(0.0), rad(45.0), rad(90.0), rad(180.0),
+        rad(225.0), rad(270.0), rad(315.0), rad(360.0) };
+
+    for (const auto& t: translation) {
+
+        for (const double sx: scale) {
+            for (const double sy: scale) {
+                for (const double sz: scale) {
+                    const Vec3d s(sx, sy, sz);
+
+                    for (const double rx: angle) {
+                        for (const double ry: angle) {
+                            for (const double rz: angle) {
+
+                                Mat4d m =
+                                    math::rotation<Mat4d>(iz, rz) *
+                                    math::rotation<Mat4d>(iy, ry) *
+                                    math::rotation<Mat4d>(ix, rx) *
+                                    math::scale<Mat4d>(s);
+                                m.setTranslation(t);
+
+                                Vec3d outS(0), outR(0), outT(0);
+                                if (decompose(m, outS, outR, outT)) {
+                                    // If decomposition succeeds, verify that it produces
+                                    // the same matrix.  (Most decompositions fail to find
+                                    // a unique solution, though.)
+                                    Mat4d outM =
+                                        math::rotation<Mat4d>(iz, outR.z()) *
+                                        math::rotation<Mat4d>(iy, outR.y()) *
+                                        math::rotation<Mat4d>(ix, outR.x()) *
+                                        math::scale<Mat4d>(outS);
+                                    outM.setTranslation(outT);
+                                    CPPUNIT_ASSERT(outM.eq(m));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

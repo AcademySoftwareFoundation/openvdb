@@ -52,7 +52,7 @@ floatingPointToFixedPoint(const FloatT s)
     static_assert(std::is_unsigned<IntegerT>::value, "IntegerT must be unsigned");
     if (FloatT(0.0) > s) return std::numeric_limits<IntegerT>::min();
     else if (FloatT(1.0) <= s) return std::numeric_limits<IntegerT>::max();
-    return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max())));
+    return IntegerT(s * FloatT(std::numeric_limits<IntegerT>::max()));
 }
 
 
@@ -101,7 +101,6 @@ public:
     enum Flag {
         TRANSIENT = 0x1,            /// by default not written to disk
         HIDDEN = 0x2,               /// hidden from UIs or iterators
-        OUTOFCORE = 0x4,            /// data not yet loaded from disk (deprecated flag as of ABI=5)
         CONSTANTSTRIDE = 0x8,       /// stride size does not vary in the array
         STREAMING = 0x10,           /// streaming mode collapses attributes when first accessed
         PARTIALREAD = 0x20          /// data has been partially read (compressed bytes is used)
@@ -126,15 +125,11 @@ public:
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
-    using FactoryMethod = Ptr (*)(Index, Index, bool);
+    using FactoryMethod = Ptr (*)(Index, Index, bool, const Metadata*);
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     AttributeArray(): mPageHandle() { mOutOfCore = 0; }
-#else
-    AttributeArray(): mPageHandle() {}
-#endif
     virtual ~AttributeArray()
     {
         // if this AttributeArray has been partially read, zero the compressed bytes,
@@ -148,8 +143,8 @@ public:
     AttributeArray(const AttributeArray&) = default;
     AttributeArray& operator=(const AttributeArray&) = default;
 #endif
-    AttributeArray(AttributeArray&&) = default;
-    AttributeArray& operator=(AttributeArray&&) = default;
+    AttributeArray(AttributeArray&&) = delete;
+    AttributeArray& operator=(AttributeArray&&) = delete;
 
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
@@ -211,7 +206,13 @@ public:
     /// @details If @a lock is non-null, the AttributeArray registry mutex
     /// has already been locked
     static Ptr create(const NamePair& type, Index length, Index stride = 1,
-        bool constantStride = true, const ScopedRegistryLock* lock = nullptr);
+        bool constantStride = true,
+        const Metadata* metadata = nullptr,
+        const ScopedRegistryLock* lock = nullptr);
+
+    static OPENVDB_DEPRECATED Ptr create(const NamePair& type, Index length,
+        Index stride, bool constantStride, const ScopedRegistryLock* lock);
+
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
     /// Clear the attribute type registry.
@@ -280,9 +281,6 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// @deprecated Previously this returned @c true if the array was compressed,
-    /// now it always returns @c false.
-    OPENVDB_DEPRECATED bool isCompressed() const { return false; }
     /// @deprecated Previously this compressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
@@ -407,9 +405,7 @@ protected:
     size_t mCompressedBytes = 0;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     tbb::atomic<Index32> mOutOfCore; // interpreted as bool
-#endif
     compression::PageHandle::Ptr mPageHandle;
 
 #else // #if OPENVDB_ABI_VERSION_NUMBER < 6
@@ -612,12 +608,14 @@ public:
     /// @note This method is thread-safe.
     AttributeArray::Ptr copy() const override;
 
-    /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
+    /// Return a copy of this attribute.
     /// @note This method is thread-safe.
+    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
     OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
-    static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true);
+    static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true,
+        const Metadata* metadata = nullptr);
 
     /// Cast an AttributeArray to TypedAttributeArray<T>
     static TypedAttributeArray& cast(AttributeArray& attributeArray);
@@ -682,30 +680,30 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
-    /// Return the value at index @a n (assumes uncompressed and in-core)
+    /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
     /// Return the value at index @a n
     ValueType get(Index n) const;
-    /// Return the @a value at index @a n (assumes uncompressed and in-core)
+    /// Return the @a value at index @a n (assumes in-core)
     template<typename T> void getUnsafe(Index n, T& value) const;
     /// Return the @a value at index @a n
     template<typename T> void get(Index n, T& value) const;
 
     /// Non-member equivalent to getUnsafe() that static_casts array to this TypedAttributeArray
-    /// (assumes uncompressed and in-core)
+    /// (assumes in-core)
     static ValueType getUnsafe(const AttributeArray* array, const Index n);
 
-    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    /// Set @a value at the given index @a n (assumes in-core)
     void setUnsafe(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
     void set(Index n, const ValueType& value);
-    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    /// Set @a value at the given index @a n (assumes in-core)
     template<typename T> void setUnsafe(Index n, const T& value);
     /// Set @a value at the given index @a n
     template<typename T> void set(Index n, const T& value);
 
     /// Non-member equivalent to setUnsafe() that static_casts array to this TypedAttributeArray
-    /// (assumes uncompressed and in-core)
+    /// (assumes in-core)
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
@@ -803,7 +801,7 @@ private:
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
-    /// @param compression if true, loading previously compressed data will re-compressed it
+    /// @param compression parameter no longer used
     inline void doLoadUnsafe(const bool compression = true) const;
     /// Compress in-core data assuming mutex is locked
     inline bool compressUnsafe();
@@ -825,8 +823,9 @@ private:
     void deallocate();
 
     /// Helper function for use with registerType()
-    static AttributeArray::Ptr factory(Index n, Index strideOrTotalSize, bool constantStride) {
-        return TypedAttributeArray::create(n, strideOrTotalSize, constantStride);
+    static AttributeArray::Ptr factory(Index n, Index strideOrTotalSize, bool constantStride,
+        const Metadata* metadata) {
+        return TypedAttributeArray::create(n, strideOrTotalSize, constantStride, metadata);
     }
 
     static std::unique_ptr<const NamePair> sTypeName;
@@ -1268,9 +1267,14 @@ TypedAttributeArray<ValueType_, Codec_>::unregisterType()
 
 template<typename ValueType_, typename Codec_>
 inline typename TypedAttributeArray<ValueType_, Codec_>::Ptr
-TypedAttributeArray<ValueType_, Codec_>::create(Index n, Index stride, bool constantStride)
+TypedAttributeArray<ValueType_, Codec_>::create(Index n, Index stride, bool constantStride,
+    const Metadata* metadata)
 {
-    return Ptr(new TypedAttributeArray(n, stride, constantStride));
+    const TypedMetadata<ValueType>* typedMetadata = metadata ?
+        dynamic_cast<const TypedMetadata<ValueType>*>(metadata) : nullptr;
+
+    return Ptr(new TypedAttributeArray(n, stride, constantStride,
+        typedMetadata ? typedMetadata->value() : zeroVal<ValueType>()));
 }
 
 template<typename ValueType_, typename Codec_>
@@ -1652,11 +1656,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::isOutOfCore() const
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     return mOutOfCore;
-#else
-    return (mFlags & OUTOFCORE);
-#endif
 }
 
 
@@ -1664,12 +1664,7 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setOutOfCore(const bool b)
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     mOutOfCore = b;
-#else
-    if (b) mFlags = static_cast<uint8_t>(mFlags | OUTOFCORE);
-    else   mFlags = static_cast<uint8_t>(mFlags & ~OUTOFCORE);
-#endif
 }
 
 
@@ -1877,11 +1872,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
         OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     uint8_t flags(mFlags);
-#else
-    uint8_t flags(mFlags & uint8_t(~OUTOFCORE));
-#endif
     uint8_t serializationFlags(0);
     Index size(mSize);
     Index stride(mStrideOrTotalSize);
@@ -2016,11 +2007,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool /*compression*/
 
     // clear all write and out-of-core flags
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     self->mOutOfCore = false;
-#else
-    self->mFlags &= uint8_t(~OUTOFCORE);
-#endif
 }
 
 
@@ -2029,7 +2016,7 @@ AttributeArray::AccessorBasePtr
 TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
 {
     // use the faster 'unsafe' get and set methods as attribute handles
-    // ensure data is uncompressed and in-core when constructed
+    // ensure data is in-core when constructed
 
     return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
         &TypedAttributeArray<ValueType_, Codec_>::getUnsafe,

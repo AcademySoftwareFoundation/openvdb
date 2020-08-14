@@ -118,8 +118,6 @@ Metadata::operator==(const Metadata& other) const
 ////////////////////////////////////////
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
-
 Metadata::Ptr
 UnknownMetadata::copy() const
 {
@@ -159,31 +157,6 @@ UnknownMetadata::writeValue(std::ostream& os) const
         os.write(reinterpret_cast<const char*>(&mBytes[0]), mBytes.size());
     }
 }
-
-#else // if OPENVDB_ABI_VERSION_NUMBER < 5
-
-void
-UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
-{
-    // Read and discard the metadata (without seeking, because
-    // the stream might not be seekable).
-    const size_t BUFFER_SIZE = 1024;
-    std::vector<char> buffer(BUFFER_SIZE);
-    for (Index32 bytesRemaining = numBytes; bytesRemaining > 0; ) {
-        const Index32 bytesToSkip = std::min<Index32>(bytesRemaining, BUFFER_SIZE);
-        is.read(&buffer[0], bytesToSkip);
-        bytesRemaining -= bytesToSkip;
-    }
-}
-
-
-void
-UnknownMetadata::writeValue(std::ostream&) const
-{
-    OPENVDB_THROW(TypeError, "Metadata has unknown type");
-}
-
-#endif
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

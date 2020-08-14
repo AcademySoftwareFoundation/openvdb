@@ -15,7 +15,6 @@
 #include <openvdb/points/PointDataGrid.h>
 
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
 #include <GA/GA_Iterator.h>
@@ -324,17 +323,7 @@ SOP_OpenVDB_Topology_To_Level_Set::Cache::cookVDBSop(
 
             if (boss.wasInterrupted()) break;
 
-            const GU_PrimVDB *vdb = *vdbIt;
-
-            if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) {
-                if (!GEOvdbProcessTypedGridPoint(*vdb, converter)) {
-                    if (vdb->getGrid().isType<cvdb::MaskGrid>()) {
-                        cvdb::MaskGrid::ConstPtr grid =
-                            cvdb::gridConstPtrCast<cvdb::MaskGrid>(vdb->getGridPtr());
-                        converter(*grid);
-                    }
-                }
-            }
+            hvdb::GEOvdbApply<hvdb::AllGridTypes::Append<cvdb::MaskGrid>>(**vdbIt, converter);
         }
 
     } catch (std::exception& e) {

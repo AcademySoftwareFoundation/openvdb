@@ -11,7 +11,6 @@
 #include <openvdb_houdini/UT_VDBTools.h> // for GridTransformOp, et al.
 #include <openvdb_houdini/Utils.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
 #include <hboost/algorithm/string/case_conv.hpp>
 #include <hboost/algorithm/string/trim.hpp>
@@ -1000,8 +999,11 @@ SOP_OpenVDB_Create::createMaskGrid(const GU_PrimVDB* refVdb,
 
     cvdb::MaskGrid::Ptr maskGrid;
     GridConvertToMask op(maskGrid);
-    GEOvdbProcessTypedGridTopology(*refVdb, op);
-    maskGrid->setTransform(refVdb->getGrid().transform().copy());
+    if (hvdb::GEOvdbApply<hvdb::AllGridTypes>(*refVdb, op)) {
+        maskGrid->setTransform(refVdb->getGrid().transform().copy());
+    } else {
+        throw std::runtime_error("No valid reference grid found");
+    }
 
     if (!mNeedsResampling)
         return maskGrid;

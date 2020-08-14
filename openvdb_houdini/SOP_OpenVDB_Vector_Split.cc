@@ -11,7 +11,6 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -263,9 +262,7 @@ SOP_OpenVDB_Vector_Split::Cache::cookVDBSop(OP_Context& context)
             const std::string gridName = vdb->getGridName();
 
             VectorGridSplitter op(*vdb, copyInactiveValues);
-            bool ok = GEOvdbProcessTypedGridVec3(*vdb, op);
-
-            if (!ok) {
+            if (!hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op)) {
                 if (verbose && !gridName.empty()) {
                     addWarning(SOP_MESSAGE, (gridName + " is not a vector grid").c_str());
                 }

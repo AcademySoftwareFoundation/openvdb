@@ -16,8 +16,6 @@
 #include "LevelSetUtil.h"
 #include "VolumeToMesh.h"
 
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/int.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -932,10 +930,9 @@ ClosestSurfacePoint<GridT>::initialize(
 
     using Index32RootNodeT = typename Index32TreeT::RootNodeType;
     using Index32NodeChainT = typename Index32RootNodeT::NodeChainType;
-    static_assert(boost::mpl::size<Index32NodeChainT>::value > 1,
+    static_assert(Index32NodeChainT::Size > 1,
         "expected tree depth greater than one");
-    using Index32InternalNodeT =
-        typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type;
+    using Index32InternalNodeT = typename Index32NodeChainT::template Get<1>;
 
     typename Index32TreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
     nIt.setMinDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);

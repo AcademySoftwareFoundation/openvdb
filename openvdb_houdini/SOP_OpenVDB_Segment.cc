@@ -17,7 +17,6 @@
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
-#include <UT/UT_Version.h>
 
 #include <sstream>
 #include <stdexcept>
@@ -293,9 +292,9 @@ SOP_OpenVDB_Segment::Cache::cookVDBSop(OP_Context& context)
 
             const openvdb::GridClass gridClass = vdb->getGrid().getGridClass();
             if (gridClass == openvdb::GRID_LEVEL_SET) {
-                GEOvdbProcessTypedGridScalar(*vdb, segmentSDF);
+                hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, segmentSDF);
             } else {
-                GEOvdbProcessTypedGridTopology(*vdb, segmentActiveVoxels);
+                hvdb::GEOvdbApply<hvdb::AllGridTypes>(*vdb, segmentActiveVoxels);
             }
         }
 

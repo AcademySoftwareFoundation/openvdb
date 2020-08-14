@@ -60,7 +60,7 @@ public:
     virtual Metadata::Ptr getBackgroundValue() const { return Metadata::Ptr(); }
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
-    /// leaf nodes and active tiles.
+    /// active tiles and leaf nodes with active values.
     /// @details This is faster than calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
@@ -95,10 +95,8 @@ public:
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     /// Return the total number of unallocated leaf nodes residing in this tree.
     virtual Index32 unallocatedLeafCount() const = 0;
-#endif
 
 
     //
@@ -462,10 +460,8 @@ public:
     /// @sa readNonresidentBuffers, io::File::open
     void clipUnallocatedNodes() override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     /// Return the total number of unallocated leaf nodes residing in this tree.
     Index32 unallocatedLeafCount() const override;
-#endif
 
     //@{
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
@@ -1768,7 +1764,6 @@ Tree<RootNodeType>::clipUnallocatedNodes()
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
 template<typename RootNodeType>
 inline Index32
 Tree<RootNodeType>::unallocatedLeafCount() const
@@ -1777,7 +1772,6 @@ Tree<RootNodeType>::unallocatedLeafCount() const
     for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
     return sum;
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -2138,7 +2132,7 @@ Tree<RootNodeType>::evalLeafBoundingBox(CoordBBox& bbox) const
 
     mRoot.evalActiveBoundingBox(bbox, false);
 
-    return true;// not empty
+    return !bbox.empty();
 }
 
 template<typename RootNodeType>
@@ -2151,7 +2145,7 @@ Tree<RootNodeType>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 
     mRoot.evalActiveBoundingBox(bbox, true);
 
-    return true;// not empty
+    return !bbox.empty();
 }
 
 

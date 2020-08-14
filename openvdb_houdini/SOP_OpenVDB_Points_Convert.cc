@@ -25,7 +25,6 @@
 #include <GU/GU_PackedGeometry.h>
 #include <GU/GU_PackedFragment.h>
 #include <GU/GU_PrimPacked.h>
-#include <UT/UT_Version.h>
 
 #include <stdexcept>
 #include <string>

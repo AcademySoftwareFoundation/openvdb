@@ -75,10 +75,30 @@ inline std::string operator+(const std::string& s, double) { return s; }
 
 namespace math {
 
+
+/// @brief  Pi constant taken from Boost to match old behaviour
+/// @note   Available in C++20
+template <typename T> inline constexpr T pi() { return 3.141592653589793238462643383279502884e+00; }
+template <> inline constexpr float pi() { return 3.141592653589793238462643383279502884e+00F; }
+template <> inline constexpr double pi() { return 3.141592653589793238462643383279502884e+00; }
+template <> inline constexpr long double pi() { return 3.141592653589793238462643383279502884e+00L; }
+
+
 /// @brief Return the unary negation of the given value.
 /// @note A negative<T>() specialization must be defined for each ValueType T
 /// for which unary negation is not defined.
-template<typename T> inline T negative(const T& val) { return T(-val); }
+template<typename T> inline T negative(const T& val)
+{
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4146)
+#endif
+    return T(-val);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+}
 /// Return the negation of the given boolean.
 template<> inline bool negative(const bool& val) { return !val; }
 /// Return the "negation" of the given string.

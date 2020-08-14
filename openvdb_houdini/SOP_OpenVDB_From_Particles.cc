@@ -26,7 +26,6 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Assert.h>
-#include <UT/UT_Version.h>
 
 #include <algorithm>
 #include <cmath>
@@ -112,7 +111,7 @@ protected:
 
 
 const PRM_ChoiceList SOP_OpenVDB_From_Particles::sPointAttrMenu(
-    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE),
+    PRM_ChoiceListType(PRM_CHOICELIST_REPLACE),
     SOP_OpenVDB_From_Particles::buildAttrMenu);
 
 
@@ -571,12 +570,17 @@ SOP_OpenVDB_From_Particles::buildAttrMenu(void* data, PRM_Name* entries, int max
 {
     if (!data || !entries || !spare) return;
 
+    size_t menuIdx = 0;
+
+    entries[menuIdx].setToken("v");
+    entries[menuIdx++].setLabel("v");
+
     SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
 
     if (sop == nullptr) {
         // terminate and quit
-        entries[0].setToken(0);
-        entries[0].setLabel(0);
+        entries[menuIdx].setToken(0);
+        entries[menuIdx].setLabel(0);
         return;
     }
 
@@ -586,11 +590,7 @@ SOP_OpenVDB_From_Particles::buildAttrMenu(void* data, PRM_Name* entries, int max
     }();
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
 
-    size_t menuIdx = 0, menuEnd(maxEntries - 2);
-
-    // null object
-    entries[menuIdx].setToken("0");
-    entries[menuIdx++].setLabel("- no attribute selected -");
+    size_t menuEnd(maxEntries - 2);
 
     if (gdp) {
         // point attribute names

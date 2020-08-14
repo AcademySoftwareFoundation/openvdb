@@ -14,7 +14,6 @@
 #include <iostream>// for cout
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
-//#include <boost/mpl/if.hpp>
 //#include <strings.h> // for ffs
 
 
@@ -109,7 +108,16 @@ FindLowestOn(Index32 v)
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
         31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
+
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4146)
+#endif
     return DeBruijn[Index32((v & -v) * 0x077CB531U) >> 27];
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 }
 
 /// Return the least significant on bit of the given 64-bit value.
@@ -131,7 +139,18 @@ FindLowestOn(Index64 v)
         63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
         51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
     };
+
+
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable:4146)
+#endif
     return DeBruijn[Index64((v & -v) * UINT64_C(0x022FDD63CC95386D)) >> 58];
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
 #endif
 }
 

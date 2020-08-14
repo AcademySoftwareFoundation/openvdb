@@ -11,7 +11,6 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <stdexcept>
 
 
@@ -137,8 +136,7 @@ SOP_OpenVDB_Densify::Cache::cookVDBSop(OP_Context& context)
                 throw std::runtime_error("processing was interrupted");
             }
 
-            GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGridTopology(*vdbPrim, densifyOp);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, densifyOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

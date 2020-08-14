@@ -133,6 +133,8 @@ public:
     void nodeCount(std::vector<Index32> &) const {}
     /// Return the non-leaf count for this node, which is zero.
     static Index32 nonLeafCount() { return 0; }
+    /// Return the child count for this node, which is zero.
+    static Index32 childCount() { return 0; }
 
     /// Return the number of voxels marked On.
     Index64 onVoxelCount() const { return mValueMask.countOn(); }
@@ -1822,18 +1824,10 @@ LeafNode<T, Log2Dim>::visitActiveBBox(BBoxOp& op) const
 {
     if (op.template descent<LEVEL>()) {
         for (ValueOnCIter i=this->cbeginValueOn(); i; ++i) {
-#ifdef _MSC_VER
-            op.operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
-#else
             op.template operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
-#endif
         }
     } else {
-#ifdef _MSC_VER
-        op.operator()<LEVEL>(this->getNodeBoundingBox());
-#else
         op.template operator()<LEVEL>(this->getNodeBoundingBox());
-#endif
     }
 }
 

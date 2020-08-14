@@ -27,7 +27,6 @@
 #include <GA/GA_ElementGroup.h>
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_VectorTypes.h>
-#include <UT/UT_Version.h>
 
 #include <openvdb/Platform.h>
 #include <openvdb/tools/PointIndexGrid.h>

@@ -423,9 +423,10 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
         std::vector<float> rampVals(begin, end);
 
         for (size_t n = 4, N = rampVals.size(); n < N; n += 5) {
+            const int basis = static_cast<int>(rampVals[n]);
             mFunctionRamp.addNode(rampVals[n-4],
                 UT_FRGBA(rampVals[n-3], rampVals[n-2], rampVals[n-1], 1.0f),
-                static_cast<UT_SPLINE_BASIS>(rampVals[n]));
+                static_cast<UT_SPLINE_BASIS>(basis));
         }
     }
 

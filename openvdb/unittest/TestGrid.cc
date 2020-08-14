@@ -24,6 +24,7 @@ public:
     CPPUNIT_TEST(testConstPtr);
     CPPUNIT_TEST(testGetGrid);
     CPPUNIT_TEST(testIsType);
+    CPPUNIT_TEST(testIsTreeUnique);
     CPPUNIT_TEST(testTransform);
     CPPUNIT_TEST(testCopyGrid);
     CPPUNIT_TEST(testValueConversion);
@@ -35,6 +36,7 @@ public:
     void testConstPtr();
     void testGetGrid();
     void testIsType();
+    void testIsTreeUnique();
     void testTransform();
     void testCopyGrid();
     void testValueConversion();
@@ -94,9 +96,7 @@ public:
     void prune(const ValueType& = 0) {}
     void clip(const openvdb::CoordBBox&) {}
     void clipUnallocatedNodes() override {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     openvdb::Index32 unallocatedLeafCount() const override { return 0; }
-#endif
 
     void getIndexRange(openvdb::CoordBBox&) const override {}
     bool evalLeafBoundingBox(openvdb::CoordBBox& bbox) const override
@@ -192,6 +192,29 @@ TestGrid::testIsType()
     GridBase::Ptr grid = FloatGrid::create();
     CPPUNIT_ASSERT(grid->isType<FloatGrid>());
     CPPUNIT_ASSERT(!grid->isType<DoubleGrid>());
+}
+
+
+void
+TestGrid::testIsTreeUnique()
+{
+    using namespace openvdb;
+
+    FloatGrid::Ptr grid = FloatGrid::create();
+    CPPUNIT_ASSERT(grid->isTreeUnique());
+
+    // a shallow copy shares the same tree
+    FloatGrid::Ptr grid2 = grid->copy();
+    CPPUNIT_ASSERT(!grid->isTreeUnique());
+    CPPUNIT_ASSERT(!grid2->isTreeUnique());
+
+    // cleanup the shallow copy
+    grid2.reset();
+    CPPUNIT_ASSERT(grid->isTreeUnique());
+
+    // copy with new tree
+    GridBase::Ptr grid3 = grid->copyGridWithNewTree();
+    CPPUNIT_ASSERT(grid->isTreeUnique());
 }
 
 

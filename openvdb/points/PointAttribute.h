@@ -42,7 +42,7 @@ struct Default
 /// @param type               the type of the attibute.
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param metaDefaultValue   metadata default attribute value
+/// @param defaultValue       metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename PointDataTreeT>
@@ -51,7 +51,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
+                            const Metadata* defaultValue = nullptr,
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -62,7 +62,7 @@ inline void appendAttribute(PointDataTreeT& tree,
 /// @param uniformValue       the initial value of the attribute
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
-/// @param metaDefaultValue   metadata default attribute value
+/// @param defaultValue       metadata default attribute value
 /// @param hidden             mark attribute as hidden
 /// @param transient          mark attribute as transient
 template <typename ValueType,
@@ -74,7 +74,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                                 point_attribute_internal::Default<ValueType>::value(),
                             const Index strideOrTotalSize = 1,
                             const bool constantStride = true,
-                            Metadata::Ptr metaDefaultValue = Metadata::Ptr(),
+                            const TypedMetadata<ValueType>* defaultValue = nullptr,
                             const bool hidden = false,
                             const bool transient = false);
 
@@ -244,7 +244,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                             const NamePair& type,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr metaDefaultValue,
+                            const Metadata* defaultValue,
                             const bool hidden,
                             const bool transient)
 {
@@ -268,8 +268,8 @@ inline void appendAttribute(PointDataTreeT& tree,
 
     // store the attribute default value in the descriptor metadata
 
-    if (metaDefaultValue) {
-        newDescriptor->setDefaultValue(name, *metaDefaultValue);
+    if (defaultValue) {
+        newDescriptor->setDefaultValue(name, *defaultValue);
     }
 
     // extract new pos
@@ -288,7 +288,8 @@ inline void appendAttribute(PointDataTreeT& tree,
             auto expected = leaf.attributeSet().descriptorPtr();
 
             auto attribute = leaf.appendAttribute(*expected, newDescriptor,
-                pos, strideOrTotalSize, constantStride, &lock);
+                pos, strideOrTotalSize, constantStride, defaultValue,
+                &lock);
 
             if (hidden)     attribute->setHidden(true);
             if (transient)  attribute->setTransient(true);
@@ -306,7 +307,7 @@ inline void appendAttribute(PointDataTreeT& tree,
                             const ValueType& uniformValue,
                             const Index strideOrTotalSize,
                             const bool constantStride,
-                            Metadata::Ptr metaDefaultValue,
+                            const TypedMetadata<ValueType>* defaultValue,
                             const bool hidden,
                             const bool transient)
 {
@@ -318,9 +319,15 @@ inline void appendAttribute(PointDataTreeT& tree,
     using point_attribute_internal::MetadataStorage;
 
     appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
-        strideOrTotalSize, constantStride, metaDefaultValue, hidden, transient);
+        strideOrTotalSize, constantStride, defaultValue, hidden, transient);
 
-    if (!math::isExactlyEqual(uniformValue, Default<ValueType>::value())) {
+    // if the uniform value is equal to either the default value provided
+    // through the metadata argument or the default value for this value type,
+    // it is not necessary to perform the collapse
+
+    const bool uniformIsDefault = math::isExactlyEqual(uniformValue,
+            bool(defaultValue) ? defaultValue->value() : Default<ValueType>::value());
+    if (!uniformIsDefault) {
         MetadataStorage<PointDataTreeT, ValueType>::add(tree, uniformValue);
         collapseAttribute<ValueType>(tree, name, uniformValue);
     }
@@ -532,10 +539,42 @@ inline void compactAttributes(PointDataTreeT& tree)
 
 
 template <typename PointDataTreeT>
-OPENVDB_DEPRECATED inline void bloscCompressAttribute(  PointDataTreeT&,
-                                                        const Name&)
+OPENVDB_DEPRECATED inline void
+appendAttribute(PointDataTreeT& tree,
+                const Name& name,
+                const NamePair& type,
+                const Index strideOrTotalSize,
+                const bool constantStride,
+                Metadata::Ptr metaDefaultValue,
+                const bool hidden = false,
+                const bool transient = false)
 {
-    // in-memory compression is no longer supported
+    // default metadata value must now be provided as a raw pointer
+    appendAttribute(tree, name, type, strideOrTotalSize, constantStride,
+        metaDefaultValue.get(), hidden, transient);
+}
+
+
+template <typename ValueType,
+          typename CodecType = NullCodec,
+          typename PointDataTreeT = PointDataTree>
+OPENVDB_DEPRECATED inline void
+appendAttribute(PointDataTreeT& tree,
+                const std::string& name,
+                const ValueType& uniformValue,
+                const Index strideOrTotalSize,
+                const bool constantStride,
+                Metadata::Ptr metaDefaultValue,
+                const bool hidden = false,
+                const bool transient = false)
+{
+    // default metadata value must now be provided as a typed raw pointer
+    TypedMetadata<ValueType>* metadata = nullptr;
+    if (metaDefaultValue) {
+        metadata = dynamic_cast<TypedMetadata<ValueType>*>(metaDefaultValue.get());
+    }
+    appendAttribute<ValueType, CodecType>(tree, name, uniformValue, strideOrTotalSize, constantStride,
+        metadata, hidden, transient);
 }
 
 

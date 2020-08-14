@@ -13,7 +13,6 @@
 #include <openvdb/tools/Filter.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
-#include <UT/UT_Version.h>
 #include <algorithm>
 #include <iostream>
 #include <sstream>
@@ -398,7 +397,7 @@ SOP_OpenVDB_Filter::updateParmsFlags()
 ////////////////////////////////////////
 
 
-// Helper class for use with UTvdbProcessTypedGrid()
+// Helper class for use with GridBase::apply()
 struct SOP_OpenVDB_Filter::FilterOp
 {
     FilterParmVec opSequence;
@@ -567,9 +566,7 @@ SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
             }
 #endif
 
-            int success = GEOvdbProcessTypedGridTopology(*vdbPrim, filterOp);
-
-            if (!success) {
+            if (!hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(*vdbPrim, filterOp)) {
                 std::stringstream ss;
                 ss << "VDB grid " << name << " of type "
                     << vdbPrim->getConstGrid().valueType() << " was skipped";

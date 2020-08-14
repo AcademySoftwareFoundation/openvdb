@@ -17,7 +17,7 @@ global proc AEOpenVDBWriteTemplate( string $nodeAttr )
         editorTemplate -endNoOptimize;
         editorTemplate -endLayout;
 
-	    editorTemplate -addExtraControls;
+        editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
 }

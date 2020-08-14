@@ -28,7 +28,6 @@
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
-#include <UT/UT_Version.h>
 #include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
@@ -38,12 +37,30 @@
 #include <vector>
 
 
-namespace std {
-template<> struct is_integral<openvdb::PointIndex32>: public true_type {};
-template<> struct is_integral<openvdb::PointIndex64>: public true_type {};
-template<> struct is_integral<openvdb::PointDataIndex32>: public true_type {};
-template<> struct is_integral<openvdb::PointDataIndex64>: public true_type {};
-}
+namespace {
+
+template <typename T>
+struct IsGridTypeIntegral
+    : std::conditional_t<   std::is_integral<T>::value
+                         || std::is_same<T,openvdb::PointIndex32>::value
+                         || std::is_same<T,openvdb::PointIndex64>::value
+                         || std::is_same<T,openvdb::PointDataIndex32>::value
+                         || std::is_same<T,openvdb::PointDataIndex64>::value
+                         , std::true_type
+                         , std::false_type>
+{
+};
+
+template <typename T>
+struct IsGridTypeArithmetic
+    : std::conditional_t<   IsGridTypeIntegral<T>::value
+                         || std::is_floating_point<T>::value
+                         , std::true_type
+                         , std::false_type>
+{
+};
+
+} // anonymous namespace
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -664,7 +681,7 @@ private:
     GA_Offset createPoint(const openvdb::CoordBBox&, const UT_Vector3& color);
 
     template<typename ValType>
-    typename std::enable_if<std::is_integral<ValType>::value>::type
+    typename std::enable_if<IsGridTypeIntegral<ValType>::value>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
@@ -672,7 +689,7 @@ private:
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
 
     template<typename ValType>
-    typename std::enable_if<!std::is_arithmetic<ValType>::value>::type
+    typename std::enable_if<!IsGridTypeArithmetic<ValType>::value>::type
     addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType v, bool staggered);
 
     void addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, bool staggered);
@@ -904,7 +921,7 @@ TreeVisualizer::createPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename std::enable_if<std::is_integral<ValType>::value>::type
+typename std::enable_if<IsGridTypeIntegral<ValType>::value>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType s, bool)
 {
@@ -922,7 +939,7 @@ TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
 
 
 template<typename ValType>
-typename std::enable_if<!std::is_arithmetic<ValType>::value>::type
+typename std::enable_if<!IsGridTypeArithmetic<ValType>::value>::type
 TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
     const UT_Vector3& color, ValType v, bool staggered)
 {
@@ -1212,17 +1229,14 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                 if (meshing == MESH_HOUDINI) {
                     GridSurfacer surfacer(*gdp, static_cast<float>(iso),
                         static_cast<float>(adaptivity), false, &boss);
-                    GEOvdbProcessTypedGridScalar(*vdb, surfacer);
+                    hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, surfacer);
                 }
 #endif
 
                 // draw tree topology
                 if (drawTree) {
                     TreeVisualizer draw(*gdp, treeParms, &boss);
-
-                    if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
-                        GEOvdbProcessTypedGridPoint(*vdb, draw);
-                    }
+                    hvdb::GEOvdbApply<hvdb::AllGridTypes>(*vdb, draw);
                 }
 
                 if (showFrustum) {

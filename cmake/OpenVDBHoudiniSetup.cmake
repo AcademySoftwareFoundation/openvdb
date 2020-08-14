@@ -34,6 +34,10 @@ This will define the following variables:
   The version of the Houdini which was found.
 ``OPENVDB_HOUDINI_ABI``
   The ABI version that Houdini uses for it's own OpenVDB installation.
+``HOUDINI_INCLUDE_DIR``
+  The Houdini include directory.
+``HOUDINI_LIB_DIR``
+  The Houdini lib directory.
 
 A variety of variables will also be set from HoudiniConfig.cmake.
 
@@ -167,36 +171,52 @@ endif()
 # Set the relative directory containing Houdini libs and populate an extra list
 # of Houdini dependencies for _houdini_create_libraries.
 
-set(_HOUDINI_LIB_DIR)
+if(NOT HOUDINI_DSOLIB_DIR)
+  if(APPLE)
+    set(HOUDINI_DSOLIB_DIR Frameworks/Houdini.framework/Versions/Current/Libraries)
+  elseif(UNIX)
+    set(HOUDINI_DSOLIB_DIR dsolib)
+  elseif(WIN32)
+    set(HOUDINI_DSOLIB_DIR custom/houdini/dsolib)
+  endif()
+endif()
+
 set(_HOUDINI_EXTRA_LIBRARIES)
 set(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
 if(APPLE)
-  set(_HOUDINI_LIB_DIR
-    Frameworks/Houdini.framework/Versions/Current/Libraries
-  )
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
-    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.dylib
-    ${_HOUDINI_LIB_DIR}/libhboost_regex.dylib
-    ${_HOUDINI_LIB_DIR}/libhboost_thread.dylib
+    ${HOUDINI_DSOLIB_DIR}/libHoudiniRAY.dylib
+    ${HOUDINI_DSOLIB_DIR}/libhboost_regex.dylib
+    ${HOUDINI_DSOLIB_DIR}/libhboost_thread.dylib
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    HoudiniRAY
+    hboost_regex
+    hboost_thread
+  )
+elseif(UNIX)
+  list(APPEND _HOUDINI_EXTRA_LIBRARIES
+    ${HOUDINI_DSOLIB_DIR}/libHoudiniRAY.so
+    ${HOUDINI_DSOLIB_DIR}/libhboost_regex.so
+    ${HOUDINI_DSOLIB_DIR}/libhboost_thread.so
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    HoudiniRAY
+    hboost_regex
+    hboost_thread
   )
 elseif(WIN32)
-  set(_HOUDINI_LIB_DIR custom/houdini/dsolib)
-  file(GLOB _HOUDINI_EXTRA_LIBRARIES ${_HOUDINI_LIB_DIR}/*.lib)
-else()
-  set(_HOUDINI_LIB_DIR dsolib)
+  #libRAY is already included by houdini for windows builds
   list(APPEND _HOUDINI_EXTRA_LIBRARIES
-    ${_HOUDINI_LIB_DIR}/libHoudiniRAY.so
-    ${_HOUDINI_LIB_DIR}/libhboost_regex.so
-    ${_HOUDINI_LIB_DIR}/libhboost_thread.so
+    ${HOUDINI_DSOLIB_DIR}/hboost_regex-mt.lib
+    ${HOUDINI_DSOLIB_DIR}/hboost_thread-mt.lib
+  )
+  list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
+    hboost_regex
+    hboost_thread
   )
 endif()
-
-list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
-  HoudiniRAY
-  hboost_regex
-  hboost_thread
-)
 
 # Additionally link extra deps
 
@@ -211,8 +231,8 @@ unset(_HOUDINI_EXTRA_LIBRARY_NAMES)
 
 # Set Houdini lib and include directories
 
-set(_HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
-set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR})
+set(HOUDINI_INCLUDE_DIR ${_houdini_include_dir})
+set(HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
 
 # ------------------------------------------------------------------------
 #  Configure dependencies
@@ -226,17 +246,17 @@ set(_HOUDINI_LIB_DIR ${_houdini_install_root}/${_HOUDINI_LIB_DIR})
 # the zlib library
 
 if(NOT ZLIB_ROOT)
-  set(ZLIB_ROOT ${_HOUDINI_INCLUDE_DIR})
+  set(ZLIB_ROOT ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT ZLIB_LIBRARY)
   # Full path to zlib library - FindPackage ( ZLIB)
   find_library(ZLIB_LIBRARY z
     ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
-    PATHS ${_HOUDINI_LIB_DIR}
+    PATHS ${HOUDINI_LIB_DIR}
   )
   if(NOT EXISTS ${ZLIB_LIBRARY})
     message(WARNING "The OpenVDB Houdini CMake setup is unable to locate libz within "
-      "the Houdini installation at: ${_HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
+      "the Houdini installation at: ${HOUDINI_LIB_DIR}. OpenVDB may not build correctly."
     )
   endif()
 endif()
@@ -244,50 +264,47 @@ endif()
 # TBB
 
 if(NOT TBB_INCLUDEDIR)
-  set(TBB_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(TBB_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT TBB_LIBRARYDIR)
-  set(TBB_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(TBB_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Blosc
 
 if(NOT BLOSC_INCLUDEDIR)
-  set(BLOSC_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(BLOSC_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT BLOSC_LIBRARYDIR)
-  set(BLOSC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(BLOSC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Jemalloc
 
 if(NOT JEMALLOC_LIBRARYDIR)
-  set(JEMALLOC_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(JEMALLOC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # OpenEXR
 
 if(NOT OPENEXR_INCLUDEDIR)
-  set(OPENEXR_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(OPENEXR_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT OPENEXR_LIBRARYDIR)
-  set(OPENEXR_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # IlmBase
 
 if(NOT ILMBASE_INCLUDEDIR)
-  set(ILMBASE_INCLUDEDIR ${_HOUDINI_INCLUDE_DIR})
+  set(ILMBASE_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
 if(NOT ILMBASE_LIBRARYDIR)
-  set(ILMBASE_LIBRARYDIR ${_HOUDINI_LIB_DIR})
+  set(ILMBASE_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
-
-unset(_HOUDINI_INCLUDE_DIR)
-unset(_HOUDINI_LIB_DIR)
 
 # Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
@@ -296,6 +313,8 @@ if(APPLE)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
 elseif(UNIX)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.so")
+elseif(WIN32)
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.lib")
 endif()
 
 # ------------------------------------------------------------------------
@@ -309,9 +328,10 @@ if(Houdini_VERSION VERSION_LESS 17)
   set(OPENVDB_HOUDINI_ABI 4)
 elseif(Houdini_VERSION VERSION_LESS 18)
   set(OPENVDB_HOUDINI_ABI 5)
-else()
-  # Anticipated ABI version for H18
+elseif(Houdini_VERSION VERSION_LESS 18.5)
   set(OPENVDB_HOUDINI_ABI 6)
+else()
+  set(OPENVDB_HOUDINI_ABI 7)
 endif()
 
 # ------------------------------------------------------------------------

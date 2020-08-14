@@ -9,7 +9,6 @@
 #ifndef OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_SOP_VDBVERBUTILS_HAS_BEEN_INCLUDED
 
-#include <UT/UT_Version.h>
 #include <GOP/GOP_Manager.h>
 #include <SOP/SOP_NodeParmsOptions.h> // for SOP_NodeCacheOptions
 #include <openvdb/Types.h>
@@ -24,7 +23,7 @@ class SOP_VDBCacheOptions: public SOP_NodeCacheOptions
 {
 public:
             SOP_VDBCacheOptions() {}
-    virtual ~SOP_VDBCacheOptions() {}
+            ~SOP_VDBCacheOptions() override {}
 
     openvdb::Vec3f evalVec3f(const char* name, fpreal time) const
     {
@@ -108,7 +107,7 @@ public:
     }
 
 protected:
-    virtual OP_ERROR cook(OP_Context &context) override final
+    OP_ERROR cook(OP_Context &context) override final
     {
         auto result = cookMySop(context);
         gop.destroyAdhocGroups();

@@ -58,8 +58,6 @@ The following cache variables may also be set:
   The directory containing ``IlmBase/config-auto.h``.
 ``IlmBase_{COMPONENT}_LIBRARY``
   Individual component libraries for IlmBase
-``IlmBase_{COMPONENT}_DLL``
-  Individual component dlls for IlmBase on Windows.
 
 Hints
 ^^^^^
@@ -83,6 +81,7 @@ may be provided to tell this module where to look.
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
+include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -143,11 +142,12 @@ elseif(DEFINED ENV{ILMBASE_ROOT})
 endif()
 
 # Additionally try and use pkconfig to find IlmBase
-
-if(NOT DEFINED PKG_CONFIG_FOUND)
-  find_package(PkgConfig)
+if(USE_PKGCONFIG)
+  if(NOT DEFINED PKG_CONFIG_FOUND)
+    find_package(PkgConfig)
+  endif()
+  pkg_check_modules(PC_IlmBase QUIET IlmBase)
 endif()
-pkg_check_modules(PC_IlmBase QUIET IlmBase)
 
 # ------------------------------------------------------------------------
 #  Search for IlmBase include DIR
@@ -165,7 +165,7 @@ list(APPEND _ILMBASE_INCLUDE_SEARCH_DIRS
 find_path(IlmBase_INCLUDE_DIR IlmBaseConfig.h
   ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
   PATHS ${_ILMBASE_INCLUDE_SEARCH_DIRS}
-  PATH_SUFFIXES include/OpenEXR OpenEXR
+  PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR}/OpenEXR include/OpenEXR OpenEXR
 )
 
 if(EXISTS "${IlmBase_INCLUDE_DIR}/IlmBaseConfig.h")
@@ -207,41 +207,30 @@ list(APPEND _ILMBASE_LIBRARYDIR_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Build suffix directories
-
-set(ILMBASE_PATH_SUFFIXES
-  lib64
-  lib
-)
-
-if(UNIX)
-  list(INSERT ILMBASE_PATH_SUFFIXES 0 lib/x86_64-linux-gnu)
-endif()
+# Library suffix handling
 
 set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(_IlmBase_Version_Suffix "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}")
 
-# library suffix handling
 if(WIN32)
-  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-    "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.lib"
-  )
+  if(ILMBASE_USE_STATIC_LIBS)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+  endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.lib")
 else()
   if(ILMBASE_USE_STATIC_LIBS)
-    list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-      "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.a"
-    )
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
   else()
     if(APPLE)
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.dylib"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.dylib")
     else()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES
-        "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}.so"
-      )
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.so")
     endif()
   endif()
+  list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.a")
 endif()
+
+unset(_IlmBase_Version_Suffix)
 
 set(IlmBase_LIB_COMPONENTS "")
 
@@ -249,21 +238,9 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   find_library(IlmBase_${COMPONENT}_LIBRARY ${COMPONENT}
     ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
     PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
-    PATH_SUFFIXES ${ILMBASE_PATH_SUFFIXES}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
   )
   list(APPEND IlmBase_LIB_COMPONENTS ${IlmBase_${COMPONENT}_LIBRARY})
-
-  if(WIN32 AND NOT ILMBASE_USE_STATIC_LIBS)
-    set(_ILMBASE_TMP ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
-    find_library(IlmBase_${COMPONENT}_DLL ${COMPONENT}
-      ${_FIND_ILMBASE_ADDITIONAL_OPTIONS}
-      PATHS ${_ILMBASE_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES bin
-    )
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_TMP})
-    unset(_ILMBASE_TMP)
-  endif()
 
   if(IlmBase_${COMPONENT}_LIBRARY)
     set(IlmBase_${COMPONENT}_FOUND TRUE)
@@ -272,7 +249,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   endif()
 endforeach()
 
-# reset lib suffix
+# Reset library suffix
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 unset(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
@@ -295,14 +272,26 @@ if(IlmBase_FOUND)
   set(IlmBase_LIBRARIES ${IlmBase_LIB_COMPONENTS})
 
   # We have to add both include and include/OpenEXR to the include
-  # path in case OpenEXR and IlmBase are installed separately
+  # path in case OpenEXR and IlmBase are installed separately.
+  #
+  # Make sure we get the absolute path to avoid issues where
+  # /usr/include/OpenEXR/../ is picked up and passed to gcc from cmake
+  # which won't correctly compute /usr/include as an implicit system
+  # dir if the path is relative:
+  #
+  # https://github.com/AcademySoftwareFoundation/openvdb/issues/632
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129
+
+  set(_IlmBase_Parent_Dir "")
+  get_filename_component(_IlmBase_Parent_Dir
+    ${IlmBase_INCLUDE_DIR}/../ ABSOLUTE)
 
   set(IlmBase_INCLUDE_DIRS)
   list(APPEND IlmBase_INCLUDE_DIRS
-    ${IlmBase_INCLUDE_DIR}/../
+    ${_IlmBase_Parent_Dir}
     ${IlmBase_INCLUDE_DIR}
   )
-  set(IlmBase_DEFINITIONS ${PC_IlmBase_CFLAGS_OTHER})
+  unset(_IlmBase_Parent_Dir)
 
   set(IlmBase_LIBRARY_DIRS "")
   foreach(LIB ${IlmBase_LIB_COMPONENTS})
@@ -314,11 +303,37 @@ if(IlmBase_FOUND)
   # Configure imported targets
 
   foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
+    # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+    # lib is in use. If win32, we can't mark the import .libs as shared, so
+    # these are always marked as UNKNOWN. Otherwise, infer from extension.
+    set(ILMBASE_${COMPONENT}_LIB_TYPE UNKNOWN)
+    if(ILMBASE_USE_STATIC_LIBS)
+      set(ILMBASE_${COMPONENT}_LIB_TYPE STATIC)
+    elseif(UNIX)
+      get_filename_component(_ILMBASE_${COMPONENT}_EXT ${IlmBase_${COMPONENT}_LIBRARY} EXT)
+      if(${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".a")
+        set(ILMBASE_${COMPONENT}_LIB_TYPE STATIC)
+      elseif(${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".so" OR
+             ${_ILMBASE_${COMPONENT}_EXT} STREQUAL ".dylib")
+        set(ILMBASE_${COMPONENT}_LIB_TYPE SHARED)
+      endif()
+    endif()
+
+    set(IlmBase_${COMPONENT}_DEFINITIONS)
+
+    # Add the OPENEXR_DLL define if the library is not static on WIN32
+    if(WIN32)
+      if(NOT ILMBASE_${COMPONENT}_LIB_TYPE STREQUAL STATIC)
+        list(APPEND IlmBase_${COMPONENT}_DEFINITIONS OPENEXR_DLL)
+      endif()
+    endif()
+
     if(NOT TARGET IlmBase::${COMPONENT})
-      add_library(IlmBase::${COMPONENT} UNKNOWN IMPORTED)
+      add_library(IlmBase::${COMPONENT} ${ILMBASE_${COMPONENT}_LIB_TYPE} IMPORTED)
       set_target_properties(IlmBase::${COMPONENT} PROPERTIES
         IMPORTED_LOCATION "${IlmBase_${COMPONENT}_LIBRARY}"
-        INTERFACE_COMPILE_OPTIONS "${IlmBase_DEFINITIONS}"
+        INTERFACE_COMPILE_OPTIONS "${PC_IlmBase_CFLAGS_OTHER}"
+        INTERFACE_COMPILE_DEFINITIONS "${IlmBase_${COMPONENT}_DEFINITIONS}"
         INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}"
       )
     endif()

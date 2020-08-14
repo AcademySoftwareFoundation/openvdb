@@ -1,7 +1,8 @@
 ![OpenVDB](https://www.openvdb.org/images/openvdb_logo.png)
 
-[![Azure](https://dev.azure.com/academysoftwarefoundation/Academy%20Software%20Foundation/_apis/build/status/academysoftwarefoundation.openvdb)](https://dev.azure.com/academysoftwarefoundation/Academy%20Software%20Foundation/_build?definitionId=1&_a=summary)
+[![License](https://img.shields.io/github/license/AcademySoftwareFoundation/openvdb)](LICENSE.md)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2774/badge)](https://bestpractices.coreinfrastructure.org/projects/2774)
+[![Azure](https://dev.azure.com/academysoftwarefoundation/Academy%20Software%20Foundation/_apis/build/status/academysoftwarefoundation.openvdb)](https://dev.azure.com/academysoftwarefoundation/Academy%20Software%20Foundation/_build?definitionId=1&_a=summary)
 
 [Website](https://www.openvdb.org) |
 [Discussion Forum](https://www.openvdb.org/forum) |
@@ -21,11 +22,9 @@ OpenVDB is released under the [Mozilla Public License Version 2.0](https://www.m
 
 The trademarks of any contributor to this project may not be used in association with the project without the contributor's express permission.
 
-
 ### Contributing
 
-Developers who wish to contribute code to be considered for inclusion in the OpenVDB distribution must first complete the [Contributor License Agreement](https://www.openvdb.org/download/OpenVDBContributorLicenseAgreement.pdf) and submit it to [openvdb@gmail.com](mailto:openvdb@gmail.com).  We prefer code submissions in the form of pull requests to this repository.  All code should adhere to the OpenVDB [coding standards](https://www.openvdb.org/documentation/doxygen/codingStyle.html), and _every commit must be signed off_.  That is, every commit log message must include a “`Signed-off-by`” line (generated, for example, with “`git commit --signoff`”), indicating that the committer wrote the code and has the right to release it under the [MPL 2.0](https://www.mozilla.org/MPL/2.0/) license. See https://developercertificate.org/ for more information on this requirement.
-
+OpenVDB welcomes contributions to the OpenVDB project. Please refer to the [contribution guidelines](CONTRIBUTING.md) for details on how to make a contribution.
 
 ### Developer Quick Start
 
@@ -95,12 +94,23 @@ make install
 #### Windows
 ##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
 
-It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
-variable to use 64-bit libraries by default.
+Note that the following commands have only been tested for 64bit systems/libraries.
+It is recommended to set the `VCPKG_DEFAULT_TRIPLET` environment variable to
+`x64-windows` to use 64-bit libraries by default. You will also require
+[Git](https://git-scm.com/downloads), [vcpkg](https://github.com/microsoft/vcpkg)
+and [CMake](https://cmake.org/download/) to be installed.
 
 ```
-vcpkg install boost zlib blosc openexr tbb
-vcpkg integrate install
+vcpkg install zlib:x64-windows
+vcpkg install blosc:x64-windows
+vcpkg install openexr:x64-windows
+vcpkg install tbb:x64-windows
+vcpkg install boost-iostreams:x64-windows
+vcpkg install boost-system:x64-windows
+vcpkg install boost-any:x64-windows
+vcpkg install boost-algorithm:x64-windows
+vcpkg install boost-uuid:x64-windows
+vcpkg install boost-interprocess:x64-windows
 ```
 ##### Building OpenVDB
 ```
@@ -108,7 +118,6 @@ git clone git@github.com:AcademySoftwareFoundation/openvdb.git
 cd openvdb
 mkdir build
 cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake ..
-make -j4
-make install
+cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -A x64 ..
+cmake --build . --parallel 4 --config Release --target install
 ```

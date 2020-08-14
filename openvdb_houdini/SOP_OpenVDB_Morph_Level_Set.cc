@@ -12,8 +12,6 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetMorph.h>
 
-#include <UT/UT_Version.h>
-
 #include <hboost/algorithm/string/join.hpp>
 
 #include <stdexcept>

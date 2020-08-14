@@ -16,18 +16,9 @@
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetTracker.h> // LevelSetTracker::normalize
 
-#include <UT/UT_Version.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_UniquePtr.h>
 #include <PRM/PRM_Parm.h>
-
-#ifdef SESI_OPENVDB
-  #include <hboost/mpl/at.hpp>
-  namespace boostmpl = hboost::mpl;
-#else
-  #include <boost/mpl/at.hpp>
-  namespace boostmpl = boost::mpl;
-#endif
 
 #include <memory>
 #include <string>
@@ -202,7 +193,7 @@ struct Visitor
     using LeafNodeType = typename TreeType::LeafNodeType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boostmpl::at<NodeChainType, boostmpl::int_<1>>::type;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     using BoolTreePtr = typename BoolTreeType::Ptr;
@@ -1948,7 +1939,7 @@ SOP_OpenVDB_Diagnostics::Cache::cookVDBSop(OP_Context& context)
             tests.setPrimitiveName(it.getPrimitiveName().toStdString());
             tests.setPrimitiveIndex(int(it.getIndex()));
 
-            GEOvdbProcessTypedGridTopology(**it, tests, /*makeUnique=*/false);
+            hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, tests, /*makeUnique=*/false);
 
             if (tests.replacementGrid()) {
                 hvdb::replaceVdbPrimitive(*gdp, tests.replacementGrid(), **it, true,

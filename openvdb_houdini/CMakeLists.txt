@@ -34,7 +34,7 @@
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.3)
-project(OpenVDBHoudini)
+project(OpenVDBHoudini LANGUAGES CXX)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -48,11 +48,6 @@ houdini_get_default_install_dir():
   Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
 
-# SESITAG CMake options
-option(OPENVDB_HOUDINI_ENABLE_SESI_TAG [=[
-Enable SESI tag information on the OpenVDB DSOs. This is legacy functionality for
-older Houdini versions and will be removed in Houdini 18. ]=] OFF)
-
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
   set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING
@@ -65,15 +60,18 @@ if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
   )
 else()
   string(TOLOWER ${OPENVDB_HOUDINI_OPHIDE_POLICY} OPENVDB_HOUDINI_OPHIDE_POLICY)
-  if (NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} IN_LIST _OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS)
+  if(NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} IN_LIST _OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS)
     message(WARNING "Unrecognized value for OPENVDB_HOUDINI_OPHIDE_POLICY, using none instead.")
     set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING FORCE)
   endif()
 endif()
 
-mark_as_advanced(
-  OPENVDB_HOUDINI_ENABLE_SESI_TAG
-)
+if(OPENVDB_HOUDINI_ENABLE_SESI_TAG)
+  # SESI tag information on the OpenVDB DSOs. This is legacy functionality for
+  # older Houdini versions (< 18) and will be removed.
+  message(DEPRECATION "The OPENVDB_HOUDINI_ENABLE_SESI_TAG option is deprecated "
+    "and will be removed.")
+endif()
 
 #########################################################################
 
@@ -99,6 +97,7 @@ set(OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
 )
 set(OPENVDB_HOUDINI_CONFIGDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/config")
 set(OPENVDB_HOUDINI_DSODIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso")
+set(OPENVDB_HOUDINI_BINDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
 set(OPENVDB_HOUDINI_INCLUDEDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
 set(OPENVDB_HOUDINI_LIBDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 set(OPENVDB_HOUDINI_PYTHONRC_DIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/python2.7libs")
@@ -183,6 +182,8 @@ target_link_libraries(openvdb_houdini PUBLIC
   ${OPENVDB_HOUDINI_DEPENDENT_LIBS}
 )
 
+target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
+
 if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
   set(RPATHS "")
@@ -223,6 +224,7 @@ endif()
 set(OPENVDB_DSO_NAMES
   GR_PrimVDBPoints
   SHOP_OpenVDB_Points
+  SOP_OpenVDB_Activate
   SOP_OpenVDB_Advect
   SOP_OpenVDB_Advect_Points
   SOP_OpenVDB_Analysis
@@ -353,9 +355,10 @@ install(DIRECTORY
   DESTINATION ${OPENVDB_HOUDINI_INCLUDEDIR}
 )
 
-install(TARGETS
-  openvdb_houdini
-  DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
+install(TARGETS openvdb_houdini
+  RUNTIME DESTINATION ${OPENVDB_HOUDINI_BINDIR}
+  LIBRARY DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
+  ARCHIVE DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
 )
 
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
