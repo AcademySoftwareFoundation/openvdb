@@ -6,6 +6,11 @@
 @par
 <B>Version 7.1.1</B> - <I>In Development</I>
 
+@par:
+Houdini
+- Fixed a bug where a Houdini SOP's verb would not be correctly associated
+  with the corresponding node if the node's internal name was changed.
+
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
@@ -117,8 +122,6 @@ Bug fixes:
 - Fixed a compiler error when using C++17 by changing std::unexpected() to
   std::terminate().
   <I>[Contributed&nbsp;by&nbsp;Mark&nbsp;Sisson]</I>
-- Fixed a bug where a Houdini SOP's verb would not be correctly associated
-  with the corresponding node if the node's internal name was changed.
 
 @par
 API changes:

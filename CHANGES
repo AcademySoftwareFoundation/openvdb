@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 7.1.1 - In Development
 
+    Houdini:
+    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
+      with the corresponding node if the node's internal name was changed.
 
 Version 7.1.0 - August 13, 2020
 
@@ -90,8 +93,6 @@ Version 7.1.0 - August 13, 2020
     - Fixed a compiler error when using C++17 by changing std::unexpected() to
       std::terminate().
       [Contributed by Mark Sisson]
-    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
-      with the corresponding node if the node's internal name was changed.
 
     API changes:
     - Removed a number of deprecated point methods.
