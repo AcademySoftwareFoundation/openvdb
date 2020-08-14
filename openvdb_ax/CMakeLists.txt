@@ -288,7 +288,7 @@ if(OPENVDB_AX_SHARED)
   endif()
 endif()
 
-install(FILES ax.h Exceptions.h version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
+install(FILES openvdb_ax/ax.h openvdb_ax/Exceptions.h openvdb_ax/version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
 install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
 install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
 install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
