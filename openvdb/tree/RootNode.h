@@ -479,6 +479,7 @@ public:
 
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
+    Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -1546,6 +1547,14 @@ RootNode<ChildT>::nonLeafCount() const
         }
     }
     return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::childCount() const
+{
+    return this->getChildCount();
 }
 
 

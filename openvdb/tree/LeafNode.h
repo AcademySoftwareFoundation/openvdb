@@ -133,6 +133,8 @@ public:
     void nodeCount(std::vector<Index32> &) const {}
     /// Return the non-leaf count for this node, which is zero.
     static Index32 nonLeafCount() { return 0; }
+    /// Return the child count for this node, which is zero.
+    static Index32 childCount() { return 0; }
 
     /// Return the number of voxels marked On.
     Index64 onVoxelCount() const { return mValueMask.countOn(); }

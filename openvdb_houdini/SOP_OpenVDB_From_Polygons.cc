@@ -75,24 +75,25 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
 {
     if (data == nullptr || menuEntries == nullptr || spare == nullptr) return;
 
+    size_t menuIdx = 0;
+
+    menuEntries[menuIdx].setToken("point.v");
+    menuEntries[menuIdx++].setLabel("point.v");
+
     SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
 
     if (sop == nullptr) {
         // terminate and quit
-        menuEntries[0].setToken(0);
-        menuEntries[0].setLabel(0);
+        menuEntries[menuIdx].setToken(0);
+        menuEntries[menuIdx].setLabel(0);
         return;
     }
 
     int inputIndex = lookupAttrInput(spare);
     const GU_Detail* gdp = sop->getInputLastGeo(inputIndex, CHgetEvalTime());
-    size_t menuIdx = 0, menuEnd(themenusize - 2);
+    size_t menuEnd(themenusize - 2);
 
     if (gdp) {
-
-        // null object
-        menuEntries[menuIdx].setToken("");
-        menuEntries[menuIdx++].setLabel("- no attribute selected -");
 
         // point attribute names
         GA_AttributeDict::iterator iter = gdp->pointAttribs().begin(GA_SCOPE_PUBLIC);
@@ -168,7 +169,7 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
 }
 
 const PRM_ChoiceList PrimAttrMenu(
-    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
+    PRM_ChoiceListType(PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
 
 } // unnamed namespace
 
@@ -684,7 +685,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     GA_ROAttributeRef attrRef;
     int attrClass = POINT_ATTR;
     const GU_Detail* meshGdp = this->getInputLastGeo(0, time);
-    for (int i = 1, N = static_cast<int>(evalInt("numattrib", 0, time)); i <= N; ++i) {
+    for (int i = 1, N = static_cast<int>(evalInt("attrList", 0, time)); i <= N; ++i) {
         bool isVector = true;
         if (meshGdp) {
             isVector = false;

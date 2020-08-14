@@ -271,6 +271,7 @@ public:
     Index32 leafCount() const;
     void nodeCount(std::vector<Index32> &vec) const;
     Index32 nonLeafCount() const;
+    Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -1039,6 +1040,14 @@ InternalNode<ChildT, Log2Dim>::nonLeafCount() const
         sum += iter->nonLeafCount();
     }
     return sum;
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline Index32
+InternalNode<ChildT, Log2Dim>::childCount() const
+{
+    return this->getChildMask().countOn();
 }
 
 

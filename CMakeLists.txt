@@ -121,10 +121,13 @@ A global list of library paths to additionally use into when searching for depen
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
   set(CONCURRENT_MALLOC Auto CACHE STRING
-    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
-    Although not required, it is strongly recommended to use a concurrent memory allocator.
-    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
-    in which case Tbbmalloc is used." FORCE
+    "Explicitly link the OpenVDB executables against a particular concurrent malloc library.
+    Options are: None Auto Jemalloc Tbbmalloc. Although not required, it is strongly recommended
+    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES and
+    OPENVDB_BUILD_UNITTESTS are false. Auto is the default and implies Jemalloc, unless USE_MAYA
+    is ON or Jemalloc is unavailable, in which case Tbbmalloc is used. Note that this is not
+    linked into library builds and defers this choice to downstream applications via explicit
+    CMake targets." FORCE
   )
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
@@ -212,8 +215,9 @@ mark_as_advanced(
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
-# to. The minimum version must be at least 1.5. Previous versions are incompatible.
-set(MINIMUM_BLOSC_VERSION 1.5)
+# to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
+# Later versions (including 1.5.4), can be buggy on certain platforms.
+set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 5)
@@ -587,11 +591,18 @@ unset(HAS_AVAILABLE_WARNINGS)
 # * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
 #   of injecting into the Windows runtime to replace the system allocator.
 
-if(CONCURRENT_MALLOC STREQUAL "Auto")
+if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    set(CONCURRENT_MALLOC "Jemalloc")
+    find_package(Jemalloc QUIET)
+    if(NOT TARGET Jemalloc::jemalloc)
+      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+        It is recommended to use Jemalloc for optimum performance.")
+      set(CONCURRENT_MALLOC "Tbbmalloc")
+    else()
+      set(CONCURRENT_MALLOC "Jemalloc")
+    endif()
   endif()
 endif()
 

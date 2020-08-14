@@ -1,9 +1,43 @@
 OpenVDB Version History
 =======================
 
-Version 7.1.0 - In Development
+Version 7.1.1 - In Development
+
+
+Version 7.1.0 - August 13, 2020
 
       As of this release, support for grid ABI=4 has been removed.
+
+    New features:
+    - Added a novel parallel sparse FastSweeping class that outperforms our
+      existing techniques for computing signed distance fields in addition to
+      supporting velocity extension.
+    - Added tools::fogToSdf which converts a scalar (fog) volume into a signed
+      distance field.
+    - Added tools::sdfToSdf which re-normalizes a signed distance field;
+    - Added tools::fogToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a scalar (fog) volume.
+    - Added tools::sdfToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a signed distance field.
+    - Added tools::fogToSdfAndExt which computes a signed distance and extends
+      an arbitrary field (e.g. velocity) off the iso-surface of a signed
+      distance field.
+    - Added tools::fogToSdfAndExt which re-normalizes a signed distance and
+      extends an arbitrary field (e.g. velocity) off the iso-surface of a
+      signed distance field.
+    - Added tools::dilateSdf which dilates a signed distance field.
+    - Added tools::maskSdf which extends an existing signed distance into a
+      user-defined mask.
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+    - Added PointDataLeafNode::stealAttributeSet() and
+      AttributeSet::removeAttribute() for releasing ownership of attribute
+      data.
+    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
+      group index collisions when attempting to merge two Descriptors.
+    - Added RootNode::childCount(), InternalNode::childCount() and
+      LeafNode::childCount() to count the number of immediate child nodes that
+      exist below the current node.
 
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
@@ -35,15 +69,6 @@ Version 7.1.0 - In Development
     - Changed the tree::NodeChain implementation to use an openvdb::TypeList
       rather than a boost::mpl::vector and updated all usage of tree::NodeChain
       accordingly.
-
-    New features:
-    - Added Grid::isTreeUnique() to tell if the tree is shared with another
-      grid.
-    - Added PointDataLeafNode::stealAttributeSet() and
-      AttributeSet::removeAttribute() for releasing ownership of attribute
-      data.
-    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
-      group index collisions when attempting to merge two Descriptors.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -86,10 +111,16 @@ Version 7.1.0 - In Development
       point of the VDB when computing bounding box. SOPs affected include Clip,
       Fill, Points Group, Rasterize Points, Read, Remove Divergence.
       [Contributed by Kuba Roth]
+    - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+      it might be stuck hidden if the input hasn't cooked.
+    - OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require
+      input geometry to have been cooked to offer a choice of attributes,
+      the user may now also type in a value.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
       [Reported by Ian Woodward]
+    - Remove some logic for compilers older than Visual Studio 2019.
     - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
       compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
       headers were installed to /usr/include.
@@ -135,11 +166,16 @@ Version 7.1.0 - In Development
       Boost::disable_autolinking target.
     - Added support for importing pyopenvdb and openvdb_houdini through the
       FindOpenVDB CMake module
-    - Removed the @c OPENVDB_2_ABI_COMPATIBLE and @c OPENVDB_3_ABI_COMPATIBLE
-      macros.
+    - Removed the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE macros.
     - Fixed a few GCC compiler warnings by adding override keywords.
       [Contributed by Edward Lam]
-
+    - jemalloc/tbbmalloc are no longer linked into library artifacts of the
+      OpenVDB CMake build. The CONCURRENT_MALLOC CMake option now only applies
+      to the executables.
+    - Introduced a new OpenVDB::openvdb_je interface target through the
+      FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
+    - CMake build fix for the vdb_render binary on Windows when building
+      statically and using OpenEXR 2.5
 
 Version 7.0.0 - December 6, 2019
 
