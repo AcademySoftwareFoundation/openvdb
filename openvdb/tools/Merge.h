@@ -375,7 +375,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
     const ValueT insideBackground = Union ? -this->background() : this->background();
     const ValueT outsideBackground = -insideBackground;
 
-    auto getTileFlag = [](auto valueIter) -> uint8_t
+    auto getTileFlag = [&](auto valueIter) -> uint8_t
     {
         uint8_t flag(0);
         const ValueT& value = valueIter.getValue();
@@ -614,7 +614,7 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
     constexpr uint8_t INSIDE_TILE = 0x2;
     constexpr uint8_t CHILD = 0x4;
 
-    auto getTileFlag = [](auto valueIter) -> uint8_t
+    auto getTileFlag = [&](auto valueIter) -> uint8_t
     {
         uint8_t flag(0);
         const ValueT& value = valueIter.getValue();
