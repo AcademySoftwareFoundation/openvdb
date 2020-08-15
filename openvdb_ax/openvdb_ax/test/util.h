@@ -35,8 +35,8 @@
 { \
     for (const auto& test : Tests) { \
         const std::string& code = test.first; \
-        CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected LLVMSyntaxError", code), \
-            openvdb::ax::ast::parse(code.c_str()), openvdb::LLVMSyntaxError); \
+        CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected RuntimeError", code), \
+            openvdb::ax::ast::parse(code.c_str()), openvdb::RuntimeError); \
     } \
 } \
 
