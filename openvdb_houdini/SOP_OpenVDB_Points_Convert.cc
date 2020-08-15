@@ -695,7 +695,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
                                         includeGroups.empty() &&
                                         excludeGroups.empty();
 
-                for (PointDataGrid::ConstPtr grid : pointGrids) {
+                for (const PointDataGrid::ConstPtr &grid : pointGrids) {
 
                     GU_Detail geo;
 
@@ -725,7 +725,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 
                 size_t i = 0;
 
-                for (PointDataGrid::ConstPtr grid : pointGrids) {
+                for (const PointDataGrid::ConstPtr &grid : pointGrids) {
 
                     assert(i < pointNames.size());
                     const std::string gridName = pointNames[i++];
