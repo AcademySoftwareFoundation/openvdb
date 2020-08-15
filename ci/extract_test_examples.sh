@@ -2,15 +2,15 @@
 set -e
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )/../"
-VDB_AX=$ROOT/build/openvdb/openvdb_ax/cmd/vdb_ax
+VDB_AX=$ROOT/build/openvdb_ax/openvdb_ax/cmd/vdb_ax
 
 DOCS=()
-DOCS+=($ROOT/openvdb_ax/doc/ax.txt)
-DOCS+=($ROOT/openvdb_ax/doc/axexamples.txt)
-# DOCS+=($ROOT/openvdb_ax/doc/axfunctionlist.txt) do not test this file
-DOCS+=($ROOT/openvdb_ax/doc/doc.txt)
-DOCS+=($ROOT/openvdb_ax/doc/openvdbax.txt)
-DOCS+=($ROOT/openvdb_ax/doc/openvdbaxbuild.txt)
+DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/ax.txt)
+DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/axexamples.txt)
+# DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/axfunctionlist.txt) do not test this file
+DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/doc.txt)
+DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/openvdbax.txt)
+DOCS+=($ROOT/openvdb_ax/openvdb_ax/doc/openvdbaxbuild.txt)
 
 for DOC in "${DOCS[@]}"; do
     echo "Checking doxygen code in '$DOC...'"
