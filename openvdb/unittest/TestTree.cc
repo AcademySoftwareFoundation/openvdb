@@ -71,6 +71,7 @@ public:
     CPPUNIT_TEST(testStealNode);
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     CPPUNIT_TEST(testNodeCount);
+    CPPUNIT_TEST(testActiveTileCountByLevel);
 #endif
     CPPUNIT_TEST(testRootNode);
     CPPUNIT_TEST(testInternalNode);
@@ -109,6 +110,7 @@ public:
     void testStealNode();
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     void testNodeCount();
+    void testActiveTileCountByLevel();
 #endif
     void testRootNode();
     void testInternalNode();
@@ -2991,6 +2993,36 @@ TestTree::testNodeCount()
     CPPUNIT_ASSERT_EQUAL(1U, nodeCount2.back());// one root node
     CPPUNIT_ASSERT_EQUAL(tree.leafCount(), nodeCount2.front());// leaf nodes
     for (size_t i=0; i<nodeCount2.size(); ++i) CPPUNIT_ASSERT_EQUAL( nodeCount1[i], nodeCount2[i]);
+}
+
+void
+TestTree::testActiveTileCountByLevel()
+{
+    //openvdb::util::CpuTimer timer;// use for benchmark test
+
+    const openvdb::Vec3f center(0.0f, 0.0f, 0.0f);
+    const float radius = 1.0f;
+    //const int dim = 4096, halfWidth = 3;// use for benchmark test
+    const int dim = 512, halfWidth = 3;// use for unit test
+    //timer.start("\nGenerate level set sphere");// use for benchmark test
+    auto  grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, radius / dim, halfWidth);
+    //timer.stop();// use for benchmark test
+    auto& tree = grid->tree();
+
+    std::vector<openvdb::Index> dims;
+    tree.getNodeLog2Dims(dims);
+    std::vector<openvdb::Index32> activeTileCount1(dims.size());
+    //timer.start("Old technique");// use for benchmark test
+    auto it = tree.cbeginValueOn();
+    it.setMaxDepth(openvdb::FloatTree::ValueOnCIter::LEAF_DEPTH - 1);
+    for (; it; ++it) ++(activeTileCount1[dims.size() - 1 - it.getDepth()]);
+    //timer.restart("New technique");// use for benchmark test
+    const auto activeTileCount2 = tree.activeTileCountByLevel();
+    //timer.stop();// use for benchmark test
+    CPPUNIT_ASSERT_EQUAL(activeTileCount1.size(), activeTileCount2.size());
+    //for (size_t i=0; i<activeTileCount2.size(); ++i) std::cerr << "activeTileCount1("<<i<<") OLD/NEW: " << activeTileCount1[i] << "/" << activeTileCount2[i] << std::endl;
+    CPPUNIT_ASSERT_EQUAL(0U, activeTileCount2.back());// zero tile at root level
+    for (size_t i = 0; i < activeTileCount2.size(); ++i) CPPUNIT_ASSERT_EQUAL(activeTileCount1[i], activeTileCount2[i]);
 }
 #endif
 
