@@ -113,6 +113,10 @@ public:
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     std::vector<openvdb::Index32> nodeCount() const override
         { return std::vector<openvdb::Index32>(DEPTH, 0); }
+    std::vector<openvdb::Index32> activeTileCountByLevel() const override
+    {
+        return std::vector<openvdb::Index32>(DEPTH, 0);
+    }
 #endif
     openvdb::Index nonLeafCount() const override { return 0; }
     openvdb::Index64 activeVoxelCount() const override { return 0UL; }
