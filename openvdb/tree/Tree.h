@@ -113,6 +113,10 @@ public:
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
+    /// Return a vector with tile counts. The number of tiles at level NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// of this vector corresponds to the height (or depth) of this tree.
+    virtual std::vector<Index32> tileCount() const = 0;
 #endif
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
