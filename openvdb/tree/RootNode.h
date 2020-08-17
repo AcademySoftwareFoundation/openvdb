@@ -486,6 +486,7 @@ public:
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
     void nodeCount(std::vector<Index32> &vec) const;
+    void activeTileCountByLevel(std::vector<Index32>& vec) const;
 
     bool isValueOn(const Coord& xyz) const;
 
