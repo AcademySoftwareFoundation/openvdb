@@ -349,6 +349,15 @@ public:
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
+    /// Return a vector with active tile counts. The number of active tiles at level NodeType
+    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// of this vector corresponds to the height (or depth) of this tree.
+    std::vector<Index32> activeTileCount() const override
+    {
+        std::vector<Index32> vec(DEPTH, 0);
+        mRoot.activeTileCount(vec);
+        return vec;// Named Return Value Optimization
+    }
 #endif
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
