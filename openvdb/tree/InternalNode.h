@@ -270,6 +270,7 @@ public:
 
     Index32 leafCount() const;
     void nodeCount(std::vector<Index32> &vec) const;
+    void activeTileCountByLevel(std::vector<Index32>& vec) const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
