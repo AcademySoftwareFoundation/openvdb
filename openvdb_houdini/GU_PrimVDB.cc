@@ -1832,6 +1832,9 @@ DECLARE_VECTOR(openvdb::Vec2DMetadata)
 DECLARE_VECTOR(openvdb::Vec3IMetadata)
 DECLARE_VECTOR(openvdb::Vec3SMetadata)
 DECLARE_VECTOR(openvdb::Vec3DMetadata)
+DECLARE_VECTOR(openvdb::Vec4IMetadata)
+DECLARE_VECTOR(openvdb::Vec4SMetadata)
+DECLARE_VECTOR(openvdb::Vec4DMetadata)
 #undef DECLARE_VECTOR
 
 template<typename T, typename MetadataT, int I, typename ENABLE = void>
@@ -1884,12 +1887,17 @@ META_ATTR(openvdb::Vec2DMetadata,  GA_STORE_REAL64, fpreal64,    2)
 META_ATTR(openvdb::Vec3IMetadata,  GA_STORE_INT32,  int32,       3)
 META_ATTR(openvdb::Vec3SMetadata,  GA_STORE_REAL32, fpreal32,    3)
 META_ATTR(openvdb::Vec3DMetadata,  GA_STORE_REAL64, fpreal64,    3)
+META_ATTR(openvdb::Vec4IMetadata,  GA_STORE_INT32,  int32,       4)
+META_ATTR(openvdb::Vec4SMetadata,  GA_STORE_REAL32, fpreal32,    4)
+META_ATTR(openvdb::Vec4DMetadata,  GA_STORE_REAL64, fpreal64,    4)
+META_ATTR(openvdb::Mat4SMetadata,  GA_STORE_REAL32, fpreal32,    16)
+META_ATTR(openvdb::Mat4DMetadata,  GA_STORE_REAL64, fpreal64,    16)
 
 #undef META_ATTR
 
 // Functor for setAttr()
-using AttrSettor = std::function<
-    void (GEO_Detail&, GA_AttributeOwner, GA_Offset, const char*, const openvdb::Metadata&)>;
+typedef hboost::function<
+    void (GEO_Detail&, GA_AttributeOwner, GA_Offset, const char*, const openvdb::Metadata&)> AttrSettor;
 
 template <typename MetadataT>
 static void
@@ -1910,13 +1918,15 @@ setAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
 
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
     switch (MetaAttrT::theTupleSize) {
+    case 4: handle.set(elem, 3, MetaTuple<TupleT,MetadataT,3>::get(meta));
+            SYS_FALLTHROUGH;
     case 3: handle.set(elem, 2, MetaTuple<TupleT,MetadataT,2>::get(meta));
             SYS_FALLTHROUGH;
     case 2: handle.set(elem, 1, MetaTuple<TupleT,MetadataT,1>::get(meta));
             SYS_FALLTHROUGH;
     case 1: handle.set(elem, 0, MetaTuple<TupleT,MetadataT,0>::get(meta));
     }
-    UT_ASSERT(MetaAttrT::theTupleSize >= 1 && MetaAttrT::theTupleSize <= 3);
+    UT_ASSERT(MetaAttrT::theTupleSize >= 1 && MetaAttrT::theTupleSize <= 4);
 }
 
 /// for Houdini 12.1
@@ -1932,6 +1942,29 @@ setStrAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
 
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
     handle.set(elem, 0, MetaTuple<const char*, MetadataT, 0>::get(meta));
+}
+
+template <typename MetadataT>
+static void
+setMatAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
+    const char* name, const openvdb::Metadata& meta_base)
+{
+    using MetaAttrT = MetaAttr<MetadataT>;
+    using RWHandleT = typename MetaAttrT::RWHandleT;
+    using TupleT = typename MetaAttrT::TupleT;
+
+    GA_RWAttributeRef attrRef = geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
+    if (attrRef.isInvalid()) return;
+
+    RWHandleT handle(attrRef.getAttribute());
+
+    const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
+
+    auto && value = meta.value();
+    for (int i = 0; i < MetaAttrT::theTupleSize; i++)
+    {
+        handle.set(elem, i, value.asPointer()[i]);
+    }
 }
 
 class MetaToAttrMap : public std::map<std::string, AttrSettor>
@@ -1954,6 +1987,12 @@ public:
         (*this)[Vec3IMetadata::staticTypeName()]  = &setAttr<Vec3IMetadata>;
         (*this)[Vec3SMetadata::staticTypeName()]  = &setAttr<Vec3SMetadata>;
         (*this)[Vec3DMetadata::staticTypeName()]  = &setAttr<Vec3DMetadata>;
+        (*this)[Vec4IMetadata::staticTypeName()]  = &setAttr<Vec4IMetadata>;
+        (*this)[Vec4SMetadata::staticTypeName()]  = &setAttr<Vec4SMetadata>;
+        (*this)[Vec4DMetadata::staticTypeName()]  = &setAttr<Vec4DMetadata>;
+
+        (*this)[Mat4SMetadata::staticTypeName()]  = &setMatAttr<Mat4SMetadata>;
+        (*this)[Mat4DMetadata::staticTypeName()]  = &setMatAttr<Mat4DMetadata>;
     }
 };
 
@@ -2125,6 +2164,14 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
                     UTvdbConvert(handle.get(element))));
                 }
             break;
+            case 4:
+                {
+                    GA_ROHandleT<UT_Vector4i> handle(attrib);
+                    meta_map.removeMeta(name);
+                    meta_map.insertMeta(name, Vec4IMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+            break;
             default:
                 {
                     /// @todo Add warning:
@@ -2173,6 +2220,30 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
                 } else {
                     GA_ROHandleT<UT_Vector3F> handle(attrib);
                     meta_map.insertMeta(name, Vec3SMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+                break;
+            case 4:
+                meta_map.removeMeta(name);
+                if (tuple->getStorage(attrib) == GA_STORE_REAL64) {
+                    GA_ROHandleT<UT_Vector4D> handle(attrib);
+                    meta_map.insertMeta(name, Vec4DMetadata(
+                    UTvdbConvert(handle.get(element))));
+                } else {
+                    GA_ROHandleT<UT_Vector4F> handle(attrib);
+                    meta_map.insertMeta(name, Vec4SMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+                break;
+            case 16:
+                meta_map.removeMeta(name);
+                if (tuple->getStorage(attrib) == GA_STORE_REAL64) {
+                    GA_ROHandleT<UT_Matrix4D> handle(attrib);
+                    meta_map.insertMeta(name, Mat4DMetadata(
+                    UTvdbConvert(handle.get(element))));
+                } else {
+                    GA_ROHandleT<UT_Matrix4F> handle(attrib);
+                    meta_map.insertMeta(name, Mat4SMetadata(
                     UTvdbConvert(handle.get(element))));
                 }
                 break;
