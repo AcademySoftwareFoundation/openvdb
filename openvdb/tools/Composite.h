@@ -155,7 +155,7 @@ struct BuildPrimarySegment
     using NodeMaskType = typename LeafNodeType::NodeMaskType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     BuildPrimarySegment(const TreeType& lhs, const TreeType& rhs)
         : mSegment(new TreeType(lhs.background()))
@@ -363,7 +363,7 @@ struct BuildSecondarySegment
     using NodeMaskType = typename LeafNodeType::NodeMaskType;
     using RootNodeType = typename TreeType::RootNodeType;
     using NodeChainType = typename RootNodeType::NodeChainType;
-    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
 
     BuildSecondarySegment(const TreeType& lhs, const TreeType& rhs)
         : mSegment(new TreeType(lhs.background()))

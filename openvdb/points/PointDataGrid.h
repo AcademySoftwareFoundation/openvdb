@@ -30,10 +30,6 @@
 #include <utility> // std::pair, std::make_pair
 #include <vector>
 
-#include <boost/mpl/vector.hpp>//for boost::mpl::vector
-#include <boost/mpl/push_back.hpp>
-#include <boost/mpl/back.hpp>
-
 class TestPointDataLeaf;
 
 namespace openvdb {
@@ -1675,16 +1671,16 @@ void initialize();
 void uninitialize();
 
 
-/// @brief Recursive node chain which generates a boost::mpl::vector listing
-/// value converted types of nodes to PointDataGrid nodes of the same configuration,
+/// @brief Recursive node chain which generates a openvdb::TypeList value
+/// converted types of nodes to PointDataGrid nodes of the same configuration,
 /// rooted at RootNodeType in reverse order, from LeafNode to RootNode.
 /// See also TreeConverter<>.
 template<typename HeadT, int HeadLevel>
 struct PointDataNodeChain
 {
     using SubtreeT = typename PointDataNodeChain<typename HeadT::ChildNodeType, HeadLevel-1>::Type;
-    using RootNodeT = tree::RootNode<typename boost::mpl::back<SubtreeT>::type>;
-    using Type = typename boost::mpl::push_back<SubtreeT, RootNodeT>::type;
+    using RootNodeT = tree::RootNode<typename SubtreeT::Back>;
+    using Type = typename SubtreeT::template Append<RootNodeT>;
 };
 
 // Specialization for internal nodes which require their embedded child type to
@@ -1693,8 +1689,8 @@ template <typename ChildT, Index Log2Dim, int HeadLevel>
 struct PointDataNodeChain<tree::InternalNode<ChildT, Log2Dim>, HeadLevel>
 {
     using SubtreeT = typename PointDataNodeChain<ChildT, HeadLevel-1>::Type;
-    using InternalNodeT = tree::InternalNode<typename boost::mpl::back<SubtreeT>::type, Log2Dim>;
-    using Type = typename boost::mpl::push_back<SubtreeT, InternalNodeT>::type;
+    using InternalNodeT = tree::InternalNode<typename SubtreeT::Back, Log2Dim>;
+    using Type = typename SubtreeT::template Append<InternalNodeT>;
 };
 
 // Specialization for the last internal node of a node chain, expected
@@ -1704,7 +1700,7 @@ struct PointDataNodeChain<tree::InternalNode<ChildT, Log2Dim>, /*HeadLevel=*/1>
 {
     using LeafNodeT = PointDataLeafNode<PointDataIndex32, ChildT::LOG2DIM>;
     using InternalNodeT = tree::InternalNode<LeafNodeT, Log2Dim>;
-    using Type = typename boost::mpl::vector<LeafNodeT, InternalNodeT>::type;
+    using Type = TypeList<LeafNodeT, InternalNodeT>;
 };
 
 } // namespace internal
@@ -1717,7 +1713,7 @@ template <typename TreeType>
 struct TreeConverter {
     using RootNodeT = typename TreeType::RootNodeType;
     using NodeChainT = typename internal::PointDataNodeChain<RootNodeT, RootNodeT::LEVEL>::Type;
-    using Type = tree::Tree<typename boost::mpl::back<NodeChainT>::type>;
+    using Type = tree::Tree<typename NodeChainT::Back>;
 };
 
 

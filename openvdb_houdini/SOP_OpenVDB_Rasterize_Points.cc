@@ -57,13 +57,6 @@
 #include <hboost/algorithm/string/classification.hpp> // is_any_of
 #include <hboost/algorithm/string/join.hpp>
 #include <hboost/algorithm/string/split.hpp>
-#ifdef SESI_OPENVDB
-#include <hboost/mpl/at.hpp>
-namespace boostmpl = hboost::mpl;
-#else
-#include <boost/mpl/at.hpp>
-namespace boostmpl = boost::mpl;
-#endif
 
 #include <algorithm> // std::sort
 #include <cmath> // trigonometric functions
@@ -931,7 +924,7 @@ struct ConstructCandidateVoxelMask
 
         using BoolRootNodeType = BoolTreeType::RootNodeType;
         using BoolNodeChainType = BoolRootNodeType::NodeChainType;
-        using BoolInternalNodeType = boostmpl::at<BoolNodeChainType, boostmpl::int_<1>>::type;
+        using BoolInternalNodeType = BoolNodeChainType::Get<1>;
 
         for (size_t n = 0, N = rhsLeafNodes.size(); n < N; ++n) {
             const openvdb::Coord& ijk = rhsLeafNodes[n]->origin();

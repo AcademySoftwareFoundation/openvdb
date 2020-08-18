@@ -1,0 +1,87 @@
+/**
+<div style="width:800px;text-align:justify;">
+
+@page openvdbax OpenVDB AX
+
+@section vdbaxcontents Contents
+- @ref vdbaxintro
+- @ref vdbaxstructure
+    - @ref vdbaxgrammar
+    - @ref vdbaxast
+    - @ref vdbaxcodegen
+    - @ref vdbaxcompiler
+    - @ref vdbaxhoudini
+    - @ref vdbaxother
+- @ref vdbaxbinary
+- @ref vdbaxtoaxtypes
+- @ref vdbaxextend
+
+@section vdbaxintro Introduction
+<hr>
+@section vdbaxstructure OpenVDB AX Repository Structure
+@subsection vdbaxgrammar The Grammar
+@subsection vdbaxast The AST
+@subsection vdbaxcodegen The Codegen
+@subsection vdbaxcompiler The Compiler
+@subsection vdbaxhoudini The Houdini Plugin
+@subsection vdbaxother Everything Else
+<hr>
+@section vdbaxbinary The Command Line Binary: vdb_ax
+<hr>
+@section vdbaxtoaxtypes OpenVDB / OpenVDB AX Types
+@par
+Whilst OpenVDB AX is primarily designed for OpenVDB, it has its own notion of
+types. This is so that the actual AX language is able to support arithmetic that
+OpenVDB geometry would perhaps otherwise not support. For example, AX supports
+3x3 and 4x4 matrix types. These types are akin to the `openvdb::math::Mat` types
+that exist in OpenVDB library - however, historically, these types are not
+"registered Grid types" by default by OpenVDB. This means that, although you
+could theoretically create an `openvdb::Mat3dGrid` OpenVDB may not support the
+reading or writing of these grid types out the box. Whilst this may change in
+the future, there may exist other examples of types in AX which suffer from the
+same limitation of existing geometry types in OpenVDB.
+@par
+Native OpenVDB types are types which are @b a) registered for serialization and
+@b b) compilable by the default C++ installation of OpenVDB. This is a bit
+convoluted, so what does this actually mean in practice? Generally, accessing an
+@b attribute in AX requires that data to exist on the underlying geometry. As
+such, reading or writing to a given attribute (for example `bool@myattr`)
+requires both the AX compiler @b and the underlying geometry to support the
+given type. As mentioned above, there may be times where this isn't the case.
+Consider the following:
+@par
+@code{.c}
+vec4i a = {1,2,3,4};
+vec4i@attr = a;
+@endcode
+@par
+Now lets assume that a notion of four `int32` values is not supported for
+serialization of OpenVDB points or volumes (we assume the type can at least be
+instantiated). Whilst this code may execute, serializing this data to disk may
+fail due to unregistered OpenVDB types. AX does @b not register any additional
+OpenVDB types. This choice is left to downstream software. In this example, to
+allow for serialization of `vec4` types, some variant of the following can be
+implemented in your application.
+@warning
+The choice to register Grid types in OpenVDB is left to the OpenVDB maintainers.
+There are important consequences to registering custom types - other default
+installations of OpenVDB <b>will not be able to read your files</b> unless
+compiled with similar instantiations.
+@par
+@code{.cpp}
+openvdb::initialize(); // standard init of vdb
+openvdb::ax::initialize(); // standard init of ax
+// Define a Vec4I grid type from the openvdb::math::Vec4<int32_t> class.
+// Use a ValueConverter to ensure the grid has the same configuration as
+// a standard OpenVDB grid type.
+using Vec4IGrid = openvdb::BoolGrid::ValueConverter<openvdb::Vec4I>::Type;
+// register this type
+Vec4IGrid::registerGrid();
+@endcode
+
+<hr>
+@section vdbaxextend Extending OpenVDB AX
+
+
+</div>
+*/

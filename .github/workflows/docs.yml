@@ -4,24 +4,18 @@ name: Docs
 on:
   push:
     branches:
-      - '*'
-    paths:
-      - '.github/**'
-      - 'CMakeLists.txt'
-      - 'ci/**'
-      - 'doc/**'
-      - 'openvdb/**'
-      - 'openvdb_houdini/**'
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb_maya/**'
+      - '**/*.md'
   pull_request:
     branches:
-      - '*'
-    paths:
-      - '.github/**'
-      - 'CMakeLists.txt'
-      - 'ci/**'
-      - 'doc/**'
-      - 'openvdb/**'
-      - 'openvdb_houdini/**'
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb_maya/**'
+      - '**/*.md'
 
 jobs:
   doxygen:

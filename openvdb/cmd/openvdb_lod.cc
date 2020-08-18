@@ -282,11 +282,11 @@ main(int argc, char *argv[])
         usage();
     }
 
-    // If -name was specified, generate a white list of names of grids to be processed.
-    // Otherwise (if the white list is empty), process all grids of supported types.
-    std::set<std::string> whitelist;
+    // If -name was specified, generate a accept list of names of grids to be processed.
+    // Otherwise (if the accept list is empty), process all grids of supported types.
+    std::set<std::string> acceptlist;
     if (!gridNameStr.empty()) {
-        boost::split(whitelist, gridNameStr, boost::is_any_of(","));
+        boost::split(acceptlist, gridNameStr, boost::is_any_of(","));
     }
 
     // Process the input file.
@@ -304,7 +304,7 @@ main(int argc, char *argv[])
         {
             const std::string& name = nameIter.gridName();
             // If there is a white list, check if the grid is on the list.
-            const bool skip = (!whitelist.empty() && (whitelist.find(name) == whitelist.end()));
+            const bool skip = (!acceptlist.empty() && (acceptlist.find(name) == acceptlist.end()));
 
             if (skip && !opts.keep) {
                 OPENVDB_LOG_INFO("skipped grid \"" << name << "\"");

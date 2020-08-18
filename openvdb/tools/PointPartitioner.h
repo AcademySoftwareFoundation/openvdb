@@ -21,8 +21,6 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 
-#include <boost/integer.hpp> // boost::int_t<N>::least
-
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_scheduler_init.h>
@@ -84,7 +82,12 @@ public:
     using ConstPtr = SharedPtr<const PointPartitioner>;
 
     using IndexType = PointIndexType;
-    using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
+
+    static constexpr Index bits = 1 + (3 * BucketLog2Dim);
+    // signed, so if bits is exactly 16, int32 is required
+    using VoxelOffsetType = typename std::conditional<(bits < 16),
+        int16_t, typename std::conditional<(bits < 32), int32_t, int64_t>::type>::type;
+
     using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
 
     class IndexIterator;
@@ -271,7 +274,11 @@ struct CreateOrderedPointIndexArrayOp
 template<typename PointIndexType, Index BucketLog2Dim>
 struct VoxelOrderOp
 {
-    using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
+    static constexpr Index bits = 1 + (3 * BucketLog2Dim);
+    // signed, so if bits is exactly 16, int32 is required
+    using VoxelOffsetType = typename std::conditional<(bits < 16),
+        int16_t, typename std::conditional<(bits < 32), int32_t, int64_t>::type>::type;
+
     using VoxelOffsetArray = std::unique_ptr<VoxelOffsetType[]>;
     using IndexArray = std::unique_ptr<PointIndexType[]>;
 

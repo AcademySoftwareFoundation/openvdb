@@ -34,6 +34,9 @@ message(STATUS "----------------------------------------------------")
 # Collect lib dependencies shared by all binaries
 
 if(NOT OPENVDB_BUILD_CORE)
+  # @note  Could also use the openvdb_je target here, but we just opt to
+  # handle the value of CONCURRENT_MALLOC outside of this branching for
+  # both cases
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
@@ -42,6 +45,14 @@ endif()
 set(OPENVDB_BINARIES_DEPENDENT_LIBS
   ${OPENVDB_LIB}
 )
+
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
 
 ##########################################################################
 
@@ -109,7 +120,7 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread)
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
@@ -125,6 +136,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
+    IlmBase::Imath
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 

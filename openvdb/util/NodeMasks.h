@@ -14,7 +14,6 @@
 #include <iostream>// for cout
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
-//#include <boost/mpl/if.hpp>
 //#include <strings.h> // for ffs
 
 

@@ -76,6 +76,9 @@ may be provided to tell this module where to look.
 # the Houdini lib
 
 cmake_minimum_required(VERSION 3.3)
+if(OPENVDB_HOUDINI_SETUP_HAS_BEEN_CALLED)
+  return()
+endif()
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
@@ -328,8 +331,10 @@ if(Houdini_VERSION VERSION_LESS 17)
   set(OPENVDB_HOUDINI_ABI 4)
 elseif(Houdini_VERSION VERSION_LESS 18)
   set(OPENVDB_HOUDINI_ABI 5)
-else()
+elseif(Houdini_VERSION VERSION_LESS 18.5)
   set(OPENVDB_HOUDINI_ABI 6)
+else()
+  set(OPENVDB_HOUDINI_ABI 7)
 endif()
 
 # ------------------------------------------------------------------------
@@ -398,3 +403,5 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_definitions(-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI})
   endif()
 endif()
+
+set(OPENVDB_HOUDINI_SETUP_HAS_BEEN_CALLED ON CACHE BOOL "" FORCE)
