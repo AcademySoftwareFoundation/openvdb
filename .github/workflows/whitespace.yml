@@ -18,7 +18,7 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*'
+          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*' ':!nanovdb/*'
           test $? -eq 1
 
   # Search for any tabs excluding Makefiles, meeting notes, image files and a few others
@@ -29,5 +29,5 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n "	" -- ':!*/Makefile' ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png'
+          git grep -n "	" -- ':!*/Makefile' ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!nanovdb/*'
           test $? -eq 1
