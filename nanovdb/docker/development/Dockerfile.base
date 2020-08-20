@@ -1,0 +1,65 @@
+
+FROM aswf/ci-openvdb:2020 as core
+
+ENV ROOT_PATH /setup
+
+WORKDIR $ROOT_PATH/
+#COPY __dist/scripts.tar $ROOT_PATH/
+#tar -xf $ROOT_PATH/scripts.tar && \
+
+COPY __dist/scripts/linux_install_core.sh \
+    __dist/scripts/linux_install_gcc.sh \
+    __dist/scripts/build_openvdb.sh $ROOT_PATH/scripts/
+
+RUN \
+    yum -y install dos2unix && \
+    dos2unix $ROOT_PATH/scripts/linux_install_core.sh && \
+    chmod +x $ROOT_PATH/scripts/linux_install_core.sh && \
+	$ROOT_PATH/scripts/linux_install_core.sh && \
+    dos2unix $ROOT_PATH/scripts/linux_install_gcc.sh && \
+    chmod +x $ROOT_PATH/scripts/linux_install_gcc.sh && \
+	$ROOT_PATH/scripts/linux_install_gcc.sh 8 && \
+    dos2unix $ROOT_PATH/scripts/build_openvdb.sh && \
+    chmod +x $ROOT_PATH/scripts/build_openvdb.sh && \
+	$ROOT_PATH/scripts/build_openvdb.sh latest clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
+
+COPY __dist/scripts/linux_install_wine.sh \
+    $ROOT_PATH/scripts/
+
+RUN \
+    dos2unix $ROOT_PATH/scripts/linux_install_wine.sh && \
+    chmod +x $ROOT_PATH/scripts/linux_install_wine.sh && \
+	$ROOT_PATH/scripts/linux_install_wine.sh
+
+COPY __dist/scripts/linux_install_msvc.sh \
+    __dist/scripts/install.sh \
+    __dist/scripts/fixinclude \
+    __dist/scripts/lowercase \
+    __dist/scripts/vsdownload.py \
+    $ROOT_PATH/scripts/
+
+COPY __dist/scripts/wrappers $ROOT_PATH/scripts/wrappers
+
+RUN \
+    dos2unix $ROOT_PATH/scripts/linux_install_msvc.sh && \
+    chmod +x $ROOT_PATH/scripts/linux_install_msvc.sh && \
+	$ROOT_PATH/scripts/linux_install_msvc.sh 15.4
+
+#RUN \
+    #yum -y install cabextract && \
+    #mkdir -p /setup/vc_redist && \
+    #pushd /setup/vc_redist && \
+    #wget https://aka.ms/vs/16/release/vc_redist.x64.exe && \
+    #cabextract vc_redist.x64.exe && \
+    #cabextract a10  && \
+    #cabextract a11  && \
+    #ls *.dll && \
+    #cp vcruntime140.dll /root/.wine/drive_c/windows/system32/ && \
+    #cp vcruntime140_1.dll /root/.wine/drive_c/windows/system32/ && \
+    #popd
+	
+# Initialize the wine environment. Wait until the wineserver process has
+# exited before closing the session, to avoid corrupting the wine prefix.
+#RUN wine --version && \
+#    wine wineboot --init && \
+#    while pgrep wineserver > /dev/null; do sleep 1; done

@@ -1,0 +1,3 @@
+#!/bin/bash
+. $(dirname $0)/msvcenv.sh
+$(dirname $0)/wine-msvc.sh $BINDIR/ml.exe "$@"
