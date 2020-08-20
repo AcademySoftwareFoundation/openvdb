@@ -1,0 +1,219 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+
+/*!
+    \file   nanovdb_print.cpp
+
+    \author Ken Museth
+
+    \date   May 21, 2020
+
+    \brief  Command-line tool that prints information about grids in a nanovdb file
+*/
+
+#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <iomanip>
+#include <sstream>
+
+void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAILURE)
+{
+    std::cerr << "\nUsage: " << progName << " [options] *.nvdb\n"
+              << "Which: Prints grid information from one or more NanoVDB files\n\n"
+              << "Options:\n"
+              << "-g,--grid name\tPrint all grids matching the specified string name\n"
+              << "-h,--help\tPrints this message\n"
+              << "-l,--long\tPrints out extra grid information\n"
+              << "-s,--short\tOnly prints out a minimum amount of grid information\n";
+    exit(exitStatus);
+}
+
+int main(int argc, char* argv[])
+{
+    int exitStatus = EXIT_SUCCESS;
+
+    enum Mode : int { Short = 0,
+                      Default = 1,
+                      Long = 2 } mode = Default;
+    std::string              gridName;
+    std::vector<std::string> fileNames;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg[0] == '-') {
+            if (arg == "-h" || arg == "--help") {
+                usage(argv[0], EXIT_SUCCESS);
+            } else if (arg == "-s" || arg == "--short") {
+                mode = Short;
+            } else if (arg == "-l" || arg == "--long") {
+                mode = Long;
+            } else if (arg == "-g" || arg == "--grid") {
+                if (i + 1 == argc) {
+                    std::cerr << "\nExpected a grid name to follow the -g,--grid option\n";
+                    usage(argv[0]);
+                } else {
+                    gridName.assign(argv[++i]);
+                }
+            } else {
+                std::cerr << "\nUnrecognized option: \"" << arg << "\"\n";
+                usage(argv[0]);
+            }
+        } else if (!arg.empty()) {
+            fileNames.push_back(arg);
+        }
+    }
+    if (fileNames.size() == 0) {
+        std::cerr << "\nExpected at least one input NanoVDB file\n";
+        usage(argv[0]);
+    }
+    const auto nameKey = nanovdb::io::stringHash(gridName);
+
+    auto format = [](uint64_t b) {
+        std::stringstream ss;
+        ss << std::setprecision(4);
+        if (b >> 40) {
+            ss << double(b) / double(1ULL << 40) << " TB";
+        } else if (b >> 30) {
+            ss << double(b) / double(1ULL << 30) << " GB";
+        } else if (b >> 20) {
+            ss << double(b) / double(1ULL << 20) << " MB";
+        } else if (b >> 10) {
+            ss << double(b) / double(1ULL << 10) << " KB";
+        } else {
+            ss << b << " Bytes";
+        }
+        return ss.str();
+    };
+
+    const int padding = 2;
+
+    auto width = [&](size_t& n, const std::string& str) {
+        const auto size = str.length() + padding;
+        if (size > n)
+            n = size;
+    };
+    auto realToStr = [](double x) {
+        std::stringstream ss;
+        ss << std::setprecision(3) << x;
+        return ss.str();
+    };
+    auto wbboxToStr = [](const nanovdb::BBox<nanovdb::Vec3d>& bbox) {
+        std::stringstream ss;
+        ss << std::setprecision(3);
+        ss << "(" << bbox[0][0] << "," << bbox[0][1] << "," << bbox[0][2] << ")";
+        ss << " -> ";
+        ss << "(" << bbox[1][0] << "," << bbox[1][1] << "," << bbox[1][2] << ")";
+        return ss.str();
+    };
+    auto ibboxToStr = [](const nanovdb::CoordBBox& bbox) {
+        std::stringstream ss;
+        if (bbox.empty()) {
+            ss << "empty grid";
+        } else {
+            ss << "(" << bbox[0][0] << "," << bbox[0][1] << "," << bbox[0][2] << ")";
+            ss << " -> ";
+            ss << "(" << bbox[1][0] << "," << bbox[1][1] << "," << bbox[1][2] << ")";
+        }
+        return ss.str();
+    };
+    auto resToStr = [](const nanovdb::CoordBBox& bbox) {
+        std::stringstream ss;
+        auto              dim = bbox.dim();
+        ss << dim[0] << " x " << dim[1] << " x " << dim[2];
+        return ss.str();
+    };
+    auto nodesToStr = [](const uint32_t* nodes) {
+        std::stringstream ss;
+        ss << nodes[2] << "->" << nodes[1] << "->" << nodes[0];
+        return ss.str();
+    };
+
+    try {
+        for (auto& file : fileNames) {
+            auto list = nanovdb::io::readGridMetaData(file);
+            if (!gridName.empty()) {
+                std::vector<nanovdb::io::GridMetaData> tmp;
+                for (auto& m : list) {
+                    if (nameKey == m.nameKey && gridName == m.gridName)
+                        tmp.emplace_back(m);
+                }
+                list = tmp;
+            }
+            if (list.size() == 0)
+                continue;
+            const auto numberWidth = std::to_string(list.size()).length() + padding;
+            auto       nameWidth = std::string("Name").length() + padding;
+            auto       typeWidth = std::string("Type").length() + padding;
+            auto       classWidth = std::string("Class").length() + padding;
+            auto       ibboxWidth = std::string("Index Bounding Box").length() + padding;
+            auto       wbboxWidth = std::string("World BBox").length() + padding;
+            auto       sizeWidth = std::string("Size").length() + padding;
+            auto       fileWidth = std::string("File").length() + padding;
+            auto       voxelsWidth = std::string("# Voxels").length() + padding;
+            auto       voxelSizeWidth = std::string("Scale").length() + padding;
+            auto       configWidth = std::string("32^3->16^3->8^3").length() + padding;
+            auto       resWidth = std::string("Resolution").length() + padding;
+            for (auto& m : list) {
+                width(nameWidth, m.gridName);
+                width(typeWidth, nanovdb::io::getStringForGridType(m.gridType));
+                width(classWidth, nanovdb::io::getStringForGridClass(m.gridClass));
+                width(wbboxWidth, wbboxToStr(m.worldBBox));
+                width(ibboxWidth, ibboxToStr(m.indexBBox));
+                width(resWidth, resToStr(m.indexBBox));
+                width(sizeWidth, format(m.gridSize));
+                width(fileWidth, format(m.fileSize));
+                width(configWidth, nodesToStr(m.nodeCount));
+                width(voxelsWidth, std::to_string(m.voxelCount));
+                width(voxelSizeWidth, realToStr(m.voxelSize));
+            }
+            std::cout << "\nThe file \"" << file << "\" contains the following " << list.size() << " grid(s):\n";
+            std::cout << std::left << std::setw(numberWidth) << "#"
+                      << std::left << std::setw(nameWidth) << "Name"
+                      << std::left << std::setw(typeWidth) << "Type";
+            if (mode != Short) {
+                std::cout << std::left << std::setw(classWidth) << "Class"
+                          << std::left << std::setw(sizeWidth) << "Size"
+                          << std::left << std::setw(fileWidth) << "File"
+                          << std::left << std::setw(voxelSizeWidth) << "Scale";
+            }
+            std::cout << std::left << std::setw(voxelsWidth) << "# Voxels"
+                      << std::left << std::setw(resWidth) << "Resolution";
+            if (mode == Long) {
+                std::cout << std::left << std::setw(configWidth) << "32^3->16^3->8^3"
+                          << std::left << std::setw(ibboxWidth) << "Index Bounding Box"
+                          << std::left << std::setw(wbboxWidth) << "World Bounding Box";
+            }
+            std::cout << std::endl;
+            int n = 0;
+            for (auto& m : list) {
+                if (!gridName.empty() && (nameKey != m.nameKey || gridName != m.gridName))
+                    continue;
+                std::cout << std::left << std::setw(numberWidth) << ++n
+                          << std::left << std::setw(nameWidth) << m.gridName
+                          << std::left << std::setw(typeWidth) << nanovdb::io::getStringForGridType(m.gridType);
+                if (mode != Short) {
+                    std::cout << std::left << std::setw(classWidth) << nanovdb::io::getStringForGridClass(m.gridClass)
+                              << std::left << std::setw(sizeWidth) << format(m.gridSize)
+                              << std::left << std::setw(fileWidth) << format(m.fileSize)
+                              << std::left << std::setw(voxelSizeWidth) << realToStr(m.voxelSize);
+                }
+                std::cout << std::left << std::setw(voxelsWidth) << m.voxelCount
+                          << std::left << std::setw(resWidth) << resToStr(m.indexBBox);
+                if (mode == Long) {
+                    std::cout << std::left << std::setw(configWidth) << nodesToStr(m.nodeCount)
+                              << std::left << std::setw(ibboxWidth) << ibboxToStr(m.indexBBox)
+                              << std::left << std::setw(wbboxWidth) << wbboxToStr(m.worldBBox);
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
+        exitStatus = EXIT_FAILURE;
+    }
+    catch (...) {
+        std::cerr << "Exception oof unexpected type caught" << std::endl;
+        exitStatus = EXIT_FAILURE;
+    }
+
+    return exitStatus;
+}
