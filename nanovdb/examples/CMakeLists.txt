@@ -12,7 +12,7 @@ function ( _ADD_EXAMPLE )
 	set (oneValueArgs NAME PATH GENERATED GENPATHS)
 	set (multiValueArgs OPTIONS COMPILE_FLAGS CUDA_FLAGS_DEBUG SOURCES LIBS INCLUDE)
 	cmake_parse_arguments ( _ADD_EXAMPLE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    
+
 	set (EXAMPLE_NAME ${_ADD_EXAMPLE_NAME})
 	set (EXAMPLE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_NAME}")
 
@@ -46,13 +46,13 @@ function ( _ADD_EXAMPLE )
 		return()
 	endif()
 
-	add_executable (  ${EXAMPLE_NAME} 
+	add_executable (  ${EXAMPLE_NAME}
 		${EXAMPLE_SOURCE_FILES} ${EXAMPLE_SOURCE_CUDA_FILES} ${EXAMPLE_HEADER_FILES}
 		)
 
 	target_include_directories ( ${EXAMPLE_NAME}
-		PUBLIC 
-		ex_utils
+		PUBLIC
+		ex_util
 		${TBB_INCLUDE_DIRECTORY}
 		${CUDA_INCLUDE_DIRECTORY}
 		)
@@ -67,8 +67,8 @@ function ( _ADD_EXAMPLE )
 		${NANOVDB_BLOSC} # optional
 		)
 
-	target_compile_definitions (${EXAMPLE_NAME} 
-		PRIVATE 
+	target_compile_definitions (${EXAMPLE_NAME}
+		PRIVATE
 		"-D${NANOVDB_USE_OPENVDB_FLAG}"
 		"-D${NANOVDB_USE_CUDA_FLAG}"
 		"-D${NANOVDB_USE_TBB_FLAG}"
@@ -90,7 +90,7 @@ function ( _ADD_EXAMPLE_OPENVDB )
 	set (oneValueArgs NAME PATH GENERATED GENPATHS)
 	set (multiValueArgs OPTIONS COMPILE_FLAGS CUDA_FLAGS_DEBUG SOURCES LIBS INCLUDE)
 	cmake_parse_arguments ( _ADD_EXAMPLE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    
+
 	set (EXAMPLE_NAME ${_ADD_EXAMPLE_NAME})
 	set (EXAMPLE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_NAME}")
 
@@ -127,16 +127,16 @@ function ( _ADD_EXAMPLE_OPENVDB )
 	if (NOT (OpenVDB_FOUND))
 		message(WARNING " - OpenVDB required to build ${EXAMPLE_NAME}. Skipping.")
 		return()
-	endif()		
+	endif()
 
-	add_executable (  ${EXAMPLE_NAME} 
+	add_executable (  ${EXAMPLE_NAME}
 		${EXAMPLE_SOURCE_FILES} ${EXAMPLE_SOURCE_CUDA_FILES} ${EXAMPLE_HEADER_FILES}
 		)
 
 	target_include_directories ( ${EXAMPLE_NAME}
-		PUBLIC 	
-		ex_utils		
-		${OpenVDB_INCLUDE_DIRS}			
+		PUBLIC
+		ex_util
+		${OpenVDB_INCLUDE_DIRS}
 		${TBB_INCLUDE_DIRECTORY}
 		${CUDA_INCLUDE_DIRECTORY}
 		)
@@ -150,8 +150,8 @@ function ( _ADD_EXAMPLE_OPENVDB )
 		${NANOVDB_BLOSC} # optional
 		)
 
-	target_compile_definitions (${EXAMPLE_NAME} 
-		PRIVATE 
+	target_compile_definitions (${EXAMPLE_NAME}
+		PRIVATE
 		"-D${NANOVDB_USE_OPENVDB_FLAG}"
 		"-D${NANOVDB_USE_CUDA_FLAG}"
 		"-D${NANOVDB_USE_TBB_FLAG}"
@@ -184,8 +184,8 @@ _ADD_EXAMPLE(NAME "ex_read_nanovdb_sphere_accessor_cuda")
 _ADD_EXAMPLE(NAME "ex_map_pool_buffer")
 _ADD_EXAMPLE(NAME "ex_bump_pool_buffer")
 _ADD_EXAMPLE(NAME "ex_collide_level_set")
-_ADD_EXAMPLE_OPENVDB(NAME "ex_raytrace_fog_volume")
-_ADD_EXAMPLE_OPENVDB(NAME "ex_raytrace_level_set")
+_ADD_EXAMPLE(NAME "ex_raytrace_fog_volume")
+_ADD_EXAMPLE(NAME "ex_raytrace_level_set")
 
 #add_subdirectory(ex_sph_benchmark)
 
