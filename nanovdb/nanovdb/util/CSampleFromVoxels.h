@@ -8,7 +8,7 @@
 #ifndef __CSAMPLEFROMVOXELS__
 #define __CSAMPLEFROMVOXELS__
 
-#include "CNanoVDB.h"
+#include "../CNanoVDB.h"
 
 #ifdef __OPENCL_VERSION__
 #else

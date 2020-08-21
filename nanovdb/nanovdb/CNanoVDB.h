@@ -119,7 +119,7 @@ uint64_t
 cnanovdb_coord_to_key(const cnanovdb_coord *RESTRICT ijk)
 {
     // Define to workaround a bug with 64-bit shifts in the AMD OpenCL compiler.
-#if defined(AVOID_64BIT_SHIFT) && defined(__OPENCL_VERSION__)
+#if defined(AVOID_64BIT_SHIFT)
     uint2 key = (uint2)( ((uint32_t)ijk->mVec[2]) >> 12, 0) |
                 (uint2)((((uint32_t)ijk->mVec[1]) >> 12) << 21,
                          ((uint32_t)ijk->mVec[1]) >> 23) |
@@ -316,7 +316,7 @@ cnanovdb_node##LEVEL##SUFFIX##_getValue(const CNANOVDB_GLOBAL cnanovdb_node##LEV
 } \
 \
 VALUETYPE \
-cnanovdb_node##LEVEL##SUFFIX##_getValueAndCache(const CNANOVDB_GLOBAL cnanovdb_node##LEVEL##SUFFIX *RESTRICT node, const cnanovdb_coord *RESTRICT ijk, cnanovdb_readaccessor *RESTRICT /* DO NOT REMOVE: Required by some OpenCL compilers */ acc) \
+cnanovdb_node##LEVEL##SUFFIX##_getValueAndCache(const CNANOVDB_GLOBAL cnanovdb_node##LEVEL##SUFFIX *RESTRICT node, const cnanovdb_coord *RESTRICT ijk, cnanovdb_readaccessor *RESTRICT /* DO NOT REMOVE: Required for C99 compliance */ acc) \
 { \
     uint32_t n = cnanovdb_node##LEVEL##SUFFIX##_CoordToOffset(ijk); \
     return node->mVoxels[n]; \
