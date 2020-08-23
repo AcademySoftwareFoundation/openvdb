@@ -12,7 +12,27 @@
 #include <tbb/blocked_range.h>
 #endif
 
+#include <utility>
 #include <tuple>
+
+
+// forward compatibility for C++14 Standard Library
+namespace cxx14 {
+template<std::size_t...>
+struct index_sequence
+{
+};
+
+template<std::size_t N, std::size_t... Is>
+struct make_index_sequence : make_index_sequence<N - 1, N - 1, Is...>
+{
+};
+
+template<std::size_t... Is>
+struct make_index_sequence<0, Is...> : index_sequence<Is...>
+{
+};
+} // namespace cxx14
 
 #if defined(__CUDACC__)
 
@@ -52,7 +72,7 @@ public:
     }
 
     template<std::size_t... Is>
-    void call(int start, int end, std::index_sequence<Is...>) const
+    void call(int start, int end, cxx14::index_sequence<Is...>) const
     {
         mFunc(start, end, std::get<Is>(mArgs)...);
     }
@@ -63,7 +83,7 @@ public:
         int end = i * mBlockSize + mBlockSize;
         if (end > mCount)
             end = mCount;
-        call(start, end, std::make_index_sequence<sizeof...(Args)>());
+        call(start, end, cxx14::make_index_sequence<sizeof...(Args)>());
     }
 
     void operator()(const tbb::blocked_range<int>& r) const
@@ -72,7 +92,7 @@ public:
         int end = r.end();
         if (end > mCount)
             end = mCount;
-        call(start, end, std::make_index_sequence<sizeof...(Args)>());
+        call(start, end, cxx14::make_index_sequence<sizeof...(Args)>());
     }
 
 private:

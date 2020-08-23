@@ -48,7 +48,7 @@ LIBS = -lpthread
 BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 ARCHIVE = NanoVDB_$(shell date +%F_%Hh%Mm%Ss)_$(BRANCH)
 
-DEP = Makefile nanovdb/*.h
+DEP = Makefile nanovdb/*.h nanovdb/util/*.h
 CMD = release/nanovdb_print release/nanovdb_convert release/nanovdb_viewer
 EXA = debug/bump_pool_buffer debug/make_custom_nanovdb debug/make_nanovdb_sphere debug/make_typed_grids \
       debug/map_pool_buffer debug/read_nanovdb_sphere debug/read_nanovdb_sphere_accessor

@@ -1,6 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#if defined(NANOVDB_USE_OPENVDB)
+
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
@@ -90,3 +92,5 @@ void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
         saveImage("raytrace_fog_volume-openvdb-host.pfm", width, height, (float*)imageBuffer.data());
     }
 }
+
+#endif
