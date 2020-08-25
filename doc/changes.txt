@@ -15,6 +15,9 @@ Houdini:
 - Fixed a bug where a Houdini SOP's verb would not be correctly associated
   with the corresponding node if the node's internal name was changed.
 
+@par
+Build:
+- Removed the Makefiles.
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
