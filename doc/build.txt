@@ -17,7 +17,6 @@
     - @ref buildBuildMaya
   - @ref buildBuildStandalone
 - @ref buildUsingOpenVDB
-- @ref buildUsingMake
 - @ref buildTroubleshooting
 <!-- - @ref buildContents -->
 
