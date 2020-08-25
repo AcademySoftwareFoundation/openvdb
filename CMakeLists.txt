@@ -713,31 +713,31 @@ determine the ABI number. You may set this to force a given ABI number.]=] FORCE
 ##########################################################################
 
 if(OPENVDB_BUILD_CORE)
-  add_subdirectory(openvdb)
+  add_subdirectory(openvdb/openvdb)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)
-  add_subdirectory(openvdb/python)
+  add_subdirectory(openvdb/openvdb/python)
 endif()
 
 if(OPENVDB_BUILD_BINARIES)
-  add_subdirectory(openvdb/cmd)
+  add_subdirectory(openvdb/openvdb/cmd)
 endif()
 
 if(OPENVDB_BUILD_UNITTESTS)
-  add_subdirectory(openvdb/unittest)
+  add_subdirectory(openvdb/openvdb/unittest)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  add_subdirectory(openvdb_houdini)
+  add_subdirectory(openvdb_houdini/openvdb_houdini)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_ABITESTS)
-  add_subdirectory(openvdb_houdini/abitest)
+  add_subdirectory(openvdb_houdini/openvdb_houdini/abitest)
 endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
-  add_subdirectory(openvdb_maya)
+  add_subdirectory(openvdb_maya/openvdb_maya)
 endif()
 
 ##########################################################################
