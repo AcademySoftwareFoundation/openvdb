@@ -3,6 +3,13 @@ OpenVDB Version History
 
 Version 7.1.1 - In Development
 
+    Houdini:
+    - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
+      transform was ignoring the contents of packed geometry.
+    - Fixed a bug in the OpenVDB Points Convert SOP where points representing
+      packed geometry were also being converted.
+    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
+      with the corresponding node if the node's internal name was changed.
 
 Version 7.1.0 - August 13, 2020
 

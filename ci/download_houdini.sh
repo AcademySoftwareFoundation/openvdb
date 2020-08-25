@@ -18,7 +18,7 @@ fi
 
 pip install --user requests
 
-python ci/download_houdini2.py $HOUDINI_MAJOR $GOLD $HOUDINI_CLIENT_ID $HOUDINI_SECRET_KEY
+python ci/download_houdini.py $HOUDINI_MAJOR $GOLD $HOUDINI_CLIENT_ID $HOUDINI_SECRET_KEY
 
 # create dir hierarchy
 mkdir -p hou/bin

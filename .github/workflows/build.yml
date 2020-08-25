@@ -88,7 +88,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -100,8 +100,17 @@ jobs:
       image: aswf/ci-base:2018
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini17_5-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini17_5-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -124,23 +133,43 @@ jobs:
       image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
     - name: test
       run: ./ci/test.sh
 
-  # testhou180debug:
-  #   runs-on: ubuntu-16.04
-  #   container:
-  #     image: aswf/ci-base:2019
-  #   steps:
-  #   - uses: actions/checkout@v1
-  #   - name: houdini
-  #     run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
-  #   - name: build
-  #     run: ./ci/build_houdini.sh clang++ Debug OFF
+  testhou180debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
+    - name: houdini
+      run: ./ci/install_houdini.sh
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Debug OFF
+    - name: test
+      run: ./ci/test.sh
 
   testabi7gcc:
     runs-on: ubuntu-16.04
