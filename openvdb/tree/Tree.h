@@ -113,8 +113,8 @@ public:
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
-    /// Return in @a vec the vector with active tile counts. The number of active tiles at level NodeType
-    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// Return in @a vec the active tile count for each level. The number of active tiles at level NodeType
+    /// is given as element NodeType::LEVEL in the vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     /// @note While nodeCount() returns the number of allocated nodes at each level,
     /// regions of the tree may have data but not have nodes because
@@ -352,8 +352,8 @@ public:
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
-    /// Return in @a vec the vector with active tile counts. The number of active tiles at level NodeType
-    /// is given as element NodeType::LEVEL in the return vector. Thus, the size
+    /// Return in @a vec the active tile count for each level. The number of active tiles at level NodeType
+    /// is given as element NodeType::LEVEL in the vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     /// @note While nodeCount() returns the number of allocated nodes at each level,
     /// regions of the tree may have data but not have nodes because
