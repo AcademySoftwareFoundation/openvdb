@@ -11,6 +11,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/util/logging.h>
 
+#include <openvdb/points/PointDataGrid.h>
 
 namespace {
 
@@ -18,6 +19,99 @@ using StringVec = std::vector<std::string>;
 
 const char* INDENT = "   ";
 const char* gProgName = "";
+
+struct PointStats{
+    using Index64 = openvdb::Index64;
+    using Name = openvdb::Name;
+    using GridBase  = openvdb::GridBase;
+    using AttributeSet = openvdb::points::AttributeSet;
+    using PointDataGrid = openvdb::points::PointDataGrid;
+
+    // proxy collect attributes not covered by AttributeSet::Info::Array
+    struct PointAttrib{
+        AttributeSet::Info::Array array;
+        Index64 index = 0;
+        Name codec = "";
+        Name type = "";
+    };
+
+    Index64 total = 0;
+    Index64 active = 0;
+    Index64 inactive = 0;
+    bool firstLeaf = true;
+    std::map<Name, Index64> groups;
+    std::map<Name, PointAttrib> attribs;
+
+
+static void
+inspectPoints(const openvdb::GridBase::ConstPtr grid, PointStats& pointStats)
+{
+    PointDataGrid::ConstPtr inputGrid = GridBase::grid<PointDataGrid>(grid);
+
+    for (auto leafIter = inputGrid->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        auto attrset = leafIter->attributeSet();
+        auto dptr = attrset.descriptorPtr();
+        auto attrmap = dptr->map();
+
+        pointStats.total += leafIter->pointCount();
+        pointStats.active += leafIter->onPointCount();
+        pointStats.inactive += leafIter->offPointCount();
+
+        // groups
+        auto grmap = dptr->groupMap();
+
+        // Count points in groups
+        for (auto it=grmap.begin(); it!=grmap.end(); ++it){
+            if(pointStats.groups.find(it->first) == pointStats.groups.end()){
+                pointStats.groups[it->first] = 0;
+            }
+            pointStats.groups[it->first]+=leafIter->groupPointCount(it->first);
+        }
+
+        // Collect attribute info - gather attributes info from the first leaf only.
+        // (Assume consistency across leaves).
+        AttributeSet::Info info(dptr);
+        if (!pointStats.firstLeaf) continue;
+        for (auto it=attrmap.begin(); it!=attrmap.end(); ++it){
+            AttributeSet::Info::Array& arrInfo = info.arrayInfo(it->first);
+            auto attrArr = attrset.getConst(it->first /*name*/);
+            PointAttrib pa{};
+            pa.array = std::move(arrInfo);
+            pa.type = dptr->valueType(pa.index);
+            pa.index = it->second;
+            pa.codec = dptr->type(pa.index).second;
+            pointStats.attribs[it->first] = pa;
+        }
+        pointStats.firstLeaf = false;
+    }
+}
+
+static void
+printPointStats(const PointStats& pointStats)
+{
+    std::cout << "Total Point Count:\n"
+              << INDENT << "total: " << pointStats.total << '\n'
+              << INDENT << "active: " << pointStats.active  << '\n'
+              << INDENT << "inactive: " << pointStats.inactive << '\n';
+
+    std::cout << "Point attributes:" << '\n';
+    for(auto it=pointStats.attribs.begin(); it!=pointStats.attribs.end(); ++it){
+        auto attr = it->second;
+        std::cout << "  name: " << it->first << '\n';
+        std::cout << INDENT << "type: " << attr.type << '\n';
+        std::cout << INDENT << "codec: " << attr.codec << '\n';
+        std::cout << INDENT << "hidden: " << attr.array.hidden << '\n';
+        std::cout << INDENT << "transient: " << attr.array.transient << '\n';
+        std::cout << INDENT << "group: " << attr.array.group << '\n';
+        std::cout << INDENT << "string: " << attr.array.string << '\n';
+        std::cout << INDENT << "constantStride: " << attr.array.constantStride << '\n';
+    }
+    std::cout << "Point groups:" << '\n';
+    for (auto it=pointStats.groups.begin(); it!=pointStats.groups.end(); ++it){
+        std::cout << INDENT << it->first << ": " << it->second << '\n';
+    }
+}
+};
 
 void
 usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
@@ -93,7 +187,6 @@ bkgdValueAsString(const openvdb::GridBase::ConstPtr& grid)
     return ostr.str();
 }
 
-
 /// Print detailed information about the given VDB files.
 /// If @a metadata is true, include file-level metadata key, value pairs.
 void
@@ -132,16 +225,26 @@ printLongListing(const StringVec& filenames)
         }
         std::cout << "\n";
 
+        PointStats pointStats;
+
         // For each grid in the file...
         bool firstGrid = true;
         for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
-            if (openvdb::GridBase::ConstPtr grid = *it) {
+            const openvdb::GridBase::ConstPtr grid = *it;
+            if (grid) {
                 if (!firstGrid) std::cout << "\n\n";
                 std::cout << "Name: " << grid->getName() << std::endl;
                 grid->print(std::cout, /*verboseLevel=*/11);
                 firstGrid = false;
             }
+
+            // Inspect points if this is a point grid
+            if (openvdb::GridBase::grid<openvdb::points::PointDataGrid>(grid))
+                PointStats::inspectPoints(grid, pointStats);
         }
+
+        PointStats::printPointStats(pointStats);
+
     }
 }
 
