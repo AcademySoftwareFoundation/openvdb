@@ -71,7 +71,7 @@ public:
     CPPUNIT_TEST(testStealNode);
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     CPPUNIT_TEST(testNodeCount);
-    CPPUNIT_TEST(testActiveTileCountByLevel);
+    CPPUNIT_TEST(testActiveTileCount);
 #endif
     CPPUNIT_TEST(testRootNode);
     CPPUNIT_TEST(testInternalNode);
@@ -110,7 +110,7 @@ public:
     void testStealNode();
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     void testNodeCount();
-    void testActiveTileCountByLevel();
+    void testActiveTileCount();
 #endif
     void testRootNode();
     void testInternalNode();
@@ -2996,7 +2996,7 @@ TestTree::testNodeCount()
 }
 
 void
-TestTree::testActiveTileCountByLevel()
+TestTree::testActiveTileCount()
 {
     //openvdb::util::CpuTimer timer;// use for benchmark test
 
@@ -3017,7 +3017,8 @@ TestTree::testActiveTileCountByLevel()
     it.setMaxDepth(openvdb::FloatTree::ValueOnCIter::LEAF_DEPTH - 1);
     for (; it; ++it) ++(activeTileCount1[dims.size() - 1 - it.getDepth()]);
     //timer.restart("New technique");// use for benchmark test
-    const auto activeTileCount2 = tree.activeTileCountByLevel();
+    std::vector<openvdb::Index32> activeTileCount2;
+    tree.activeTileCount(activeTileCount2);
     //timer.stop();// use for benchmark test
     CPPUNIT_ASSERT_EQUAL(activeTileCount1.size(), activeTileCount2.size());
     //for (size_t i=0; i<activeTileCount2.size(); ++i) std::cerr << "activeTileCount1("<<i<<") OLD/NEW: " << activeTileCount1[i] << "/" << activeTileCount2[i] << std::endl;

@@ -113,13 +113,13 @@ public:
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
-    /// Return a vector with active tile counts. The number of active tiles at level NodeType
+    /// Return in @a vec the vector with active tile counts. The number of active tiles at level NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     /// @note While nodeCount() returns the number of allocated nodes at each level,
     /// regions of the tree may have data but not have nodes because
     /// they have activated constant regions.
-    virtual std::vector<Index32> activeTileCountByLevel() const = 0;
+    virtual void activeTileCount(std::vector<Index32>& vec) const = 0;
 #endif
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
@@ -352,17 +352,17 @@ public:
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
-    /// Return a vector with active tile counts. The number of active tiles at level NodeType
+    /// Return in @a vec the vector with active tile counts. The number of active tiles at level NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     /// @note While nodeCount() returns the number of allocated nodes at each level,
     /// regions of the tree may have data but not have nodes because
     /// they have activated constant regions.
-    std::vector<Index32> activeTileCountByLevel() const override
+    void activeTileCount(std::vector<Index32>& vec) const override
     {
-        std::vector<Index32> vec(DEPTH, 0);
-        mRoot.activeTileCountByLevel(vec);
-        return vec;// Named Return Value Optimization
+        vec.assign(DEPTH, 0);
+        vec.shrink_to_fit();
+        mRoot.activeTileCount(vec);
     }
 #endif
     /// Return the number of non-leaf nodes.
