@@ -99,7 +99,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables

@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -252,7 +252,9 @@ endif()
 
 # VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+# Note: CMake 3.15 chosen as possible next version due to Windows support
+# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
 #set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
@@ -341,7 +343,6 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
-#  FindOpenGL.cmake is needed if CMake < 3.8
 #  FindNumPy.cmake is needed if CMake < 3.14
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
