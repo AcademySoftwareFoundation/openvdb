@@ -650,7 +650,12 @@ if(NOT OPENVDB_BUILD_CORE)
   endif()
 else()
   include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
-  OPENVDB_VERSION_FROM_HEADER("${CMAKE_CURRENT_SOURCE_DIR}/openvdb/version.h"
+  set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
+  if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
+    message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
+  endif()
+
+  OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
     VERSION OpenVDB_VERSION
     MAJOR   OpenVDB_MAJOR_VERSION
     MINOR   OpenVDB_MINOR_VERSION
