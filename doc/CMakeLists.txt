@@ -153,7 +153,6 @@ if(OPENVDB_DOXYGEN_HOUDINI)
     openvdb_houdini/openvdb_houdini/GU_PrimVDB.h
     openvdb_houdini/openvdb_houdini/GU_VDBPointTools.h
     openvdb_houdini/openvdb_houdini/GeometryUtil.h
-    openvdb_houdini/openvdb_houdini/OP_NodeChain.h
     openvdb_houdini/openvdb_houdini/ParmFactory.h
     openvdb_houdini/openvdb_houdini/PointUtils.h
     openvdb_houdini/openvdb_houdini/SOP_NodeVDB.h
