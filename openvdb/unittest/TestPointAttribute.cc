@@ -135,6 +135,12 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
 
         CPPUNIT_ASSERT(attributeSet.descriptor().getMetadata()["default:id"]);
+
+        AttributeArray& array = tree.beginLeaf()->attributeArray("id");
+        CPPUNIT_ASSERT(array.isUniform());
+
+        AttributeHandle<int> handle(array);
+        CPPUNIT_ASSERT_EQUAL(0, handle.get(0));
     }
 
     { // append three attributes, check ordering is consistent with insertion

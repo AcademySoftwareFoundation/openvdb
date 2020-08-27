@@ -1,7 +1,50 @@
 OpenVDB Version History
 =======================
 
-Version 7.1.0 - In Development
+Version 7.1.1 - In Development
+
+    Houdini:
+    - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
+      transform was ignoring the contents of packed geometry.
+    - Fixed a bug in the OpenVDB Points Convert SOP where points representing
+      packed geometry were also being converted.
+    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
+      with the corresponding node if the node's internal name was changed.
+
+Version 7.1.0 - August 13, 2020
+
+      As of this release, support for grid ABI=4 has been removed.
+
+    New features:
+    - Added a novel parallel sparse FastSweeping class that outperforms our
+      existing techniques for computing signed distance fields in addition to
+      supporting velocity extension.
+    - Added tools::fogToSdf which converts a scalar (fog) volume into a signed
+      distance field.
+    - Added tools::sdfToSdf which re-normalizes a signed distance field;
+    - Added tools::fogToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a scalar (fog) volume.
+    - Added tools::sdfToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a signed distance field.
+    - Added tools::fogToSdfAndExt which computes a signed distance and extends
+      an arbitrary field (e.g. velocity) off the iso-surface of a signed
+      distance field.
+    - Added tools::fogToSdfAndExt which re-normalizes a signed distance and
+      extends an arbitrary field (e.g. velocity) off the iso-surface of a
+      signed distance field.
+    - Added tools::dilateSdf which dilates a signed distance field.
+    - Added tools::maskSdf which extends an existing signed distance into a
+      user-defined mask.
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+    - Added PointDataLeafNode::stealAttributeSet() and
+      AttributeSet::removeAttribute() for releasing ownership of attribute
+      data.
+    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
+      group index collisions when attempting to merge two Descriptors.
+    - Added RootNode::childCount(), InternalNode::childCount() and
+      LeafNode::childCount() to count the number of immediate child nodes that
+      exist below the current node.
 
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
@@ -17,13 +60,22 @@ Version 7.1.0 - In Development
     - Add a new Houdini ABI test binary.
     - Fixed an indexing typo in tools::Filter. [Contributed by Yuanming Hu]
     - Removed redundant null pointer checks. [Contributed by Kuba Roth]
-
-    New features:
-    - Added Grid::isTreeUnique() to tell if the tree is shared with another
-      grid.
-    - Added PointDataLeafNode::stealAttributeSet() and
-      AttributeSet::removeAttribute() for releasing ownership of attribute
-      data.
+    - Added support for vdb_view on Windows. Requires GLEW.
+    - Removed support for GLFW 2.
+    - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
+    - vdb_view, vdb_print and vdb_render now use std::terminate() when catching
+      an unknown exception.
+    - Removed Boost::thread as a dependency of vdb_view in favour of
+      std::thread.
+    - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+      the latter in favour of new openvdb math constants for pi
+    - Removed usage of boost/mpl/*.hpp methods in favour of new template
+      meta-programming methods on the openvdb::TypeList struct. This now
+      supports get, front, back, contains, index, unique, popback, popfront
+      and range removal of types.
+    - Changed the tree::NodeChain implementation to use an openvdb::TypeList
+      rather than a boost::mpl::vector and updated all usage of tree::NodeChain
+      accordingly.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -39,21 +91,43 @@ Version 7.1.0 - In Development
       [Contributed by Michael Tao]
     - Fixed a bug in the unit test for util::CpuTimer on Windows by using a
       more accurate sleep implementation.
+    - Fixed a bug where the requested uniform value of an AttributeArray was
+      not being applied on attribute creation if the default attribute value
+      was not the default value for that value type.
+    - Fixed a compiler error when using C++17 by changing std::unexpected() to
+      std::terminate().
+      [Contributed by Mark Sisson]
 
     API changes:
     - Removed a number of deprecated point methods.
     - points::StringIndexType is now deprecated, use Index instead.
     - PointPartitioner::voxelOffsets() now returns a std::unique_ptr instead of
       a boost::scoped_array.
+    - Renamed AttributeSet::Descriptor::nextUnusedGroupOffset() to
+      AttributeSet::Descriptor::unusedGroupOffset() to allow for providing an
+      optional group offset hint.
 
     Houdini:
     - Platonic SOP is now verbified.
     - Extend all SOP references to support VDB Points.
     - Combine SOP will not error in flatten-all mode if second has no grids.
+    - Changed the label (but not the opname) of Resize Narrow Band SOP to match
+      the corresponding native Houdini SOP. The new label is Activate SDF.
+    - Fixed a bug by using GEO_Detail::getBBox() instead of
+      GEO_Detail::computeQuickBounds() as the latter was incorrectly using the
+      point of the VDB when computing bounding box. SOPs affected include Clip,
+      Fill, Points Group, Rasterize Points, Read, Remove Divergence.
+      [Contributed by Kuba Roth]
+    - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+      it might be stuck hidden if the input hasn't cooked.
+    - OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require
+      input geometry to have been cooked to offer a choice of attributes,
+      the user may now also type in a value.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
       [Reported by Ian Woodward]
+    - Remove some logic for compilers older than Visual Studio 2019.
     - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
       compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
       headers were installed to /usr/include.
@@ -75,6 +149,40 @@ Version 7.1.0 - In Development
       Houdini shared library.
     - Added a USE_PKGCONFIG option to CMake to optionally disable use of
       pkg-config. [Contributed by Kartik Shrivastava]
+    - Standardized the dependency search paths in FindPackage modules using
+      GNU install paths.
+    - Added better library type detection of dependencies through FindPackage
+      modules on UNIX.
+    - Added missing TBB, OpenEXR and IlmBase defines for static builds on
+      Windows through the relevant FindPackage modules.
+    - Improved the logic in FindOpenVDB for static builds.
+    - Fixed a compiler warning on Apple Clang 11.0 where the AttributeArray
+      move constructor was being implicitly deleted despite being marked
+      default.
+    - Added an option BLOSC_USE_EXTERNAL_SOURCES to FindBlosc to include blosc
+      dependencies as interface libraries.
+    - Added a root CMake option USE_STATIC_DEPENDENCIES to force CMake to
+      only locate static libraries on UNIX. On Windows, if enabled, located
+      libraries are assumed to be static.
+    - Added support for CMAKE_MSVC_RUNTIME_LIBRARY for compilers that target
+      the MSVC ABI. Requires CMake 3.15 or greater.
+    - Fixed an issue where OPENVDB_OPENEXR_STATICLIB was not being defined and
+      OPENEXR_DLL was being defined when linking against static builds of
+      OpenEXR/IlmBase on Windows.
+    - Improved the behaviour of boost implicit linking with the
+      Boost::disable_autolinking target.
+    - Added support for importing pyopenvdb and openvdb_houdini through the
+      FindOpenVDB CMake module
+    - Removed the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE macros.
+    - Fixed a few GCC compiler warnings by adding override keywords.
+      [Contributed by Edward Lam]
+    - jemalloc/tbbmalloc are no longer linked into library artifacts of the
+      OpenVDB CMake build. The CONCURRENT_MALLOC CMake option now only applies
+      to the executables.
+    - Introduced a new OpenVDB::openvdb_je interface target through the
+      FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
+    - CMake build fix for the vdb_render binary on Windows when building
+      statically and using OpenEXR 2.5
 
 Version 7.0.0 - December 6, 2019
 

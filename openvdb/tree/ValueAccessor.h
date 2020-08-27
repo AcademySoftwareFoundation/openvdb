@@ -31,17 +31,6 @@
 #ifndef OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-#include <boost/mpl/front.hpp>
-#include <boost/mpl/pop_front.hpp>
-#include <boost/mpl/push_back.hpp>
-#include <boost/mpl/size.hpp>
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/equal_to.hpp>
-#include <boost/mpl/comparison.hpp>
-#include <boost/mpl/vector.hpp>
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/erase.hpp>
-#include <boost/mpl/find.hpp>
 #include <tbb/null_mutex.h>
 #include <tbb/spin_mutex.h>
 #include <openvdb/version.h>
@@ -435,11 +424,10 @@ private:
     // Define a list of all tree node types from LeafNode to RootNode
     using InvTreeT = typename RootNodeT::NodeChainType;
     // Remove all tree node types that are excluded from the cache
-    using BeginT = typename boost::mpl::begin<InvTreeT>::type;
-    using FirstT = typename boost::mpl::advance<BeginT, boost::mpl::int_<CacheLevels>>::type;
-    using LastT = typename boost::mpl::find<InvTreeT, RootNodeT>::type;
-    using SubtreeT = typename boost::mpl::erase<InvTreeT, FirstT, LastT>::type;
-    using CacheItemT = CacheItem<ValueAccessor, SubtreeT, boost::mpl::size<SubtreeT>::value==1>;
+    static constexpr int64_t First = CacheLevels;
+    static constexpr int64_t Last = InvTreeT::template Index<RootNodeT>;
+    using SubtreeT = typename InvTreeT::template RemoveByIndex<First, Last-1>;
+    using CacheItemT = CacheItem<ValueAccessor, SubtreeT, SubtreeT::Size==1>;
 
     // Private member data
     mutable CacheItemT mCache;
@@ -532,7 +520,7 @@ template<typename TreeCacheT, typename NodeVecT, bool AtRoot>
 class CacheItem
 {
 public:
-    using NodeType = typename boost::mpl::front<NodeVecT>::type;
+    using NodeType = typename NodeVecT::Front;
     using ValueType = typename NodeType::ValueType;
     using LeafNodeType = typename NodeType::LeafNodeType;
     using CoordLimits = std::numeric_limits<Int32>;
@@ -827,8 +815,8 @@ private:
     TreeCacheT* mParent;
     Coord mHash;
     const NodeType* mNode;
-    using RestT = typename boost::mpl::pop_front<NodeVecT>::type; // NodeVecT minus its first item
-    CacheItem<TreeCacheT, RestT, /*AtRoot=*/boost::mpl::size<RestT>::value == 1> mNext;
+    using RestT = typename NodeVecT::PopFront;
+    CacheItem<TreeCacheT, RestT, /*AtRoot=*/RestT::Size == 1> mNext;
 };// end of CacheItem
 
 
@@ -837,7 +825,7 @@ template<typename TreeCacheT, typename NodeVecT>
 class CacheItem<TreeCacheT, NodeVecT, /*AtRoot=*/true>
 {
 public:
-    using RootNodeType = typename boost::mpl::front<NodeVecT>::type;
+    using RootNodeType = typename NodeVecT::Front;
     using ValueType = typename RootNodeType::ValueType;
     using LeafNodeType = typename RootNodeType::LeafNodeType;
 
@@ -1234,7 +1222,7 @@ public:
     using LeafNodeT = typename TreeType::LeafNodeType;
     using BaseT = ValueAccessorBase<TreeType, IsSafe>;
     using InvTreeT = typename RootNodeT::NodeChainType;
-    using NodeT0 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type;
+    using NodeT0 = typename InvTreeT::template Get<L0>;
 
     /// Constructor from a tree
     ValueAccessor1(TreeType& tree) : BaseT(tree), mKey0(Coord::max()), mNode0(nullptr)
@@ -1610,8 +1598,8 @@ public:
     using LeafNodeT = typename TreeType::LeafNodeType;
     using BaseT = ValueAccessorBase<TreeType, IsSafe>;
     using InvTreeT = typename RootNodeT::NodeChainType;
-    using NodeT0 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0>>::type;
-    using NodeT1 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1>>::type;
+    using NodeT0 = typename InvTreeT::template Get<L0>;
+    using NodeT1 = typename InvTreeT::template Get<L1>;
 
     /// Constructor from a tree
     ValueAccessor2(TreeType& tree) : BaseT(tree),
@@ -2100,9 +2088,9 @@ public:
     using LeafNodeT = typename TreeType::LeafNodeType;
     using BaseT = ValueAccessorBase<TreeType, IsSafe>;
     using InvTreeT = typename RootNodeT::NodeChainType;
-    using NodeT0 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type;
-    using NodeT1 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type;
-    using NodeT2 = typename boost::mpl::at<InvTreeT, boost::mpl::int_<L2> >::type;
+    using NodeT0 = typename InvTreeT::template Get<L0>;
+    using NodeT1 = typename InvTreeT::template Get<L1>;
+    using NodeT2 = typename InvTreeT::template Get<L2>;
 
     /// Constructor from a tree
     ValueAccessor3(TreeType& tree) : BaseT(tree),

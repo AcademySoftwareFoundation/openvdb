@@ -39,30 +39,9 @@ namespace internal {
 template<typename T>
 struct LeafBufferFlags
 {
-#if OPENVDB_ABI_VERSION_NUMBER >= 5
     /// The type of LeafBuffer::mOutOfCore
     using type = tbb::atomic<Index32>;
     static constexpr bool IsAtomic = true;
-#else // OPENVDB_ABI_VERSION_NUMBER < 5
-    // These structs need to have the same data members as LeafBuffer.
-    struct Atomic { union { T* data; void* ptr; }; tbb::atomic<Index32> i; tbb::spin_mutex mutex; };
-    struct NonAtomic { union { T* data; void* ptr; }; Index32 i; tbb::spin_mutex mutex; };
-
-#ifndef __INTEL_COMPILER
-    /// @c true if LeafBuffer::mOutOfCore is atomic, @c false otherwise
-    static constexpr bool IsAtomic = ((sizeof(Atomic) == sizeof(NonAtomic))
-         && (offsetof(Atomic, i) == offsetof(NonAtomic, i)));
-#else
-    // We can't use offsetof() with ICC, because it requires the arguments
-    // to be POD types.  (C++11 requires only that they be standard layout types,
-    // which Atomic and NonAtomic are.)
-    static constexpr bool IsAtomic = (sizeof(Atomic) == sizeof(NonAtomic));
-#endif
-    /// The size of a LeafBuffer when LeafBuffer::mOutOfCore is atomic
-    static constexpr size_t size = sizeof(Atomic);
-    /// The type of LeafBuffer::mOutOfCore
-    using type = typename std::conditional<IsAtomic, tbb::atomic<Index32>, Index32>::type;
-#endif
 };
 
 } // namespace internal

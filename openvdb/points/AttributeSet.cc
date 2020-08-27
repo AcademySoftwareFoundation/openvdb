@@ -1194,8 +1194,14 @@ AttributeSet::Descriptor::canCompactGroups() const
 }
 
 size_t
-AttributeSet::Descriptor::nextUnusedGroupOffset() const
+AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
 {
+    // all group offsets are in use
+
+    if (unusedGroups() == size_t(0)) {
+        return std::numeric_limits<size_t>::max();
+    }
+
     // build a list of group indices
 
     std::vector<size_t> indices;
@@ -1206,7 +1212,15 @@ AttributeSet::Descriptor::nextUnusedGroupOffset() const
 
     std::sort(indices.begin(), indices.end());
 
-    // return first index not present
+    // return hint if not already in use
+
+    if (hint != std::numeric_limits<Index>::max() &&
+        hint < availableGroups() &&
+        std::find(indices.begin(), indices.end(), hint) == indices.end()) {
+        return hint;
+    }
+
+    // otherwise return first index not present
 
     size_t offset = 0;
     for (const size_t& index : indices) {
@@ -1217,12 +1231,18 @@ AttributeSet::Descriptor::nextUnusedGroupOffset() const
     return offset;
 }
 
+// deprecated
+size_t
+AttributeSet::Descriptor::nextUnusedGroupOffset() const
+{
+    return this->unusedGroupOffset();
+}
+
 bool
 AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
     size_t& sourceOffset, size_t& targetOffset) const
 {
-
-    targetOffset = this->nextUnusedGroupOffset();
+    targetOffset = this->unusedGroupOffset();
 
     for (const auto& namePos : mGroupMap) {
 
@@ -1232,6 +1252,36 @@ AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
             sourceName = namePos.first;
             sourceOffset = namePos.second;
             return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+AttributeSet::Descriptor::groupIndexCollision(const Descriptor& rhs) const
+{
+    const auto& groupMap = this->groupMap();
+    const auto& otherGroupMap = rhs.groupMap();
+
+    // iterate both group maps at the same time and find any keys that occur
+    // in both maps and test their values for equality
+
+    auto groupsIt1 = groupMap.cbegin();
+    auto groupsIt2 = otherGroupMap.cbegin();
+
+    while (groupsIt1 != groupMap.cend() && groupsIt2 != otherGroupMap.cend()) {
+        if (groupsIt1->first < groupsIt2->first) {
+            ++groupsIt1;
+        } else if (groupsIt1->first > groupsIt2->first) {
+            ++groupsIt2;
+        } else {
+            if (groupsIt1->second != groupsIt2->second) {
+                return true;
+            } else {
+                ++groupsIt1;
+                ++groupsIt2;
+            }
         }
     }
 

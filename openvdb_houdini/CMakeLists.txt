@@ -224,6 +224,7 @@ endif()
 set(OPENVDB_DSO_NAMES
   GR_PrimVDBPoints
   SHOP_OpenVDB_Points
+  SOP_OpenVDB_Activate
   SOP_OpenVDB_Advect
   SOP_OpenVDB_Advect_Points
   SOP_OpenVDB_Analysis

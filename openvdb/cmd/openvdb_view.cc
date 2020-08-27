@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb_viewer/Viewer.h>
+#include "../viewer/Viewer.h"
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
 #include <boost/algorithm/string/split.hpp>
@@ -159,11 +159,15 @@ main(int argc, char *argv[])
         openvdb_viewer::exit();
 
     } catch (const char* s) {
-        OPENVDB_LOG_ERROR(s);
+        OPENVDB_LOG_FATAL(s);
         status = EXIT_FAILURE;
     } catch (std::exception& e) {
-        OPENVDB_LOG_ERROR(e.what());
+        OPENVDB_LOG_FATAL(e.what());
         status = EXIT_FAILURE;
+    } catch (...) {
+        OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
+        std::terminate();
     }
+
     return status;
 }

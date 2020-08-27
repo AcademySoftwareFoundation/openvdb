@@ -3,4 +3,4 @@
 set -ex
 
 vcpkg update
-vcpkg install zlib openexr tbb cppunit blosc
+vcpkg install zlib openexr tbb cppunit blosc glfw3 glew

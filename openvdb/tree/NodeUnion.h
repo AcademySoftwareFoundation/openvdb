@@ -21,7 +21,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
 
 // Forward declaration of traits class
 template<typename T> struct CopyTraits;
@@ -106,92 +105,6 @@ template<> struct CopyTraits<math::Coord> { static const bool IsCopyable = true;
 
 ////////////////////////////////////////
 
-
-#else // OPENVDB_ABI_VERSION_NUMBER <= 3
-
-// Prior to OpenVDB 4 and the introduction of C++11, values of non-POD types
-// were heap-allocated and stored by pointer due to C++98 restrictions on unions.
-
-// Internal implementation of a union of a child node pointer and a value
-template<bool ValueIsClass, class ValueT, class ChildT> class NodeUnionImpl;
-
-
-// Partial specialization for values of non-class types
-// (int, float, pointer, etc.) that stores elements by value
-template<typename ValueT, typename ChildT>
-class NodeUnionImpl</*ValueIsClass=*/false, ValueT, ChildT>
-{
-private:
-    union { ChildT* child; ValueT value; } mUnion;
-
-public:
-    NodeUnionImpl() { mUnion.child = nullptr; }
-
-    ChildT* getChild() const { return mUnion.child; }
-    void setChild(ChildT* child) { mUnion.child = child; }
-
-    const ValueT& getValue() const { return mUnion.value; }
-    ValueT& getValue() { return mUnion.value; }
-    void setValue(const ValueT& val) { mUnion.value = val; }
-};
-
-
-// Partial specialization for values of class types (std::string,
-// math::Vec, etc.) that stores elements by pointer
-template<typename ValueT, typename ChildT>
-class NodeUnionImpl</*ValueIsClass=*/true, ValueT, ChildT>
-{
-private:
-    union { ChildT* child; ValueT* value; } mUnion;
-    bool mHasChild;
-
-public:
-    NodeUnionImpl() : mHasChild(true) { this->setChild(nullptr); }
-    NodeUnionImpl(const NodeUnionImpl& other) : mHasChild(true)
-    {
-        if (other.mHasChild) {
-            this->setChild(other.getChild());
-        } else {
-            this->setValue(other.getValue());
-        }
-    }
-    NodeUnionImpl& operator=(const NodeUnionImpl& other)
-    {
-        if (other.mHasChild) {
-            this->setChild(other.getChild());
-        } else {
-            this->setValue(other.getValue());
-        }
-        return *this;
-    }
-    ~NodeUnionImpl() { this->setChild(nullptr); }
-
-    ChildT* getChild() const { return mHasChild ? mUnion.child : nullptr; }
-    void setChild(ChildT* child)
-    {
-        if (!mHasChild) delete mUnion.value;
-        mUnion.child = child;
-        mHasChild = true;
-    }
-
-    const ValueT& getValue() const { return *mUnion.value; }
-    ValueT& getValue() { return *mUnion.value; }
-    void setValue(const ValueT& val)
-    {
-        if (!mHasChild) delete mUnion.value;
-        mUnion.value = new ValueT(val);
-        mHasChild = false;
-    }
-};
-
-
-template<typename ValueT, typename ChildT>
-struct NodeUnion: public NodeUnionImpl<std::is_class<ValueT>::value, ValueT, ChildT>
-{
-    NodeUnion() {}
-};
-
-#endif
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

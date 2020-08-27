@@ -30,7 +30,6 @@
 #include <openvdb/openvdb.h>
 #include "Interpolation.h" // for Sampler, etc.
 #include <openvdb/math/FiniteDifference.h>
-#include <boost/math/constants/constants.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -45,7 +44,8 @@ class DiscreteField
 public:
     typedef typename VelGridT::ValueType     VectorType;
     typedef typename VectorType::ValueType   ValueType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    static_assert(std::is_floating_point<ValueType>::value,
+        "DiscreteField requires a floating point grid.");
 
     DiscreteField(const VelGridT &vel)
         : mAccessor(vel.tree())
@@ -103,7 +103,8 @@ class EnrightField
 public:
     typedef ScalarT             ValueType;
     typedef math::Vec3<ScalarT> VectorType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ScalarT>::value);
+    static_assert(std::is_floating_point<ScalarT>::value,
+        "EnrightField requires a floating point grid.");
 
     EnrightField() {}
 
@@ -127,7 +128,7 @@ template <typename ScalarT>
 inline math::Vec3<ScalarT>
 EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
 {
-    const ScalarT pi = boost::math::constants::pi<ScalarT>();
+    const ScalarT pi = math::pi<ScalarT>();
     const ScalarT phase = pi / ScalarT(3);
     const ScalarT Px =  pi * ScalarT(xyz[0]), Py = pi * ScalarT(xyz[1]), Pz = pi * ScalarT(xyz[2]);
     const ScalarT tr =  math::Cos(ScalarT(time) * phase);

@@ -588,9 +588,6 @@ Set values appropriate to your environment for the following variables at the to
 <TR><TD><TT>GLFW_LIB</TT></TD><TD>linker flags for the GLFW library
     (e.g., <TT>-lglfw</TT>)</TD></TR>
 
-<TR><TD><TT>GLFW_MAJOR_VERSION</TT></TD><TD>the major version number of the GLFW library<BR>
-    (header filenames changed between GLFW 2 and 3, so this must be specified explicitly)</TD></TR>
-
 <TR><TD><TT>LOG4CPLUS_INCL_DIR</TT></TD><TD>the parent directory of the
     <TT>log4cplus/</TT> header directory<BR>
     (leave blank if log4cplus is not available)</TD></TR>

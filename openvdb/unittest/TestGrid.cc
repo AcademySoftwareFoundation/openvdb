@@ -96,9 +96,7 @@ public:
     void prune(const ValueType& = 0) {}
     void clip(const openvdb::CoordBBox&) {}
     void clipUnallocatedNodes() override {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 4
     openvdb::Index32 unallocatedLeafCount() const override { return 0; }
-#endif
 
     void getIndexRange(openvdb::CoordBBox&) const override {}
     bool evalLeafBoundingBox(openvdb::CoordBBox& bbox) const override

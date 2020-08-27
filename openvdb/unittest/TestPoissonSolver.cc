@@ -7,7 +7,6 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
-//#include <openvdb/math/Math.h> // for math::isApproxEqual()
 #include <openvdb/math/ConjGradient.h> // for JacobiPreconditioner
 #include <openvdb/tools/Composite.h> // for csgDifference/Union/Intersection
 #include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
@@ -15,7 +14,6 @@
 #include <openvdb/tools/MeshToVolume.h> // for createLevelSetBox()
 #include <openvdb/tools/Morphology.h> // for tools::erodeVoxels()
 #include <openvdb/tools/PoissonSolver.h>
-#include <boost/math/constants/constants.hpp> // for boost::math::constants::pi
 #include <cmath>
 
 
@@ -133,7 +131,7 @@ TestPoissonSolver::testLaplacian()
     for (int N = 8; N <= 20; N += 12) {
         // Construct an N x N x N volume in which the value of voxel (i, j, k)
         // is sin(i) * sin(j) * sin(k), using a voxel spacing of pi / N.
-        const double delta = boost::math::constants::pi<double>() / N;
+        const double delta = openvdb::math::pi<double>() / N;
         FloatTree inputTree(/*background=*/0.f);
         Coord ijk(0);
         Int32 &i = ijk[0], &j = ijk[1], &k = ijk[2];

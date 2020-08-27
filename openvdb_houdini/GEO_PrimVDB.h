@@ -65,18 +65,19 @@ protected:
     ///       constructors.
     GEO_PrimVDB(GEO_Detail *d, GA_Offset offset = GA_INVALID_OFFSET);
 
+    ~GEO_PrimVDB() override;
 public:
     static GA_PrimitiveFamilyMask       buildFamilyMask()
                                             { return GA_FAMILY_NONE; }
 
     /// @{
     /// Required interface methods
-    virtual bool        isDegenerate() const;
-    virtual int         getBBox(UT_BoundingBox *bbox) const;
-    virtual void        reverse();
-    virtual UT_Vector3  computeNormal() const;
-    virtual void        copyPrimitive(const GEO_Primitive *src);
-    virtual void        copySubclassData(const GA_Primitive *source);
+    bool                isDegenerate() const override;
+    int                 getBBox(UT_BoundingBox *bbox) const override;
+    void                reverse() override;
+    UT_Vector3          computeNormal() const override;
+    void                copyPrimitive(const GEO_Primitive *src) override;
+    void                copySubclassData(const GA_Primitive *source) override;
 
     using GEO_Primitive::getVertexOffset;
     using GEO_Primitive::getPointOffset;
@@ -174,7 +175,7 @@ public:
 
     // Transform the matrix associated with this primitive. Translate is
     // ignored.
-    virtual void        transform(const UT_Matrix4 &mat);
+    void                transform(const UT_Matrix4 &mat) override;
 
     /// Accessors for the 4x4 matrix representing the affine transform that
     /// converts from index space voxel coordinates to world space. For frustum
@@ -190,28 +191,31 @@ public:
     // successful, -1 if it failed because it would have become degenerate,
     // and -2 if it failed because it would have had to remove the primitive
     // altogether.
-    virtual int          detachPoints(GA_PointGroup &grp);
+    int                 detachPoints(GA_PointGroup &grp) override;
     /// Before a point is deleted, all primitives using the point will be
     /// notified.  The method should return "false" if it's impossible to
     /// delete the point.  Otherwise, the vertices should be removed.
-    virtual GA_DereferenceStatus        dereferencePoint(GA_Offset point,
-                                                bool dry_run=false);
-    virtual GA_DereferenceStatus        dereferencePoints(
-                                                const GA_RangeMemberQuery &pt_q,
-                                                bool dry_run=false);
-    virtual const GA_PrimitiveJSON      *getJSON() const;
+    GA_DereferenceStatus    dereferencePoint(GA_Offset point,
+                                             bool dry_run=false) override;
+    GA_DereferenceStatus    dereferencePoints(const GA_RangeMemberQuery &pt_q,
+                                              bool dry_run=false) override;
+    const GA_PrimitiveJSON *getJSON() const override;
 
     /// This method assigns a preallocated vertex to the quadric, optionally
     /// creating the topological link between the primitive and new vertex.
     void                 assignVertex(GA_Offset new_vtx, bool update_topology);
 
     /// Evalaute a point given a u,v coordinate (with derivatives)
-    virtual bool        evaluatePointRefMap(GA_Offset result_vtx,
+    bool                evaluatePointRefMap(
+                                GA_Offset result_vtx,
                                 GA_AttributeRefMap &hlist,
-                                fpreal u, fpreal v, uint du, uint dv) const;
+                                fpreal u, fpreal v,
+                                uint du, uint dv) const override;
     /// Evalaute position given a u,v coordinate (with derivatives)
-    virtual int         evaluatePointV4(UT_Vector4 &pos, float u, float v = 0,
-                                        unsigned du=0, unsigned dv=0) const
+    int                 evaluatePointV4(
+                                UT_Vector4 &pos,
+                                float u, float v = 0,
+                                unsigned du=0, unsigned dv=0) const override
                         {
                            return GEO_Primitive::evaluatePointV4(pos, u, v,
                                        du, dv);
@@ -312,21 +316,22 @@ public:
     /// @{
     /// Though not strictly required (i.e. not pure virtual), these methods
     /// should be implemented for proper behaviour.
-    virtual GEO_Primitive       *copy(int preserve_shared_pts = 0) const;
+    GEO_Primitive       *copy(int preserve_shared_pts = 0) const override;
 
     // Have we been deactivated and stashed?
-    virtual void        stashed(bool beingstashed, GA_Offset offset=GA_INVALID_OFFSET);
+    void                stashed(bool beingstashed,
+                                GA_Offset offset=GA_INVALID_OFFSET) override;
 
     /// @}
 
     /// @{
     /// Optional interface methods.  Though not required, implementing these
     /// will give better behaviour for the new primitive.
-    virtual UT_Vector3  baryCenter() const;
-    virtual fpreal      calcVolume(const UT_Vector3 &refpt) const;
+    UT_Vector3          baryCenter() const override;
+    fpreal              calcVolume(const UT_Vector3 &refpt) const override;
     /// Calculate the surface area of the active voxels where
     /// a voxel face contributes if it borders an inactive voxel.
-    virtual fpreal      calcArea() const;
+    fpreal              calcArea() const override;
     /// @}
 
     /// @{
@@ -334,25 +339,28 @@ public:
     /// return value of false indicates an error in the operation, most
     /// likely an invalid P.  For any attribute other than the position
     /// these methods simply enlarge the bounding box based on the vertex.
-    virtual bool         enlargeBoundingBox(UT_BoundingRect &b,
-                                        const GA_Attribute *P) const;
-    virtual bool         enlargeBoundingBox(UT_BoundingBox &b,
-                                        const GA_Attribute *P) const;
-    virtual void         enlargePointBounds(UT_BoundingBox &e) const;
+    bool                 enlargeBoundingBox(
+                                UT_BoundingRect &b,
+                                const GA_Attribute *P) const override;
+    bool                 enlargeBoundingBox(
+                                UT_BoundingBox &b,
+                                const GA_Attribute *P) const override;
+    void                 enlargePointBounds(UT_BoundingBox &e) const override;
     /// @}
     /// Enlarge a bounding sphere to encompass the primitive.  A return value
     /// of false indicates an error in the operation, most likely an invalid
     /// P.  For any attribute other than the position this method simply
     /// enlarges the sphere based on the vertex.
-    virtual bool         enlargeBoundingSphere(UT_BoundingSphere &b,
-                                        const GA_Attribute *P) const;
+    bool                 enlargeBoundingSphere(
+                                UT_BoundingSphere &b,
+                                const GA_Attribute *P) const override;
 
     /// Accessor for the local 3x3 affine transform matrix for the primitive.
     /// For frustum maps, this will be transform as if the taper value is set
     /// to 1.
     /// @{
-    virtual void        getLocalTransform(UT_Matrix3D &result) const;
-    virtual void        setLocalTransform(const UT_Matrix3D &new_mat3);
+    void                getLocalTransform(UT_Matrix3D &result) const override;
+    void                setLocalTransform(const UT_Matrix3D &new_mat3) override;
     /// @}
 
     /// @internal Hack to condition 4x4 matrices that we avoid creating what
@@ -363,7 +371,7 @@ public:
     /// Visualization accessors
     /// @{
     const GEO_VolumeOptions &getVisOptions() const  { return myVis; }
-    void                     setVisOptions(const GEO_VolumeOptions &vis) 
+    void                     setVisOptions(const GEO_VolumeOptions &vis)
     { setVisualization(vis.myMode, vis.myIso, vis.myDensity, vis.myLod); }
 
     void                setVisualization(
@@ -593,7 +601,7 @@ protected:
     typedef SYS_AtomicCounter AtomicUniqueId; // 64-bit
 
     /// Register intrinsic attributes
-    GA_DECLARE_INTRINSICS(GA_NO_OVERRIDE)
+    GA_DECLARE_INTRINSICS(override)
 
     /// Return true if the given metadata token is an intrinsic
     static bool         isIntrinsicMetadata(const char *name);

@@ -164,7 +164,7 @@ template <class TreeType>
 MinMaxVoxel<TreeType>::MinMaxVoxel(LeafArray& leafs)
     : mLeafArray(leafs)
     , mMin(std::numeric_limits<ValueType>::max())
-    , mMax(-mMin)
+    , mMax(std::numeric_limits<ValueType>::lowest())
 {
 }
 
@@ -174,7 +174,7 @@ inline
 MinMaxVoxel<TreeType>::MinMaxVoxel(const MinMaxVoxel<TreeType>& rhs, tbb::split)
     : mLeafArray(rhs.mLeafArray)
     , mMin(std::numeric_limits<ValueType>::max())
-    , mMax(-mMin)
+    , mMax(std::numeric_limits<ValueType>::lowest())
 {
 }
 

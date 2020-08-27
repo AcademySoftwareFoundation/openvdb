@@ -876,7 +876,7 @@ GEO_PrimVDB::enlargeBoundingBox(UT_BoundingRect &box,
         box.enlargeBounds(my_bbox.xmax(), my_bbox.ymax());
         return true;
     }
-    return false;
+    return true;
 }
 
 bool
@@ -896,7 +896,7 @@ GEO_PrimVDB::enlargeBoundingBox(UT_BoundingBox &box,
         box.enlargeBounds(my_bbox);
         return true;
     }
-    return false;
+    return true;
 }
 
 bool
@@ -1163,7 +1163,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, double *f, int stride, const UT_Vecto
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
             geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
             geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
@@ -1177,7 +1177,7 @@ geoEvaluateVDBMany(const GEO_PrimVDB *vdb, exint *f, int stride, const UT_Vector
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
             geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(), 
+    UTvdbReturnBoolType(vdb->getStorageType(),
             geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
     for (int i = 0; i < num; i++)
     {
@@ -2671,7 +2671,7 @@ public:
 
 public:
     geo_PrimVDBJSON() {}
-    virtual ~geo_PrimVDBJSON() {}
+    ~geo_PrimVDBJSON() override {}
 
     enum
     {
@@ -2687,11 +2687,11 @@ public:
     GEO_PrimVDB         *vdb(GA_Primitive *p) const
                         { return static_cast<GEO_PrimVDB *>(p); }
 
-    virtual int         getEntries() const
+    int                 getEntries() const override
                         { return geo_TBJ_ENTRIES; }
 
-    virtual const UT_StringHolder &
-    getKeyword(int i) const
+    const UT_StringHolder &
+    getKeyword(int i) const override
     {
         switch (i)
         {
@@ -2705,9 +2705,9 @@ public:
         return UT_StringHolder::theEmptyString;
     }
 
-    virtual bool
+    bool
     shouldSaveField(const GA_Primitive *prim, int i,
-                    const GA_SaveMap &sm) const
+                    const GA_SaveMap &sm) const override
     {
         bool is_shmem = sm.getOptions().hasOption("geo:sharedmemowner");
         switch (i)
@@ -2722,9 +2722,9 @@ public:
         return false;
     }
 
-    virtual bool
+    bool
     saveField(const GA_Primitive *pr, int i, UT_JSONWriter &w,
-              const GA_SaveMap &map) const
+              const GA_SaveMap &map) const override
     {
         switch (i)
         {
@@ -2745,9 +2745,9 @@ public:
         }
         return false;
     }
-    virtual bool
+    bool
     loadField(GA_Primitive *pr, int i, UT_JSONParser &p,
-              const GA_LoadMap &map) const
+              const GA_LoadMap &map) const override
     {
         switch (i)
         {
@@ -2778,18 +2778,18 @@ public:
         return false;
     }
 
-    virtual bool
+    bool
     saveField(const GA_Primitive *pr, int i, UT_JSONValue &val,
-              const GA_SaveMap &map) const
+              const GA_SaveMap &map) const override
     {
         UT_AutoJSONWriter w(val);
         return saveField(pr, i, *w, map);
     }
     // Re-implement the H12.5 base class version, note that this was pure
     // virtual in H12.1.
-    virtual bool
+    bool
     loadField(GA_Primitive *pr, int i, UT_JSONParser &p,
-              const UT_JSONValue &jval, const GA_LoadMap &map) const
+              const UT_JSONValue &jval, const GA_LoadMap &map) const override
     {
         UT_AutoJSONParser parser(jval);
         bool ok = loadField(pr, i, *parser, map);
@@ -2797,8 +2797,9 @@ public:
         return ok;
     }
 
-    virtual bool
-    isEqual(int i, const GA_Primitive *p0, const GA_Primitive *p1) const
+    bool
+    isEqual(int i,
+            const GA_Primitive *p0, const GA_Primitive *p1) const override
     {
         switch (i)
         {
@@ -3015,14 +3016,14 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
 
             openvdb::GridBase::Ptr grid = (*grids)[0];
             UT_ASSERT(grid);
-            if (grid) 
+            if (grid)
             {
                 // When we saved the grid, we auto-added metadata
                 // which isn't reflected by our primitive attributes.
                 // if any later node tries to sync the metadata from
                 // the vdb primitive, we'll gain extra data such as
                 // file_bbox
-                const char *file_metadata[] = 
+                const char *file_metadata[] =
                 {
                     "file_bbox_min",
                     "file_bbox_max",
@@ -3307,7 +3308,7 @@ GEO_PrimVDB::GridAccessor::updateGridTranslates(const GEO_PrimVDB &prim) const
     Vec3d delta = newpos - oldpos;
     const_cast<GEO_PrimVDB::GridAccessor *>(this)->makeGridUnique();
     myGrid->setTransform(
-        openvdb::SharedPtr<Transform>(new Transform{map->postTranslate(delta)}));
+        std::make_shared<Transform>(map->postTranslate(delta)));
 }
 
 // Copy the translation from xform and set into our vertex position
