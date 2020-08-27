@@ -16,7 +16,6 @@ INPUT                 += doc/houdini.txt \
                          openvdb_houdini/GU_PrimVDB.h \
                          openvdb_houdini/GU_VDBPointTools.h \
                          openvdb_houdini/GeometryUtil.h \
-                         openvdb_houdini/OP_NodeChain.h \
                          openvdb_houdini/ParmFactory.h \
                          openvdb_houdini/PointUtils.h \
                          openvdb_houdini/SOP_NodeVDB.h \

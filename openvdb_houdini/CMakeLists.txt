@@ -131,7 +131,6 @@ set(OPENVDB_HOUDINI_UTILS_DIR ${PROJECT_BINARY_DIR}/houdini_utils)
 file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_UTILS_DIR})
 file(COPY
     geometry.h
-    OP_NodeChain.h
     ParmFactory.h
   DESTINATION
     ${OPENVDB_HOUDINI_UTILS_DIR}
