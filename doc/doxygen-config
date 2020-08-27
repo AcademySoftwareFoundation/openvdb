@@ -68,7 +68,6 @@ ALIASES               += hulink{2}="<B>\2</B>" \
                          hvdblink{2}="<B>\2</B>"
 
 PREDEFINED            += __declspec(x):= __attribute__(x):=
-PREDEFINED            += OPENVDB_STATIC_SPECIALIZATION=""
 PREDEFINED            += OPENVDB_USE_LOG4CPLUS=
 
 #EXPAND_AS_DEFINED = \
@@ -76,8 +75,7 @@ PREDEFINED            += OPENVDB_USE_LOG4CPLUS=
 #    OPENVDB_HOUDINI_API \
 #    OPENVDB_EXPORT \
 #    OPENVDB_IMPORT \
-#    OPENVDB_DEPRECATED \
-#    OPENVDB_STATIC_SPECIALIZATION
+#    OPENVDB_DEPRECATED
 
 IMAGE_PATH             = doc/img
 
