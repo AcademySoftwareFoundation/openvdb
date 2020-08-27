@@ -65,6 +65,8 @@ jobs:
       image: aswf/ci-openvdb:2018
     steps:
     - uses: actions/checkout@v1
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
     - name: build
       run: ./ci/build.sh clang++ Release 5 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -111,6 +113,8 @@ jobs:
       run: test -f "hou/hou.tar.gz"
     - name: houdini
       run: ./ci/install_houdini.sh
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
