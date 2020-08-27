@@ -71,6 +71,8 @@ public:
     CPPUNIT_TEST(testStealNode);
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     CPPUNIT_TEST(testNodeCount);
+#endif
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
     CPPUNIT_TEST(testActiveTileCount);
 #endif
     CPPUNIT_TEST(testRootNode);
