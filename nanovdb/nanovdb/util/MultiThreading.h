@@ -69,11 +69,13 @@ int parallel_for(RangeT taskRange, const Func &taskFunc)
 #else
     if (const size_t threadCount = std::thread::hardware_concurrency()>>1) {
         std::vector<RangeT> vec{ taskRange };
-LOOP:   size_t m = vec.size();
-        for (size_t n = 0; n < m && vec.size() < threadCount; ++n) {
-            if (vec[n].is_divisible()) vec.push_back(RangeT(vec[n], Split()));
+        while(vec.size() < threadCount) {
+            const size_t m = vec.size();
+            for (size_t n = 0; n < m && vec.size() < threadCount; ++n) {
+                if (vec[n].is_divisible()) vec.push_back(RangeT(vec[n], Split()));
+            }
+            if (vec.size() == m) break;// none of the ranges were devisible
         }
-        if (vec.size() > m && vec.size() < threadCount) goto LOOP;
         std::vector<std::thread> threadPool;
         for (auto &r : vec) threadPool.emplace_back(taskFunc, r);// launch threads
         for (auto &t : threadPool) t.join();// syncronize threads
