@@ -19,7 +19,7 @@
 #include <nanovdb/util/SampleFromVoxels.h>
 #include "Image.h"
 #include "Camera.h"
-#include "CpuTimer.h"
+#include "../ex_util/CpuTimer.h"
 
 #if defined(NANOVDB_USE_CUDA)
 #include <nanovdb/util/CudaDeviceBuffer.h>

@@ -72,6 +72,7 @@ public:
     /// @brief Move copy assignment operation
     HostBuffer& operator=(HostBuffer&& other) noexcept
     {
+        clear();
         mSize = other.mSize;
         mData = other.mData;
         other.mSize = 0;

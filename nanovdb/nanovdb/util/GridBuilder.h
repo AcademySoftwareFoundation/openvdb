@@ -18,11 +18,12 @@
 #define NANOVDB_GRIDBUILDER_H_HAS_BEEN_INCLUDED
 
 #include "GridHandle.h"
-#include <thread>
-#include <atomic>
-#include <limits>
-#include <sstream>// for stringstream
+#include "MultiThreading.h"
+
 #include <map>
+#include <limits>
+#include <atomic>
+#include <sstream>// for stringstream
 #include <vector>
 #include <cstring>// for memcpy
 
@@ -368,9 +369,9 @@ class GridBuilder
     uint8_t* mData;
     uint64_t mBytes[7]; // Byte offsets to from mData to: tree, root, node2, node1, leafs, meta, (total size)
     std::atomic<uint64_t> mActiveVoxelCount;
-    std::vector<SrcNode0*> mArray0; // OpenVDB leaf nodes
-    std::vector<SrcNode1*> mArray1; // lower OpenVDB internal nodes
-    std::vector<SrcNode2*> mArray2; // upper OpenVDB internal nodes
+    std::vector<SrcNode0*> mArray0; // leaf nodes
+    std::vector<SrcNode1*> mArray1; // lower internal nodes
+    std::vector<SrcNode2*> mArray2; // upper internal nodes
     uint64_t mBlindDataSize;
 
     template<typename DstNodeT>
@@ -386,7 +387,8 @@ class GridBuilder
     void processTree();
     void processGrid(const Map&, const std::string&, GridClass);
     
-    void update();
+    template <typename SrcNodeT>
+    void update(std::vector<SrcNodeT*>&);
 
     template<typename T, typename FlagT>
     typename std::enable_if<!std::is_floating_point<T>::value>::type
@@ -412,58 +414,83 @@ public:
     template <typename BufferT = HostBuffer>
     GridHandle<BufferT> getHandle(const Map &map, const std::string &name = "", GridClass gridClass = GridClass::Unknown, const BufferT& buffer = BufferT());
 
+    /// @brief Sets grids values in domain of the @a bbox to those returned by the specified @a func with the 
+    ///        expected signature [](const Coord&)->ValueT.
+    ///
+    /// @note If @a func returns a value equal to the brackground value (specified in the constructor) at a 
+    ///       specefic voxel coordinate, then the active state of that coordinate is left off! Else the value
+    ///       value is set and the active state is on. This is done to allow for sparse grids to be generated.
+    ///
+    /// @param func  Functor used to evaluate the grid values in the @a bbox 
+    /// @param bbox  Coordinate bounding-box over which the grid values will be set.
+    /// @param delta Specifies a lower threshold value for rendering (optiona). Typically equals the voxel size
+    ///              for level sets and otherwise it's zero.
     template <typename Func>
     void operator()(const Func &func, const CoordBBox &bbox, ValueT delta = ValueT(0));
 
 };// GridBuilder
-
 
 //================================================================================================
 
 template <typename ValueT, typename ExtremaOp>
 template <typename Func>
 void GridBuilder<ValueT, ExtremaOp>::
-operator()(const Func &func, const CoordBBox &bbox, ValueT delta)
+operator()(const Func &func, const CoordBBox &voxelBBox, ValueT delta)
 {
-    static_assert(nanovdb::is_same<ValueT, typename std::result_of<Func(const Coord&)>::type>::value, "GridBuilder: mismatched ValueType");
-    
-    auto acc = this->getAccessor();
-    uint64_t count = 0;
-    // Slow single-threaded evaluation for now
-    for (Coord ijk = bbox[0]; ijk[0]<=bbox[1][0]; ++ijk[0]) {
-        for (ijk[1] = bbox[0][1]; ijk[1]<=bbox[1][1]; ++ijk[1]) {
-            for (ijk[2] = bbox[0][2]; ijk[2]<=bbox[1][2]; ++ijk[2]) {
-                if (func(ijk) != mRoot.mBackground) ++count;
-                acc.setValue( ijk, func(ijk) );
+    static_assert(is_same<ValueT, typename std::result_of<Func(const Coord&)>::type>::value, "GridBuilder: mismatched ValueType");
+    mDelta = delta;// delta = voxel size for level sets, else 0
+    mActiveVoxelCount = 0;
+
+    using NodeT = Leaf;
+    //using NodeT = Node<Leaf>;
+    const CoordBBox nodeBBox(voxelBBox[0] >> NodeT::TOTAL, voxelBBox[1] >> NodeT::TOTAL);
+    std::mutex mutex;
+    auto kernel = [&](const CoordBBox &b)
+    {
+        uint64_t sum = 0;
+        NodeT *node = nullptr;
+        for (auto it = b.begin(); it; ++it) {
+            Coord min(*it << NodeT::TOTAL), max(min + Coord(NodeT::DIM - 1));
+            const CoordBBox bbox( min.maxComponent(voxelBBox.min()), 
+                                  max.minComponent(voxelBBox.max()) );
+            if (node == nullptr) {
+                node = new NodeT( bbox[0], mRoot.mBackground, false );
+            } else {
+                node->mOrigin = bbox[0] & ~NodeT::MASK;
+            }
+            uint64_t count = 0;
+            for (auto ijk = bbox.begin(); ijk; ++ijk) {
+                const auto v = func( *ijk );
+                if ( v == mRoot.mBackground ) continue;
+                ++count;
+                node->setValue( *ijk, v );
+            }
+            if (count>0) {
+                sum += count;
+                std::lock_guard<std::mutex> guard(mutex);
+                assert(node != nullptr);
+                mRoot.addNode(node); 
+                assert(node == nullptr);
             }
         }
-    }
-    mDelta = delta;// delta = dx fpr level set, else 0
-}// GridBuilder::operator()
+        if (node) delete node;
+        mActiveVoxelCount += sum;
+    };// kernel
+    parallel_for(nodeBBox, kernel);
+}
 
 //================================================================================================
 
 template <typename ValueT, typename ExtremaOp>
+template <typename SrcNodeT>
 void GridBuilder<ValueT, ExtremaOp>::
-update()
+update(std::vector<SrcNodeT*> &array)
 {
-    const uint32_t nodeCount0 = mRoot.template nodeCount<SrcNode0>();
-    if (nodeCount0 != uint32_t(mArray0.size())) {
-        mArray0.clear();
-        mArray0.reserve(nodeCount0);
-        mRoot.getNodes(mArray0);
-    }
-    const uint32_t nodeCount1 = mRoot.template nodeCount<SrcNode1>();
-    if (nodeCount1 != uint32_t(mArray1.size())) {
-        mArray1.clear();
-        mArray1.reserve(nodeCount1);
-        mRoot.getNodes(mArray1);
-    }
-    const uint32_t nodeCount2 = mRoot.template nodeCount<SrcNode2>();
-    if (nodeCount2 != uint32_t(mArray2.size())) {
-        mArray2.clear();
-        mArray2.reserve(nodeCount2);
-        mRoot.getNodes(mArray2);
+    const uint32_t nodeCount = mRoot.template nodeCount<SrcNodeT>();
+    if (nodeCount != uint32_t(array.size())) {
+        array.clear();
+        array.reserve(nodeCount);
+        mRoot.getNodes(array);
     }
 }// GridBuilder::update
 
@@ -473,12 +500,20 @@ template <typename ValueT, typename ExtremaOp>
 void GridBuilder<ValueT, ExtremaOp>::
 sdfToLevelSet()
 {
-    this->update();
     const ValueT outside = mRoot.mBackground;
     // Note that the bottum-up flood filling is essential
-    for (auto *leaf : mArray0) leaf->signedFloodFill(outside);
-    for (auto *node : mArray1) node->signedFloodFill(outside);
-    for (auto *node : mArray2) node->signedFloodFill(outside);
+    parallel_invoke([&](){this->update(mArray0);}, 
+                    [&](){this->update(mArray1);}, 
+                    [&](){this->update(mArray2);});
+    parallel_for(0, mArray0.size(), 8,[&](const BlockedRange<size_t> &r){
+        for (auto i = r.begin(); i != r.end(); ++i) mArray0[i]->signedFloodFill(outside);
+    });
+    parallel_for(0, mArray1.size(), 1,[&](const BlockedRange<size_t> &r){
+        for (auto i = r.begin(); i != r.end(); ++i) mArray1[i]->signedFloodFill(outside);
+    });
+    parallel_for(0, mArray2.size(), 1,[&](const BlockedRange<size_t> &r){
+        for (auto i = r.begin(); i != r.end(); ++i) mArray2[i]->signedFloodFill(outside);
+    });
     mRoot.signedFloodFill(outside);
 }// GridBuilder::sdfToLevelSet
 
@@ -529,11 +564,13 @@ getHandle(const Map &map,
     if (gridClass == GridClass::FogVolume && !is_floating_point<ValueT>::value)
         throw std::runtime_error("Fog volumes are expected to be floating point types");
     
-    this->update();
+    parallel_invoke([&](){this->update(mArray0);}, 
+                    [&](){this->update(mArray1);}, 
+                    [&](){this->update(mArray2);});
 
     mBytes[0] = DstGridT::memUsage(mBlindDataSize>0 ? 1 : 0); // grid + blind meta data
     mBytes[1] = DstTreeT::memUsage(); // tree
-    mBytes[2] = DstRootT::memUsage(mRoot.mTable.size()); // root
+    mBytes[2] = DstRootT::memUsage(uint32_t(mRoot.mTable.size())); // root
     mBytes[3] = mArray2.size() * DstNode2::memUsage(); // upper internal nodes
     mBytes[4] = mArray1.size() * DstNode1::memUsage(); // lower internal nodes
     mBytes[5] = mArray0.size() * DstNode0::memUsage(); // leaf nodes
@@ -589,41 +626,49 @@ sdfToFog()
         v = v>d ? v*w : ValueT(1);
         return true; 
     };
-
-    for (SrcNode0 *leaf : mArray0) {
-        for (uint32_t i=0; i<SrcNode0::SIZE; ++i) {
-            leaf->mValueMask.set(i, op(leaf->mValues[i]));
+    auto kernel0 = [&](const BlockedRange<size_t> &r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            SrcNode0* node = mArray0[i];
+            for (uint32_t i=0; i<SrcNode0::SIZE; ++i) node->mValueMask.set(i, op(node->mValues[i]));
         }
-    }
-    for (SrcNode1 *node : mArray1) {
-        for (uint32_t i=0; i<SrcNode1::SIZE; ++i) {
-            if (node->mChildMask.isOn(i)) {
-                SrcNode0 *leaf = node->mTable[i].child;
-                if (leaf->mValueMask.isOff()) {
-                    node->mTable[i].value = leaf->getFirstValue();
-                    node->mChildMask.setOff(i);
-                    delete leaf;
+    };
+    auto kernel1 = [&](const BlockedRange<size_t> &r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            SrcNode1* node = mArray1[i];
+            for (uint32_t i=0; i<SrcNode1::SIZE; ++i) {
+                if (node->mChildMask.isOn(i)) {
+                    SrcNode0 *leaf = node->mTable[i].child;
+                    if (leaf->mValueMask.isOff()) {
+                        node->mTable[i].value = leaf->getFirstValue();
+                        node->mChildMask.setOff(i);
+                        delete leaf;
+                    }
+                } else {
+                    node->mValueMask.set(i, op(node->mTable[i].value));
                 }
-            } else {
-                node->mValueMask.set(i, op(node->mTable[i].value));
             }
         }
-    }
-
-    for (SrcNode2 *node : mArray2) {
-        for (uint32_t i=0; i<SrcNode2::SIZE; ++i) {
-            if (node->mChildMask.isOn(i)) {
-                SrcNode1 *child = node->mTable[i].child;
-                if (child->mChildMask.isOff() && child->mValueMask.isOff()) {
-                    node->mTable[i].value = child->getFirstValue();
-                    node->mChildMask.setOff(i);
-                    delete child;
+    };
+    auto kernel2 = [&](const BlockedRange<size_t> &r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            SrcNode2* node = mArray2[i];
+            for (uint32_t i=0; i<SrcNode2::SIZE; ++i) {
+                if (node->mChildMask.isOn(i)) {
+                    SrcNode1 *child = node->mTable[i].child;
+                    if (child->mChildMask.isOff() && child->mValueMask.isOff()) {
+                        node->mTable[i].value = child->getFirstValue();
+                        node->mChildMask.setOff(i);
+                        delete child;
+                    }
+                } else {
+                    node->mValueMask.set(i, op(node->mTable[i].value));
                 }
-            } else {
-                node->mValueMask.set(i, op(node->mTable[i].value));
             }
         }
-    }
+    };
+    parallel_for(0, mArray0.size(), 8, kernel0);
+    parallel_for(0, mArray1.size(), 1, kernel1);
+    parallel_for(0, mArray2.size(), 1, kernel2);
 
     for (auto it = mRoot.mTable.begin(); it != mRoot.mTable.end(); ++it) {
         SrcNode2 *child = it->second.child;
@@ -646,10 +691,10 @@ processLeafs()
 {
     mActiveVoxelCount = 0;
     auto* start = this->template nodeData<DstNode0>(); // address of first leaf node
-    auto  op = [&](uint32_t begin, uint32_t end) {
+    auto kernel = [&](const BlockedRange<uint32_t> &r) {
         uint64_t sum = 0;
-        auto* data = start + begin;
-        for (auto i = begin; i != end; ++i, ++data) {
+        auto* data = start + r.begin();
+        for (auto i = r.begin(); i != r.end(); ++i, ++data) {
             SrcNode0& srcLeaf = *mArray0[i];
             assert(srcLeaf.mID == i);
             sum += srcLeaf.mValueMask.countOn();
@@ -684,7 +729,7 @@ processLeafs()
         }
         mActiveVoxelCount += sum;
     };
-    op(0, static_cast<uint32_t>(mArray0.size()));
+    parallel_for(BlockedRange<uint32_t>(0, uint32_t(mArray0.size()), 8), kernel);
 } // GridBuilder::processLeafs
 
 //================================================================================================
@@ -697,42 +742,54 @@ processNodes(std::vector<SrcNodeT*>& array)
     using SrcChildT = typename SrcNodeT::ChildType;
     const uint32_t size = static_cast<uint32_t>(array.size());
     auto*          start = this->template nodeData<DstNodeT>();
-    auto           op = [&](uint32_t begin, uint32_t end) 
+    auto           kernel = [&](const BlockedRange<uint32_t> &r) 
     {
-        auto* data = start + begin;
+        auto* data = start + r.begin();
         uint64_t sum = 0;
-        for (auto i = begin; i != end; ++i, ++data) {
+        for (auto i = r.begin(); i != r.end(); ++i, ++data) {
             SrcNodeT& srcNode = *array[i];
             assert(srcNode.mID == i);
             sum += SrcChildT::NUM_VALUES * srcNode.mValueMask.countOn();// active tiles
             data->mValueMask = srcNode.mValueMask;
             data->mChildMask = srcNode.mChildMask;
             data->mOffset = size - i;
-            auto iter = srcNode.mChildMask.beginOn();
-            if (!iter) throw std::runtime_error("Expected at least one child node in every internal node! Hint: try pruneInactive.");
-            data->mTable[*iter].childID = srcNode.mTable[*iter].child->mID;
-            auto* dstChild = data->child(*iter);
-            ExtremaOp extrema(dstChild->valueMin(), dstChild->valueMax());
-            data->mBBox = dstChild->bbox();
-            for (++iter; iter; ++iter) {
-                data->mTable[*iter].childID = srcNode.mTable[*iter].child->mID;
-                auto* dstChild = data->child(*iter);
-                extrema.min( dstChild->valueMin() );
-                extrema.max( dstChild->valueMax() );
-                const auto& bbox = dstChild->bbox();
-                data->mBBox[0].minComponent(bbox[0]);
-                data->mBBox[1].maxComponent(bbox[1]);
-            }
             auto noneChildMask = srcNode.mChildMask;//copy
             noneChildMask.toggle();// bits are on for values vs child nodes
             for (auto iter = noneChildMask.beginOn(); iter; ++iter) {
                 data->mTable[*iter].value = srcNode.mTable[*iter].value;
             }
-            for (auto iter = srcNode.mValueMask.beginOn(); iter; ++iter) { // typically there are few active tiles
-                extrema( srcNode.mTable[*iter].value );
-                const Coord ijk = srcNode.offsetToGlobalCoord(*iter);
+            auto onValIter = srcNode.mValueMask.beginOn();
+            auto childIter = srcNode.mChildMask.beginOn();
+            ExtremaOp extrema;
+            if (onValIter) {
+                extrema = ExtremaOp(srcNode.mTable[*onValIter].value);
+                const Coord ijk = srcNode.offsetToGlobalCoord(*onValIter);
+                data->mBBox[0] = ijk;
+                data->mBBox[1] = ijk + Coord(int32_t(SrcChildT::DIM) - 1);
+                ++onValIter;
+            } else if (childIter) {
+                data->mTable[*childIter].childID = srcNode.mTable[*childIter].child->mID;
+                auto* dstChild = data->child(*childIter);
+                extrema = ExtremaOp(dstChild->valueMin(), dstChild->valueMax());
+                data->mBBox = dstChild->bbox();
+                ++childIter;
+            } else {
+                throw std::runtime_error("Internal node with no children or active values! Hint: try pruneInactive.");
+            }
+            for (; onValIter; ++onValIter) { // typically there are few active tiles
+                extrema( srcNode.mTable[*onValIter].value );
+                const Coord ijk = srcNode.offsetToGlobalCoord(*onValIter);
                 data->mBBox[0].minComponent(ijk);
                 data->mBBox[1].maxComponent(ijk + Coord(int32_t(SrcChildT::DIM) - 1));
+            }
+            for (; childIter; ++childIter) {
+                data->mTable[*childIter].childID = srcNode.mTable[*childIter].child->mID;
+                auto* dstChild = data->child(*childIter);
+                extrema.min( dstChild->valueMin() );
+                extrema.max( dstChild->valueMax() );
+                const auto& bbox = dstChild->bbox();
+                data->mBBox[0].minComponent(bbox[0]);
+                data->mBBox[1].maxComponent(bbox[1]);
             }
             data->mValueMin = extrema.min();
             data->mValueMax = extrema.max();
@@ -740,7 +797,7 @@ processNodes(std::vector<SrcNodeT*>& array)
         }
         mActiveVoxelCount += sum;
     };
-    op(0, static_cast<uint32_t>(array.size()));
+    parallel_for(BlockedRange<uint32_t>(0, uint32_t(array.size()), 4), kernel);
 } // GridBuilder::processNodes
 
 //================================================================================================
@@ -752,7 +809,7 @@ processRoot()
     using SrcChildT = SrcNode2;
     auto& data = *(this->template nodeData<DstRootT>());
     data.mBackground = mRoot.mBackground;
-    data.mTileCount = mRoot.mTable.size();
+    data.mTileCount = uint32_t(mRoot.mTable.size());
     // since openvdb::RootNode internally uses a std::map for child nodes its iterator
     // visits elements in the stored order required by the nanovdb::RootNode
     if (data.mTileCount == 0) { // empty root node
@@ -920,6 +977,18 @@ struct GridBuilder<ValueT, ExtremaOp>::Root
         return iter->second.state;
     }
 
+    const ValueT& getValue(const Coord& ijk) const
+    {
+        auto iter = mTable.find(CoordToKey(ijk));
+        if (iter == mTable.end()) {
+            return mBackground;
+        } else if (iter->second.child) {
+            return iter->second.child->getValue(ijk);
+        } else {
+            return iter->second.value;
+        }
+    }
+
     template <typename AccT>
     const ValueT& getValueAndCache(const Coord& ijk, AccT& acc) const
     {
@@ -986,16 +1055,39 @@ struct GridBuilder<ValueT, ExtremaOp>::Root
         }
     }
 
-    void addChild(ChildT* child)
+    void addChild(ChildT*& child)
     {
         assert(child);
-        const Coord& ijk = child->mOrigin;
-        auto iter = mTable.find(ijk);
+        const Coord key = CoordToKey(child->mOrigin);
+        auto iter = mTable.find(key);
         if (iter != mTable.end() && iter->second.child != nullptr) {// existing child node
             delete iter->second.child;
             iter->second.child = child;
         } else {
-            mTable[ijk] = Tile(child);
+            mTable[key] = Tile(child);
+        }
+        child = nullptr;
+    }
+
+    template <typename NodeT>
+    void addNode(NodeT*& node)
+    {
+        if (is_same<NodeT, ChildT>::value) {//resolved at compile-time
+            this->addChild(reinterpret_cast<ChildT*&>(node));
+        } else {
+            ChildT* child = nullptr;
+            const Coord key = CoordToKey(node->mOrigin);
+            auto iter = mTable.find(key);
+            if (iter == mTable.end()) {
+                child = new ChildT(node->mOrigin, mBackground, false);
+                mTable[key] = Tile(child);
+            } else if (iter->second.child != nullptr) {
+                child = iter->second.child;
+            } else {
+                child = new ChildT(node->mOrigin, iter->second.value, iter->second.state);
+                iter->second.child = child;
+            }
+            child->addNode(node);
         }
     }
 
@@ -1120,6 +1212,15 @@ Node
     ValueT getFirstValue() const {return mChildMask.isOn(0) ? mTable[0].child->getFirstValue() : mTable[0].value;}
     ValueT getLastValue() const {return mChildMask.isOn(SIZE-1) ? mTable[SIZE-1].child->getLastValue() : mTable[SIZE-1].value;}
 
+    const ValueT& getValue(const Coord& ijk) const
+    {
+        const uint32_t n = CoordToOffset(ijk);
+        if (mChildMask.isOn(n)) {
+            return mTable[n].child->getValue(ijk);
+        }
+        return mTable[n].value;
+    }
+
     template<typename AccT>
     const ValueT& getValueAndCache(const Coord& ijk, AccT& acc) const
     {
@@ -1131,20 +1232,34 @@ Node
         return mTable[n].value;
     }
 
-    template<typename AccT>
-    void setValueAndCache(const Coord& ijk, const ValueT& value, AccT& acc)
+    void setValue(const Coord& ijk, const ValueT& value)
     {
         const uint32_t n = CoordToOffset(ijk);
-        ChildT* child = mChildMask.isOn(n) ? mTable[n].child : nullptr;
-        if (child == nullptr) {
+        ChildT* child = nullptr;
+        if (mChildMask.isOn(n)) {
+            child = mTable[n].child;
+        } else {
             child = new ChildT(ijk, mTable[n].value, mValueMask.isOn(n));
             mTable[n].child = child;
             mChildMask.setOn(n);
         }
-        if (child) {
-            acc.insert(ijk, child);
-            child->setValueAndCache(ijk, value, acc);
+        child->setValue(ijk, value);
+    }
+
+    template<typename AccT>
+    void setValueAndCache(const Coord& ijk, const ValueT& value, AccT& acc)
+    {
+        const uint32_t n = CoordToOffset(ijk);
+        ChildT* child = nullptr;
+        if (mChildMask.isOn(n)) {
+            child = mTable[n].child;
+        } else {
+            child = new ChildT(ijk, mTable[n].value, mValueMask.isOn(n));
+            mTable[n].child = child;
+            mChildMask.setOn(n);
         }
+        acc.insert(ijk, child);
+        child->setValueAndCache(ijk, value, acc);
     }
 
     template <typename NodeT>
@@ -1178,10 +1293,9 @@ Node
         }
     }
 
-    bool addChild(ChildT* child)
+    void addChild(ChildT*& child)
     {
-        assert(child);
-        if ((child->mOrigin & ~MASK) != this->mOrigin)  return false;
+        assert(child && (child->mOrigin & ~MASK) == this->mOrigin);
         const uint32_t n = CoordToOffset(child->mOrigin);
         if (mChildMask.isOn(n)) {
             delete mTable[n].child;
@@ -1189,7 +1303,26 @@ Node
             mChildMask.setOn(n);
         }
         mTable[n].child = child;
-        return true;
+        child = nullptr;
+    }
+
+    template <typename NodeT>
+    void addNode(NodeT*& node)
+    {
+        if (is_same<NodeT, ChildT>::value) {//resolved at compile-time
+            this->addChild(reinterpret_cast<ChildT*&>(node));
+        } else {
+            const uint32_t n = CoordToOffset(node->mOrigin);
+            ChildT* child = nullptr;
+            if (mChildMask.isOn(n)) {
+                child = mTable[n].child;
+            } else {
+                child = new ChildT(node->mOrigin, mTable[n].value, mValueMask.isOn(n));
+                mTable[n].child = child;
+                mChildMask.setOn(n);
+            }
+            child->addNode(node);
+        }
     }
 
     template <typename T>
@@ -1300,6 +1433,11 @@ Leaf
     ValueT getFirstValue() const {return mValues[0];}
     ValueT getLastValue() const {return mValues[SIZE-1];}
 
+    const ValueT& getValue(const Coord& ijk) const
+    {
+        return mValues[CoordToOffset(ijk)];
+    }
+
     template<typename AccT>
     const ValueT& getValueAndCache(const Coord& ijk, const AccT&) const
     {
@@ -1314,8 +1452,18 @@ Leaf
         mValues[n] = value;
     }
 
+    void setValue(const Coord& ijk, const ValueT& value)
+    {   
+        const uint32_t n = CoordToOffset(ijk);
+        mValueMask.setOn(n);
+        mValues[n] = value;
+    }
+
     template <typename NodeT>
     void getNodes(std::vector<NodeT*>&) { assert(false); }
+
+    template <typename NodeT>
+    void addNode(NodeT*&) {}
 
     template <typename NodeT>
     uint32_t nodeCount() const { assert(false); return 1;}
