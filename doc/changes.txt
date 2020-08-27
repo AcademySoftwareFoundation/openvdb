@@ -1059,8 +1059,8 @@ API changes:
 - Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
   including @b io::File::readGridPartial, @b points::initialize,
   @b points::uninitialize and @b util::PagedArray::pop_back.
-- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
-  in favor of @vdblink::ValueError ValueError@endlink.
+- Deprecated IllegalValueException in favor of
+  @vdblink::ValueError ValueError@endlink.
 - Changed the naming scheme for the
   @link OPENVDB_VERSION_NAME library namespace@endlink
   from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
