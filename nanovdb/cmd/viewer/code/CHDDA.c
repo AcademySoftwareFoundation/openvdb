@@ -135,7 +135,7 @@ CNANOVDB_INLINE boolean nanovdb_ZeroCrossing(CNANOVDB_CONTEXT cxt, nanovdb_Ray r
                                 nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min),
                                 nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max));
 
-    if (!hit)
+    if (!hit || ray.mT1 > 1000000.f)
         return CNANOVDB_FALSE;
 
     // intersect with levelset...
@@ -147,16 +147,16 @@ CNANOVDB_INLINE boolean nanovdb_ZeroCrossing(CNANOVDB_CONTEXT cxt, nanovdb_Ray r
 
 #if 0
 	HDDA hdda = HDDA_create(ray, nanovdb_ReadAccessor_getDim(cxt, CNANOVDB_ADDRESS(acc), CNANOVDB_DEREF(ijk), ray));
-	while (HDDA_step(CNANOVDB_ADDRESS(hdda)) && (--n > 0)) 
-	{	
-		CNANOVDB_DEREF(ijk) = nanovdb_Vec3fToCoord(vec3_add(ray.mEye, vec3_fmul((hdda.mT0 + 1.0f), ray.mDir)));	
+	while (HDDA_step(CNANOVDB_ADDRESS(hdda)) && (--n > 0))
+	{
+		CNANOVDB_DEREF(ijk) = nanovdb_Vec3fToCoord(vec3_add(ray.mEye, vec3_fmul((hdda.mT0 + 1.0f), ray.mDir)));
 		HDDA_update(CNANOVDB_ADDRESS(hdda), ray, nanovdb_ReadAccessor_getDim(cxt, CNANOVDB_ADDRESS(acc), CNANOVDB_DEREF(ijk), ray));
 		if ( hdda.mDim > 1 || !nanovdb_ReadAccessor_isActive(acc, CNANOVDB_DEREF(ijk) ) )
 			continue;
-		
-		while(HDDA_step(CNANOVDB_ADDRESS(hdda)) && nanovdb_ReadAccessor_isActive(acc, nanovdb_Vec3iToCoord(hdda.mVoxel)) ) 
-		{ 
-			// in the narrow band			
+
+		while(HDDA_step(CNANOVDB_ADDRESS(hdda)) && nanovdb_ReadAccessor_isActive(acc, nanovdb_Vec3iToCoord(hdda.mVoxel)) )
+		{
+			// in the narrow band
 			CNANOVDB_DEREF(v) = nanovdb_ReadAccessor_getValue(cxt, CNANOVDB_ADDRESS(acc), nanovdb_Vec3iToCoord(hdda.mVoxel));
 			if (CNANOVDB_DEREF(v)*v0 < 0)
 			{

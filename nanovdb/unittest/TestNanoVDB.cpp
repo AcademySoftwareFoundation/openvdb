@@ -16,6 +16,14 @@
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
 #include <nanovdb/CNanoVDB.h>
+#include "../examples/ex_util/CpuTimer.h"
+
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::Coord& b)
+{
+    os << "(" << b[0] << "," << b[1] << "," << b[2] << ")";
+    return os;
+}
 
 // The fixture for testing class.
 class TestNanoVDB : public ::testing::Test
@@ -50,6 +58,7 @@ protected:
     {
     }
 */
+    nanovdb::CpuTimer<> mTimer;
 }; // TestNanoVDB
 
 TEST_F(TestNanoVDB, Basic)
@@ -247,6 +256,7 @@ TEST_F(TestNanoVDB, CoordBBox)
         for (int i = bbox.min()[0]; i <= bbox.max()[0]; ++i) {
             for (int j = bbox.min()[1]; j <= bbox.max()[1]; ++j) {
                 for (int k = bbox.min()[2]; k <= bbox.max()[2]; ++k) {
+                    EXPECT_TRUE(bbox.isInside(*iter));
                     EXPECT_TRUE(iter);
                     const auto &ijk = *iter;// note, copy by reference
                     EXPECT_EQ( ijk[0] , i);
@@ -976,14 +986,11 @@ TEST_F(TestNanoVDB, GridBuilderBasicDense)
         auto                        srcAcc = builder.getAccessor();
         const nanovdb::CoordBBox    bbox(nanovdb::Coord(0), nanovdb::Coord(100));
         auto                        func = [](const nanovdb::Coord&) { return 1.0f; };
+        //auto                        func = [](const nanovdb::Coord&, float &v) { v = 1.0f; return true; };
         builder(func, bbox);
-        for (nanovdb::Coord ijk = bbox[0]; ijk[0] <= bbox[1][0]; ++ijk[0]) {
-            for (ijk[1] = bbox[0][1]; ijk[1] <= bbox[1][1]; ++ijk[1]) {
-                for (ijk[2] = bbox[0][2]; ijk[2] <= bbox[1][2]; ++ijk[2]) {
-                    EXPECT_EQ(1.0f, srcAcc.getValue(ijk));
-                    EXPECT_TRUE(srcAcc.isActive(ijk));
-                }
-            }
+        for (auto ijk = bbox.begin(); ijk; ++ijk) {
+            EXPECT_EQ(1.0f, srcAcc.getValue(*ijk));
+            EXPECT_TRUE(srcAcc.isActive(*ijk));
         }
         auto handle = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test", nanovdb::GridClass::LevelSet);
         EXPECT_TRUE(handle);
@@ -1098,8 +1105,10 @@ TEST_F(TestNanoVDB, GridBuilderSphere)
     nanovdb::GridBuilder<float> builder(sphere.background());
     auto                        srcAcc = builder.getAccessor();
 
-    const nanovdb::CoordBBox bbox(nanovdb::Coord(0), nanovdb::Coord(100));
+    const nanovdb::CoordBBox bbox(nanovdb::Coord(-100), nanovdb::Coord(100));
+    //mTimer.start("GridBulder Sphere");
     builder(sphere, bbox);
+    //mTimer.stop();
 
     auto handle = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test", nanovdb::GridClass::LevelSet);
     EXPECT_TRUE(handle);

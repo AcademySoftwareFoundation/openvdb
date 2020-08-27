@@ -98,6 +98,7 @@ public:
     /// @brief Move copy assignment operation
     CudaDeviceBuffer& operator=(CudaDeviceBuffer&& other) noexcept
     {
+        clear();
         mSize = other.mSize;
         mCpuData = other.mCpuData;
         mGpuData = other.mGpuData;
@@ -186,9 +187,10 @@ inline void CudaDeviceBuffer::deviceDownload(void* stream, bool sync) const
 
 inline void CudaDeviceBuffer::clear()
 {
-    cudaCheck(cudaFree(mGpuData));
-    cudaCheck(cudaFreeHost(mCpuData));
-
+    if (mGpuData)
+        cudaCheck(cudaFree(mGpuData));
+    if (mCpuData)
+        cudaCheck(cudaFreeHost(mCpuData));
     mCpuData = mGpuData = nullptr;
     mSize = 0;
 } // CudaDeviceBuffer::clear

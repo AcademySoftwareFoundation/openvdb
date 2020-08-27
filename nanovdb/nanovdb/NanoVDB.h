@@ -267,7 +267,7 @@ __hostdev__ inline bool isApproxZero(const Type& x)
 template<typename Type>
 __hostdev__ inline Type Min(Type a, Type b)
 {
-    return (a < b)?a:b;
+    return (a < b) ? a : b;
 }
 __hostdev__ inline int32_t Min(int32_t a, int32_t b)
 {
@@ -494,6 +494,9 @@ public:
     // @brief Return a new instance with coordinates left-shifted by the given unsigned integer.
     __hostdev__ Coord operator<<(IndexType n) const { return Coord(mVec[0] << n, mVec[1] << n, mVec[2] << n); }
 
+    // @brief Return a new instance with coordinates right-shifted by the given unsigned integer.
+    __hostdev__ Coord operator>>(IndexType n) const { return Coord(mVec[0] >> n, mVec[1] >> n, mVec[2] >> n); }
+
     /// @brief Return true is this Coord is Lexicographiclly less than the given Coord.
     __hostdev__ bool operator<(const Coord& rhs) const
     {
@@ -535,19 +538,28 @@ public:
     }
 
     /// @brief Perform a component-wise minimum with the other Coord.
-    __hostdev__ void minComponent(const Coord& other)
+    __hostdev__ Coord& minComponent(const Coord& other)
     {
         if (other[0] < mVec[0]) mVec[0] = other[0];
         if (other[1] < mVec[1]) mVec[1] = other[1];
         if (other[2] < mVec[2]) mVec[2] = other[2];
+        return *this;
     }
 
     /// @brief Perform a component-wise maximum with the other Coord.
-    __hostdev__ void maxComponent(const Coord& other)
+    __hostdev__ Coord& maxComponent(const Coord& other)
     {
         if (other[0] > mVec[0]) mVec[0] = other[0];
         if (other[1] > mVec[1]) mVec[1] = other[1];
         if (other[2] > mVec[2]) mVec[2] = other[2];
+        return *this;
+    }
+
+    /// Return true if any of the components of @a a are smaller than the
+    /// corresponding components of @a b.
+    __hostdev__ static inline bool lessThan(const Coord& a, const Coord& b)
+    {
+        return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
 
     /// @brief Return the largest integer coordinates that are not greater
@@ -817,7 +829,8 @@ struct BBox;
 
 /// @brief Partial template specialization for floating point coordinate types.
 ///
-/// @note If min = max the bounding box is assumed to be empty and the dimenion is zero.
+/// @note Min is inclusive and max is exclusive. If min = max the dimension of
+///       bounding box is is zero and therefore it is also empty.
 template<typename Vec3T>
 struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
 {
@@ -831,6 +844,10 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
                                             mCoord[0][2] >= mCoord[1][2]; }
     __hostdev__ operator bool() const { return !this->empty(); }
     __hostdev__ Vec3T dim() const { return this->empty() ? Vec3T(0) : this->max() - this->min(); }
+    __hostdev__ bool isInside(const Vec3T &p) const {
+        return p[0] > mCoord[0][0] && p[1] > mCoord[0][1] && p[2] > mCoord[0][2] &&
+               p[0] < mCoord[1][0] && p[1] < mCoord[1][1] && p[2] < mCoord[1][2];
+    }
 };
 
 /// @brief Partial template specialization for integer coordinate types
@@ -864,11 +881,26 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
     __hostdev__ BBox() : BaseT(CoordT::max(), CoordT::min()) {}
     __hostdev__ BBox(const CoordT& min, const CoordT& max) : BaseT(min, max) {}
+    template <typename SplitT>
+    __hostdev__ BBox(BBox &other, const SplitT&) : BaseT(other.mCoord[0], other.mCoord[1]) {
+        assert(this->is_divisible());
+        const int n = MaxIndex(this->dim());
+        mCoord[1][n] = (mCoord[0][n] + mCoord[1][n]) >> 1;
+        other.mCoord[0][n] = mCoord[1][n] + 1;
+    }
+    __hostdev__ bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] && 
+                                                   mCoord[0][1] < mCoord[1][1] && 
+                                                   mCoord[0][2] < mCoord[1][2]; }
     __hostdev__ bool empty() const { return mCoord[0][0] > mCoord[1][0] ||
                                             mCoord[0][1] > mCoord[1][1] ||
                                             mCoord[0][2] > mCoord[1][2]; }
     __hostdev__ operator bool() const { return !this->empty(); }
     __hostdev__ CoordT dim() const {return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1);}
+    __hostdev__ bool isInside(const CoordT &p) const { return !(CoordT::lessThan(p,this->min()) || CoordT::lessThan(this->max(),p)); }
+    __hostdev__ bool isInside(const BBox& b) const 
+    {
+        return !(CoordT::lessThan(b.min(),this->min()) || CoordT::lessThan(this->max(),b.max()));
+    }
     template <typename RealT>
     __hostdev__  BBox<Vec3<RealT>> asReal() const {
         static_assert(is_floating_point<RealT>::value, "Expected a floating point coordinate");
@@ -1297,7 +1329,7 @@ public:
     __hostdev__ const uint64_t& activeVoxelCount() const { return this->tree().activeVoxelCount(); }
 
     /// @brief Methods related to the classification of this grid
-    __hostdev__ bool      valid() const { return DataType::mMagic == NANOVDB_MAGIC_NUMBER; }
+    __hostdev__ bool      isValid() const { return DataType::mMagic == NANOVDB_MAGIC_NUMBER; }
     __hostdev__ const GridType&  gridType() const { return DataType::mGridType; }
     __hostdev__ const GridClass& gridClass() const { return DataType::mGridClass; }
     __hostdev__ bool      isLevelSet() const { return DataType::mGridClass == GridClass::LevelSet; }
@@ -2393,6 +2425,7 @@ class GridMetaData
     using GridT = NanoGrid<int>;
     __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>( this ); }
 public:
+    __hostdev__ bool isValid() const { return this->grid().isValid(); }
     __hostdev__ const char* gridName() const { return this->grid().gridName(); }
     __hostdev__ GridType gridType() const { return this->grid().gridType(); }
     __hostdev__ GridClass gridClass() const { return this->grid().gridClass(); }
