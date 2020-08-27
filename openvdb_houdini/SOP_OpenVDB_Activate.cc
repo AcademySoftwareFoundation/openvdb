@@ -522,7 +522,7 @@ SOP_VDBActivate::Cache::getIndexSpaceBounds(OP_Context &context,
             index_bbox = CoordBBox(MINPOS(t), MAXPOS(t));
             break;
         default:
-            UT_ASSERT(!"Invalid region type");
+            UT_ASSERT("Invalid region type" == nullptr);
             break;
     }
     return index_bbox;
@@ -543,7 +543,7 @@ sopXlateOperation(OPERATION_NAMES operation)
             return GEO_PrimVDB::ACTIVATE_COPY;
     }
 
-    UT_ASSERT(!"Unhandled operation");
+    UT_ASSERT("Unhandled operation" == nullptr);
     return GEO_PrimVDB::ACTIVATE_UNION;
 }
 
