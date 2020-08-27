@@ -110,6 +110,8 @@ public:
     void testStealNode();
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     void testNodeCount();
+#endif
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
     void testActiveTileCount();
 #endif
     void testRootNode();
