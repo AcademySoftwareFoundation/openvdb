@@ -107,9 +107,6 @@ public:
         return dt.seconds();
     }
 
-    /// @brief This method is identical to milliseconds() - deprecated
-    OPENVDB_DEPRECATED inline double delta() const { return this->milliseconds(); }
-
     inline std::string time() const
     {
         const double msec = this->milliseconds();

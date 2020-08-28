@@ -210,9 +210,6 @@ public:
         const Metadata* metadata = nullptr,
         const ScopedRegistryLock* lock = nullptr);
 
-    static OPENVDB_DEPRECATED Ptr create(const NamePair& type, Index length,
-        Index stride, bool constantStride, const ScopedRegistryLock* lock);
-
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
     /// Clear the attribute type registry.
