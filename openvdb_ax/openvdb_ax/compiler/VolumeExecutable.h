@@ -95,29 +95,6 @@ public:
 
     ////////////////////////////////////////////////////////
 
-    // @brief deprecated methods
-    OPENVDB_DEPRECATED void
-    execute(openvdb::GridPtrVec& grids,
-        const IterType iter,
-        const bool create) const
-    {
-        VolumeExecutable copy(*this);
-        copy.setValueIterator(iter);
-        copy.setCreateMissing(create);
-        copy.execute(grids);
-    }
-
-    OPENVDB_DEPRECATED void
-    execute(openvdb::GridPtrVec& grids,
-        const IterType iter) const
-    {
-        VolumeExecutable copy(*this);
-        copy.setValueIterator(iter);
-        copy.execute(grids);
-    }
-
-    ////////////////////////////////////////////////////////
-
     // foward declaration of settings for this executable
     struct Settings;
 
