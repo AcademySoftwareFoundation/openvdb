@@ -18,6 +18,10 @@ Houdini:
 @par
 Build:
 - Removed the Makefiles.
+- Re-organised the repository layout such that each independent library
+  is able to be configured against an existing installation of OpenVDB
+  without ambiguous include paths.
+
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
