@@ -150,9 +150,8 @@ public:
     virtual AttributeArray::Ptr copy() const = 0;
 
     /// Return a copy of this attribute.
-    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    [[deprecated("In-memory compression no longer supported, use AttributeArray::copy() instead")]]
 #endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
@@ -226,11 +225,10 @@ public:
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
-    /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
     // Windows does not allow base classes to be easily deprecated.
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    [[deprecated("From ABI 6 on, use copyValues() with source-target index pairs")]]
 #endif
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
@@ -278,16 +276,14 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// @deprecated Previously this compressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    [[deprecated("Previously this compressed the attribute array, now it does nothing")]]
 #endif
     virtual bool compress() = 0;
-    /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    [[deprecated("Previously this uncompressed the attribute array, now it does nothing")]]
 #endif
     virtual bool decompress() = 0;
 
@@ -583,8 +579,8 @@ public:
     /// It is not thread-safe for write.
     TypedAttributeArray(const TypedAttributeArray&);
     /// Deep copy constructor.
-    /// @deprecated Use copy-constructor without unused bool parameter
-    OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
+    [[deprecated("Use copy-constructor without unused bool parameter")]]
+    TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
 #else
     /// Deep copy constructor.
     /// @note This method is not thread-safe for reading or writing, use
@@ -607,8 +603,8 @@ public:
 
     /// Return a copy of this attribute.
     /// @note This method is thread-safe.
-    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
-    OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
+    [[deprecated("In-memory compression no longer supported, use AttributeArray::copy() instead")]]
+    AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true,
@@ -705,7 +701,7 @@ public:
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-    OPENVDB_DEPRECATED
+    [[deprecated("From ABI 6 on, use copyValues() with source-target index pairs")]]
 #endif
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
@@ -732,9 +728,11 @@ public:
     static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
-    OPENVDB_DEPRECATED bool compress() override;
+    [[deprecated("Previously this compressed the attribute array, now it does nothing")]]
+    bool compress() override;
     /// Uncompress the attribute array.
-    OPENVDB_DEPRECATED bool decompress() override;
+    [[deprecated("Previously this uncompressed the attribute array, now it does nothing")]]
+    bool decompress() override;
 
     /// Read attribute data from a stream.
     void read(std::istream&) override;
