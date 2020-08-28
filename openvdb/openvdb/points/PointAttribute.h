@@ -538,49 +538,6 @@ inline void compactAttributes(PointDataTreeT& tree)
 ////////////////////////////////////////
 
 
-template <typename PointDataTreeT>
-OPENVDB_DEPRECATED inline void
-appendAttribute(PointDataTreeT& tree,
-                const Name& name,
-                const NamePair& type,
-                const Index strideOrTotalSize,
-                const bool constantStride,
-                Metadata::Ptr metaDefaultValue,
-                const bool hidden = false,
-                const bool transient = false)
-{
-    // default metadata value must now be provided as a raw pointer
-    appendAttribute(tree, name, type, strideOrTotalSize, constantStride,
-        metaDefaultValue.get(), hidden, transient);
-}
-
-
-template <typename ValueType,
-          typename CodecType = NullCodec,
-          typename PointDataTreeT = PointDataTree>
-OPENVDB_DEPRECATED inline void
-appendAttribute(PointDataTreeT& tree,
-                const std::string& name,
-                const ValueType& uniformValue,
-                const Index strideOrTotalSize,
-                const bool constantStride,
-                Metadata::Ptr metaDefaultValue,
-                const bool hidden = false,
-                const bool transient = false)
-{
-    // default metadata value must now be provided as a typed raw pointer
-    TypedMetadata<ValueType>* metadata = nullptr;
-    if (metaDefaultValue) {
-        metadata = dynamic_cast<TypedMetadata<ValueType>*>(metaDefaultValue.get());
-    }
-    appendAttribute<ValueType, CodecType>(tree, name, uniformValue, strideOrTotalSize, constantStride,
-        metadata, hidden, transient);
-}
-
-
-////////////////////////////////////////
-
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
