@@ -13,6 +13,9 @@ Version 7.1.1 - In Development
 
     Build:
     - Removed the Makefiles.
+    - Re-organised the repository layout such that each independent library
+      is able to be configured against an existing installation of OpenVDB
+      without ambiguous include paths.
 
 Version 7.1.0 - August 13, 2020
 
