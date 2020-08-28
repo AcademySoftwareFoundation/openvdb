@@ -11,7 +11,7 @@ cmakelists="
 cmake_minimum_required(VERSION 3.12)
 project(TestInstall LANGUAGES CXX)
 find_package(OpenVDB REQUIRED COMPONENTS openvdb)
-add_executable(test_vdb_print \"../openvdb/cmd/openvdb_print.cc\")
+add_executable(test_vdb_print \"../openvdb/openvdb/cmd/openvdb_print.cc\")
 target_link_libraries(test_vdb_print OpenVDB::openvdb)
 "
 mkdir tmp
