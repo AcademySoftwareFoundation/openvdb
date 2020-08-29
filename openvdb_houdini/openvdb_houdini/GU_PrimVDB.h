@@ -57,7 +57,7 @@ class OPENVDB_HOUDINI_API GU_PrimVDB : public GEO_PrimVDB
 protected:
     /// NOTE: Primitives should not be deleted directly.  They are managed
     ///       by the GA_PrimitiveList and the stash.
-    virtual ~GU_PrimVDB() {}
+    ~GU_PrimVDB() override {}
 
 public:
     /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
@@ -66,12 +66,12 @@ public:
     {}
 
     /// Report approximate memory usage.
-    virtual int64 getMemoryUsage() const;
+    int64 getMemoryUsage() const override;
 
     /// Count memory usage using a UT_MemoryCounter in order to count
     /// shared memory correctly.
     /// NOTE: This should always include sizeof(*this).
-    virtual void countMemory(UT_MemoryCounter &counter) const;
+    void countMemory(UT_MemoryCounter &counter) const override;
 
 #ifndef SESI_OPENVDB
     /// Allows you to find out what this primitive type was named.
@@ -82,7 +82,7 @@ public:
     static void         registerMyself(GA_PrimitiveFactory *factory);
 #endif
 
-    virtual const GA_PrimitiveDefinition &getTypeDef() const
+    const GA_PrimitiveDefinition &getTypeDef() const override
     {
         UT_ASSERT(theDefinition);
         return *theDefinition;
@@ -90,9 +90,9 @@ public:
 
     // Conversion Methods
 
-    virtual GEO_Primitive       *convert(GU_ConvertParms &parms,
-                                         GA_PointGroup *usedpts = 0);
-    virtual GEO_Primitive       *convertNew(GU_ConvertParms &parms);
+    GEO_Primitive               *convert(GU_ConvertParms &parms,
+                                         GA_PointGroup *usedpts = 0) override;
+    GEO_Primitive               *convertNew(GU_ConvertParms &parms) override;
 
     /// Convert all GEO_PrimVolume primitives in geometry to
     /// GEO_PrimVDB, preserving prim/vertex/point attributes (and prim/point
@@ -165,7 +165,7 @@ public:
                             GU_Detail &dst_geo,
                             const GEO_PrimVolume &src_vol);
 
-    virtual void        normal(NormalComp &output) const;
+    void                normal(NormalComp &output) const override;
 
     /// @brief Transfer any metadata associated with this primitive's
     /// VDB grid to primitive attributes.
