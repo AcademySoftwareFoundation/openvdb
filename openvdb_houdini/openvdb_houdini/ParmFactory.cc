@@ -966,6 +966,7 @@ public:
     SOP_NodeParms* allocParms() const override { return new SOP_NodeParmsOptions{mParms}; }
     SOP_NodeCache* allocCache() const override { return mAllocator(); }
 
+    void setName(const std::string& name) { mName = name; }
     UT_StringHolder name() const override { return mName; }
     CookMode cookMode(const SOP_NodeParms*) const override { return mCookMode; }
 
@@ -1056,7 +1057,11 @@ struct OpFactory::Impl
 
         if (mObsoleteParms != nullptr) op->setObsoleteTemplates(mObsoleteParms);
 
-        if (mVerb) SOP_NodeVerb::registerVerb(mVerb);
+        if (mVerb) {
+            // reset the name in case the internal name has changed
+            mVerb->setName(mName);
+            SOP_NodeVerb::registerVerb(mVerb);
+        }
 
         mergeSpareData(op->spareData(), mSpareData);
 

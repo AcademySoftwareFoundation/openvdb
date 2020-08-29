@@ -51,7 +51,7 @@ variables may be provided to tell this module where to look.
 # Find the Maya installation and use Maya's CMake to initialize
 # the Maya lib
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 # Monitoring <PackageName>_ROOT variables
 if(POLICY CMP0074)
