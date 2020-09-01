@@ -37,7 +37,6 @@ endif()
 find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
 
 set(OPENVDB_TEST_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
   CppUnit::cppunit
 )
 
@@ -54,7 +53,6 @@ endif()
 ##### VDB unit tests
 
 set(UNITTEST_SOURCE_FILES
-  main.cc
   TestAttributeArray.cc
   TestAttributeArrayString.cc
   TestAttributeGroup.cc
@@ -155,7 +153,9 @@ set(UNITTEST_SOURCE_FILES
   TestVolumeToSpheres.cc
 )
 
-add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
+add_library(vdb_test_shared ${UNITTEST_SOURCE_FILES})
+
+add_executable(vdb_test main.cc)
 
 if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   # Blosc is a hidden dependency for the core library (not exposed in headers)
@@ -163,10 +163,20 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   # blosc relevant unit tests
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
   list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
-  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
+  target_compile_definitions(vdb_test_shared PRIVATE "-DOPENVDB_USE_BLOSC")
 endif()
 
+target_include_directories(vdb_test_shared
+  PUBLIC ../../
+)
+
+target_link_libraries(vdb_test_shared
+  ${OPENVDB_TEST_DEPENDENT_LIBS}
+)
+
 target_link_libraries(vdb_test
+  vdb_test_shared
+  ${OPENVDB_LIB}
   ${OPENVDB_TEST_DEPENDENT_LIBS}
 )
 
