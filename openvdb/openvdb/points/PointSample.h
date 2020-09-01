@@ -156,11 +156,13 @@ template<typename T> struct CompatibleTypes<
     ValueMask, T> {                     enum { value = CompatibleTypes<bool, T>::value }; };
 
 
-// Ability to access the Staggered template parameter from tools::Sampler<Order, Staggered>
+// Ability to access the Order and Staggered template parameter from tools::Sampler<Order, Staggered>
 template <typename T> struct SamplerTraits {
+    static const size_t Order = 0;
     static const bool Staggered = false;
 };
 template <size_t T0, bool T1> struct SamplerTraits<tools::Sampler<T0, T1>> {
+    static const size_t Order = T0;
     static const bool Staggered = T1;
 };
 
@@ -243,7 +245,14 @@ private:
     struct SamplerWrapper
     {
         using ValueType = ValueT;
+        using SourceValueType = typename SourceGridT::ValueType;
         using SourceAccessorT = typename SourceGridT::ConstAccessor;
+
+        // can only sample from a bool or mask grid using a PointSampler
+        static const bool SourceIsBool = std::is_same<SourceValueType, bool>::value ||
+            std::is_same<SourceValueType, ValueMask>::value;
+        static const bool OrderIsZero = SamplerTraits<GridSamplerT>::Order == 0;
+        static const bool IsValid = !SourceIsBool || OrderIsZero;
 
         SamplerWrapper(const SourceGridT& sourceGrid, const SamplerT& sampler)
             : mAccessor(sourceGrid.getConstAccessor())
@@ -255,9 +264,17 @@ private:
             : mAccessor(other.mAccessor.tree())
             , mSampler(other.mSampler) { }
 
-        inline ValueT sample(const Vec3d& position) const {
+        template <bool IsValidT = IsValid>
+        inline typename std::enable_if<IsValidT, ValueT>::type
+        sample(const Vec3d& position) const {
             return mSampler.template sample<ValueT, GridSamplerT, SourceAccessorT>(
                 mAccessor, position);
+        }
+
+        template <bool IsValidT = IsValid>
+        inline typename std::enable_if<!IsValidT, ValueT>::type
+        sample(const Vec3d& /*position*/) const {
+            OPENVDB_THROW(RuntimeError, "Cannot sample bool grid with BoxSampler or QuadraticSampler.");
         }
 
     private:
@@ -341,7 +358,11 @@ public:
     template <typename SourceGridT, typename TargetValueT = typename SourceGridT::ValueType>
     inline void sample(const SourceGridT& sourceGrid, Index targetIndex)
     {
-        if (mOrder == 0) {
+        using SourceValueType = typename SourceGridT::ValueType;
+        static const bool SourceIsMask = std::is_same<SourceValueType, bool>::value ||
+            std::is_same<SourceValueType, ValueMask>::value;
+
+        if (SourceIsMask || mOrder == 0) {
             resolveStaggered<SourceGridT, TargetValueT, 0>(sourceGrid, targetIndex);
         } else if (mOrder == 1) {
             resolveStaggered<SourceGridT, TargetValueT, 1>(sourceGrid, targetIndex);

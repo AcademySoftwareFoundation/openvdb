@@ -457,6 +457,26 @@ doResampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interr
 }
 
 
+template<typename ValueType>
+struct HalfWidthOp {
+    static ValueType eval(const ValueType& background, const Vec3d& voxelSize)
+    {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        ValueType result(background * (1.0 / voxelSize[0]));
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return result;
+    }
+}; // struct HalfWidthOp
+
+template<>
+struct HalfWidthOp<bool> {
+    static bool eval(const bool& background, const Vec3d& /*voxelSize*/)
+    {
+        return background;
+    }
+}; // struct HalfWidthOp<bool>
+
+
 template<typename Sampler, typename Interrupter, typename GridType>
 inline void
 resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrupter)
@@ -476,11 +496,9 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
         using ValueT = typename GridType::ValueType;
         const bool outIsLevelSet = outGrid.getGridClass() == openvdb::GRID_LEVEL_SET;
 
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         const ValueT halfWidth = outIsLevelSet
-            ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
-            : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0]));
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            ? HalfWidthOp<ValueT>::eval(outGrid.background(), outGrid.voxelSize())
+            : HalfWidthOp<ValueT>::eval(inGrid.background(),  inGrid.voxelSize());
 
         typename GridType::Ptr tempGrid;
         try {
