@@ -3,17 +3,21 @@
 
 ////////////////////////////////////////////////////////
 
+#if defined(CNANOVDB_COMPILER_GLSL)
+#line 7
+#endif
+
 CNANOVDB_INLINE vec3 nanovdb_CoordToVec3f(const nanovdb_Coord x)
 {
-    return CNANOVDB_MAKE_VEC3((float)(x.mVec[0]), (float)(x.mVec[1]), (float)(x.mVec[2]));
+    return CNANOVDB_MAKE_VEC3(CNANOVDB_MAKE(float)(x.mVec[0]), CNANOVDB_MAKE(float)(x.mVec[1]), CNANOVDB_MAKE(float)(x.mVec[2]));
 }
 
 CNANOVDB_INLINE nanovdb_Coord nanovdb_Vec3fToCoord(const vec3 p)
 {
     nanovdb_Coord x;
-    x.mVec[0] = (int32_t)(floor(p.x));
-    x.mVec[1] = (int32_t)(floor(p.y));
-    x.mVec[2] = (int32_t)(floor(p.z));
+    x.mVec[0] = CNANOVDB_MAKE(int32_t)(floor(p.x));
+    x.mVec[1] = CNANOVDB_MAKE(int32_t)(floor(p.y));
+    x.mVec[2] = CNANOVDB_MAKE(int32_t)(floor(p.z));
     return x;
 }
 
@@ -116,6 +120,7 @@ CNANOVDB_INLINE nanovdb_ReadAccessor
 nanovdb_ReadAccessor_create()
 {
     nanovdb_ReadAccessor acc;
+    acc.mKey.mVec[0] = acc.mKey.mVec[1] = acc.mKey.mVec[2] = 0;
     acc.mNodeIndex[0] = acc.mNodeIndex[1] = acc.mNodeIndex[2] = -1;
     return acc;
 }
@@ -215,7 +220,7 @@ CNANOVDB_INLINE nanovdb_Ray nanovdb_Ray_worldToIndexF(nanovdb_Ray ray, const nan
     nanovdb_Ray result;
     const vec3  eye = nanovdb_Grid_worldToIndexF(grid, ray.mEye);
     const vec3  dir = nanovdb_Grid_worldToIndexDirF(grid, ray.mDir);
-    const float len = vec3_length(dir), invLength = (float)(1) / len;
+    const float len = vec3_length(dir), invLength = CNANOVDB_MAKE(float)(1) / len;
     float       t1 = ray.mT1;
     if (t1 < MaxFloat)
         t1 *= len;

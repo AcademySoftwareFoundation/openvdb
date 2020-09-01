@@ -4,6 +4,7 @@
 ////////////////////////////////////////////////////////
 
 #if defined(CNANOVDB_COMPILER_GLSL)
+#line 7
 
 layout(std430, binding = 0) restrict readonly buffer nanovdb_Node0_Block
 {
@@ -39,17 +40,17 @@ kGridData;
 #else
 struct nanovdb_Node0_Block
 {
-    CNANOVDB_GLOBAL const struct _nanovdb_Node0_float* nodes;
+    CNANOVDB_GLOBAL const nanovdb_Node0_float* nodes;
 };
 
 struct nanovdb_Node1_Block
 {
-    CNANOVDB_GLOBAL const struct _nanovdb_Node1_float* nodes;
+    CNANOVDB_GLOBAL const nanovdb_Node1_float* nodes;
 };
 
 struct nanovdb_Node2_Block
 {
-    CNANOVDB_GLOBAL const struct _nanovdb_Node2_float* nodes;
+    CNANOVDB_GLOBAL const nanovdb_Node2_float* nodes;
 };
 
 struct nanovdb_Root_Block

@@ -134,12 +134,19 @@ struct RenderLevelSetRgba32fFn
                 if (params.useGround > 0) {
                     float wGroundT = (params.groundHeight - wRayEye[1]) / wRayDir[1];
                     if (wGroundT > 0.f) {
-                        Vec3T wGroundPos = wRayEye + wGroundT * wRayDir;
-                        Vec3T iGroundPos = grid->worldToIndexF(wGroundPos);
+                        const Vec3T wGroundPos = wRayEye + wGroundT * wRayDir;
+                        const Vec3T iGroundPos = grid->worldToIndexF(wGroundPos);
+                        const Vec3T iGroundNormal = Vec3T(0,1,0);
 
                         rayTraceGround(wGroundT, params.groundFalloff, wGroundPos, wRayDir[1], groundIntensity, groundMix);
 
                         groundMix *= params.useGround;
+
+                        if (params.useOcclusion > 0) {
+                            RayT iOccRay(iGroundPos, lambertNoTangent(iGroundNormal, randVar1, randVar2));
+                            if (nanovdb::ZeroCrossing(iOccRay, acc, ijk, v0, t))
+                                groundIntensity = groundIntensity * (1.0f - params.useOcclusion);
+                        }
 
                         if (params.useShadows > 0) {
                             RayT iShadowRay(iGroundPos, iLightDir);

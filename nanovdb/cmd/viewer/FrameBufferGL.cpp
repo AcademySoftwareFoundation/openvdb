@@ -382,7 +382,7 @@ bool FrameBufferGL::genTextureGL(int w, int h, GLenum internalFormat)
     NANOVDB_GL_CHECKERRORS();
 
     glBindTexture(GL_TEXTURE_2D, mTexture);
-    if (glIsTexture(mTexture) == GL_FALSE)
+    if (!mTexture)
         throw "Error: Unable to create texture";
 
     NANOVDB_GL_CHECKERRORS();

@@ -411,7 +411,7 @@ inline __hostdev__ double Sqrt(double x)
 template<typename Vec3T>
 __hostdev__ inline int MinIndex(const Vec3T& v)
 {
-#if 1
+#if 0
     static const int hashTable[8] = {2, 1, 9, 1, 2, 9, 0, 0}; //9 are dummy values
     const int        hashKey = ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]); // ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -425,9 +425,15 @@ __hostdev__ inline int MinIndex(const Vec3T& v)
 template<typename Vec3T>
 __hostdev__ inline int MaxIndex(const Vec3T& v)
 {
+#if 0
     static const int hashTable[8] = {2, 1, 9, 1, 2, 9, 0, 0}; //9 are dummy values
     const int        hashKey = ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]); // ?*4+?*2+?*1
     return hashTable[hashKey];
+#else
+    if (v[0] > v[1] && v[0] > v[2]) return 0;
+    if (v[1] > v[2]) return 1;
+    else return 2;
+#endif
 }
 
 // round up byteSize to the nearest wordSize. E.g. to align to machine word: AlignUp<sizeof(size_t)(n)
@@ -610,6 +616,7 @@ public:
     {
     }
     __hostdev__ bool operator==(const Vec3& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2]; }
+    __hostdev__ bool operator!=(const Vec3& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2]; }
     template<typename Vec3T>
     __hostdev__ Vec3& operator=(const Vec3T& rhs)
     {
@@ -798,6 +805,7 @@ struct BaseBBox
 {
     Vec3T mCoord[2];
     __hostdev__ bool  operator==(const BaseBBox& rhs) const { return mCoord[0] == rhs.mCoord[0] && mCoord[1] == rhs.mCoord[1]; };
+    __hostdev__ bool  operator!=(const BaseBBox& rhs) const { return mCoord[0] != rhs.mCoord[0] || mCoord[1] != rhs.mCoord[1]; };
     __hostdev__ const Vec3T& operator[](int i) const { return mCoord[i]; }
     __hostdev__ Vec3T& operator[](int i) { return mCoord[i]; }
     __hostdev__ Vec3T& min() { return mCoord[0]; }
@@ -842,7 +850,6 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
     __hostdev__ bool empty() const { return mCoord[0][0] >= mCoord[1][0] ||
                                             mCoord[0][1] >= mCoord[1][1] ||
                                             mCoord[0][2] >= mCoord[1][2]; }
-    __hostdev__ operator bool() const { return !this->empty(); }
     __hostdev__ Vec3T dim() const { return this->empty() ? Vec3T(0) : this->max() - this->min(); }
     __hostdev__ bool isInside(const Vec3T &p) const {
         return p[0] > mCoord[0][0] && p[1] > mCoord[0][1] && p[2] > mCoord[0][2] &&
@@ -894,7 +901,6 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     __hostdev__ bool empty() const { return mCoord[0][0] > mCoord[1][0] ||
                                             mCoord[0][1] > mCoord[1][1] ||
                                             mCoord[0][2] > mCoord[1][2]; }
-    __hostdev__ operator bool() const { return !this->empty(); }
     __hostdev__ CoordT dim() const {return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1);}
     __hostdev__ bool isInside(const CoordT &p) const { return !(CoordT::lessThan(p,this->min()) || CoordT::lessThan(this->max(),p)); }
     __hostdev__ bool isInside(const BBox& b) const 
@@ -944,10 +950,8 @@ public:
     public:
       __hostdev__ Iterator() : mPos(Mask::SIZE), mParent(nullptr) {}
       __hostdev__ Iterator(uint32_t pos, const Mask* parent) : mPos(pos), mParent(parent) {}
-      //__hostdev__ bool operator!=(const Iterator &iter) const {return mPos != iter.mPos;}
       Iterator& operator=(const Iterator&) = default;
       __hostdev__ uint32_t operator*() const { return mPos; }
-      //__hostdev__ uint32_t pos() const { return mPos; }
       __hostdev__ operator bool() const { return mPos != Mask::SIZE;}
       __hostdev__ Iterator& operator++() { mPos = mParent->findNextOn(mPos+1); return *this; }
     private:
@@ -984,7 +988,6 @@ public:
     }
 
     __hostdev__ Iterator beginOn() const { return Iterator(this->findFirstOn(), this); }
-    //__hostdev__ Iterator end() const { return Iterator(SIZE, this); }
 
     /// @brief Return true of the given bit is set.
     __hostdev__ bool isOn(uint32_t n) const { return 0 != (mWords[n >> 6] & (uint64_t(1) << (n & 63))); }
@@ -1185,7 +1188,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     GridType         mGridType; //  2 bytes
     uint32_t         mBlindDataCount; // count of GridBlindMetaData structures that follow this grid (after the gridname).
     uint64_t         memUsage() const { return sizeof(*this) + mBlindDataCount * sizeof(GridBlindMetaData); }
-    //__hostdev__ const char* gridName() const { return mGridName; }
     // Affine transformations based on double precision
     template<typename Vec3T>
     __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return mMap.applyMap(xyz); }
@@ -1254,6 +1256,8 @@ public:
     Grid& operator=(const Grid&) = delete;
     ~Grid() = delete;
 
+    __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
+
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
     /// @brief return memory usage in bytes for the class (note this computes room for blindMetaData structures.)
@@ -1285,12 +1289,10 @@ public:
     // assumes dir to be normalized
     template<typename Vec3T>
     __hostdev__ Vec3T indexToWorldDir(const Vec3T& dir) const { return this->applyInverseJacobian(dir); }
-    //__hostdev__ Vec3T indexToWorldDir( const Vec3T &dir ) const { return this->applyJacobian(dir); }
 
     // assumes dir to be normalized
     template<typename Vec3T>
     __hostdev__ Vec3T worldToIndexDir(const Vec3T& dir) const { return this->applyJacobian(dir); }
-    //__hostdev__ Vec3T worldToIndexDir( const Vec3T &dir ) const { return this->applyInverseJacobian(dir); }
 
     // Inverse jacobian map, suitable for gradients.
     template<typename Vec3T>
@@ -1307,12 +1309,10 @@ public:
     // assumes dir to be normalized
     template<typename Vec3T>
     __hostdev__ Vec3T indexToWorldDirF(const Vec3T& dir) const { return this->applyInverseJacobianF(dir); }
-    //__hostdev__ Vec3T indexToWorldDirF( const Vec3T &dir ) const { return this->applyJacobianF(dir); }
 
     // assumes dir to be normalized
     template<typename Vec3T>
     __hostdev__ Vec3T worldToIndexDirF(const Vec3T& dir) const { return this->applyJacobianF(dir); }
-    //__hostdev__ Vec3T worldToIndexDirF( const Vec3T &dir ) const { return this->applyInverseJacobianF(dir); }
 
     // Inverse jacobian map, suitable for gradients.
     template<typename Vec3T>
@@ -1521,9 +1521,17 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
                (KeyT(uint32_t(ijk[1]) >> ChildT::TOTAL) << 21) | // middle 21 bits
                (KeyT(uint32_t(ijk[0]) >> ChildT::TOTAL) << 42); // upper 21 bits
     }
+    __hostdev__ static CoordT KeyToCoord(const KeyT& key) 
+    { 
+        static constexpr uint64_t MASK = (1u << 21) - 1;
+        return Coord(( key        & MASK) << ChildT::TOTAL,
+                     ((key >> 21) & MASK) << ChildT::TOTAL,
+                     ((key >> 42) & MASK) << ChildT::TOTAL); 
+    }
 #else
     using KeyT = CoordT;
     __hostdev__ static KeyT CoordToKey(const CoordT& ijk) { return ijk & ~ChildT::MASK; }
+    __hostdev__ static CoordT KeyToCoord(const KeyT& key) { return key; }
 #endif
     BBox<CoordT> mBBox; // AABB if active values in index space, 2*3*4 = 24 bytes
     uint64_t mActiveVoxelCount; // total number of active voxels in the root and all its child nodes, 8 bytes
@@ -1544,6 +1552,8 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
             value = v;
             childID = -1;
         }
+        bool isChild() const { return childID >=0; }
+        CoordT origin() const { return KeyToCoord(key); }
         KeyT    key;
         ValueT  value; // value of tile (i.e. no child node)
         int32_t childID; // negative values indicate no child node, i.e. this is a value tile
@@ -1564,7 +1574,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
     /// @warning A child node is assumed to exist in the specified tile
     __hostdev__ const ChildT& child(const Tile& tile) const
     {
-        assert(tile.childID >= 0 && tile.childID < int32_t(ChildT::SIZE));
+        assert(tile.isChild() && tile.childID < int32_t(ChildT::SIZE));
         return *(reinterpret_cast<const ChildT*>(reinterpret_cast<const Tile*>(this + 1) + mTileCount) + tile.childID);
     }
 
@@ -1593,6 +1603,8 @@ public:
     RootNode(const RootNode&) = delete;
     RootNode& operator=(const RootNode&) = delete;
     ~RootNode() = delete;
+
+    __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
 
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
@@ -1820,9 +1832,11 @@ class InternalNode : private InternalData<ChildT, Log2Dim>
 public:
     static constexpr uint32_t LOG2DIM = Log2Dim;
     static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; //dimension in index space
+    static constexpr uint32_t DIM = 1u << TOTAL;// number of voxels along each axis of this node
     static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); //number of tile values (or child pointers)
     static constexpr uint32_t MASK = (1u << TOTAL) - 1u;
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
+    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL);// total voxel count represented by this node
 
     using LeafNodeType = typename ChildT::LeafNodeType;
     using ChildNodeType = ChildT;
@@ -1837,6 +1851,8 @@ public:
     InternalNode(const InternalNode&) = delete;
     InternalNode& operator=(const InternalNode&) = delete;
     ~InternalNode() = delete;
+
+    __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
 
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
@@ -1894,6 +1910,34 @@ public:
         return nullptr;
     }
 
+    /// @brief Return the linear offset corresponding to the given coordinate
+    __hostdev__ static uint32_t CoordToOffset(const CoordType& ijk)
+    {
+        return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) +
+               (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) +
+               ((ijk[2] & MASK) >> ChildT::TOTAL);
+    }
+
+    __hostdev__ static Coord OffsetToLocalCoord(uint32_t n)
+    {
+        assert(n < SIZE);
+        const uint32_t m = n & ((1<<2*LOG2DIM)-1);
+        return Coord(n >> 2*LOG2DIM, m >> LOG2DIM, m & ((1<<LOG2DIM)-1));
+    }
+
+    __hostdev__ void localToGlobalCoord(Coord &ijk) const
+    {
+        ijk <<= ChildT::TOTAL;
+        ijk  += this->origin();
+    }
+
+    __hostdev__ Coord offsetToGlobalCoord(uint32_t n) const
+    {
+        Coord ijk = InternalNode::OffsetToLocalCoord(n);
+        this->localToGlobalCoord(ijk); 
+        return ijk;
+    }
+
 private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(InternalData) is misaligned");
 
@@ -1903,14 +1947,6 @@ private:
     friend class RootNode;
     template<typename, uint32_t>
     friend class InternalNode;
-
-    /// @brief Return the linear offset corresponding to the given coordinate
-    __hostdev__ static uint32_t CoordToOffset(const CoordType& ijk)
-    {
-        return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) +
-               (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) +
-               ((ijk[2] & MASK) >> ChildT::TOTAL);
-    }
 
     /// @biref Private read access method used by the ReadAccessor
     template<typename AccT>
@@ -2042,9 +2078,11 @@ class LeafNode : private LeafData<ValueT, CoordT, MaskT, Log2Dim>
 public:
     static constexpr uint32_t LOG2DIM = Log2Dim;
     static constexpr uint32_t TOTAL = LOG2DIM; // needed by parent nodes
+    static constexpr uint32_t DIM = 1u << TOTAL;// number of voxels along each axis of this node
     static constexpr uint32_t SIZE = 1u << 3 * LOG2DIM; // total number of voxels represented by this node
     static constexpr uint32_t MASK = (1u << LOG2DIM) - 1u; // mask for bit operations
     static constexpr uint32_t LEVEL = 0; // level 0 = leaf
+    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL);// total voxel count represented by this node
 
     struct ChildNodeType
     {
@@ -2056,6 +2094,8 @@ public:
     using CoordType = CoordT;
     template<uint32_t LOG2>
     using MaskType = MaskT<LOG2>;
+
+    __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
 
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
@@ -2082,6 +2122,9 @@ public:
         const uint32_t m = n & ((1<<2*LOG2DIM)-1);
         return CoordT(n >> 2*LOG2DIM, m >> LOG2DIM, m & MASK);
     }
+
+    /// @brief Converts (in place) a local index coordinate to a global index coordinate
+    __hostdev__ void localToGlobalCoord(Coord &ijk) const { ijk += this->origin(); }
 
     __hostdev__ CoordT offsetToGlobalCoord(uint32_t n) const
     {

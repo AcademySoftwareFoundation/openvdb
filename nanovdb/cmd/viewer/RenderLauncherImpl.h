@@ -68,6 +68,7 @@ private:
     {
         bool   mInitialized = false;
         void*  mDeviceGrid = nullptr;
+        bool   mGlTextureResourceCUDAError = false;
         void*  mGlTextureResourceCUDA = nullptr;
         size_t mGlTextureResourceSize = 0;
         int    mGlTextureResourceId = 0;

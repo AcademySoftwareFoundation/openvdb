@@ -247,7 +247,7 @@ if (TRUE)
 	set_source_files_properties(${VIEWER_OPTIX_CODE} PROPERTIES HEADER_FILE_ONLY TRUE)
 	set_source_files_properties(${VIEWER_AGNOSTIC_CODE} PROPERTIES HEADER_FILE_ONLY TRUE)
 
-	target_include_directories(nanovdb_viewer PRIVATE 
+	target_include_directories(nanovdb_viewer PRIVATE
 		${NANOVDB_INCLUDE_DIR} 
 		${TBB_INCLUDE_DIRECTORY} # optional 
 		${CUDA_INCLUDE_DIRECTORY} # optional 
@@ -258,7 +258,7 @@ if (TRUE)
 		${NANOVDB_GLAD_INCLUDE_DIRECTORY} # optional 
 		${NANOVDB_OPENGLES_INCLUDE_DIR} # optional 
 		${EGL_INCLUDE_DIRECTORY} # optional 
-		${NANOVDB_NFD_INCLUDE_DIRECTORY} # optional 
+		${NANOVDB_NFD_INCLUDE_DIRECTORY} # optional
 		)
 			
 	target_compile_definitions (nanovdb_viewer 

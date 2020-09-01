@@ -5,6 +5,10 @@
 
 #if defined(__OPENCL_VERSION__)
 
+#define CNANOVDB_RETURN(c) return
+#ifndef CNANOVDB_COMPILER_OPENCL
+#define CNANOVDB_COMPILER_OPENCL
+#endif
 #define CNANOVDB_INLINE inline
 #define CNANOVDB_KERNEL __kernel
 #define CNANOVDB_GLOBAL __global
@@ -27,14 +31,15 @@
     } \
     ; \
     typedef union _##name name;
-#define CNANOVDB_NODEDATA(c, level) c->mNodeLevel##level
-#define CNANOVDB_ROOTDATA(c) c->mRootData
-#define CNANOVDB_GRIDDATA(c) c->mGridData
+#define CNANOVDB_NODEDATA(cxt, level) cxt->mNodeLevel##level.nodes
+#define CNANOVDB_ROOTDATA(cxt) cxt->mRootData.root
+#define CNANOVDB_ROOTDATATILES(cxt) cxt->mRootData.tiles
+#define CNANOVDB_GRIDDATA(cxt) cxt->mGridData.grid
 #define CNANOVDB_CONTEXT const TreeContext* restrict
-#define CNANOVDB_DECLARE_UNIFORMS_BEGIN() \
+#define CNANOVDB_DECLARE_UNIFORMS_BEGIN \
     struct _ArgUniforms \
     {
-#define CNANOVDB_DECLARE_UNIFORMS_END() \
+#define CNANOVDB_DECLARE_UNIFORMS_END \
     } \
     ; \
     typedef struct _ArgUniforms ArgUniforms;
@@ -56,10 +61,15 @@ typedef signed char    int8_t;
 typedef float3         vec3;
 typedef float4         vec4;
 typedef int2           ivec2;
+typedef uint2          uvec2;
 typedef int3           ivec3;
 typedef bool           boolean;
 #define CNANOVDB_TRUE true
 #define CNANOVDB_FALSE false
+
+#define CNANOVDB_WORD_TYPE uint64_t
+#define CNANOVDB_WORD_LOG2SIZE 6
+#define CNANOVDB_WORD_MASK 63
 
 CNANOVDB_INLINE ivec2 getThreadId()
 {
@@ -100,12 +110,12 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 
 #elif defined(CNANOVDB_COMPILER_GLSL)
 
-#extension GL_NV_gpu_shader5 : enable // for stdint
 #extension GL_ARB_shader_image_load_store : enable
 #pragma optimize(on)
-#line 44
+#line 115
 
-#define CNANOVDB_INLINE 
+#define CNANOVDB_RETURN(c) return
+#define CNANOVDB_INLINE
 #define CNANOVDB_KERNEL
 #define CNANOVDB_GLOBAL
 #define CNANOVDB_RESTRICT
@@ -119,25 +129,34 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 #define CNANOVDB_DECLARE_STRUCT_END(name) \
     } \
     ;
-#define CNANOVDB_NODEDATA(cxt, level) kNodeLevel##level
-#define CNANOVDB_ROOTDATA(cxt) kRootData
-#define CNANOVDB_GRIDDATA(cxt) kGridData
+#define CNANOVDB_NODEDATA(cxt, level) kNodeLevel##level.nodes
+#define CNANOVDB_ROOTDATA(cxt) kRootData.root
+#define CNANOVDB_ROOTDATATILES(cxt) kRootData.tiles
+#define CNANOVDB_GRIDDATA(cxt) kGridData.grid
 #define CNANOVDB_CONTEXT int
-#define CNANOVDB_DECLARE_UNIFORMS_BEGIN() \
+#define CNANOVDB_DECLARE_UNIFORMS_BEGIN \
     uniform ArgUniforms \
     {
-#define CNANOVDB_DECLARE_UNIFORMS_END() \
+#define CNANOVDB_DECLARE_UNIFORMS_END \
     } \
     kArgs;
 #define CNANOVDB_MAKE(t) t
-#define CNANOVDB_MAKE_VEC3(a, b, c) vec3((float)a, (float)b, (float)c)
-#define CNANOVDB_MAKE_IVEC3(a, b, c) ivec3((int)a, (int)b, (int)c)
-#define CNANOVDB_MAKE_IVEC2(a, b) ivec2((int)a, (int)b)
-#define CNANOVDB_MAKE_VEC4(a, b, c, d) vec4((float)a, (float)b, (float)c, (float)d)
+#define CNANOVDB_MAKE_VEC3(a, b, c) vec3(float(a), float(b), float(c))
+#define CNANOVDB_MAKE_IVEC3(a, b, c) ivec3(int(a), int(b), int(c))
+#define CNANOVDB_MAKE_IVEC2(a, b) ivec2(int(a), int(b))
+#define CNANOVDB_MAKE_VEC4(a, b, c, d) vec4(float(a), float(b), float(c), float(d))
 
+#define uint32_t uint
+#define int32_t int
+#define uint64_t uvec2
+#define int64_t ivec2
 #define boolean bool
 #define CNANOVDB_TRUE true
 #define CNANOVDB_FALSE false
+
+#define CNANOVDB_WORD_TYPE uint32_t
+#define CNANOVDB_WORD_LOG2SIZE 5
+#define CNANOVDB_WORD_MASK 31
 
 #define getThreadId() ivec2(gl_GlobalInvocationID.xy)
 
@@ -172,6 +191,7 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 
 #elif defined(__cplusplus)
 
+#define CNANOVDB_RETURN(c) return
 #define CNANOVDB_INLINE inline
 #define CNANOVDB_KERNEL inline
 #define CNANOVDB_GLOBAL
@@ -180,9 +200,10 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 #define CNANOVDB_REF(t) t&
 #define CNANOVDB_DEREF(x) (x)
 #define CNANOVDB_ADDRESS(x) x
-#define CNANOVDB_NODEDATA(cxt, level) cxt->mNodeLevel##level
-#define CNANOVDB_ROOTDATA(cxt) cxt->mRootData
-#define CNANOVDB_GRIDDATA(cxt) cxt->mGridData
+#define CNANOVDB_NODEDATA(cxt, level) cxt->mNodeLevel##level.nodes
+#define CNANOVDB_ROOTDATA(cxt) cxt->mRootData.root
+#define CNANOVDB_ROOTDATATILES(cxt) cxt->mRootData.tiles
+#define CNANOVDB_GRIDDATA(cxt) cxt->mGridData.grid
 #define CNANOVDB_CONTEXT const TreeContext*
 #define CNANOVDB_MAKE(t) (t)
 #define CNANOVDB_MAKE_VEC3(a, b, c) \
@@ -207,10 +228,10 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
     } \
     ; \
     typedef union _##name name;
-#define CNANOVDB_DECLARE_UNIFORMS_BEGIN() \
+#define CNANOVDB_DECLARE_UNIFORMS_BEGIN \
     struct _ArgUniforms \
     {
-#define CNANOVDB_DECLARE_UNIFORMS_END() \
+#define CNANOVDB_DECLARE_UNIFORMS_END \
     } \
     ; \
     typedef struct _ArgUniforms ArgUniforms;
@@ -222,8 +243,16 @@ typedef bool boolean;
 #define CNANOVDB_TRUE true
 #define CNANOVDB_FALSE false
 
-//float nanovdb_Clamp_float(float x, float a, float b)
+#define CNANOVDB_WORD_TYPE uint64_t
+#define CNANOVDB_WORD_LOG2SIZE 6
+#define CNANOVDB_WORD_MASK 63
 
+//float nanovdb_Clamp_float(float x, float a, float b)
+struct uvec2
+{
+    unsigned int x;
+    unsigned int y;
+};
 struct ivec2
 {
     int x;
@@ -327,6 +356,7 @@ CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
 
 #else
 
+#define CNANOVDB_RETURN(c) return
 #define CNANOVDB_INLINE static inline
 #define CNANOVDB_KERNEL static inline
 #define CNANOVDB_GLOBAL
@@ -335,9 +365,10 @@ CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
 #define CNANOVDB_REF(t) t*
 #define CNANOVDB_DEREF(x) (*x)
 #define CNANOVDB_ADDRESS(x) &x
-#define CNANOVDB_NODEDATA(cxt, level) cxt->mNodeLevel##level
-#define CNANOVDB_ROOTDATA(cxt) cxt->mRootData
-#define CNANOVDB_GRIDDATA(cxt) cxt->mGridData
+#define CNANOVDB_NODEDATA(cxt, level) cxt->mNodeLevel##level.nodes
+#define CNANOVDB_ROOTDATA(cxt) cxt->mRootData.root
+#define CNANOVDB_ROOTDATATILES(cxt) cxt->mRootData.tiles
+#define CNANOVDB_GRIDDATA(cxt) cxt->mGridData.grid
 #define CNANOVDB_CONTEXT const TreeContext*
 #define CNANOVDB_MAKE(t) (t)
 #define CNANOVDB_MAKE_VEC3(a, b, c) \
@@ -362,10 +393,10 @@ CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
     } \
     ; \
     typedef union _##name name;
-#define CNANOVDB_DECLARE_UNIFORMS_BEGIN() \
+#define CNANOVDB_DECLARE_UNIFORMS_BEGIN \
     struct _ArgUniforms \
     {
-#define CNANOVDB_DECLARE_UNIFORMS_END() \
+#define CNANOVDB_DECLARE_UNIFORMS_END \
     } \
     ; \
     typedef struct _ArgUniforms ArgUniforms;
@@ -376,6 +407,16 @@ CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
 typedef int boolean;
 #define CNANOVDB_TRUE 1
 #define CNANOVDB_FALSE 0
+
+#define CNANOVDB_WORD_TYPE uint64_t
+#define CNANOVDB_WORD_LOG2SIZE 6
+#define CNANOVDB_WORD_MASK 63
+
+typedef struct
+{
+    unsigned int x;
+    unsigned int y;
+} uvec2;
 typedef struct
 {
     int x;

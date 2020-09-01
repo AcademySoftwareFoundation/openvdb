@@ -1737,7 +1737,7 @@ TEST_F(TestOpenVDB, Trilinear)
     };
 
     mTimer.start("Generating a dense tri-linear openvdb grid");
-    auto        srcGrid = openvdb::createLevelSet<openvdb::FloatGrid>(/*background=*/1.0f);
+    auto        srcGrid = openvdb::createGrid<openvdb::FloatGrid>(/*background=*/1.0f);
     const float voxelSize = 0.5f;
     srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
     const openvdb::CoordBBox bbox(openvdb::Coord(0), openvdb::Coord(128));
@@ -1802,7 +1802,7 @@ TEST_F(TestOpenVDB, Tricubic)
     };
 
     mTimer.start("Generating a dense tri-cubic openvdb grid");
-    auto srcGrid = openvdb::createLevelSet<openvdb::DoubleGrid>(/*background=*/1.0);
+    auto srcGrid = openvdb::createGrid<openvdb::DoubleGrid>(/*background=*/1.0);
     srcGrid->setName("Tri-Cubic");
     srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/0.5));
     const openvdb::CoordBBox bbox(openvdb::Coord(0), openvdb::Coord(128));

@@ -8,6 +8,10 @@
 //
 ////////////////////////////////////////////////////////
 
+#if defined(CNANOVDB_COMPILER_GLSL)
+#line 12
+#endif
+
 #define CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION 1
 
 CNANOVDB_DECLARE_STRUCT_BEGIN(HeterogenousMedium)
@@ -23,8 +27,8 @@ CNANOVDB_INLINE float
 deltaTracking(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed)
 {
     boolean hit = nanovdb_Ray_clip(ray,
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min),
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max));
+                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min),
+                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max));
     if (!hit)
         return -1.f;
 
@@ -40,8 +44,8 @@ CNANOVDB_INLINE float
 getTransmittance(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed)
 {
     boolean hit = nanovdb_Ray_clip(ray,
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min),
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max));
+                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min),
+                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max));
     if (!hit)
         return 1.0f;
 
@@ -127,10 +131,10 @@ CNANOVDB_INLINE float henyeyGreenstein(float g, float cosTheta)
     // phase function pdf.
 #if 1
     // isotropic.
-    return 3.14159265359f / 4.f;
+    return 1.0f / (3.14159265359f * 4.f);
 #else
     float denom = 1.f + g * g - 2.f * g * cosTheta;
-    return (3.14159265359f / 4.f) * (1.f - g * g) / (denom * sqrtf(denom));
+    return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
 #endif
 }
 
@@ -139,18 +143,18 @@ CNANOVDB_INLINE vec3 sampleHG(float g, float e1, float e2)
     // phase function.
 #if 1
     // isotropic
-    const float phi = (float)(2.0f * 3.14165f) * e1;
+    const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e1;
     const float cosTheta = 1.0f - 2.0f * e2;
     const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
 #else
-    const float phi = (float)(2.0f * 3.14159265359f) * e2;
+    const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e2;
     const float s = 2.0f * e1 - 1.0f;
     const float denom = nanovdb::Max(0.001f, (1.0f + g * s));
     const float f = (1.0f - g * g) / denom;
     const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
     const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
 #endif
-    return CNANOVDB_MAKE_VEC3(cosf(phi) * cosTheta, sinf(phi) * sinTheta, cosTheta);
+    return CNANOVDB_MAKE_VEC3(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
 }
 
 CNANOVDB_INLINE Vec3T estimateLight(CNANOVDB_CONTEXT cxt, Vec3T pos, Vec3T dir, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed, Vec3T lightDir)
@@ -163,7 +167,7 @@ CNANOVDB_INLINE Vec3T estimateLight(CNANOVDB_CONTEXT cxt, Vec3T pos, Vec3T dir, 
     shadowRay.mT1 = MaxFloat;
 
     float transmittance = getTransmittance(cxt, CNANOVDB_ADDRESS(shadowRay), acc, medium, seed);
-    float pdf = henyeyGreenstein(medium.hgMeanCosine, vec3_dot(dir, lightDir));
+    float pdf = 1.0f;//henyeyGreenstein(medium.hgMeanCosine, vec3_dot(dir, lightDir));
     return vec3_fmul(pdf * transmittance, lightRadiance);
 }
 
@@ -176,7 +180,7 @@ CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nan
     int max_interactions = 40;
     int num_interactions = 0;
 
-    if (!nanovdb_Ray_clip(ray, nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max))) {
+    if (!nanovdb_Ray_clip(ray, nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max))) {
         return CNANOVDB_MAKE_VEC3(0, 0, 0);
     }
 
@@ -218,7 +222,7 @@ CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nan
         pathRay.mT0 = DeltaFloat;
         pathRay.mT1 = MaxFloat;
 
-        if (!nanovdb_Ray_clip(CNANOVDB_ADDRESS(pathRay), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max)))
+        if (!nanovdb_Ray_clip(CNANOVDB_ADDRESS(pathRay), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max)))
             return CNANOVDB_MAKE_VEC3(0, 0, 0);
     }
     /*
@@ -289,7 +293,7 @@ CNANOVDB_KERNEL void renderFogVolume(
     uint32_t ix = threadId.x;
     uint32_t iy = threadId.y;
 
-    if (ix >= (uint32_t)kArgs.width || iy >= (uint32_t)kArgs.height)
+    if (ix >= CNANOVDB_MAKE(uint32_t)(kArgs.width) || iy >= CNANOVDB_MAKE(uint32_t)(kArgs.height))
         return;
 
     vec3 cameraP = CNANOVDB_MAKE_VEC3(kArgs.cameraPx, kArgs.cameraPy, kArgs.cameraPz);
@@ -298,7 +302,7 @@ CNANOVDB_KERNEL void renderFogVolume(
     vec3 cameraW = CNANOVDB_MAKE_VEC3(kArgs.cameraWx, kArgs.cameraWy, kArgs.cameraWz);
 
     const vec3 wLightDir = CNANOVDB_MAKE_VEC3(0.0f, 1.0f, 0.0f);
-    const vec3 iLightDir = vec3_normalize(nanovdb_Grid_worldToIndexDirF(CNANOVDB_GRIDDATA(cxt).grid, wLightDir));
+    const vec3 iLightDir = vec3_normalize(nanovdb_Grid_worldToIndexDirF(CNANOVDB_GRIDDATA(cxt), wLightDir));
 
 #if 0
     {
@@ -313,7 +317,7 @@ CNANOVDB_KERNEL void renderFogVolume(
 
     HeterogenousMedium medium;
     medium.densityFactor = kArgs.volumeDensity;
-    medium.densityMin = CNANOVDB_ROOTDATA(cxt).root.mValueMin * medium.densityFactor;
+    medium.densityMin = CNANOVDB_ROOTDATA(cxt).mValueMin * medium.densityFactor;
     medium.densityMax = medium.densityFactor; //grid->tree().root().valueMax() * medium.densityFactor;
     medium.densityMax = fmax(medium.densityMin, fmax(medium.densityMax, 0.001f));
     medium.hgMeanCosine = 0.f;
@@ -322,8 +326,8 @@ CNANOVDB_KERNEL void renderFogVolume(
     for (int sampleIndex = 0; sampleIndex < kArgs.samplesPerPixel; ++sampleIndex) {
         uint32_t pixelSeed = hash1(sampleIndex + kArgs.numAccumulations * kArgs.samplesPerPixel ^ hash2(ix, iy));
 
-        float u = (float)(ix) + 0.5f;
-        float v = (float)(iy) + 0.5f;
+        float u = CNANOVDB_MAKE(float)(ix) + 0.5f;
+        float v = CNANOVDB_MAKE(float)(iy) + 0.5f;
 
         float randVar1 = randomf(pixelSeed + 0);
         float randVar2 = randomf(pixelSeed + 1);
@@ -333,8 +337,8 @@ CNANOVDB_KERNEL void renderFogVolume(
             v += randVar2 - 0.5f;
         }
 
-        u /= (float)(kArgs.width);
-        v /= (float)(kArgs.height);
+        u /= CNANOVDB_MAKE(float)(kArgs.width);
+        v /= CNANOVDB_MAKE(float)(kArgs.height);
 
         // get camera ray...
         vec3        wRayDir = vec3_sub(vec3_add(vec3_fmul(u, cameraU), vec3_fmul(v, cameraV)), cameraW);
@@ -345,7 +349,7 @@ CNANOVDB_KERNEL void renderFogVolume(
         wRay.mT0 = 0;
         wRay.mT1 = MaxFloat;
 
-        nanovdb_Ray iRay = nanovdb_Ray_worldToIndexF(wRay, CNANOVDB_GRIDDATA(cxt).grid);
+        nanovdb_Ray iRay = nanovdb_Ray_worldToIndexF(wRay, CNANOVDB_GRIDDATA(cxt));
         vec3        iRayDir = iRay.mDir;
 
         Vec3T radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
@@ -364,7 +368,7 @@ CNANOVDB_KERNEL void renderFogVolume(
                 float wGroundT = (kArgs.groundHeight - wRayEye.y) / wRayDir.y;
                 if (wGroundT > 0.f) {
                     vec3 wGroundPos = vec3_add(wRayEye, vec3_fmul(wGroundT, wRayDir));
-                    vec3 iGroundPos = nanovdb_Grid_worldToIndexF(CNANOVDB_GRIDDATA(cxt).grid, wGroundPos);
+                    vec3 iGroundPos = nanovdb_Grid_worldToIndexF(CNANOVDB_GRIDDATA(cxt), wGroundPos);
 
                     rayTraceGround(wGroundT, kArgs.groundFalloff, wGroundPos, wRayDir.y, CNANOVDB_ADDRESS(groundIntensity), CNANOVDB_ADDRESS(groundMix));
 
@@ -399,7 +403,7 @@ CNANOVDB_KERNEL void renderFogVolume(
         vec3 prevColor = CNANOVDB_MAKE_VEC3(prevOutput.x, prevOutput.y, prevOutput.z);
         vec3 oldLinearPixel;
         invTonemapReinhard(CNANOVDB_ADDRESS(oldLinearPixel), prevColor, kArgs.tonemapWhitePoint);
-        color = vec3_add(oldLinearPixel, vec3_fmul((1.0f / (float)(kArgs.numAccumulations)), vec3_sub(color, oldLinearPixel)));
+        color = vec3_add(oldLinearPixel, vec3_fmul((1.0f / CNANOVDB_MAKE(float)(kArgs.numAccumulations)), vec3_sub(color, oldLinearPixel)));
     }
 
     tonemapReinhard(CNANOVDB_ADDRESS(color), color, kArgs.tonemapWhitePoint);

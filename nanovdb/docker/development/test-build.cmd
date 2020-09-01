@@ -27,13 +27,13 @@ GOTO BuildImage
 
 :BuildImage
 rem IF EXIST %DIST_DIR%\repo.tar (
-    docker build -t %IMAGE%:dev-test -f %DOCKER_DIR%\Dockerfile.test %DOCKER_DIR%
+    docker build -t %IMAGE%:dev-test-build -f %DOCKER_DIR%\Dockerfile.test-build %DOCKER_DIR%
 rem )
 
 GOTO Exit
 
 :Usage
-echo "Usage: test.cmd <branch|commit>"
+echo "Usage: test-build.cmd <branch|commit>"
 GOTO Exit
 
 :Exit

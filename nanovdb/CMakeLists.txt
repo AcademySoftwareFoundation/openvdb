@@ -20,6 +20,10 @@ if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif ()
 
+if (POLICY CMP0104)
+	cmake_policy(SET CMP0104 OLD)
+endif()
+
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Set the default build to Release.

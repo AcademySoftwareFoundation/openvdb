@@ -7,8 +7,12 @@
 ///
 /// @brief NearestNeighborSampler, TrilinearSampler, TriquadraticSampler and TricubicSampler
 ///
-/// @note These interpolators employ internal caching for better perormance when used repeadetly
+/// @note These interpolators employ internal caching for better performance when used repeatedly
 ///       in the same voxel location, so try to reuse an instance of these classes more than once.
+///
+/// @warning While all the interpolators defined below work with both scalars and vectors 
+///          values (e.g. float and Vec3<float>) TrilinarSampler::zeroCrossing and 
+///          Trilinear::gradient will only compile with floating point value types.
 ///
 /// @author Ken Museth
 ///
@@ -27,11 +31,12 @@
 
 namespace nanovdb {
 
-// Utility functions
+/// @brief Utility function that returns the Coord of the round-down of @a xyz
+///        and redefined @xyz as the frational part, ie xyz-in = return-value + xyz-out
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Floor(Vec3T<RealT>& xyz);
 
-// Template specializatio for Vec3<float>
+/// @brief Template specialization of Floor for Vec3<float>
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Floor(Vec3T<float>& xyz)
 {
@@ -42,7 +47,7 @@ __hostdev__ inline CoordT Floor(Vec3T<float>& xyz)
     return CoordT(int32_t(ijk[0]), int32_t(ijk[1]), int32_t(ijk[2]));
 }
 
-// Template specializatio for Vec3<float>
+/// @brief Template specialization of Floor for Vec3<float>
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Floor(Vec3T<double>& xyz)
 {
@@ -53,12 +58,13 @@ __hostdev__ inline CoordT Floor(Vec3T<double>& xyz)
     return CoordT(int32_t(ijk[0]), int32_t(ijk[1]), int32_t(ijk[2]));
 }
 
-// Forward declaration of sampler of specefic order
+// Forward declaration of sampler with specefic polynomial orders
 template<typename TreeT, int Order>
 struct SampleFromVoxels;
 
-/// @brief Factory free-function for a sampler of specefic order
-/// This allows for the compact syntax:
+/// @brief Factory free-function for a sampler of specefic polynomial orders
+///
+/// @details This allows for the compact syntax:
 /// @code
 ///   auto acc = grid.getAccessor();
 ///   auto smp = nanovdb::createSampler<1>( acc );
@@ -71,14 +77,15 @@ __hostdev__ SampleFromVoxels<TreeOrAccT, Order> createSampler(const TreeOrAccT& 
 
 // ------------------------------> NearestNeighborSampler <--------------------------------------
 
+/// @brief Neigherest neighbor, i.e. zero order, interpolator
 template<typename TreeOrAccT>
 class NearestNeighborSampler
 {
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
-    static_assert(std::is_floating_point<ValueT>::value, "Invalid ValueType");
 
 public:
+    /// @brief Construction from a Tree or ReadAccessor
     __hostdev__ NearestNeighborSampler(const TreeOrAccT& acc)
         : mAcc(&acc)
         , mPos(CoordT::max())
@@ -109,14 +116,15 @@ typename TreeOrAccT::ValueType NearestNeighborSampler<TreeOrAccT>::operator()(co
 
 // ------------------------------> TrilinearSampler <--------------------------------------
 
+/// @brief Tri-linear sampler, i.e. first order, interpolator
 template<typename TreeOrAccT>
 class TrilinearSampler
 {
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
-    static_assert(std::is_floating_point<ValueT>::value, "Invalid ValueType");
 
 public:
+    /// @brief Construction from a Tree or ReadAccessor
     __hostdev__ TrilinearSampler(const TreeOrAccT& acc)
         : mAcc(&acc)
         , mPos(CoordT::max())
@@ -127,15 +135,21 @@ public:
     template<typename RealT, template<typename...> class Vec3T>
     inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz);
 
-    /// @brief Return the gradient in index space. For
+    /// @brief Return the gradient in index space.
+    ///
+    /// @warning Will only compile with floating point value types
     template<typename RealT, template<typename...> class Vec3T>
     inline __hostdev__ Vec3T<ValueT> gradient(Vec3T<RealT> xyz);
 
-    /// @brief Return true if the tr-linear stencil, at the specified index position, has a zero crossing.
+    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
+    ///
+    /// @warning Will only compile with floating point value types
     template<typename RealT, template<typename...> class Vec3T>
     inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz);
 
     /// @brief Return true if the cached tri-linear stencil has a zero crossing.
+    ///
+    /// @warning Will only compile with floating point value types
     inline __hostdev__ bool zeroCrossing();
 
 private:
@@ -167,6 +181,7 @@ template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
 Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(Vec3T<RealT> xyz)
 {
+    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::gradient requires a floating-point type");
     this->update(xyz);
 #if 0
   auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
@@ -198,6 +213,7 @@ Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(Vec
 template<typename TreeOrAccT>
 bool TrilinearSampler<TreeOrAccT>::zeroCrossing()
 {
+    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
     const bool less = mVal[0][0][0] < ValueT(0);
     return (less ^ (mVal[0][0][1] < ValueT(0))) ||
            (less ^ (mVal[0][1][1] < ValueT(0))) ||
@@ -256,27 +272,31 @@ bool TrilinearSampler<TreeOrAccT>::update(Vec3T& xyz)
 
 // ------------------------------> TriquadraticSampler <--------------------------------------
 
+/// @brief Tri-quadratic sampler, i.e. second order, interpolator
+///
+/// @warning TriquadraticSampler has not implemented yet!
 template<typename TreeT>
 class TriquadraticSampler
 {
+    // TriquadraticSampler has not implemented yet!
 };
 
 // ------------------------------> TricubicSampler <--------------------------------------
 
-// Tri-cubic interpolation (third order). Employs caching!
-//
-// See the following paper for implementation details:
-// Lekien, F. and Marsden, J.: Tricubic interpolation in three dimensions.
-//                         In: International Journal for Numerical Methods
-//                         in Engineering (2005), No. 63, p. 455-471
+/// @brief Tri-cubic sampler, i.e. third order, interpolator.
+///
+/// @details See the following paper for implementation details:
+/// Lekien, F. and Marsden, J.: Tricubic interpolation in three dimensions.
+///                         In: International Journal for Numerical Methods
+///                         in Engineering (2005), No. 63, p. 455-471
 template<typename TreeOrAccT>
 class TricubicSampler
 {
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
-    static_assert(std::is_floating_point<ValueT>::value, "Invalid ValueType");
 
 public:
+    /// @brief Construction from a Tree or ReadAccessor
     __hostdev__ TricubicSampler(const TreeOrAccT& acc)
         : mAcc(&acc)
         , mPos(CoordT::max())
@@ -302,12 +322,12 @@ __hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT>::operator
 {
     this->update(xyz); // modifies xyz and re-computes mC and mPos if required
 
-    ValueT zPow = 1, sum = 0;
+    ValueT zPow(1), sum(0);
     for (int k = 0, n = 0; k < 4; ++k) {
-        ValueT yPow = 1;
+        ValueT yPow(1);
         for (int j = 0; j < 4; ++j, n += 4) {
 #if 0
-      sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], mC[n + 3], mC[n + 2]), mC[n + 1]), mC[n]), sum);
+            sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], mC[n + 3], mC[n + 2]), mC[n + 1]), mC[n]), sum);
 #else
             sum += yPow * zPow * (mC[n] + xyz[0] * (mC[n + 1] + xyz[0] * (mC[n + 2] + xyz[0] * mC[n + 3])));
 #endif
@@ -339,78 +359,79 @@ bool TricubicSampler<TreeOrAccT>::update(Vec3T& xyz)
             fetch(i, j, 2) = mAcc->getValue(mPos + CoordT(i, j, 2));
         }
     }
-    const ValueT half = 0.5, quarter = 0.25, eighth = 0.125, X[64] = {// values of f(x,y,z) at the 8 corners (each from 1 stencil value).
-                                                                      fetch(0, 0, 0),
-                                                                      fetch(1, 0, 0),
-                                                                      fetch(0, 1, 0),
-                                                                      fetch(1, 1, 0),
-                                                                      fetch(0, 0, 1),
-                                                                      fetch(1, 0, 1),
-                                                                      fetch(0, 1, 1),
-                                                                      fetch(1, 1, 1),
-                                                                      // values of df/dx at the 8 corners (each from 2 stencil values).
-                                                                      half * (fetch(1, 0, 0) - fetch(-1, 0, 0)),
-                                                                      half * (fetch(2, 0, 0) - fetch(0, 0, 0)),
-                                                                      half * (fetch(1, 1, 0) - fetch(-1, 1, 0)),
-                                                                      half * (fetch(2, 1, 0) - fetch(0, 1, 0)),
-                                                                      half * (fetch(1, 0, 1) - fetch(-1, 0, 1)),
-                                                                      half * (fetch(2, 0, 1) - fetch(0, 0, 1)),
-                                                                      half * (fetch(1, 1, 1) - fetch(-1, 1, 1)),
-                                                                      half * (fetch(2, 1, 1) - fetch(0, 1, 1)),
-                                                                      // values of df/dy at the 8 corners (each from 2 stencil values).
-                                                                      half * (fetch(0, 1, 0) - fetch(0, -1, 0)),
-                                                                      half * (fetch(1, 1, 0) - fetch(1, -1, 0)),
-                                                                      half * (fetch(0, 2, 0) - fetch(0, 0, 0)),
-                                                                      half * (fetch(1, 2, 0) - fetch(1, 0, 0)),
-                                                                      half * (fetch(0, 1, 1) - fetch(0, -1, 1)),
-                                                                      half * (fetch(1, 1, 1) - fetch(1, -1, 1)),
-                                                                      half * (fetch(0, 2, 1) - fetch(0, 0, 1)),
-                                                                      half * (fetch(1, 2, 1) - fetch(1, 0, 1)),
-                                                                      // values of df/dz at the 8 corners (each from 2 stencil values).
-                                                                      half * (fetch(0, 0, 1) - fetch(0, 0, -1)),
-                                                                      half * (fetch(1, 0, 1) - fetch(1, 0, -1)),
-                                                                      half * (fetch(0, 1, 1) - fetch(0, 1, -1)),
-                                                                      half * (fetch(1, 1, 1) - fetch(1, 1, -1)),
-                                                                      half * (fetch(0, 0, 2) - fetch(0, 0, 0)),
-                                                                      half * (fetch(1, 0, 2) - fetch(1, 0, 0)),
-                                                                      half * (fetch(0, 1, 2) - fetch(0, 1, 0)),
-                                                                      half * (fetch(1, 1, 2) - fetch(1, 1, 0)),
-                                                                      // values of d2f/dxdy at the 8 corners (each from 4 stencil values).
-                                                                      quarter * (fetch(1, 1, 0) - fetch(-1, 1, 0) - fetch(1, -1, 0) + fetch(-1, -1, 0)),
-                                                                      quarter * (fetch(2, 1, 0) - fetch(0, 1, 0) - fetch(2, -1, 0) + fetch(0, -1, 0)),
-                                                                      quarter * (fetch(1, 2, 0) - fetch(-1, 2, 0) - fetch(1, 0, 0) + fetch(-1, 0, 0)),
-                                                                      quarter * (fetch(2, 2, 0) - fetch(0, 2, 0) - fetch(2, 0, 0) + fetch(0, 0, 0)),
-                                                                      quarter * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, -1, 1) + fetch(-1, -1, 1)),
-                                                                      quarter * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, -1, 1) + fetch(0, -1, 1)),
-                                                                      quarter * (fetch(1, 2, 1) - fetch(-1, 2, 1) - fetch(1, 0, 1) + fetch(-1, 0, 1)),
-                                                                      quarter * (fetch(2, 2, 1) - fetch(0, 2, 1) - fetch(2, 0, 1) + fetch(0, 0, 1)),
-                                                                      // values of d2f/dxdz at the 8 corners (each from 4 stencil values).
-                                                                      quarter * (fetch(1, 0, 1) - fetch(-1, 0, 1) - fetch(1, 0, -1) + fetch(-1, 0, -1)),
-                                                                      quarter * (fetch(2, 0, 1) - fetch(0, 0, 1) - fetch(2, 0, -1) + fetch(0, 0, -1)),
-                                                                      quarter * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, 1, -1) + fetch(-1, 1, -1)),
-                                                                      quarter * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, 1, -1) + fetch(0, 1, -1)),
-                                                                      quarter * (fetch(1, 0, 2) - fetch(-1, 0, 2) - fetch(1, 0, 0) + fetch(-1, 0, 0)),
-                                                                      quarter * (fetch(2, 0, 2) - fetch(0, 0, 2) - fetch(2, 0, 0) + fetch(0, 0, 0)),
-                                                                      quarter * (fetch(1, 1, 2) - fetch(-1, 1, 2) - fetch(1, 1, 0) + fetch(-1, 1, 0)),
-                                                                      quarter * (fetch(2, 1, 2) - fetch(0, 1, 2) - fetch(2, 1, 0) + fetch(0, 1, 0)),
-                                                                      // values of d2f/dydz at the 8 corners (each from 4 stencil values).
-                                                                      quarter * (fetch(0, 1, 1) - fetch(0, -1, 1) - fetch(0, 1, -1) + fetch(0, -1, -1)),
-                                                                      quarter * (fetch(1, 1, 1) - fetch(1, -1, 1) - fetch(1, 1, -1) + fetch(1, -1, -1)),
-                                                                      quarter * (fetch(0, 2, 1) - fetch(0, 0, 1) - fetch(0, 2, -1) + fetch(0, 0, -1)),
-                                                                      quarter * (fetch(1, 2, 1) - fetch(1, 0, 1) - fetch(1, 2, -1) + fetch(1, 0, -1)),
-                                                                      quarter * (fetch(0, 1, 2) - fetch(0, -1, 2) - fetch(0, 1, 0) + fetch(0, -1, 0)),
-                                                                      quarter * (fetch(1, 1, 2) - fetch(1, -1, 2) - fetch(1, 1, 0) + fetch(1, -1, 0)),
-                                                                      quarter * (fetch(0, 2, 2) - fetch(0, 0, 2) - fetch(0, 2, 0) + fetch(0, 0, 0)),
-                                                                      quarter * (fetch(1, 2, 2) - fetch(1, 0, 2) - fetch(1, 2, 0) + fetch(1, 0, 0)),
-                                                                      // values of d3f/dxdydz at the 8 corners (each from 8 stencil values).
-                                                                      eighth * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, -1, 1) + fetch(-1, -1, 1) - fetch(1, 1, -1) + fetch(-1, 1, -1) + fetch(1, -1, -1) - fetch(-1, -1, -1)),
-                                                                      eighth * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, -1, 1) + fetch(0, -1, 1) - fetch(2, 1, -1) + fetch(0, 1, -1) + fetch(2, -1, -1) - fetch(0, -1, -1)),
-                                                                      eighth * (fetch(1, 2, 1) - fetch(-1, 2, 1) - fetch(1, 0, 1) + fetch(-1, 0, 1) - fetch(1, 2, -1) + fetch(-1, 2, -1) + fetch(1, 0, -1) - fetch(-1, 0, -1)),
-                                                                      eighth * (fetch(2, 2, 1) - fetch(0, 2, 1) - fetch(2, 0, 1) + fetch(0, 0, 1) - fetch(2, 2, -1) + fetch(0, 2, -1) + fetch(2, 0, -1) - fetch(0, 0, -1)),
-                                                                      eighth * (fetch(1, 1, 2) - fetch(-1, 1, 2) - fetch(1, -1, 2) + fetch(-1, -1, 2) - fetch(1, 1, 0) + fetch(-1, 1, 0) + fetch(1, -1, 0) - fetch(-1, -1, 0)),
-                                                                      eighth * (fetch(2, 1, 2) - fetch(0, 1, 2) - fetch(2, -1, 2) + fetch(0, -1, 2) - fetch(2, 1, 0) + fetch(0, 1, 0) + fetch(2, -1, 0) - fetch(0, -1, 0)),
-                                                                      eighth * (fetch(1, 2, 2) - fetch(-1, 2, 2) - fetch(1, 0, 2) + fetch(-1, 0, 2) - fetch(1, 2, 0) + fetch(-1, 2, 0) + fetch(1, 0, 0) - fetch(-1, 0, 0)),
-                                                                      eighth * (fetch(2, 2, 2) - fetch(0, 2, 2) - fetch(2, 0, 2) + fetch(0, 0, 2) - fetch(2, 2, 0) + fetch(0, 2, 0) + fetch(2, 0, 0) - fetch(0, 0, 0))};
+    static const ValueT half(0.5), quarter(0.25), eighth(0.125);
+    const ValueT        X[64] = {// values of f(x,y,z) at the 8 corners (each from 1 stencil value).
+                          fetch(0, 0, 0),
+                          fetch(1, 0, 0),
+                          fetch(0, 1, 0),
+                          fetch(1, 1, 0),
+                          fetch(0, 0, 1),
+                          fetch(1, 0, 1),
+                          fetch(0, 1, 1),
+                          fetch(1, 1, 1),
+                          // values of df/dx at the 8 corners (each from 2 stencil values).
+                          half * (fetch(1, 0, 0) - fetch(-1, 0, 0)),
+                          half * (fetch(2, 0, 0) - fetch(0, 0, 0)),
+                          half * (fetch(1, 1, 0) - fetch(-1, 1, 0)),
+                          half * (fetch(2, 1, 0) - fetch(0, 1, 0)),
+                          half * (fetch(1, 0, 1) - fetch(-1, 0, 1)),
+                          half * (fetch(2, 0, 1) - fetch(0, 0, 1)),
+                          half * (fetch(1, 1, 1) - fetch(-1, 1, 1)),
+                          half * (fetch(2, 1, 1) - fetch(0, 1, 1)),
+                          // values of df/dy at the 8 corners (each from 2 stencil values).
+                          half * (fetch(0, 1, 0) - fetch(0, -1, 0)),
+                          half * (fetch(1, 1, 0) - fetch(1, -1, 0)),
+                          half * (fetch(0, 2, 0) - fetch(0, 0, 0)),
+                          half * (fetch(1, 2, 0) - fetch(1, 0, 0)),
+                          half * (fetch(0, 1, 1) - fetch(0, -1, 1)),
+                          half * (fetch(1, 1, 1) - fetch(1, -1, 1)),
+                          half * (fetch(0, 2, 1) - fetch(0, 0, 1)),
+                          half * (fetch(1, 2, 1) - fetch(1, 0, 1)),
+                          // values of df/dz at the 8 corners (each from 2 stencil values).
+                          half * (fetch(0, 0, 1) - fetch(0, 0, -1)),
+                          half * (fetch(1, 0, 1) - fetch(1, 0, -1)),
+                          half * (fetch(0, 1, 1) - fetch(0, 1, -1)),
+                          half * (fetch(1, 1, 1) - fetch(1, 1, -1)),
+                          half * (fetch(0, 0, 2) - fetch(0, 0, 0)),
+                          half * (fetch(1, 0, 2) - fetch(1, 0, 0)),
+                          half * (fetch(0, 1, 2) - fetch(0, 1, 0)),
+                          half * (fetch(1, 1, 2) - fetch(1, 1, 0)),
+                          // values of d2f/dxdy at the 8 corners (each from 4 stencil values).
+                          quarter * (fetch(1, 1, 0) - fetch(-1, 1, 0) - fetch(1, -1, 0) + fetch(-1, -1, 0)),
+                          quarter * (fetch(2, 1, 0) - fetch(0, 1, 0) - fetch(2, -1, 0) + fetch(0, -1, 0)),
+                          quarter * (fetch(1, 2, 0) - fetch(-1, 2, 0) - fetch(1, 0, 0) + fetch(-1, 0, 0)),
+                          quarter * (fetch(2, 2, 0) - fetch(0, 2, 0) - fetch(2, 0, 0) + fetch(0, 0, 0)),
+                          quarter * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, -1, 1) + fetch(-1, -1, 1)),
+                          quarter * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, -1, 1) + fetch(0, -1, 1)),
+                          quarter * (fetch(1, 2, 1) - fetch(-1, 2, 1) - fetch(1, 0, 1) + fetch(-1, 0, 1)),
+                          quarter * (fetch(2, 2, 1) - fetch(0, 2, 1) - fetch(2, 0, 1) + fetch(0, 0, 1)),
+                          // values of d2f/dxdz at the 8 corners (each from 4 stencil values).
+                          quarter * (fetch(1, 0, 1) - fetch(-1, 0, 1) - fetch(1, 0, -1) + fetch(-1, 0, -1)),
+                          quarter * (fetch(2, 0, 1) - fetch(0, 0, 1) - fetch(2, 0, -1) + fetch(0, 0, -1)),
+                          quarter * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, 1, -1) + fetch(-1, 1, -1)),
+                          quarter * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, 1, -1) + fetch(0, 1, -1)),
+                          quarter * (fetch(1, 0, 2) - fetch(-1, 0, 2) - fetch(1, 0, 0) + fetch(-1, 0, 0)),
+                          quarter * (fetch(2, 0, 2) - fetch(0, 0, 2) - fetch(2, 0, 0) + fetch(0, 0, 0)),
+                          quarter * (fetch(1, 1, 2) - fetch(-1, 1, 2) - fetch(1, 1, 0) + fetch(-1, 1, 0)),
+                          quarter * (fetch(2, 1, 2) - fetch(0, 1, 2) - fetch(2, 1, 0) + fetch(0, 1, 0)),
+                          // values of d2f/dydz at the 8 corners (each from 4 stencil values).
+                          quarter * (fetch(0, 1, 1) - fetch(0, -1, 1) - fetch(0, 1, -1) + fetch(0, -1, -1)),
+                          quarter * (fetch(1, 1, 1) - fetch(1, -1, 1) - fetch(1, 1, -1) + fetch(1, -1, -1)),
+                          quarter * (fetch(0, 2, 1) - fetch(0, 0, 1) - fetch(0, 2, -1) + fetch(0, 0, -1)),
+                          quarter * (fetch(1, 2, 1) - fetch(1, 0, 1) - fetch(1, 2, -1) + fetch(1, 0, -1)),
+                          quarter * (fetch(0, 1, 2) - fetch(0, -1, 2) - fetch(0, 1, 0) + fetch(0, -1, 0)),
+                          quarter * (fetch(1, 1, 2) - fetch(1, -1, 2) - fetch(1, 1, 0) + fetch(1, -1, 0)),
+                          quarter * (fetch(0, 2, 2) - fetch(0, 0, 2) - fetch(0, 2, 0) + fetch(0, 0, 0)),
+                          quarter * (fetch(1, 2, 2) - fetch(1, 0, 2) - fetch(1, 2, 0) + fetch(1, 0, 0)),
+                          // values of d3f/dxdydz at the 8 corners (each from 8 stencil values).
+                          eighth * (fetch(1, 1, 1) - fetch(-1, 1, 1) - fetch(1, -1, 1) + fetch(-1, -1, 1) - fetch(1, 1, -1) + fetch(-1, 1, -1) + fetch(1, -1, -1) - fetch(-1, -1, -1)),
+                          eighth * (fetch(2, 1, 1) - fetch(0, 1, 1) - fetch(2, -1, 1) + fetch(0, -1, 1) - fetch(2, 1, -1) + fetch(0, 1, -1) + fetch(2, -1, -1) - fetch(0, -1, -1)),
+                          eighth * (fetch(1, 2, 1) - fetch(-1, 2, 1) - fetch(1, 0, 1) + fetch(-1, 0, 1) - fetch(1, 2, -1) + fetch(-1, 2, -1) + fetch(1, 0, -1) - fetch(-1, 0, -1)),
+                          eighth * (fetch(2, 2, 1) - fetch(0, 2, 1) - fetch(2, 0, 1) + fetch(0, 0, 1) - fetch(2, 2, -1) + fetch(0, 2, -1) + fetch(2, 0, -1) - fetch(0, 0, -1)),
+                          eighth * (fetch(1, 1, 2) - fetch(-1, 1, 2) - fetch(1, -1, 2) + fetch(-1, -1, 2) - fetch(1, 1, 0) + fetch(-1, 1, 0) + fetch(1, -1, 0) - fetch(-1, -1, 0)),
+                          eighth * (fetch(2, 1, 2) - fetch(0, 1, 2) - fetch(2, -1, 2) + fetch(0, -1, 2) - fetch(2, 1, 0) + fetch(0, 1, 0) + fetch(2, -1, 0) - fetch(0, -1, 0)),
+                          eighth * (fetch(1, 2, 2) - fetch(-1, 2, 2) - fetch(1, 0, 2) + fetch(-1, 0, 2) - fetch(1, 2, 0) + fetch(-1, 2, 0) + fetch(1, 0, 0) - fetch(-1, 0, 0)),
+                          eighth * (fetch(2, 2, 2) - fetch(0, 2, 2) - fetch(2, 0, 2) + fetch(0, 0, 2) - fetch(2, 2, 0) + fetch(0, 2, 0) + fetch(2, 0, 0) - fetch(0, 0, 0))};
 
     // 4Kb of static table (int8_t has a range of -127 -> 127 which suffices)
     static const int8_t A[64][64] = {
@@ -480,7 +501,7 @@ bool TricubicSampler<TreeOrAccT>::update(Vec3T& xyz)
         {8, -8, -8, 8, -8, 8, 8, -8, 4, 4, -4, -4, -4, -4, 4, 4, 4, -4, 4, -4, -4, 4, -4, 4, 4, -4, -4, 4, 4, -4, -4, 4, 2, 2, 2, 2, -2, -2, -2, -2, 2, 2, -2, -2, 2, 2, -2, -2, 2, -2, 2, -2, 2, -2, 2, -2, 1, 1, 1, 1, 1, 1, 1, 1}};
 
     for (int i = 0; i < 64; ++i) { // C = A * X
-        mC[i] = 0;
+        mC[i] = ValueT(0);
 #if 0
     for (int j = 0; j < 64; j += 4) {
       mC[i] = fma(A[i][j], X[j], fma(A[i][j+1], X[j+1], fma(A[i][j+2], X[j+2], fma(A[i][j+3], X[j+3], mC[i]))));

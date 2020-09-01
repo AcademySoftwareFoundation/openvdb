@@ -3,7 +3,7 @@
 
 ////////////////////////////////////////////////////////
 
-CNANOVDB_DECLARE_UNIFORMS_BEGIN()
+CNANOVDB_DECLARE_UNIFORMS_BEGIN
 int   width;
 int   height;
 int   numAccumulations;
@@ -21,7 +21,7 @@ float cameraPx, cameraPy, cameraPz;
 float cameraUx, cameraUy, cameraUz;
 float cameraVx, cameraVy, cameraVz;
 float cameraWx, cameraWy, cameraWz;
-CNANOVDB_DECLARE_UNIFORMS_END()
+CNANOVDB_DECLARE_UNIFORMS_END
 
 ////////////////////////////////////////////////////////
 
@@ -78,7 +78,7 @@ CNANOVDB_INLINE uint32_t hash2(uint32_t x, uint32_t y)
 
 CNANOVDB_INLINE float randomf(uint32_t s)
 {
-    return (float)(hash1(s)) / (float)(0xffffffffu);
+    return CNANOVDB_MAKE(float)(hash1(s)) / CNANOVDB_MAKE(float)(0xffffffffu);
 }
 
 CNANOVDB_INLINE vec3 makeVec3(float x)

@@ -354,10 +354,9 @@ void RendererBase::setGridIndex(int groupIndex, int gridIndex)
             groupIndex = 0;
     }
 
-    if (groupIndex < 0)
-    {
+    if (groupIndex < 0) {
         mRenderGroupIndex = groupIndex;
-        resetAccumulationBuffer();   
+        resetAccumulationBuffer();
         return;
     }
 
@@ -373,10 +372,10 @@ void RendererBase::setGridIndex(int groupIndex, int gridIndex)
         return;
     }
 
-    mRenderGroupIndex = groupIndex;    
+    mRenderGroupIndex = groupIndex;
     group->mCurrentGridIndex = gridIndex;
 
-    std::cout << "Selecting group["  << groupIndex << "].instance[" << gridIndex << "]\n";
+    //std::cout << "Selecting group[" << groupIndex << "].instance[" << gridIndex << "]\n";
 
     if (gridIndex < 0)
         return;
@@ -385,7 +384,7 @@ void RendererBase::setGridIndex(int groupIndex, int gridIndex)
     auto instance = group->mInstances[gridIndex];
     memcpy(mParams.mOptions.attributeSemanticMap, instance->attributeSemanticMap, sizeof(RendererAttributeParams) * size_t(nanovdb::GridBlindDataSemantic::End));
 
-    resetAccumulationBuffer();    
+    resetAccumulationBuffer();
 }
 
 void RendererBase::removeGridIndices(std::vector<int> indices)

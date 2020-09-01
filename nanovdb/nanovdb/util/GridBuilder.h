@@ -18,7 +18,9 @@
 #define NANOVDB_GRIDBUILDER_H_HAS_BEEN_INCLUDED
 
 #include "GridHandle.h"
-#include "MultiThreading.h"
+#include "Range.h"
+#include "Invoke.h"
+#include "ForEach.h"
 
 #include <map>
 #include <limits>
@@ -476,7 +478,7 @@ operator()(const Func &func, const CoordBBox &voxelBBox, ValueT delta)
         if (node) delete node;
         mActiveVoxelCount += sum;
     };// kernel
-    parallel_for(nodeBBox, kernel);
+    forEach(nodeBBox, kernel);
 }
 
 //================================================================================================
@@ -502,16 +504,14 @@ sdfToLevelSet()
 {
     const ValueT outside = mRoot.mBackground;
     // Note that the bottum-up flood filling is essential
-    parallel_invoke([&](){this->update(mArray0);}, 
-                    [&](){this->update(mArray1);}, 
-                    [&](){this->update(mArray2);});
-    parallel_for(0, mArray0.size(), 8,[&](const BlockedRange<size_t> &r){
+    invoke([&](){this->update(mArray0);}, [&](){this->update(mArray1);}, [&](){this->update(mArray2);});
+    forEach(0, mArray0.size(), 8, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray0[i]->signedFloodFill(outside);
     });
-    parallel_for(0, mArray1.size(), 1,[&](const BlockedRange<size_t> &r){
+    forEach(0, mArray1.size(), 1, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray1[i]->signedFloodFill(outside);
     });
-    parallel_for(0, mArray2.size(), 1,[&](const BlockedRange<size_t> &r){
+    forEach(0, mArray2.size(), 1, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray2[i]->signedFloodFill(outside);
     });
     mRoot.signedFloodFill(outside);
@@ -564,9 +564,7 @@ getHandle(const Map &map,
     if (gridClass == GridClass::FogVolume && !is_floating_point<ValueT>::value)
         throw std::runtime_error("Fog volumes are expected to be floating point types");
     
-    parallel_invoke([&](){this->update(mArray0);}, 
-                    [&](){this->update(mArray1);}, 
-                    [&](){this->update(mArray2);});
+    invoke([&](){this->update(mArray0);}, [&](){this->update(mArray1);}, [&](){this->update(mArray2);});
 
     mBytes[0] = DstGridT::memUsage(mBlindDataSize>0 ? 1 : 0); // grid + blind meta data
     mBytes[1] = DstTreeT::memUsage(); // tree
@@ -626,13 +624,13 @@ sdfToFog()
         v = v>d ? v*w : ValueT(1);
         return true; 
     };
-    auto kernel0 = [&](const BlockedRange<size_t> &r) {
+    auto kernel0 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode0* node = mArray0[i];
             for (uint32_t i=0; i<SrcNode0::SIZE; ++i) node->mValueMask.set(i, op(node->mValues[i]));
         }
     };
-    auto kernel1 = [&](const BlockedRange<size_t> &r) {
+    auto kernel1 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode1* node = mArray1[i];
             for (uint32_t i=0; i<SrcNode1::SIZE; ++i) {
@@ -649,7 +647,7 @@ sdfToFog()
             }
         }
     };
-    auto kernel2 = [&](const BlockedRange<size_t> &r) {
+    auto kernel2 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode2* node = mArray2[i];
             for (uint32_t i=0; i<SrcNode2::SIZE; ++i) {
@@ -666,9 +664,9 @@ sdfToFog()
             }
         }
     };
-    parallel_for(0, mArray0.size(), 8, kernel0);
-    parallel_for(0, mArray1.size(), 1, kernel1);
-    parallel_for(0, mArray2.size(), 1, kernel2);
+    forEach(0, mArray0.size(), 8, kernel0);
+    forEach(0, mArray1.size(), 1, kernel1);
+    forEach(0, mArray2.size(), 1, kernel2);
 
     for (auto it = mRoot.mTable.begin(); it != mRoot.mTable.end(); ++it) {
         SrcNode2 *child = it->second.child;
@@ -691,12 +689,12 @@ processLeafs()
 {
     mActiveVoxelCount = 0;
     auto* start = this->template nodeData<DstNode0>(); // address of first leaf node
-    auto kernel = [&](const BlockedRange<uint32_t> &r) {
+    auto kernel = [&](const Range1D &r) {
         uint64_t sum = 0;
         auto* data = start + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i, ++data) {
             SrcNode0& srcLeaf = *mArray0[i];
-            assert(srcLeaf.mID == i);
+            assert(size_t(srcLeaf.mID) == i);
             sum += srcLeaf.mValueMask.countOn();
             data->mValueMask = srcLeaf.mValueMask;
             const ValueT* src = srcLeaf.mValues;
@@ -729,7 +727,7 @@ processLeafs()
         }
         mActiveVoxelCount += sum;
     };
-    parallel_for(BlockedRange<uint32_t>(0, uint32_t(mArray0.size()), 8), kernel);
+    forEach(0, mArray0.size(), 8, kernel);
 } // GridBuilder::processLeafs
 
 //================================================================================================
@@ -740,9 +738,8 @@ void GridBuilder<ValueT, ExtremaOp>::
 processNodes(std::vector<SrcNodeT*>& array)
 {
     using SrcChildT = typename SrcNodeT::ChildType;
-    const uint32_t size = static_cast<uint32_t>(array.size());
-    auto*          start = this->template nodeData<DstNodeT>();
-    auto           kernel = [&](const BlockedRange<uint32_t> &r) 
+    auto* start = this->template nodeData<DstNodeT>();
+    auto  kernel = [&](const Range1D &r) 
     {
         auto* data = start + r.begin();
         uint64_t sum = 0;
@@ -752,7 +749,7 @@ processNodes(std::vector<SrcNodeT*>& array)
             sum += SrcChildT::NUM_VALUES * srcNode.mValueMask.countOn();// active tiles
             data->mValueMask = srcNode.mValueMask;
             data->mChildMask = srcNode.mChildMask;
-            data->mOffset = size - i;
+            data->mOffset = array.size() - i;
             auto noneChildMask = srcNode.mChildMask;//copy
             noneChildMask.toggle();// bits are on for values vs child nodes
             for (auto iter = noneChildMask.beginOn(); iter; ++iter) {
@@ -797,7 +794,7 @@ processNodes(std::vector<SrcNodeT*>& array)
         }
         mActiveVoxelCount += sum;
     };
-    parallel_for(BlockedRange<uint32_t>(0, uint32_t(array.size()), 4), kernel);
+    forEach(0, array.size(), 4, kernel);
 } // GridBuilder::processNodes
 
 //================================================================================================

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #if [ $# -eq 0 ]; then
-#	echo "Usage: test.sh <branch|commit>"
+#	echo "Usage: test-build.sh <branch|commit>"
 #	exit 1
 #fi
 
@@ -28,5 +28,5 @@ fi
 
 # -- build the image.
 if [ -f ${DIST_DIR}/repo.tar ]; then
-    docker build -t ${IMAGE}:dev-test -f ${DOCKER_DIR}/Dockerfile.test ${DOCKER_DIR}
+    docker build -t ${IMAGE}:dev-test-build -f ${DOCKER_DIR}/Dockerfile.test-build ${DOCKER_DIR}
 fi
