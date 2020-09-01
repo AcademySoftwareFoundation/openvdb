@@ -55,7 +55,13 @@ internal::initialize()
     // Register types associated with point data grids.
     Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointDataIndex64>(), Int64Metadata::createMetadata);
-    PointDataGrid::registerGrid();
+
+#define OPENVDB_TREE4(T, N1, N2, N3, LeafT) Grid<tree::Tree<tree::RootNode< \
+    tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>>>>::registerGrid();
+
+    OPENVDB_TREE4_POINT_DATA_INITIALIZE()
+
+#undef OPENVDB_TREE4
 }
 
 

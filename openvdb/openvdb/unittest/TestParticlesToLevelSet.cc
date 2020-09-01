@@ -10,6 +10,8 @@
 #include <openvdb/tools/LevelSetUtil.h> // for sdfInteriorMask()
 #include <openvdb/tools/ParticlesToLevelSet.h>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 

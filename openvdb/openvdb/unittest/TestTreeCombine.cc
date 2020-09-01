@@ -22,6 +22,8 @@
 #include <iostream>
 #endif
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 namespace {
 using Float433Tree = openvdb::tree::Tree4<float, 4, 3, 3>::Type;
 using Float433Grid = openvdb::Grid<Float433Tree>;

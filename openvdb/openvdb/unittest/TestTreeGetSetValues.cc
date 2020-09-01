@@ -8,6 +8,8 @@
 #include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin() et al.
 #include <openvdb/tools/Prune.h>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 

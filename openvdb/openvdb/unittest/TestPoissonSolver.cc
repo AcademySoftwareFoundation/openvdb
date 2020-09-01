@@ -16,6 +16,8 @@
 #include <openvdb/tools/PoissonSolver.h>
 #include <cmath>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 
 class TestPoissonSolver: public CppUnit::TestCase
 {

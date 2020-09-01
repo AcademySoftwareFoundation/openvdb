@@ -13,6 +13,7 @@
 #include <limits>
 #include <vector>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
 
 class TestVolumeToSpheres: public CppUnit::TestCase
 {

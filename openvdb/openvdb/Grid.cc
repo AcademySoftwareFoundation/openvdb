@@ -429,5 +429,20 @@ GridBase::clipGrid(const BBoxd& worldBBox)
     this->clip(indexBBox);
 }
 
+
+////////////////////////////////////////
+
+// explicit template instantiation
+
+#define OPENVDB_TREE4(T, N1, N2, N3, LeafT) \
+    template class Grid<tree::Tree<tree::RootNode< \
+        tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>>>>;
+
+OPENVDB_TREE4_VOLUME_INITIALIZE()
+OPENVDB_TREE4_PRIVATE_INITIALIZE()
+
+#undef OPENVDB_TREE4
+
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

@@ -33,6 +33,7 @@
 #include <random>
 #include <sstream>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
 
 // Uncomment to test on models from our web-site
 //#define TestTools_DATA_PATH "/home/kmu/src/openvdb/data/"

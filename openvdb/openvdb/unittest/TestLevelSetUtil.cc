@@ -10,6 +10,8 @@
 #include <openvdb/tools/MeshToVolume.h>     // for createLevelSetBox()
 #include <openvdb/tools/Composite.h>        // for csgDifference()
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 class TestLevelSetUtil: public CppUnit::TestCase
 {
 public:

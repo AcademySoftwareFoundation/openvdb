@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 using namespace openvdb;
 
 class TestPointSample: public CppUnit::TestCase

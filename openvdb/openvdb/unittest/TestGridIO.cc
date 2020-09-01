@@ -6,6 +6,7 @@
 #include <openvdb/openvdb.h>
 #include <cstdio> // for remove()
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
 
 class TestGridIO: public CppUnit::TestCase
 {

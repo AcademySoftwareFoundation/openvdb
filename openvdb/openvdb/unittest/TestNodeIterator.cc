@@ -4,6 +4,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/tree/Tree.h>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
 
 class TestNodeIterator: public CppUnit::TestCase
 {

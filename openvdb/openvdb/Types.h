@@ -87,6 +87,45 @@ using math::Quatd;
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};
 
+
+////////////////////////////////////////
+
+// OpenVDB type instantiation
+
+// Tree4
+
+#define OPENVDB_TREE4_VOLUME_INITIALIZE()                                   \
+    OPENVDB_TREE4(double, 5, 4, 3, tree::LeafNode)                          \
+    OPENVDB_TREE4(float, 5, 4, 3, tree::LeafNode)                           \
+    OPENVDB_TREE4(int32_t, 5, 4, 3, tree::LeafNode)                         \
+    OPENVDB_TREE4(int64_t, 5, 4, 3, tree::LeafNode)                         \
+    OPENVDB_TREE4(std::string, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(uint32_t, 5, 4, 3, tree::LeafNode)                        \
+    OPENVDB_TREE4(math::Vec2d, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(math::Vec2i, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(math::Vec2s, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(math::Vec3d, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(math::Vec3i, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(math::Vec3s, 5, 4, 3, tree::LeafNode)                     \
+    OPENVDB_TREE4(bool, 5, 4, 3, tree::LeafNode)                            \
+    OPENVDB_TREE4(ValueMask, 5, 4, 3, tree::LeafNode)
+
+#define OPENVDB_TREE4_PRIVATE_INITIALIZE()                                  \
+    OPENVDB_TREE4(int16_t, 5, 4, 3, tree::LeafNode)                         \
+    OPENVDB_TREE4(unsigned char, 5, 4, 3, tree::LeafNode)                   \
+    OPENVDB_TREE4(char, 5, 4, 3, tree::LeafNode)                            \
+    OPENVDB_TREE4(PointIndex32, 5, 4, 3, tree::LeafNode)                    \
+    OPENVDB_TREE4(PointDataIndex32, 5, 4, 3, tree::LeafNode)
+
+#define OPENVDB_TREE4_POINT_INDEX_INITIALIZE()                              \
+    OPENVDB_TREE4(PointIndex32, 5, 4, 3, tools::PointIndexLeafNode)
+
+#define OPENVDB_TREE4_POINT_DATA_INITIALIZE()                               \
+    OPENVDB_TREE4(PointDataIndex32, 5, 4, 3, points::PointDataLeafNode)
+
+
+////////////////////////////////////////
+
 // Use STL shared pointers from OpenVDB 4 on.
 template<typename T> using SharedPtr = std::shared_ptr<T>;
 template<typename T> using WeakPtr = std::weak_ptr<T>;

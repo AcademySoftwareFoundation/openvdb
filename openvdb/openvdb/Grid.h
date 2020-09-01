@@ -1835,4 +1835,24 @@ GridBase::apply(const OpT& op)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
+////////////////////////////////////////
+
+// suppress instantiation using extern template
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+
+#define OPENVDB_TREE4(T, N1, N2, N3, LeafT) \
+    extern template class Grid<tree::Tree<tree::RootNode< \
+        tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>>>>;
+
+OPENVDB_TREE4_VOLUME_INITIALIZE()
+OPENVDB_TREE4_PRIVATE_INITIALIZE()
+
+#undef OPENVDB_TREE4
+
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED

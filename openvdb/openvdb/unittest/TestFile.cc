@@ -36,6 +36,8 @@
 #include <cstring> // for memset()
 #endif
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 
 class TestFile: public CppUnit::TestCase
 {

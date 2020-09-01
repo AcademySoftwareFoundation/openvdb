@@ -14,6 +14,8 @@
 #include <sstream>
 #include <vector>
 
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
+
 using namespace openvdb;
 using namespace openvdb::points;
 

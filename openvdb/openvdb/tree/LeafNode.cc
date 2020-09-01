@@ -1,0 +1,24 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+
+#include "LeafNodeImpl.h"
+
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+
+////////////////////////////////////////
+
+// explicit template instantiation
+
+#define OPENVDB_TREE4(T, N1, N2, N3, LeafT) \
+    template class LeafT<T, N3>;
+
+OPENVDB_TREE4_VOLUME_INITIALIZE()
+OPENVDB_TREE4_PRIVATE_INITIALIZE()
+
+#undef OPENVDB_TREE4
+
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb

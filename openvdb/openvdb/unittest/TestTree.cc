@@ -19,6 +19,7 @@
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/SignedFloodFill.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include "utilCustomTree.h" // allow testing of non-standard tree configurations
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);

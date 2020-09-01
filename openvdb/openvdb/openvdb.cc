@@ -80,21 +80,18 @@ initialize()
 
     // Register common grid types.
     GridBase::clearRegistry();
-    BoolGrid::registerGrid();
-    MaskGrid::registerGrid();
-    FloatGrid::registerGrid();
-    DoubleGrid::registerGrid();
-    Int32Grid::registerGrid();
-    Int64Grid::registerGrid();
-    StringGrid::registerGrid();
-    Vec3IGrid::registerGrid();
-    Vec3SGrid::registerGrid();
-    Vec3DGrid::registerGrid();
 
     // Register types associated with point index grids.
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
-    tools::PointIndexGrid::registerGrid();
+
+#define OPENVDB_TREE4(T, N1, N2, N3, LeafT) Grid<tree::Tree<tree::RootNode< \
+    tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>>>>::registerGrid();
+
+    OPENVDB_TREE4_VOLUME_INITIALIZE()
+    OPENVDB_TREE4_POINT_INDEX_INITIALIZE()
+
+#undef OPENVDB_TREE4
 
     // Register types associated with point data grids.
 //#ifdef OPENVDB_ENABLE_POINTS

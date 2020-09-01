@@ -212,8 +212,14 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   points/AttributeArrayString.cc
   points/AttributeGroup.cc
   points/AttributeSet.cc
+  points/PointDataGrid.cc
   points/StreamCompression.cc
   points/points.cc
+  tools/PointIndexGrid.cc
+  tree/InternalNode.cc
+  tree/LeafNode.cc
+  tree/RootNode.cc
+  tree/Tree.cc
   util/Formats.cc
   util/Util.cc
 )

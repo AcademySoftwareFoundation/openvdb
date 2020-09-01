@@ -5,7 +5,6 @@
 #define OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include <openvdb/math/Math.h> // for math::isZero()
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
@@ -862,49 +861,12 @@ LeafNode<bool, Log2Dim>::~LeafNode()
 
 
 template<Index Log2Dim>
-inline Index64
-LeafNode<bool, Log2Dim>::memUsage() const
-{
-    // Use sizeof(*this) to capture alignment-related padding
-    return sizeof(*this);
-}
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
-{
-    CoordBBox this_bbox = this->getNodeBoundingBox();
-    if (bbox.isInside(this_bbox)) return;//this LeafNode is already enclosed in the bbox
-    if (ValueOnCIter iter = this->cbeginValueOn()) {//any active values?
-        if (visitVoxels) {//use voxel granularity?
-            this_bbox.reset();
-            for(; iter; ++iter) this_bbox.expand(this->offsetToLocalCoord(iter.pos()));
-            this_bbox.translate(this->origin());
-        }
-        bbox.expand(this_bbox);
-    }
-}
-
-
-template<Index Log2Dim>
 template<typename OtherType, Index OtherLog2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* other) const
 {
     assert(other);
     return (Log2Dim == OtherLog2Dim && mValueMask == other->getValueMask());
-}
-
-
-template<Index Log2Dim>
-inline std::string
-LeafNode<bool, Log2Dim>::str() const
-{
-    std::ostringstream ostr;
-    ostr << "LeafNode @" << mOrigin << ": ";
-    for (Index32 n = 0; n < SIZE; ++n) ostr << (mValueMask.isOn(n) ? '#' : '.');
-    return ostr.str();
 }
 
 
@@ -948,97 +910,6 @@ LeafNode<bool, Log2Dim>::offsetToGlobalCoord(Index n) const
 
 
 template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
-{
-    mValueMask.load(is);
-}
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
-{
-    mValueMask.save(os);
-}
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
-{
-    // Boolean LeafNodes don't currently implement lazy loading.
-    // Instead, load the full buffer, then clip it.
-
-    this->readBuffers(is, fromHalf);
-
-    // Get this tree's background value.
-    bool background = false;
-    if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
-        background = *static_cast<const bool*>(bgPtr);
-    }
-    this->clip(clipBBox, background);
-}
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
-{
-    // Read in the value mask.
-    mValueMask.load(is);
-    // Read in the origin.
-    is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-
-    if (io::getFormatVersion(is) >= OPENVDB_FILE_VERSION_BOOL_LEAF_OPTIMIZATION) {
-        // Read in the mask for the voxel values.
-        mBuffer.mData.load(is);
-    } else {
-        // Older files stored one or more bool arrays.
-
-        // Read in the number of buffers, which should now always be one.
-        int8_t numBuffers = 0;
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
-
-        // Read in the buffer.
-        // (Note: prior to the bool leaf optimization, buffers were always compressed.)
-        std::unique_ptr<bool[]> buf{new bool[SIZE]};
-        io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
-
-        // Transfer values to mBuffer.
-        mBuffer.mData.setOff();
-        for (Index i = 0; i < SIZE; ++i) {
-            if (buf[i]) mBuffer.mData.setOn(i);
-        }
-
-        if (numBuffers > 1) {
-            // Read in and discard auxiliary buffers that were created with
-            // earlier versions of the library.
-            for (int i = 1; i < numBuffers; ++i) {
-                io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
-            }
-        }
-    }
-}
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::writeBuffers(std::ostream& os, bool /*toHalf*/) const
-{
-    // Write out the value mask.
-    mValueMask.save(os);
-    // Write out the origin.
-    os.write(reinterpret_cast<const char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-    // Write out the voxel values.
-    mBuffer.mData.save(os);
-}
-
-
-////////////////////////////////////////
-
-
-template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::operator==(const LeafNode& other) const
 {
@@ -1055,52 +926,6 @@ LeafNode<bool, Log2Dim>::operator!=(const LeafNode& other) const
     return !(this->operator==(other));
 }
 
-
-////////////////////////////////////////
-
-
-template<Index Log2Dim>
-inline bool
-LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
-{
-    if (!mValueMask.isConstant(state)) return false;
-
-    // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
-    if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;
-
-    constValue = mBuffer.mData.isOn();
-    return true;
-}
-
-////////////////////////////////////////
-
-template<Index Log2Dim>
-inline bool
-LeafNode<bool, Log2Dim>::medianAll() const
-{
-    const Index countTrue = mBuffer.mData.countOn();
-    return countTrue > (NUM_VALUES >> 1);
-}
-
-template<Index Log2Dim>
-inline Index
-LeafNode<bool, Log2Dim>::medianOn(bool& state) const
-{
-    const NodeMaskType tmp = mBuffer.mData & mValueMask;//both true and active
-    const Index countTrueOn = tmp.countOn(), countOn = mValueMask.countOn();
-    state = countTrueOn > (NUM_VALUES >> 1);
-    return countOn;
-}
-
-template<Index Log2Dim>
-inline Index
-LeafNode<bool, Log2Dim>::medianOff(bool& state) const
-{
-    const NodeMaskType tmp = mBuffer.mData & (!mValueMask);//both true and inactive
-    const Index countTrueOff = tmp.countOn(), countOff = mValueMask.countOff();
-    state = countTrueOff > (NUM_VALUES >> 1);
-    return countOff;
-}
 
 ////////////////////////////////////////
 
@@ -1253,22 +1078,6 @@ LeafNode<bool, Log2Dim>::modifyValueAndActiveState(const Coord& xyz, const Modif
 
 
 template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::resetBackground(bool oldBackground, bool newBackground)
-{
-    if (newBackground != oldBackground) {
-        // Flip mBuffer's background bits and zero its foreground bits.
-        NodeMaskType bgMask = !(mBuffer.mData | mValueMask);
-        // Overwrite mBuffer's background bits, leaving its foreground bits intact.
-        mBuffer.mData = (mBuffer.mData & mValueMask) | bgMask;
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<Index Log2Dim>
 template<MergePolicy Policy>
 inline void
 LeafNode<bool, Log2Dim>::merge(const LeafNode& other, bool /*bg*/, bool /*otherBG*/)
@@ -1330,86 +1139,6 @@ LeafNode<bool, Log2Dim>::topologyDifference(const LeafNode<OtherType, Log2Dim>& 
                                             const bool&)
 {
     mValueMask &= !other.valueMask();
-}
-
-
-////////////////////////////////////////
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::clip(const CoordBBox& clipBBox, bool background)
-{
-    CoordBBox nodeBBox = this->getNodeBoundingBox();
-    if (!clipBBox.hasOverlap(nodeBBox)) {
-        // This node lies completely outside the clipping region.  Fill it with background tiles.
-        this->fill(nodeBBox, background, /*active=*/false);
-    } else if (clipBBox.isInside(nodeBBox)) {
-        // This node lies completely inside the clipping region.  Leave it intact.
-        return;
-    }
-
-    // This node isn't completely contained inside the clipping region.
-    // Set any voxels that lie outside the region to the background value.
-
-    // Construct a boolean mask that is on inside the clipping region and off outside it.
-    NodeMaskType mask;
-    nodeBBox.intersect(clipBBox);
-    Coord xyz;
-    int &x = xyz.x(), &y = xyz.y(), &z = xyz.z();
-    for (x = nodeBBox.min().x(); x <= nodeBBox.max().x(); ++x) {
-        for (y = nodeBBox.min().y(); y <= nodeBBox.max().y(); ++y) {
-            for (z = nodeBBox.min().z(); z <= nodeBBox.max().z(); ++z) {
-                mask.setOn(static_cast<Index32>(this->coordToOffset(xyz)));
-            }
-        }
-    }
-
-    // Set voxels that lie in the inactive region of the mask (i.e., outside
-    // the clipping region) to the background value.
-    for (MaskOffIter maskIter = mask.beginOff(); maskIter; ++maskIter) {
-        this->setValueOff(maskIter.pos(), background);
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::fill(const CoordBBox& bbox, bool value, bool active)
-{
-    auto clippedBBox = this->getNodeBoundingBox();
-    clippedBBox.intersect(bbox);
-    if (!clippedBBox) return;
-
-    for (Int32 x = clippedBBox.min().x(); x <= clippedBBox.max().x(); ++x) {
-        const Index offsetX = (x & (DIM-1u))<<2*Log2Dim;
-        for (Int32 y = clippedBBox.min().y(); y <= clippedBBox.max().y(); ++y) {
-            const Index offsetXY = offsetX + ((y & (DIM-1u))<<  Log2Dim);
-            for (Int32 z = clippedBBox.min().z(); z <= clippedBBox.max().z(); ++z) {
-                const Index offset = offsetXY + (z & (DIM-1u));
-                mValueMask.set(offset, active);
-                mBuffer.mData.set(offset, value);
-            }
-        }
-    }
-}
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::fill(const bool& value)
-{
-    mBuffer.fill(value);
-}
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::fill(const bool& value, bool active)
-{
-    mBuffer.fill(value);
-    mValueMask.set(active);
 }
 
 
