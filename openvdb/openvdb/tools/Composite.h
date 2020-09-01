@@ -36,58 +36,58 @@ namespace tools {
 /// @brief Given two level set grids, replace the A grid with the union of A and B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 /// @brief Given two level set grids, replace the A grid with the intersection of A and B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 /// @brief Given two level set grids, replace the A grid with the difference A / B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 
 /// @brief  Threaded CSG union operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG union of the @a and @b level set inputs.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline typename GridOrTreeT::Ptr csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 /// @brief  Threaded CSG intersection operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG intersection of the @a and @b level set inputs.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline typename GridOrTreeT::Ptr csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 /// @brief  Threaded CSG difference operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG difference of the @a and @b level set inputs.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline typename GridOrTreeT::Ptr csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 
 /// @brief Given grids A and B, compute max(a, b) per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compMax(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute min(a, b) per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compMin(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a + b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compSum(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a * b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compMul(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a / b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compDiv(GridOrTreeT& a, GridOrTreeT& b);
 
 /// Copy the active voxels of B into A.
-template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+template<typename GridOrTreeT>
 inline void compReplace(GridOrTreeT& a, const GridOrTreeT& b);
 
 
@@ -726,7 +726,7 @@ struct CopyOp
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compMax(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -742,7 +742,7 @@ compMax(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compMin(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -758,7 +758,7 @@ compMin(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compSum(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -773,7 +773,7 @@ compSum(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -788,7 +788,7 @@ compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compDiv(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -833,7 +833,7 @@ struct CompReplaceOp
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1123,7 +1123,7 @@ struct CsgDiffVisitor: public CsgVisitorBase<TreeType>
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1135,7 +1135,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 }
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1147,7 +1147,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 }
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1160,7 +1160,7 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline typename GridOrTreeT::Ptr
+inline typename GridOrTreeT::Ptr
 csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1174,7 +1174,7 @@ csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline typename GridOrTreeT::Ptr
+inline typename GridOrTreeT::Ptr
 csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -1188,7 +1188,7 @@ csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 
 
 template<typename GridOrTreeT>
-OPENVDB_STATIC_SPECIALIZATION inline typename GridOrTreeT::Ptr
+inline typename GridOrTreeT::Ptr
 csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;

@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(OpenVDBBinaries LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
