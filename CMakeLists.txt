@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -152,53 +152,22 @@ set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
-option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
-option(OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF)
-
-# Alias deprecated vars
-
 if(OPENVDB_BUILD_HOUDINI_SOPS)
-  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
-  message(DEPRECATION "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
-    "Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
-  set(OPENVDB_BUILD_HOUDINI_PLUGIN ON)
+  message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
-
-if(OPENVDB_ENABLE_3_ABI_COMPATIBLE)
-  message(DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated and will be removed. Use "
-    "-D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version.")
-  if(OPENVDB_ABI_VERSION_NUMBER)
-    if(NOT (${OPENVDB_ABI_VERSION_NUMBER} EQUAL 3))
-      message(WARNING "OPENVDB_ABI_VERSION_NUMBER holds a different ABI value to "
-        "OPENVDB_ENABLE_3_ABI_COMPATIBLE, which will be ignored.")
-    endif()
-  else()
-    # Don't bother setting the docstring as we'll update it later
-    set(OPENVDB_ABI_VERSION_NUMBER "3" CACHE STRING "" FORCE)
-  endif()
-endif()
-
 if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
-  message(DEPRECATION "The USE_SYSTEM_LIBRARY_PATHS option is deprecated and will be removed. "
-    "Use DISABLE_CMAKE_SEARCH_PATHS.")
-  if(USE_SYSTEM_LIBRARY_PATHS)
-    set(DISABLE_CMAKE_SEARCH_PATHS OFF)
-  else()
-    set(DISABLE_CMAKE_SEARCH_PATHS ON)
-  endif()
+  message(FATAL_ERROR "The USE_SYSTEM_LIBRARY_PATHS option has been removed. Use DISABLE_CMAKE_SEARCH_PATHS.")
 endif()
 
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
   OPENVDB_CXX_STRICT
-  OPENVDB_ENABLE_3_ABI_COMPATIBLE
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
   USE_CCACHE
-  OPENVDB_BUILD_HOUDINI_SOPS
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
@@ -252,7 +221,9 @@ endif()
 
 # VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+# Note: CMake 3.15 chosen as possible next version due to Windows support
+# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
 #set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
@@ -341,7 +312,6 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
-#  FindOpenGL.cmake is needed if CMake < 3.8
 #  FindNumPy.cmake is needed if CMake < 3.14
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)

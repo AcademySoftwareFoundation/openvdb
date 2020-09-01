@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(OpenVDBPython LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
@@ -71,37 +71,12 @@ function(OPENVDB_CHECK_PYTHON_VERSION)
 endfunction()
 
 # Configure Python and Numpy. Note that:
-#  - find_package(Python Interpreter Development) requires CMake >= 3.12
 #  - find_package(Python NumPy) requires CMake >= 3.14
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
 # FindPython
 # Note that the Interpreter component is only required for the python test
-if(${CMAKE_VERSION} VERSION_LESS 3.12)
-  # CMake < 3.12
-  if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-    find_package(PythonInterp REQUIRED)
-  endif()
-  find_package(PythonLibs REQUIRED)
-
-  # Alias variables to newer names
-  set(Python_VERSION ${PYTHON_VERSION_STRING})
-  set(Python_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
-  set(Python_VERSION_MINOR ${PYTHON_VERSION_MINOR})
-  set(Python_EXECUTABLE ${PYTHON_EXECUTABLE})
-  set(OPENVDB_PYTHON_DEPS ${PYTHON_LIBRARIES})
-  get_filename_component(Python_LIBRARY_DIRS ${OPENVDB_PYTHON_DEPS} DIRECTORY)
-
-  list(APPEND OPENVDB_PYTHON_INCLUDES ${PYTHON_INCLUDE_DIR})
-
-  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${PYTHON_INCLUDE_DIR})
-
-  if(USE_NUMPY)
-    # Note: This uses our custom backport in cmake/backports
-    find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
-    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-  endif()
-elseif(${CMAKE_VERSION} VERSION_LESS 3.14)
+if(${CMAKE_VERSION} VERSION_LESS 3.14)
   # CMake < 3.14
   if(OPENVDB_BUILD_PYTHON_UNITTESTS)
     find_package(Python QUIET COMPONENTS Interpreter Development)
