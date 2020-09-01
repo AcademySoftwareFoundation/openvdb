@@ -22,7 +22,7 @@ namespace OPENVDB_VERSION_NAME {
     template class tree::RootNode<tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>>; \
     template class tree::InternalNode<tree::InternalNode<LeafT<T, N3>, N2>, N1>; \
     template class tree::InternalNode<LeafT<T, N3>, N2>; \
-    template class LeafT<T, N3>;
+    template struct LeafT<T, N3>;
 
 OPENVDB_TREE4_POINT_INDEX_INITIALIZE()
 
