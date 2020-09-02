@@ -18,7 +18,7 @@ project(OpenVDBDocs LANGUAGES NONE)
 # USE_HOUDINI=ON will define Houdini_VERSION. If Houdini_VERSION is not set,
 # all documentation is included.
 option(OPENVDB_DOXYGEN_HOUDINI "Build Houdini documentation" ON)
-
+option(OPENVDB_DOXYGEN_AX "Build AX documentation" ON)
 
 find_package(Doxygen REQUIRED doxygen)
 if(MINIMUM_DOXYGEN_VERSION)
@@ -78,6 +78,7 @@ set(DOXYGEN_HIDE_SCOPE_NAMES YES)
 set(DOXYGEN_INLINE_INHERITED_MEMB YES)
 set(DOXYGEN_MACRO_EXPANSION YES)
 set(DOXYGEN_CLASS_DIAGRAMS NO) # @todo use dot with class diagrams for relevant classes
+set(DOXYGEN_ENABLED_SECTIONS "")
 
 set(DOXYGEN_QUIET YES)
 
@@ -142,7 +143,7 @@ if(OPENVDB_DOXYGEN_HOUDINI)
     [[hvdblink="@link @hvdbnamespace"]]
     )
 
-  set(DOXYGEN_ENABLED_SECTIONS "OPENVDB_HOUDINI")
+  list(APPEND DOXYGEN_ENABLED_SECTIONS "OPENVDB_HOUDINI")
 
   list(APPEND DOXY_FILES
     doc/houdini.txt
@@ -160,6 +161,30 @@ if(OPENVDB_DOXYGEN_HOUDINI)
     openvdb_houdini/openvdb_houdini/UT_VDBTools.h
     openvdb_houdini/openvdb_houdini/UT_VDBUtils.h
     openvdb_houdini/openvdb_houdini/Utils.h)
+endif()
+
+if(OPENVDB_DOXYGEN_AX)
+  set(DOXYGEN_EXTRA_PACKAGES amsmath) # for math formatting
+  set(DOXYGEN_FORMULA_FONTSIZE 14)
+  list(APPEND DOXYGEN_ENABLED_SECTIONS "OPENVDB_AX")
+
+  list(APPEND DOXY_FILES
+    doc/ax/ax.txt
+    doc/ax/axexamples.txt
+    doc/ax/axfunctionlist.txt
+    doc/ax/doc.txt
+    doc/ax/openvdbaxapi.txt
+    doc/ax/openvdbaxbuild.txt
+    openvdb_ax/openvdb_ax
+    openvdb_ax/openvdb_ax/ast
+    openvdb_ax/openvdb_ax/cmd
+    openvdb_ax/openvdb_ax/codegen
+    openvdb_ax/openvdb_ax/compiler
+    openvdb_ax/openvdb_ax/grammar
+    openvdb_ax/openvdb_ax/grammar/generated
+    openvdb_ax/openvdb_ax/math
+    openvdb_ax/openvdb_ax/python
+    openvdb_ax/openvdb_ax/test)
 endif()
 
 set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)

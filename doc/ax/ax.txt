@@ -8,7 +8,7 @@
 Welcome to the AX Language documentation. These docs provide detailed
 information on the AX language including syntax, data types, available
 functionality (including OpenVDB specific methods) execution structure and
-control flow. See the @subpage openvdbax documentation for the C++ developer
+control flow. See the @subpage openvdbaxapi documentation for the C++ developer
 documentation.
 @note
 These documents are currently in @b BETA and are subject to change. Please @ref
@@ -97,7 +97,7 @@ OpenVDB Points or OpenVDB Volumes. For any given AX program, the execution conte
 importantly, the behaviour of reading/writing from attributes. See the @ref axexecutionxcontext
 for details.
 @par
-For details of extending AX for custom geometry, see the @subpage openvdbax
+For details of extending AX for custom geometry, see the @subpage openvdbaxapi
 developer documentation. Note that custom geometry support requires C++ extension.
 
 
