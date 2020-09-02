@@ -703,24 +703,6 @@ private:
         }
     }
 
-    /// @brief Rasterize sphere at position P and radius R.
-    /// @return @c false if rasterization was interrupted
-    ///
-    /// @param P coordinates of the particle position in voxel units
-    /// @param R radius of particle in voxel units
-    /// @param att
-    /// @param acc grid accessor with a private copy of the grid
-    bool makeSphere(const Vec3R& P, Real R, const AttT& att, AccessorT& acc)
-    {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (OutputIsMask) {
-            return makeSphereMask(P, R, att, acc);
-        } else {
-            return makeNarrowBandSphere(P, R, att, acc);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
-
     /// @brief Rasterize sphere at position P and radius R into
     /// a narrow-band level set with half-width, mHalfWidth.
     /// @return @c false if rasterization was interrupted
@@ -735,7 +717,9 @@ private:
     /// to world units (the grid stores the closest Euclidean signed distances
     /// measured in world units).  Also note we use the convention of positive distances
     /// outside the surface and negative distances inside the surface.
-    bool makeNarrowBandSphere(const Vec3R& P, Real R, const AttT& att, AccessorT& acc)
+    template <bool IsMaskT = OutputIsMask>
+    typename std::enable_if<!IsMaskT, bool>::type
+    makeSphere(const Vec3R& P, Real R, const AttT& att, AccessorT& acc)
     {
         const Real
             dx = mParent.mDx,
@@ -787,7 +771,9 @@ private:
 
     /// @brief Rasterize a sphere of radius @a r at position @a p into a boolean mask grid.
     /// @return @c false if rasterization was interrupted
-    bool makeSphereMask(const Vec3R& p, Real r, const AttT& att, AccessorT& acc)
+    template <bool IsMaskT = OutputIsMask>
+    typename std::enable_if<IsMaskT, bool>::type
+    makeSphere(const Vec3R& p, Real r, const AttT& att, AccessorT& acc)
     {
         const Real
             rSquared = r * r, // sphere radius squared, in voxel units

@@ -89,7 +89,7 @@ enum TilePolicy { IGNORE_TILES, EXPAND_TILES, PRESERVE_TILES };
 ///                      (see above for details)
 ///
 /// @note The values of any voxels are unchanged.
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void dilateActiveValues(TreeType& tree,
                                int iterations = 1,
                                NearestNeighbors nn = NN_FACE,
@@ -119,7 +119,7 @@ inline void dilateActiveValues(TreeType& tree,
 ///                      (see above for details)
 ///
 /// @note The values of any voxels are unchanged.
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void dilateActiveValues(tree::LeafManager<TreeType>& manager,
                                int iterations = 1,
                                NearestNeighbors nn = NN_FACE,
@@ -138,7 +138,7 @@ inline void dilateActiveValues(tree::LeafManager<TreeType>& manager,
 ///     nearest neighbors).
 ///
 /// @note The values of any voxels are unchanged.
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE);
@@ -157,7 +157,7 @@ inline void dilateVoxels(TreeType& tree,
 ///     nearest neighbors).
 ///
 /// @note The values of any voxels are unchanged.
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE);
@@ -169,12 +169,12 @@ inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
 /// in the +x, -x, +y, -y, +z and -z directions, but don't change the values
 /// of any voxels, only their active states.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void erodeVoxels(TreeType& tree,
                         int iterations=1,
                         NearestNeighbors nn = NN_FACE);
 
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+template<typename TreeType>
 inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
                         int iterations = 1,
                         NearestNeighbors nn = NN_FACE);
@@ -812,7 +812,7 @@ Morphology<TreeType>::doErosion(NearestNeighbors nn)
 
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 dilateVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
@@ -822,7 +822,7 @@ dilateVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighb
 }
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 dilateVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
@@ -832,7 +832,7 @@ dilateVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 }
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
@@ -842,7 +842,7 @@ erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbo
 }
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 erodeVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
@@ -1043,14 +1043,14 @@ private:
 };// DilationOp
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 dilateActiveValues(TreeType& tree, int iterations, NearestNeighbors nn, TilePolicy mode)
 {
     if (iterations > 0 ) DilationOp<TreeType> tmp(tree, iterations, nn, mode);
 }
 
 template<typename TreeType>
-OPENVDB_STATIC_SPECIALIZATION inline void
+inline void
 dilateActiveValues(tree::LeafManager<TreeType>& manager,
                    int iterations,
                    NearestNeighbors nn,

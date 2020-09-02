@@ -499,6 +499,9 @@ struct D1<CD_2ND>
     static ValueType difference(const ValueType& xp1, const ValueType& xm1) {
         return (xp1 - xm1)*ValueType(0.5);
     }
+    static bool difference(const bool& xp1, const bool& /*xm1*/) {
+        return xp1;
+    }
 
 
     // random access

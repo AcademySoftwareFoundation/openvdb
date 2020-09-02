@@ -77,9 +77,9 @@ private:
 public:
     NodeUnion(): mChild(nullptr) {}
     NodeUnion(const NodeUnion& other): mChild(nullptr)
-        { std::memcpy(this, &other, sizeof(*this)); }
+        { std::memcpy(static_cast<void*>(this), &other, sizeof(*this)); }
     NodeUnion& operator=(const NodeUnion& rhs)
-        { std::memcpy(this, &rhs, sizeof(*this)); return *this; }
+        { std::memcpy(static_cast<void*>(this), &rhs, sizeof(*this)); return *this; }
 
     ChildT* getChild() const { return mChild; }
     void setChild(ChildT* child) { mChild = child; }
