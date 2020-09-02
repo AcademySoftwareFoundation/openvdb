@@ -142,7 +142,7 @@ if(OPENVDB_DOXYGEN_HOUDINI)
     [[hvdblink="@link @hvdbnamespace"]]
     )
 
-  set(DOXYGEN_ENABLED_SECTIONS ON)
+  set(DOXYGEN_ENABLED_SECTIONS "OPENVDB_HOUDINI")
 
   list(APPEND DOXY_FILES
     doc/houdini.txt
