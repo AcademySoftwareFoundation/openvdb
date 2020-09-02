@@ -14,6 +14,7 @@
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointDataGrid.h>
+#include <openvdb/util/Formats.h> // for formattedInt
 
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
