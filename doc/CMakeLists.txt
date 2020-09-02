@@ -174,7 +174,6 @@ if(OPENVDB_DOXYGEN_AX)
     doc/ax/axfunctionlist.txt
     doc/ax/doc.txt
     doc/ax/openvdbaxapi.txt
-    doc/ax/openvdbaxbuild.txt
     openvdb_ax/openvdb_ax
     openvdb_ax/openvdb_ax/ast
     openvdb_ax/openvdb_ax/cmd
@@ -183,7 +182,6 @@ if(OPENVDB_DOXYGEN_AX)
     openvdb_ax/openvdb_ax/grammar
     openvdb_ax/openvdb_ax/grammar/generated
     openvdb_ax/openvdb_ax/math
-    openvdb_ax/openvdb_ax/python
     openvdb_ax/openvdb_ax/test)
 endif()
 

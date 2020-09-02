@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file version.h
+/// @file openvdb_ax/version.h
 ///
 /// @brief Library and file format version numbers
 ///

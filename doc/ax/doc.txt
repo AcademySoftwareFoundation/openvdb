@@ -3,7 +3,7 @@
 
 @page openvdbax OpenVDB AX
 
-@section overview Overview
+@section axoverview Overview
 @par
 <b>OpenVDB AX</b> is an open source C++ library that provides a powerful and
 easy way of interacting with OpenVDB volume and point data. The software strives
@@ -25,7 +25,6 @@ The doxygen documentation provide information on both AX as a language and the
 developer documentation for OpenVDB AX as a C++ API. There are two main sections:
 @par
  - The @subpage ax "AX Language Documentation" provides useful information for front-end users looking for documentation on the AX Language.
- - The @subpage openvdbaxbuild "Building OpenVDB AX" provides build instructions and requirements.
  - The @subpage openvdbaxapi "OpenVDB AX Documentation" provides API and other C++ specific software information for developers.
 @par
 Some additional quick links to useful subsections of the documentation are also
@@ -33,7 +32,7 @@ provided:
 @par
  - @subpage axexamples "Code Examples" for examples of OpenVDB AX in action.
  - @subpage axfunctionlist "AX Functions" for a list of all available AX functions.
- - @subpage vdbaxbuild "Building OpenVDB AX" for information on building <b>OpenVDB AX</b>.
+ - @subpage build "Building OpenVDB" and @subpage dependencies "OpenVDB Dependencies" for information on building OpenVDB and <b>OpenVDB AX</b>.
 
 @subsection contact Contact
 @par
