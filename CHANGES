@@ -17,6 +17,8 @@ Version 7.1.1 - In Development
       is able to be configured against an existing installation of OpenVDB
       without ambiguous include paths.
     - Upgraded CMake minimum version support to 3.12.
+    - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
+    - Fixed various compiler warnings for GCC 9.1.
 
 Version 7.1.0 - August 13, 2020
 
