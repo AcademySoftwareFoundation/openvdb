@@ -7,8 +7,7 @@
 
 #]=======================================================================]
 
-# @note  Version 3.4 is required for re-generation of AX Grammar
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(OpenVDBAXCore LANGUAGES CXX)
 
 option(OPENVDB_AX_SHARED "Build dynamically linked version of the ax library." ON)
@@ -44,7 +43,6 @@ set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
 file(MAKE_DIRECTORY ${OPENVDB_AX_GRAMMAR_DIR})
 
 if(OPENVDB_BUILD_AX_GRAMMAR)
-  cmake_minimum_required(VERSION 3.4)
   find_package(FLEX REQUIRED)
   find_package(BISON 3.0 REQUIRED)
 
