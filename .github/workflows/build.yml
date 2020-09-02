@@ -18,6 +18,9 @@ on:
       - 'openvdb/doc/**'
       - 'openvdb_maya/**'
       - '**/*.md'
+  schedule:
+    # run this workflow every day at 7am UTC
+    - cron:  '0 7 * * *'
 
 jobs:
   testvfx2021:
