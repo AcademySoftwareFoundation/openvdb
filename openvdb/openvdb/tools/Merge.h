@@ -354,6 +354,41 @@ bool TreeToMerge<TreeT>::MaskUnionOp::operator()(NodeT& node, size_t /*idx*/) co
 ////////////////////////////////////////
 
 
+namespace merge_internal {
+
+
+template <typename BufferT, typename ValueT>
+struct UnallocatedBuffer
+{
+    static void allocateAndFill(BufferT& buffer, const ValueT& background)
+    {
+        if (!buffer.isOutOfCore() && buffer.empty()) {
+            buffer.allocate();
+            buffer.fill(background);
+        }
+    }
+
+    static bool isPartiallyConstructed(const BufferT& buffer)
+    {
+        return !buffer.isOutOfCore() && buffer.empty();
+    }
+}; // struct AllocateAndFillBuffer
+
+template <typename BufferT>
+struct UnallocatedBuffer<BufferT, bool>
+{
+    // do nothing for bool buffers as they cannot be unallocated
+    static void allocateAndFill(BufferT&, const bool&) { }
+    static bool isPartiallyConstructed(const BufferT&) { return false; }
+}; // struct AllocateAndFillBuffer
+
+
+} // namespace merge_internal
+
+
+////////////////////////////////////////
+
+
 template <typename TreeT, bool Union>
 bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) const
 {
@@ -561,31 +596,6 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(NodeT& node, size_t) con
     return continueRecurse;
 }
 
-template <typename BufferT, typename ValueT>
-struct UnallocatedBuffer
-{
-    static void allocateAndFill(BufferT& buffer, const ValueT& background)
-    {
-        if (!buffer.isOutOfCore() && buffer.empty()) {
-            buffer.allocate();
-            buffer.fill(background);
-        }
-    }
-
-    static bool isPartiallyConstructed(const BufferT& buffer)
-    {
-        return !buffer.isOutOfCore() && buffer.empty();
-    }
-}; // struct AllocateAndFillBuffer
-
-template <typename BufferT>
-struct UnallocatedBuffer<BufferT, bool>
-{
-    // do nothing for bool buffers as they cannot be unallocated
-    static void allocateAndFill(BufferT&, const bool&) { }
-    static bool isPartiallyConstructed(const BufferT&) { return false; }
-}; // struct AllocateAndFillBuffer
-
 template <typename TreeT, bool Union>
 bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(LeafT& leaf, size_t) const
 {
@@ -600,14 +610,16 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(LeafT& leaf, size_t) con
     // if buffer is not out-of-core and empty, leaf node must have only been
     // partially constructed, so allocate and fill with background value
 
-    UnallocatedBuffer<BufferT, ValueT>::allocateAndFill(leaf.buffer(), background);
+    merge_internal::UnallocatedBuffer<BufferT, ValueT>::allocateAndFill(
+        leaf.buffer(), background);
 
     for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
         const LeafT* mergeLeaf = mergeTree.template probeConstNode<LeafT>(leaf.origin());
         if (!mergeLeaf)     continue;
         // if buffer is not out-of-core yet empty, leaf node must have only been
         // partially constructed, so skip merge
-        if (UnallocatedBuffer<BufferT, ValueT>::isPartiallyConstructed(mergeLeaf->buffer())) {
+        if (merge_internal::UnallocatedBuffer<BufferT, ValueT>::isPartiallyConstructed(
+            mergeLeaf->buffer())) {
             continue;
         }
 
@@ -778,10 +790,26 @@ bool CsgDifferenceOp<TreeT>::operator()(NodeT& node, size_t) const
 template <typename TreeT>
 bool CsgDifferenceOp<TreeT>::operator()(LeafT& leaf, size_t) const
 {
-    if (!leaf.allocate())           return false;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename LeafT::ValueType;
+    using BufferT = typename LeafT::Buffer;
+
+    // if buffer is not out-of-core and empty, leaf node must have only been
+    // partially constructed, so allocate and fill with background value
+
+    merge_internal::UnallocatedBuffer<BufferT, ValueT>::allocateAndFill(
+        leaf.buffer(), this->background());
 
     const LeafT* mergeLeaf = mTree.template probeConstNode<LeafT>(leaf.origin());
     if (!mergeLeaf)                 return false;
+
+    // if buffer is not out-of-core yet empty, leaf node must have only been
+    // partially constructed, so skip merge
+
+    if (merge_internal::UnallocatedBuffer<BufferT, ValueT>::isPartiallyConstructed(
+        mergeLeaf->buffer())) {
+        return false;
+    }
 
     for (Index i = 0 ; i < LeafT::SIZE; i++) {
         const ValueT& aValue = leaf.getValue(i);
