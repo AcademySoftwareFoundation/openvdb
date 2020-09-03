@@ -136,11 +136,25 @@ protected:
             return *(this->parent().getChildNode(pos));
         }
 
-        // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ChildT& c) const { this->parent().resetChildNode(pos, &c); }
 
-        // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
+       // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
+
+    template<typename NodeT, typename ChildT, typename MaskIterT, typename TagT>
+    struct ConstChildIter: public SparseIteratorBase<
+        MaskIterT, ConstChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>
+    {
+        ConstChildIter() {}
+        ConstChildIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
+            MaskIterT, ConstChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>(iter, parent) {}
+
+        ChildT& getItem(Index pos) const
+        {
+            assert(this->parent().isChildMaskOn(pos));
+            return *(this->parent().getChildNode(pos));
+        }
+    };// ConstChildIter
 
     // Sparse iterator that visits tile values of an InternalNode
     template<typename NodeT, typename ValueT, typename MaskIterT, typename TagT>
@@ -153,16 +167,25 @@ protected:
 
         const ValueT& getItem(Index pos) const { return this->parent().mNodes[pos].getValue(); }
 
-        // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ValueT& v) const { this->parent().mNodes[pos].setValue(v); }
 
-        // Note: modifyItem() can't be called on const iterators.
         template<typename ModifyOp>
         void modifyItem(Index pos, const ModifyOp& op) const
         {
             op(this->parent().mNodes[pos].getValue());
         }
     };// ValueIter
+
+    template<typename NodeT, typename ValueT, typename MaskIterT, typename TagT>
+    struct ConstValueIter: public SparseIteratorBase<
+        MaskIterT, ConstValueIter<NodeT, ValueT, MaskIterT, TagT>, NodeT, ValueT>
+    {
+        ConstValueIter() {}
+        ConstValueIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
+            MaskIterT, ConstValueIter<NodeT, ValueT, MaskIterT, TagT>, NodeT, ValueT>(iter, parent) {}
+
+        const ValueT& getItem(Index pos) const { return this->parent().mNodes[pos].getValue(); }
+    };// ConstValueIter
 
     // Dense iterator that visits both tiles and child nodes of an InternalNode
     template<typename NodeT, typename ChildT, typename ValueT, typename TagT>
@@ -200,21 +223,44 @@ protected:
         }
     };// DenseIter
 
+    template<typename NodeT, typename ChildT, typename ValueT, typename TagT>
+    struct ConstDenseIter: public DenseIteratorBase<
+        MaskDenseIterator, ConstDenseIter<NodeT, ChildT, ValueT, TagT>, NodeT, ChildT, ValueT>
+    {
+        using BaseT = DenseIteratorBase<MaskDenseIterator, ConstDenseIter, NodeT, ChildT, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
+
+        ConstDenseIter() {}
+        ConstDenseIter(const MaskDenseIterator& iter, NodeT* parent):
+            DenseIteratorBase<MaskDenseIterator, ConstDenseIter, NodeT, ChildT, ValueT>(iter, parent) {}
+
+        bool getItem(Index pos, ChildT*& child, NonConstValueT& value) const
+        {
+            if (this->parent().isChildMaskOn(pos)) {
+                child = this->parent().getChildNode(pos);
+                return true;
+            }
+            child = nullptr;
+            value = this->parent().mNodes[pos].getValue();
+            return false;
+        }
+    };// ConstDenseIter
+
 public:
     // Iterators (see Iterator.h for usage)
     using ChildOnIter = ChildIter<InternalNode, ChildNodeType, MaskOnIterator, ChildOn>;
-    using ChildOnCIter = ChildIter<const InternalNode,const ChildNodeType,MaskOnIterator,ChildOn>;
+    using ChildOnCIter = ConstChildIter<const InternalNode,const ChildNodeType,MaskOnIterator,ChildOn>;
     using ChildOffIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ChildOff>;
-    using ChildOffCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ChildOff>;
+    using ChildOffCIter = ConstValueIter<const InternalNode,const ValueType,MaskOffIterator,ChildOff>;
     using ChildAllIter = DenseIter<InternalNode, ChildNodeType, ValueType, ChildAll>;
-    using ChildAllCIter = DenseIter<const InternalNode,const ChildNodeType, ValueType, ChildAll>;
+    using ChildAllCIter = ConstDenseIter<const InternalNode,const ChildNodeType, ValueType, ChildAll>;
 
     using ValueOnIter = ValueIter<InternalNode, const ValueType, MaskOnIterator, ValueOn>;
-    using ValueOnCIter = ValueIter<const InternalNode, const ValueType, MaskOnIterator, ValueOn>;
+    using ValueOnCIter = ConstValueIter<const InternalNode, const ValueType, MaskOnIterator, ValueOn>;
     using ValueOffIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueOff>;
-    using ValueOffCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueOff>;
+    using ValueOffCIter = ConstValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueOff>;
     using ValueAllIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueAll>;
-    using ValueAllCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueAll>;
+    using ValueAllCIter = ConstValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueAll>;
 
     ChildOnCIter  cbeginChildOn()  const { return ChildOnCIter(mChildMask.beginOn(), this); }
     ChildOffCIter cbeginChildOff() const { return ChildOffCIter(mChildMask.beginOff(), this); }

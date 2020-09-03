@@ -307,6 +307,27 @@ private:
         }
     }; // ValueIter
 
+    template<typename RootNodeT, typename MapIterT, typename FilterPredT, typename ValueT>
+    class ConstValueIter: public BaseIter<RootNodeT, MapIterT, FilterPredT>
+    {
+    public:
+        using BaseT = BaseIter<RootNodeT, MapIterT, FilterPredT>;
+        using NodeType = RootNodeT;
+        using ValueType = ValueT;
+        using NonConstNodeType = typename std::remove_const<NodeType>::type;
+        using NonConstValueType = typename std::remove_const<ValueT>::type;
+        using BaseT::mIter;
+
+        ConstValueIter() {}
+        ConstValueIter(RootNodeT& parent, const MapIterT& iter): BaseT(parent, iter) { BaseT::skip(); }
+
+        ConstValueIter& operator++() { BaseT::increment(); return *this; }
+
+        ValueT& getValue() const { return getTile(mIter).value; }
+        ValueT& operator*() const { return this->getValue(); }
+        ValueT* operator->() const { return &(this->getValue()); }
+    }; // ConstValueIter
+
     template<typename RootNodeT, typename MapIterT, typename ChildNodeT, typename ValueT>
     class DenseIter: public BaseIter<RootNodeT, MapIterT, NullPred>
     {
@@ -352,20 +373,54 @@ private:
         }
     }; // DenseIter
 
+    template<typename RootNodeT, typename MapIterT, typename ChildNodeT, typename ValueT>
+    class ConstDenseIter: public BaseIter<RootNodeT, MapIterT, NullPred>
+    {
+    public:
+        using BaseT = BaseIter<RootNodeT, MapIterT, NullPred>;
+        using NodeType = RootNodeT;
+        using ValueType = ValueT;
+        using ChildNodeType = ChildNodeT;
+        using NonConstNodeType = typename std::remove_const<NodeType>::type;
+        using NonConstValueType = typename std::remove_const<ValueT>::type;
+        using NonConstChildNodeType = typename std::remove_const<ChildNodeT>::type;
+        using BaseT::mIter;
+
+        ConstDenseIter() {}
+        ConstDenseIter(RootNodeT& parent, const MapIterT& iter): BaseT(parent, iter) {}
+
+        ConstDenseIter& operator++() { BaseT::increment(); return *this; }
+
+        bool isChildNode() const { return isChild(mIter); }
+
+        ChildNodeT* probeChild(NonConstValueType& value) const
+        {
+            if (isChild(mIter)) return &getChild(mIter);
+            value = getTile(mIter).value;
+            return nullptr;
+        }
+        bool probeChild(ChildNodeT*& child, NonConstValueType& value) const
+        {
+            child = this->probeChild(value);
+            return child != nullptr;
+        }
+        bool probeValue(NonConstValueType& value) const { return !this->probeChild(value); }
+    }; // ConstDenseIter
+
 public:
     using ChildOnIter = ChildIter<RootNode, MapIter, ChildOnPred, ChildType>;
     using ChildOnCIter = ChildIter<const RootNode, MapCIter, ChildOnPred, const ChildType>;
     using ChildOffIter = ValueIter<RootNode, MapIter, ChildOffPred, const ValueType>;
-    using ChildOffCIter = ValueIter<const RootNode, MapCIter, ChildOffPred, ValueType>;
+    using ChildOffCIter = ConstValueIter<const RootNode, MapCIter, ChildOffPred, ValueType>;
     using ChildAllIter = DenseIter<RootNode, MapIter, ChildType, ValueType>;
-    using ChildAllCIter = DenseIter<const RootNode, MapCIter, const ChildType, const ValueType>;
+    using ChildAllCIter = ConstDenseIter<const RootNode, MapCIter, const ChildType, const ValueType>;
 
     using ValueOnIter = ValueIter<RootNode, MapIter, ValueOnPred, ValueType>;
-    using ValueOnCIter = ValueIter<const RootNode, MapCIter, ValueOnPred, const ValueType>;
+    using ValueOnCIter = ConstValueIter<const RootNode, MapCIter, ValueOnPred, const ValueType>;
     using ValueOffIter = ValueIter<RootNode, MapIter, ValueOffPred, ValueType>;
-    using ValueOffCIter = ValueIter<const RootNode, MapCIter, ValueOffPred, const ValueType>;
+    using ValueOffCIter = ConstValueIter<const RootNode, MapCIter, ValueOffPred, const ValueType>;
     using ValueAllIter = ValueIter<RootNode, MapIter, ValueAllPred, ValueType>;
-    using ValueAllCIter = ValueIter<const RootNode, MapCIter, ValueAllPred, const ValueType>;
+    using ValueAllCIter = ConstValueIter<const RootNode, MapCIter, ValueAllPred, const ValueType>;
 
 
     ChildOnCIter  cbeginChildOn()  const { return ChildOnCIter(*this, mTable.begin()); }
