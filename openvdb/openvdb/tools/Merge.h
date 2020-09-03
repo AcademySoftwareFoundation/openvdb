@@ -582,8 +582,8 @@ template <typename BufferT>
 struct UnallocatedBuffer<BufferT, bool>
 {
     // do nothing for bool buffers as they cannot be unallocated
-    static void allocateAndFill(BufferT& buffer, const bool&) { }
-    static bool isPartiallyConstructed(const BufferT& buffer) { return false; }
+    static void allocateAndFill(BufferT&, const bool&) { }
+    static bool isPartiallyConstructed(const BufferT&) { return false; }
 }; // struct AllocateAndFillBuffer
 
 template <typename TreeT, bool Union>
