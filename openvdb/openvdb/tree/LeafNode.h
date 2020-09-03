@@ -215,26 +215,38 @@ protected:
         ValueIter() {}
         ValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
 
-        ValueT& getItem(Index pos) const { return this->parent().getValue(pos); }
-        ValueT& getValue() const { return this->parent().getValue(this->pos()); }
+        const ValueT& getItem(Index pos) const { return this->parent().getValue(pos); }
+        const ValueT& getValue() const { return this->parent().getValue(this->pos()); }
 
-        // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ValueT& value) const
         {
             this->parent().setValueOnly(pos, value);
         }
-        // Note: setValue() can't be called on const iterators.
         void setValue(const ValueT& value) const
         {
             this->parent().setValueOnly(this->pos(), value);
         }
 
-        // Note: modifyItem() can't be called on const iterators.
         template<typename ModifyOp>
         void modifyItem(Index n, const ModifyOp& op) const { this->parent().modifyValue(n, op); }
-        // Note: modifyValue() can't be called on const iterators.
         template<typename ModifyOp>
         void modifyValue(const ModifyOp& op) const { this->parent().modifyValue(this->pos(), op); }
+    };
+
+    template<typename MaskIterT, typename NodeT, typename ValueT, typename TagT>
+    struct ConstValueIter:
+        // Derives from SparseIteratorBase, but can also be used as a dense iterator,
+        // if MaskIterT is a dense mask iterator type.
+        public SparseIteratorBase<
+            MaskIterT, ConstValueIter<MaskIterT, NodeT, ValueT, TagT>, NodeT, ValueT>
+    {
+        using BaseT = SparseIteratorBase<MaskIterT, ConstValueIter, NodeT, ValueT>;
+
+        ConstValueIter() {}
+        ConstValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
+
+        ValueT& getItem(Index pos) const { return this->parent().getValue(pos); }
+        ValueT& getValue() const { return this->parent().getValue(this->pos()); }
     };
 
     /// Leaf nodes have no children, so their child iterators have no get/set accessors.
@@ -245,6 +257,15 @@ protected:
         ChildIter() {}
         ChildIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
             MaskIterT, ChildIter<MaskIterT, NodeT, TagT>, NodeT, ValueType>(iter, parent) {}
+    };
+
+    template<typename MaskIterT, typename NodeT, typename TagT>
+    struct ConstChildIter:
+        public SparseIteratorBase<MaskIterT, ConstChildIter<MaskIterT, NodeT, TagT>, NodeT, ValueType>
+    {
+        ConstChildIter() {}
+        ConstChildIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
+            MaskIterT, ConstChildIter<MaskIterT, NodeT, TagT>, NodeT, ValueType>(iter, parent) {}
     };
 
     template<typename NodeT, typename ValueT, typename TagT>
@@ -264,29 +285,43 @@ protected:
             return false; // no child
         }
 
-        // Note: setItem() can't be called on const iterators.
-        //void setItem(Index pos, void* child) const {}
-
-        // Note: unsetItem() can't be called on const iterators.
         void unsetItem(Index pos, const ValueT& value) const
         {
             this->parent().setValueOnly(pos, value);
         }
     };
 
+    template<typename NodeT, typename ValueT, typename TagT>
+    struct ConstDenseIter: public DenseIteratorBase<
+        MaskDenseIterator, ConstDenseIter<NodeT, ValueT, TagT>, NodeT, /*ChildT=*/void, ValueT>
+    {
+        using BaseT = DenseIteratorBase<MaskDenseIterator, ConstDenseIter, NodeT, void, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
+
+        ConstDenseIter() {}
+        ConstDenseIter(const MaskDenseIterator& iter, NodeT* parent): BaseT(iter, parent) {}
+
+        bool getItem(Index pos, void*& child, NonConstValueT& value) const
+        {
+            value = this->parent().getValue(pos);
+            child = nullptr;
+            return false; // no child
+        }
+    };
+
 public:
     using ValueOnIter = ValueIter<MaskOnIterator, LeafNode, const ValueType, ValueOn>;
-    using ValueOnCIter = ValueIter<MaskOnIterator, const LeafNode, const ValueType, ValueOn>;
+    using ValueOnCIter = ConstValueIter<MaskOnIterator, const LeafNode, const ValueType, ValueOn>;
     using ValueOffIter = ValueIter<MaskOffIterator, LeafNode, const ValueType, ValueOff>;
-    using ValueOffCIter = ValueIter<MaskOffIterator,const LeafNode,const ValueType,ValueOff>;
+    using ValueOffCIter = ConstValueIter<MaskOffIterator,const LeafNode,const ValueType,ValueOff>;
     using ValueAllIter = ValueIter<MaskDenseIterator, LeafNode, const ValueType, ValueAll>;
-    using ValueAllCIter = ValueIter<MaskDenseIterator,const LeafNode,const ValueType,ValueAll>;
+    using ValueAllCIter = ConstValueIter<MaskDenseIterator,const LeafNode,const ValueType,ValueAll>;
     using ChildOnIter = ChildIter<MaskOnIterator, LeafNode, ChildOn>;
     using ChildOnCIter = ChildIter<MaskOnIterator, const LeafNode, ChildOn>;
     using ChildOffIter = ChildIter<MaskOffIterator, LeafNode, ChildOff>;
     using ChildOffCIter = ChildIter<MaskOffIterator, const LeafNode, ChildOff>;
     using ChildAllIter = DenseIter<LeafNode, ValueType, ChildAll>;
-    using ChildAllCIter = DenseIter<const LeafNode, const ValueType, ChildAll>;
+    using ChildAllCIter = ConstDenseIter<const LeafNode, const ValueType, ChildAll>;
 
     ValueOnCIter  cbeginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
     ValueOnCIter   beginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
@@ -848,9 +883,9 @@ protected:
     friend struct ValueIter<MaskOnIterator, LeafNode, ValueType, ValueOn>;
     friend struct ValueIter<MaskOffIterator, LeafNode, ValueType, ValueOff>;
     friend struct ValueIter<MaskDenseIterator, LeafNode, ValueType, ValueAll>;
-    friend struct ValueIter<MaskOnIterator, const LeafNode, ValueType, ValueOn>;
-    friend struct ValueIter<MaskOffIterator, const LeafNode, ValueType, ValueOff>;
-    friend struct ValueIter<MaskDenseIterator, const LeafNode, ValueType, ValueAll>;
+    friend struct ConstValueIter<MaskOnIterator, const LeafNode, const ValueType, ValueOn>;
+    friend struct ConstValueIter<MaskOffIterator, const LeafNode, const ValueType, ValueOff>;
+    friend struct ConstValueIter<MaskDenseIterator, const LeafNode, const ValueType, ValueAll>;
 
     // Allow iterators to call mask accessor methods (see below).
     /// @todo Make mask accessors public?

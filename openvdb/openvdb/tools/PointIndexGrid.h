@@ -1583,27 +1583,27 @@ protected:
 public:
     using ValueOnIter = typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointIndexLeafNode, const ValueType, ValueOn>;
-    using ValueOnCIter = typename BaseLeaf::template ValueIter<
+    using ValueOnCIter = typename BaseLeaf::template ConstValueIter<
         MaskOnIterator, const PointIndexLeafNode, const ValueType, ValueOn>;
     using ValueOffIter = typename BaseLeaf::template ValueIter<
         MaskOffIterator, PointIndexLeafNode, const ValueType, ValueOff>;
-    using ValueOffCIter = typename BaseLeaf::template ValueIter<
+    using ValueOffCIter = typename BaseLeaf::template ConstValueIter<
         MaskOffIterator,const PointIndexLeafNode,const ValueType, ValueOff>;
     using ValueAllIter = typename BaseLeaf::template ValueIter<
         MaskDenseIterator, PointIndexLeafNode, const ValueType, ValueAll>;
-    using ValueAllCIter = typename BaseLeaf::template ValueIter<
+    using ValueAllCIter = typename BaseLeaf::template ConstValueIter<
         MaskDenseIterator,const PointIndexLeafNode,const ValueType, ValueAll>;
     using ChildOnIter = typename BaseLeaf::template ChildIter<
         MaskOnIterator, PointIndexLeafNode, ChildOn>;
-    using ChildOnCIter = typename BaseLeaf::template ChildIter<
+    using ChildOnCIter = typename BaseLeaf::template ConstChildIter<
         MaskOnIterator, const PointIndexLeafNode, ChildOn>;
     using ChildOffIter = typename BaseLeaf::template ChildIter<
         MaskOffIterator, PointIndexLeafNode, ChildOff>;
-    using ChildOffCIter = typename BaseLeaf::template ChildIter<
+    using ChildOffCIter = typename BaseLeaf::template ConstChildIter<
         MaskOffIterator, const PointIndexLeafNode, ChildOff>;
     using ChildAllIter = typename BaseLeaf::template DenseIter<
         PointIndexLeafNode, ValueType, ChildAll>;
-    using ChildAllCIter = typename BaseLeaf::template DenseIter<
+    using ChildAllCIter = typename BaseLeaf::template ConstDenseIter<
         const PointIndexLeafNode, const ValueType, ChildAll>;
 
 #define VMASK_ this->getValueMask()
