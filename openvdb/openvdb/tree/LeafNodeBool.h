@@ -584,17 +584,28 @@ protected:
         const bool& getItem(Index pos) const { return this->parent().getValue(pos); }
         const bool& getValue() const { return this->getItem(this->pos()); }
 
-        // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, bool value) const { this->parent().setValueOnly(pos, value); }
-        // Note: setValue() can't be called on const iterators.
         void setValue(bool value) const { this->setItem(this->pos(), value); }
 
-        // Note: modifyItem() can't be called on const iterators.
         template<typename ModifyOp>
         void modifyItem(Index n, const ModifyOp& op) const { this->parent().modifyValue(n, op); }
-        // Note: modifyValue() can't be called on const iterators.
         template<typename ModifyOp>
         void modifyValue(const ModifyOp& op) const { this->modifyItem(this->pos(), op); }
+    };
+
+    template<typename MaskIterT, typename NodeT, typename ValueT>
+    struct ConstValueIter:
+        // Derives from SparseIteratorBase, but can also be used as a dense iterator,
+        // if MaskIterT is a dense mask iterator type.
+        public SparseIteratorBase<MaskIterT, ConstValueIter<MaskIterT, NodeT, ValueT>, NodeT, ValueT>
+    {
+        using BaseT = SparseIteratorBase<MaskIterT, ConstValueIter, NodeT, ValueT>;
+
+        ConstValueIter() {}
+        ConstValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
+
+        const bool& getItem(Index pos) const { return this->parent().getValue(pos); }
+        const bool& getValue() const { return this->getItem(this->pos()); }
     };
 
     /// Leaf nodes have no children, so their child iterators have no get/set accessors.
@@ -624,26 +635,40 @@ protected:
             return false; // no child
         }
 
-        // Note: setItem() can't be called on const iterators.
-        //void setItem(Index pos, void* child) const {}
-
-        // Note: unsetItem() can't be called on const iterators.
         void unsetItem(Index pos, const ValueT& val) const {this->parent().setValueOnly(pos, val);}
+    };
+
+    template<typename NodeT, typename ValueT>
+    struct ConstDenseIter: public DenseIteratorBase<
+        MaskDenseIter, ConstDenseIter<NodeT, ValueT>, NodeT, /*ChildT=*/void, ValueT>
+    {
+        using BaseT = DenseIteratorBase<MaskDenseIter, ConstDenseIter, NodeT, void, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
+
+        ConstDenseIter() {}
+        ConstDenseIter(const MaskDenseIter& iter, NodeT* parent): BaseT(iter, parent) {}
+
+        bool getItem(Index pos, void*& child, NonConstValueT& value) const
+        {
+            value = this->parent().getValue(pos);
+            child = nullptr;
+            return false; // no child
+        }
     };
 
 public:
     using ValueOnIter = ValueIter<MaskOnIter, LeafNode, const bool>;
-    using ValueOnCIter = ValueIter<MaskOnIter, const LeafNode, const bool>;
+    using ValueOnCIter = ConstValueIter<MaskOnIter, const LeafNode, const bool>;
     using ValueOffIter = ValueIter<MaskOffIter, LeafNode, const bool>;
-    using ValueOffCIter = ValueIter<MaskOffIter, const LeafNode, const bool>;
+    using ValueOffCIter = ConstValueIter<MaskOffIter, const LeafNode, const bool>;
     using ValueAllIter = ValueIter<MaskDenseIter, LeafNode, const bool>;
-    using ValueAllCIter = ValueIter<MaskDenseIter, const LeafNode, const bool>;
+    using ValueAllCIter = ConstValueIter<MaskDenseIter, const LeafNode, const bool>;
     using ChildOnIter = ChildIter<MaskOnIter, LeafNode>;
     using ChildOnCIter = ChildIter<MaskOnIter, const LeafNode>;
     using ChildOffIter = ChildIter<MaskOffIter, LeafNode>;
     using ChildOffCIter = ChildIter<MaskOffIter, const LeafNode>;
     using ChildAllIter = DenseIter<LeafNode, bool>;
-    using ChildAllCIter = DenseIter<const LeafNode, const bool>;
+    using ChildAllCIter = ConstDenseIter<const LeafNode, const bool>;
 
     ValueOnCIter  cbeginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
     ValueOnCIter   beginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
