@@ -626,15 +626,15 @@ public:
 
     using ValueOnIter = typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
-    using ValueOnCIter = typename BaseLeaf::template ValueIter<
+    using ValueOnCIter = typename BaseLeaf::template ConstValueIter<
         MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn>;
     using ValueOffIter = typename BaseLeaf::template ValueIter<
         MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff>;
-    using ValueOffCIter = typename BaseLeaf::template ValueIter<
+    using ValueOffCIter = typename BaseLeaf::template ConstValueIter<
         MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff>;
     using ValueAllIter = typename BaseLeaf::template ValueIter<
         MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll>;
-    using ValueAllCIter = typename BaseLeaf::template ValueIter<
+    using ValueAllCIter = typename BaseLeaf::template ConstValueIter<
         MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll>;
     using ChildOnIter = typename BaseLeaf::template ChildIter<
         MaskOnIterator, PointDataLeafNode, ChildOn>;
@@ -646,7 +646,7 @@ public:
         MaskOffIterator, const PointDataLeafNode, ChildOff>;
     using ChildAllIter = typename BaseLeaf::template DenseIter<
         PointDataLeafNode, ValueType, ChildAll>;
-    using ChildAllCIter = typename BaseLeaf::template DenseIter<
+    using ChildAllCIter = typename BaseLeaf::template ConstDenseIter<
         const PointDataLeafNode, const ValueType, ChildAll>;
 
     using IndexVoxelIter    = IndexIter<ValueVoxelCIter, NullFilter>;
