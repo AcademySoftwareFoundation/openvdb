@@ -67,7 +67,6 @@ option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 
 option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
-option(OPENVDB_BUILD_AX_DOCS "Build the OpenVDB AX documentation" OFF)
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_AX_HOUDINI_PLUGIN "Build the AX Houdini plugin" OFF)
@@ -371,10 +370,6 @@ endif()
 
 if(OPENVDB_BUILD_DOCS)
   add_subdirectory(doc)
-endif()
-
-if(OPENVDB_BUILD_AX_DOCS)
-  add_subdirectory(openvdb_ax/doc)
 endif()
 
 # Early exit if there's nothing to build
