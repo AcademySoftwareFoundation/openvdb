@@ -11,7 +11,7 @@ functionality (including OpenVDB specific methods) execution structure and
 control flow. See the @subpage openvdbaxapi documentation for the C++ developer
 documentation.
 @note
-These documents are currently in @b BETA and are subject to change. Please @ref
+These documents are currently in @b BETA and are subject to change. Please
 contact us for more information.
 
 @section axcontents Contents
@@ -2057,7 +2057,7 @@ For a list of all functions, see the @ref axfunctionlist "AX Function List".
 AX supports a variety of mathematical, string, utility and custom function calls
 which can be used from within an AX program. Native function support is constantly
 growing and we encourage users who wish to see particular methods exposed and
-supported natively by AX to @ref contact "contact us". Whilst we can't guarantee
+supported natively by AX to contact us. Whilst we can't guarantee
 to accommodate every function, these requests provide the developers insights into
 how the language is being used.
 @par Function Execution Context
