@@ -157,7 +157,7 @@ for this:
 ZLIB is an optional dependency of all OpenVDB components. The documented build
 steps below treat ZLib as a required dependency.
 
-You can disable ZLib using `-D USE_ZLIB=OFF`.
+You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D USE_BLOSC=OFF`.
 
 @subsection buildVCPKG Building Dependencies using VCPKG
 

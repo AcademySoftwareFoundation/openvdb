@@ -345,7 +345,7 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   endif()
 endif()
 
-if(USE_ZLIB OR OpenVDB_USES_ZLIB)
+if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   if(TARGET SOP_OpenVDB_Write)
     target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
   endif()

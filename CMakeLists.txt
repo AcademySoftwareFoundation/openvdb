@@ -88,8 +88,7 @@ openvdb build configuration to decide on blosc support. You may set this to on t
 know it to be required.]=] ON)
 option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on zlib support. You may set this to on to force zlib to be used if you
-know it to be required.]=] ON)
+openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -149,6 +148,10 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
   message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
     "using None instead.")
   set(OPENVDB_SIMD None CACHE STRING FORCE)
+endif()
+
+if(USE_BLOSC AND NOT USE_ZLIB)
+  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
 endif()
 
 # Top-level location for all openvdb headers
