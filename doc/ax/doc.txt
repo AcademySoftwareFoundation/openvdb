@@ -12,12 +12,21 @@ performing custom manipulation of OpenVDB data via an expression language: AX.
 AX expressions are JIT-compiled and used in combination with a multi-threaded
 execution framework, specifically designed for VDB, that in many cases rival
 custom C++ operators.
-@par
-<b>OpenVDB AX is currently in BETA</b>. This predominately means that the C++
-API is subject to change without backward compatible guarantees.
-@par
-The software is currently hosted on <A HREF="https://github.com/dneg/openvdb_ax">github</A>
-and has a variety of releases for download.
+
+@b OpenVDB AX is maintained by the
+<A HREF="https://www.aswf.io/">Academy Software Foundation&nbsp;(ASWF)</A>.
+It was originally developed at <A HREF="https://www.dneg.com/">DNEG</A>
+primarily by:
+- Nick Avramoussis
+- Richard Jones
+
+Other notable contributors include:
+- Francisco Gochez
+- Matthew Warner
+- Dan Bailey
+- Todd Keeler
+- James Bird
+- Harry Biddle
 
 @subsection docs Documentation
 @par
@@ -33,23 +42,6 @@ provided:
  - @subpage axexamples "Code Examples" for examples of OpenVDB AX in action.
  - @subpage axfunctionlist "AX Functions" for a list of all available AX functions.
  - @subpage build "Building OpenVDB" and @subpage dependencies "OpenVDB Dependencies" for information on building OpenVDB and <b>OpenVDB AX</b>.
-
-@subsection contact Contact
-@par
-<b>OpenVDB AX</b> is maintained by <A HREF="https://www.dneg.com/">DNEG</A>
-and currently supported by:
-- Nick Avramoussis
-- Richard Jones
-@par
-Please contact us on openvdbax@dneg.com if you have any questions.
-@par
-Other notable contributors include:
-- Francisco Gochez
-- Matthew Warner
-- Dan Bailey
-- Todd Keeler
-- James Bird
-- Harry Biddle
 
 </div>
 */
