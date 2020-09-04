@@ -24,6 +24,8 @@ Build:
 - Upgraded CMake minimum version support to 3.12.
 - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
 - Fixed various compiler warnings for GCC 9.1.
+- Moved to CMake doxygen commands and removed the doxygen-config files for
+  doxygen documentation.
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
