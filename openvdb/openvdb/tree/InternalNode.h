@@ -136,7 +136,7 @@ protected:
             return *(this->parent().getChildNode(pos));
         }
 
-        void setItem(Index pos, const ChildT& c) const { this->parent().resetChildNode(pos, &c); }
+        void setItem(Index pos, ChildT& c) const { this->parent().resetChildNode(pos, &c); }
 
        // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
