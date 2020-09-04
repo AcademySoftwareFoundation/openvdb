@@ -95,6 +95,7 @@ newSopOperator(OP_OperatorTable* table)
 
         obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression"));
 #else
+#ifdef OPENVDB_USE_ZLIB
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression")
             .setDefault(true)
             .setTooltip(
@@ -103,6 +104,12 @@ newSopOperator(OP_OperatorTable* table)
 
         obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+#else
+        // no compression available
+        obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression"));
+        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+#endif
 #endif
     }
 
