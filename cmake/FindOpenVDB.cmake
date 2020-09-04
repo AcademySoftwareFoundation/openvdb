@@ -527,7 +527,7 @@ endif()
 
 if(NOT OPENVDB_USE_STATIC_LIBS)
   if(WIN32)
-    list(APPEND OpenVDB_DEFINITIONS -DOPENVDB_DLL)
+    list(APPEND OpenVDB_DEFINITIONS OPENVDB_DLL)
   endif()
 
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to

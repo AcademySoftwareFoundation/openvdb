@@ -28,7 +28,7 @@
 
 // Library major, minor and patch version numbers
 #define OPENVDB_AX_LIBRARY_MAJOR_VERSION_NUMBER 0
-#define OPENVDB_AX_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_AX_LIBRARY_MINOR_VERSION_NUMBER 3
 #define OPENVDB_AX_LIBRARY_PATCH_VERSION_NUMBER 0
 
 #define OPENVDB_AX_VERSION_NAME                                          \

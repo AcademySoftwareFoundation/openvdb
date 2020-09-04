@@ -252,8 +252,8 @@ if(OPENVDB_AX_SHARED)
     openvdb_ax_shared
     PROPERTIES
       OUTPUT_NAME openvdb_ax
-      SOVERSION 0.2
-      VERSION 0.2.0
+      SOVERSION 0.3
+      VERSION 0.3.0
     )
 
   if(OPENVDB_ENABLE_RPATH)
