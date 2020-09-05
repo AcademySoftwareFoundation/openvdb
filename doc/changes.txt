@@ -26,6 +26,8 @@ Build:
 - Fixed various compiler warnings for GCC 9.1.
 - Moved to CMake doxygen commands and removed the doxygen-config files for
   doxygen documentation.
+- Add OPENVDB_USE_HALF macro to allow for switching off Half support.
+  <I>[Contributed&nbsp;by&nbsp;Ben&nbsp;FrantzDale]</I>
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
@@ -1968,8 +1970,7 @@ API changes:
   to specify the integer type.
   The @vdblink::math::RandomInt RandomInt@endlink typedef is unchanged.
 - @vdblink::io::readData() io::readData@endlink,
-  @vdblink::io::HalfReader<false,T>::read() io::HalfReader::read@endlink
-  and @vdblink::io::HalfWriter<false,T>::write() io::HalfWriter::write@endlink
+  io::HalfReader<false,T>::read() and io::HalfWriter<false,T>::write()
   now take a @c uint32_t argument indicating the type of compression
   instead of a @c bool indicating whether compression is enabled.
 - Removed @c io::Archive::isCompressionEnabled() and

@@ -21,6 +21,8 @@ Version 7.1.1 - In Development
     - Fixed various compiler warnings for GCC 9.1.
     - Moved to CMake doxygen commands and removed the doxygen-config files for
       doxygen documentation.
+    - Add OPENVDB_USE_HALF macro to allow for switching off Half support.
+      [Contributed by Ben FrantzDale]
 
 Version 7.1.0 - August 13, 2020
 
