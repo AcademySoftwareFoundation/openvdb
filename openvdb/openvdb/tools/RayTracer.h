@@ -33,7 +33,7 @@
 #include <type_traits>
 #include <vector>
 
-#ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
+#ifdef OPENVDB_USE_EXR
 #include <OpenEXR/ImfPixelType.h>
 #include <OpenEXR/ImfChannelList.h>
 #include <OpenEXR/ImfOutputFile.h>
@@ -328,7 +328,7 @@ public:
         os.write(reinterpret_cast<const char*>(&(*tmp)), 3 * mSize * sizeof(unsigned char));
     }
 
-#ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
+#ifdef OPENVDB_USE_EXR
     void saveEXR(const std::string& fileName, size_t compression = 2, size_t threads = 8)
     {
         std::string name(fileName);
@@ -357,6 +357,11 @@ public:
         Imf::OutputFile file(name.c_str(), header);
         file.setFrameBuffer(framebuffer);
         file.writePixels(mHeight);
+    }
+#else
+    void saveEXR(const std::string& /*fileName*/, size_t /*compression*/ = 2, size_t /*threads*/ = 8)
+    {
+        OPENVDB_THROW(IoError, "OpenVDB has been compiled without EXR support");
     }
 #endif
 
