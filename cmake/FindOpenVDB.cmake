@@ -54,6 +54,8 @@ This will define the following variables:
   True if the OpenVDB Library has been built with blosc support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
+``OpenVDB_USES_HALF``
+  True if the OpenVDB Library has been built with half support
 ``OpenVDB_USES_EXR``
   True if the OpenVDB Library has been built with openexr support
 ``OpenVDB_ABI``
@@ -480,6 +482,7 @@ endif()
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
+set(OpenVDB_USES_HALF ${USE_HALF})
 set(OpenVDB_USES_EXR ${USE_EXR})
 set(OpenVDB_DEFINITIONS)
 
@@ -529,6 +532,11 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
       set(OpenVDB_USES_LOG4CPLUS ON)
     endif()
 
+    string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_HALF ON)
+    endif()
+
     string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_EXR ON)
@@ -547,8 +555,11 @@ if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
 endif()
 
-if(OpenVDB_USES_EXR)
+if(OpenVDB_USES_EXR OR OpenVDB_USES_HALF)
   find_package(IlmBase REQUIRED)
+endif()
+
+if(OpenVDB_USES_EXR)
   find_package(OpenEXR REQUIRED)
 endif()
 
@@ -575,11 +586,17 @@ endif()
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
 
 if(OpenVDB_ABI)
   list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
+endif()
+
+if(OpenVDB_USES_HALF)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
+    IlmBase::Half
+  )
+  list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_HALF)
 endif()
 
 if(OpenVDB_USES_EXR)

@@ -2260,8 +2260,12 @@ RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
     if (!toHalf) {
         os.write(reinterpret_cast<const char*>(&mBackground), sizeof(ValueType));
     } else {
+#ifdef OPENVDB_USE_HALF
         ValueType truncatedVal = io::truncateRealToHalf(mBackground);
         os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueType));
+#else
+        OPENVDB_THROW_HALF
+#endif
     }
     io::setGridBackgroundValuePtr(os, &mBackground);
 

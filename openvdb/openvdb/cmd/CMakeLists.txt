@@ -120,7 +120,10 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
+  if(USE_HALF)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+  endif()
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Iex IlmThread Imath)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
@@ -137,6 +140,16 @@ if(OPENVDB_BUILD_VDB_RENDER)
     IlmBase::IlmThread
     IlmBase::Iex
     IlmBase::Imath
+    ${OPENVDB_BINARIES_DEPENDENT_LIBS}
+  )
+
+  if(USE_HALF)
+    target_link_libraries(vdb_render
+      IlmBase::Half
+    )
+  endif()
+
+  target_link_libraries(vdb_render
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 

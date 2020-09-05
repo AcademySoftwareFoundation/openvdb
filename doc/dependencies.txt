@@ -37,10 +37,10 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                                                         | Optional
 ----------------------- | ------------------------------------------------------------------------------------ | --------
-OpenVDB Core Library    | CMake, C++14 compiler, IlmBase::Half, TBB::tbb, ZLIB, Boost::system, Boost::iostream | Blosc, Log4cplus, OpenEXR::IlmImf
+OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, ZLIB, Boost::system, Boost::iostream                | Blosc, Log4cplus, IlmBase::Half, OpenEXR::IlmImf
 OpenVDB Print           | Core Library dependencies                                                            | -
 OpenVDB LOD             | Core Library dependencies                                                            | -
-OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
+OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | IlmBase::Half
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
 OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -

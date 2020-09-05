@@ -1397,7 +1397,11 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         Buffer temp;
         for (int i = 1; i < numBuffers; ++i) {
             if (fromHalf) {
+#ifdef OPENVDB_USE_HALF
                 io::HalfReader<io::RealToHalf<T>::isReal, T>::read(is, temp.mData, SIZE, zipped);
+#else
+                OPENVDB_THROW_HALF
+#endif
             } else {
                 io::readData<T>(is, temp.mData, SIZE, zipped);
             }

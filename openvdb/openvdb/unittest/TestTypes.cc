@@ -53,7 +53,9 @@ TestTypes::testVecTraits()
         // some less common types (Vec3U16, etc)
         CPPUNIT_ASSERT(VecTraits<Vec2R>::IsVec);
         CPPUNIT_ASSERT(VecTraits<Vec3U16>::IsVec);
+#ifdef OPENVDB_USE_HALF
         CPPUNIT_ASSERT(VecTraits<Vec4H>::IsVec);
+#endif
 
         // some non-vector types
         CPPUNIT_ASSERT(!VecTraits<int>::IsVec);
@@ -82,7 +84,9 @@ TestTypes::testVecTraits()
         // some less common types (Vec3U16, etc)
         CPPUNIT_ASSERT(VecTraits<Vec2R>::Size == 2);
         CPPUNIT_ASSERT(VecTraits<Vec3U16>::Size == 3);
+#ifdef OPENVDB_USE_HALF
         CPPUNIT_ASSERT(VecTraits<Vec4H>::Size == 4);
+#endif
 
         // some non-vector types
         CPPUNIT_ASSERT(VecTraits<int>::Size == 1);
@@ -111,7 +115,9 @@ TestTypes::testVecTraits()
         // some less common types (Vec3U16, etc)
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Vec2R>::ElementType, double>::value));
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Vec3U16>::ElementType, uint16_t>::value));
+#ifdef OPENVDB_USE_HALF
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<Vec4H>::ElementType, half>::value));
+#endif
 
         // some non-vector types
         CPPUNIT_ASSERT(bool(std::is_same<VecTraits<int>::ElementType, int>::value));

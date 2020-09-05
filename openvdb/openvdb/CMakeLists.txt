@@ -48,8 +48,21 @@ message(STATUS "----------------------------------------------------")
 
 # Collect and configure lib dependencies
 
+if(USE_HALF OR USE_EXR)
+  if(USE_HALF)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+  else()
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
+  endif()
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+endif()
+
 if(USE_EXR)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
     if(${OpenEXR_VERSION} VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
@@ -57,16 +70,9 @@ if(USE_EXR)
         "is deprecated and will be removed.")
     endif()
   endif()
-else()
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
-endif()
+
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
 
@@ -130,7 +136,6 @@ endif()
 set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
 
 if(WIN32)
@@ -144,6 +149,12 @@ if(WIN32)
         Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
       )
   endif()
+endif()
+
+if(USE_HALF)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    IlmBase::Half
+  )
 endif()
 
 if(USE_EXR)
@@ -410,6 +421,9 @@ if(WIN32)
     list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
   endif()
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
+endif()
+if(USE_HALF)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_HALF)
 endif()
 if(USE_EXR)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)

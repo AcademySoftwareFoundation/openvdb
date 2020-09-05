@@ -236,7 +236,9 @@ void
 TestAttributeArray::testRegistry()
 {
     using AttributeF = TypedAttributeArray<float>;
+#ifdef OPENVDB_USE_HALF
     using AttributeFTrnc = TypedAttributeArray<float, TruncateCodec>;
+#endif
 
     AttributeArray::clearRegistry();
 
@@ -255,15 +257,19 @@ TestAttributeArray::testRegistry()
     AttributeF::registerType();
 
     { // can register an AttributeArray with the same value type but different codec
+#ifdef OPENVDB_USE_HALF
         CPPUNIT_ASSERT_NO_THROW(AttributeFTrnc::registerType());
-        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeF::attributeType()));
         CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
+#endif
+        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeF::attributeType()));
     }
 
     { // un-registering
         AttributeArray::unregisterType(AttributeF::attributeType());
         CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
+#ifdef OPENVDB_USE_HALF
         CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
+#endif
     }
 
     { // clearing registry
@@ -443,6 +449,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#ifdef OPENVDB_USE_HALF
         {
             // half is not registered by default, but for complete-ness
             TypedAttributeArray<half> typedAttr(size);
@@ -457,6 +464,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#endif
         {
             TypedAttributeArray<float> typedAttr(size);
             AttributeArray& attr(typedAttr);
@@ -548,6 +556,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#ifdef OPENVDB_USE_HALF
         {
             TypedAttributeArray<float, TruncateCodec> typedAttr(size);
             AttributeArray& attr(typedAttr);
@@ -561,6 +570,7 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
             CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
         }
+#endif
 #endif
     }
 
@@ -726,12 +736,14 @@ TestAttributeArray::testAttributeArray()
             }
         }
 
+#ifdef OPENVDB_USE_HALF
         { // Equality using an unregistered attribute type
             TypedAttributeArray<half> attr1(50);
             TypedAttributeArray<half> attr2(50);
 
             CPPUNIT_ASSERT(attr1 == attr2);
         }
+#endif
 
         // attribute array must not be uniform for compression
 
@@ -971,6 +983,7 @@ TestAttributeArray::testAttributeArrayCopy()
         CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
     }
 
+#ifdef OPENVDB_USE_HALF
     { // copy values between attribute arrays with different value types, but the same storage type
         // target half array
         TypedAttributeArray<half> targetTypedAttr1(size);
@@ -994,6 +1007,7 @@ TestAttributeArray::testAttributeArrayCopy()
             CPPUNIT_ASSERT(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
         }
     }
+#endif
 
     { // out-of-range checking
         AttributeArrayD typedAttr(size);
@@ -1174,13 +1188,17 @@ TestAttributeArray::testAttributeHandle()
     using namespace openvdb::math;
 
     using AttributeI            = TypedAttributeArray<int>;
+#ifdef OPENVDB_USE_HALF
     using AttributeFH           = TypedAttributeArray<float, TruncateCodec>;
+#endif
     using AttributeVec3f        = TypedAttributeArray<Vec3f>;
 
     using AttributeHandleRWI    = AttributeWriteHandle<int>;
 
     AttributeI::registerType();
+#ifdef OPENVDB_USE_HALF
     AttributeFH::registerType();
+#endif
     AttributeVec3f::registerType();
 
     // create a Descriptor and AttributeSet
@@ -1191,13 +1209,15 @@ TestAttributeArray::testAttributeHandle()
     unsigned count = 500;
     AttributeSet attrSet(descr, /*arrayLength=*/count);
 
+#ifdef OPENVDB_USE_HALF
     attrSet.appendAttribute("truncate", AttributeFH::attributeType());
+#endif
     attrSet.appendAttribute("int", AttributeI::attributeType());
 
     // check uniform value implementation
 
     {
-        AttributeArray* array = attrSet.get(2);
+        AttributeArray* array = attrSet.get("int");
 
         AttributeHandleRWI nonExpandingHandle(*array, /*expand=*/false);
         CPPUNIT_ASSERT(nonExpandingHandle.isUniform());
@@ -1255,7 +1275,7 @@ TestAttributeArray::testAttributeHandle()
     }
 
     {
-        AttributeArray* array = attrSet.get(0);
+        AttributeArray* array = attrSet.get("P");
 
         AttributeWriteHandle<Vec3f> handle(*array);
 
@@ -1264,8 +1284,9 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
     }
 
+#ifdef OPENVDB_USE_HALF
     {
-        AttributeArray* array = attrSet.get(1);
+        AttributeArray* array = attrSet.get("truncate");
 
         AttributeWriteHandle<float> handle(*array);
 
@@ -1279,24 +1300,27 @@ TestAttributeArray::testAttributeHandle()
             CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
         }
     }
+#endif
 
     // check values have been correctly set without using handles
 
     {
-        AttributeVec3f* array = static_cast<AttributeVec3f*>(attrSet.get(0));
+        AttributeVec3f* array = static_cast<AttributeVec3f*>(attrSet.get("P"));
 
         CPPUNIT_ASSERT(array);
 
         CPPUNIT_ASSERT_EQUAL(Vec3f(10), array->get(5));
     }
 
+#ifdef OPENVDB_USE_HALF
     {
-        AttributeFH* array = static_cast<AttributeFH*>(attrSet.get(1));
+        AttributeFH* array = static_cast<AttributeFH*>(attrSet.get("truncate"));
 
         CPPUNIT_ASSERT(array);
 
         CPPUNIT_ASSERT_EQUAL(float(11), array->get(6));
     }
+#endif
 }
 
 void

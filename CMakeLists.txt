@@ -90,6 +90,10 @@ option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
+option(USE_HALF [=[
+Use Half while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+openvdb build configuration to decide on Half support. You may set this to on to force Half to be used if you
+know it to be required.]=] ON)
 option(USE_EXR [=[
 Use OpenEXR while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you

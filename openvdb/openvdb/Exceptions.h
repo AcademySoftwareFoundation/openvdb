@@ -90,4 +90,6 @@ public:
     throw exception(_openvdb_throw_msg); \
 } // OPENVDB_THROW
 
+#define OPENVDB_THROW_HALF OPENVDB_THROW(IoError, "OpenVDB has been compiled without Half support")
+
 #endif // OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
