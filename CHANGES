@@ -11,6 +11,17 @@ Version 7.1.1 - In Development
     - Fixed a bug where a Houdini SOP's verb would not be correctly associated
       with the corresponding node if the node's internal name was changed.
 
+    Build:
+    - Removed the Makefiles.
+    - Re-organised the repository layout such that each independent library
+      is able to be configured against an existing installation of OpenVDB
+      without ambiguous include paths.
+    - Upgraded CMake minimum version support to 3.12.
+    - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
+    - Fixed various compiler warnings for GCC 9.1.
+    - Moved to CMake doxygen commands and removed the doxygen-config files for
+      doxygen documentation.
+
 Version 7.1.0 - August 13, 2020
 
       As of this release, support for grid ABI=4 has been removed.

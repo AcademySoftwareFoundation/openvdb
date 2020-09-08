@@ -21,7 +21,7 @@ jobs:
           git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*'
           test $? -eq 1
 
-  # Search for any tabs excluding Makefiles, meeting notes, image files and a few others
+  # Search for any tabs excluding meeting notes, image files and a few others
   spacesnottabs:
     runs-on: ubuntu-16.04
     steps:
@@ -29,5 +29,5 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n "	" -- ':!*/Makefile' ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png'
+          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png'
           test $? -eq 1
