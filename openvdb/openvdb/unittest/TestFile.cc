@@ -622,8 +622,10 @@ TEST_F(TestFile, testWriteInstancedGrids)
     EXPECT_TRUE(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     EXPECT_TRUE(density.get() != nullptr);
+#ifdef OPENVDB_USE_DELAYED_LOADING
     EXPECT_TRUE(density->unallocatedLeafCount() > 0);
     EXPECT_EQ(density->leafCount(), density->unallocatedLeafCount());
+#endif // OPENVDB_USE_DELAYED_LOADING
     grid = findGridByName(*grids, "density_copy");
     EXPECT_TRUE(grid.get() != nullptr);
     EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);

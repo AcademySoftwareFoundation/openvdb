@@ -1356,7 +1356,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     std::streamoff maskpos = is.tellg();
+#endif
 
     if (seekable) {
         // Seek over the value mask.
@@ -1382,6 +1384,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
+#ifdef OPENVDB_USE_DELAYED_LOADING
         // If this node lies completely inside the clipping region and it is being read
         // from a memory-mapped file, delay loading of its buffer until the buffer
         // is actually accessed.  (If this node requires clipping, its buffer
@@ -1401,6 +1404,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             // Skip over voxel values.
             skipCompressedValues(seekable, is, fromHalf);
         } else {
+#endif
             mBuffer.allocate();
             io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
             mBuffer.setOutOfCore(false);
@@ -1411,7 +1415,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
                 background = *static_cast<const T*>(bgPtr);
             }
             this->clip(clipBBox, background);
+#ifdef OPENVDB_USE_DELAYED_LOADING
         }
+#endif
     }
 
     if (numBuffers > 1) {

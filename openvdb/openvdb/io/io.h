@@ -129,6 +129,8 @@ struct MultiPass {};
 
 class File;
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+
 /// @brief Handle to control the lifetime of a memory-mapped .vdb file
 class OPENVDB_API MappedFile
 {
@@ -170,6 +172,7 @@ private:
     std::unique_ptr<Impl> mImpl;
 }; // class MappedFile
 
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 ////////////////////////////////////////
 
@@ -243,6 +246,7 @@ OPENVDB_API bool getWriteGridStatsMetadata(std::ios_base&);
 /// and store them as grid metadata when writing to the given stream.
 OPENVDB_API void setWriteGridStatsMetadata(std::ios_base&, bool writeGridStats);
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 /// @brief Return a shared pointer to the memory-mapped file with which the given stream
 /// is associated, or a null pointer if the stream is not associated with a memory-mapped file.
 OPENVDB_API SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&);
@@ -250,6 +254,7 @@ OPENVDB_API SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&);
 /// @note The shared pointer object (not just the io::MappedFile object to which it points)
 /// must remain valid until the file is closed.
 OPENVDB_API void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&);
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 /// @brief Return a shared pointer to an object that stores metadata (file format,
 /// compression scheme, etc.) for use when reading from or writing to the given stream.

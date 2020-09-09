@@ -1166,6 +1166,7 @@ TEST_F(TestPointDataLeaf, testIO)
             EXPECT_TRUE(leaf == *leafFromDisk);
         }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
         { // read grids from file and pre-fetch
             PointDataGrid::Ptr gridFromDisk;
 
@@ -1268,6 +1269,7 @@ TEST_F(TestPointDataLeaf, testIO)
         }
 
         remove("leaf.vdb");
+#endif // OPENVDB_USE_DELAYED_LOADING
     }
 
     { // test multi-buffer IO with varying attribute storage per-leaf
