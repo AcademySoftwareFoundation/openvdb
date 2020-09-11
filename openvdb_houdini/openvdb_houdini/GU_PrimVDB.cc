@@ -155,7 +155,9 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
         grid->setIsInWorldSpace(is_in_world_space);
         bool save_as_half = grid->saveFloatAsHalf();
         grid->removeMeta(openvdb::GridBase::META_SAVE_HALF_FLOAT);
+#ifdef OPENVDB_USE_HALF
         grid->setSaveFloatAsHalf(save_as_half);
+#endif
 
         // Transfer the grid's metadata to primitive attributes.
         GU_PrimVDB::createGridAttrsFromMetadata(*vdb, *grid, gdp);

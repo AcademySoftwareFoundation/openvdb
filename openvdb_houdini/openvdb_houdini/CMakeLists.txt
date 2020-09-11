@@ -345,6 +345,18 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   endif()
 endif()
 
+# This is only required for the OpenVDB Write SOP and OpenVDB Metadata SOP which
+# enable half options if half is supported.
+
+if(USE_HALF OR OpenVDB_USES_HALF)
+  if(TARGET SOP_OpenVDB_Metadata)
+    target_compile_definitions(SOP_OpenVDB_Metadata PRIVATE "-DOPENVDB_USE_HALF")
+  endif()
+  if(TARGET SOP_OpenVDB_Write)
+    target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_HALF")
+  endif()
+endif()
+
 ##########
 # Installs
 ##########

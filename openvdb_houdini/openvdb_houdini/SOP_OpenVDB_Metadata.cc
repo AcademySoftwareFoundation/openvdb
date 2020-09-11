@@ -38,7 +38,7 @@ newSopOperator(OP_OperatorTable* table)
 {
     if (table == nullptr) return;
 
-    hutil::ParmList parms;
+    hutil::ParmList parms, obsoleteParms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setTooltip("Specify a subset of the input VDBs to be modified.")
@@ -120,6 +120,7 @@ Other:\n\
             .setTooltip(::strdup(help.c_str())));
     }
 
+#ifdef OPENVDB_USE_HALF
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setfloat16", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "float16", "Write 16-Bit Floats")
@@ -127,6 +128,10 @@ Other:\n\
         .setTooltip(
             "When saving the VDB to a file, write floating-point\n"
             "scalar or vector voxel values as 16-bit half floats."));
+#else
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "setfloat16", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "float16", ""));
+#endif
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "syncattrs", "Transfer Metadata to Attributes")
         .setDefault(PRMoneDefaults)
@@ -145,6 +150,7 @@ Other:\n\
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Metadata", SOP_OpenVDB_Metadata::factory, parms, *table)
         .setNativeName("")
+        .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDBs")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Metadata::Cache; })
         .setDocumentation("\
@@ -188,7 +194,9 @@ SOP_OpenVDB_Metadata::updateParmsFlags()
     changed |= enableParm("name",    bool(evalInt("setname", 0, time)));
     changed |= enableParm("class",   bool(evalInt("setclass", 0, time)));
     changed |= enableParm("creator", bool(evalInt("setcreator", 0, time)));
+#ifdef OPENVDB_USE_HALF
     changed |= enableParm("float16", bool(evalInt("setfloat16", 0, time)));
+#endif
     changed |= enableParm("world",   bool(evalInt("setworld", 0, time)));
     changed |= enableParm("vectype", bool(evalInt("setvectype", 0, time)));
 
@@ -222,7 +230,11 @@ SOP_OpenVDB_Metadata::Cache::cookVDBSop(OP_Context& context)
             setname = evalInt("setname", 0, time),
             setclass = evalInt("setclass", 0, time),
             setcreator = evalInt("setcreator", 0, time),
+#ifdef OPENVDB_USE_HALF
             setfloat16 = evalInt("setfloat16", 0, time),
+#else
+            setfloat16 = false,
+#endif
             setvectype = evalInt("setvectype", 0, time),
             setworld = evalInt("setworld", 0, time),
             syncattrs = evalInt("syncattrs", 0, time),
@@ -234,7 +246,9 @@ SOP_OpenVDB_Metadata::Cache::cookVDBSop(OP_Context& context)
             return error();
         }
 
+#ifdef OPENVDB_USE_HALF
         const bool float16 = (!setfloat16 ? false : evalInt("float16", 0, time));
+#endif
         const bool world = (!setworld ? false : evalInt("world", 0, time));
         const std::string name = (!setname ? std::string{} : evalStdString("name", time));
         const std::string creator = (!setcreator ? std::string{} : evalStdString("creator", time));
@@ -260,7 +274,9 @@ SOP_OpenVDB_Metadata::Cache::cookVDBSop(OP_Context& context)
             // Set various grid metadata items.
             if (setname)    grid.setName(name);
             if (setcreator) grid.setCreator(creator);
+#ifdef OPENVDB_USE_HALF
             if (setfloat16) grid.setSaveFloatAsHalf(float16);
+#endif
             if (setvectype) grid.setVectorType(vectype);
             if (setworld)   grid.setIsInWorldSpace(world);
             if (setclass) {

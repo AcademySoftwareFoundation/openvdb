@@ -124,6 +124,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Click to write the output file."));
 
     {   // Float precision
+#ifdef OPENVDB_USE_HALF
         parms.add(hutil::ParmFactory(PRM_HEADING, "float_header", "Float Precision"));
 
         parms.add(hutil::ParmFactory(PRM_STRING, "float_16_group", "Write 16-Bit")
@@ -143,6 +144,13 @@ newSopOperator(OP_OperatorTable* table)
                 "using full-precision floats or doubles.\n"
                 "If no groups are listed, all grids will be written\n"
                 "using their existing precision settings."));
+#else
+        obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "float_header", "Float Precision"));
+        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "float_16_group", "Write 16-Bit")
+            .setChoiceList(&hutil::PrimGroupMenuInput1));
+        obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "float_full_group", "Write Full-Precision")
+            .setChoiceList(&hutil::PrimGroupMenuInput1));
+#endif
     }
 
     // Register this operator.
@@ -303,11 +311,14 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     // Get grid groups.
     UT_String groupStr, halfGroupStr, fullGroupStr;
     evalString(groupStr, "group", 0, time);
+    const GA_PrimitiveGroup
+        *group = matchGroup(*gdp, groupStr.toStdString());
+
+#ifdef OPENVDB_USE_HALF
     evalString(halfGroupStr, "float_16_group", 0, time);
     evalString(fullGroupStr, "float_full_group", 0, time);
 
     const GA_PrimitiveGroup
-        *group = matchGroup(*gdp, groupStr.toStdString()),
         *halfGroup = nullptr,
         *fullGroup = nullptr;
     if (halfGroupStr.isstring()) {
@@ -318,6 +329,7 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     if (fullGroupStr.isstring()) {
         fullGroup = matchGroup(*gdp, fullGroupStr.toStdString());
     }
+#endif
 
     // Get compression options.
 #ifdef OPENVDB_USE_BLOSC
@@ -348,6 +360,7 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
         GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
         grid->removeMeta("is_vdb");
 
+#ifdef OPENVDB_USE_HALF
         // Retrieve the grid's name from the primitive attribute.
         const std::string gridName = it.getPrimitiveName().toStdString();
 
@@ -369,6 +382,7 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
         } else {
             // Preserve this grid's existing saveFloatAsHalf setting.
         }
+#endif
 
         outGrids.insert(grid);
     }
