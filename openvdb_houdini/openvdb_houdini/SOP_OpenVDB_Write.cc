@@ -195,11 +195,13 @@ SOP_OpenVDB_Write::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
         setString(compression, CH_STRING_LITERAL, "compression", 0, 0.0);
     }
 #else
+#ifdef OPENVDB_USE_ZLIB
     if (nullptr != obsoleteParms->getParmPtr("compression")) {
         UT_String compression;
         obsoleteParms->evalString(compression, "compression", 0, /*time=*/0.0);
         setInt("compress_zip", 0, 0.0, (compression == "zip" ? 1 : 0));
     }
+#endif
 #endif
 
     // Delegate to the base class.
@@ -331,7 +333,9 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     UT_String compression;
     evalString(compression, "compression", 0, time);
 #else
+#ifdef OPENVDB_USE_ZLIB
     const bool zip = evalInt("compress_zip", 0, time);
+#endif
 #endif
 
     UT_AutoInterrupt progress(("Writing " + filename).c_str());
@@ -407,8 +411,10 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     }
 #else
     uint32_t compressionFlags = openvdb::io::COMPRESS_ACTIVE_MASK;
+#ifdef OPENVDB_USE_ZLIB
     if (zip) compressionFlags |= openvdb::io::COMPRESS_ZIP;
 #endif
+#endif // OPENVDB_USE_BLOSC
     file.setCompression(compressionFlags);
 
     file.write(outGrids, outMeta);
