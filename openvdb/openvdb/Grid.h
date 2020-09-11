@@ -279,8 +279,11 @@ public:
 
     /// @brief Return @c true if this grid should be written out with floating-point
     /// voxel values (including components of vectors) quantized to 16 bits.
+    /// @note Always returns false if library built without half support
     bool saveFloatAsHalf() const;
+#ifdef OPENVDB_USE_HALF
     void setSaveFloatAsHalf(bool);
+#endif
 
     /// @brief Return the class of volumetric data (level set, fog volume, etc.)
     /// that is stored in this grid.

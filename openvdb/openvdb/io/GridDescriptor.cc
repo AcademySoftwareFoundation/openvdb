@@ -95,7 +95,9 @@ GridDescriptor::read(std::istream &is)
     }
     // else
     GridBase::Ptr grid = GridBase::createGrid(mGridType);
+#ifdef OPENVDB_USE_HALF
     if (grid) grid->setSaveFloatAsHalf(mSaveFloatAsHalf);
+#endif
 
     // Read in the offsets.
     is.read(reinterpret_cast<char*>(&mGridPos), sizeof(int64_t));

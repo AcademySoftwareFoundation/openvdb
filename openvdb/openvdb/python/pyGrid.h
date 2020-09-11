@@ -2298,9 +2298,11 @@ exportGrid()
                 "iterkeys() -> iterator\n\n"
                 "Return an iterator over this grid's metadata keys.")
 
+#ifdef OPENVDB_USE_HALF
             .add_property("saveFloatAsHalf",
                 &GridType::saveFloatAsHalf, &GridType::setSaveFloatAsHalf,
                 "if True, write floating-point voxel values as 16-bit half floats")
+#endif
 
             //
             // Statistics

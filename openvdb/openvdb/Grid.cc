@@ -341,20 +341,23 @@ GridBase::setCreator(const std::string& creator)
 bool
 GridBase::saveFloatAsHalf() const
 {
+#ifdef OPENVDB_USE_HALF
     if (Metadata::ConstPtr meta = (*this)[META_SAVE_HALF_FLOAT]) {
         return meta->asBool();
     }
+#endif
     return false;
 }
 
 
+#ifdef OPENVDB_USE_HALF
 void
 GridBase::setSaveFloatAsHalf(bool saveAsHalf)
 {
     this->removeMeta(META_SAVE_HALF_FLOAT);
     this->insertMeta(META_SAVE_HALF_FLOAT, BoolMetadata(saveAsHalf));
 }
-
+#endif
 
 ////////////////////////////////////////
 

@@ -730,7 +730,9 @@ File::createGrid(const GridDescriptor& gd) const
     }
 
     GridBase::Ptr grid = GridBase::createGrid(gd.gridType());
+#ifdef OPENVDB_USE_HALF
     if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
+#endif
 
     return grid;
 }

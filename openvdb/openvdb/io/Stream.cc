@@ -181,7 +181,9 @@ Stream::readGrid(const GridDescriptor& gd, std::istream& is) const
             "\" from input stream because grid type " << gd.gridType() << " is unknown");
     } else {
         grid = GridBase::createGrid(gd.gridType());
+#ifdef OPENVDB_USE_HALF
         if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
+#endif
 
         Archive::readGrid(grid, gd, is);
     }
