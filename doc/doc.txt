@@ -354,7 +354,7 @@ file I/O routines recognize an ordinal suffix:
 &ldquo;<TT>density[0]</TT>&rdquo; and &ldquo;<TT>density[1]</TT>&rdquo;
 refer to the first and second grids named &ldquo;density&rdquo;.
 Also of interest for file I/O is a grid&rsquo;s
-&ldquo;@vdblink::Grid::setSaveFloatAsHalf() save float as half@endlink&rdquo;
+&ldquo;save float as half&rdquo;
 setting, which allows it to be written more compactly using 16-bit
 floating point values rather than full-precision values.
 Finally, during file output certain statistics are computed and stored
