@@ -7,6 +7,10 @@
 <B>Version 7.1.1</B> - <I>In Development</I>
 
 @par
+Improvements:
+- util::CpuTimer now uses C++11 chrono instead of TBB.
+
+@par
 Houdini:
 - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
   transform was ignoring the contents of packed geometry.
@@ -24,8 +28,11 @@ Build:
 - Upgraded CMake minimum version support to 3.12.
 - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
 - Fixed various compiler warnings for GCC 9.1.
+- Moved to CMake doxygen commands and removed the doxygen-config files for
+  doxygen documentation.
 - Added USE_ZLIB compiler flag that enables zlib compression and defaults
   to on.
+
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
 @par
