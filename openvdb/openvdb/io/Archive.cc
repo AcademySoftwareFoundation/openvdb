@@ -64,7 +64,11 @@ namespace io {
 #ifdef OPENVDB_USE_BLOSC
 const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC | COMPRESS_ACTIVE_MASK);
 #else
+#ifdef OPENVDB_USE_ZLIB
 const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
+#else
+const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ACTIVE_MASK);
+#endif
 #endif
 
 
@@ -757,6 +761,18 @@ bool
 Archive::hasBloscCompression()
 {
 #ifdef OPENVDB_USE_BLOSC
+    return true;
+#else
+    return false;
+#endif
+}
+
+
+//static
+bool
+Archive::hasZLibCompression()
+{
+#ifdef OPENVDB_USE_ZLIB
     return true;
 #else
     return false;

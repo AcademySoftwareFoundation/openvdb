@@ -6,7 +6,9 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
 #include <boost/algorithm/string/join.hpp>
+#ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
+#endif
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
@@ -33,11 +35,20 @@ compressionToString(uint32_t flags)
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_USE_ZLIB
 namespace {
 const int ZIP_COMPRESSION_LEVEL = Z_DEFAULT_COMPRESSION; ///< @todo use Z_BEST_SPEED?
 }
+#endif
 
 
+#ifndef OPENVDB_USE_ZLIB
+size_t
+zipToStreamSize(const char*, size_t)
+{
+    OPENVDB_THROW(IoError, "Zip encoding is not supported");
+}
+#else
 size_t
 zipToStreamSize(const char* data, size_t numBytes)
 {
@@ -55,8 +66,15 @@ zipToStreamSize(const char* data, size_t numBytes)
         return size_t(numBytes);
     }
 }
+#endif
 
-
+#ifndef OPENVDB_USE_ZLIB
+void
+zipToStream(std::ostream&, const char*, size_t)
+{
+    OPENVDB_THROW(IoError, "Zip encoding is not supported");
+}
+#else
 void
 zipToStream(std::ostream& os, const char* data, size_t numBytes)
 {
@@ -90,8 +108,16 @@ zipToStream(std::ostream& os, const char* data, size_t numBytes)
         os.write(reinterpret_cast<const char*>(data), numBytes);
     }
 }
+#endif
 
 
+#ifndef OPENVDB_USE_ZLIB
+void
+unzipFromStream(std::istream&, char*, size_t)
+{
+    OPENVDB_THROW(IoError, "Zip decoding is not supported");
+}
+#else
 void
 unzipFromStream(std::istream& is, char* data, size_t numBytes)
 {
@@ -138,6 +164,7 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
         }
     }
 }
+#endif
 
 
 namespace {

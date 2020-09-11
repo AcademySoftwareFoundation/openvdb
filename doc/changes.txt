@@ -30,6 +30,8 @@ Build:
 - Fixed various compiler warnings for GCC 9.1.
 - Moved to CMake doxygen commands and removed the doxygen-config files for
   doxygen documentation.
+- Added USE_ZLIB compiler flag that enables zlib compression and defaults
+  to on.
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
