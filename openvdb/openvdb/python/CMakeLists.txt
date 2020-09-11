@@ -258,6 +258,9 @@ endif()
 if(USE_NUMPY)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
+if(USE_HALF OR OpenVDB_USES_HALF)
+  target_compile_definitions(pyopenvdb PRIVATE "-DOPENVDB_USE_HALF")
+endif()
 
 if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets

@@ -127,9 +127,13 @@ class TestOpenVDB(unittest.TestCase):
             grid.name = 'test'
             self.assertEqual(grid.name, 'test')
 
-            self.assertFalse(grid.saveFloatAsHalf)
-            grid.saveFloatAsHalf = True
-            self.assertTrue(grid.saveFloatAsHalf)
+            try:
+                self.assertFalse(grid.saveFloatAsHalf)
+                grid.saveFloatAsHalf = True
+                self.assertTrue(grid.saveFloatAsHalf)
+            except AttributeError:
+                # ignore attribute error as half support is optional
+                pass
 
             self.assertTrue(grid.treeDepth > 2)
 
