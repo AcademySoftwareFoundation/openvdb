@@ -46,7 +46,7 @@ The following functions are provided:
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 
 function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
