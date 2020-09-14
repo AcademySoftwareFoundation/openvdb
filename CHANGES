@@ -26,6 +26,9 @@ Version 7.1.1 - In Development
       doxygen documentation.
     - Added USE_ZLIB compiler flag that enables zlib compression and defaults
       to on.
+    - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
+      Windows which use the multithread/DLL-specific version of the CRT.
+      [Reported by Tobias Rittig]
 
 Version 7.1.0 - August 13, 2020
 
