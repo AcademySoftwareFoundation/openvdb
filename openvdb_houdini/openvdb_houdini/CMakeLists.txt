@@ -336,24 +336,17 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
 
 endforeach()
 
-# This is only required for the OpenVDB Write SOP which enables a blosc menu
-# option if blosc is supported.
+# This is only required for the OpenVDB Write SOP which enables a compression menu
+# option if blosc and zlib are supported.
 
 if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   if(TARGET SOP_OpenVDB_Write)
     target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC")
   endif()
 endif()
-
-# This is only required for the OpenVDB Write SOP and OpenVDB Metadata SOP which
-# enable half options if half is supported.
-
-if(USE_HALF OR OpenVDB_USES_HALF)
-  if(TARGET SOP_OpenVDB_Metadata)
-    target_compile_definitions(SOP_OpenVDB_Metadata PRIVATE "-DOPENVDB_USE_HALF")
-  endif()
+if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   if(TARGET SOP_OpenVDB_Write)
-    target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_HALF")
+    target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
   endif()
 endif()
 

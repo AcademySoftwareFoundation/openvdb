@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 7.1.1 - In Development
 
+    Improvements:
+    - util::CpuTimer now uses C++11 chrono instead of TBB.
+
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
       transform was ignoring the contents of packed geometry.
@@ -21,6 +24,8 @@ Version 7.1.1 - In Development
     - Fixed various compiler warnings for GCC 9.1.
     - Moved to CMake doxygen commands and removed the doxygen-config files for
       doxygen documentation.
+    - Added USE_ZLIB compiler flag that enables zlib compression and defaults
+      to on.
     - Add OPENVDB_USE_HALF macro to allow for switching off Half support.
       [Contributed by Ben FrantzDale]
 

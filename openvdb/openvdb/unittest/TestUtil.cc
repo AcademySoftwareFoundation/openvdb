@@ -141,10 +141,10 @@ TestUtil::testCpuTimer()
     // so use this more accurate, but non-asynchronous implementation for unit testing
     auto sleep_for = [&](int ms) -> void
     {
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::steady_clock::now();
         while (true) {
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::high_resolution_clock::now() - start);
+                std::chrono::steady_clock::now() - start);
             if (duration.count() > ms)    return;
         }
     };

@@ -71,6 +71,9 @@ public:
     /// Return @c true if the OpenVDB library includes support for the Blosc compressor.
     static bool hasBloscCompression();
 
+    /// Return @c true if the OpenVDB library includes support for the ZLib compressor.
+    static bool hasZLibCompression();
+
     /// Return a bit mask specifying compression options for the data stream.
     uint32_t compression() const { return mCompression; }
     /// @brief Specify whether and how the data stream should be compressed.

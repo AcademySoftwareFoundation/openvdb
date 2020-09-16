@@ -35,16 +35,16 @@ Reference Platform, but for those that do, their specified versions are
 
 @section depComponents OpenVDB Components
 
-Component               | Requirements                                                                         | Optional
------------------------ | ------------------------------------------------------------------------------------ | --------
-OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, ZLIB, Boost::system, Boost::iostream                | Blosc, Log4cplus, IlmBase::Half, OpenEXR::IlmImf
-OpenVDB Print           | Core Library dependencies                                                            | -
-OpenVDB LOD             | Core Library dependencies                                                            | -
-OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | IlmBase::Half
-OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
-OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
-OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
-OpenVDB Documentation   | Doxygen                                                                              | -
+Component               | Requirements                                                          | Optional
+----------------------- | --------------------------------------------------------------------- | --------
+OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::system, Boost::iostream       | Blosc, ZLIB, Log4cplus, IlmBase::Half, OpenEXR::IlmImf
+OpenVDB Print           | Core Library dependencies                                             | -
+OpenVDB LOD             | Core Library dependencies                                             | -
+OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                           | IlmBase::Half
+OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                      | -
+OpenVDB Python          | Core Library dependencies, Python, Boost::python                      | Boost::numpy*, NumPy
+OpenVDB UnitTests       | Core Library dependencies, CppUnit                                    | -
+OpenVDB Documentation   | Doxygen                                                               | -
 
  - @b * Boost::numpy is required for NumPy support with Boost from version 1.65
  onwards.

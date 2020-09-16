@@ -52,6 +52,8 @@ This will define the following variables:
   True if the system has the named OpenVDB component.
 ``OpenVDB_USES_BLOSC``
   True if the OpenVDB Library has been built with blosc support
+``OpenVDB_USES_ZLIB``
+  True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_HALF``
@@ -481,6 +483,7 @@ endif()
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
+set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_HALF ${USE_HALF})
 set(OpenVDB_USES_EXR ${USE_EXR})
@@ -527,6 +530,11 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
       set(OpenVDB_USES_BLOSC ON)
     endif()
 
+    string(FIND ${PREREQUISITE} "zlib" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_ZLIB ON)
+    endif()
+
     string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_LOG4CPLUS ON)
@@ -549,6 +557,10 @@ endif()
 
 if(OpenVDB_USES_BLOSC)
   find_package(Blosc REQUIRED)
+endif()
+
+if(OpenVDB_USES_ZLIB)
+  find_package(ZLIB REQUIRED)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
@@ -629,8 +641,9 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   if(OpenVDB_USES_BLOSC)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
   endif()
-
-  list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  if(OpenVDB_USES_ZLIB)
+    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  endif()
 endif()
 
 if(openvdb_je IN_LIST OpenVDB_FIND_COMPONENTS)
