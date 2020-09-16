@@ -63,7 +63,7 @@ public:
         }
     }
 
-    /// @brief Similar to init above except it uses the bounds of the input ray
+    /// @brief Similar to init above except it uses the bounds of the input ray.
     __hostdev__ void init(const RayT& ray, int dim) { this->init(ray, ray.t0(), ray.t1(), dim); }
 
     /// @brief Updates the HDDA to march with the specified dimension
@@ -232,7 +232,7 @@ public:
         }
     }
 
-    /// @brief Similar to init above except it uses the bounds of the input ray
+    /// @brief Similar to init above except it uses the bounds of the input ray.
     __hostdev__ void init(const RayT& ray) { this->init(ray, ray.t0(), ray.t1()); }
 
     /// @brief Increment the voxel index to next intersected voxel or node
