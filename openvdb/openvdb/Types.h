@@ -272,14 +272,6 @@ template <> struct IsFloatingPoint<half> { enum { value = true }; };
 #endif
 
 
-// @brief Extend std::is_class<T>::value to work with half
-template <typename T>
-struct IsClass { enum { value = std::is_class<T>::value }; };
-#if OPENVDB_USE_HALF
-template <> struct IsClass<half> { enum { value = false }; };
-#endif
-
-
 ////////////////////////////////////////
 
 
