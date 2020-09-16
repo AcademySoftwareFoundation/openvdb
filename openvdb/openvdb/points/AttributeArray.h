@@ -1364,18 +1364,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
 {
-    // TODO: Update to use Traits that correctly handle matrices and quaternions.
-
-    if (std::is_same<ValueType, Quats>::value ||
-        std::is_same<ValueType, Quatd>::value ||
-        std::is_same<ValueType, Mat3s>::value ||
-        std::is_same<ValueType, Mat3d>::value ||
-        std::is_same<ValueType, Mat4s>::value ||
-        std::is_same<ValueType, Mat4d>::value)      return true;
-
-    using ElementT = typename VecTraits<ValueType>::ElementType;
-
-    return IsFloatingPoint<ElementT>::value;
+    return IsFloatingPoint<typename ValueTraits<ValueType>::ElementType>::value;
 }
 
 
@@ -1383,7 +1372,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsClass() const
 {
-    return IsClass<ValueType>::value;
+    return !ValueTraits<ValueType>::IsScalar;
 }
 
 
@@ -1391,7 +1380,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsVector() const
 {
-    return VecTraits<ValueType>::IsVec;
+    return ValueTraits<ValueType>::IsVec;
 }
 
 
@@ -1399,8 +1388,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsQuaternion() const
 {
-    // TODO: improve performance by making this a compile-time check using type traits
-    return !this->valueType().compare(0, 4, "quat");
+    return ValueTraits<ValueType>::IsQuat;
 }
 
 
@@ -1408,8 +1396,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsMatrix() const
 {
-    // TODO: improve performance by making this a compile-time check using type traits
-    return !this->valueType().compare(0, 3, "mat");
+    return ValueTraits<ValueType>::IsMat;
 }
 #endif
 
