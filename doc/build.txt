@@ -8,6 +8,7 @@
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
   - @ref buildBloscSupport
+  - @ref buildZLibSupport
   - @ref buildVCPKG
 - @ref buildComponents
 - @ref buildGuide
@@ -142,16 +143,21 @@ provide direct include/lib paths to isolated software locations.
 
 @subsection buildBloscSupport Blosc Support
 
-Blosc is one of the optional dependencies of all OpenVDB components. It is the
-only dependency which is enabled by default. The documented build steps below
-treat blosc as a required dependency. There are two reasons for this:
+Blosc is an optional dependency of all OpenVDB components. The documented
+build steps below treat blosc as a required dependency. There are two reasons
+for this:
 
  - Blosc produces significantly smaller `.vdb` files
  - If Blosc is disabled, you will not be able to read or use any `.vdb` files
    that were created using blosc compression. This includes OpenVDB files from
    Houdini.
 
-You can disable Blosc using `-D USE_BLOSC=OFF`.
+@subsection buildZLibSupport ZLIB Support
+
+ZLIB is an optional dependency of all OpenVDB components. The documented build
+steps below treat ZLib as a required dependency.
+
+You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D USE_BLOSC=OFF`.
 
 @subsection buildVCPKG Building Dependencies using VCPKG
 
@@ -209,8 +215,9 @@ Developers may wish to build a standalone version of OpenVDB to take advantage
 of newer dependencies and newer library features. See
 [here](@ref buildBuildStandalone) for more information.
 
-@b Note: Blosc is treated as a required dependency in these install instructions.
-See the [blosc support](@ref buildBloscSupport) section for more information.
+@b Note: Blosc and ZLib are treated as required dependencies in these install
+instructions. See the [blosc support](@ref buildBloscSupport) and
+[zlib support](@ref buildZLibSupport) sections for more information.
 
 @subsection buildBuildHouMaya Building Against Houdini/Maya
 
@@ -253,8 +260,8 @@ LLVM           | Target-independent code generation                             
 
 At a minimum, boost, a matching C++14 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
-installing the above software. Note that as Blosc is provided as part of the
-Houdini installation `USE_BLOSC` should be left `ON`.
+installing the above software. Note that as Blosc and ZLib are provided as part
+of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've

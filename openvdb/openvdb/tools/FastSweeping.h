@@ -1220,7 +1220,6 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
             for (int sliceIdx = 0; sliceIdx < maskRange; sliceIdx++) {
                 if (leafSliceMasks[leafOffset + sliceIdx] == uint8_t(1)) {
                     const int64_t voxelSliceKey = leafKey+sliceIdx-maskOffset;
-                    assert(voxelSliceKey >= 0);
                     map[voxelSliceKey].emplace_back(leafIdx);
                 }
             }
