@@ -696,17 +696,19 @@ struct TypeList
     static constexpr int64_t Index = internal::TSHasTypeImpl<Self, T>::Index;
 
     /// @brief Remove any duplicate types from this TypeList by rotating the
-    /// next valid type left (maintains the order of other types).
+    /// next valid type left (maintains the order of other types). Optionally
+    /// combine the result with another TypeList.
     /// @details Example:
     /// @code
     /// {
     ///     using Types = openvdb::TypeList<Int16, Int32, Int16, float, float, Int64>;
     /// }
     /// {
-    ///     using UniqueTypes = Types::Unique; // <Int16, Int32, float, Int64>
+    ///     using UniqueTypes = Types::Unique<>; // <Int16, Int32, float, Int64>
     /// }
     /// @endcode
-    using Unique = typename internal::TSMakeUniqueImpl<TypeList<>, Ts...>::type;
+    template<typename ListT = TypeList<>>
+    using Unique = typename internal::TSMakeUniqueImpl<ListT, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
     /// @details Example:

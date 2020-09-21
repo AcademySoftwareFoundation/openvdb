@@ -2195,9 +2195,17 @@ TestFile::testCompression()
     // See io/Compression.h for the flag values.
 
 #ifdef OPENVDB_USE_BLOSC
-    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+    #ifdef OPENVDB_USE_ZLIB
+        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+    #else
+        std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
+    #endif
 #else
-    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+    #ifdef OPENVDB_USE_ZLIB
+        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+    #else
+        std::vector<uint32_t> validFlags{0x0,0x2};
+    #endif
 #endif
     for (uint32_t flags : validFlags) {
 

@@ -6,7 +6,7 @@
 
 #include <openvdb/version.h>
 #include <string>
-#include <tbb/tick_count.h>
+#include <chrono>
 #include <iostream>// for std::cerr
 #include <sstream>// for ostringstream
 #include <iomanip>// for setprecision
@@ -66,19 +66,18 @@ namespace util {
 class CpuTimer
 {
 public:
-
     /// @brief Initiate timer
-    CpuTimer(std::ostream& os = std::cerr) : mOutStream(os), mT0(tbb::tick_count::now()) {}
+    CpuTimer(std::ostream& os = std::cerr) : mOutStream(os), mT0(this->now()) {}
 
     /// @brief Prints message and start timer.
     ///
     /// @note Should normally be followed by a call to stop()
-    CpuTimer(const std::string& msg, std::ostream& os = std::cerr) : mOutStream(os), mT0() { this->start(msg); }
+    CpuTimer(const std::string& msg, std::ostream& os = std::cerr) : mOutStream(os) { this->start(msg); }
 
     /// @brief Start timer.
     ///
     /// @note Should normally be followed by a call to milliseconds() or stop(std::string)
-    inline void start() { mT0 = tbb::tick_count::now(); }
+    inline void start() { mT0 = this->now(); }
 
     /// @brief Print message and start timer.
     ///
@@ -89,13 +88,21 @@ public:
         this->start();
     }
 
+    /// @brief Return Time difference in microseconds since construction or start was called.
+    ///
+    /// @note Combine this method with start() to get timing without any outputs.
+    inline int64_t microseconds() const
+    {
+        return (this->now() - mT0);
+    }
+
     /// @brief Return Time difference in milliseconds since construction or start was called.
     ///
     /// @note Combine this method with start() to get timing without any outputs.
     inline double milliseconds() const
     {
-        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
-        return 1000.0*dt.seconds();
+        static constexpr double resolution = 1.0 / 1E3;
+        return static_cast<double>(this->microseconds()) * resolution;
     }
 
     /// @brief Return Time difference in seconds since construction or start was called.
@@ -103,8 +110,8 @@ public:
     /// @note Combine this method with start() to get timing without any outputs.
     inline double seconds() const
     {
-        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
-        return dt.seconds();
+        static constexpr double resolution = 1.0 / 1E6;
+        return static_cast<double>(this->microseconds()) * resolution;
     }
 
     /// @brief This method is identical to milliseconds() - deprecated
@@ -162,8 +169,22 @@ public:
     }
 
 private:
-    std::ostream&   mOutStream;
-    tbb::tick_count mT0;
+    static int64_t now()
+    {
+        // steady_clock is a monotonically increasing clock designed for timing duration
+        // note that high_resolution_clock is aliased to either steady_clock or system_clock
+        // depending on the platform, so it is preferrable to use steady_clock
+        const auto time_since_epoch =
+            std::chrono::steady_clock::now().time_since_epoch();
+        // cast time since epoch into microseconds (1 / 1000000 seconds)
+        const auto microseconds =
+            std::chrono::duration_cast<std::chrono::microseconds>(time_since_epoch).count();
+        // cast to a a 64-bit signed integer as this will overflow in 2262!
+        return static_cast<int64_t>(microseconds);
+    }
+
+    std::ostream&       mOutStream;
+    int64_t             mT0{0};
 };// CpuTimer
 
 } // namespace util
