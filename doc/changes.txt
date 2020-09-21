@@ -20,6 +20,11 @@ Houdini:
   with the corresponding node if the node's internal name was changed.
 
 @par
+Bug Fixes:
+- Fixed a bug which could cause recursive compile time instantiations of
+  TypeList objects, manifesting in longer compile times.
+
+@par
 Build:
 - Removed the Makefiles.
 - Re-organised the repository layout such that each independent library
