@@ -13,6 +13,7 @@ Version 7.1.1 - In Development
       packed geometry were also being converted.
     - Fixed a bug where a Houdini SOP's verb would not be correctly associated
       with the corresponding node if the node's internal name was changed.
+    - Fixed bug where OpenVDB Convert SOP could revert the name attribute.
 
     Build:
     - Removed the Makefiles.
