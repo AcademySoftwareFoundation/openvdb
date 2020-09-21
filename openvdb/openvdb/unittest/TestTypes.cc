@@ -536,13 +536,13 @@ TestTypes::testTypeList()
     //
 
     // Test some methods on lists with duplicate types
-    using DulplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
-    using DulplicateRealTypes = TypeList<float, float, float, float>;
-    static_assert(DulplicateIntTypes::Size == 4, "");
-    static_assert(DulplicateRealTypes::Size == 4, "");
-    static_assert(DulplicateIntTypes::Index<Int16> == 1, "");
-    static_assert(std::is_same<DulplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value, "");
-    static_assert(std::is_same<DulplicateRealTypes::Unique<>, TypeList<float>>::value, "");
+    using DuplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
+    using DuplicateRealTypes = TypeList<float, float, float, float>;
+    static_assert(DuplicateIntTypes::Size == 4, "");
+    static_assert(DuplicateRealTypes::Size == 4, "");
+    static_assert(DuplicateIntTypes::Index<Int16> == 1, "");
+    static_assert(std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value, "");
+    static_assert(std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value, "");
 
     //
 
