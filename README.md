@@ -2,8 +2,12 @@
 
 [![License](https://img.shields.io/github/license/AcademySoftwareFoundation/openvdb)](LICENSE.md)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2774/badge)](https://bestpractices.coreinfrastructure.org/projects/2774)
-[![GitHub Actions](https://github.com/AcademySoftwareFoundation/openvdb/workflows/Build/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3ABuild)
 
+| Build           | Status |
+| --------------- | ------ |
+| OpenVDB         | [![Build](https://github.com/AcademySoftwareFoundation/openvdb/workflows/Build/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3ABuild) |
+| OpenVDB AX      | [![ax](https://github.com/AcademySoftwareFoundation/openvdb/workflows/ax/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3Aax) |
+| OpenVDB Houdini | [![Houdini](https://github.com/AcademySoftwareFoundation/openvdb/workflows/Houdini/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3AHoudini) |
 
 [Website](https://www.openvdb.org) |
 [Discussion Forum](https://www.openvdb.org/forum) |

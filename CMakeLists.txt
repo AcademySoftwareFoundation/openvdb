@@ -67,7 +67,6 @@ option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 
 option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
-option(OPENVDB_BUILD_AX_DOCS "Build the OpenVDB AX documentation" OFF)
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_AX_HOUDINI_PLUGIN "Build the AX Houdini plugin" OFF)
@@ -92,6 +91,9 @@ option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
 know it to be required.]=] ON)
+option(USE_ZLIB [=[
+Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -153,6 +155,10 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
+if(USE_BLOSC AND NOT USE_ZLIB)
+  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
+endif()
+
 # Top-level location for all openvdb headers
 set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
@@ -211,7 +217,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_OPENEXR_VERSION 2.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2017.0)
-  set(MINIMUM_LLVM_VERSION 5.0.0)
+  set(MINIMUM_LLVM_VERSION 6.0.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
   set(MINIMUM_NUMPY_VERSION 1.12.1)
@@ -371,10 +377,6 @@ endif()
 
 if(OPENVDB_BUILD_DOCS)
   add_subdirectory(doc)
-endif()
-
-if(OPENVDB_BUILD_AX_DOCS)
-  add_subdirectory(openvdb_ax/doc)
 endif()
 
 # Early exit if there's nothing to build

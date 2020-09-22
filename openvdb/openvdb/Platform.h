@@ -53,15 +53,6 @@
 /// OpenVDB now requires C++11
 #define OPENVDB_HAS_CXX11 1
 
-/// For compilers that need templated function specializations to have
-/// storage qualifiers, we need to declare the specializations as static inline.
-/// Otherwise, we'll get linker errors about multiply defined symbols.
-#if defined(__GNUC__) && OPENVDB_CHECK_GCC(4, 4)
-    #define OPENVDB_STATIC_SPECIALIZATION
-#else
-    #define OPENVDB_STATIC_SPECIALIZATION static
-#endif
-
 
 /// SIMD Intrinsic Headers
 #if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)

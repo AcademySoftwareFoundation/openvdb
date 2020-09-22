@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Exceptions.h
+/// @file openvdb_ax/Exceptions.h
 ///
 /// @authors Nick Avramoussis, Richard Jones
 ///

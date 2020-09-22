@@ -18,6 +18,9 @@ on:
       - 'openvdb/doc/**'
       - 'openvdb_maya/**'
       - '**/*.md'
+  schedule:
+    # run this workflow every day at 7am UTC
+    - cron:  '0 7 * * *'
 
 jobs:
   testvfx2021:
@@ -120,14 +123,14 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testabi7noblosc:
+  testabi7lite:
     runs-on: ubuntu-16.04
     container:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
       run: ./ci/test.sh
 
@@ -174,6 +177,19 @@ jobs:
       run: ./ci/build_houdini.sh clang++ Debug OFF
     - name: test
       run: ./ci/test.sh
+
+  testvfx2021gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2021
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
+    - name: test
+      run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
 
   testabi7gcc:
     runs-on: ubuntu-16.04

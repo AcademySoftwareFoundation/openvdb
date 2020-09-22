@@ -1,7 +1,7 @@
 /**
 <div style="width:800px;text-align:justify;">
 
-@page openvdbax OpenVDB AX
+@page openvdbaxapi OpenVDB AX
 
 @section vdbaxcontents Contents
 - @ref vdbaxintro

@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 7.1.1 - In Development
 
+    Improvements:
+    - util::CpuTimer now uses C++11 chrono instead of TBB.
+
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
       transform was ignoring the contents of packed geometry.
@@ -11,12 +14,25 @@ Version 7.1.1 - In Development
     - Fixed a bug where a Houdini SOP's verb would not be correctly associated
       with the corresponding node if the node's internal name was changed.
 
+    Bug fixes:
+    - Fixed a bug which could cause recursive compile time instantiations of
+      TypeList objects, manifesting in longer compile times.
+
     Build:
     - Removed the Makefiles.
     - Re-organised the repository layout such that each independent library
       is able to be configured against an existing installation of OpenVDB
       without ambiguous include paths.
     - Upgraded CMake minimum version support to 3.12.
+    - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
+    - Fixed various compiler warnings for GCC 9.1.
+    - Moved to CMake doxygen commands and removed the doxygen-config files for
+      doxygen documentation.
+    - Added USE_ZLIB compiler flag that enables zlib compression and defaults
+      to on.
+    - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
+      Windows which use the multithread/DLL-specific version of the CRT.
+      [Reported by Tobias Rittig]
 
 Version 7.1.0 - August 13, 2020
 
