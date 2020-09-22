@@ -171,7 +171,7 @@ fogToExt(const FogGridT &fogGrid,
 ///
 /// @param sdfGrid  An approximate signed distance field to the specified iso-surface.
 ///
-/// @param op       Functor with signature [](const Vec3R &xyz)->float that
+/// @param op       Functor with signature [](const Vec3R &xyz)->ExtValueT that
 ///                 defines the Dirichlet boundary condition, on the iso-surface,
 ///                 of the field to be extended.
 ///
@@ -183,7 +183,7 @@ fogToExt(const FogGridT &fogGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @note The only difference between this method and fogToEXT, defined above, is the
+/// @note The only difference between this method and fogToExt, defined above, is the
 ///       convention of the sign of the signed distance field.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -209,7 +209,7 @@ sdfToExt(const SdfGridT &sdfGrid,
 /// @param fogGrid  Scalar (floating-point) volume from which an
 ///                 iso-surface can be defined.
 ///
-/// @param op       Functor with signature [](const Vec3R &xyz)->float that
+/// @param op       Functor with signature [](const Vec3R &xyz)->ExtValueT that
 ///                 defines the Dirichlet boundary condition, on the iso-surface,
 ///                 of the field to be extended.
 ///
@@ -251,7 +251,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 /// @param sdfGrid  Scalar (floating-point) volume from which an
 ///                 iso-surface can be defined.
 ///
-/// @param op       Functor with signature [](const Vec3R &xyz)->float that
+/// @param op       Functor with signature [](const Vec3R &xyz)->ExtValueT that
 ///                 defines the Dirichlet boundary condition, on the iso-surface,
 ///                 of the field to be extended.
 ///
@@ -1503,7 +1503,7 @@ sdfToExt(const SdfGridT &sdfGrid,
          typename SdfGridT::ValueType isoValue,
          int nIter)
 {
-  FastSweeping<SdfGridT> fs;
+  FastSweeping<SdfGridT, ExtValueT> fs;
   if (fs.initExt(sdfGrid, op, background, isoValue, /*isInputSdf*/true)) fs.sweep(nIter);
   return fs.extGrid();
 }
