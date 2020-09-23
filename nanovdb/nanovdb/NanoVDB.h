@@ -1053,14 +1053,14 @@ private:
     }
     __hostdev__ uint32_t findNextOn(uint32_t start) const
     {
-        uint32_t n = start >> 6;//initiate
+        uint32_t n = start >> 6;// initiate
         if (n >= WORD_COUNT) return SIZE; // check for out of bounds
         uint32_t m = start & 63;
         uint64_t b = mWords[n];
-        if (b & (uint64_t(1) << m)) return start;//simpel case: start is on
+        if (b & (uint64_t(1) << m)) return start;// simple case: start is on
         b &= ~uint64_t(0) << m;// mask out lower bits
         while(!b && ++n<WORD_COUNT) b = mWords[n];// find next none-zero word
-        return (!b ? SIZE : (n << 6) + FindLowestOn(b));//catch last word=0
+        return (!b ? SIZE : (n << 6) + FindLowestOn(b));// catch last word=0
     }
 }; // Mask class
 
@@ -1672,10 +1672,10 @@ private:
     __hostdev__ const Tile* findTile(const CoordType& ijk) const
     {
         // binary-search of pre-sorted elements
-        int32_t     low = 0, high = DataType::mTileCount; //low is inclusive and high is exclusive
+        int32_t     low = 0, high = DataType::mTileCount; // low is inclusive and high is exclusive
         const Tile* tiles = reinterpret_cast<const Tile*>(this + 1);
         const auto  key = DataType::CoordToKey(ijk);
-#if 1 //switch between linear and binary seach
+#if 1 // switch between linear and binary seach
         for (int i = low; i < high; i++) {
             const Tile* tile = &tiles[i];
             if (tile->key == key)
@@ -1819,8 +1819,8 @@ class InternalNode : private InternalData<ChildT, Log2Dim>
 {
 public:
     static constexpr uint32_t LOG2DIM = Log2Dim;
-    static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; //dimension in index space
-    static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); //number of tile values (or child pointers)
+    static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; // dimension in index space
+    static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); // number of tile values (or child pointers)
     static constexpr uint32_t MASK = (1u << TOTAL) - 1u;
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
 
@@ -1840,10 +1840,10 @@ public:
 
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
-    /// @brief Return the dimnetion, in voxel units, of this internal node (typically 8*16 or 8*16*32)
+    /// @brief Return the dimension, in voxel units, of this internal node (typically 8*16 or 8*16*32)
     __hostdev__ static uint32_t dim() { return 1u << TOTAL; }
 
-    /// @brief return memory usage in bytes for the class
+    /// @brief Return memory usage in bytes for the class
     __hostdev__ static size_t memUsage() { return sizeof(DataType); }
 
     /// @brief Return a const reference to the bit mask of active voxels in this internal node
