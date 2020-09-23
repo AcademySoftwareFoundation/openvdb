@@ -9,6 +9,7 @@ if [ -z $LLVM_VERSION ]; then
 fi
 
 brew update
+brew install bash
 brew install ilmbase
 brew install openexr
 brew install cmake

@@ -110,6 +110,14 @@ message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE
 
 # Configure other dependencies
 
+if(OPENVDB_AX_SHARED AND NOT Boost_USE_STATIC_LIBS)
+  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
+  #        boost shared libraries (more specifically libraries built with -fPIC).
+  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
+  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
+  set(BUILD_SHARED_LIBS ON)
+  set(Boost_USE_STATIC_LIBS OFF)
+endif()
 find_package(Boost REQUIRED COMPONENTS random)
 
 #########################################################################
