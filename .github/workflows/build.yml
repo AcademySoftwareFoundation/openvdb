@@ -18,6 +18,9 @@ on:
       - 'openvdb/doc/**'
       - 'openvdb_maya/**'
       - '**/*.md'
+  schedule:
+    # run this workflow every day at 7am UTC
+    - cron:  '0 7 * * *'
 
 jobs:
   testvfx2021:
@@ -65,6 +68,8 @@ jobs:
       image: aswf/ci-openvdb:2018
     steps:
     - uses: actions/checkout@v1
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
     - name: build
       run: ./ci/build.sh clang++ Release 5 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -88,7 +93,7 @@ jobs:
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini2.sh
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -100,21 +105,32 @@ jobs:
       image: aswf/ci-base:2018
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini17_5-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini17_5-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini.sh 17.5 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
       run: ./ci/test.sh
 
-  testabi7noblosc:
+  testabi7lite:
     runs-on: ubuntu-16.04
     container:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
       run: ./ci/test.sh
 
@@ -124,23 +140,56 @@ jobs:
       image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
     - name: houdini
-      run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
+      run: ./ci/install_houdini.sh
     - name: build
       run: ./ci/build_houdini.sh g++ Release OFF
     - name: test
       run: ./ci/test.sh
 
-  # testhou180debug:
-  #   runs-on: ubuntu-16.04
-  #   container:
-  #     image: aswf/ci-base:2019
-  #   steps:
-  #   - uses: actions/checkout@v1
-  #   - name: houdini
-  #     run: ./ci/install_houdini.sh 18.0 ${{ secrets.HOUPASS }}
-  #   - name: build
-  #     run: ./ci/build_houdini.sh clang++ Debug OFF
+  testhou180debug:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_0-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
+    - name: houdini
+      run: ./ci/install_houdini.sh
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Debug OFF
+    - name: test
+      run: ./ci/test.sh
+
+  testvfx2021gcc:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-openvdb:2021
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
+    - name: test
+      run: ./ci/test.sh
+    - name: test_install
+      run: ./ci/test_install.sh
 
   testabi7gcc:
     runs-on: ubuntu-16.04
@@ -181,7 +230,7 @@ jobs:
       run: |
         # note: system path must be modified in a previous step to it's use
         echo "::add-path::%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\bin"
-        echo "::add-path::${{github.workspace}}\build\openvdb\Release"
+        echo "::add-path::${{github.workspace}}\build\openvdb\openvdb\Release"
     - name: install
       shell: bash
       run: ./ci/install_windows.sh
@@ -202,7 +251,7 @@ jobs:
       run: |
         # note: system path must be modified in a previous step to it's use
         echo "::add-path::%VCPKG_INSTALLATION_ROOT%\installed\x64-windows-static\bin"
-        echo "::add-path::${{github.workspace}}\build\openvdb\Release"
+        echo "::add-path::${{github.workspace}}\build\openvdb\openvdb\Release"
     - name: install
       shell: bash
       run: ./ci/install_windows.sh

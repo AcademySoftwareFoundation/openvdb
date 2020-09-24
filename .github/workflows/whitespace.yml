@@ -21,7 +21,7 @@ jobs:
           git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*' ':!nanovdb/*'
           test $? -eq 1
 
-  # Search for any tabs excluding Makefiles, meeting notes, image files and a few others
+  # Search for any tabs excluding meeting notes, image files and a few others
   spacesnottabs:
     runs-on: ubuntu-16.04
     steps:
