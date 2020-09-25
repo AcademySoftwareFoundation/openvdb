@@ -15,7 +15,7 @@
 #
 #  clean: clean up the build directory
 
-USE_OPENVDB := no
+USE_OPENVDB := yes
 USE_ZLIB   := yes
 USE_BLOSC := yes
 USE_CUDA := yes
@@ -26,7 +26,7 @@ USE_OPENCL := yes
 
 BUILD_BENCHMARK := yes
 BUILD_UNITTESTS := yes
-BUILD_INTERACTIVE_RENDERER := yes
+BUILD_INTERACTIVE_RENDERER := no
 
 ifeq (yes,$(USE_OPENVDB))
 	USE_TBB = yes
@@ -38,8 +38,13 @@ ifeq ("$(shell uname -s)","Darwin")
     SHELL = /bin/tcsh
 endif
 
+#CC = clang -Wall -Wunused-parameter -march=native
 CC = g++ -Wall -Wunused-parameter -march=native
-CXXFLAGS += -std=c++14
+ifeq (yes,$(USE_OPENVDB))
+    CXXFLAGS += -std=c++14
+else
+    CXXFLAGS += -std=c++11
+endif
 BUILD_DEBUG   = $(CC) $(CXXFLAGS) -O1 -g
 BUILD_RELEASE = $(CC) $(CXXFLAGS) -DNDEBUG -O3
 INCLUDES = -I$(HOME)/local/include -I./
@@ -218,7 +223,7 @@ data/test.nvdb: release/testOpenVDB
 	./release/testOpenVDB --gtest_filter="*OpenToNanoVDB" --gtest_repeat=1
 
 benchmark: data/test.nvdb cuda/benchmark
-	./cuda/benchmark --gtest_filter="*_CPU" --gtest_repeat=1
+	./cuda/benchmark --gtest_filter="*" --gtest_repeat=1
 else
 benchmark: cuda/benchmark
 	./cuda/benchmark --gtest_filter="*" --gtest_repeat=1

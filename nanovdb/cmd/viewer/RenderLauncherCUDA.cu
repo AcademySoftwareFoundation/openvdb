@@ -105,9 +105,11 @@ void RenderLauncherCUDA::unmapCUDA(const std::shared_ptr<Resource>& resource, Fr
 #if defined(NANOVDB_USE_OPENGL)
     auto imgBufferGL = dynamic_cast<FrameBufferGL*>(imgBuffer);
     if (imgBufferGL) {
-        NANOVDB_CUDA_SAFE_CALL(cudaGraphicsUnmapResources(
-            1, (cudaGraphicsResource**)&resource->mGlTextureResourceCUDA, (cudaStream_t)stream));
-        imgBuffer->invalidate();
+        if (resource->mGlTextureResourceCUDA) {
+            NANOVDB_CUDA_SAFE_CALL(cudaGraphicsUnmapResources(
+                1, (cudaGraphicsResource**)&resource->mGlTextureResourceCUDA, (cudaStream_t)stream));
+            imgBuffer->invalidate();
+        }
         return;
     }
 #endif
@@ -125,7 +127,12 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& r
 #if defined(NANOVDB_USE_OPENGL)
     auto imgBufferGL = dynamic_cast<FrameBufferGL*>(imgBuffer);
     if (imgBufferGL) {
+
+        if (resource->mGlTextureResourceCUDAError)
+            return nullptr;
+
         auto     accessGL = FrameBufferBase::AccessType(access);
+
         uint32_t accessCUDA = cudaGraphicsMapFlagsNone;
         if (accessGL == FrameBufferBase::AccessType::READ_ONLY) {
             accessCUDA = cudaGraphicsMapFlagsReadOnly;
@@ -154,7 +161,7 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& r
                 resource->mGlTextureResourceId = 0;
             }
 
-            NANOVDB_GL_SAFE_CALL(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, imgBufferGL->bufferGL()));
+            //NANOVDB_GL_SAFE_CALL(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, imgBufferGL->bufferGL()));
 
             cudaGraphicsResource* resCUDA = nullptr;
             bool                  rc =
@@ -163,13 +170,13 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& r
                                                                     accessCUDA));
             if (!rc) {
                 std::cerr << "Can't register GL buffer (" << imgBufferGL->bufferGL() << ") with CUDA" << std::endl;
-                exit(1);
-
+                resource->mGlTextureResourceCUDAError = true;
                 return nullptr;
             }
 
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            //glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
+            resource->mGlTextureResourceCUDAError = false;
             resource->mGlTextureResourceCUDA = resCUDA;
             resource->mGlTextureResourceId = imgBufferGL->resourceId();
             resource->mGlTextureResourceSize = imgBuffer->size();

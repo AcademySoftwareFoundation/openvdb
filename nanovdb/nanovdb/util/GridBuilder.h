@@ -18,7 +18,10 @@
 #define NANOVDB_GRIDBUILDER_H_HAS_BEEN_INCLUDED
 
 #include "GridHandle.h"
-#include "MultiThreading.h"
+#include "GridChecksum.h"
+#include "Range.h"
+#include "Invoke.h"
+#include "ForEach.h"
 
 #include <map>
 #include <limits>
@@ -37,6 +40,7 @@ namespace nanovdb {
 /// @param halfWidth Half-width of narrow band in voxel units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -46,6 +50,7 @@ createLevelSetSphere(ValueT radius = 100,
                      ValueT halfWidth = 3.0,
                      const Vec3d &origin = Vec3d(0),
                      const std::string &name = "sphere_ls",
+                     ChecksumMode mode = ChecksumMode::Default,
                      const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -61,6 +66,7 @@ createLevelSetSphere(ValueT radius = 100,
 /// @param halfWidth Half-width of narrow band in voxel units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template<typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -70,6 +76,7 @@ createFogVolumeSphere(ValueT             radius = 100,
                       ValueT             halfWidth = 3.0,
                       const Vec3d&       origin = Vec3d(0),
                       const std::string& name = "sphere_fog",
+                      ChecksumMode mode = ChecksumMode::Default,
                       const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -83,6 +90,7 @@ createFogVolumeSphere(ValueT             radius = 100,
 /// @param voxelSize      Size of a voxel in world units
 /// @param origin         Origin of grid in world units
 /// @param name           Name of the grid
+/// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
@@ -92,6 +100,7 @@ createPointSphere(int pointsPerVoxel = 1,
                   ValueT voxelSize = 1.0,
                   const Vec3d &origin = Vec3d(0),
                   const std::string &name = "sphere_points",
+                  ChecksumMode mode = ChecksumMode::Default,
                   const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -105,6 +114,7 @@ createPointSphere(int pointsPerVoxel = 1,
 /// @param halfWidth   Half-width of narrow band in voxel units
 /// @param origin      Origin of grid in world units
 /// @param name        Name of the grid
+/// @param mode        Mode of computation for the checksum.
 /// @param buffer      Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -115,6 +125,7 @@ createLevelSetTorus(ValueT majorRadius = 100,
                     ValueT halfWidth = 3.0,
                     const Vec3d &origin = Vec3d(0), 
                     const std::string &name = "torus_ls",
+                    ChecksumMode mode = ChecksumMode::Default,
                     const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -131,6 +142,7 @@ createLevelSetTorus(ValueT majorRadius = 100,
 /// @param halfWidth   Half-width of narrow band in voxel units
 /// @param origin      Origin of grid in world units
 /// @param name        Name of the grid
+/// @param mode        Mode of computation for the checksum.
 /// @param buffer      Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -139,8 +151,9 @@ createFogVolumeTorus(ValueT majorRadius = 100,
                      const Vec3d& center = Vec3d(0),
                      ValueT voxelSize = 1.0,
                      ValueT halfWidth = 3.0,
-                     const Vec3d &origin = Vec3d(0), 
+                     const Vec3d &origin = Vec3d(0),
                      const std::string &name = "torus_fog",
+                     ChecksumMode mode = ChecksumMode::Default,
                      const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -155,6 +168,7 @@ createFogVolumeTorus(ValueT majorRadius = 100,
 /// @param voxelSize      Size of a voxel in world units
 /// @param origin         Origin of grid in world units
 /// @param name           Name of the grid
+/// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
@@ -165,6 +179,7 @@ createPointTorus(int pointsPerVoxel = 1,// half-width of narrow band in voxel un
                  ValueT voxelSize = 1.0, // size of a voxel in world units 
                  const Vec3d& origin = Vec3d(0), // origin of grid in world units
                  const std::string& name = "torus_points",// name of grid
+                 ChecksumMode mode = ChecksumMode::Default,// mode of computation for the checksum
                  const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -179,6 +194,7 @@ createPointTorus(int pointsPerVoxel = 1,// half-width of narrow band in voxel un
 /// @param halfWidth Half-width of narrow band in voxel units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -190,6 +206,7 @@ createLevelSetBox(ValueT width = 40,
                   ValueT halfWidth = 3.0, 
                   const Vec3d &origin = Vec3d(0),
                   const std::string &name = "box_ls",
+                  ChecksumMode mode = ChecksumMode::Default,
                   const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -205,6 +222,7 @@ createLevelSetBox(ValueT width = 40,
 /// @param halfWidth Half-width of narrow band in voxel units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -217,6 +235,7 @@ createLevelSetBBox(ValueT width = 40,
                    ValueT halfWidth = 3.0, 
                    const Vec3d &origin = Vec3d(0),
                    const std::string &name = "bbox_ls",
+                   ChecksumMode mode = ChecksumMode::Default,
                    const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -234,6 +253,7 @@ createLevelSetBBox(ValueT width = 40,
 /// @param halfWidth Half-width of narrow band in voxel units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -245,6 +265,7 @@ createFogVolumeBox(ValueT width = 40,
                    ValueT halfWidth = 3.0, 
                    const Vec3d &origin = Vec3d(0),
                    const std::string &name = "box_ls",
+                   ChecksumMode mode = ChecksumMode::Default,
                    const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -260,6 +281,7 @@ createFogVolumeBox(ValueT width = 40,
 /// @param voxelSize Size of a voxel in world units
 /// @param origin    Origin of grid in world units
 /// @param name      Name of the grid
+/// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
@@ -271,6 +293,7 @@ createPointBox(int pointsPerVoxel = 1,// half-width of narrow band in voxel unit
                ValueT voxelSize = 1.0,// size of a voxel in world units
                const Vec3d &origin = Vec3d(0),// origin of grid in world units
                const std::string& name = "box_points",// name of grid
+               ChecksumMode mode = ChecksumMode::Default,
                const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -281,12 +304,14 @@ createPointBox(int pointsPerVoxel = 1,// half-width of narrow band in voxel unit
 /// @param srcGrid        Const input grid used to determine the active voxels to scatter point intp 
 /// @param pointsPerVoxel Number of point per voxel on on the surface
 /// @param name           Name of the grid
+/// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
 template <typename ValueT = float, typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
 createPointScatter(const NanoGrid<ValueT> &srcGrid,// origin of grid in world units
                    int pointsPerVoxel = 1,// half-width of narrow band in voxel units
                    const std::string &name = "point_scatter",// name of grid
+                   ChecksumMode mode = ChecksumMode::Default,
                    const BufferT& buffer = BufferT());
 
 //================================================================================================
@@ -367,7 +392,7 @@ class GridBuilder
     ValueT   mDelta;// skip node if: node.max < -mDelta || node.min > mDelta
     SrcRootT mRoot;
     uint8_t* mData;
-    uint64_t mBytes[7]; // Byte offsets to from mData to: tree, root, node2, node1, leafs, meta, (total size)
+    uint64_t mBytes[8]; // Byte offsets to from mData to: tree, blindmetadata, root, node2, node1, leafs, blinddata, (total size)
     std::atomic<uint64_t> mActiveVoxelCount;
     std::vector<SrcNode0*> mArray0; // leaf nodes
     std::vector<SrcNode1*> mArray1; // lower internal nodes
@@ -375,9 +400,12 @@ class GridBuilder
     uint64_t mBlindDataSize;
 
     template<typename DstNodeT>
-    typename DstNodeT::DataType* nodeData() const { return reinterpret_cast<typename DstNodeT::DataType*>(mData + mBytes[4 - DstNodeT::LEVEL]); }
+    typename DstNodeT::DataType* nodeData() const { return reinterpret_cast<typename DstNodeT::DataType*>(mData + mBytes[5 - DstNodeT::LEVEL]); }
     typename DstTreeT::DataType* treeData() const { return reinterpret_cast<typename DstTreeT::DataType*>(mData + mBytes[0]); }
     typename DstGridT::DataType* gridData() const { return reinterpret_cast<typename DstGridT::DataType*>(mData); }
+    uint64_t gridSize() const { return mBytes[7]; }
+    nanovdb::GridBlindMetaData* blindMetaData() const { return reinterpret_cast<nanovdb::GridBlindMetaData*>(mData + mBytes[1]); }
+    uint8_t* blindData() const { return reinterpret_cast<uint8_t*>(mData + mBytes[6]); }
     
     // Below are private methods use to serialize nodes into NanoVDB
     void processLeafs();   
@@ -386,6 +414,7 @@ class GridBuilder
     void processRoot();
     void processTree();
     void processGrid(const Map&, const std::string&, GridClass);
+    void postProcessGrid(ChecksumMode mode);
     
     template <typename SrcNodeT>
     void update(std::vector<SrcNodeT*>&);
@@ -409,10 +438,10 @@ public:
     void sdfToFog();
 
     template <typename BufferT = HostBuffer>
-    GridHandle<BufferT> getHandle(double voxelSize = 1.0, const Vec3d &gridOrigin = Vec3d(0), const std::string &name = "", GridClass gridClass = GridClass::Unknown, const BufferT& buffer = BufferT());
+    GridHandle<BufferT> getHandle(double voxelSize = 1.0, const Vec3d &gridOrigin = Vec3d(0), const std::string &name = "", GridClass gridClass = GridClass::Unknown, ChecksumMode mode = ChecksumMode::Default, const BufferT& buffer = BufferT());
 
     template <typename BufferT = HostBuffer>
-    GridHandle<BufferT> getHandle(const Map &map, const std::string &name = "", GridClass gridClass = GridClass::Unknown, const BufferT& buffer = BufferT());
+    GridHandle<BufferT> getHandle(const Map &map, const std::string &name = "", GridClass gridClass = GridClass::Unknown, ChecksumMode mode = ChecksumMode::Default, const BufferT& buffer = BufferT());
 
     /// @brief Sets grids values in domain of the @a bbox to those returned by the specified @a func with the 
     ///        expected signature [](const Coord&)->ValueT.
@@ -476,7 +505,7 @@ operator()(const Func &func, const CoordBBox &voxelBBox, ValueT delta)
         if (node) delete node;
         mActiveVoxelCount += sum;
     };// kernel
-    parallel_for(nodeBBox, kernel);
+    forEach(nodeBBox, kernel);
 }
 
 //================================================================================================
@@ -502,16 +531,14 @@ sdfToLevelSet()
 {
     const ValueT outside = mRoot.mBackground;
     // Note that the bottum-up flood filling is essential
-    parallel_invoke([&](){this->update(mArray0);}, 
-                    [&](){this->update(mArray1);}, 
-                    [&](){this->update(mArray2);});
-    parallel_for(0, mArray0.size(), 8,[&](const BlockedRange<size_t> &r){
+    invoke([&](){this->update(mArray0);}, [&](){this->update(mArray1);}, [&](){this->update(mArray2);});
+    forEach(0, mArray0.size(), 8, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray0[i]->signedFloodFill(outside);
     });
-    parallel_for(0, mArray1.size(), 1,[&](const BlockedRange<size_t> &r){
+    forEach(0, mArray1.size(), 1, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray1[i]->signedFloodFill(outside);
     });
-    parallel_for(0, mArray2.size(), 1,[&](const BlockedRange<size_t> &r){
+    forEach(0, mArray2.size(), 1, [&](const Range1D &r){
         for (auto i = r.begin(); i != r.end(); ++i) mArray2[i]->signedFloodFill(outside);
     });
     mRoot.signedFloodFill(outside);
@@ -526,6 +553,7 @@ getHandle(double dx,//voxel size
           const Vec3d &p0,// origin
           const std::string &name,
           GridClass gridClass,
+          ChecksumMode mode,
           const BufferT& buffer)
 { 
     if (dx <= 0) {
@@ -546,7 +574,7 @@ getHandle(double dx,//voxel size
         {-Tx, -Ty,  -Tz, 1.0},// row 3
     };
     map.set(mat, invMat, 1.0);
-    return this->getHandle(map, name, gridClass, buffer);
+    return this->getHandle(map, name, gridClass, mode, buffer);
 }// GridBuilder::getHandle
 
 //================================================================================================
@@ -557,6 +585,7 @@ GridHandle<BufferT> GridBuilder<ValueT, ExtremaOp>::
 getHandle(const Map &map,
           const std::string &name,
           GridClass gridClass,
+          ChecksumMode mode,
           const BufferT& buffer)
 { 
     if (gridClass == GridClass::LevelSet && !is_floating_point<ValueT>::value)
@@ -564,23 +593,22 @@ getHandle(const Map &map,
     if (gridClass == GridClass::FogVolume && !is_floating_point<ValueT>::value)
         throw std::runtime_error("Fog volumes are expected to be floating point types");
     
-    parallel_invoke([&](){this->update(mArray0);}, 
-                    [&](){this->update(mArray1);}, 
-                    [&](){this->update(mArray2);});
+    invoke([&](){this->update(mArray0);}, [&](){this->update(mArray1);}, [&](){this->update(mArray2);});
 
-    mBytes[0] = DstGridT::memUsage(mBlindDataSize>0 ? 1 : 0); // grid + blind meta data
+    mBytes[0] = DstGridT::memUsage(); // grid
     mBytes[1] = DstTreeT::memUsage(); // tree
-    mBytes[2] = DstRootT::memUsage(uint32_t(mRoot.mTable.size())); // root
-    mBytes[3] = mArray2.size() * DstNode2::memUsage(); // upper internal nodes
-    mBytes[4] = mArray1.size() * DstNode1::memUsage(); // lower internal nodes
-    mBytes[5] = mArray0.size() * DstNode0::memUsage(); // leaf nodes
-    mBytes[6] = mBlindDataSize;
+    mBytes[2] = nanovdb::GridBlindMetaData::memUsage(mBlindDataSize>0 ? 1 : 0); // blind meta data
+    mBytes[3] = DstRootT::memUsage(uint32_t(mRoot.mTable.size())); // root
+    mBytes[4] = mArray2.size() * DstNode2::memUsage(); // upper internal nodes
+    mBytes[5] = mArray1.size() * DstNode1::memUsage(); // lower internal nodes
+    mBytes[6] = mArray0.size() * DstNode0::memUsage(); // leaf nodes
+    mBytes[7] = mBlindDataSize;
 
-    for (int i = 1; i < 7; ++i) {
-        mBytes[i] += mBytes[i - 1]; // Byte offsets to: tree, root, node2, node1, leafs, meta, total
+    for (int i = 1; i < 8; ++i) {
+        mBytes[i] += mBytes[i - 1]; // Byte offsets to: tree, blindmetadata, root, node2, node1, leafs, blinddata, total
     }
 
-    GridHandle<BufferT> handle(BufferT::create(mBytes[6], &buffer));
+    GridHandle<BufferT> handle(BufferT::create(this->gridSize(), &buffer));
     mData = handle.data();
 
     this->processLeafs();
@@ -589,6 +617,7 @@ getHandle(const Map &map,
     this->processRoot();
     this->processTree();
     this->processGrid(map, name, gridClass);
+    this->postProcessGrid( mode );
     
     return handle; 
 }// GridBuilder::getHandle
@@ -626,13 +655,13 @@ sdfToFog()
         v = v>d ? v*w : ValueT(1);
         return true; 
     };
-    auto kernel0 = [&](const BlockedRange<size_t> &r) {
+    auto kernel0 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode0* node = mArray0[i];
             for (uint32_t i=0; i<SrcNode0::SIZE; ++i) node->mValueMask.set(i, op(node->mValues[i]));
         }
     };
-    auto kernel1 = [&](const BlockedRange<size_t> &r) {
+    auto kernel1 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode1* node = mArray1[i];
             for (uint32_t i=0; i<SrcNode1::SIZE; ++i) {
@@ -649,7 +678,7 @@ sdfToFog()
             }
         }
     };
-    auto kernel2 = [&](const BlockedRange<size_t> &r) {
+    auto kernel2 = [&](const Range1D &r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             SrcNode2* node = mArray2[i];
             for (uint32_t i=0; i<SrcNode2::SIZE; ++i) {
@@ -666,9 +695,9 @@ sdfToFog()
             }
         }
     };
-    parallel_for(0, mArray0.size(), 8, kernel0);
-    parallel_for(0, mArray1.size(), 1, kernel1);
-    parallel_for(0, mArray2.size(), 1, kernel2);
+    forEach(0, mArray0.size(), 8, kernel0);
+    forEach(0, mArray1.size(), 1, kernel1);
+    forEach(0, mArray2.size(), 1, kernel2);
 
     for (auto it = mRoot.mTable.begin(); it != mRoot.mTable.end(); ++it) {
         SrcNode2 *child = it->second.child;
@@ -691,12 +720,12 @@ processLeafs()
 {
     mActiveVoxelCount = 0;
     auto* start = this->template nodeData<DstNode0>(); // address of first leaf node
-    auto kernel = [&](const BlockedRange<uint32_t> &r) {
+    auto kernel = [&](const Range1D &r) {
         uint64_t sum = 0;
         auto* data = start + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i, ++data) {
             SrcNode0& srcLeaf = *mArray0[i];
-            assert(srcLeaf.mID == i);
+            assert(size_t(srcLeaf.mID) == i);
             sum += srcLeaf.mValueMask.countOn();
             data->mValueMask = srcLeaf.mValueMask;
             const ValueT* src = srcLeaf.mValues;
@@ -729,7 +758,7 @@ processLeafs()
         }
         mActiveVoxelCount += sum;
     };
-    parallel_for(BlockedRange<uint32_t>(0, uint32_t(mArray0.size()), 8), kernel);
+    forEach(0, mArray0.size(), 8, kernel);
 } // GridBuilder::processLeafs
 
 //================================================================================================
@@ -740,9 +769,8 @@ void GridBuilder<ValueT, ExtremaOp>::
 processNodes(std::vector<SrcNodeT*>& array)
 {
     using SrcChildT = typename SrcNodeT::ChildType;
-    const uint32_t size = static_cast<uint32_t>(array.size());
-    auto*          start = this->template nodeData<DstNodeT>();
-    auto           kernel = [&](const BlockedRange<uint32_t> &r) 
+    auto* start = this->template nodeData<DstNodeT>();
+    auto  kernel = [&](const Range1D &r) 
     {
         auto* data = start + r.begin();
         uint64_t sum = 0;
@@ -752,7 +780,7 @@ processNodes(std::vector<SrcNodeT*>& array)
             sum += SrcChildT::NUM_VALUES * srcNode.mValueMask.countOn();// active tiles
             data->mValueMask = srcNode.mValueMask;
             data->mChildMask = srcNode.mChildMask;
-            data->mOffset = size - i;
+            data->mOffset = array.size() - i;
             auto noneChildMask = srcNode.mChildMask;//copy
             noneChildMask.toggle();// bits are on for values vs child nodes
             for (auto iter = noneChildMask.beginOn(); iter; ++iter) {
@@ -797,7 +825,7 @@ processNodes(std::vector<SrcNodeT*>& array)
         }
         mActiveVoxelCount += sum;
     };
-    parallel_for(BlockedRange<uint32_t>(0, uint32_t(array.size()), 4), kernel);
+    forEach(0, array.size(), 4, kernel);
 } // GridBuilder::processNodes
 
 //================================================================================================
@@ -870,7 +898,7 @@ processTree()
     for (int i = 0; i < 4; ++i) {
         if (count[i] > std::numeric_limits<uint32_t>::max()) throw std::runtime_error("Node count exceeds 32 bit range");
         data.mCount[i] = static_cast<uint32_t>(count[i]);
-        data.mBytes[i] = mBytes[4 - i] - mBytes[0]; // offset from the tree to the first node at each tree level
+        data.mBytes[i] = mBytes[5 - i] - mBytes[0]; // offset from the tree to the first node at each tree level
     }
 }// GridBuilder::processTree
 
@@ -884,7 +912,13 @@ processGrid(const Map &map,
 {
     auto& data = *this->gridData();
     data.mMagic = NANOVDB_MAGIC_NUMBER;
-    data.mBlindDataCount = mBlindDataSize>0 ? 1u : 0u;
+    data.mMajor = NANOVDB_MAJOR_VERSION_NUMBER;
+    data.mGridSize = this->gridSize();
+    data.setFlagsOff();
+    data.setBBox(true);
+    data.setMinMax(true);
+    data.mBlindMetadataOffset = mBlindDataSize>0?mBytes[1]:0;
+    data.mBlindMetadataCount = mBlindDataSize>0 ? 1u : 0u;
     data.mGridClass = gridClass;
     if (std::is_same<ValueT, float>::value) { // resolved at compiletime
         data.mGridType = GridType::Float;
@@ -911,7 +945,7 @@ processGrid(const Map &map,
         }
         memcpy(data.mGridName, name.c_str(), name.size() + 1);
     }
-    data.mUniformScale = (map.applyMap(Vec3d(1,0,0))-map.applyMap(Vec3d(0))).length();
+    data.mVoxelSize = map.applyMap(Vec3d(1))-map.applyMap(Vec3d(0));
     data.mMap = map;
     { // set world space AABB
         const auto& indexBBox = this->template nodeData<DstRootT>()->mBBox;
@@ -926,6 +960,15 @@ processGrid(const Map &map,
         worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[1][1], indexBBox[1][2])));
     }
 }// GridBuilder::processGrid
+
+//================================================================================================
+
+template<typename ValueT, typename ExtremaOp>
+inline void GridBuilder<ValueT, ExtremaOp>::postProcessGrid(ChecksumMode mode)
+{
+    auto& data = *this->gridData();
+    data.mChecksum = checksum( *reinterpret_cast<const NanoGrid<ValueT>*>(mData), mode );
+}
 
 //================================================================================================
 
@@ -1852,11 +1895,12 @@ createLevelSetSphere(ValueT radius,// radius of sphere in world units
                      ValueT halfWidth,// half-width of narrow band in voxel units 
                      const Vec3d &origin,// origin of grid in world units
                      const std::string &name,// name of grid
+                     ChecksumMode mode,// mode of comutation for the checksum
                      const BufferT& buffer)
 {
     auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, mode, buffer);
     assert(handle);
     return handle;
 }// createLevelSetSphere
@@ -1871,11 +1915,12 @@ createFogVolumeSphere(ValueT             radius, // radius of sphere in world un
                       ValueT             halfWidth,// half-width of narrow band in voxel units 
                       const Vec3d&       origin, // origin of grid in world units
                       const std::string& name,// name of grid
+                      ChecksumMode mode,// mode of comutation for the checksum
                       const BufferT& buffer)
 {
     auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, mode, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeSphere
@@ -1890,13 +1935,14 @@ createPointSphere(int pointsPerVoxel,// half-width of narrow band in voxel units
                   ValueT voxelSize,// size of a voxel in world units 
                   const Vec3d &origin,// origin of grid in world units
                   const std::string &name,// name of grid
+                  ChecksumMode mode,// mode of comutation for the checksum
                   const BufferT& buffer)
 {
-    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5f, origin, "dummy", buffer);
+    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5f, origin,  "dummy", ChecksumMode::Disable, buffer);
     assert(sphereHandle);
     auto *sphereGrid = sphereHandle.template grid<ValueT>();
     assert(sphereGrid);
-    auto pointHandle = createPointScatter(*sphereGrid, pointsPerVoxel, name, buffer);
+    auto pointHandle = createPointScatter(*sphereGrid, pointsPerVoxel, name, mode, buffer);
     assert(pointHandle);
     return pointHandle;
 }// createPointSphere
@@ -1912,11 +1958,12 @@ createLevelSetTorus(ValueT majorRadius,// major radius of torus in world units
                     ValueT halfWidth,// half-width of narrow band in voxel units 
                     const Vec3d &origin,// origin of grid in world units
                     const std::string& name,// name of grid
+                    ChecksumMode mode,// mode of comutation for the checksum
                     const BufferT& buffer)
 {
     auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, mode, buffer);
     assert(handle);
     return handle;
 }// createLevelSetTorus
@@ -1932,11 +1979,12 @@ createFogVolumeTorus(ValueT majorRadius,// major radius of torus in world units
                      ValueT halfWidth,// half-width of narrow band in voxel units 
                      const Vec3d& origin, // origin of grid in world units
                      const std::string& name,// name of grid
+                     ChecksumMode mode,// mode of comutation for the checksum
                      const BufferT& buffer)
 {
     auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, mode, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeTorus
@@ -1952,13 +2000,14 @@ createPointTorus(int pointsPerVoxel,// half-width of narrow band in voxel units
                  ValueT voxelSize, // size of a voxel in world units 
                  const Vec3d& origin, // origin of grid in world units
                  const std::string& name,// name of grid
+                 ChecksumMode mode,// mode of comutation for the checksum
                  const BufferT& buffer)
 {
-    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, "dummy", buffer);
+    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, "dummy", ChecksumMode::Disable, buffer);
     assert(torusHandle);
     auto *torusGrid = torusHandle.template grid<ValueT>();
     assert(torusGrid);
-    auto pointHandle = createPointScatter(*torusGrid, pointsPerVoxel, name, buffer);
+    auto pointHandle = createPointScatter(*torusGrid, pointsPerVoxel, name, mode, buffer);
     assert(pointHandle);
     return pointHandle;
 }// createPointTorus
@@ -1975,11 +2024,12 @@ createLevelSetBox(ValueT width,// width of box in world units
                   ValueT halfWidth,// half-width of narrow band in voxel units 
                   const Vec3d &origin,// origin of grid in world units
                   const std::string& name,// name of grid
+                  ChecksumMode mode,// mode of comutation for the checksum
                   const BufferT& buffer)
 {
     auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, mode, buffer);
     assert(handle);
     return handle;
 }// createLevelSetBox
@@ -1997,11 +2047,12 @@ createLevelSetBBox(ValueT width,// width of box in world units
                    ValueT halfWidth,// half-width of narrow band in voxel units 
                    const Vec3d &origin,// origin of grid in world units
                    const std::string& name,// name of grid
+                   ChecksumMode mode,// mode of comutation for the checksum
                    const BufferT& buffer)
 {
     auto builder = initBBox(width, height, depth, thickness, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, mode, buffer);
     assert(handle);
     return handle;
 }// createLevelSetBBox
@@ -2018,11 +2069,12 @@ createFogVolumeBox(ValueT width,// width of box in world units
                    ValueT             halfWidth,// half-width of narrow band in voxel units 
                    const Vec3d&       origin, // origin of grid in world units
                    const std::string& name,// name of grid
+                   ChecksumMode mode,// mode of comutation for the checksum
                    const BufferT& buffer)
 {
     auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, buffer);
+    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, mode, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeBox
@@ -2039,13 +2091,14 @@ createPointBox(int pointsPerVoxel,// half-width of narrow band in voxel units
                ValueT voxelSize,// size of a voxel in world units
                const Vec3d &origin,// origin of grid in world units
                const std::string& name,// name of grid
+               ChecksumMode mode,// mode of comutation for the checksum
                const BufferT& buffer)
 {
-    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5f, origin, "dummy", buffer);
+    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5f, origin, "dummy", ChecksumMode::Disable, buffer);
     assert(boxHandle);
     auto *boxGrid = boxHandle.template grid<ValueT>();
     assert(boxGrid);
-    auto pointHandle = createPointScatter(*boxGrid, pointsPerVoxel, name, buffer);
+    auto pointHandle = createPointScatter(*boxGrid, pointsPerVoxel, name, mode, buffer);
     assert(pointHandle);
     return pointHandle;
     
@@ -2058,6 +2111,7 @@ inline GridHandle<BufferT>
 createPointScatter(const NanoGrid<ValueT> &srcGrid,// origin of grid in world units
                    int pointsPerVoxel,// half-width of narrow band in voxel units
                    const std::string &name,// name of grid
+                   ChecksumMode mode,// mode of comutation for the checksum
                    const BufferT& buffer)
 {
     static_assert(is_floating_point<ValueT>::value,"Sphere: expect floating point");
@@ -2093,7 +2147,7 @@ createPointScatter(const NanoGrid<ValueT> &srcGrid,// origin of grid in world un
         }
     }
     assert(pointCount == xyz.size());
-    auto handle = builder.template getHandle<BufferT>(srcGrid.map(), name, GridClass::PointData, buffer);
+    auto handle = builder.template getHandle<BufferT>(srcGrid.map(), name, GridClass::PointData, ChecksumMode::Disable, buffer);
     assert(handle);
     auto *dstGrid = handle.template grid<uint32_t>();
     assert(dstGrid);
@@ -2125,6 +2179,7 @@ createPointScatter(const NanoGrid<ValueT> &srcGrid,// origin of grid in world un
         throw std::runtime_error("Unsupported value type");
     }
     memcpy(handle.data() + meta.mByteOffset, xyz.data(), xyz.size() * sizeof(Vec3T));
+    updateChecksum( *dstGrid, mode);
     return handle;
 }// createPointScatter
 

@@ -21,7 +21,7 @@ CNANOVDB_INLINE int MinIndex(vec3 v)
 #if 1
     return (v.y < v.x) ? (v.z < v.y ? 2 : 1) : (v.z < v.x ? 2 : 0);
 #else
-    const int        hashKey = ((int)(v.x < v.y) << 2) + ((int)(v.x < v.z) << 1) + (int)(v.y < v.z); // ?*4+?*2+?*1
+    const int hashKey = (CNANOVDB_MAKE(int)(v.x < v.y) << 2) + (CNANOVDB_MAKE(int)(v.x < v.z) << 1) + CNANOVDB_MAKE(int)(v.y < v.z); // ?*4+?*2+?*1
     return MinIndex_hashTable[hashKey];
 #endif
 }

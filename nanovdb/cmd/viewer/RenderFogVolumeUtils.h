@@ -174,10 +174,10 @@ inline __hostdev__ float henyeyGreenstein(float g, float cosTheta)
     // phase function pdf.
 #if 1
     // isotropic.
-    return 3.14159265359f / 4.f;
+    return 1.0f / (3.14159265359f * 4.f);
 #else
     float denom = 1.f + g * g - 2.f * g * cosTheta;
-    return (3.14159265359f / 4.f) * (1.f - g * g) / (denom * sqrtf(denom));
+    return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
 #endif
 }
 
@@ -197,7 +197,7 @@ inline __hostdev__ nanovdb::Vec3f sampleHG(float g, float e1, float e2)
     const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
     const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
 #endif
-    return nanovdb::Vec3f(cosf(phi) * cosTheta, sinf(phi) * sinTheta, cosTheta);
+    return nanovdb::Vec3f(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
 }
 
 template<typename Vec3T, typename AccT>
@@ -206,7 +206,7 @@ inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& dir, const
     const Vec3T lightRadiance = Vec3T(1) * 1.f;
     auto        shadowRay = nanovdb::Ray<float>(pos, lightDir);
     auto        transmittance = getTransmittance(shadowRay, acc, medium, seed);
-    float       pdf = henyeyGreenstein(medium.hgMeanCosine, dir.dot(lightDir));
+    float       pdf = 1.0f;//henyeyGreenstein(medium.hgMeanCosine, dir.dot(lightDir));
     return pdf * lightRadiance * transmittance;
 }
 

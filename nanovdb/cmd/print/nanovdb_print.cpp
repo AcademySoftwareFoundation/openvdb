@@ -23,7 +23,8 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "-g,--grid name\tPrint all grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
               << "-l,--long\tPrints out extra grid information\n"
-              << "-s,--short\tOnly prints out a minimum amount of grid information\n";
+              << "-s,--short\tOnly prints out a minimum amount of grid information\n"
+              << "-v,--verbose\tPrint information about the meaning of the labels\n";
     exit(exitStatus);
 }
 
@@ -34,6 +35,7 @@ int main(int argc, char* argv[])
     enum Mode : int { Short = 0,
                       Default = 1,
                       Long = 2 } mode = Default;
+    bool verbose = false;
     std::string              gridName;
     std::vector<std::string> fileNames;
     for (int i = 1; i < argc; ++i) {
@@ -45,6 +47,8 @@ int main(int argc, char* argv[])
                 mode = Short;
             } else if (arg == "-l" || arg == "--long") {
                 mode = Long;
+            } else if (arg == "-v" || arg == "--verbose") {
+                verbose = true;
             } else if (arg == "-g" || arg == "--grid") {
                 if (i + 1 == argc) {
                     std::cerr << "\nExpected a grid name to follow the -g,--grid option\n";
@@ -90,9 +94,10 @@ int main(int argc, char* argv[])
         if (size > n)
             n = size;
     };
-    auto realToStr = [](double x) {
+    auto vec3RToStr = [](const nanovdb::Vec3R& v) {
         std::stringstream ss;
-        ss << std::setprecision(3) << x;
+        ss << std::setprecision(3);
+        ss << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
         return ss.str();
     };
     auto wbboxToStr = [](const nanovdb::BBox<nanovdb::Vec3d>& bbox) {
@@ -162,7 +167,7 @@ int main(int argc, char* argv[])
                 width(fileWidth, format(m.fileSize));
                 width(configWidth, nodesToStr(m.nodeCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
-                width(voxelSizeWidth, realToStr(m.voxelSize));
+                width(voxelSizeWidth, vec3RToStr(m.voxelSize));
             }
             std::cout << "\nThe file \"" << file << "\" contains the following " << list.size() << " grid(s):\n";
             std::cout << std::left << std::setw(numberWidth) << "#"
@@ -193,7 +198,7 @@ int main(int argc, char* argv[])
                     std::cout << std::left << std::setw(classWidth) << nanovdb::io::getStringForGridClass(m.gridClass)
                               << std::left << std::setw(sizeWidth) << format(m.gridSize)
                               << std::left << std::setw(fileWidth) << format(m.fileSize)
-                              << std::left << std::setw(voxelSizeWidth) << realToStr(m.voxelSize);
+                              << std::left << std::setw(voxelSizeWidth) << vec3RToStr(m.voxelSize);
                 }
                 std::cout << std::left << std::setw(voxelsWidth) << m.voxelCount
                           << std::left << std::setw(resWidth) << resToStr(m.indexBBox);
@@ -203,6 +208,65 @@ int main(int argc, char* argv[])
                               << std::left << std::setw(wbboxWidth) << wbboxToStr(m.worldBBox);
                 }
                 std::cout << std::endl;
+            }
+        }
+        if (verbose) {
+            size_t w = 0;
+            switch (mode) {
+            case Mode::Short:
+                width(w, "\"Name\":");
+                width(w, "\"Type\":");
+                width(w, "\"# Voxels\":");
+                width(w, "\"Resolution\":");
+                std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
+                          << std::left << std::setw(w) << "\n\"Type\":"  << "static type of the values in a grid, e.g. float, vec3f etc."
+                          << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid."
+                          << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!\n";
+                break;
+            case Mode::Default:
+                width(w, "\"Name\":");
+                width(w, "\"Type\":");
+                width(w, "\"Class\":");
+                width(w, "\"Size\":");
+                width(w, "\"File\":");
+                width(w, "\"Scale\":");
+                width(w, "\"# Voxels\":");
+                width(w, "\"Resolution\":");
+                std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
+                          << std::left << std::setw(w) << "\n\"Type\":"  << "static type of the values in a grid, e.g. float, vec3f etc."
+                          << std::left << std::setw(w) << "\n\"Class\":"  << "class of the grid, e.g. FOG for Fog volume, LS for level set, etc."
+                          << std::left << std::setw(w) << "\n\"Size\":"  << "In-core memory footprint of the grid, i.e. in ram."
+                          << std::left << std::setw(w) << "\n\"File\":"  << "Out-of-core memory footprint of the grid, i.e. on disk."
+                          << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid."
+                          << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!\n";
+                break;
+            case Mode::Long:
+            width(w, "\"Name\":");
+                width(w, "\"Type\":");
+                width(w, "\"Class\":");
+                width(w, "\"Size\":");
+                width(w, "\"File\":");
+                width(w, "\"Scale\":");
+                width(w, "\"# Voxels\":");
+                width(w, "\"Resolution\":");
+                width(w, "\"32^3->16^3->8^3\":");
+                width(w, "\"Index Bounding Box\":");
+                width(w, "\"World Bounding Box\":");
+                std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
+                          << std::left << std::setw(w) << "\n\"Type\":"  << "static type of the values in a grid, e.g. float, vec3f etc."
+                          << std::left << std::setw(w) << "\n\"Class\":"  << "class of the grid, e.g. FOG for Fog volume, LS for level set, etc."
+                          << std::left << std::setw(w) << "\n\"Size\":"  << "In-core memory footprint of the grid, e.g. in RAM on the CPU."
+                          << std::left << std::setw(w) << "\n\"File\":"  << "Out-of-core memory footprint of the grid, i.e. compressed on disk."
+                          << std::left << std::setw(w) << "\n\"Scale\":"  << "Uniform scale of the grid, i.e. the size of a voxel in world units."
+                          << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid. Note this includes both active tiles and voxels."
+                          << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!"
+                          << std::left << std::setw(w) << "\n\"32^3->16^3->8^3\":" << "Number of nodes at each level of the tree structure from the root to leaf level."
+                          << std::left << std::setw(w) << "\n\"Index Bounding Box\":" << "coordinate bounding box of all the active values in a grid. Note that both min and max coordinates are inclusive!"
+                          << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid.\n";  
+                break;
+            default:
+                throw std::runtime_error("Internal error in switch!");
+                break;
             }
         }
     }

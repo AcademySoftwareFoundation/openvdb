@@ -254,8 +254,9 @@ TEST_F(Benchmark, HDDA)
                 for (int i = 1; i <= 10; ++i) {
                     EXPECT_TRUE(dda.step());
                     EXPECT_EQ(4 * i, dda.time());
-                    if (i > 1)
+                    if (i > 1) {
                         EXPECT_EQ(dda.time(), next);
+                    }
                     next = dda.next();
                 }
             }
@@ -398,7 +399,7 @@ TEST_F(Benchmark, NanoVDB_CPU)
     auto*                  img = imgHandle.image();
 
     auto kernel2D = [&](int x0, int y0, int x1, int y1) {
-        const RealT invDx = 1.0f / grid->voxelSize(), wScale = 1.0f / width, hScale = 1.0f / height;
+        const RealT wScale = 1.0f / width, hScale = 1.0f / height;
         //std::cerr << "\nActive voxel count = " << grid->activeVoxelCount() << std::endl;
         auto        acc = grid->getAccessor();
         CoordT      ijk;

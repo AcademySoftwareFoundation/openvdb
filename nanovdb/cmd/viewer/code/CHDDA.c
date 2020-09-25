@@ -3,6 +3,10 @@
 
 ////////////////////////////////////////////////////////
 
+#if defined(CNANOVDB_COMPILER_GLSL)
+#line 7
+#endif
+
 CNANOVDB_INLINE HDDA HDDA_create(nanovdb_Ray ray, int dim)
 {
     vec3 dir = ray.mDir;
@@ -20,7 +24,7 @@ CNANOVDB_INLINE HDDA HDDA_create(nanovdb_Ray ray, int dim)
             v.mNext.x = MaxFloat; //i.e. disabled!
         } else if (inv.x > 0) {
             v.mStep.x = dim;
-            v.mNext.x = v.mT0 + ((float)(v.mVoxel.x) + (float)(dim)-pos.x) * inv.x;
+            v.mNext.x = v.mT0 + (CNANOVDB_MAKE(float)(v.mVoxel.x) + CNANOVDB_MAKE(float)(dim) - pos.x) * inv.x;
             v.mDelta.x = dim * inv.x;
         } else {
             v.mStep.x = -dim;
@@ -132,8 +136,8 @@ CNANOVDB_INLINE boolean nanovdb_ZeroCrossing(CNANOVDB_CONTEXT cxt, nanovdb_Ray r
 {
     // intersect with bounds...
     boolean hit = nanovdb_Ray_clip(CNANOVDB_ADDRESS(ray),
-                                nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_min),
-                                nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).root.mBBox_max));
+                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min),
+                                   vec3_add(nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max), CNANOVDB_MAKE_VEC3(1, 1, 1)));
 
     if (!hit || ray.mT1 > 1000000.f)
         return CNANOVDB_FALSE;
@@ -141,7 +145,7 @@ CNANOVDB_INLINE boolean nanovdb_ZeroCrossing(CNANOVDB_CONTEXT cxt, nanovdb_Ray r
     // intersect with levelset...
     CNANOVDB_DEREF(ijk) = nanovdb_Vec3fToCoord(nanovdb_Ray_start(CNANOVDB_ADDRESS(ray)));
     float v0 = nanovdb_ReadAccessor_getValue(cxt, CNANOVDB_ADDRESS(acc), CNANOVDB_DEREF(ijk));
-    int   n = (int)(ray.mT1 - ray.mT0);
+    int   n = CNANOVDB_MAKE(int32_t)(ray.mT1 - ray.mT0);
     if (n <= 1)
         return CNANOVDB_FALSE;
 

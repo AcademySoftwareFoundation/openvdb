@@ -83,13 +83,13 @@ static bool checkCUDA(cudaError_t result, const char* file, const int line)
 #endif
 
 FrameBufferGL::FrameBufferGL(void* context, void* display)
-    : mTexture(0)
-    , mTextureBufferId(0)
-    , mFbo(0)
-    , mBufferResourceId(0)
+    : mBufferResourceId(0)
     , mBufferTypeGL(GL_STREAM_DRAW)
+    , mTexture(0)
+    , mFbo(0)
     , mContext(context)
     , mDisplay(display)
+    , mTextureBufferId(0)
     , mTempBuffer(nullptr)
 {
     for (int i = 0; i < BUFFER_COUNT; ++i) {
@@ -119,7 +119,7 @@ void* FrameBufferGL::display() const
     return mDisplay;
 }
 
-void* FrameBufferGL::cudaMap(AccessType access, void* stream)
+void* FrameBufferGL::cudaMap(AccessType /*access*/, void* /*stream*/)
 {
 #if defined(NANOVDB_USE_CUDA) && defined(NANOVDB_USE_CUDA_GL)
 
@@ -161,7 +161,7 @@ void* FrameBufferGL::cudaMap(AccessType access, void* stream)
 #endif
 }
 
-void FrameBufferGL::cudaUnmap(void* stream)
+void FrameBufferGL::cudaUnmap(void* /*stream*/)
 {
 #if defined(NANOVDB_USE_CUDA) && defined(NANOVDB_USE_CUDA_GL)
     int writeIndex = (mIndex + 1) % BUFFER_COUNT;
@@ -171,7 +171,7 @@ void FrameBufferGL::cudaUnmap(void* stream)
 #endif
 }
 
-void* FrameBufferGL::clMap(AccessType access, void* stream)
+void* FrameBufferGL::clMap(AccessType /*access*/, void* /*stream*/)
 {
 #if defined(NANOVDB_USE_OPENCL) && 0
 
@@ -203,7 +203,7 @@ void* FrameBufferGL::clMap(AccessType access, void* stream)
 #endif
 }
 
-void FrameBufferGL::clUnmap(void* stream)
+void FrameBufferGL::clUnmap(void* /*stream*/)
 {
 #if defined(NANOVDB_USE_OPENCL) && 0
     int    writeIndex = (mIndex + 1) % BUFFER_COUNT;
@@ -382,7 +382,7 @@ bool FrameBufferGL::genTextureGL(int w, int h, GLenum internalFormat)
     NANOVDB_GL_CHECKERRORS();
 
     glBindTexture(GL_TEXTURE_2D, mTexture);
-    if (glIsTexture(mTexture) == GL_FALSE)
+    if (!mTexture)
         throw "Error: Unable to create texture";
 
     NANOVDB_GL_CHECKERRORS();
@@ -446,7 +446,7 @@ GLenum FrameBufferGL::formatToGL(InternalFormat format)
     }
 }
 
-bool FrameBufferGL::genPixelPackBufferGL(int w, int h, GLenum internalFormatGL, GLenum bufferType, void* contextCL)
+bool FrameBufferGL::genPixelPackBufferGL(int w, int h, GLenum internalFormatGL, GLenum bufferType, void* /*contextCL*/)
 {
     mInternalFormat = formatFromGL(internalFormatGL);
     mBufferTypeGL = bufferType;
@@ -528,7 +528,7 @@ bool FrameBufferGL::setup(int w, int h, InternalFormat format)
     return setupGL(w, h, nullptr, formatToGL(format), mBufferTypeGL, mContext);
 }
 
-bool FrameBufferGL::setupGL(int w, int h, void* buffer, GLenum texFormat, GLenum bufferType, void* contextCL)
+bool FrameBufferGL::setupGL(int w, int h, void* /*buffer*/, GLenum texFormat, GLenum bufferType, void* contextCL)
 {
     if (w == 0 || h == 0) {
         reset();

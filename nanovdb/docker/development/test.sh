@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #if [ $# -eq 0 ]; then
-#	echo "Usage: build.sh <branch|commit>"
+#	echo "Usage: test.sh <branch|commit>"
 #	exit 1
 #fi
 

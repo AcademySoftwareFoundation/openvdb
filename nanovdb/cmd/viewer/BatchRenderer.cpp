@@ -184,6 +184,11 @@ void BatchRenderer::run()
     float totalPSNR = 0;
 
     for (int i = 0; i < count; ++i) {
+        if (mRenderGroupIndex < mGridGroups.size()) {
+            auto group = mGridGroups[mRenderGroupIndex];
+            setGridIndex(mRenderGroupIndex, ++group->mCurrentGridIndex);
+        }
+
         render(mFrame);
         float renderDuration = mRenderStats.mDuration;
 

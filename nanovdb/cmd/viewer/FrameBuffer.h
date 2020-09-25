@@ -93,7 +93,7 @@ public:
     virtual void  clUnmap(void* commandQueueCL) = 0;
     virtual bool  setup(int w, int h, InternalFormat format) = 0;
     virtual bool  cleanup() = 0;
-    virtual bool  render(int x, int y, int w, int h) { return false; }
+    virtual bool  render(int /*x*/, int /*y*/, int /*w*/, int /*h*/) { return false; }
 
     int              mIndex;
     int              mWidth;

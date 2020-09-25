@@ -798,6 +798,13 @@ void Viewer::drawRenderOptionsDialog()
                         currentFileName = currentFileName.substr(currentFilePath.length());
                     }
 
+#if defined(_WIN32)
+                    if (currentFilePath == "./") {
+                        char buffer[MAX_PATH];
+                        GetCurrentDirectoryA(MAX_PATH, buffer);
+                        currentFilePath = buffer;
+                    }
+#endif
                     printf("currentFileName: %s\n", currentFileName.c_str());
 
                     if (openFolderDialog(newFilePath, currentFilePath)) {

@@ -33,7 +33,7 @@ rem )
 GOTO Exit
 
 :Usage
-echo "Usage: build.cmd <branch|commit>"
+echo "Usage: test.cmd <branch|commit>"
 GOTO Exit
 
 :Exit

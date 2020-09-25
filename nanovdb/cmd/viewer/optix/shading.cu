@@ -113,7 +113,7 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
     float        useLighting = params.constants.useLighting;
     float        intensity = 1.0f;
     float        occlusion = 0.0f;
-    float        voxelSize = grid->voxelSize();
+    float        voxelUniformSize = float(grid->voxelSize()[0]);
 
     if (params.constants.useOcclusion > 0) {
         float attenuation = 0.0f;

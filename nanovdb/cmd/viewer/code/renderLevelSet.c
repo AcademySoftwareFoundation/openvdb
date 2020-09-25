@@ -9,15 +9,15 @@
 ////////////////////////////////////////////////////////
 
 #if defined(CNANOVDB_COMPILER_GLSL)
+#line 12
 
 layout(rgba32f, binding = 0) uniform image2D outImage;
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 void main()
 {
-    int cxt;
-
-    ivec2 threadId = getThreadId();
+    int   cxt;
+    ivec2 threadId = ivec2(gl_GlobalInvocationID.xy);
 
 #elif defined(__OPENCL_VERSION__)
 
@@ -67,8 +67,8 @@ CNANOVDB_KERNEL void renderLevelSet(
     uint32_t ix = threadId.x;
     uint32_t iy = threadId.y;
 
-    if (ix >= (uint32_t)kArgs.width || iy >= (uint32_t)kArgs.height)
-        return;
+    if (ix >= CNANOVDB_MAKE(uint32_t)(kArgs.width) || iy >= CNANOVDB_MAKE(uint32_t)(kArgs.height))
+        CNANOVDB_RETURN(CNANOVDB_MAKE_VEC4(0, 0, 0, 0));
 
     uint32_t pixelSeed = kArgs.numAccumulations + hash2(ix, iy);
 
@@ -78,24 +78,18 @@ CNANOVDB_KERNEL void renderLevelSet(
     vec3 cameraW = CNANOVDB_MAKE_VEC3(kArgs.cameraWx, kArgs.cameraWy, kArgs.cameraWz);
 
     const vec3 wLightDir = CNANOVDB_MAKE_VEC3(0.0f, 1.0f, 0.0f);
-    const vec3 iLightDir = vec3_normalize(nanovdb_Grid_worldToIndexDirF(CNANOVDB_GRIDDATA(cxt).grid, wLightDir));
-
-#if 0
-    {
-        vec4 color = CNANOVDB_MAKE_VEC4(fabs(iRayDir.x), fabs(iRayDir.y), fabs(iRayDir.z), 1);
-        imageStorePixel(outImage, kArgs.width, threadId, color);
-        return;
-    }
-#endif
+    const vec3 iLightDir = vec3_normalize(nanovdb_Grid_worldToIndexDirF(CNANOVDB_GRIDDATA(cxt), wLightDir));
 
     nanovdb_ReadAccessor acc = nanovdb_ReadAccessor_create();
     vec3                 color = CNANOVDB_MAKE_VEC3(0, 0, 0);
 
-    for (int sampleIndex = 0; sampleIndex < kArgs.samplesPerPixel; ++sampleIndex) {
+    int sampleIndex = 0;
+    //for (; sampleIndex < kArgs.samplesPerPixel; sampleIndex++) 
+    {
         uint32_t pixelSeed = hash1(sampleIndex + kArgs.numAccumulations * kArgs.samplesPerPixel ^ hash2(ix, iy));
 
-        float u = (float)(ix) + 0.5f;
-        float v = (float)(iy) + 0.5f;
+        float u = CNANOVDB_MAKE(float)(ix) + 0.5f;
+        float v = CNANOVDB_MAKE(float)(iy) + 0.5f;
 
         float randVar1 = randomf(pixelSeed + 0);
         float randVar2 = randomf(pixelSeed + 1);
@@ -105,8 +99,8 @@ CNANOVDB_KERNEL void renderLevelSet(
             v += randVar2 - 0.5f;
         }
 
-        u /= (float)(kArgs.width);
-        v /= (float)(kArgs.height);
+        u /= CNANOVDB_MAKE(float)(kArgs.width);
+        v /= CNANOVDB_MAKE(float)(kArgs.height);
 
         // get camera ray...
         vec3        wRayDir = vec3_sub(vec3_add(vec3_fmul(u, cameraU), vec3_fmul(v, cameraV)), cameraW);
@@ -117,18 +111,12 @@ CNANOVDB_KERNEL void renderLevelSet(
         wRay.mT0 = 0;
         wRay.mT1 = MaxFloat;
 
-        nanovdb_Ray iRay = nanovdb_Ray_worldToIndexF(wRay, CNANOVDB_GRIDDATA(cxt).grid);
+        nanovdb_Ray iRay = nanovdb_Ray_worldToIndexF(wRay, CNANOVDB_GRIDDATA(cxt));
         vec3        iRayDir = iRay.mDir;
 
         nanovdb_Coord ijk;
         float         v0 = 0.0f;
         if (nanovdb_ZeroCrossing(cxt, iRay, acc, CNANOVDB_ADDRESS(ijk), CNANOVDB_ADDRESS(v0))) {
-#if 0
-		// DEBUG...
-		color = CNANOVDB_MAKE_VEC4(v0,0,0,1);
-		imageStorePixel(outImage, kArgs.width, threadId, color);
-		return;
-#endif
 
             Vec3T iPrimaryPos = nanovdb_CoordToVec3f(ijk);
             //Vec3T wPrimaryPos = nanovdb_Grid_indexToWorldF(grid, iPrimaryPos);
@@ -198,11 +186,22 @@ CNANOVDB_KERNEL void renderLevelSet(
                 float wGroundT = (kArgs.groundHeight - wRayEye.y) / wRayDir.y;
                 if (wGroundT > 0.f) {
                     vec3 wGroundPos = vec3_add(wRayEye, vec3_fmul(wGroundT, wRayDir));
-                    vec3 iGroundPos = nanovdb_Grid_worldToIndexF(CNANOVDB_GRIDDATA(cxt).grid, wGroundPos);
+                    vec3 iGroundPos = nanovdb_Grid_worldToIndexF(CNANOVDB_GRIDDATA(cxt), wGroundPos);
+                    vec3 iGroundNormal = CNANOVDB_MAKE_VEC3(0, 1, 0);
 
                     rayTraceGround(wGroundT, kArgs.groundFalloff, wGroundPos, wRayDir.y, CNANOVDB_ADDRESS(groundIntensity), CNANOVDB_ADDRESS(groundMix));
 
                     groundMix *= kArgs.useGround;
+
+                    if (kArgs.useOcclusion > 0) {
+                        nanovdb_Ray iOccRay;
+                        iOccRay.mEye = vec3_add(iGroundPos, vec3_fmul(2.0f, iGroundNormal));
+                        iOccRay.mDir = lambertNoTangent(iGroundNormal, randVar1, randVar2);
+                        iOccRay.mT0 = DeltaFloat;
+                        iOccRay.mT1 = MaxFloat;
+                        if (nanovdb_ZeroCrossing(cxt, iOccRay, acc, CNANOVDB_ADDRESS(ijk), CNANOVDB_ADDRESS(v0)))
+                            groundIntensity = groundIntensity * (1.0f - kArgs.useOcclusion);
+                    }
 
                     if (kArgs.useShadows > 0) {
                         nanovdb_Ray iShadowRay;
@@ -244,7 +243,7 @@ CNANOVDB_KERNEL void renderLevelSet(
         vec3 prevColor = CNANOVDB_MAKE_VEC3(prevOutput.x, prevOutput.y, prevOutput.z);
         vec3 oldLinearPixel;
         invTonemapReinhard(CNANOVDB_ADDRESS(oldLinearPixel), prevColor, kArgs.tonemapWhitePoint);
-        color = vec3_add(oldLinearPixel, vec3_fmul((1.0f / (float)(kArgs.numAccumulations)), vec3_sub(color, oldLinearPixel)));
+        color = vec3_add(oldLinearPixel, vec3_fmul((1.0f / CNANOVDB_MAKE(float)(kArgs.numAccumulations)), vec3_sub(color, oldLinearPixel)));
     }
 
     tonemapReinhard(CNANOVDB_ADDRESS(color), color, kArgs.tonemapWhitePoint);

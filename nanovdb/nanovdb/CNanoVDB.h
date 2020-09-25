@@ -24,6 +24,7 @@ typedef long int64_t;
 typedef unsigned int uint32_t;
 typedef int int32_t;
 typedef short int16_t;
+typedef unsigned short uint16_t;
 typedef unsigned char uint8_t;
 
 #else
@@ -210,15 +211,20 @@ typedef struct
 
 typedef struct
 {
-    uint64_t    mMagic;
-    char        mGridName[256];
-    double      mBBox[6];
-    cnanovdb_map mMap;
-    double      mUniformScale;
-    uint32_t    mGridClass;
-    uint32_t    mGridType;
-    uint32_t    mBlindDataCount;
-    uint8_t     _reserved[CNANOVDB_ALIGNMENT_PADDING(256*sizeof(char)+sizeof(uint64_t)+sizeof(double[6])+sizeof(cnanovdb_map)+sizeof(double)+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(uint32_t), CNANOVDB_DATA_ALIGNMENT)];
+    uint64_t         mMagic; // 8B magic to validate it is valid grid data.
+    uint64_t         mChecksum; // 8B. Checksum of grid buffer.
+    uint32_t         mMajor;// 4B. major version number.
+    uint32_t         mFlags; // 4B. flags for grid.
+    uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
+    char             mGridName[256]; // 256B
+    cnanovdb_map     mMap; // 264B. affine transformation between index and world space in both single and double precision
+    double           mBBox[6]; // 48B. floating-point bounds of active values in WORLD SPACE
+    double           mVoxelSize[3]; // 24B. size of a voxel in world units
+    uint32_t         mGridClass; // 4B.
+    uint32_t         mGridType; // 4B.
+    uint64_t         mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures.
+    uint32_t         mBlindMetadataCount; // 4B. count of GridBlindMetaData structures.
+    uint32_t         _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 8 + 256 + 24 + 24 + sizeof(cnanovdb_map) + 24 + 4 + 4 + 8 + 4, CNANOVDB_DATA_ALIGNMENT) / 4];
 } cnanovdb_griddata;
 
 void
@@ -255,13 +261,13 @@ typedef struct
 {
     uint64_t mBytes[ROOT_LEVEL + 1];
     uint32_t mCount[ROOT_LEVEL + 1];
-    uint8_t  _reserved[CNANOVDB_ALIGNMENT_PADDING(4*(sizeof(uint32_t)+sizeof(uint64_t)), CNANOVDB_DATA_ALIGNMENT)];
+    uint8_t  _reserved[CNANOVDB_ALIGNMENT_PADDING(4*(sizeof(uint64_t)+sizeof(uint32_t)), CNANOVDB_DATA_ALIGNMENT)];
 } cnanovdb_treedata;
 
 const CNANOVDB_GLOBAL cnanovdb_treedata *
 cnanovdb_griddata_tree(const CNANOVDB_GLOBAL cnanovdb_griddata *RESTRICT griddata)
 {
-    return (const CNANOVDB_GLOBAL cnanovdb_treedata *) ((const CNANOVDB_GLOBAL cnanovdb_gridblindmetadata *)(griddata + 1) + griddata->mBlindDataCount);
+    return (const CNANOVDB_GLOBAL cnanovdb_treedata *)(griddata + 1);
 }
 
 #define CREATE_TILEENTRY(VALUETYPE, SUFFIX) \
@@ -291,13 +297,14 @@ cnanovdb_readaccessor_insert(cnanovdb_readaccessor *RESTRICT acc, int childlevel
 #define CREATE_LEAF_NODE_int(LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUETYPE, SUFFIX) \
 typedef struct \
 { \
-    cnanovdb_mask##LOG2DIM       mValueMask; \
-    VALUETYPE                   mVoxels[1u << (3*LOG2DIM)]; \
-    VALUETYPE                   mValueMin, mValueMax; \
-    cnanovdb_coord               mBBox_min; \
+    cnanovdb_coord              mBBox_min; \
     uint8_t                     mBBoxDif[3]; \
     uint8_t                     mFlags; \
-    uint8_t                     _reserved[ CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_mask##LOG2DIM)+sizeof(VALUETYPE)*(2+(1u << (3*LOG2DIM)))+sizeof(cnanovdb_coord)+sizeof(uint8_t[3])+sizeof(uint8_t), CNANOVDB_DATA_ALIGNMENT)]; \
+    cnanovdb_mask##LOG2DIM      mValueMask; \
+    VALUETYPE                   mValueMin; \
+    VALUETYPE                   mValueMax; \
+    uint32_t                    _reserved[ CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_mask##LOG2DIM)+2*sizeof(VALUETYPE)+sizeof(cnanovdb_coord)+sizeof(uint8_t[3])+sizeof(uint8_t), CNANOVDB_DATA_ALIGNMENT)/4]; \
+    VALUETYPE                   mVoxels[1u << (3*LOG2DIM)]; \
 } cnanovdb_node##LEVEL##SUFFIX; \
 \
 uint32_t \
@@ -337,13 +344,13 @@ CREATE_LEAF_NODE_int(LEVEL, LOG2DIM, (TOTAL-LOG2DIM), TOTAL, ((1u << TOTAL) - 1u
 #define CREATE_INTERNAL_NODE_int(CHILDLEVEL, LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUETYPE, SUFFIX) \
 typedef struct \
 { \
-    cnanovdb_mask##LOG2DIM       mValueMask, mChildMask; \
-    cnanovdb_tileentry##SUFFIX   mTable[1u << (3*LOG2DIM)]; \
-    VALUETYPE                   mValueMin, mValueMax; \
     cnanovdb_coord               mBBox_min, mBBox_max; \
-    int32_t                     mOffset; \
-    uint32_t                    mFlags; \
-    uint8_t                     _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_mask##LOG2DIM)+sizeof(cnanovdb_tileentry##SUFFIX)*(1u<<(3*LOG2DIM))+sizeof(VALUETYPE)*2+sizeof(cnanovdb_coord)*2+sizeof(int32_t)+sizeof(uint32_t), CNANOVDB_DATA_ALIGNMENT)]; \
+    int32_t                      mOffset; \
+    uint32_t                     mFlags; \
+    cnanovdb_mask##LOG2DIM       mValueMask, mChildMask; \
+    VALUETYPE                    mValueMin, mValueMax; \
+    uint8_t                      _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_mask##LOG2DIM)+sizeof(VALUETYPE)*2+sizeof(cnanovdb_coord)*2+sizeof(int32_t)+sizeof(uint32_t), CNANOVDB_DATA_ALIGNMENT)]; \
+    cnanovdb_tileentry##SUFFIX   mTable[1u << (3*LOG2DIM)]; \
 } cnanovdb_node##LEVEL##SUFFIX; \
 \
 uint32_t \
@@ -447,19 +454,19 @@ CREATE_INTERNAL_NODE_int(CHILDLEVEL, LEVEL, LOG2DIM, (TOTAL-LOG2DIM), TOTAL, ((1
 typedef struct \
 { \
     DEFINE_KEY(key); \
-    VALUETYPE           value; \
     int32_t             childID; \
-    uint8_t             state; \
-    uint8_t             _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(KEYSIZE)+sizeof(VALUETYPE)+sizeof(int32_t)+sizeof(uint8_t), CNANOVDB_DATA_ALIGNMENT)]; \
+    uint32_t            state; \
+    VALUETYPE           value; \
+    uint8_t             _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(KEYSIZE)+sizeof(VALUETYPE)+sizeof(int32_t)+sizeof(uint32_t), CNANOVDB_DATA_ALIGNMENT)]; \
 } cnanovdb_rootdata_tile##SUFFIX; \
  \
 typedef struct \
 { \
-    cnanovdb_coord  mBBox_min, mBBox_max; \
+    cnanovdb_coord mBBox_min, mBBox_max; \
     uint64_t       mActiveVoxelCount; \
-    uint32_t       mTileCount, _padding[3]; \
+    uint32_t       mTileCount; \
     VALUETYPE      mBackground, mValueMin, mValueMax; \
-    uint8_t        _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_coord)*2+sizeof(uint64_t)+sizeof(VALUETYPE)*3+4*sizeof(uint32_t), CNANOVDB_DATA_ALIGNMENT)]; \
+    uint32_t       _reserved[CNANOVDB_ALIGNMENT_PADDING(sizeof(cnanovdb_coord)*2+sizeof(uint64_t)+sizeof(uint32_t)+sizeof(VALUETYPE)*3, CNANOVDB_DATA_ALIGNMENT)/4]; \
 } cnanovdb_rootdata##SUFFIX; \
  \
 const CNANOVDB_GLOBAL cnanovdb_rootdata##SUFFIX * \

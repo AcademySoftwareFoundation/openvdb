@@ -14,7 +14,7 @@ pushd ${DOCKER_DIR}/..
 
 # tar -cvf ${DIST_DIR}/scripts.tar scripts
 rm -rf ${DIST_DIR}/scripts/*
-cp scripts/* ${DIST_DIR}/scripts/
+cp -R scripts/* ${DIST_DIR}/scripts/
 
 popd
 

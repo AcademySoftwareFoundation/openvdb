@@ -66,13 +66,13 @@ static bool savePFM(const float* buffer, int width, int height, FrameBufferBase:
     float scale = 1.0f;
     if (isLittleEndian())
         scale = -scale;
-
+    /*
     auto applyColorProfile = [](float x) -> float {
         return (x <= 0.04045f)
                    ? (x / 12.92f)
                    : (powf((x + 0.055f) / 1.055f, 2.4f));
     };
-
+    */
     file << method << "\n"
          << width << "\n"
          << height << "\n"
@@ -115,19 +115,19 @@ static bool loadPFM(const char* filePath, FrameBufferBase::InternalFormat format
         std::cerr << "Unable to open file: " << filePath << std::endl;
         return false;
     }
-
+    /*
     const auto isLittleEndian = []() -> bool {
         static int  x = 1;
         static bool result = reinterpret_cast<uint8_t*>(&x)[0] == 1;
         return result;
     };
-
+    
     auto applyColorProfile = [](float x) -> float {
         return (x <= 0.0031308f)
                    ? (12.92f * x)
                    : (1.055f * powf(x, 1.0f / 2.4f) - 0.055f);
     };
-
+    */
     int numComponents = 0;
 
     switch (format) {
