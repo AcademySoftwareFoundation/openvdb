@@ -31,6 +31,14 @@ RUN \
     chmod +x $ROOT_PATH/scripts/linux_install_wine.sh && \
 	$ROOT_PATH/scripts/linux_install_wine.sh
 
+COPY __dist/scripts/linux_install_cuda.sh \
+    $ROOT_PATH/scripts/
+
+RUN \
+    dos2unix $ROOT_PATH/scripts/linux_install_cuda.sh && \
+    chmod +x $ROOT_PATH/scripts/linux_install_cuda.sh && \
+	$ROOT_PATH/scripts/linux_install_cuda.sh 9-2
+
 COPY __dist/scripts/linux_install_msvc.sh \
     __dist/scripts/install.sh \
     __dist/scripts/fixinclude \

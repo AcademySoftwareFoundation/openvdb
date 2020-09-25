@@ -12,6 +12,7 @@
 */
 
 #include <nanovdb/util/GridHandle.h> // manages and streams the raw memory buffer of a NanoVDB grid.
+#include <nanovdb/util/GridChecksum.h>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
@@ -32,12 +33,12 @@ namespace nanovdb {
 /// @brief Forward declaration of free-standing function that converts an OpenVDB GridBase into a NanoVDB GridHandle
 template<typename BufferT = HostBuffer>
 GridHandle<BufferT>
-openToNanoVDB(const openvdb::GridBase::Ptr& base, bool mortonSort = false, int verbose = 0);
+openToNanoVDB(const openvdb::GridBase::Ptr& base, bool mortonSort = false, int verbose = 0, ChecksumMode mode = ChecksumMode::Default);
 
 /// @brief Forward declaration of free-standing function that converts a typed OpenVDB Grid into a NanoVDB GridHandle
 template<typename BufferT = HostBuffer, typename SrcTreeT = openvdb::FloatTree>
 GridHandle<BufferT>
-openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid, bool mortonSort = false, int verbose = 0);
+openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid, bool mortonSort = false, int verbose = 0, ChecksumMode mode = ChecksumMode::Default);
 
 namespace { // unnamed namespace
 
@@ -49,7 +50,7 @@ class OpenToNanoVDB
     using ValueT = typename SrcTreeT::ValueType;
     ValueT                  mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
     uint8_t*                mData;
-    uint64_t                mBytes[7]; // Byte offsets to from mData to: tree, root, node2, node1, leafs, meta, (total size)
+    uint64_t                mBytes[8]; // Byte offsets to from mData to: tree, blindmetadata, root, node2, node1, leafs, blinddata, (total size)
     tbb::atomic<uint64_t>   mActiveVoxelCount;
     std::set<BlindMetaData> mBlindMetaData; // sorted accoring to index
 
@@ -60,7 +61,7 @@ public:
     }
 
     /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpneVDB grid
-    GridHandle<BufferT> operator()(const openvdb::Grid<SrcTreeT>& grid, bool mortonSort = false, int verbose = 0, const BufferT& allocator = BufferT());
+    GridHandle<BufferT> operator()(const openvdb::Grid<SrcTreeT>& grid, bool fullChecksum = false, int verbose = 0, ChecksumMode mode = ChecksumMode::Default, const BufferT& allocator = BufferT());
 
 private:
     static_assert(SrcTreeT::DEPTH == 4, "Converter assumes an OpenVDB tree of depth 4 (which is the default configuration)");
@@ -96,6 +97,9 @@ private:
     /// @brief Private method to process the grid
     void processGrid(const SrcGridT& srcGrid);
 
+    /// @brief Private method to post-process the grid
+    void postProcessGrid(ChecksumMode mode);
+
     template<typename LeafT>
     uint64_t pointCount(std::vector<const LeafT*>&);
 
@@ -127,9 +131,12 @@ private:
 
     /// @brief Private methods to access points to data
     template<typename DstNodeT>
-    typename DstNodeT::DataType* nodeData() const { return reinterpret_cast<typename DstNodeT::DataType*>(mData + mBytes[4 - DstNodeT::LEVEL]); }
+    typename DstNodeT::DataType* nodeData() const { return reinterpret_cast<typename DstNodeT::DataType*>(mData + mBytes[5 - DstNodeT::LEVEL]); }
     typename DstTreeT::DataType* treeData() const { return reinterpret_cast<typename DstTreeT::DataType*>(mData + mBytes[0]); }
     typename DstGridT::DataType* gridData() const { return reinterpret_cast<typename DstGridT::DataType*>(mData); }
+    uint64_t gridSize() const { return mBytes[7]; }
+    nanovdb::GridBlindMetaData* blindMetaData() const { return reinterpret_cast<nanovdb::GridBlindMetaData*>(mData + mBytes[1]); }
+    uint8_t* blindData() const { return reinterpret_cast<uint8_t*>(mData + mBytes[6]); }
 
     /// @brief Private method used to cache the x compoment of a Coord into x and
     //         encode uint32_t id into the x component despite it being of type const int32_t.
@@ -216,6 +223,14 @@ OpenToNanoVDB<SrcTreeT, BufferT>::preProcessPoints(std::vector<const LeafT*>& ar
 }
 
 template<typename SrcTreeT, typename BufferT>
+inline void
+OpenToNanoVDB<SrcTreeT, BufferT>::postProcessGrid(ChecksumMode mode)
+{
+    auto& data = *this->gridData();
+    data.mChecksum = nanovdb::checksum( *reinterpret_cast<const NanoGrid<ValueT>*>(mData), mode );
+}
+
+template<typename SrcTreeT, typename BufferT>
 template<typename LeafT>
 inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value>::type
 OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& array)
@@ -236,7 +251,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
     assert(b.count == data[leafCount - 1].mValueMin + data[leafCount - 1].mValueMax);
     assert(b.name == "index" && b.typeName == "uint32");
     auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(0));
-    meta.mByteOffset = mBytes[5]; // offset from Grid to blind data
+    meta.mByteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
     meta.mElementCount = b.count;
     meta.mFlags = 0;
     meta.mSemantic = GridBlindDataSemantic::Unknown;
@@ -249,7 +264,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
     }
     memcpy(meta.mName, b.name.c_str(), b.name.size() + 1);
 
-    uint32_t* points = reinterpret_cast<uint32_t*>(mData + mBytes[5]);
+    uint32_t* points = reinterpret_cast<uint32_t*>(this->blindData());
     tbb::parallel_for(tbb::blocked_range<uint32_t>(0, array.size(), 16),
                       [&](const tbb::blocked_range<uint32_t>& r) {
                           for (auto i = r.begin(); i != r.end(); ++i) {
@@ -275,7 +290,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
         data[i].mValueMin = data[i - 1].mValueMin + data[i - 1].mValueMax;
 
     // write point coordinates as blind meta data
-    size_t byteOffset = mBytes[5];
+    size_t byteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
     for (auto& b : mBlindMetaData) {
         assert(b.count == data[leafCount - 1].mValueMin + data[leafCount - 1].mValueMax);
         auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(static_cast<uint32_t>(b.index)));
@@ -371,7 +386,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::setFlag(const T& min, const T& max, FlagT& fla
 
 template<typename SrcTreeT, typename BufferT>
 GridHandle<BufferT>
-OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcGrid, bool mortonSort, int verbose, const BufferT& allocator)
+OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcGrid, bool mortonSort, int verbose, ChecksumMode mode, const BufferT& allocator)
 {
     openvdb::util::CpuTimer timer;
 
@@ -409,18 +424,19 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     if (verbose > 1)
         timer.stop();
 
-    mBytes[0] = DstGridT::memUsage(mBlindMetaData.size()); // grid + blind meta data
+    mBytes[0] = DstGridT::memUsage(); // grid + blind meta data
     mBytes[1] = DstTreeT::memUsage(); // tree
-    mBytes[2] = DstRootT::memUsage(srcRoot.getTableSize()); // root
-    mBytes[3] = array2.size() * DstNode2::memUsage(); // upper internal nodes
-    mBytes[4] = array1.size() * DstNode1::memUsage(); // lower internal nodes
-    mBytes[5] = array0.size() * DstNode0::memUsage(); // leaf nodes
-    mBytes[6] = 0;
+    mBytes[2] = nanovdb::GridBlindMetaData::memUsage(mBlindMetaData.size()); // blind meta data
+    mBytes[3] = DstRootT::memUsage(srcRoot.getTableSize()); // root
+    mBytes[4] = array2.size() * DstNode2::memUsage(); // upper internal nodes
+    mBytes[5] = array1.size() * DstNode1::memUsage(); // lower internal nodes
+    mBytes[6] = array0.size() * DstNode0::memUsage(); // leaf nodes
+    mBytes[7] = 0;
     for (auto& i : mBlindMetaData)
-        mBytes[6] += i.size; // blind meta data
+        mBytes[7] += i.size; // blind meta data
 
-    for (int i = 1; i < 7; ++i)
-        mBytes[i] += mBytes[i - 1]; // Byte offsets to: tree, root, node2, node1, leafs, meta, total
+    for (int i = 1; i < 8; ++i)
+        mBytes[i] += mBytes[i - 1]; // Byte offsets to: tree, blindmetadata, root, node2, node1, leafs, blinddata, total
 
     if (mortonSort) { // Morton sorting of the leaf nodes is disabled by default since it has not been performance tested yet
         if (verbose > 1)
@@ -442,13 +458,13 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
 
     if (verbose > 1)
         timer.start("Allocating memory for the NanoVDB");
-    GridHandle<BufferT> handle(allocator.create(mBytes[6]));
+    GridHandle<BufferT> handle(allocator.create(this->gridSize()));
     mData = handle.data();
     if (verbose > 1)
         timer.stop();
 
     if (verbose)
-        openvdb::util::printBytes(std::cerr, mBytes[6], "Allocated", " for the NanoVDB\n");
+        openvdb::util::printBytes(std::cerr, this->gridSize(), "Allocated", " for the NanoVDB\n");
 
     if (srcGrid.getGridClass() == openvdb::GRID_LEVEL_SET) {
         mDelta = ValueT(srcGrid.voxelSize()[0]); // skip a node if max < -mDelta || min > mDelta
@@ -507,6 +523,12 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     if (verbose > 1)
         timer.start("Post-processing points");
     this->postProcessPoints(array0);
+    if (verbose > 1)
+        timer.stop();
+
+    if (verbose > 1)
+        timer.start("Post-processing Grid");
+    this->postProcessGrid(mode);
     if (verbose > 1)
         timer.stop();
 
@@ -707,7 +729,7 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
         if (count[i] > std::numeric_limits<uint32_t>::max())
             OPENVDB_THROW(openvdb::ValueError, "Node count exceeds 32 bit range");
         data.mCount[i] = static_cast<uint32_t>(count[i]);
-        data.mBytes[i] = mBytes[4 - i] - mBytes[0]; // offset from the tree to the first node at each tree level
+        data.mBytes[i] = mBytes[5 - i] - mBytes[0]; // offset from the tree to the first node at each tree level
     }
 }
 
@@ -720,7 +742,13 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
     auto  affineMap = srcGrid.transform().baseMap()->getAffineMap();
     auto& data = *this->gridData();
     data.mMagic = NANOVDB_MAGIC_NUMBER;
-    data.mBlindDataCount = static_cast<uint32_t>(mBlindMetaData.size());
+    data.mMajor = NANOVDB_MAJOR_VERSION_NUMBER;
+    data.mGridSize = this->gridSize();
+    data.setFlagsOff();
+    data.setMinMax(true);
+    data.setBBox(true);
+    data.mBlindMetadataOffset = mBlindMetaData.size()?mBytes[1]:0;
+    data.mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
     { // set grid name
         const std::string name = srcGrid.getName();
         if (name.length() + 1 > nanovdb::GridData::MaxNameSize) {
@@ -770,9 +798,9 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
     }
     { // set affine map
         if (srcGrid.hasUniformVoxels())
-            data.mUniformScale = affineMap->voxelSize()[0];
+            data.mVoxelSize = nanovdb::Vec3R(affineMap->voxelSize()[0]);
         else
-            data.mUniformScale = (affineMap->voxelSize()[0] + affineMap->voxelSize()[1] + affineMap->voxelSize()[2]) / 3;
+            data.mVoxelSize = affineMap->voxelSize();
         const auto mat = affineMap->getMat4();
         // Only support non-tapered at the moment:
         data.mMap.set(mat, mat.inverse(), 1.0);
@@ -822,32 +850,32 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
 
 template<typename BufferT, typename SrcTreeT>
 GridHandle<BufferT>
-openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid, bool mortonSort, int verbose)
+openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid, bool mortonSort, int verbose, ChecksumMode mode)
 {
     OpenToNanoVDB<SrcTreeT, BufferT> s;
-    return s(grid, mortonSort, verbose);
+    return s(grid, mortonSort, verbose, mode);
 }
 
 template<typename BufferT>
 GridHandle<BufferT>
-openToNanoVDB(const openvdb::GridBase::Ptr& base, bool mortonSort, int verbose)
+openToNanoVDB(const openvdb::GridBase::Ptr& base, bool mortonSort, int verbose, ChecksumMode mode)
 {
     if (auto grid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
-        return openToNanoVDB<BufferT, openvdb::FloatTree>(*grid, mortonSort, verbose);
+        return openToNanoVDB<BufferT, openvdb::FloatTree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::DoubleGrid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::DoubleTree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::DoubleTree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::Int32Grid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::Int32Tree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::Int32Tree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::Int64Grid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::Int64Tree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::Int64Tree>(*grid, mortonSort, verbose, mode);
      } else if (auto grid = openvdb::GridBase::grid<openvdb::Grid<openvdb::UInt32Tree>>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::UInt32Tree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::UInt32Tree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::Vec3fTree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::Vec3fTree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3dGrid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::Vec3dTree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::Vec3dTree>(*grid, mortonSort, verbose, mode);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::points::PointDataGrid>(base)) {
-        return nanovdb::openToNanoVDB<BufferT, openvdb::points::PointDataTree>(*grid, mortonSort, verbose);
+        return nanovdb::openToNanoVDB<BufferT, openvdb::points::PointDataTree>(*grid, mortonSort, verbose, mode);
     } else {
         OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
     }

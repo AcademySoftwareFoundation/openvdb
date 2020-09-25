@@ -11,6 +11,10 @@
     \brief  Command-line tool that converts between openvdb and nanovdb files
 */
 
+#include <string>
+#include <algorithm>
+#include <cctype>
+
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
 #include <nanovdb/util/OpenToNanoVDB.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
@@ -23,6 +27,7 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "Which: converts one or more NanoVDB files to a single OpenVDB file\n\n"
               << "Options:\n"
               << "-b,--blosc\tUse BLOSC compression on the output file\n"
+              << "-c,--checksum mode\t where mode={none, partial, full}\n"
               << "-f,--force\tOverwrite output file if it already exists\n"
               << "-g,--grid name\tConvert all grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
@@ -36,6 +41,7 @@ int main(int argc, char* argv[])
     int exitStatus = EXIT_SUCCESS;
 
     nanovdb::io::Codec       codec = nanovdb::io::Codec::NONE;
+    nanovdb::ChecksumMode    mode = nanovdb::ChecksumMode::Default;
     bool                     verbose = false, overwrite = false;
     std::string              gridName;
     std::vector<std::string> fileNames;
@@ -52,15 +58,33 @@ int main(int argc, char* argv[])
                 codec = nanovdb::io::Codec::BLOSC;
             } else if (arg == "-z" || arg == "--zip") {
                 codec = nanovdb::io::Codec::ZIP;
+            } else if (arg == "-c" || arg == "--checksum") {
+                if (i + 1 == argc) {
+                    std::cerr << "Expected a mode to follow the -c,--checksum option\n" << std::endl;
+                    usage(argv[0]);
+                } else {
+                    std::string str(argv[++i]);
+                    std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){ return std::tolower(c); });
+                    if (str == "none") {
+                       mode = nanovdb::ChecksumMode::Disable;
+                    } else if (str == "partial") {
+                       mode = nanovdb::ChecksumMode::Partial;
+                    } else if (str == "full") {
+                       mode = nanovdb::ChecksumMode::Full;
+                    } else {
+                      std::cerr << "Expected one of the following checksum modes: {none, partial, full}\n" << std::endl;
+                      usage(argv[0]);
+                    }
+                }
             } else if (arg == "-g" || arg == "--grid") {
                 if (i + 1 == argc) {
-                    std::cerr << "Expected a grid name to follow the -g,--grid option\n\n";
+                    std::cerr << "Expected a grid name to follow the -g,--grid option\n" << std::endl;
                     usage(argv[0]);
                 } else {
                     gridName.assign(argv[++i]);
                 }
             } else {
-                std::cerr << "Unrecognized option: \"" << arg << "\"\n\n";
+                std::cerr << "Unrecognized option: \"" << arg << "\"\n" << std::endl;
                 usage(argv[0]);
             }
         } else if (!arg.empty()) {
@@ -68,7 +92,7 @@ int main(int argc, char* argv[])
         }
     }
     if (fileNames.size() < 2) {
-        std::cerr << "Expected at least an input file followed by exactly one output file\n\n";
+        std::cerr << "Expected at least an input file followed by exactly one output file\n" << std::endl;
         usage(argv[0]);
     }
     const std::string outputFile = fileNames.back();
@@ -77,7 +101,7 @@ int main(int argc, char* argv[])
     if (ext == "nvdb") {
         toNanoVDB = true;
     } else if (ext != "vdb") {
-        std::cerr << "Unregnoized file extension: \"" << ext << "\"\n\n";
+        std::cerr << "Unrecognized file extension: \"" << ext << "\"\n" << std::endl;
         usage(argv[0]);
     }
 
@@ -90,7 +114,7 @@ int main(int argc, char* argv[])
             std::string answer;
             getline(std::cin, answer);
             if (!answer.empty() && answer != "Y" && answer != "y" && answer != "yes" && answer != "YES") {
-                std::cout << "Please specify a different output file\n";
+                std::cout << "Please specify a different output file" << std::endl;
                 exit(EXIT_SUCCESS);
             }
         }
@@ -107,25 +131,25 @@ int main(int argc, char* argv[])
             std::ofstream os(outputFile, std::ios::out | std::ios::binary);
             for (auto& inputFile : fileNames) {
                 if (inputFile.substr(inputFile.find_last_of(".") + 1) != "vdb") {
-                    std::cerr << "Since the last file has extension .nvdb the remaining input files were expected to have extensions .vdb\n\n";
+                    std::cerr << "Since the last file has extension .nvdb the remaining input files were expected to have extensions .vdb\n" << std::endl;
                     usage(argv[0]);
                 }
                 if (verbose)
-                    std::cout << "Opening OpenVDB file named \"" << inputFile << "\"\n";
+                    std::cout << "Opening OpenVDB file named \"" << inputFile << "\"" << std::endl;
                 openvdb::io::File file(inputFile);
                 file.open(false); //disable delayed loading
                 if (gridName.empty()) {
                     auto grids = file.getGrids();
                     for (auto& grid : *grids) {
                         if (verbose)
-                            std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB\n";
-                        nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid), codec);
+                            std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
+                        nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid, false, 0, mode), codec);
                     } // loop over OpenVDB grids in file
                 } else {
                     auto grid = file.readGrid(gridName);
                     if (verbose)
-                        std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB\n";
-                    nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid), codec);
+                        std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
+                    nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid, false, 0, mode), codec);
                 }
             } // loop over input files
         } else { // NanoVDB -> OpenVDB
@@ -133,26 +157,26 @@ int main(int argc, char* argv[])
             openvdb::GridPtrVecPtr grids(new openvdb::GridPtrVec());
             for (auto& inputFile : fileNames) {
                 if (inputFile.substr(inputFile.find_last_of(".") + 1) != "nvdb") {
-                    std::cerr << "Since the last file has extension .vdb the remaining input files were expected to have extensions .nvdb\n\n";
+                    std::cerr << "Since the last file has extension .vdb the remaining input files were expected to have extensions .nvdb\n" << std::endl;
                     usage(argv[0]);
                 }
                 if (verbose)
-                    std::cout << "Opening NanoVDB file named \"" << inputFile << "\"\n";
+                    std::cout << "Opening NanoVDB file named \"" << inputFile << "\"" << std::endl;
                 if (gridName.empty()) {
                     auto handles = nanovdb::io::readGrids(inputFile, verbose);
                     for (auto &h : handles) {
                         if (verbose)
-                            std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData()->gridName() << "\" to OpenVDB\n";
+                            std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData()->gridName() << "\" to OpenVDB" << std::endl;
                         grids->push_back(nanoToOpenVDB(h));
                     }
                 } else {
                     auto handle = nanovdb::io::readGrid(inputFile, gridName);
                     if (!handle) {
-                        std::cerr << "File did not contain a NanoVDB grid named \"" << gridName << "\"\n\n";
+                        std::cerr << "File did not contain a NanoVDB grid named \"" << gridName << "\"\n" << std::endl;
                         usage(argv[0]);
                     }
                     if (verbose)
-                        std::cout << "Converting NanoVDB grid named \"" << handle.gridMetaData()->gridName() << "\" to OpenVDB\n";
+                        std::cout << "Converting NanoVDB grid named \"" << handle.gridMetaData()->gridName() << "\" to OpenVDB" << std::endl;
                     grids->push_back(nanoToOpenVDB(handle));
                 }
             } // loop over input files

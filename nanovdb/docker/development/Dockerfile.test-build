@@ -1,5 +1,7 @@
 FROM oddsocks/nanovdb:dev-base
 
+ARG COMPILER
+ARG CUDA_VER
 ENV ROOT_PATH /repo
 
 WORKDIR $ROOT_PATH/
@@ -12,9 +14,9 @@ RUN \
 	chmod +x $ROOT_PATH/ci/*.sh
 
 RUN \
-    ./ci/build_core.sh clang++ clang Release \
+    ./ci/build_core.sh default $COMPILER $CUDA_VER Release \
         -DNANOVDB_USE_OPTIX=OFF \
-        -DNANOVDB_USE_CUDA=OFF
+        -DNANOVDB_USE_CUDA=ON
 
 # current status:
 #
@@ -28,7 +30,7 @@ RUN \
 RUN \
     wine --version && \
     wine wineboot && \
-    ./ci/build_core_toolchain.sh $ROOT_PATH/ci/wine-toolchain.cmake msvc16 Release \
+    ./ci/build_core_toolchain.sh msvc16 $ROOT_PATH/ci/wine-toolchain.cmake Release \
         -DNANOVDB_USE_OPENVDB=OFF \
         -DNANOVDB_USE_TBB=OFF \
         -DNANOVDB_USE_ZLIB=OFF \
@@ -40,5 +42,5 @@ RUN \
     ./ci/build_docs.sh
 
 RUN \
-    ./ci/test_core.sh clang && \
-    ./ci/test_render.sh clang
+    ./ci/test_core.sh default && \
+    ./ci/test_render.sh default

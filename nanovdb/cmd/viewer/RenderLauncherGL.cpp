@@ -89,7 +89,7 @@ bool RenderLauncherGL::ensureGridResource(const std::shared_ptr<Resource>& resou
         uint32_t(grid->tree().nodeCount<Node1T>() * Node1T::memUsage()),
         uint32_t(grid->tree().nodeCount<Node2T>() * Node2T::memUsage()),
         uint32_t(RootT::memUsage(grid->tree().root().tileCount())),
-        uint32_t(GridT::memUsage(grid->blindDataCount()))};
+        uint32_t(GridT::memUsage())};
 
     auto node0Level = grid->tree().getNode<Node0T>(0);
     auto node1Level = grid->tree().getNode<Node1T>(0);

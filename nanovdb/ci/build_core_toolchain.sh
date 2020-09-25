@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 set -ex
-        
-TOOLCHAIN_FILE="$1"; shift
+
 NAME="$1"; shift
+TOOLCHAIN_FILE="$1"; shift
 RELEASE="$1"; shift
 CMAKE_EXTRA="$@"
 

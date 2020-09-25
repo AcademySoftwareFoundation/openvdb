@@ -88,6 +88,7 @@ extern "C" __global__ void __intersection__nanovdb_levelset()
     auto       iRay = nanovdb::Ray<float>(iEye, iDir);
 
     auto acc = grid->tree().getAccessor();
+    float voxelUniformSize = float(grid->voxelSize()[0]);
 
 #if (OPTIX_PERF_USE_LEAF_DDA)
     CoordT ijk;
@@ -98,8 +99,8 @@ extern "C" __global__ void __intersection__nanovdb_levelset()
 #else
     if (!iRay.clip(leafNode->bbox()))
         return;
-    float t0 = iRay.t0() - 2 * grid->voxelSize();
-    float t1 = iRay.t1() + 2 * grid->voxelSize();
+    float t0 = iRay.t0() - 2.f * voxelUniformSize;
+    float t1 = iRay.t1() + 2.f * voxelUniformSize;
     iRay.setTimes(nanovdb::Max(t0, 0.000001f), nanovdb::Max(t1, 0.0001f));
     CoordT ijk;
     float  v;
@@ -108,7 +109,7 @@ extern "C" __global__ void __intersection__nanovdb_levelset()
 #endif
         // compute the intersection interval.
         auto p = make_float3(grid->indexToWorldF(iRay(iT)));
-        optixReportIntersection(iT * grid->voxelSize(), 0, array3_as_args(ijk), float3_as_args(p));
+        optixReportIntersection(iT * voxelUniformSize, 0, array3_as_args(ijk), float3_as_args(p));
     }
 
     return;
@@ -131,8 +132,8 @@ extern "C" __global__ void __intersection__nanovdb_fogvolume()
     auto bbox = grid->tree().bbox().asReal<float>();
     auto hit = rayBoxIntersect(iRay.eye(), iRay.dir(), bbox.min(), bbox.max());
     if (hit[2] != -1) {
-        float voxelSize = float(grid->voxelSize());
-        optixReportIntersection(hit[0] * voxelSize, 0, float_as_int(hit[1] * voxelSize));
+        float voxelUniformSize = float(grid->voxelSize()[0]);
+        optixReportIntersection(hit[0] * voxelUniformSize, 0, float_as_int(hit[1] * voxelUniformSize));
     }
 }
 

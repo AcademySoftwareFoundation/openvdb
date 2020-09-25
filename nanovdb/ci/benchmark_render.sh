@@ -7,9 +7,10 @@ EXEC=$1; shift
 NAME=$1; shift
 
 GRIDS=(
-    ~/Downloads/dragon.vdb 
     "internal://ls_sphere_100" 
     "internal://ls_torus_100" 
+    "internal://ls_bbox_100" 
+    "internal://ls_box_100" 
 )
 
 # find available platforms...

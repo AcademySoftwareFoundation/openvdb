@@ -1,78 +1,75 @@
-# Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# Copyright Contributors to the OpenVDB Project SPDX-License-Identifier: MPL-2.0
 
-#---------------------------------------------------------------
+# ---------------------------------------------------------------
 # Unit tests
 #
 
-#-----------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # TODO: Benchmark should probably not require gtest.
-if (NOT (NANOVDB_GTEST))
-	message (WARNING " - GTest required to build unittests. Skipping.")
-	return ()
+if(NOT (NANOVDB_GTEST))
+  message(WARNING " - GTest required to build unittests. Skipping.")
+  return()
 endif()
 
 # ---------------------------------------------------------------
 
-SET (UNITTEST_NANOVDB_SOURCE_FILES "TestNanoVDB.cpp")
+set(UNITTEST_NANOVDB_SOURCE_FILES "TestNanoVDB.cpp")
 
-SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_NANOVDB_SOURCE_FILES}
-  PROPERTIES
-  COMPILE_FLAGS "-DNOMINMAX"
-  )
+add_executable(testNanoVDB ${UNITTEST_NANOVDB_SOURCE_FILES})
 
-ADD_EXECUTABLE ( testNanoVDB
-	${UNITTEST_NANOVDB_SOURCE_FILES}
-	)
+target_compile_definitions(
+  testNanoVDB
+  PRIVATE "-D${NANOVDB_USE_CUDA_FLAG}" "-D${NANOVDB_USE_TBB_FLAG}"
+          "-D${NANOVDB_USE_BLOSC_FLAG}" "-D${NANOVDB_USE_ZLIB_FLAG}")
 
-TARGET_INCLUDE_DIRECTORIES ( testNanoVDB
-	PUBLIC 
-	)
+target_include_directories(testNanoVDB PUBLIC)
 
-TARGET_LINK_LIBRARIES ( testNanoVDB
-	PRIVATE
-	libnanovdb
-	${NANOVDB_GTEST}
-	)
+target_link_libraries(
+  testNanoVDB
+  PRIVATE libnanovdb ${NANOVDB_GTEST} ${NANOVDB_TBB} # optional
+          ${NANOVDB_BLOSC} # optional
+          ${NANOVDB_ZLIB} # optional
+)
 
-ADD_TEST ( NanoVDB_unit_test testNanoVDB )
+add_test(NanoVDB_unit_test testNanoVDB)
 
 # ---------------------------------------------------------------
 
-IF (NOT (TBB_FOUND AND OpenVDB_FOUND))
-	MESSAGE(WARNING " - OpenVDB required to build OpenVDB unit tests. Skipping.")
-ELSE()
+if(NOT (TBB_FOUND AND OpenVDB_FOUND))
+  message(WARNING " - OpenVDB required to build OpenVDB unit tests. Skipping.")
+else()
 
-	SET (UNITTEST_OPENVDB_SOURCE_FILES "TestOpenVDB.cpp")
+  set(UNITTEST_OPENVDB_SOURCE_FILES "TestOpenVDB.cpp")
 
-	SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_OPENVDB_SOURCE_FILES}
-	PROPERTIES
-	COMPILE_FLAGS "-DNOMINMAX"
-	)
+  set_source_files_properties(${UNITTEST_OPENVDB_SOURCE_FILES}
+                              PROPERTIES COMPILE_FLAGS "-DNOMINMAX")
 
-	ADD_EXECUTABLE ( testOpenVDB
-		${UNITTEST_OPENVDB_SOURCE_FILES}
-		)
+  add_executable(testOpenVDB ${UNITTEST_OPENVDB_SOURCE_FILES})
 
-	TARGET_INCLUDE_DIRECTORIES ( testOpenVDB
-		PUBLIC 
-		)
+  target_compile_definitions(
+    testOpenVDB
+    PRIVATE "-D${NANOVDB_USE_OPENVDB_FLAG}" "-D${NANOVDB_USE_CUDA_FLAG}"
+            "-D${NANOVDB_USE_TBB_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
+            "-D${NANOVDB_USE_ZLIB_FLAG}")
 
-	TARGET_LINK_LIBRARIES ( testOpenVDB    
-		PRIVATE
-		libnanovdb
-		${NANOVDB_GTEST}
-		${NANOVDB_TBB}
-		${NANOVDB_OPENVDB}
-		)
+  target_include_directories(testOpenVDB PUBLIC)
 
-	ADD_TEST ( OpenVDB_unit_test testOpenVDB )
-ENDIF()
+  target_link_libraries(
+    testOpenVDB
+    PRIVATE libnanovdb
+            ${NANOVDB_GTEST}
+            ${NANOVDB_TBB} # optional
+            ${NANOVDB_BLOSC} # optional
+            ${NANOVDB_ZLIB} # optional
+            ${NANOVDB_OPENVDB} # optional
+  )
+
+  add_test(OpenVDB_unit_test testOpenVDB)
+endif()
 
 # ---------------------------------------------------------------
 
 # workaround for win32 bug when nvcc "--keep" is used.
-IF (WIN32 AND NANOVDB_CUDA_KEEP_PTX)
-	FILE (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
-ENDIF()
-
+if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
+endif()

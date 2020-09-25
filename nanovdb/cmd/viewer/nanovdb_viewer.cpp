@@ -20,8 +20,10 @@
 
 void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAILURE)
 {
-    std::cerr << "\nUsage: " << progName << " [options] *.nvdb\n"
-              << "Which: Render grids from one or more NanoVDB files\n\n"
+    std::cerr << "\n"
+              << "Usage: " << progName << " [options] *.nvdb\n"
+              << "Description: Render grids from one or more NanoVDB files\n"
+              << "\n"
               << "Options:\n"
               << "-h,--help\tPrints this message\n"
               << "-g,--grid name\tView all grids matching the specified string name\n"
@@ -29,11 +31,18 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "-p,--render-platform\tThe rendering platform to use by name\n"
               << "-o,--output\tThe output filename prefix (format = ./<output>.frame.ext)\n"
               << "-l,--render-platform-list\tList the available rendering platforms\n"
-              << "-n,--frame-count\trender <count> frames\n"
-              << "-t,--render-turntable\tRender a 360 turntable within the frame count\n"
+              << "-n,--count\trender <count> frames\n"
+              << "--turntable\tRender a 360 turntable within the frame count\n"
               << "--width\tThe render width\n"
               << "--height\tThe render height\n"
-              << "--samples\tThe render sample count\n";
+              << "--samples\tThe render sample count\n"
+              << "\n"
+              << "Examples:\n"
+              << "* Render temperature grid using CUDA with 32 samples:\n"
+              << "\t" << progName << " -p cuda --grid temperature --samples 32 explosion.0023.vdb\n"
+              << "* Render density grid sequence:\n"
+              << "\t" << progName << " --grid density explosion.%04d.vdb:0-100\n"
+              << "\n";
     exit(exitStatus);
 }
 
@@ -126,7 +135,7 @@ int main(int argc, char* argv[])
         } else if (!arg.empty()) {
             // check for sequence...
             if (arg.find("%", 0) != std::string::npos) {
-                auto pos = arg.find_last_of(';');
+                auto pos = arg.find_last_of(':');
                 auto range = arg.substr(pos + 1);
                 auto filename = arg.substr(0, pos);
 

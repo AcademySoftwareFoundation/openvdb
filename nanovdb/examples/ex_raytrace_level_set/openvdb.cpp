@@ -72,7 +72,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>& handle, int numI
             // intersect...
             float t0;
             if (intersector.intersectsIS(iRay, t0)) {
-                // write distance to surface.
+                // write distance to surface. (we assume it is a uniform voxel)
                 float wT0 = t0 * float(grid->voxelSize()[0]);
                 compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);
             } else {

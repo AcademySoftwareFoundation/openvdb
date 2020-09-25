@@ -18,6 +18,7 @@
 #include "Range.h"
 #include "ForEach.h"
 #include "GridBuilder.h"// for Extrema
+#include "GridChecksum.h"
 
 #include <atomic>
 
@@ -25,9 +26,10 @@ namespace nanovdb {
 
 /// @brief Re-computes the min/max and bbox information for an existing NaoVDB Grid
 ///
-/// @param grid
+/// @param grid  Grid whoes stats to update
+/// @param mode  Mode of computation for the checksum.
 template <typename ValueT = float>
-void gridStats(const NanoGrid<ValueT> &grid);
+void gridStats(NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default);
 
 /// @brief Allows for the construction of NanoVDB grids without any dependecy
 template <typename ValueT, typename ExtremaOp = Extrema<ValueT> >
@@ -48,6 +50,7 @@ class GridStats
     void processNodes();
     void processRoot();
     void processGrid();
+    void postProcessGrid(ChecksumMode mode);
 
     template<typename T, typename FlagT>
     typename std::enable_if<!std::is_floating_point<T>::value>::type
@@ -60,14 +63,14 @@ class GridStats
 public:
     GridStats() : mGrid(nullptr) {}
 
-    void operator()(NanoGrid<ValueT> &grid, ValueT delta = ValueT(0));
+    void operator()(NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default, ValueT delta = ValueT(0));
 
 };// GridStats
 
 //================================================================================================
 
 template <typename ValueT, typename ExtremaOp>
-void GridStats<ValueT, ExtremaOp>::operator()(NanoGrid<ValueT> &grid, ValueT delta)
+void GridStats<ValueT, ExtremaOp>::operator()(NanoGrid<ValueT> &grid, ChecksumMode mode, ValueT delta)
 {
     mGrid = &grid;
     mDelta = delta;// delta = voxel size for level sets, else 0
@@ -77,6 +80,7 @@ void GridStats<ValueT, ExtremaOp>::operator()(NanoGrid<ValueT> &grid, ValueT del
     this->template processNodes<Node2>();
     this->processRoot();
     this->processGrid();
+    this->postProcessGrid( mode );
 }
 
 //================================================================================================
@@ -100,11 +104,11 @@ template<typename ValueT, typename ExtremaOp>
 void GridStats<ValueT, ExtremaOp>::
 processLeafs()
 {
-    const auto &tree = mGrid->tree();
+    auto &tree = mGrid->tree();
     auto kernel = [&](const Range1D &r) {
         uint64_t sum = 0;
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto *leaf = const_cast<Node0*>(tree.template getNode<Node0>(i));
+            Node0 *leaf = tree.template getNode<Node0>(i);
             auto *data = leaf->data();
             auto iter = data->mValueMask.beginOn();
             if (!iter) throw std::runtime_error("Expected at least one active voxel in every leaf node!");
@@ -140,12 +144,12 @@ void GridStats<ValueT, ExtremaOp>::
 processNodes()
 {
     using ChildT = typename NodeT::ChildNodeType;
-    const auto &tree = mGrid->tree();
+    auto &tree = mGrid->tree();
     auto kernel = [&](const Range1D &r) 
     {
         uint64_t sum = 0;
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto *node = const_cast<NodeT*>(tree.template getNode<NodeT>(i));
+            NodeT *node = tree.template getNode<NodeT>(i);
             auto *data = node->data();
             sum += ChildT::NUM_VALUES * data->mValueMask.countOn();// active tiles
             auto onValIter = data->mValueMask.beginOn();
@@ -194,7 +198,8 @@ void GridStats<ValueT, ExtremaOp>::
 processRoot()
 {
     using ChildT = Node2;
-    auto &root = const_cast<RootT&>(mGrid->tree().root());
+    RootT &root = mGrid->tree().root();
+    //auto &root = const_cast<RootT&>(mGrid->tree().root());
     auto &data = *root.data();
     if (data.mTileCount == 0) { // empty root node
         data.mValueMin = data.mValueMax = data.mBackground;
@@ -260,15 +265,29 @@ processGrid()
     worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[0][1], indexBBox[1][2])));
     worldBBox.expand(map.applyMap(Vec3d(indexBBox[0][0], indexBBox[1][1], indexBBox[1][2])));
     worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[1][1], indexBBox[1][2])));
+    
+    // set bit flags
+    data.setMinMax(true);
+    data.setBBox(true);
 }// GridStats::processGrid
 
 //================================================================================================
 
+template<typename ValueT, typename ExtremaOp>
+void GridStats<ValueT, ExtremaOp>::
+postProcessGrid(ChecksumMode mode)
+{
+    auto &data = *mGrid->data();
+    data.mChecksum = checksum(*mGrid, mode);
+}// GridStats::postProcessGrid
+
+//================================================================================================
+
 template <typename ValueT>
-void gridStats(const NanoGrid<ValueT> &grid)
+void gridStats(NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     GridStats<ValueT> stats;
-    stats( const_cast<NanoGrid<ValueT>&>( grid ) );
+    stats( grid, mode );
 }
 
 } // namespace nanovdb

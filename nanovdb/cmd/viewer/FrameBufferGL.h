@@ -51,7 +51,7 @@ public:
     uint32_t bufferGL(int i = 0) const { return mPixelPackBuffers[(mIndex + i) % BUFFER_COUNT]; }
 
     //! return the texture resource ID.
-    uint32_t textureGL(int i = 0) const { return mTexture; }
+    uint32_t textureGL(int = 0) const { return mTexture; }
 
     //! this can be called multiple times and will be a NOP if there
     //! are no changes.

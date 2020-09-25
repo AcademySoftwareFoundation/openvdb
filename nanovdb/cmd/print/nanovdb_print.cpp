@@ -94,9 +94,10 @@ int main(int argc, char* argv[])
         if (size > n)
             n = size;
     };
-    auto realToStr = [](double x) {
+    auto vec3RToStr = [](const nanovdb::Vec3R& v) {
         std::stringstream ss;
-        ss << std::setprecision(3) << x;
+        ss << std::setprecision(3);
+        ss << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
         return ss.str();
     };
     auto wbboxToStr = [](const nanovdb::BBox<nanovdb::Vec3d>& bbox) {
@@ -166,7 +167,7 @@ int main(int argc, char* argv[])
                 width(fileWidth, format(m.fileSize));
                 width(configWidth, nodesToStr(m.nodeCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
-                width(voxelSizeWidth, realToStr(m.voxelSize));
+                width(voxelSizeWidth, vec3RToStr(m.voxelSize));
             }
             std::cout << "\nThe file \"" << file << "\" contains the following " << list.size() << " grid(s):\n";
             std::cout << std::left << std::setw(numberWidth) << "#"
@@ -197,7 +198,7 @@ int main(int argc, char* argv[])
                     std::cout << std::left << std::setw(classWidth) << nanovdb::io::getStringForGridClass(m.gridClass)
                               << std::left << std::setw(sizeWidth) << format(m.gridSize)
                               << std::left << std::setw(fileWidth) << format(m.fileSize)
-                              << std::left << std::setw(voxelSizeWidth) << realToStr(m.voxelSize);
+                              << std::left << std::setw(voxelSizeWidth) << vec3RToStr(m.voxelSize);
                 }
                 std::cout << std::left << std::setw(voxelsWidth) << m.voxelCount
                           << std::left << std::setw(resWidth) << resToStr(m.indexBBox);

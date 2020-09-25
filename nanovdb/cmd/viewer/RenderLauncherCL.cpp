@@ -471,7 +471,7 @@ std::shared_ptr<RenderLauncherCL::Resource> RenderLauncherCL::ensureResource(con
                 uint32_t(grid->tree().nodeCount<Node2T>() * Node2T::memUsage()),
                 uint32_t(RootT::memUsage(grid->tree().root().tileCount()) - RootT::memUsage(0)),
                 uint32_t(RootT::memUsage(0)),
-                uint32_t(GridT::memUsage(grid->blindDataCount()))};
+                uint32_t(GridT::memUsage())};
 
             auto node0Level = grid->tree().getNode<Node0T>(0);
             auto node1Level = grid->tree().getNode<Node1T>(0);
@@ -480,7 +480,7 @@ std::shared_ptr<RenderLauncherCL::Resource> RenderLauncherCL::ensureResource(con
             auto gridData = grid;
 
             uintptr_t gridBaseAddr = uintptr_t(grid);
-            uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
+           // uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
             uint32_t  offsets[] = {
                 uint32_t(uintptr_t(node0Level) - gridBaseAddr),
                 uint32_t(uintptr_t(node1Level) - gridBaseAddr),
@@ -571,7 +571,7 @@ void* RenderLauncherCL::mapCL(int access, const std::shared_ptr<Resource>& resou
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, imgBufferGL->bufferGL());
 
-        if (!resource->mGlTextureResourceCL || resource->mGlTextureResourceSize != imgBuffer->size()) {
+        if (!resource->mGlTextureResourceCL || resource->mGlTextureResourceSize != size_t(imgBuffer->size())) {
             std::cout << "Resizing OpenCL resources. (" << imgBuffer->size() << "B)" << std::endl;
 
             if (resource->mGlTextureResourceCL) {

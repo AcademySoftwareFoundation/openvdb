@@ -12,6 +12,7 @@
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/OpenToNanoVDB.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/util/GridValidator.h>
 #include <nanovdb/util/SampleFromVoxels.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
@@ -112,10 +113,10 @@ TEST_F(TestOpenVDB, Grid)
     using GridT = nanovdb::Grid<TreeT>;
     using CoordT = LeafT::CoordType;
 
-    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(nanovdb::GridData::MaxNameSize + 8 + 8 * 2 * 3 + sizeof(nanovdb::Map) + 8 + 2 + 2 + 4), sizeof(GridT));
+    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 + 8 + 2 + 2 + 4 + 8 + nanovdb::GridData::MaxNameSize + 48 + sizeof(nanovdb::Map) + 24 + 4 + 4 + 8 + 4), sizeof(GridT));
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>((4 + 8) * (RootT::LEVEL + 1)), sizeof(TreeT));
 
-    size_t bytes[6] = {GridT::memUsage(0), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::memUsage()};
+    size_t bytes[6] = {GridT::memUsage(), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::memUsage()};
     for (int i = 1; i < 6; ++i)
         bytes[i] += bytes[i - 1]; // Byte offsets to: tree, root, internal nodes, leafs, total
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[bytes[5]]);
@@ -205,7 +206,7 @@ TEST_F(TestOpenVDB, Grid)
         {
             openvdb::math::UniformScaleTranslateMap map(2.0, openvdb::Vec3R(0.0, 0.0, 0.0));
             auto                                    affineMap = map.getAffineMap();
-            data->mUniformScale = affineMap->voxelSize()[0];
+            data->mVoxelSize = affineMap->voxelSize();
             const auto mat = affineMap->getMat4(), invMat = mat.inverse();
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<mat[i][0]<<", "<<mat[i][1]<<", "<<mat[i][2]<<", "<<mat[i][3]<<"]\n";
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<invMat[i][0]<<", "<<invMat[i][1]<<", "<<invMat[i][2]<<", "<<invMat[i][3]<<"]\n";
@@ -224,7 +225,7 @@ TEST_F(TestOpenVDB, Grid)
         {
             openvdb::math::UniformScaleTranslateMap map(2.0, p1);
             auto                                    affineMap = map.getAffineMap();
-            data->mUniformScale = affineMap->voxelSize()[0];
+            data->mVoxelSize = affineMap->voxelSize();
             const auto mat = affineMap->getMat4(), invMat = mat.inverse();
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<mat[i][0]<<", "<<mat[i][1]<<", "<<mat[i][2]<<", "<<mat[i][3]<<"]\n";
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<invMat[i][0]<<", "<<invMat[i][1]<<", "<<invMat[i][2]<<", "<<invMat[i][3]<<"]\n";
@@ -735,10 +736,11 @@ TEST_F(TestOpenVDB, Conversion)
         auto& data = *reinterpret_cast<DstGridT::DataType*>(dstGrid);
         { // affine transformation
             auto affineMap = srcGrid->transform().baseMap()->getAffineMap();
-            data.mUniformScale = affineMap->voxelSize()[0];
+            data.mVoxelSize = affineMap->voxelSize();
             const auto mat = affineMap->getMat4();
             data.mMap.set(mat, mat.inverse(), 1.0);
-            data.mBlindDataCount = 0;
+            data.mBlindMetadataOffset = 0;
+            data.mBlindMetadataCount = 0;
         }
         switch (srcGrid->getGridClass()) { // set grid class
         case openvdb::GRID_LEVEL_SET:
@@ -1131,7 +1133,7 @@ TEST_F(TestOpenVDB, PointData)
     // a good balance of memory against performance.
     int   pointsPerVoxel = 8;
     float voxelSize = openvdb::points::computeVoxelSize(positionsWrapper, pointsPerVoxel);
-    std::cout << "VoxelSize=" << voxelSize << std::endl;
+    //std::cout << "VoxelSize=" << voxelSize << std::endl;
     auto transform = openvdb::math::Transform::createLinearTransform(voxelSize);
     auto srcGrid = openvdb::points::createPointDataGrid<openvdb::points::NullCodec,
                                                         openvdb::points::PointDataGrid>(positions, *transform);
@@ -1762,7 +1764,7 @@ TEST_F(TestOpenVDB, Trilinear)
     auto* dstGrid = handles[0].grid<float>();
     EXPECT_TRUE(dstGrid);
     EXPECT_FALSE(handles[0].grid<double>());
-    EXPECT_EQ(voxelSize, dstGrid->voxelSize());
+    EXPECT_EQ(voxelSize, dstGrid->voxelSize()[0]);
 
     const openvdb::Vec3R ijk(13.4, 24.67, 5.23); // in index space
     const float          exact = trilinear(srcGrid->indexToWorld(ijk));
@@ -1846,6 +1848,54 @@ TEST_F(TestOpenVDB, Tricubic)
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
     EXPECT_NEAR(exact, sampler3(ijk), 1e-4);
 } // Tricubic
+
+TEST_F(TestOpenVDB, GridValidator)
+{
+    auto srcGrid = this->getSrcGrid();
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, false, 0, nanovdb::ChecksumMode::Full);
+    mTimer.stop();
+    EXPECT_TRUE(handle);
+    EXPECT_TRUE(handle.data());
+    auto* grid = handle.grid<float>();
+    EXPECT_TRUE(grid);
+    
+    //mTimer.start("isValid - detailed");
+    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+    //mTimer.stop();
+
+    //mTimer.start("isValid - not detailed");
+    EXPECT_TRUE( nanovdb::isValid(*grid, false, true ) );
+    //mTimer.stop();
+
+    //mTimer.start("Slow CRC");
+    auto slowChecksum = nanovdb::crc32_slow(*grid);
+    //mTimer.stop();
+    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
+    
+    //mTimer.start("Fast CRC");
+    auto fastChecksum = nanovdb::crc32(*grid);
+    //mTimer.stop();
+    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
+
+    auto *leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
+    leaf->data()->mValues[512>>1] += 0.00001f;// slightly modify a single voxel value 
+
+    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
+
+    leaf->data()->mValues[512>>1] -= 0.00001f;// change back the single voxel value to it's original value
+
+    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+
+    leaf->data()->mValueMask.toggle(512>>1);// change a single bit in a value mask
+
+    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
+}// GridValidator
 
 int main(int argc, char** argv)
 {

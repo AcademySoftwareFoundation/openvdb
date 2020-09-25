@@ -62,8 +62,8 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             CoordT ijk;
             float  v;
             if (nanovdb::ZeroCrossing(iRay, acc, ijk, v, t0)) {
-                // write distance to surface.
-                float wT0 = t0 * grid->voxelSize();
+                // write distance to surface. (we assume it is a uniform voxel)
+                float wT0 = t0 * float(grid->voxelSize()[0]);
                 compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);
             } else {
                 // write background value.

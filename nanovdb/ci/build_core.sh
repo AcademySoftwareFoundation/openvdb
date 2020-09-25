@@ -2,8 +2,9 @@
 
 set -ex
 
-COMPILER="$1"; shift
 NAME="$1"; shift
+COMPILER="$1"; shift
+CUDA_VER="$1"; shift
 RELEASE="$1"; shift
 CMAKE_EXTRA="$@"
 
@@ -12,6 +13,25 @@ cd __build_core/${NAME}
 
 # print version
 cmake --version
+
+if [[ $COMPILER = gcc-* ]] || [[ $COMPILER = g++-* ]]; then
+    GCC_TOOLCHAIN=`echo $COMPILER | cut -d"-" -f 2`
+    COMPILER=`echo $COMPILER | cut -d"-" -f 1`
+    echo "COMPILER=$COMPILER GCC_TOOLCHAIN=$GCC_TOOLCHAIN"
+fi
+
+if [[ ! -z "$GCC_TOOLCHAIN" ]]; then
+    source scl_source enable devtoolset-${GCC_TOOLCHAIN} || export RC=true
+fi
+
+sudo rm -f /usr/local/cuda
+sudo ln -s /usr/local/cuda-${CUDA_VER} /usr/local/cuda
+
+echo "CUDA_VERSION=$CUDA_VER"
+
+if [[ -z "$RELEASE" ]]; then
+    RELEASE=Release
+fi
 
 cmake \
 	-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \

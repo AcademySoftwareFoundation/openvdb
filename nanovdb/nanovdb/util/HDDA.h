@@ -310,7 +310,7 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
     }
 
     float t0 = ray.t0();
-    float t1 = ray.t1();
+    //float t1 = ray.t1();
 
     static const float Delta = 1.0001f;
     ijk = Coord::Floor(ray(ray.t0() + Delta));
@@ -380,8 +380,8 @@ public:
             hddaIsValid = mHdda.step();
             const CoordT ijk = RoundDown<Coord>(mRay(mHdda.time() + Delta));
             auto         currentNode = mAcc.template getNode<NodeT>();
-            const int    dim = mAcc.getDim(ijk, mRay);
-            mHdda.update(mRay, nanovdb::Max(dim, (int)NodeT::dim()));
+            const auto    dim = mAcc.getDim(ijk, mRay);
+            mHdda.update(mRay, (int)nanovdb::Max(dim, NodeT::dim()));
             mT0 = (dim <= ChildT::dim()) ? mHdda.time() : -1; // potentially begin a span.
 
             if (t0 >= 0) { // we are in a span.

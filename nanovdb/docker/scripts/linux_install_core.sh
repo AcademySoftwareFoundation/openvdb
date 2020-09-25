@@ -10,6 +10,7 @@ if [ ! -f /usr/lib/libOpenCL.so ]; then
 fi
 sudo yum -y install ImageMagick
 sudo yum -y install glfw-devel
+sudo yum -y install gtk3-devel
 
 g++ --version
 

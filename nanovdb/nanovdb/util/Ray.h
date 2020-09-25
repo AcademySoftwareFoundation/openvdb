@@ -215,8 +215,8 @@ public:
         return Ray(eye, dir * invLength, length * mTimeSpan.t0, t1);
     }
 
-    // @brief Return a new ray in world space, assuming the existing
-    /// ray is represented in the index space of the specified grid.
+    /// @brief Return a new ray in index space, assuming the existing
+    /// ray is represented in the world space of the specified grid.
     template<typename GridType>
     __hostdev__ Ray worldToIndexF(const GridType& grid) const
     {

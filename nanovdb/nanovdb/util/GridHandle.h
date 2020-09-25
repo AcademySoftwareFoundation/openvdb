@@ -17,6 +17,7 @@
 #ifndef NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
 
+#include "../NanoVDB.h"// for mapToGridType
 #include "HostBuffer.h"
 
 #include <fstream> // for std::ifstream
@@ -65,8 +66,6 @@ public:
 template<typename BufferT = HostBuffer>
 class GridHandle : public GridHandleBase
 {
-    friend BufferT;
-
     BufferT mBuffer;
 
 public:
@@ -92,10 +91,6 @@ public:
     ~GridHandle() override { reset(); }
 
     void reset() { mBuffer.clear(); }
-
-    /// @brief Maps from a NanoVDB grid type to GridType
-    template<typename GridT>
-    static GridType map();
 
     BufferT&       buffer() { return mBuffer; }
     const BufferT& buffer() const { return mBuffer; }
@@ -129,6 +124,9 @@ public:
     template<typename ValueT>
     const NanoGrid<ValueT>* grid() const;
 
+    template<typename ValueT>
+    NanoGrid<ValueT>* grid();
+
     template<typename ValueT, typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
     deviceGrid() const;
@@ -145,33 +143,6 @@ public:
 // --------------------------> Implementation of GridHandle <------------------------------------
 
 template<typename BufferT>
-template<typename GridT>
-inline GridType GridHandle<BufferT>::map()
-{
-    using T = typename GridT::ValueType;
-    if (std::is_same<T, float>::value) { // resolved at compiletime
-        return GridType::Float;
-    } else if (std::is_same<T, double>::value) {
-        return GridType::Double;
-    } else if (std::is_same<T, int16_t>::value) {
-        return GridType::Int16;
-    } else if (std::is_same<T, int32_t>::value) {
-        return GridType::Int32;
-    } else if (std::is_same<T, int64_t>::value) {
-        return GridType::Int64;
-    } else if (std::is_same<T, Vec3f>::value) {
-        return GridType::Vec3f;
-    } else if (std::is_same<T, Vec3d>::value) {
-        return GridType::Vec3d;
-    } else if (std::is_same<T, uint32_t>::value) {
-        return GridType::UInt32;
-    } else if (std::is_same<T, ValueMask>::value) {
-        return GridType::Mask;
-    }
-    return GridType::Unknown;
-}
-
-template<typename BufferT>
 GridHandle<BufferT>::GridHandle(BufferT&& resources)
 {
     mBuffer = std::move(resources);
@@ -183,7 +154,16 @@ inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid() const
 {
     using GridT = const NanoGrid<ValueT>;
     GridT* grid = reinterpret_cast<GridT*>(mBuffer.data());
-    return (grid && grid->gridType() == map<GridT>()) ? grid : nullptr;
+    return (grid && grid->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
+}
+
+template<typename BufferT>
+template<typename ValueT>
+inline NanoGrid<ValueT>* GridHandle<BufferT>::grid()
+{
+    using GridT = NanoGrid<ValueT>;
+    GridT* grid = reinterpret_cast<GridT*>(mBuffer.data());
+    return (grid && grid->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
 }
 
 template<typename BufferT>
@@ -193,7 +173,7 @@ GridHandle<BufferT>::deviceGrid() const
 {
     using GridT = const NanoGrid<ValueT>;
     GridT* grid = reinterpret_cast<GridT*>(mBuffer.deviceData());
-    return (grid && this->gridMetaData()->gridType() == map<GridT>()) ? grid : nullptr;
+    return (grid && this->gridMetaData()->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
 }
 
 template<typename BufferT>

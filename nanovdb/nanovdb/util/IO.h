@@ -128,18 +128,19 @@ struct Header
 // Characters in grid name         (uint32_t)   |
 // AABB in world space             (2*3*double) |
 // AABB in index space             (2*3*int)    |
-// Size of a voxel in world units  (double)     |
+// Size of a voxel in world units  (3*double)     |
 struct MetaData
 {
-    uint64_t    gridSize, fileSize, nameKey, voxelCount; // 4 * 8 = 32 bytes
-    GridType    gridType; // 4 bytes
-    GridClass   gridClass; // 4 bytes
-    uint32_t    nameSize; // 4 bytes
-    uint32_t    nodeCount[4]; //4 x 4 = 16 bytes
-    BBox<Vec3d> worldBBox; // 2 * 3 * 8 = 48 bytes
-    CoordBBox   indexBBox; // 2 * 3 * 4 = 24 bytes
-    double      voxelSize; // 8 bytes
-}; // MetaData ( 136 bytes = 17 words )
+    uint64_t    gridSize, fileSize, nameKey, voxelCount; // 4 * 8 = 32B.
+    GridType    gridType; // 4B.
+    GridClass   gridClass; // 4B.
+    BBox<Vec3d> worldBBox; // 2 * 3 * 8 = 48B.
+    CoordBBox   indexBBox; // 2 * 3 * 4 = 24B.
+    Vec3R       voxelSize; // 24B.
+    uint32_t    nameSize; // 4B.
+    uint32_t    nodeCount[4]; //4 x 4 = 16B
+    uint32_t    _padding; // 4B.
+}; // MetaData ( 160B )
 
 struct GridMetaData : public MetaData
 {
@@ -156,7 +157,7 @@ struct Segment
 {
     // Check assumtions made during read and write of Header and MetaData
     static_assert(sizeof(Header) == 16u, "Unexpected sizeof(Header)");
-    static_assert(sizeof(MetaData) == 144u, "Unexpected sizeof(MetaData)");
+    static_assert(sizeof(MetaData) == 160u, "Unexpected sizeof(MetaData)");
     Header                    header;
     std::vector<GridMetaData> meta;
     Segment(Codec c = Codec::NONE)
@@ -346,7 +347,7 @@ void Internal::read(std::istream& is, GridHandle<BufferT>& handle, Codec codec)
 
 template<typename ValueT>
 inline GridMetaData::GridMetaData(uint64_t size, const NanoGrid<ValueT>& grid)
-    : MetaData{size, 0, 0, grid.activeVoxelCount(), grid.gridType(), grid.gridClass(), 0, {0, 0, 0, 0}, grid.worldBBox(), grid.indexBBox(), grid.voxelSize()}
+    : MetaData{size, 0, 0, grid.activeVoxelCount(), grid.gridType(), grid.gridClass(), grid.worldBBox(), grid.indexBBox(), grid.voxelSize(), 0, {0, 0, 0, 0}, 0}
     , gridName(grid.gridName())
 {
     nameKey = stringHash(gridName);

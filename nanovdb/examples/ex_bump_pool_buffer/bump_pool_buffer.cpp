@@ -110,8 +110,8 @@ int main()
         std::vector<nanovdb::GridHandle<PoolBuffer>> gridHdls;
 
         // create two grids...
-        gridHdls.push_back(nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3R(-20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "spheref", bufferContext));
-        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0f, nanovdb::Vec3R(20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "sphered", bufferContext));
+        gridHdls.push_back(nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3R(-20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "spheref", nanovdb::ChecksumMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0f, nanovdb::Vec3R(20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "sphered", nanovdb::ChecksumMode::Partial, bufferContext));
 
         // Get a (raw) pointer to the NanoVDB grid form the GridManager.
         auto* dstGrid = gridHdls[0].grid<float>();
