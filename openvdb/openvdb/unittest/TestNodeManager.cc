@@ -17,10 +17,12 @@ public:
 
     CPPUNIT_TEST_SUITE(TestNodeManager);
     CPPUNIT_TEST(testAll);
+    CPPUNIT_TEST(testConst);
     CPPUNIT_TEST(testDynamic);
     CPPUNIT_TEST_SUITE_END();
 
     void testAll();
+    void testConst();
     void testDynamic();
 };
 
@@ -153,6 +155,37 @@ TestNodeManager::testAll()
     }
 
 }
+
+
+void
+TestNodeManager::testConst()
+{
+    using namespace openvdb;
+
+    const Vec3f center(0.35f, 0.35f, 0.35f);
+    const int dim = 128, half_width = 5;
+    const float voxel_size = 1.0f/dim;
+
+    FloatGrid::Ptr grid = FloatGrid::create(/*background=*/half_width*voxel_size);
+    const FloatTree& tree = grid->constTree();
+
+    tree::NodeManager<const FloatTree> manager(tree);
+
+    NodeCountOp<const FloatTree> topDownOp;
+    manager.reduceTopDown(topDownOp);
+
+    std::vector<Index64> nodeCount;
+    for (openvdb::Index i=0; i<FloatTree::DEPTH; ++i) nodeCount.push_back(0);
+    for (FloatTree::NodeCIter it = tree.cbeginNode(); it; ++it) ++(nodeCount[it.getLevel()]);
+
+    Index64 totalCount = 0;
+    for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+        CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
+        totalCount += nodeCount[i];
+    }
+    CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+}
+
 
 namespace {
 

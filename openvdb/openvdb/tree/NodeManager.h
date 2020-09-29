@@ -3,7 +3,7 @@
 
 /// @file tree/NodeManager.h
 ///
-/// @author Ken Museth
+/// @authors Ken Museth, Dan Bailey
 ///
 /// @brief NodeManager produces linear arrays of all tree nodes
 /// allowing for efficient threading and bottom-up processing.
@@ -368,6 +368,9 @@ template<typename NodeT, Index LEVEL>
 class NodeManagerLink
 {
 public:
+    using NonConstChildNodeType = typename NodeT::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<NodeT, NonConstChildNodeType>::Type;
+
     NodeManagerLink() {}
 
     virtual ~NodeManagerLink() {}
@@ -425,7 +428,7 @@ public:
 
 protected:
     NodeList<NodeT> mList;
-    NodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+    NodeManagerLink<ChildNodeType, LEVEL-1> mNext;
 };// NodeManagerLink class
 
 
@@ -500,7 +503,10 @@ public:
     static const Index LEVELS = _LEVELS;
     static_assert(LEVELS > 0,
         "expected instantiation of template specialization"); // see specialization below
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
+    using NonConstChildNodeType = typename RootNodeType::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstChildNodeType>::Type;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
     NodeManager(TreeOrLeafManagerT& tree, bool serial = false)
@@ -675,7 +681,7 @@ public:
 
 protected:
     RootNodeType& mRoot;
-    NodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+    NodeManagerLink<ChildNodeType, LEVELS-1> mChain;
 
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
@@ -882,7 +888,8 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 0>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static const Index LEVELS = 0;
 
     NodeManager(TreeOrLeafManagerT& tree, bool /*serial*/ = false) : mRoot(tree.root()) { }
@@ -933,7 +940,8 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
@@ -992,7 +1000,8 @@ public:
 
 protected:
     using NodeT1 = RootNodeType;
-    using NodeT0 = typename NodeT1::ChildNodeType;
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;
     using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
@@ -1012,7 +1021,8 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
@@ -1081,8 +1091,10 @@ public:
 
 protected:
     using NodeT2 = RootNodeType;
-    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // upper level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT1 = NodeList<NodeT1>; // upper level
     using ListT0 = NodeList<NodeT0>; // lower level
@@ -1105,7 +1117,8 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
@@ -1180,9 +1193,12 @@ public:
 
 protected:
     using NodeT3 = RootNodeType;
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
-    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
     using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
@@ -1207,7 +1223,8 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
@@ -1291,10 +1308,14 @@ public:
 
 protected:
     using NodeT4 = RootNodeType;
-    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT3 = typename NodeT4::ChildNodeType;
+    using NodeT3 = typename CopyConstness<RootNodeType, NonConstNodeT3>::Type;  // upper level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper mid level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // lower mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
     using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
