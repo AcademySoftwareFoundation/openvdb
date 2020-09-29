@@ -889,7 +889,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
-    CsgUnionOp<TreeT> op{&bTree};
+    CsgUnionOp<TreeT> op{&bTree, Steal()};
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
@@ -904,7 +904,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
-    CsgIntersectionOp<TreeT> op{&bTree};
+    CsgIntersectionOp<TreeT> op{&bTree, Steal()};
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
@@ -919,7 +919,7 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
-    CsgDifferenceOp<TreeT> op(bTree);
+    CsgDifferenceOp<TreeT> op(bTree, Steal());
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);

@@ -87,7 +87,7 @@ TestMerge::testTreeToMerge()
 
     { // non-const nullptr
         FloatTree* tree = nullptr;
-        tools::TreeToMerge<FloatTree> treeToMerge(tree);
+        tools::TreeToMerge<FloatTree> treeToMerge(tree, Steal());
         CPPUNIT_ASSERT(!treeToMerge.rootPtr());
         CPPUNIT_ASSERT(!treeToMerge.probeConstNode<RootChildNode>(Coord(0)));
         std::unique_ptr<RootChildNode> nodePtr = treeToMerge.stealOrDeepCopyNode<RootChildNode>(Coord(0));
@@ -98,7 +98,7 @@ TestMerge::testTreeToMerge()
 
     { // const nullptr
         const FloatTree* tree = nullptr;
-        tools::TreeToMerge<FloatTree> treeToMerge(tree);
+        tools::TreeToMerge<FloatTree> treeToMerge(tree, DeepCopy());
         CPPUNIT_ASSERT(!treeToMerge.rootPtr());
         CPPUNIT_ASSERT(!treeToMerge.probeConstNode<RootChildNode>(Coord(0)));
         std::unique_ptr<RootChildNode> nodePtr = treeToMerge.stealOrDeepCopyNode<RootChildNode>(Coord(0));
@@ -112,7 +112,7 @@ TestMerge::testTreeToMerge()
         grid->tree().touchLeaf(Coord(8));
         CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
 
-        tools::TreeToMerge<FloatTree> treeToMerge{&grid->tree()};
+        tools::TreeToMerge<FloatTree> treeToMerge{&grid->tree(), Steal()};
         CPPUNIT_ASSERT_EQUAL(&grid->constTree().root(), treeToMerge.rootPtr());
 
         // probe root child
@@ -169,7 +169,10 @@ TestMerge::testTreeToMerge()
         grid->tree().touchLeaf(Coord(8));
         CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
 
-        tools::TreeToMerge<FloatTree> treeToMerge{&grid->constTree()};
+        tools::TreeToMerge<FloatTree> treeToMerge{&grid->constTree(), DeepCopy(), /*initialize=*/false};
+        CPPUNIT_ASSERT(!treeToMerge.hasMask());
+        treeToMerge.initializeMask();
+        CPPUNIT_ASSERT(treeToMerge.hasMask());
         CPPUNIT_ASSERT_EQUAL(&grid->constTree().root(), treeToMerge.rootPtr());
 
         // probe root child
@@ -187,7 +190,7 @@ TestMerge::testTreeToMerge()
         CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
 
         { // deep copy leaf node
-            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree()};
+            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree(), DeepCopy()};
             std::unique_ptr<LeafNode> leafNodePtr = treeToMerge2.stealOrDeepCopyNode<LeafNode>(Coord(8));
             CPPUNIT_ASSERT(leafNodePtr);
             CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount()); // leaf has not been stolen
@@ -196,7 +199,7 @@ TestMerge::testTreeToMerge()
         }
 
         { // deep copy root child
-            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree()};
+            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree(), DeepCopy()};
             grid->tree().touchLeaf(Coord(8));
             std::unique_ptr<RootChildNode> node2Ptr = treeToMerge2.stealOrDeepCopyNode<RootChildNode>(Coord(8));
             CPPUNIT_ASSERT(node2Ptr);
@@ -204,7 +207,7 @@ TestMerge::testTreeToMerge()
         }
 
         { // add root child tile
-            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree()};
+            tools::TreeToMerge<FloatTree> treeToMerge2{&grid->constTree(), DeepCopy()};
             CPPUNIT_ASSERT(treeToMerge2.probeConstNode<RootChildNode>(Coord(8)));
             treeToMerge2.addTile<RootChildNode>(Coord(8), 1.7f, true);
             CPPUNIT_ASSERT(!treeToMerge2.probeConstNode<RootChildNode>(Coord(8))); // tile has been added to mask
@@ -217,6 +220,48 @@ TestMerge::testTreeToMerge()
         treeToMerge.addTile<RootChildNode>(Coord(0), 1.8f, true);
         CPPUNIT_ASSERT_EQUAL(Index64(0), grid->tree().activeTileCount());
     }
+
+    { // non-const tree shared pointer
+        // no tree or const tree
+        tools::TreeToMerge<FloatTree> treeToMerge;
+        CPPUNIT_ASSERT(!treeToMerge.tree());
+        CPPUNIT_ASSERT(!treeToMerge.constTree());
+        CPPUNIT_ASSERT(!treeToMerge.rootPtr());
+        CPPUNIT_ASSERT(!treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
+
+        {
+            FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
+            grid->tree().touchLeaf(Coord(8));
+            CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
+
+            treeToMerge.reset(grid->treePtr());
+        }
+
+        // verify tree shared ownership
+
+        CPPUNIT_ASSERT(treeToMerge.tree());
+        CPPUNIT_ASSERT(!treeToMerge.constTree());
+        CPPUNIT_ASSERT(treeToMerge.rootPtr());
+        CPPUNIT_ASSERT(treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
+
+        // verify tree pointers are updated on reset()
+
+        const FloatTree tree;
+        tools::TreeToMerge<FloatTree> treeToMerge2(&tree, DeepCopy());
+        treeToMerge2.initializeMask(); // no-op
+
+        CPPUNIT_ASSERT(!treeToMerge2.tree());
+        CPPUNIT_ASSERT(treeToMerge2.constTree());
+        CPPUNIT_ASSERT_EQUAL(Index(0), treeToMerge2.constTree()->leafCount());
+
+        FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
+        grid->tree().touchLeaf(Coord(8));
+        treeToMerge2.reset(grid->treePtr());
+
+        CPPUNIT_ASSERT(treeToMerge2.tree());
+        CPPUNIT_ASSERT(!treeToMerge2.constTree());
+        CPPUNIT_ASSERT_EQUAL(Index(1), treeToMerge2.tree()->leafCount());
+    }
 }
 
 void
@@ -227,42 +272,55 @@ TestMerge::testCsgUnion()
         FloatTree tree2;
         const FloatTree tree3;
 
-        // empty
-        tools::CsgUnionOp<FloatTree> mergeOp1{};
-        CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp1.size());
-        // one item, initializer list
-        tools::CsgUnionOp<FloatTree> mergeOp2{&tree1};
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
-        // two items, initializer list
-        tools::CsgUnionOp<FloatTree> mergeOp3{&tree1, &tree2};
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp3.size());
-        // vector of tree pointers
-        std::vector<FloatTree*> trees4{&tree1, &tree2};
-        tools::CsgUnionOp<FloatTree> mergeOp4(trees4);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp4.size());
-        // deque of tree pointers
-        std::deque<FloatTree*> trees5{&tree1, &tree2};
-        tools::CsgUnionOp<FloatTree> mergeOp5(trees5);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp5.size());
-        // vector of TreesToMerge (to mix const and non-const trees)
-        std::vector<tools::TreeToMerge<FloatTree>> trees6;
-        trees6.emplace_back(&tree1);
-        trees6.emplace_back(&tree3); // const tree
-        trees6.emplace_back(&tree2);
-        tools::CsgUnionOp<FloatTree> mergeOp6(trees6);
-        CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp6.size());
-        // implicit copy constructor
-        tools::CsgUnionOp<FloatTree> mergeOp7(mergeOp3);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp7.size());
-        // implicit assignment operator
-        tools::CsgUnionOp<FloatTree> mergeOp8 = mergeOp3;
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp8.size());
+        { // one non-const tree (steal)
+            tools::CsgUnionOp<FloatTree> mergeOp(&tree1, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one non-const tree (deep-copy)
+            tools::CsgUnionOp<FloatTree> mergeOp(&tree1, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one const tree (deep-copy)
+            tools::CsgUnionOp<FloatTree> mergeOp(&tree2, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // vector of tree pointers
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+        }
+        { // deque of tree pointers
+            std::deque<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgUnionOp<FloatTree> mergeOp(trees, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+        }
+        { // vector of TreesToMerge (to mix const and non-const trees)
+            std::vector<tools::TreeToMerge<FloatTree>> trees;
+            trees.emplace_back(&tree1, Steal());
+            trees.emplace_back(&tree3, DeepCopy()); // const tree
+            trees.emplace_back(&tree2, Steal());
+            tools::CsgUnionOp<FloatTree> mergeOp(trees);
+            CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp.size());
+        }
+        { // implicit copy constructor
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
+            tools::CsgUnionOp<FloatTree> mergeOp2(mergeOp);
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+        }
+        { // implicit assignment operator
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
+            tools::CsgUnionOp<FloatTree> mergeOp2 = mergeOp;
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+        }
     }
 
     { // empty merge trees
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
-        tools::CsgUnionOp<FloatTree> mergeOp{};
+        std::vector<FloatTree*> trees;
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
 
         CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp.size());
 
@@ -286,8 +344,8 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
-        std::vector<FloatTree*> treesToMerge{&grid2->tree()};
-        tools::CsgUnionOp<FloatTree> mergeOp(treesToMerge);
+        std::vector<FloatTree*> trees{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -309,7 +367,8 @@ TestMerge::testCsgUnion()
         root2.addTile(Coord(0, 0, 0), /*background=*/123.0f, false);
         root3.addTile(Coord(8192, 0, 0), /*background=*/0.1f, true);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -337,7 +396,8 @@ TestMerge::testCsgUnion()
         root2.addTile(Coord(0, 0, 0), grid->background(), true);
         root3.addTile(Coord(0, 0, 0), grid->background(), false);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -349,7 +409,8 @@ TestMerge::testCsgUnion()
 
         root.clear();
         // reverse tree order
-        tools::CsgUnionOp<FloatTree> mergeOp2{&grid3->tree(), &grid2->tree()};
+        std::vector<FloatTree*> trees2{&grid3->tree(), &grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp2(trees2, Steal());
         nodeManager.foreachTopDown(mergeOp2);
         // merge order is important - tile should now be inactive
         CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
@@ -364,7 +425,7 @@ TestMerge::testCsgUnion()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), grid->background(), true);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -386,7 +447,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -409,7 +470,8 @@ TestMerge::testCsgUnion()
         auto& root3 = grid3->tree().root();
         root3.addTile(Coord(0, 0, 0), /*inside*/-0.1f, false);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -436,7 +498,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -458,7 +520,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -480,7 +542,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -506,7 +568,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -535,7 +597,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -574,7 +636,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
         CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -615,7 +677,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
         CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -639,7 +701,7 @@ TestMerge::testCsgUnion()
         CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -657,7 +719,7 @@ TestMerge::testCsgUnion()
         auto* leaf = grid2->tree().touchLeaf(Coord(0, 0, 0));
         leaf->setValueOnly(10, -2.3f);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -691,7 +753,8 @@ TestMerge::testCsgUnion()
         leaf2->setValueOnly(9, 3.0f);
         leaf3->setValueOnly(9, 2.0f);
 
-        tools::CsgUnionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -715,10 +778,10 @@ TestMerge::testCsgUnion()
 
         // merge from a const tree
 
-        std::vector<tools::TreeToMerge<FloatTree>> trees;
-        trees.emplace_back(&grid2->constTree());
+        std::vector<tools::TreeToMerge<FloatTree>> treesToMerge;
+        treesToMerge.emplace_back(&grid2->constTree(), DeepCopy());
 
-        tools::CsgUnionOp<FloatTree> mergeOp(trees);
+        tools::CsgUnionOp<FloatTree> mergeOp(treesToMerge);
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -736,42 +799,55 @@ TestMerge::testCsgIntersection()
         FloatTree tree2;
         const FloatTree tree3;
 
-        // empty
-        tools::CsgIntersectionOp<FloatTree> mergeOp1{};
-        CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp1.size());
-        // one item, initializer list
-        tools::CsgIntersectionOp<FloatTree> mergeOp2{&tree1};
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
-        // two items, initializer list
-        tools::CsgIntersectionOp<FloatTree> mergeOp3{&tree1, &tree2};
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp3.size());
-        // vector of tree pointers
-        std::vector<FloatTree*> trees4{&tree1, &tree2};
-        tools::CsgIntersectionOp<FloatTree> mergeOp4(trees4);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp4.size());
-        // deque of tree pointers
-        std::deque<FloatTree*> trees5{&tree1, &tree2};
-        tools::CsgIntersectionOp<FloatTree> mergeOp5(trees5);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp5.size());
-        // vector of TreesToMerge (to mix const and non-const trees)
-        std::vector<tools::TreeToMerge<FloatTree>> trees6;
-        trees6.emplace_back(&tree1);
-        trees6.emplace_back(&tree3); // const tree
-        trees6.emplace_back(&tree2);
-        tools::CsgIntersectionOp<FloatTree> mergeOp6(trees6);
-        CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp6.size());
-        // implicit copy constructor
-        tools::CsgIntersectionOp<FloatTree> mergeOp7(mergeOp3);
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp7.size());
-        // implicit assignment operator
-        tools::CsgIntersectionOp<FloatTree> mergeOp8 = mergeOp3;
-        CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp8.size());
+        { // one non-const tree (steal)
+            tools::CsgIntersectionOp<FloatTree> mergeOp(&tree1, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one non-const tree (deep-copy)
+            tools::CsgIntersectionOp<FloatTree> mergeOp(&tree1, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one const tree (deep-copy)
+            tools::CsgIntersectionOp<FloatTree> mergeOp(&tree2, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // vector of tree pointers
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+        }
+        { // deque of tree pointers
+            std::deque<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+        }
+        { // vector of TreesToMerge (to mix const and non-const trees)
+            std::vector<tools::TreeToMerge<FloatTree>> trees;
+            trees.emplace_back(&tree1, Steal());
+            trees.emplace_back(&tree3, DeepCopy()); // const tree
+            trees.emplace_back(&tree2, Steal());
+            tools::CsgIntersectionOp<FloatTree> mergeOp(trees);
+            CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp.size());
+        }
+        { // implicit copy constructor
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
+            tools::CsgIntersectionOp<FloatTree> mergeOp2(mergeOp);
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+        }
+        { // implicit assignment operator
+            std::vector<FloatTree*> trees{&tree1, &tree2};
+            tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
+            tools::CsgIntersectionOp<FloatTree> mergeOp2 = mergeOp;
+            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+        }
     }
 
     { // empty merge trees
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
-        tools::CsgIntersectionOp<FloatTree> mergeOp{};
+        std::vector<FloatTree*> trees;
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
 
         CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp.size());
 
@@ -795,8 +871,8 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
-        std::vector<FloatTree*> treesToMerge{&grid2->tree()};
-        tools::CsgIntersectionOp<FloatTree> mergeOp(treesToMerge);
+        std::vector<FloatTree*> trees{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -818,7 +894,8 @@ TestMerge::testCsgIntersection()
         root2.addTile(Coord(0, 0, 0), /*background=*/123.0f, false);
         root3.addTile(Coord(8192, 0, 0), /*background=*/0.1f, true);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -846,7 +923,8 @@ TestMerge::testCsgIntersection()
         root2.addTile(Coord(0, 0, 0), grid->background(), true);
         root3.addTile(Coord(0, 0, 0), grid->background(), false);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -858,7 +936,8 @@ TestMerge::testCsgIntersection()
 
         root.clear();
         // reverse tree order
-        tools::CsgIntersectionOp<FloatTree> mergeOp2{&grid3->tree(), &grid2->tree()};
+        std::vector<FloatTree*> trees2{&grid3->tree(), &grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp2(trees2, Steal());
         nodeManager.foreachTopDown(mergeOp2);
         // merge order is important - tile should now be inactive
         CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
@@ -873,7 +952,7 @@ TestMerge::testCsgIntersection()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), grid->background(), true);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -895,7 +974,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -918,7 +997,8 @@ TestMerge::testCsgIntersection()
         auto& root3 = grid3->tree().root();
         root3.addTile(Coord(0, 0, 0), /*outside*/0.1f, false);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -945,7 +1025,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -967,7 +1047,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -989,7 +1069,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1015,7 +1095,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1044,7 +1124,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1084,7 +1164,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
         CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1108,7 +1188,7 @@ TestMerge::testCsgIntersection()
         CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1126,7 +1206,7 @@ TestMerge::testCsgIntersection()
         auto* leaf = grid2->tree().touchLeaf(Coord(0, 0, 0));
         leaf->setValueOnly(10, 6.4f);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1160,7 +1240,8 @@ TestMerge::testCsgIntersection()
         leaf2->setValueOnly(9, 3.0f);
         leaf3->setValueOnly(9, 2.0f);
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1184,10 +1265,10 @@ TestMerge::testCsgIntersection()
 
         // merge from a const tree
 
-        std::vector<tools::TreeToMerge<FloatTree>> trees;
-        trees.emplace_back(&grid2->constTree());
+        std::vector<tools::TreeToMerge<FloatTree>> treesToMerge;
+        treesToMerge.emplace_back(&grid2->constTree(), DeepCopy());
 
-        tools::CsgIntersectionOp<FloatTree> mergeOp(trees);
+        tools::CsgIntersectionOp<FloatTree> mergeOp(treesToMerge);
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1206,26 +1287,40 @@ TestMerge::testCsgDifference()
         FloatTree tree1;
         const FloatTree tree2;
 
-        // one non-const tree
-        tools::CsgDifferenceOp<FloatTree> mergeOp1(tree1);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp1.size());
-        // one const tree
-        tools::CsgDifferenceOp<FloatTree> mergeOp2(tree2);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
-        // one non-const tree wrapped in TreeToMerge
-        tools::TreeToMerge<FloatTree> tree3(&tree1);
-        tools::CsgDifferenceOp<FloatTree> mergeOp3(tree3);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp3.size());
-        // one const tree wrapped in TreeToMerge
-        tools::TreeToMerge<FloatTree> tree4(&tree2);
-        tools::CsgDifferenceOp<FloatTree> mergeOp4(tree4);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp4.size());
-        // implicit copy constructor
-        tools::CsgDifferenceOp<FloatTree> mergeOp5(mergeOp2);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp5.size());
-        // implicit assignment operator
-        tools::CsgDifferenceOp<FloatTree> mergeOp6 = mergeOp3;
-        CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp6.size());
+        { // one non-const tree (steal)
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree1, Steal());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one non-const tree (deep-copy)
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree1, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one const tree (deep-copy)
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one non-const tree wrapped in TreeToMerge
+            tools::TreeToMerge<FloatTree> tree3(&tree1, Steal());
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree3);
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // one const tree wrapped in TreeToMerge
+            tools::TreeToMerge<FloatTree> tree4(&tree2, DeepCopy());
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree4);
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+        }
+        { // implicit copy constructor
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            tools::CsgDifferenceOp<FloatTree> mergeOp2(mergeOp);
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
+        }
+        { // implicit assignment operator
+            tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            tools::CsgDifferenceOp<FloatTree> mergeOp2 = mergeOp;
+            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
+        }
     }
 
     { // merge two different outside root tiles from one grid into an empty grid (noop)
@@ -1242,7 +1337,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1257,7 +1352,7 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), grid->background(), true);
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1281,7 +1376,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1303,7 +1398,7 @@ TestMerge::testCsgDifference()
 
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1323,7 +1418,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1347,7 +1442,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1367,7 +1462,7 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), -0.2f, false);
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1392,7 +1487,7 @@ TestMerge::testCsgDifference()
 
         CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1421,7 +1516,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
@@ -1455,7 +1550,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1479,7 +1574,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
         CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1523,7 +1618,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
         CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1550,7 +1645,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1567,7 +1662,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1585,7 +1680,7 @@ TestMerge::testCsgDifference()
         auto* leaf = grid2->tree().touchLeaf(Coord(0, 0, 0));
         leaf->setValueOnly(10, 6.4f);
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1614,7 +1709,7 @@ TestMerge::testCsgDifference()
         leaf->setValueOn(9);
         leaf2->setValueOnly(9, -100.0f);
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
@@ -1636,7 +1731,7 @@ TestMerge::testCsgDifference()
         CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
 
-        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->constTree());
+        tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->constTree(), DeepCopy());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
