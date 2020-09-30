@@ -61,7 +61,7 @@ struct TileData;
 ///        values in a tree, i.e. either active voxels or active tiles.
 ///
 /// @warning For repeated calls to this method consider instead creating an instance of
-///          FindActiveValues and then repeatedly call any(). This assumes the tree
+///          FindActiveValues and then repeatedly call anyActiveValues(). This assumes the tree
 ///          to be constant between calls but is slightly faster.
 ///
 /// @param tree   const tree to be tested for active values.
@@ -70,11 +70,40 @@ template<typename TreeT>
 inline bool
 anyActiveValues(const TreeT& tree, const CoordBBox &bbox);
 
+/// @brief Returns true if the bounding box intersects any of the active
+///        voxels in a tree, i.e. ignores active tile values.
+///
+/// @note In VDB voxels by definition reside in the leaf nodes ONLY. So this method
+///       ignores active tile values that reside higher up in the VDB tree structure.
+///
+/// @warning For repeated calls to this method consider instead creating an instance of
+///          FindActiveValues and then repeatedly call anyActiveVoxels(). This assumes the tree
+///          to be constant between calls but is slightly faster.
+///
+/// @param tree   const tree to be tested for active voxels.
+/// @param bbox   index bounding box which is intersected against the active voxels.
+template<typename TreeT>
+inline bool
+anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox);
+
+/// @brief Returns true if the bounding box intersects any of the active
+///        tiles in a tree, i.e. ignores active leaf values.
+///
+/// @warning For repeated calls to this method consider instead creating an instance of
+///          FindActiveValues and then repeatedly call anyActiveTiles(). This assumes the tree
+///          to be constant between calls but is slightly faster.
+///
+/// @param tree   const tree to be tested for active tiles.
+/// @param bbox   index bounding box which is intersected against the active tiles.
+template<typename TreeT>
+inline bool
+anyActiveTiles(const TreeT& tree, const CoordBBox &bbox);
+
 /// @brief Returns true if the bounding box intersects none of the active
 ///        values in a tree, i.e. neither active voxels or active tiles.
 ///
 /// @warning For repeated calls to this method consider instead creating an instance of
-///          FindActiveValues and then repeatedly call none(). This assumes the tree
+///          FindActiveValues and then repeatedly call noActiveValues(). This assumes the tree
 ///          to be constant between calls but is slightly faster.
 ///
 /// @param tree   const tree to be tested for active values.
@@ -95,19 +124,6 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox);
 template<typename TreeT>
 inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox);
-
-/// @brief Returns true if the bounding box intersects any of the active
-///        tiles in a tree, i.e. ignores active leaf values.
-///
-/// @warning For repeated calls to this method consider instead creating an instance of
-///          FindActiveValues and then repeatedly call any(). This assumes the tree
-///          to be constant between calls but is slightly faster.
-///
-/// @param tree   const tree to be tested for active tiles.
-/// @param bbox   index bounding box which is intersected against the active tiles.
-template<typename TreeT>
-inline bool
-anyActiveTiles(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Return a vector with bounding boxes that represents all the intersections
 ///        between active tiles in the tree and the specified bounding box.
@@ -152,14 +168,20 @@ public:
     /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especially
     ///          small bounding boxes, but at the cost of no thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
-    bool any(const CoordBBox &bbox, bool useAccessor = false) const;
+    bool anyActiveValues(const CoordBBox &bbox, bool useAccessor = false) const;
+
+    /// @brief Returns true if the specified bounding box intersects any active tiles only.
+    bool anyActiveVoxels(const CoordBBox &bbox) const;
+
+    /// @brief Returns true if the specified bounding box intersects any active tiles only.
+    bool anyActiveTiles(const CoordBBox &bbox) const;
 
     /// @brief Returns true if the specified bounding box does not intersect any active values.
     ///
     /// @warning Using a ValueAccessor (i.e. useAccessor = true) can improve performance for especially
     ///          small bounding boxes, but at the cost of no thread-safety. So if multiple threads are
     ///          calling this method concurrently use the default setting, useAccessor = false.
-    bool none(const CoordBBox &bbox, bool useAccessor = false) const { return !this->any(bbox, useAccessor); }
+    bool noActiveValues(const CoordBBox &bbox, bool useAccessor = false) const { return !this->anyActiveValues(bbox, useAccessor); }
 
     /// @brief Returns the number of active voxels intersected by the specified bounding box.
     Index64 count(const CoordBBox &bbox) const;
@@ -168,8 +190,14 @@ public:
     ///        between active tiles in the tree and the specified bounding box.
     std::vector<TileDataT> activeTiles(const CoordBBox &bbox) const;
 
-    /// @brief Returns true if the specified bounding box intersects any active tiles only.
-    bool anyActiveTiles(const CoordBBox &bbox) const;
+    OPENVDB_DEPRECATED inline bool any(const CoordBBox &bbox, bool useAccessor = false) const
+    {
+        return this->anyActiveValues(bbox, useAccessor);
+    }
+    OPENVDB_DEPRECATED inline bool none(const CoordBBox &bbox, bool useAccessor = false) const
+    {
+        return this->noActiveValues(bbox, useAccessor);
+    }
 
 private:
 
@@ -182,33 +210,24 @@ private:
     template<typename NodeT>
     typename NodeT::NodeMaskType getBBoxMask(const CoordBBox &bbox, const NodeT* node) const;
 
-    // process leaf node
-    inline bool any(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const;
-
-    // process internal node
-    template<typename NodeT>
-    bool any(const NodeT* node, const CoordBBox &bbox) const;
-
-    // process leaf node
-    inline bool anyActiveTiles(const typename TreeT::LeafNodeType*, const CoordBBox& ) const {return false;}
-
-    // process internal node
-    template<typename NodeT>
-    bool anyActiveTiles(const NodeT* node, const CoordBBox &bbox) const;
-
-    // process leaf node
+    // process leaf nodes
+    inline bool anyActiveValues(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const { return this->anyActiveVoxels(leaf, bbox); }
+    inline bool anyActiveVoxels(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const;
+    static bool anyActiveTiles( const typename TreeT::LeafNodeType*, const CoordBBox& ) {return false;}
+    void activeTiles(const typename TreeT::LeafNodeType*, const CoordBBox&, std::vector<TileDataT>&) const {;}// no-op
     inline Index64 count(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const;
 
-    // process internal node
+    // process internal nodes
     template<typename NodeT>
-    Index64 count(const NodeT* node, const CoordBBox &bbox) const;
-
-    // process internal node
+    bool anyActiveValues(const NodeT* node, const CoordBBox &bbox) const;
+    template<typename NodeT>
+    bool anyActiveVoxels(const NodeT* node, const CoordBBox &bbox) const;
+    template<typename NodeT>
+    bool anyActiveTiles(const NodeT* node, const CoordBBox &bbox) const;
     template<typename NodeT>
     void activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<TileDataT> &tiles) const;
-
-    // No-op for leaf node
-    void activeTiles(const typename TreeT::LeafNodeType*, const CoordBBox&, std::vector<TileDataT>&) const {;}
+    template<typename NodeT>
+    Index64 count(const NodeT* node, const CoordBBox &bbox) const;
 
     using AccT = tree::ValueAccessor<const TreeT, false/* IsSafe */>;
     using RootChildType = typename TreeT::RootNodeType::ChildNodeType;
@@ -263,8 +282,9 @@ void FindActiveValues<TreeT>::init(const TreeT& tree)
 }
 
 template<typename TreeT>
-bool FindActiveValues<TreeT>::any(const CoordBBox &bbox, bool useAccessor) const
+bool FindActiveValues<TreeT>::anyActiveValues(const CoordBBox &bbox, bool useAccessor) const
 {
+    // test early-out: the center of the bbox is active
     if (useAccessor) {
         if (mAcc.isValueOn( (bbox.min() + bbox.max())>>1 )) return true;
     } else {
@@ -275,13 +295,16 @@ bool FindActiveValues<TreeT>::any(const CoordBBox &bbox, bool useAccessor) const
         if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
-        if (!node.bbox.hasOverlap(bbox)) {
-            continue;
-        } else if (node.bbox.isInside(bbox)) {
-            return this->any(node.child, bbox);
-        } else if (this->any(node.child, bbox)) {
-            return true;
-        }
+        if (node.bbox.hasOverlap(bbox) && this->anyActiveValues(node.child, bbox)) return true;
+    }
+    return false;
+}
+
+template<typename TreeT>
+bool FindActiveValues<TreeT>::anyActiveVoxels(const CoordBBox &bbox) const
+{
+    for (auto& node : mRootNodes) {
+        if (node.bbox.hasOverlap(bbox) && this->anyActiveVoxels(node.child, bbox)) return true;
     }
     return false;
 }
@@ -293,13 +316,7 @@ bool FindActiveValues<TreeT>::anyActiveTiles(const CoordBBox &bbox) const
         if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
-        if (!node.bbox.hasOverlap(bbox)) {
-            continue;
-        } else if (node.bbox.isInside(bbox)) {
-            return this->anyActiveTiles(node.child, bbox);
-        } else if (this->anyActiveTiles(node.child, bbox)) {
-            return true;
-        }
+        if (node.bbox.hasOverlap(bbox) && this->anyActiveTiles(node.child, bbox)) return true;
     }
     return false;
 }
@@ -369,21 +386,22 @@ template<typename TreeT>
 template<typename NodeT>
 typename NodeT::NodeMaskType FindActiveValues<TreeT>::getBBoxMask(const CoordBBox &bbox, const NodeT* node) const
 {
-    typename NodeT::NodeMaskType mask;
+    typename NodeT::NodeMaskType mask;// typically 32^3 or 16^3 bit mask
     auto b = node->getNodeBoundingBox();
     assert( bbox.hasOverlap(b) );
     if ( bbox.isInside(b) ) {
         mask.setOn();//node is completely inside the bbox so early out
     } else {
-        b.intersect(bbox);
+        b.intersect(bbox);// trim bounding box
+        // transform bounding box from global to local coordinates
         b.min() &=  NodeT::DIM-1u;
         b.min() >>= NodeT::ChildNodeType::TOTAL;
         b.max() &=  NodeT::DIM-1u;
         b.max() >>= NodeT::ChildNodeType::TOTAL;
         assert( b.hasVolume() );
-        auto it = b.begin();
-        for (const Coord& x = *it; it; ++it) {
-            mask.setOn(x[2] + (x[1] << NodeT::LOG2DIM) + (x[0] << 2*NodeT::LOG2DIM));
+        auto it = b.begin();// iterates over all the child nodes or tiles that intersects bbox
+        for (const Coord& ijk = *it; it; ++it) {
+            mask.setOn(ijk[2] + (ijk[1] << NodeT::LOG2DIM) + (ijk[0] << 2*NodeT::LOG2DIM));
         }
     }
     return mask;
@@ -391,7 +409,7 @@ typename NodeT::NodeMaskType FindActiveValues<TreeT>::getBBoxMask(const CoordBBo
 
 template<typename TreeT>
 template<typename NodeT>
-bool FindActiveValues<TreeT>::any(const NodeT* node, const CoordBBox &bbox) const
+bool FindActiveValues<TreeT>::anyActiveValues(const NodeT* node, const CoordBBox &bbox) const
 {
     // Generate a bit mask of the bbox coverage
     auto mask = this->getBBoxMask(bbox, node);
@@ -403,22 +421,44 @@ bool FindActiveValues<TreeT>::any(const NodeT* node, const CoordBBox &bbox) cons
     // Check child nodes
     mask &= node->getChildMask();// prune the child mask with the bbox mask
     const auto* table = node->getTable();
-    bool test = false;
-    for (auto i = mask.beginOn(); !test && i; ++i) {
-        test = this->any(table[i.pos()].getChild(), bbox);
+    bool active = false;
+    for (auto i = mask.beginOn(); !active && i; ++i) {
+        active = this->anyActiveValues(table[i.pos()].getChild(), bbox);
     }
-    return test;
+    return active;
 }
 
 template<typename TreeT>
-inline bool FindActiveValues<TreeT>::any(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const
+template<typename NodeT>
+bool FindActiveValues<TreeT>::anyActiveVoxels(const NodeT* node, const CoordBBox &bbox) const
 {
-    bool test = leaf->getValueMask().isOn();
+    // Generate a bit mask of the bbox coverage
+    auto mask = this->getBBoxMask(bbox, node);
 
-    for (auto i = leaf->cbeginValueOn(); !test && i; ++i) {
-        test = bbox.isInside(i.getCoord());
+    // Check child nodes
+    mask &= node->getChildMask();// prune the child mask with the bbox mask
+    const auto* table = node->getTable();
+    bool active = false;
+    for (auto i = mask.beginOn(); !active && i; ++i) {
+        active = this->anyActiveValues(table[i.pos()].getChild(), bbox);
     }
-    return test;
+    return active;
+}
+
+template<typename TreeT>
+inline bool FindActiveValues<TreeT>::anyActiveVoxels(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const
+{
+    const auto &mask = leaf->getValueMask();
+
+    // check for two common cases that leads to early-out
+    if (bbox.isInside(leaf->getNodeBoundingBox())) return !mask.isOff();// leaf in inside the bbox
+    if (mask.isOn()) return true;// all values are active
+
+    bool active = false;
+    for (auto i = leaf->cbeginValueOn(); !active && i; ++i) {
+        active = bbox.isInside(i.getCoord());
+    }
+    return active;
 }
 
 template<typename TreeT>
@@ -432,15 +472,15 @@ bool FindActiveValues<TreeT>::anyActiveTiles(const NodeT* node, const CoordBBox 
     const auto tmp = mask & node->getValueMask();// prune active the tile mask with the bbox mask
     if (!tmp.isOff()) return true;
 
-    bool test = false;
+    bool active = false;
     if (NodeT::LEVEL>1) {// Only check child nodes if they are NOT leaf nodes
         mask &= node->getChildMask();// prune the child mask with the bbox mask
         const auto* table = node->getTable();
-        for (auto i = mask.beginOn(); !test && i; ++i) {
-            test = this->anyActiveTiles(table[i.pos()].getChild(), bbox);
+        for (auto i = mask.beginOn(); !active && i; ++i) {
+            active = this->anyActiveTiles(table[i.pos()].getChild(), bbox);
         }
     }
-    return test;
+    return active;
 }
 
 template<typename TreeT>
@@ -605,25 +645,16 @@ inline bool
 anyActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
-    return op.any(bbox);
+    return op.anyActiveValues(bbox);
 }
 
 // Implementation of stand-alone function
 template<typename TreeT>
 inline bool
-noActiveValues(const TreeT& tree, const CoordBBox &bbox)
+anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
-    return op.none(bbox);
-}
-
-// Implementation of stand-alone function
-template<typename TreeT>
-inline bool
-countActiveValues(const TreeT& tree, const CoordBBox &bbox)
-{
-    FindActiveValues<TreeT> op(tree);
-    return op.count(bbox);
+    return op.anyActiveVoxels(bbox);
 }
 
 // Implementation of stand-alone function
@@ -633,6 +664,24 @@ anyActiveTiles(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
     return op.anyActiveTiles(bbox);
+}
+
+// Implementation of stand-alone function
+template<typename TreeT>
+inline bool
+noActiveValues(const TreeT& tree, const CoordBBox &bbox)
+{
+    FindActiveValues<TreeT> op(tree);
+    return op.noActiveValues(bbox);
+}
+
+// Implementation of stand-alone function
+template<typename TreeT>
+inline bool
+countActiveValues(const TreeT& tree, const CoordBBox &bbox)
+{
+    FindActiveValues<TreeT> op(tree);
+    return op.count(bbox);
 }
 
 // Implementation of stand-alone function

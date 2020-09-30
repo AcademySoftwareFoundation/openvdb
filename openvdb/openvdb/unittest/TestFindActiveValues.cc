@@ -160,7 +160,7 @@ TestFindActiveValues::testSphere2()
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (class)");
         int count = 0;
-        while(op.none(bbox)) {
+        while(op.noActiveValues(bbox)) {
             ++count;
             bbox.expand(1);
         }
@@ -205,7 +205,7 @@ TestFindActiveValues::testSparseBox()
         CPPUNIT_ASSERT(tree.activeTileCount() > 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
         for (int i=1; i<half_dim; ++i) {
-            CPPUNIT_ASSERT(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+            CPPUNIT_ASSERT(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
         }
         CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
 
@@ -214,7 +214,7 @@ TestFindActiveValues::testSparseBox()
         //openvdb::util::CpuTimer timer;
         for (bool test = true; test; ) {
             //timer.restart();
-            test = op.any(bbox2);
+            test = op.anyActiveValues(bbox2);
             //t = std::max(t, timer.restart());
             if (test) bbox2.translate(openvdb::Coord(1));
         }
@@ -255,7 +255,7 @@ TestFindActiveValues::testDenseBox()
       openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 3);// leaf value
       for (int i=1; i<half_dim; ++i) {
-          CPPUNIT_ASSERT(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
+          CPPUNIT_ASSERT(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
       }
       CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
 
@@ -264,7 +264,7 @@ TestFindActiveValues::testDenseBox()
       //openvdb::util::CpuTimer timer;
       for (bool test = true; test; ) {
           //timer.restart();
-          test = op.any(bbox2);
+          test = op.anyActiveValues(bbox2);
           //t = std::max(t, timer.restart());
           if (test) bbox2.translate(openvdb::Coord(1));
       }
@@ -291,7 +291,7 @@ TestFindActiveValues::testBenchmarks()
       //util::CpuTimer timer;
       for (auto b = CoordBBox::createCube(Coord(-half_dim), bbox_size); true; b.translate(Coord(1))) {
           //timer.restart();
-          bool test = op.any(b);
+          bool test = op.anyActiveValues(b);
           //t = std::max(t, timer.restart());
           if (!test) break;
       }
@@ -309,7 +309,7 @@ TestFindActiveValues::testBenchmarks()
       //openvdb::util::CpuTimer timer;
       for (auto b = CoordBBox::createCube(Coord(-half_dim), bbox_size); true; b.translate(Coord(1))) {
           //timer.restart();
-          bool test = op.any(b);
+          bool test = op.anyActiveValues(b);
           //t = std::max(t, timer.restart());
           if (!test) break;
       }
@@ -322,7 +322,7 @@ TestFindActiveValues::testBenchmarks()
       tree.denseFill(CoordBBox::createCube(Coord(0), 256), 1.0f, true);
       tools::FindActiveValues<FloatTree> op(tree);
       //openvdb::util::CpuTimer timer("new test");
-      CPPUNIT_ASSERT(op.none(CoordBBox::createCube(Coord(256), 1)));
+      CPPUNIT_ASSERT(op.noActiveValues(CoordBBox::createCube(Coord(256), 1)));
       //timer.stop();
     }
 }
