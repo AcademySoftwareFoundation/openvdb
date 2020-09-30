@@ -85,6 +85,9 @@ TestFindActiveValues::testBasic()
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
     tree.setValue(max, 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
+    auto tiles = openvdb::tools::activeTiles(tree, bbox);
+    CPPUNIT_ASSERT( tiles.size() == 0u );
 }
 
 void
@@ -113,6 +116,10 @@ TestFindActiveValues::testSphere1()
 
     const openvdb::CoordBBox e(openvdb::Coord(0), openvdb::Coord(dim));
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, e));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, e));
+
+    auto tiles = openvdb::tools::activeTiles(tree, e);
+    CPPUNIT_ASSERT( tiles.size() == 0u );
 }
 
 void
@@ -188,7 +195,7 @@ TestFindActiveValues::testSparseBox()
 {
     {//test active tiles in a sparsely filled box
         const int half_dim = 256;
-        const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim));
+        const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim-1));
         openvdb::FloatTree tree;
         CPPUNIT_ASSERT(tree.activeTileCount() == 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
@@ -213,7 +220,20 @@ TestFindActiveValues::testSparseBox()
         }
         //std::cerr << "bbox = " << bbox2 << std::endl;
         //openvdb::util::printTime(std::cout, t, "The slowest sparse test ", "\n", true, 4, 3);
-        CPPUNIT_ASSERT(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
+        CPPUNIT_ASSERT(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim), 1));
+
+        CPPUNIT_ASSERT( openvdb::tools::anyActiveTiles(tree, bbox) );
+
+        auto tiles = openvdb::tools::activeTiles(tree, bbox);
+        CPPUNIT_ASSERT( tiles.size() == openvdb::math::Pow3(size_t(4)) ); // {-256, -129} -> {-128, 0} -> {0, 127} -> {128, 255}
+        //std::cerr << "bbox " << bbox << " overlaps with " << tiles.size() << " active tiles " << std::endl;
+        openvdb::CoordBBox tmp;
+        for (auto &b : tiles) {
+            tmp.expand( b );
+            //std::cerr << b << std::endl;
+        }
+        //std::cerr << tmp << std::endl;
+        CPPUNIT_ASSERT( tmp == bbox );
     }
 }
 
@@ -247,6 +267,9 @@ TestFindActiveValues::testDenseBox()
       //std::cerr << "bbox = " << bbox2 << std::endl;
       //openvdb::util::printTime(std::cout, t, "The slowest dense test ", "\n", true, 4, 3);
       CPPUNIT_ASSERT(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
+
+      auto tiles = openvdb::tools::activeTiles(tree, bbox);
+      CPPUNIT_ASSERT( tiles.size() == 0u );
     }
 }
 
