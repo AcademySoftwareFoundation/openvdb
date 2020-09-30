@@ -53,6 +53,10 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+/// @brief Struct that encodes a bounding box, value and level of a tile
+template<typename ValueType>
+struct TileData;
+
 /// @brief Returns true if the bounding box intersects any of the active
 ///        values in a tree, i.e. either active voxels or active tiles.
 ///
@@ -115,7 +119,7 @@ anyActiveTiles(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active tiles.
 /// @param bbox   index bounding box which is intersected against the active tiles.
 template<typename TreeT>
-inline std::vector<CoordBBox>
+inline std::vector<TileData<typename TreeT::ValueType>>
 activeTiles(const TreeT& tree, const CoordBBox &bbox);
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -131,6 +135,8 @@ template<typename TreeT>
 class FindActiveValues
 {
 public:
+
+    using TileDataT = TileData<typename TreeT::ValueType>;
 
     /// @brief Constructor from a const tree, which is assumed not to be modified after construction.
     FindActiveValues(const TreeT& tree);
@@ -160,7 +166,7 @@ public:
 
     /// @brief Return a vector with bounding boxes that represents all the intersections
     ///        between active tiles in the tree and the specified bounding box.
-    std::vector<CoordBBox> activeTiles(const CoordBBox &bbox) const;
+    std::vector<TileDataT> activeTiles(const CoordBBox &bbox) const;
 
     /// @brief Returns true if the specified bounding box intersects any active tiles only.
     bool anyActiveTiles(const CoordBBox &bbox) const;
@@ -199,19 +205,19 @@ private:
 
     // process internal node
     template<typename NodeT>
-    void activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<CoordBBox> &tiles) const;
+    void activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<TileDataT> &tiles) const;
 
     // No-op for leaf node
-    void activeTiles(const typename TreeT::LeafNodeType*, const CoordBBox&, std::vector<CoordBBox>&) const {;}
+    void activeTiles(const typename TreeT::LeafNodeType*, const CoordBBox&, std::vector<TileDataT>&) const {;}
 
     using AccT = tree::ValueAccessor<const TreeT, false/* IsSafe */>;
-    using RootChildT = typename TreeT::RootNodeType::ChildNodeType;
+    using RootChildType = typename TreeT::RootNodeType::ChildNodeType;
 
-    struct NodePairT;
+    struct RootChild;
 
     AccT mAcc;
-    std::vector<CoordBBox> mRootTiles;// cache bbox of child nodes (faster to cache than access RootNode)
-    std::vector<NodePairT> mRootNodes;// cache bbox of acive tiles (faster to cache than access RootNode)
+    std::vector<TileDataT> mRootTiles;// cache bbox of child nodes (faster to cache than access RootNode)
+    std::vector<RootChild> mRootNodes;// cache bbox of acive tiles (faster to cache than access RootNode)
 
 };// FindActiveValues class
 
@@ -247,11 +253,12 @@ void FindActiveValues<TreeT>::clear()
 template<typename TreeT>
 void FindActiveValues<TreeT>::init(const TreeT& tree)
 {
-    for (auto i = tree.root().cbeginChildOn(); i; ++i) {
+    const auto &root = tree.root();
+    for (auto i = root.cbeginChildOn(); i; ++i) {
         mRootNodes.emplace_back(i.getCoord(), &*i);
     }
-    for (auto i = tree.root().cbeginValueOn(); i; ++i) {
-        mRootTiles.emplace_back(CoordBBox::createCube(i.getCoord(), RootChildT::DIM));
+    for (auto i = root.cbeginValueOn(); i; ++i) {
+        mRootTiles.emplace_back(root, i.getCoord(), *i);
     }
 }
 
@@ -265,7 +272,7 @@ bool FindActiveValues<TreeT>::any(const CoordBBox &bbox, bool useAccessor) const
     }
 
     for (auto& tile : mRootTiles) {
-        if (tile.hasOverlap(bbox)) return true;
+        if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
         if (!node.bbox.hasOverlap(bbox)) {
@@ -283,7 +290,7 @@ template<typename TreeT>
 bool FindActiveValues<TreeT>::anyActiveTiles(const CoordBBox &bbox) const
 {
     for (auto& tile : mRootTiles) {
-        if (tile.hasOverlap(bbox)) return true;
+        if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
         if (!node.bbox.hasOverlap(bbox)) {
@@ -302,14 +309,14 @@ Index64 FindActiveValues<TreeT>::count(const CoordBBox &bbox) const
 {
     Index64 count = 0;
     for (auto& tile : mRootTiles) {//loop over active tiles only
-        if (!tile.hasOverlap(bbox)) {
+        if (!tile.bbox.hasOverlap(bbox)) {
             continue;//ignore non-overlapping tiles
-        } else if (tile.isInside(bbox)) {
+        } else if (tile.bbox.isInside(bbox)) {
             return bbox.volume();// bbox is completely inside the active tile
-        } else if (bbox.isInside(tile)) {
-            count += RootChildT::NUM_VOXELS;
+        } else if (bbox.isInside(tile.bbox)) {
+            count += RootChildType::NUM_VOXELS;
         } else {// partial overlap between tile and bbox
-            auto tmp = tile;
+            auto tmp = tile.bbox;
             tmp.intersect(bbox);
             count += tmp.volume();
         }
@@ -327,21 +334,22 @@ Index64 FindActiveValues<TreeT>::count(const CoordBBox &bbox) const
 }
 
 template<typename TreeT>
-std::vector<CoordBBox> FindActiveValues<TreeT>::activeTiles(const CoordBBox &bbox) const
+std::vector<TileData<typename TreeT::ValueType> >
+FindActiveValues<TreeT>::activeTiles(const CoordBBox &bbox) const
 {
-    std::vector<CoordBBox> tiles;
+    std::vector<TileDataT> tiles;
     for (auto& tile : mRootTiles) {//loop over active tiles only
-        if (!tile.hasOverlap(bbox)) {
+        if (!tile.bbox.hasOverlap(bbox)) {
             continue;//ignore non-overlapping tiles
-        } else if (tile.isInside(bbox)) {
-            tiles.push_back(bbox);// bbox is completely inside the active tile
+        } else if (tile.bbox.isInside(bbox)) {
+            tiles.emplace_back(bbox, tile.value, tile.level);// bbox is completely inside the active tile
             return tiles;
-        } else if (bbox.isInside(tile)) {// active tile is completely inside the bbox
+        } else if (bbox.isInside(tile.bbox)) {// active tile is completely inside the bbox
             tiles.push_back(tile);
         } else {// partial overlap between tile and bbox
-            auto tmp = tile;
+            auto tmp = tile.bbox;
             tmp.intersect(bbox);
-            tiles.push_back(tmp);
+            tiles.emplace_back(tmp, tile.value, tile.level);
         }
     }
     for (auto &node : mRootNodes) {//loop over child nodes of the root node only
@@ -500,7 +508,7 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
 // process internal node
 template<typename TreeT>
 template<typename NodeT>
-void FindActiveValues<TreeT>::activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<CoordBBox> &tiles) const
+void FindActiveValues<TreeT>::activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<TileDataT> &tiles) const
 {
     // Generate a bit masks
     auto mask = this->getBBoxMask(bbox, node);
@@ -515,19 +523,17 @@ void FindActiveValues<TreeT>::activeTiles(const NodeT* node, const CoordBBox &bb
     const size_t tileCount = mask.countOn();
     if (tileCount < 8) {// Serial processing of active tiles
         for (auto iter = mask.beginOn(); iter; ++iter) {
-            auto b = CoordBBox::createCube(node->offsetToGlobalCoord(iter.pos()), NodeT::ChildNodeType::DIM);
-            b.intersect(bbox);
-            tiles.push_back(b);
+            tiles.emplace_back(*node, iter.pos());
+            tiles.back().bbox.intersect(bbox);
         }
     } else {// Parallel processing of active tiles
-        std::vector<CoordBBox> tmp( tileCount );// for temporary thread-safe processing
+        std::vector<TileDataT> tmp( tileCount );// for temporary thread-safe processing
         int n = 0;
-        for (auto iter = mask.beginOn(); iter; ++iter) tmp[n++].min()[0] = iter.pos();
+        for (auto iter = mask.beginOn(); iter; ++iter) tmp[n++].level = iter.pos();// placeholder to support multi-threading
         tbb::parallel_for(tbb::blocked_range<size_t>(0, tileCount, 8), [&](const tbb::blocked_range<size_t>& r) {
             for ( size_t i = r.begin(); i != r.end(); ++i ) {
-                const Coord ijk = node->offsetToGlobalCoord(tmp[i].min()[0]);// origin of tile
-                tmp[i] = CoordBBox::createCube(ijk, NodeT::ChildNodeType::DIM);
-                tmp[i].intersect(bbox);
+                tmp[i] = TileDataT(*node, tmp[i].level);
+                tmp[i].bbox.intersect(bbox);
             }
         });
         tiles.insert(tiles.end(), tmp.begin(), tmp.end());
@@ -535,15 +541,61 @@ void FindActiveValues<TreeT>::activeTiles(const NodeT* node, const CoordBBox &bb
 }
 
 template<typename TreeT>
-struct FindActiveValues<TreeT>::NodePairT
+struct FindActiveValues<TreeT>::RootChild
 {
-    const RootChildT* child;
-    const CoordBBox   bbox;
-    NodePairT(const Coord& c = Coord(), const RootChildT* p = nullptr)
-        : child(p), bbox(CoordBBox::createCube(c, RootChildT::DIM))
+    const CoordBBox      bbox;
+    const RootChildType* child;
+    RootChild(const Coord& ijk = Coord(), const RootChildType* ptr = nullptr)
+        : bbox(CoordBBox::createCube(ijk, RootChildType::DIM)), child(ptr)
     {
     }
-};// NodePairT struct
+};// RootChild struct
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+template<typename ValueType>
+struct TileData
+{
+    CoordBBox bbox;
+    ValueType value;
+    Index     level;
+    bool      state;
+
+    /// @brief Default constructor
+    TileData() = default;
+
+    /// @brief Member data constructor
+    TileData(const CoordBBox &b, const ValueType &v, Index l, bool active = true)
+        : bbox(b), value(v), level(l), state(active) {}
+
+    /// @brief Constructor from a parent node and the linear offset to one of its tiles
+    ///
+    /// @warning This is an expert-only method since it assumes the linear offset to be valid,
+    ///          i.e. within the rand of the dimention of the parent node and NOT corresponding
+    ///          to a child node.
+    template <typename ParentNodeT>
+    TileData(const ParentNodeT &parent, Index childIdx)
+        : bbox(CoordBBox::createCube(parent.offsetToGlobalCoord(childIdx), parent.getChildDim()))
+        , level(parent.getLevel() - 1)
+        , state(true)
+    {
+        assert(childIdx < ParentNodeT::NUM_VALUES);
+        assert(parent.isChildMaskOff(childIdx));
+        assert(parent.isValueMaskOn(childIdx));
+        value = parent.getTable()[childIdx].getValue();
+    }
+
+    /// @brief Constructor form a parent node, the coordinate of the origin of one of its tiles,
+    ///        and said tiles value.
+    template <typename ParentNodeT>
+    TileData(const ParentNodeT &parent, const Coord &ijk, const ValueType &v)
+        : bbox(CoordBBox::createCube(ijk, parent.getChildDim()))
+        , value(v)
+        , level(parent.getLevel() - 1)
+        , state(true)
+    {
+    }
+};// TileData struct
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -585,7 +637,7 @@ anyActiveTiles(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline std::vector<CoordBBox>
+inline std::vector<TileData<typename TreeT::ValueType>>
 activeTiles(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);

@@ -228,12 +228,16 @@ TestFindActiveValues::testSparseBox()
         CPPUNIT_ASSERT( tiles.size() == openvdb::math::Pow3(size_t(4)) ); // {-256, -129} -> {-128, 0} -> {0, 127} -> {128, 255}
         //std::cerr << "bbox " << bbox << " overlaps with " << tiles.size() << " active tiles " << std::endl;
         openvdb::CoordBBox tmp;
-        for (auto &b : tiles) {
-            tmp.expand( b );
-            //std::cerr << b << std::endl;
+        for (auto &t : tiles) {
+            CPPUNIT_ASSERT( t.state );
+            CPPUNIT_ASSERT( t.level == 1);// tiles should all reside just about the leaf level
+            CPPUNIT_ASSERT( t.value == 1.0f);// tiles should all reside just about the leaf level
+            CPPUNIT_ASSERT( t.bbox.volume() == openvdb::math::Pow3(openvdb::Index64(128)) );
+            tmp.expand( t.bbox );
+            //std::cerr << t.bbox << std::endl;
         }
         //std::cerr << tmp << std::endl;
-        CPPUNIT_ASSERT( tmp == bbox );
+        CPPUNIT_ASSERT( tmp == bbox );// uniion of all the active tiles should equal the bbox of the sparseFill operation!
     }
 }
 
