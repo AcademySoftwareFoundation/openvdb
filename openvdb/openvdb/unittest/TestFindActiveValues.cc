@@ -75,16 +75,25 @@ TestFindActiveValues::testBasic()
     const openvdb::CoordBBox bbox(min[0], min[1], min[2],
                                   max[0], max[1], max[2]);
 
-    CPPUNIT_ASSERT(openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT( openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
 
     tree.setValue(min.offsetBy(-1), 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
     tree.setValue(max.offsetBy( 1), 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
     tree.setValue(min, 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
     tree.setValue(max, 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
     auto tiles = openvdb::tools::activeTiles(tree, bbox);
     CPPUNIT_ASSERT( tiles.size() == 0u );
@@ -205,7 +214,8 @@ TestFindActiveValues::testSparseBox()
         CPPUNIT_ASSERT(tree.activeTileCount() > 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
         for (int i=1; i<half_dim; ++i) {
-            CPPUNIT_ASSERT(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+            CPPUNIT_ASSERT( op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+            CPPUNIT_ASSERT(!op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
         }
         CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
 
@@ -239,7 +249,7 @@ TestFindActiveValues::testSparseBox()
         //std::cerr << tmp << std::endl;
         CPPUNIT_ASSERT( tmp == bbox );// uniion of all the active tiles should equal the bbox of the sparseFill operation!
     }
-}
+}// testSparseBox
 
 void
 TestFindActiveValues::testDenseBox()
@@ -256,6 +266,7 @@ TestFindActiveValues::testDenseBox()
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 3);// leaf value
       for (int i=1; i<half_dim; ++i) {
           CPPUNIT_ASSERT(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
+          CPPUNIT_ASSERT(op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
       }
       CPPUNIT_ASSERT(op.count(bbox) == bbox.volume());
 
@@ -275,7 +286,7 @@ TestFindActiveValues::testDenseBox()
       auto tiles = openvdb::tools::activeTiles(tree, bbox);
       CPPUNIT_ASSERT( tiles.size() == 0u );
     }
-}
+}// testDenseBox
 
 void
 TestFindActiveValues::testBenchmarks()
@@ -325,7 +336,7 @@ TestFindActiveValues::testBenchmarks()
       CPPUNIT_ASSERT(op.noActiveValues(CoordBBox::createCube(Coord(256), 1)));
       //timer.stop();
     }
-}
+}// testBenchmarks
 
 // Copyright (c) Ken Museth
 // All rights reserved. This software is distributed under the
