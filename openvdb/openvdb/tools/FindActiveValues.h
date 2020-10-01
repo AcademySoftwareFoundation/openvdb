@@ -54,6 +54,9 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 /// @brief Struct that encodes a bounding box, value and level of a tile
+///
+/// @details The bbox of a tiles is trimmed to the bounding box that probed it.
+///          The level is typically defined as: 1 is 8^3, 2 is 128^3, and 3 is 4096^3.
 template<typename ValueType>
 struct TileData;
 
@@ -295,7 +298,13 @@ bool FindActiveValues<TreeT>::anyActiveValues(const CoordBBox &bbox, bool useAcc
         if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
-        if (node.bbox.hasOverlap(bbox) && this->anyActiveValues(node.child, bbox)) return true;
+        if (!node.bbox.hasOverlap(bbox)) {// no overlap
+            continue;
+        } else if (node.bbox.isInside(bbox)) {// bbox is inside the child node
+            return this->anyActiveValues(node.child, bbox);
+        } else if (this->anyActiveValues(node.child, bbox)) {// bbox overlaps the child node
+            return true;
+        }
     }
     return false;
 }
@@ -304,7 +313,13 @@ template<typename TreeT>
 bool FindActiveValues<TreeT>::anyActiveVoxels(const CoordBBox &bbox) const
 {
     for (auto& node : mRootNodes) {
-        if (node.bbox.hasOverlap(bbox) && this->anyActiveVoxels(node.child, bbox)) return true;
+        if (!node.bbox.hasOverlap(bbox)) {// no overlap
+            continue;
+        } else if (node.bbox.isInside(bbox)) {// bbox is inside the child node
+            return this->anyActiveVoxels(node.child, bbox);
+        } else if (this->anyActiveVoxels(node.child, bbox)) {// bbox overlaps the child node
+            return true;
+        }
     }
     return false;
 }
@@ -316,7 +331,13 @@ bool FindActiveValues<TreeT>::anyActiveTiles(const CoordBBox &bbox) const
         if (tile.bbox.hasOverlap(bbox)) return true;
     }
     for (auto& node : mRootNodes) {
-        if (node.bbox.hasOverlap(bbox) && this->anyActiveTiles(node.child, bbox)) return true;
+        if (!node.bbox.hasOverlap(bbox)) {// no overlap
+            continue;
+        } else if (node.bbox.isInside(bbox)) {// bbox is inside the child node
+            return this->anyActiveTiles(node.child, bbox);
+        } else if (this->anyActiveTiles(node.child, bbox)) {// bbox overlaps the child node
+            return true;
+        }
     }
     return false;
 }
@@ -358,8 +379,8 @@ FindActiveValues<TreeT>::activeTiles(const CoordBBox &bbox) const
     for (auto& tile : mRootTiles) {//loop over active tiles only
         if (!tile.bbox.hasOverlap(bbox)) {
             continue;//ignore non-overlapping tiles
-        } else if (tile.bbox.isInside(bbox)) {
-            tiles.emplace_back(bbox, tile.value, tile.level);// bbox is completely inside the active tile
+        } else if (tile.bbox.isInside(bbox)) {// bbox is completely inside the active tile
+            tiles.emplace_back(bbox, tile.value, tile.level);
             return tiles;
         } else if (bbox.isInside(tile.bbox)) {// active tile is completely inside the bbox
             tiles.push_back(tile);
@@ -440,7 +461,7 @@ bool FindActiveValues<TreeT>::anyActiveVoxels(const NodeT* node, const CoordBBox
     const auto* table = node->getTable();
     bool active = false;
     for (auto i = mask.beginOn(); !active && i; ++i) {
-        active = this->anyActiveValues(table[i.pos()].getChild(), bbox);
+        active = this->anyActiveVoxels(table[i.pos()].getChild(), bbox);
     }
     return active;
 }
@@ -616,7 +637,7 @@ struct TileData
     template <typename ParentNodeT>
     TileData(const ParentNodeT &parent, Index childIdx)
         : bbox(CoordBBox::createCube(parent.offsetToGlobalCoord(childIdx), parent.getChildDim()))
-        , level(parent.getLevel() - 1)
+        , level(parent.getLevel())
         , state(true)
     {
         assert(childIdx < ParentNodeT::NUM_VALUES);
@@ -631,7 +652,7 @@ struct TileData
     TileData(const ParentNodeT &parent, const Coord &ijk, const ValueType &v)
         : bbox(CoordBBox::createCube(ijk, parent.getChildDim()))
         , value(v)
-        , level(parent.getLevel() - 1)
+        , level(parent.getLevel())
         , state(true)
     {
     }

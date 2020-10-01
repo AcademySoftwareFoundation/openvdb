@@ -80,22 +80,44 @@ TestFindActiveValues::testBasic()
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
 
     tree.setValue(min.offsetBy(-1), 1.0f);
-    CPPUNIT_ASSERT(openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT( openvdb::tools::noActiveValues(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
+
     tree.setValue(max.offsetBy( 1), 1.0f);
-    CPPUNIT_ASSERT(openvdb::tools::noActiveValues(tree, bbox));
+    CPPUNIT_ASSERT( openvdb::tools::noActiveValues(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveValues(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveVoxels(tree, bbox));
+
     tree.setValue(min, 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
     CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
+
     tree.setValue(max, 1.0f);
     CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
     CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
     CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
     auto tiles = openvdb::tools::activeTiles(tree, bbox);
+    CPPUNIT_ASSERT( tiles.size() == 0u );
+
+    tree.sparseFill(bbox, 1.0f);
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveTiles( tree, bbox));
+    tiles = openvdb::tools::activeTiles(tree, bbox);
+    CPPUNIT_ASSERT( tiles.size() != 0u );
+    for (auto &t : tiles) {
+        CPPUNIT_ASSERT( t.level == 1);
+        CPPUNIT_ASSERT( t.bbox.volume() == openvdb::math::Pow3(uint64_t(8)) );
+        //std::cerr << "bbox = " << t.bbox << ", level = " << t.level << std::endl;
+    }
+
+    tree.denseFill(bbox, 1.0f);
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveValues(tree, bbox));
+    CPPUNIT_ASSERT(openvdb::tools::anyActiveVoxels(tree, bbox));
+    CPPUNIT_ASSERT(!openvdb::tools::anyActiveTiles(tree, bbox));
+    tiles = openvdb::tools::activeTiles(tree, bbox);
     CPPUNIT_ASSERT( tiles.size() == 0u );
 }
 
@@ -209,7 +231,9 @@ TestFindActiveValues::testSparseBox()
         CPPUNIT_ASSERT(tree.activeTileCount() == 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
+
         tree.sparseFill(bbox, 1.0f, true);
+
         op.update(tree);//tree was modified so op needs to be updated
         CPPUNIT_ASSERT(tree.activeTileCount() > 0);
         CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
@@ -240,8 +264,8 @@ TestFindActiveValues::testSparseBox()
         openvdb::CoordBBox tmp;
         for (auto &t : tiles) {
             CPPUNIT_ASSERT( t.state );
-            CPPUNIT_ASSERT( t.level == 1);// tiles should all reside just about the leaf level
-            CPPUNIT_ASSERT( t.value == 1.0f);// tiles should all reside just about the leaf level
+            CPPUNIT_ASSERT( t.level == 2);// tiles at level 1 are 8^3, at level 2 they are 128^3, and at level 3 they are 4096^3
+            CPPUNIT_ASSERT( t.value == 1.0f);
             CPPUNIT_ASSERT( t.bbox.volume() == openvdb::math::Pow3(openvdb::Index64(128)) );
             tmp.expand( t.bbox );
             //std::cerr << t.bbox << std::endl;
@@ -260,7 +284,9 @@ TestFindActiveValues::testDenseBox()
       openvdb::FloatTree tree;
       CPPUNIT_ASSERT(tree.activeTileCount() == 0);
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
+
       tree.denseFill(bbox, 1.0f, true);
+
       CPPUNIT_ASSERT(tree.activeTileCount() == 0);
       openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
       CPPUNIT_ASSERT(tree.getValueDepth(openvdb::Coord(0)) == 3);// leaf value
