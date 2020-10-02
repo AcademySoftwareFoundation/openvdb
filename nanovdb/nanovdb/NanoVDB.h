@@ -1381,12 +1381,12 @@ public:
     /// @brief transformation from index space direction to world space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T indexToWorldDirF(const Vec3T& dir) const { return this->applyInverseJacobianF(dir); }
+    __hostdev__ Vec3T indexToWorldDirF( const Vec3T &dir ) const { return this->applyJacobianF(dir); }
 
     /// @brief transformation from world space direction to index space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T worldToIndexDirF(const Vec3T& dir) const { return this->applyJacobianF(dir); }
+    __hostdev__ Vec3T worldToIndexDirF( const Vec3T &dir ) const { return this->applyInverseJacobianF(dir); }
 
     /// @brief Inverse jacobian map, suitable for gradients.
     template<typename Vec3T>
