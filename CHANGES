@@ -3,6 +3,13 @@ OpenVDB Version History
 
 Version 7.1.1 - In Development
 
+    New features:
+    - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
+      if respectively active voxels or tiles in a tree intersect a given
+      CoordBBox.
+    - Added tools::activeTiles that returns a vector containing all the active
+      tiles in a tree that intersects a given CoordBBox.
+
     Improvements:
     - util::CpuTimer now uses C++11 chrono instead of TBB.
 
