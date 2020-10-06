@@ -9,10 +9,10 @@
 @par
 New features:
 - Added @vdblink::tools::anyActiveVoxels tools::anyActiveVoxels@endlink
-  and @vdblink::tools::anyActiveTile tools::anyActiveTile@endlink that check
+  and @vdblink::tools::anyActiveTiles tools::anyActiveTiles@endlink that check
   if respectively active voxels or tiles in a tree intersect a given
   CoordBBox.
-- Added @vdblink::ttools::activeTiles ools::activeTiles@endlink that returns
+- Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
   a vector containing all the active tiles in a tree that intersects a given
   CoordBBox.
 
