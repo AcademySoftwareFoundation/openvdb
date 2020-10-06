@@ -141,15 +141,19 @@ int main(int argc, char* argv[])
                 if (gridName.empty()) {
                     auto grids = file.getGrids();
                     for (auto& grid : *grids) {
-                        if (verbose)
+                        if (verbose) {
                             std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
-                        nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid, false, 0, mode), codec);
+                        }
+                        auto handle = nanovdb::openToNanoVDB(grid, false, verbose ? 1 : 0, mode);
+                        nanovdb::io::writeGrid(os, handle, codec);
                     } // loop over OpenVDB grids in file
                 } else {
                     auto grid = file.readGrid(gridName);
-                    if (verbose)
+                    if (verbose) {
                         std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
-                    nanovdb::io::writeGrid(os, nanovdb::openToNanoVDB(grid, false, 0, mode), codec);
+                    }
+                    auto handle = nanovdb::openToNanoVDB(grid, false, verbose ? 1 : 0, mode);
+                    nanovdb::io::writeGrid(os, handle, codec);
                 }
             } // loop over input files
         } else { // NanoVDB -> OpenVDB
@@ -181,6 +185,11 @@ int main(int argc, char* argv[])
                 }
             } // loop over input files
             file.write(*grids);
+        }
+        if (verbose) {
+            std::cout << "\nThis binary was build against NanoVDB version " << NANOVDB_MAJOR_VERSION_NUMBER << "."
+                                                                            << NANOVDB_MINOR_VERSION_NUMBER << "."
+                                                                            << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
         }
     }
     catch (const std::exception& e) {

@@ -14,6 +14,11 @@ RUN \
 	chmod +x $ROOT_PATH/ci/*.sh
 
 RUN \
+    dos2unix ./docker/scripts/*.sh && \
+	chmod +x ./docker/scripts/*.sh && \
+    ./docker/scripts/linux_install_gcc.sh $COMPILER
+
+RUN \
     ./ci/build_core.sh default $COMPILER $CUDA_VER Release \
         -DNANOVDB_USE_OPTIX=OFF \
         -DNANOVDB_USE_CUDA=ON
@@ -27,20 +32,20 @@ RUN \
 #
 # examples fails to run due to missing WINE implementation of fma.
 
-RUN \
-    wine --version && \
-    wine wineboot && \
-    ./ci/build_core_toolchain.sh msvc16 $ROOT_PATH/ci/wine-toolchain.cmake Release \
-        -DNANOVDB_USE_OPENVDB=OFF \
-        -DNANOVDB_USE_TBB=OFF \
-        -DNANOVDB_USE_ZLIB=OFF \
-        -DNANOVDB_USE_BLOSC=OFF \
-        -DNANOVDB_BUILD_TOOLS=ON \
-        -DNANOVDB_BUILD_UNITTESTS=OFF
+#RUN \
+#    wine --version && \
+#    wine wineboot && \
+#    ./ci/build_core_toolchain.sh msvc16 $ROOT_PATH/ci/wine-toolchain.cmake Release \
+#        -DNANOVDB_USE_OPENVDB=OFF \
+#        -DNANOVDB_USE_TBB=OFF \
+#        -DNANOVDB_USE_ZLIB=OFF \
+#        -DNANOVDB_USE_BLOSC=OFF \
+#        -DNANOVDB_BUILD_TOOLS=ON \
+#        -DNANOVDB_BUILD_UNITTESTS=OFF
+
+#RUN \
+#    ./ci/build_docs.sh
 
 RUN \
-    ./ci/build_docs.sh
-
-RUN \
-    ./ci/test_core.sh default && \
-    ./ci/test_render.sh default
+    ./ci/test_core.sh default
+#    ./ci/test_render.sh default

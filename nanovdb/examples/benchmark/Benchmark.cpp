@@ -43,6 +43,29 @@
 #include <tbb/blocked_range2d.h>
 #endif
 
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
+{
+    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") ->"
+       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
+    return os;
+}
+
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::Coord& ijk)
+{
+    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
+    return os;
+}
+
+template <typename T>
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::Vec3<T>& v)
+{
+    os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
+    return os;
+}
+
 // define the enviroment variable VDB_DATA_PATH to use models from the web
 // e.g. setenv VDB_DATA_PATH /home/kmu/dev/data/vdb
 // or   export VDB_DATA_PATH=/Users/ken/dev/data/vdb
@@ -126,32 +149,70 @@ TEST_F(Benchmark, Ray)
     using BBoxT = nanovdb::BBox<Vec3T>;
     using RayT = nanovdb::Ray<RealT>;
 
-    // test bbox clip
-    const Vec3T dir(-1.0, 2.0, 3.0);
-    const Vec3T eye(2.0, 1.0, 1.0);
-    RealT       t0 = 0.1, t1 = 12589.0;
-    RayT        ray(eye, dir, t0, t1);
+    {// clip ray against an index bbox
+        // test bbox clip
+        const Vec3T dir(-1.0, 2.0, 3.0);
+        const Vec3T eye(2.0, 1.0, 1.0);
+        RealT       t0 = 0.1, t1 = 12589.0;
+        RayT        ray(eye, dir, t0, t1);
 
-    // intersects the two faces of the box perpendicular to the y-axis!
-    EXPECT_TRUE(ray.clip(CoordBBoxT(CoordT(0, 2, 2), CoordT(2, 4, 6))));
-    EXPECT_EQ(0.5, ray.t0());
-    EXPECT_EQ(1.5, ray.t1());
-    EXPECT_EQ(ray(0.5)[1], 2); //lower y component of intersection
-    EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
+        // intersects the two faces of the box perpendicular to the y-axis!
+        EXPECT_TRUE(ray.clip(CoordBBoxT(CoordT(0, 2, 2), CoordT(2, 4, 6))));
+        //std::cerr << "t0 = " << ray.t0() << ", ray.t1() = " << ray.t1() << std::endl;
+        //std::cerr << "ray(0.5) = " << ray(0.5) << std::endl;
+        //std::cerr << "ray(1.5) = " << ray(1.5) << std::endl;
+        //std::cerr << "ray(2.0) = " << ray(2.0) << std::endl;
+        EXPECT_EQ(0.5, ray.t0());
+        EXPECT_EQ(1.5, ray.t1());
+        EXPECT_EQ(ray(0.5)[1], 2); //lower y component of intersection
+        EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
 
-    ray.reset(eye, dir, t0, t1);
-    // intersects the lower edge anlong the z-axis of the box
-    EXPECT_TRUE(ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))));
-    EXPECT_EQ(0.5, ray.t0());
-    EXPECT_EQ(0.5, ray.t1());
-    EXPECT_EQ(ray(0.5)[0], 1.5); //lower y component of intersection
-    EXPECT_EQ(ray(0.5)[1], 2.0); //higher y component of intersection
+        ray.reset(eye, dir, t0, t1);
+        // intersects the lower edge anlong the z-axis of the box
+        EXPECT_TRUE(ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))));
+        EXPECT_EQ(0.5, ray.t0());
+        EXPECT_EQ(0.5, ray.t1());
+        EXPECT_EQ(ray(0.5)[0], 1.5); //lower y component of intersection
+        EXPECT_EQ(ray(0.5)[1], 2.0); //higher y component of intersection
 
-    ray.reset(eye, dir, t0, t1);
-    // no intersections
-    EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6))));
-    EXPECT_EQ(t0, ray.t0());
-    EXPECT_EQ(t1, ray.t1());
+        ray.reset(eye, dir, t0, t1);
+        // no intersections
+        EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6))));
+        EXPECT_EQ(t0, ray.t0());
+        EXPECT_EQ(t1, ray.t1());
+    }
+    {// clip ray against an real bbox
+        // test bbox clip
+        const Vec3T dir(-1.0, 2.0, 3.0);
+        const Vec3T eye(2.0, 1.0, 1.0);
+        RealT       t0 = 0.1, t1 = 12589.0;
+        RayT        ray(eye, dir, t0, t1);
+
+        // intersects the two faces of the box perpendicular to the y-axis!
+        EXPECT_TRUE( ray.clip(CoordBBoxT(CoordT(0, 2, 2), CoordT(2, 4, 6)).asReal<double>()) );
+        //std::cerr << "t0 = " << ray.t0() << ", ray.t1() = " << ray.t1() << std::endl;
+        //std::cerr << "ray(0.5) = " << ray(0.5) << std::endl;
+        //std::cerr << "ray(1.5) = " << ray(1.5) << std::endl;
+        //std::cerr << "ray(2.0) = " << ray(2.0) << std::endl;
+        EXPECT_EQ(0.5, ray.t0());
+        EXPECT_EQ(2.0, ray.t1());
+        EXPECT_EQ(ray(0.5)[1], 2); //lower y component of intersection
+        EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
+
+        ray.reset(eye, dir, t0, t1);
+        // intersects the lower edge anlong the z-axis of the box
+        EXPECT_TRUE( ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))) );
+        EXPECT_EQ(0.5, ray.t0());
+        EXPECT_EQ(0.5, ray.t1());
+        EXPECT_EQ(ray(0.5)[0], 1.5); //lower y component of intersection
+        EXPECT_EQ(ray(0.5)[1], 2.0); //higher y component of intersection
+
+        ray.reset(eye, dir, t0, t1);
+        // no intersections
+        EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6)).asReal<double>()) );
+        EXPECT_EQ(t0, ray.t0());
+        EXPECT_EQ(t1, ray.t1());
+    }
 }
 
 TEST_F(Benchmark, HDDA)

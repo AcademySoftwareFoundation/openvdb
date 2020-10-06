@@ -150,11 +150,14 @@ public:
     __hostdev__ bool test(RealT time) const { return mTimeSpan.test(time); }
 
     /// @brief Return a new Ray that is transformed with the specified map.
+    ///
     /// @param map  the map from which to construct the new Ray.
+    ///
     /// @warning Assumes a linear map and a normalized direction.
+    ///
     /// @details The requirement that the direction is normalized
-    /// follows from the transformation of t0 and t1 - and that fact that
-    /// we want applyMap and applyInverseMap to be inverse operations.
+    ///          follows from the transformation of t0 and t1 - and that fact that
+    ///          we want applyMap and applyInverseMap to be inverse operations.
     template<typename MapType>
     __hostdev__ Ray applyMap(const MapType& map) const
     {
@@ -162,8 +165,9 @@ public:
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length(), invLength = RealT(1) / length;
         RealT       t1 = mTimeSpan.t1;
-        if (mTimeSpan.t1 < Maximum<RealT>::value())
+        if (mTimeSpan.t1 < Maximum<RealT>::value()) {
             t1 *= length;
+        }
         return Ray(eye, dir * invLength, length * mTimeSpan.t0, t1);
     }
     template<typename MapType>
@@ -173,17 +177,21 @@ public:
         const Vec3T dir = map.applyJacobianF(mDir);
         const RealT length = dir.length(), invLength = RealT(1) / length;
         RealT       t1 = mTimeSpan.t1;
-        if (mTimeSpan.t1 < Maximum<RealT>::value())
+        if (mTimeSpan.t1 < Maximum<RealT>::value()) {
             t1 *= length;
+        }
         return Ray(eye, dir * invLength, length * mTimeSpan.t0, t1);
     }
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
+    ///
     /// @param map  the map from which to construct the new Ray by inverse mapping.
+    ///
     /// @warning Assumes a linear map and a normalized direction.
+    ///
     /// @details The requirement that the direction is normalized
-    /// follows from the transformation of t0 and t1 - and that fact that
-    /// we want applyMap and applyInverseMap to be inverse operations.
+    ///          follows from the transformation of t0 and t1 - and that fact that
+    ///          we want applyMap and applyInverseMap to be inverse operations.
     template<typename MapType>
     __hostdev__ Ray applyInverseMap(const MapType& map) const
     {
@@ -202,7 +210,7 @@ public:
     }
 
     /// @brief Return a new ray in world space, assuming the existing
-    /// ray is represented in the index space of the specified grid.
+    ///        ray is represented in the index space of the specified grid.
     template<typename GridType>
     __hostdev__ Ray indexToWorldF(const GridType& grid) const
     {
@@ -210,13 +218,14 @@ public:
         const Vec3T dir = grid.indexToWorldDirF(mDir);
         const RealT length = dir.length(), invLength = RealT(1) / length;
         RealT       t1 = mTimeSpan.t1;
-        if (mTimeSpan.t1 < Maximum<RealT>::value())
+        if (mTimeSpan.t1 < Maximum<RealT>::value()) {
             t1 *= length;
+        }
         return Ray(eye, dir * invLength, length * mTimeSpan.t0, t1);
     }
 
     /// @brief Return a new ray in index space, assuming the existing
-    /// ray is represented in the world space of the specified grid.
+    ///        ray is represented in the world space of the specified grid.
     template<typename GridType>
     __hostdev__ Ray worldToIndexF(const GridType& grid) const
     {
@@ -224,23 +233,21 @@ public:
         const Vec3T dir = grid.worldToIndexDirF(mDir);
         const RealT length = dir.length(), invLength = RealT(1) / length;
         RealT       t1 = mTimeSpan.t1;
-        if (mTimeSpan.t1 < Maximum<RealT>::value())
+        if (mTimeSpan.t1 < Maximum<RealT>::value()) {
             t1 *= length;
+        }
         return Ray(eye, dir * invLength, length * mTimeSpan.t0, t1);
     }
 
-    /// @brief Return a new ray in the index space of the specified
-    /// grid, assuming the existing ray is represented in world space.
-    //template<typename GridType>
-    //__hostdev__  Ray worldToIndex(const GridType& grid) const { return this->applyInverseMap(grid); }
-
     /// @brief Return true if this ray intersects the specified sphere.
+    ///
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
     /// @param t0     The first intersection point if an intersection exists.
     /// @param t1     The second intersection point if an intersection exists.
+    ///
     /// @note If the return value is true, i.e. a hit, and t0 =
-    /// this->t0() or t1 == this->t1() only one true intersection exist.
+    ///       this->t0() or t1 == this->t1() only one true intersection exist.
     __hostdev__ bool intersects(const Vec3T& center, RealT radius, RealT& t0, RealT& t1) const
     {
         const Vec3T origin = mEye - center;
@@ -249,9 +256,9 @@ public:
         const RealT C = origin.lengthSqr() - radius * radius;
         const RealT D = B * B - 4 * A * C;
 
-        if (D < 0)
+        if (D < 0) {
             return false;
-
+        }
         const RealT Q = RealT(-0.5) * (B < 0 ? (B + Sqrt(D)) : (B - Sqrt(D)));
 
         t0 = Q / A;
@@ -262,14 +269,17 @@ public:
             t0 = t1;
             t1 = tmp;
         }
-        if (t0 < mTimeSpan.t0)
+        if (t0 < mTimeSpan.t0) {
             t0 = mTimeSpan.t0;
-        if (t1 > mTimeSpan.t1)
+        }
+        if (t1 > mTimeSpan.t1) {
             t1 = mTimeSpan.t1;
+        }
         return t0 <= t1;
     }
 
     /// @brief Return true if this ray intersects the specified sphere.
+    ///
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
     __hostdev__ bool intersects(const Vec3T& center, RealT radius) const
@@ -279,27 +289,29 @@ public:
     }
 
     /// @brief Return true if this ray intersects the specified sphere.
+    ///
     /// @note For intersection this ray is clipped to the two intersection points.
+    ///
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
     __hostdev__ bool clip(const Vec3T& center, RealT radius)
     {
         RealT      t0, t1;
         const bool hit = this->intersects(center, radius, t0, t1);
-        if (hit)
+        if (hit) {
             mTimeSpan.set(t0, t1);
+        }
         return hit;
-        //return this->intersects(center, radius, mTimeSpan.t0, mTimeSpan.t1);
     }
-
+#if 0
     /// @brief Return true if the Ray intersects the specified
-    /// axisaligned bounding box.
+    ///        axisaligned bounding box.
+    ///
     /// @param bbox Axis-aligned bounding box in the same space as the Ray.
     /// @param t0   If an intersection is detected this is assigned
     ///             the time for the first intersection point.
     /// @param t1   If an intersection is detected this is assigned
     ///             the time for the second intersection point.
-#if 0    
     template<typename BBoxT>
     __hostdev__  bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
     {
@@ -309,14 +321,14 @@ public:
         t1       = (bbox[1-mSign[0]][0] - mEye[0]) * mInvDir[0];
         RealT t3 = (bbox[  mSign[1]][1] - mEye[1]) * mInvDir[1];
         if (t3 > t1) return false;
-        if (t3 > t0) t0 = t3; 
+        if (t3 > t0) t0 = t3;
         if (t2 < t1) t1 = t2;
         t3 = (bbox[  mSign[2]][2] - mEye[2]) * mInvDir[2];
-        if (t3 > t1) return false; 
+        if (t3 > t1) return false;
         t2 = (bbox[1-mSign[2]][2] - mEye[2]) * mInvDir[2];
-        if (t0 > t2) return false; 
+        if (t0 > t2) return false;
         if (t3 > t0) t0 = t3;
-        if (mTimeSpan.t1 < t0) return false; 
+        if (mTimeSpan.t1 < t0) return false;
         if (t2 < t1) t1 = t2;
         if (mTimeSpan.t0 > t1) return false;
         if (mTimeSpan.t0 > t0) t0 = mTimeSpan.t0;
@@ -337,8 +349,8 @@ public:
             if (a > t0) t0 = a;
             if (b < t1) t1 = b;
             if (t0 > t1) {
-                //if (gVerbose) printf("Missed BBOX: (%i,%i,%i) -> (%i,%i,%i) t0=%f t1=%f\n", 
-                //                     bbox.min()[0], bbox.min()[1], bbox.min()[2], 
+                //if (gVerbose) printf("Missed BBOX: (%i,%i,%i) -> (%i,%i,%i) t0=%f t1=%f\n",
+                //                     bbox.min()[0], bbox.min()[1], bbox.min()[2],
                 //                     bbox.max()[0], bbox.max()[1], bbox.max()[2], t0, t1);
                 return false;
             }
@@ -348,14 +360,43 @@ public:
         */
     }
 #else
+    /// @brief Returns true if this ray intersects an index bounding box.
+    ///        If the return value is true t0 and t1 are set to the intersection
+    ///        times along the ray.
+    ///
+    /// @warning Intersection with a CoordBBox internally converts to a floating-point bbox
+    ///          which imples that the max is padded with one voxel, i.e. bbox.max += 1! This
+    ///          avoids gaps between neighboring CoordBBox'es, say from neighboring tree nodes.
     __hostdev__ bool intersects(const CoordBBox& bbox, RealT& t0, RealT& t1) const
     {
-        return this->intersects(bbox.asReal<RealT>(), t0, t1);
+        mTimeSpan.get(t0, t1);
+        for (int i = 0; i < 3; ++i) {
+            RealT a = (RealT(bbox.min()[i]    ) - mEye[i]) * mInvDir[i];
+            RealT b = (RealT(bbox.max()[i] + 1) - mEye[i]) * mInvDir[i];
+            if (a > b) {
+                RealT tmp = a;
+                a = b;
+                b = tmp;
+            }
+            if (a > t0) {
+                t0 = a;
+            }
+            if (b < t1) {
+                t1 = b;
+            }
+            if (t0 > t1) {
+                return false;
+            }
+        }
+        return true;
     }
-
-    template<typename BBoxT>
-    __hostdev__ bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
+    /// @brief Returns true if this ray intersects a floating-point bounding box.
+    ///        If the return value is true t0 and t1 are set to the intersection
+    ///        times along the ray.
+    template<typename Vec3T>
+    __hostdev__ bool intersects(const BBox<Vec3T>& bbox, RealT& t0, RealT& t1) const
     {
+        static_assert(is_floating_point<typename Vec3T::ValueType>::value, "Ray::intersects: Expected a floating point coordinate");
         mTimeSpan.get(t0, t1);
         for (int i = 0; i < 3; ++i) {
             RealT a = (bbox.min()[i] - mEye[i]) * mInvDir[i];
@@ -365,10 +406,12 @@ public:
                 a = b;
                 b = tmp;
             }
-            if (a > t0)
+            if (a > t0) {
                 t0 = a;
-            if (b < t1)
+            }
+            if (b < t1) {
                 t1 = b;
+            }
             if (t0 > t1) {
                 return false;
             }
@@ -378,7 +421,13 @@ public:
 #endif
 
     /// @brief Return true if this ray intersects the specified bounding box.
+    ///
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
+    ///
+    /// @warning If @a bbox is of the type CoordBBox it is converted to a floating-point
+    ///          bounding box, which imples that the max is padded with one voxel, i.e.
+    ///          bbox.max += 1! This avoids gaps between neighboring CoordBBox'es, say
+    ///          from neighboring tree nodes.
     template<typename BBoxT>
     __hostdev__ bool intersects(const BBoxT& bbox) const
     {
@@ -415,35 +464,45 @@ public:
     }
 
     /// @brief Return true if this ray intersects the specified bounding box.
-    /// @note For intersection this ray is clipped to the two intersection points.
+    ///
+    /// @note For intersection this ray is clipped to the two intersection points
+    ///.
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
+    ///
+    /// @warning If @a bbox is of the type CoordBBox it is converted to a floating-point
+    ///          bounding box, which imples that the max is padded with one voxel, i.e.
+    ///          bbox.max += 1! This avoids gaps between neighboring CoordBBox'es, say
+    ///          from neighboring tree nodes.
     template<typename BBoxT>
     __hostdev__ bool clip(const BBoxT& bbox)
     {
         RealT      t0, t1;
         const bool hit = this->intersects(bbox, t0, t1);
-        if (hit)
+        if (hit) {
             mTimeSpan.set(t0, t1);
+        }
         return hit;
-        //return this->intersects(bbox, mTimeSpan.t0, mTimeSpan.t1);
     }
 
     /// @brief Return true if the Ray intersects the plane specified
-    /// by a normal and distance from the origin.
+    ///        by a normal and distance from the origin.
+    ///
     /// @param normal   Normal of the plane.
     /// @param distance Distance of the plane to the origin.
     /// @param t        Time of intersection, if one exists.
     __hostdev__ bool intersects(const Vec3T& normal, RealT distance, RealT& t) const
     {
         const RealT cosAngle = mDir.dot(normal);
-        if (isApproxZero(cosAngle))
-            return false; //parallel
+        if (isApproxZero(cosAngle)) {
+            return false; // ray is parallel to plane
+        }
         t = (distance - mEye.dot(normal)) / cosAngle;
         return this->test(t);
     }
 
     /// @brief Return true if the Ray intersects the plane specified
-    /// by a normal and point.
+    ///        by a normal and point.
+    ///
     /// @param normal   Normal of the plane.
     /// @param point    Point in the plane.
     /// @param t        Time of intersection, if one exists.

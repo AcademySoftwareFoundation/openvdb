@@ -30,7 +30,7 @@
 
 
     \warning NanoVDB grids can only be constructed from with tools like openToNanoVDB
-             or the GridBuilder. This explains why none of the grid nodes defined below 
+             or the GridBuilder. This explains why none of the grid nodes defined below
              have public constructors or destructors.
 
     \details Please see the following paper for more details on the data structure:
@@ -65,7 +65,7 @@
 
 #define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL// "NanoVDB0" in hex - little endian (uint64_t)
 
-#define NANOVDB_MAJOR_VERSION_NUMBER 25// reflects changes to the ABI
+#define NANOVDB_MAJOR_VERSION_NUMBER 27// reflects changes to the ABI
 #define NANOVDB_MINOR_VERSION_NUMBER  0// reflects changes to the API but not ABI
 #define NANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
 
@@ -98,7 +98,7 @@ typedef unsigned long long  uint64_t;
 #include <stddef.h> //    for size_t type
 #include <cassert> //     for assert
 #include <cmath> //       for sqrt and fma
-#include <limits> //      for numeric_limits 
+#include <limits> //      for numeric_limits
 #endif
 
 #ifdef __CUDACC__
@@ -862,11 +862,19 @@ struct BBox;
 template<typename Vec3T>
 struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
 {
+    using Vec3Type  = Vec3T;
+    using ValueType = typename Vec3T::ValueType;
+    static_assert(is_floating_point<ValueType>::value, "Expected a floating point coordinate type");
     using BaseT = BaseBBox<Vec3T>;
     using BaseT::mCoord;
     __hostdev__ BBox() : BaseT(Vec3T( Maximum<typename Vec3T::ValueType>::value()),
                                Vec3T(-Maximum<typename Vec3T::ValueType>::value())) {}
     __hostdev__ BBox(const Vec3T& min, const Vec3T& max) : BaseT(min, max) {}
+    __hostdev__ BBox(const Coord& min, const Coord& max)
+        : BaseT(Vec3T(ValueType(min[0])  , ValueType(min[1])  , ValueType(min[2])),
+                Vec3T(ValueType(max[0]+1), ValueType(max[1]+1), ValueType(max[2]+1)) )
+    {}
+    __hostdev__ BBox(const BaseBBox<Coord> &bbox) : BBox(bbox[0], bbox[1]) {}
     __hostdev__ bool empty() const { return mCoord[0][0] >= mCoord[1][0] ||
                                             mCoord[0][1] >= mCoord[1][1] ||
                                             mCoord[0][2] >= mCoord[1][2]; }
@@ -915,27 +923,30 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         mCoord[1][n] = (mCoord[0][n] + mCoord[1][n]) >> 1;
         other.mCoord[0][n] = mCoord[1][n] + 1;
     }
-    __hostdev__ bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] && 
-                                                   mCoord[0][1] < mCoord[1][1] && 
+    __hostdev__ bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] &&
+                                                   mCoord[0][1] < mCoord[1][1] &&
                                                    mCoord[0][2] < mCoord[1][2]; }
     __hostdev__ bool empty() const { return mCoord[0][0] > mCoord[1][0] ||
                                             mCoord[0][1] > mCoord[1][1] ||
                                             mCoord[0][2] > mCoord[1][2]; }
     __hostdev__ CoordT dim() const {return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1);}
     __hostdev__ bool isInside(const CoordT &p) const { return !(CoordT::lessThan(p,this->min()) || CoordT::lessThan(this->max(),p)); }
-    __hostdev__ bool isInside(const BBox& b) const 
+    __hostdev__ bool isInside(const BBox& b) const
     {
         return !(CoordT::lessThan(b.min(),this->min()) || CoordT::lessThan(this->max(),b.max()));
     }
+
+    /// @warning This converts a CoordBBox into a floating-point bounding box which implies that max += 1 !
     template <typename RealT>
     __hostdev__  BBox<Vec3<RealT>> asReal() const {
-        static_assert(is_floating_point<RealT>::value, "Expected a floating point coordinate");
+        static_assert(is_floating_point<RealT>::value, "CoordBBox::asReal: Expected a floating point coordinate");
         return BBox<Vec3<RealT>>(Vec3<RealT>(RealT(mCoord[0][0]    ), RealT(mCoord[0][1]    ), RealT(mCoord[0][2])   ),
                                  Vec3<RealT>(RealT(mCoord[1][0] + 1), RealT(mCoord[1][1] + 1), RealT(mCoord[1][2] + 1)));
     }
 };
 
 using CoordBBox = BBox<Coord>;
+using BBoxR = BBox<Vec3R>;
 
 // ----------------------------> Mask <--------------------------------------
 
@@ -1093,14 +1104,14 @@ private:
 /// @brief Defined an affine transform and its inverse represented as a 3x3 matrix and a vec3 translation
 struct Map
 {
-    float  mMatF[9]; // 9*4B
-    float  mInvMatF[9]; // 9*4B
-    float  mVecF[3]; // 3*4B
-    float  mTaperF; // 4B, taper value
-    double mMatD[9]; // 9*8B
-    double mInvMatD[9]; // 9*8B
-    double mVecD[3]; // 3*8B
-    double mTaperD; // 8B
+    float  mMatF[9]; // 9*4B <- 3x3 matrix
+    float  mInvMatF[9]; // 9*4B <- 3x3 matrix
+    float  mVecF[3]; // 3*4B <- translation
+    float  mTaperF; // 4B, placeholder for taper value
+    double mMatD[9]; // 9*8B <- 3x3 matrix
+    double mInvMatD[9]; // 9*8B <- 3x3 matrix
+    double mVecD[3]; // 3*8B <- translation
+    double mTaperD; // 8B, placeholder for taper value
 
     // This method can only be called on the host to initialize the member data
     template<typename Mat4T>
@@ -1249,27 +1260,27 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
             mFlags &= ~static_cast<uint32_t>(GridFlags::HAS_TRUNCATED_GRIDNAME);
         }
      }
-    
+
     // Affine transformations based on double precision
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return mMap.applyMap(xyz); }
+    __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return mMap.applyMap(xyz); }// Pos: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const { return mMap.applyInverseMap(xyz); }
+    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const { return mMap.applyInverseMap(xyz); }// Pos: world -> index
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobian(const Vec3T& xyz) const { return mMap.applyJacobian(xyz); }
+    __hostdev__ Vec3T applyJacobian(const Vec3T& xyz) const { return mMap.applyJacobian(xyz); }// Dir: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return mMap.applyInverseJacobian(xyz); }
+    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return mMap.applyInverseJacobian(xyz); }// Dir: world -> index
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return mMap.applyIJT(xyz); }
     // Affine transformations based on single precision
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMapF(const Vec3T& xyz) const { return mMap.applyMapF(xyz); }
+    __hostdev__ Vec3T applyMapF(const Vec3T& xyz) const { return mMap.applyMapF(xyz); }// Pos: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const { return mMap.applyInverseMapF(xyz); }
+    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const { return mMap.applyInverseMapF(xyz); }// Pos: world -> index
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobianF(const Vec3T& xyz) const { return mMap.applyJacobianF(xyz); }
+    __hostdev__ Vec3T applyJacobianF(const Vec3T& xyz) const { return mMap.applyJacobianF(xyz); }// Dir: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return mMap.applyInverseJacobianF(xyz); }
+    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return mMap.applyInverseJacobianF(xyz); }// Dir: world -> index
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return mMap.applyIJTF(xyz); }
 
@@ -1359,16 +1370,17 @@ public:
     /// @brief transformation from index space direction to world space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T indexToWorldDir(const Vec3T& dir) const { return this->applyInverseJacobian(dir); }
+    __hostdev__ Vec3T indexToWorldDir(const Vec3T& dir) const { return this->applyJacobian(dir); }
 
     /// @brief transformation from world space direction to index space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T worldToIndexDir(const Vec3T& dir) const { return this->applyJacobian(dir); }
+    __hostdev__ Vec3T worldToIndexDir(const Vec3T& dir) const { return this->applyInverseJacobian(dir); }
 
-    /// @brief Inverse jacobian map, suitable for gradients.
+    /// @brief Trnasform the gradient from index space to world space.
+    /// @details Applies the inverse jacobian transform map.
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJT(const Vec3T& dir) const { return this->applyIJT(dir); }
+    __hostdev__ Vec3T indexToWorldGrad(const Vec3T& grad) const { return this->applyIJT(grad); }
 
     /// @brief world to index space transformation
     template<typename Vec3T>
@@ -1381,23 +1393,27 @@ public:
     /// @brief transformation from index space direction to world space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T indexToWorldDirF(const Vec3T& dir) const { return this->applyInverseJacobianF(dir); }
+    __hostdev__ Vec3T indexToWorldDirF(const Vec3T& dir) const { return this->applyJacobianF(dir); }
 
     /// @brief transformation from world space direction to index space direction
     /// @warning assumes dir to be normalized
     template<typename Vec3T>
-    __hostdev__ Vec3T worldToIndexDirF(const Vec3T& dir) const { return this->applyJacobianF(dir); }
+    __hostdev__ Vec3T worldToIndexDirF(const Vec3T& dir) const { return this->applyInverseJacobianF(dir); }
 
-    /// @brief Inverse jacobian map, suitable for gradients.
+    /// @brief Transforms the gradient from index space to world space.
+    /// @details Applies the inverse jacobian transform map.
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJTF(const Vec3T& dir) const { return this->applyIJTF(dir); }
+    __hostdev__ Vec3T indexToWorldGradF(const Vec3T& grad) const { return DataType::applyIJTF(grad); }
 
 
     /// @brief Computes a AABB of active values in world space
     __hostdev__ const BBox<Vec3R>& worldBBox() const { return DataType::mWorldBBox; }
 
     /// @brief Computes a AABB of active values in index space
-    __hostdev__ const BBox<CoordType>& indexBBox() const { return this->tree().bbox(); }
+    ///
+    /// @note This method is returning a floating point bounding box and not a CoordBBox. This makes
+    ///       it more useful for clipping rays.
+    __hostdev__ const BBox<Coord>&  indexBBox() const { return this->tree().bbox(); }
 
     /// @brief Return the total number of active voxels in this tree.
     __hostdev__ const uint64_t& activeVoxelCount() const { return this->tree().activeVoxelCount(); }
@@ -1641,12 +1657,12 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
                (KeyT(uint32_t(ijk[1]) >> ChildT::TOTAL) << 21) | // middle 21 bits
                (KeyT(uint32_t(ijk[0]) >> ChildT::TOTAL) << 42); // upper 21 bits
     }
-    __hostdev__ static CoordT KeyToCoord(const KeyT& key) 
-    { 
+    __hostdev__ static CoordT KeyToCoord(const KeyT& key)
+    {
         static constexpr uint64_t MASK = (1u << 21) - 1;
         return Coord(( key        & MASK) << ChildT::TOTAL,
                      ((key >> 21) & MASK) << ChildT::TOTAL,
-                     ((key >> 42) & MASK) << ChildT::TOTAL); 
+                     ((key >> 42) & MASK) << ChildT::TOTAL);
     }
 #else
     using KeyT = CoordT;
@@ -2066,7 +2082,7 @@ public:
     __hostdev__ Coord offsetToGlobalCoord(uint32_t n) const
     {
         Coord ijk = InternalNode::OffsetToLocalCoord(n);
-        this->localToGlobalCoord(ijk); 
+        this->localToGlobalCoord(ijk);
         return ijk;
     }
 
@@ -2133,12 +2149,7 @@ private:
     {
         if (DataType::mFlags & uint32_t(1))
             this->dim(); //ship this node if first bit is set
-        //if (DataType::mFlags) ChildNodeType::dim();
-        //if (DataType::mFlags || !ray.intersects( this->bbox() )) return 1<<TOTAL;
-        //auto bbox = this->bbox();
-        //bbox.min() += -1;
-        //bbox.max() += 1;
-        //if (!ray.intersects( bbox )) return 1<<TOTAL;
+        //if (!ray.intersects( this->bbox() )) return 1<<TOTAL;
 
         const uint32_t n = CoordToOffset(ijk);
         if (DataType::mChildMask.isOn(n)) {
@@ -2355,7 +2366,7 @@ private:
     {
         if (DataType::mFlags & uint8_t(1))
             return this->dim(); // skip this node if first bit is set
-        //if (!ray.intersects( this->bbox() )) return 1<<TOTAL;
+        //if (!ray.intersects( this->bbox() )) return 1 << LOG2DIM;
         return ChildNodeType::dim();
     }
 
@@ -2624,7 +2635,7 @@ public:
     __hostdev__ bool isStaggered() const { return this->grid().isStaggered(); }
     __hostdev__ bool isUnknown() const { return this->grid().isUnknown(); }
     __hostdev__ const Map& map() const { return this->grid().map(); }
-    __hostdev__ const BBox<Vec3R> worldBBox() const { return this->grid().worldBBox(); }
+    __hostdev__ const BBox<Vec3R>& worldBBox() const { return this->grid().worldBBox(); }
     __hostdev__ const BBox<Coord>& indexBBox() const { return this->grid().indexBBox(); }
     __hostdev__ Vec3R voxelSize() const { return this->grid().voxelSize(); }
     __hostdev__ int blindDataCount() const { return this->grid().blindDataCount(); }

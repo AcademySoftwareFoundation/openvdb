@@ -148,23 +148,27 @@ int main(int argc, char* argv[])
             auto       nameWidth = std::string("Name").length() + padding;
             auto       typeWidth = std::string("Type").length() + padding;
             auto       classWidth = std::string("Class").length() + padding;
+            auto       codecWidth = std::string("Codec").length() + padding;
             auto       ibboxWidth = std::string("Index Bounding Box").length() + padding;
             auto       wbboxWidth = std::string("World BBox").length() + padding;
             auto       sizeWidth = std::string("Size").length() + padding;
             auto       fileWidth = std::string("File").length() + padding;
             auto       voxelsWidth = std::string("# Voxels").length() + padding;
             auto       voxelSizeWidth = std::string("Scale").length() + padding;
+            auto       majorWidth = std::string("Version").length() + padding;
             auto       configWidth = std::string("32^3->16^3->8^3").length() + padding;
             auto       resWidth = std::string("Resolution").length() + padding;
             for (auto& m : list) {
                 width(nameWidth, m.gridName);
                 width(typeWidth, nanovdb::io::getStringForGridType(m.gridType));
                 width(classWidth, nanovdb::io::getStringForGridClass(m.gridClass));
+                width(codecWidth, nanovdb::io::getStringForCodec(m.codec));
                 width(wbboxWidth, wbboxToStr(m.worldBBox));
                 width(ibboxWidth, ibboxToStr(m.indexBBox));
                 width(resWidth, resToStr(m.indexBBox));
                 width(sizeWidth, format(m.gridSize));
                 width(fileWidth, format(m.fileSize));
+                width(majorWidth, std::to_string(m.major) + ".X");
                 width(configWidth, nodesToStr(m.nodeCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
                 width(voxelSizeWidth, vec3RToStr(m.voxelSize));
@@ -175,6 +179,8 @@ int main(int argc, char* argv[])
                       << std::left << std::setw(typeWidth) << "Type";
             if (mode != Short) {
                 std::cout << std::left << std::setw(classWidth) << "Class"
+                          << std::left << std::setw(majorWidth) << "Version"
+                          << std::left << std::setw(codecWidth) << "Codec"
                           << std::left << std::setw(sizeWidth) << "Size"
                           << std::left << std::setw(fileWidth) << "File"
                           << std::left << std::setw(voxelSizeWidth) << "Scale";
@@ -196,6 +202,8 @@ int main(int argc, char* argv[])
                           << std::left << std::setw(typeWidth) << nanovdb::io::getStringForGridType(m.gridType);
                 if (mode != Short) {
                     std::cout << std::left << std::setw(classWidth) << nanovdb::io::getStringForGridClass(m.gridClass)
+                              << std::left << std::setw(majorWidth) << (std::to_string(m.major) + ".X")
+                              << std::left << std::setw(codecWidth) << nanovdb::io::getStringForCodec(m.codec)
                               << std::left << std::setw(sizeWidth) << format(m.gridSize)
                               << std::left << std::setw(fileWidth) << format(m.fileSize)
                               << std::left << std::setw(voxelSizeWidth) << vec3RToStr(m.voxelSize);
@@ -227,6 +235,8 @@ int main(int argc, char* argv[])
                 width(w, "\"Name\":");
                 width(w, "\"Type\":");
                 width(w, "\"Class\":");
+                width(w, "\"Version\":");
+                width(w, "\"Codec\":");
                 width(w, "\"Size\":");
                 width(w, "\"File\":");
                 width(w, "\"Scale\":");
@@ -235,8 +245,11 @@ int main(int argc, char* argv[])
                 std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
                           << std::left << std::setw(w) << "\n\"Type\":"  << "static type of the values in a grid, e.g. float, vec3f etc."
                           << std::left << std::setw(w) << "\n\"Class\":"  << "class of the grid, e.g. FOG for Fog volume, LS for level set, etc."
+                          << std::left << std::setw(w) << "\n\"Version\":"  << "major version number of the grid."
+                          << std::left << std::setw(w) << "\n\"Codec\":"  << "codec of the optional compression applied to the out-of-core grid, i.e. on disk."
                           << std::left << std::setw(w) << "\n\"Size\":"  << "In-core memory footprint of the grid, i.e. in ram."
                           << std::left << std::setw(w) << "\n\"File\":"  << "Out-of-core memory footprint of the grid, i.e. on disk."
+                          << std::left << std::setw(w) << "\n\"Scale\":"  << "Scale of the grid, i.e. the size of a voxel in world units."
                           << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid."
                           << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!\n";
                 break;
@@ -244,6 +257,8 @@ int main(int argc, char* argv[])
             width(w, "\"Name\":");
                 width(w, "\"Type\":");
                 width(w, "\"Class\":");
+                width(w, "\"Version\":");
+                width(w, "\"Codec\":");
                 width(w, "\"Size\":");
                 width(w, "\"File\":");
                 width(w, "\"Scale\":");
@@ -255,19 +270,24 @@ int main(int argc, char* argv[])
                 std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
                           << std::left << std::setw(w) << "\n\"Type\":"  << "static type of the values in a grid, e.g. float, vec3f etc."
                           << std::left << std::setw(w) << "\n\"Class\":"  << "class of the grid, e.g. FOG for Fog volume, LS for level set, etc."
+                          << std::left << std::setw(w) << "\n\"Version\":" << "major version number of the grid."
+                          << std::left << std::setw(w) << "\n\"Codec\":"  << "codec of the optional compression applied to the out-of-core grid, i.e. on disk."
                           << std::left << std::setw(w) << "\n\"Size\":"  << "In-core memory footprint of the grid, e.g. in RAM on the CPU."
                           << std::left << std::setw(w) << "\n\"File\":"  << "Out-of-core memory footprint of the grid, i.e. compressed on disk."
-                          << std::left << std::setw(w) << "\n\"Scale\":"  << "Uniform scale of the grid, i.e. the size of a voxel in world units."
+                          << std::left << std::setw(w) << "\n\"Scale\":"  << "Scale of the grid, i.e. the size of a voxel in world units."
                           << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid. Note this includes both active tiles and voxels."
                           << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!"
                           << std::left << std::setw(w) << "\n\"32^3->16^3->8^3\":" << "Number of nodes at each level of the tree structure from the root to leaf level."
                           << std::left << std::setw(w) << "\n\"Index Bounding Box\":" << "coordinate bounding box of all the active values in a grid. Note that both min and max coordinates are inclusive!"
-                          << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid.\n";  
+                          << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid. Note that min is inclusive and max is exclusive!\n";  
                 break;
             default:
                 throw std::runtime_error("Internal error in switch!");
                 break;
             }
+            std::cout << "\nThis binary was build against NanoVDB version " << NANOVDB_MAJOR_VERSION_NUMBER << "."
+                                                                            << NANOVDB_MINOR_VERSION_NUMBER << "."
+                                                                            << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
         }
     }
     catch (const std::exception& e) {
