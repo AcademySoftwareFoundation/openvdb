@@ -1646,7 +1646,7 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(nanovdb::Vec3f(0.0f, 0.0f, -1.0f), grid->tree().getValue(ijk + nanovdb::Coord(1, 0, 0)));
         EXPECT_EQ(nanovdb::Vec3f(1.0f, 0.0f, 0.0f), grid->tree().root().valueMin());
         EXPECT_EQ(nanovdb::Vec3f(1.0f, 0.0f, 0.0f), grid->tree().root().valueMax());
-        EXPECT_EQ(nanovdb::CoordBBox(ijk, ijk), grid->tree().bbox());
+        EXPECT_EQ(nanovdb::CoordBBox(ijk, ijk), grid->indexBBox());
         EXPECT_FALSE(grid->isLevelSet());
         EXPECT_FALSE(grid->isFogVolume());
         EXPECT_FALSE(grid->isUnknown());
@@ -1689,7 +1689,7 @@ TEST_F(TestOpenVDB, MultiFile2)
         file.open(false); //disable delayed loading
         auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(file.beginName().gridName()));
         mTimer.restart("Generating NanoVDB grid");
-        auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort*/ false, 1);
+        auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort*/ false, /* verbose */ 1);
         mTimer.restart("Writing NanoVDB grid");
 #if defined(NANOVDB_USE_BLOSC)
         nanovdb::io::writeGrid(os, handle, nanovdb::io::Codec::BLOSC);
@@ -1785,7 +1785,7 @@ TEST_F(TestOpenVDB, Trilinear)
     EXPECT_NEAR(1.6f, gradIndex[0] / voxelSize, 1e-5);
     EXPECT_NEAR(6.7f, gradIndex[1] / voxelSize, 1e-5);
     EXPECT_NEAR(-3.5f, gradIndex[2] / voxelSize, 1e-5);
-    const auto gradWorld = dstGrid->indexToWorldDir(gradIndex); // in world units
+    const auto gradWorld = dstGrid->indexToWorldGrad(gradIndex); // in world units
     EXPECT_NEAR(1.6f, gradWorld[0], 1e-5);
     EXPECT_NEAR(6.7f, gradWorld[1], 1e-5);
     EXPECT_NEAR(-3.5f, gradWorld[2], 1e-5);

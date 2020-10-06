@@ -126,7 +126,7 @@ TEST_F(TestNanoVDB, Assumptions)
 
 TEST_F(TestNanoVDB, Magic)
 {
-    EXPECT_EQ(25, NANOVDB_MAJOR_VERSION_NUMBER);
+    EXPECT_EQ(27, NANOVDB_MAJOR_VERSION_NUMBER);
     EXPECT_EQ(0, NANOVDB_MINOR_VERSION_NUMBER);
     EXPECT_EQ(0, NANOVDB_PATCH_VERSION_NUMBER);
     EXPECT_EQ(0x304244566f6e614eUL, NANOVDB_MAGIC_NUMBER); // Magic number: "NanoVDB0" in hex)
@@ -523,6 +523,42 @@ TEST_F(TestNanoVDB, Vec3R)
     EXPECT_EQ(sqrt(1.0 + 4.0 + 9.0), xyz.length());
 }
 
+TEST_F(TestNanoVDB, RayBasic)
+{
+    using RealT = float;
+    using Vec3T = nanovdb::Vec3<RealT>;
+    using CoordT = nanovdb::Coord;
+    using CoordBBoxT = nanovdb::BBox<CoordT>;
+    using BBoxT = nanovdb::BBox<Vec3T>;
+    using RayT = nanovdb::Ray<RealT>;
+
+    // test bbox clip
+    const Vec3T dir( 1.0, 0.0, 0.0);
+    const Vec3T eye(-1.0, 0.5, 0.5);
+    RealT       t0 = 0.0, t1 = 10000.0;
+    RayT        ray(eye, dir, t0, t1);
+
+    const CoordBBoxT bbox(CoordT(0, 0, 0), CoordT(0, 0, 0));// only contains a single point (0,0,0)
+    EXPECT_FALSE( bbox.empty() );
+    EXPECT_EQ( bbox.dim(), CoordT(1,1,1) );
+
+    const BBoxT bbox2(CoordT(0, 0, 0), CoordT(0, 0, 0));
+    EXPECT_EQ( bbox2, bbox.asReal<float>() );
+    EXPECT_FALSE( bbox2.empty() );
+    EXPECT_EQ( bbox2.dim(), Vec3T(1.0f, 1.0f, 1.0f) );
+    EXPECT_EQ( bbox2[0], Vec3T(0.0f, 0.0f, 0.0f) );
+    EXPECT_EQ( bbox2[1], Vec3T(1.0f, 1.0f, 1.0f) );
+    
+    EXPECT_TRUE(ray.clip(bbox));// ERROR: how can a non-empty bbox have no intersections!?
+    //EXPECT_TRUE( ray.clip(bbox.asReal<float>()));// correct!
+
+    // intersects the two faces of the box perpendicular to the x-axis!
+    EXPECT_EQ(1.0f, ray.t0());
+    EXPECT_EQ(2.0f, ray.t1());
+    EXPECT_EQ(ray(1.0f), Vec3T(0.0f, 0.5f, 0.5f)); //lower y component of intersection
+    EXPECT_EQ(ray(2.0f), Vec3T(1.0f, 0.5f, 0.5f)); //higher y component of intersection
+}// RayBasic
+
 TEST_F(TestNanoVDB, Ray)
 {
     using RealT = float;
@@ -534,20 +570,22 @@ TEST_F(TestNanoVDB, Ray)
 
     // test bbox clip
     const Vec3T dir(-1.0, 2.0, 3.0);
-    const Vec3T eye(2.0, 1.0, 1.0);
+    const Vec3T eye( 2.0, 1.0, 1.0);
     RealT       t0 = 0.1, t1 = 12589.0;
     RayT        ray(eye, dir, t0, t1);
 
     // intersects the two faces of the box perpendicular to the y-axis!
-    EXPECT_TRUE(ray.clip(CoordBBoxT(CoordT(0, 2, 2), CoordT(2, 4, 6) - CoordT(1))));
+    EXPECT_TRUE(ray.clip(CoordBBoxT(CoordT(0, 2, 2), CoordT(2, 4, 6))));
+    //std::cerr << ray(0.5) << ", " << ray(2.0) << std::endl;
     EXPECT_EQ(0.5, ray.t0());
-    EXPECT_EQ(1.5, ray.t1());
+    EXPECT_EQ(2.0, ray.t1());
     EXPECT_EQ(ray(0.5)[1], 2); //lower y component of intersection
-    EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
+    EXPECT_EQ(ray(2.0)[1], 5); //higher y component of intersection
 
     ray.reset(eye, dir, t0, t1);
     // intersects the lower edge anlong the z-axis of the box
     EXPECT_TRUE(ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))));
+    //std::cerr << ray(0.5) << ", " << ray(2.0) << std::endl;
     EXPECT_EQ(0.5, ray.t0());
     EXPECT_EQ(0.5, ray.t1());
     EXPECT_EQ(ray(0.5)[0], 1.5); //lower y component of intersection
@@ -555,7 +593,7 @@ TEST_F(TestNanoVDB, Ray)
 
     ray.reset(eye, dir, t0, t1);
     // no intersections
-    EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6) - CoordT(1))));
+    EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6) )));
     EXPECT_EQ(t0, ray.t0());
     EXPECT_EQ(t1, ray.t1());
 }
@@ -1319,6 +1357,15 @@ TEST_F(TestNanoVDB, GridBuilderBasic2)
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_EQ(1.0f, dstAcc.getValue(nanovdb::Coord(1, 2, 3)));
         EXPECT_EQ(2.0f, dstAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+        const nanovdb::BBox<nanovdb::Vec3R> indexBBox = dstGrid->indexBBox();
+        EXPECT_DOUBLE_EQ( 1.0, indexBBox[0][0]);
+        EXPECT_DOUBLE_EQ(-2.0, indexBBox[0][1]);
+        EXPECT_DOUBLE_EQ( 3.0, indexBBox[0][2]);
+        EXPECT_DOUBLE_EQ( 3.0, indexBBox[1][0]);
+        EXPECT_DOUBLE_EQ( 3.0, indexBBox[1][1]);
+        EXPECT_DOUBLE_EQ(10.0, indexBBox[1][2]);
+
         EXPECT_EQ(nanovdb::Coord(1, -2, 3), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord(2, 2, 9), dstGrid->indexBBox()[1]);
     }
@@ -1936,7 +1983,7 @@ TEST_F(TestNanoVDB, ScalarSampleFromVoxels)
     EXPECT_NEAR( 1.6f, gradIndex[0] / dx, 2e-5);
     EXPECT_NEAR( 6.7f, gradIndex[1] / dx, 2e-5);
     EXPECT_NEAR(-3.5f, gradIndex[2] / dx, 2e-5);
-    const auto gradWorld = grid->indexToWorldDir(gradIndex); // in world units
+    const auto gradWorld = grid->indexToWorldGrad(gradIndex); // in world units
     EXPECT_NEAR( 1.6f, gradWorld[0], 2e-5);
     EXPECT_NEAR( 6.7f, gradWorld[1], 2e-5);
     EXPECT_NEAR(-3.5f, gradWorld[2], 2e-5);

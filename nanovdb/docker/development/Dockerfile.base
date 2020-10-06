@@ -18,7 +18,7 @@ RUN \
 	$ROOT_PATH/scripts/linux_install_core.sh && \
     dos2unix $ROOT_PATH/scripts/linux_install_gcc.sh && \
     chmod +x $ROOT_PATH/scripts/linux_install_gcc.sh && \
-	$ROOT_PATH/scripts/linux_install_gcc.sh 8 && \
+	$ROOT_PATH/scripts/linux_install_gcc.sh g++-8 && \
     dos2unix $ROOT_PATH/scripts/build_openvdb.sh && \
     chmod +x $ROOT_PATH/scripts/build_openvdb.sh && \
 	$ROOT_PATH/scripts/build_openvdb.sh latest clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON

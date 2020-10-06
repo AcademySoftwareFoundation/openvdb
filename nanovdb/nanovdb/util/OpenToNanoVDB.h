@@ -464,7 +464,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
         timer.stop();
 
     if (verbose)
-        openvdb::util::printBytes(std::cerr, this->gridSize(), "Allocated", " for the NanoVDB\n");
+        openvdb::util::printBytes(std::cerr, this->gridSize(), "Allocated", " for the NanoVDB grid\n");
 
     if (srcGrid.getGridClass() == openvdb::GRID_LEVEL_SET) {
         mDelta = ValueT(srcGrid.voxelSize()[0]); // skip a node if max < -mDelta || min > mDelta

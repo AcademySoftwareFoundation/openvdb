@@ -187,14 +187,16 @@ int main(int argc, char* argv[])
 
     std::unique_ptr<RendererBase> renderer;
 
-#if defined(NANOVDB_USE_GLFW)
-    if (batch)
+    if (batch) {
         renderer.reset(new BatchRenderer(rendererParams));
-    else
+    } else {
+#if defined(NANOVDB_USE_GLFW)
         renderer.reset(new Viewer(rendererParams));
 #else
-    renderer.reset(new BatchRenderer(rendererParams));
+        std::cerr << "Warning: GLFW was not enabled in your build configuration. Using batch mode.\n";
+        renderer.reset(new BatchRenderer(rendererParams));
 #endif
+    }
 
     if (platformName.empty() == false) {
         if (renderer->setRenderPlatformByName(platformName) == false) {
