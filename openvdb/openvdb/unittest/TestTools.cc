@@ -7,7 +7,6 @@
 #include <openvdb/tools/Composite.h>        // for csunion()
 #include <openvdb/tools/Diagnostics.h>
 #include <openvdb/tools/GridOperators.h>
-#include <openvdb/tools/Filter.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetAdvect.h>
@@ -52,7 +51,6 @@ public:
     CPPUNIT_TEST(testDilateActiveValues);
     CPPUNIT_TEST(testErodeVoxels);
     CPPUNIT_TEST(testActivate);
-    CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
     CPPUNIT_TEST(testInteriorMask);
     CPPUNIT_TEST(testLevelSetSphere);
@@ -80,7 +78,6 @@ public:
     void testDilateActiveValues();
     void testErodeVoxels();
     void testActivate();
-    void testFilter();
     void testFloatApply();
     void testInteriorMask();
     void testLevelSetSphere();
@@ -1085,129 +1082,6 @@ TestTools::testActivate()
     tools::activate(tree, foreground);
     // Verify that the expected number of voxels are active.
     CPPUNIT_ASSERT_EQUAL(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
-}
-
-void
-TestTools::testFilter()
-{
-    openvdb::FloatGrid::Ptr referenceGrid = openvdb::FloatGrid::create(/*background=*/5.0);
-
-    const openvdb::Coord dim(40);
-    const openvdb::Vec3f center(25.0f, 20.0f, 20.0f);
-    const float radius = 10.0f;
-    unittest_util::makeSphere<openvdb::FloatGrid>(
-        dim, center, radius, *referenceGrid, unittest_util::SPHERE_DENSE);
-    const openvdb::FloatTree& sphere = referenceGrid->tree();
-
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(sphere.activeVoxelCount()));
-    openvdb::Coord xyz;
-
-    {// test Filter::offsetFilter
-        openvdb::FloatGrid::Ptr grid = referenceGrid->deepCopy();
-        openvdb::FloatTree& tree = grid->tree();
-        openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
-        const float offset = 2.34f;
-        filter.setGrainSize(0);//i.e. disable threading
-        filter.offset(offset);
-        for (int x=0; x<dim[0]; ++x) {
-            xyz[0]=x;
-            for (int y=0; y<dim[1]; ++y) {
-                xyz[1]=y;
-                for (int z=0; z<dim[2]; ++z) {
-                    xyz[2]=z;
-                    float delta = sphere.getValue(xyz) + offset - tree.getValue(xyz);
-                    //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
-                }
-            }
-        }
-        filter.setGrainSize(1);//i.e. enable threading
-        filter.offset(-offset);//default is multi-threaded
-        for (int x=0; x<dim[0]; ++x) {
-            xyz[0]=x;
-            for (int y=0; y<dim[1]; ++y) {
-                xyz[1]=y;
-                for (int z=0; z<dim[2]; ++z) {
-                    xyz[2]=z;
-                    float delta = sphere.getValue(xyz) - tree.getValue(xyz);
-                    //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
-                }
-            }
-        }
-        //std::cerr << "Successfully completed TestTools::testFilter offset test" << std::endl;
-    }
-    {// test Filter::median
-        openvdb::FloatGrid::Ptr filteredGrid = referenceGrid->deepCopy();
-        openvdb::FloatTree& filteredTree = filteredGrid->tree();
-        const int width = 2;
-        openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
-        openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-        filter.median(width, /*interations=*/1);
-        std::vector<float> tmp;
-        for (int x=0; x<dim[0]; ++x) {
-            xyz[0]=x;
-            for (int y=0; y<dim[1]; ++y) {
-                xyz[1]=y;
-                for (int z=0; z<dim[2]; ++z) {
-                    xyz[2]=z;
-                    for (int i = xyz[0] - width, ie= xyz[0] + width; i <= ie; ++i) {
-                        openvdb::Coord ijk(i,0,0);
-                        for (int j = xyz[1] - width, je = xyz[1] + width; j <= je; ++j) {
-                            ijk.setY(j);
-                            for (int k = xyz[2] - width, ke = xyz[2] + width; k <= ke; ++k) {
-                                ijk.setZ(k);
-                                tmp.push_back(sphere.getValue(ijk));
-                            }
-                        }
-                    }
-                    std::sort(tmp.begin(), tmp.end());
-                    stencil.moveTo(xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                        tmp[(tmp.size()-1)/2], stencil.median(), /*tolerance=*/0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                        stencil.median(), filteredTree.getValue(xyz), /*tolerance=*/0.0001);
-                    tmp.clear();
-                }
-            }
-        }
-        //std::cerr << "Successfully completed TestTools::testFilter median test" << std::endl;
-    }
-    {// test Filter::mean
-        openvdb::FloatGrid::Ptr filteredGrid = referenceGrid->deepCopy();
-        openvdb::FloatTree& filteredTree = filteredGrid->tree();
-        const int width = 2;
-        openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
-        openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-        filter.mean(width,  /*interations=*/1);
-        for (int x=0; x<dim[0]; ++x) {
-            xyz[0]=x;
-            for (int y=0; y<dim[1]; ++y) {
-                xyz[1]=y;
-                for (int z=0; z<dim[2]; ++z) {
-                    xyz[2]=z;
-                    double sum =0.0, count=0.0;
-                    for (int i = xyz[0] - width, ie= xyz[0] + width; i <= ie; ++i) {
-                        openvdb::Coord ijk(i,0,0);
-                        for (int j = xyz[1] - width, je = xyz[1] + width; j <= je; ++j) {
-                            ijk.setY(j);
-                            for (int k = xyz[2] - width, ke = xyz[2] + width; k <= ke; ++k) {
-                                ijk.setZ(k);
-                                sum += sphere.getValue(ijk);
-                                count += 1.0;
-                            }
-                        }
-                    }
-                    stencil.moveTo(xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                        sum/count, stencil.mean(), /*tolerance=*/0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                        stencil.mean(), filteredTree.getValue(xyz), 0.0001);
-                }
-            }
-        }
-        //std::cerr << "Successfully completed TestTools::testFilter mean test" << std::endl;
-    }
 }
 
 

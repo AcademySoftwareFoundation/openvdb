@@ -11,6 +11,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/Filter.h>
+#include <openvdb/util/Util.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
 #include <algorithm>
@@ -118,8 +119,6 @@ struct FilterParms {
 #endif
 };
 
-using FilterParmVec = std::vector<FilterParms>;
-
 } // anonymous namespace
 
 
@@ -146,11 +145,8 @@ public:
     {
 protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
-        OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
+        FilterParms evalFilterParms(const fpreal);
     }; // class Cache
-
-private:
-    struct FilterOp;
 };
 
 
@@ -398,91 +394,87 @@ SOP_OpenVDB_Filter::updateParmsFlags()
 
 
 // Helper class for use with GridBase::apply()
-struct SOP_OpenVDB_Filter::FilterOp
+struct FilterOp
 {
-    FilterParmVec opSequence;
-    hvdb::Interrupter* interrupt;
+    template <typename GridT>
+    using FilterT = openvdb::tools::Filter<GridT, openvdb::FloatGrid, hvdb::Interrupter>;
+
+    FilterOp(const FilterParms& parms, hvdb::Interrupter& interrupt)
+        : mParms(parms), mInterrupt(interrupt) {}
 
     template<typename GridT>
     void operator()(GridT& grid)
     {
         using ValueT = typename GridT::ValueType;
-        using MaskT = openvdb::FloatGrid;
+        using TreeType = typename GridT::TreeType;
 
-        openvdb::tools::Filter<GridT, MaskT, hvdb::Interrupter> filter(grid, interrupt);
+        int radius = mParms.radius;
+        if (mParms.useWorldRadius) {
+            double voxelRadius = double(mParms.worldRadius) / grid.voxelSize()[0];
+            radius = std::max(1, int(voxelRadius));
+        }
 
-        for (size_t i = 0, N = opSequence.size(); i < N; ++i) {
-            if (interrupt && interrupt->wasInterrupted()) return;
+        FilterT<GridT> filter(grid, &mInterrupt);
+        filter.setProcessTiles(true);
+        filter.setMaskRange(mParms.minMask, mParms.maxMask);
+        filter.invertMask(mParms.invertMask);
 
-            const FilterParms& parms = opSequence[i];
-
-            int radius = parms.radius;
-
-            if (parms.useWorldRadius) {
-                double voxelRadius = double(parms.worldRadius) / grid.voxelSize()[0];
-                radius = std::max(1, int(voxelRadius));
+        switch (mParms.op) {
+#ifndef SESI_OPENVDB
+        case OP_OFFSET:
+            {
+                const ValueT offset = static_cast<ValueT>(mParms.offset);
+                if (mParms.verbose) std::cout << "Applying Offset by " << offset << std::endl;
+                filter.offset(offset, mParms.mask);
             }
-
-            filter.setMaskRange(parms.minMask, parms.maxMask);
-            filter.invertMask(parms.invertMask);
-
-            switch (parms.op) {
-#ifndef SESI_OPENVDB
-            case OP_OFFSET:
-                {
-                    const ValueT offset = static_cast<ValueT>(parms.offset);
-                    if (parms.verbose) std::cout << "Applying Offset by " << offset << std::endl;
-                    filter.offset(offset, parms.mask);
-                }
-                break;
+            break;
 #endif
-            case OP_MEAN:
+        case OP_MEAN:
 #ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of mean value"
-                        " filtering with a radius of " << radius << std::endl;
-                }
-#endif
-                filter.mean(radius, parms.iterations, parms.mask);
-                break;
-
-            case OP_GAUSS:
-#ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of gaussian"
-                        " filtering with a radius of " <<radius << std::endl;
-                }
-#endif
-                filter.gaussian(radius, parms.iterations, parms.mask);
-                break;
-
-            case OP_MEDIAN:
-#ifndef SESI_OPENVDB
-                if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of median value"
-                        " filtering with a radius of " << radius << std::endl;
-                }
-#endif
-                filter.median(radius, parms.iterations, parms.mask);
-                break;
-
-            case NUM_OPERATIONS:
-                break;
+            if (mParms.verbose) {
+                std::cout << "Applying " << mParms.iterations << " iterations of mean value"
+                    " filtering with a radius of " << radius << std::endl;
             }
+#endif
+            filter.mean(radius, mParms.iterations, mParms.mask);
+            break;
+
+        case OP_GAUSS:
+#ifndef SESI_OPENVDB
+            if (mParms.verbose) {
+                std::cout << "Applying " << mParms.iterations << " iterations of gaussian"
+                    " filtering with a radius of " <<radius << std::endl;
+            }
+#endif
+            filter.gaussian(radius, mParms.iterations, mParms.mask);
+            break;
+
+        case OP_MEDIAN:
+#ifndef SESI_OPENVDB
+            if (mParms.verbose) {
+                std::cout << "Applying " << mParms.iterations << " iterations of median value"
+                    " filtering with a radius of " << radius << std::endl;
+            }
+#endif
+            filter.median(radius, mParms.iterations, mParms.mask);
+            break;
+
+        case NUM_OPERATIONS:
+            break;
         }
     }
+
+    const FilterParms& mParms;
+    hvdb::Interrupter& mInterrupt;
 };
 
 
 ////////////////////////////////////////
 
 
-OP_ERROR
-SOP_OpenVDB_Filter::Cache::evalFilterParms(
-    OP_Context& context, GU_Detail&, FilterParmVec& parmVec)
+FilterParms
+SOP_OpenVDB_Filter::Cache::evalFilterParms(const fpreal now)
 {
-    const fpreal now = context.getTime();
-
     const Operation op = stringToOp(evalStdString("operation", 0));
 
     FilterParms parms(op);
@@ -524,10 +516,7 @@ SOP_OpenVDB_Filter::Cache::evalFilterParms(
     parms.minMask = static_cast<float>(evalFloat("minmask", 0, now));
     parms.maxMask = static_cast<float>(evalFloat("maxmask", 0, now));
     parms.invertMask = evalInt("invert", 0, now);
-
-    parmVec.push_back(parms);
-
-    return error();
+    return parms;
 }
 
 
@@ -538,21 +527,17 @@ OP_ERROR
 SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
 {
     try {
+        hvdb::Interrupter progress("Filtering VDB grids");
+
         const fpreal now = context.getTime();
-
-        FilterOp filterOp;
-
-        evalFilterParms(context, *gdp, filterOp.opSequence);
+        const FilterParms parms = evalFilterParms(now);
+        FilterOp filterOp(parms, progress);
 
         // Get the group of grids to process.
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", now));
 
-        hvdb::Interrupter progress("Filtering VDB grids");
-        filterOp.interrupt = &progress;
-
         // Process each VDB primitive in the selected group.
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
-
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
