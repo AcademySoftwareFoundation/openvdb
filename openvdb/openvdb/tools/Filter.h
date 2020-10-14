@@ -269,8 +269,8 @@ private:
         void operator()(const RootT& node) const
         {
             using ChildT = typename RootT::ChildNodeType;
-            constexpr Int32 CHILDDIM = Int32(ChildT::DIM);
-            constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
+            static constexpr Int32 CHILDDIM = Int32(ChildT::DIM);
+            static constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
             const Tester op(mTree, mNeighbours);
 
             auto step =
@@ -316,8 +316,8 @@ private:
         void operator()(const NodeT& node) const
         {
             using ChildT = typename NodeT::ChildNodeType;
-            constexpr Int32 CHILDDIM = Int32(ChildT::DIM);
-            constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
+            static constexpr Int32 CHILDDIM = Int32(ChildT::DIM);
+            static constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
 
             static auto step =
                 [](const Tester& op,
@@ -446,7 +446,7 @@ private:
             inline bool test(const Coord& ijk,
                 const typename TreeT::ValueType& val) const
             {
-                constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
+                static constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
                 const Coord* NN = util::COORD_OFFSETS;
                 for (size_t i = 0; i < mNeighbours; ++i, ++NN) {
                     Coord neighbour(*NN);
