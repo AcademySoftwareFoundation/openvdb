@@ -102,10 +102,14 @@ int main(int argc, char* argv[])
     };
     auto wbboxToStr = [](const nanovdb::BBox<nanovdb::Vec3d>& bbox) {
         std::stringstream ss;
-        ss << std::setprecision(3);
-        ss << "(" << bbox[0][0] << "," << bbox[0][1] << "," << bbox[0][2] << ")";
-        ss << " -> ";
-        ss << "(" << bbox[1][0] << "," << bbox[1][1] << "," << bbox[1][2] << ")";
+        if (bbox.empty()) {
+            ss << "empty grid";
+        } else {
+            ss << std::setprecision(3);
+            ss << "(" << bbox[0][0] << "," << bbox[0][1] << "," << bbox[0][2] << ")";
+            ss << " -> ";
+            ss << "(" << bbox[1][0] << "," << bbox[1][1] << "," << bbox[1][2] << ")";
+        }
         return ss.str();
     };
     auto ibboxToStr = [](const nanovdb::CoordBBox& bbox) {

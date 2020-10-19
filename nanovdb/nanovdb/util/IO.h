@@ -25,7 +25,7 @@
 #include <string> // for std::string
 #include <sstream> // for std::stringstream
 #include <cstring> // for std::strcmp
-#include <memory>// for std::unique_ptr
+#include <memory> // for std::unique_ptr
 #include <vector> // for std::vector
 #ifdef NANOVDB_USE_ZIP
 #include <zlib.h> // for ZIP compression
@@ -89,9 +89,9 @@ inline uint64_t stringHash(const std::string& str)
 inline uint64_t reverseEndianness(uint64_t val)
 {
     return (((val) >> 56) & 0x00000000000000FF) | (((val) >> 40) & 0x000000000000FF00) |
-	       (((val) >> 24) & 0x0000000000FF0000) | (((val) >>  8) & 0x00000000FF000000) |
-	       (((val) <<  8) & 0x000000FF00000000) | (((val) << 24) & 0x0000FF0000000000) |
-    	   (((val) << 40) & 0x00FF000000000000) | (((val) << 56) & 0xFF00000000000000) ;
+           (((val) >> 24) & 0x0000000000FF0000) | (((val) >> 8) & 0x00000000FF000000) |
+           (((val) << 8) & 0x000000FF00000000) | (((val) << 24) & 0x0000FF0000000000) |
+           (((val) << 40) & 0x00FF000000000000) | (((val) << 56) & 0xFF00000000000000);
 }
 
 /// @brief Data encoded at the head of each segment of a file or stream.
@@ -139,8 +139,8 @@ struct MetaData
     Vec3R       voxelSize; // 24B.
     uint32_t    nameSize; // 4B.
     uint32_t    nodeCount[4]; //4 x 4 = 16B
-    Codec       codec;// 2B
-    uint16_t    major;// 2B
+    Codec       codec; // 2B
+    uint16_t    major; // 2B
 }; // MetaData ( 160B )
 
 struct GridMetaData : public MetaData
@@ -351,18 +351,18 @@ void Internal::read(std::istream& is, GridHandle<BufferT>& handle, Codec codec)
 template<typename ValueT>
 inline GridMetaData::GridMetaData(uint64_t size, Codec c, const NanoGrid<ValueT>& grid)
     : MetaData{size, // gridSize
-               0,// fileSize
-               0,// nameKey
-               grid.activeVoxelCount(),// voxelCount
-               grid.gridType(),// gridType
-               grid.gridClass(),// gridClass
-               grid.worldBBox(),// worldBBox
-               grid.tree().bbox(),// indexBBox
-               grid.voxelSize(),// voxelSize
-               0,// nameSize
-               {0, 0, 0, 0},// nodeCount[4]
+               0, // fileSize
+               0, // nameKey
+               grid.activeVoxelCount(), // voxelCount
+               grid.gridType(), // gridType
+               grid.gridClass(), // gridClass
+               grid.worldBBox(), // worldBBox
+               grid.tree().bbox(), // indexBBox
+               grid.voxelSize(), // voxelSize
+               0, // nameSize
+               {0, 0, 0, 0}, // nodeCount[4]
                c, // codec
-               NANOVDB_MAJOR_VERSION_NUMBER}// major
+               NANOVDB_MAJOR_VERSION_NUMBER} // major
     , gridName(grid.gridName())
 {
     nameKey = stringHash(gridName);
@@ -454,9 +454,14 @@ inline bool Segment::read(std::istream& is)
         throw std::runtime_error("Magic number error: This is not a valid nvdb file");
     } else if (header.major != NANOVDB_MAJOR_VERSION_NUMBER) {
         std::stringstream ss;
-        ss << "Read version " << header.major << "." << header.minor << ".X"
-           << " but expected version " << NANOVDB_MAJOR_VERSION_NUMBER << ".X" << std::endl;
-        throw std::runtime_error("Incompatible file format: " + ss.str());
+        if (header.major < NANOVDB_MAJOR_VERSION_NUMBER) {
+            ss << "The file is written in an older version of NanoVDB: " << header.major << "." << header.minor << ".X!\n\t"
+               << "Recommendation: Re-generate this NanoVDB file with the never version " << NANOVDB_MAJOR_VERSION_NUMBER << ".X of NanoVDB";
+        } else {
+            ss << "This tool was compiled against an older version of NanoVDB: " << NANOVDB_MAJOR_VERSION_NUMBER << ".X!\n\t"
+               << "Recommendation: Re-compile this tool against version " << header.major << ".X of NanoVDB";
+        }
+        throw std::runtime_error("An unrecoverable error in nanaovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
     }
     meta.resize(header.gridCount);
     for (auto& m : meta) {
@@ -539,7 +544,7 @@ GridHandle<BufferT> readGrid(const std::string& fileName, uint64_t n, int verbos
     if (verbose) {
         std::cout << "Read NanoGrid # " << n << " from the file named \"" << fileName << "\"" << std::endl;
     }
-    return handle;// is converted to r-value and return value is move constructed.
+    return handle; // is converted to r-value and return value is move constructed.
 }
 
 template<typename BufferT>
@@ -554,7 +559,7 @@ GridHandle<BufferT> readGrid(std::istream& is, uint64_t n, const BufferT& buffer
                 GridHandle<BufferT> handle(BufferT::create(m.gridSize, &buffer));
                 is.seekg(seek, std::ios_base::cur); // skip forward from the current position
                 Internal::read(is, handle, s.header.codec);
-                return handle;// is converted to r-value and return value is move constructed.
+                return handle; // is converted to r-value and return value is move constructed.
             } else {
                 seek += m.fileSize;
             }
@@ -581,7 +586,7 @@ GridHandle<BufferT> readGrid(const std::string& fileName, const std::string& gri
             std::cout << "File named \"" << fileName << "\" does not contain a grid named \"" + gridName + "\"" << std::endl;
         }
     }
-    return handle;// is converted to r-value and return value is move constructed.
+    return handle; // is converted to r-value and return value is move constructed.
 }
 
 template<typename BufferT>
@@ -596,14 +601,14 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
                 GridHandle<BufferT> handle(BufferT::create(m.gridSize, &buffer));
                 is.seekg(seek, std::ios_base::cur); // rewind
                 Internal::read(is, handle, s.header.codec);
-                return handle;// is converted to r-value and return value is move constructed.
+                return handle; // is converted to r-value and return value is move constructed.
             } else {
                 seek += m.fileSize;
             }
         }
         is.seekg(seek, std::ios_base::cur); // skip forward from the current position
     }
-    return GridHandle<BufferT>();// empty handle
+    return GridHandle<BufferT>(); // empty handle
 }
 
 /// @brief Read all the grids
@@ -618,22 +623,22 @@ VecT<GridHandle<BufferT>> readGrids(const std::string& fileName, int verbose, co
     if (verbose) {
         std::cout << "Read " << handles.size() << " NanoGrid(s) from the file named \"" << fileName << "\"" << std::endl;
     }
-    return handles;// is converted to r-value and return value is move constructed.
+    return handles; // is converted to r-value and return value is move constructed.
 }
 
 template<typename BufferT, template<typename...> class VecT>
 VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& buffer)
 {
     VecT<GridHandle<BufferT>> handles;
-    Segment seg;
+    Segment                   seg;
     while (seg.read(is)) {
         for (auto& m : seg.meta) {
             GridHandle<BufferT> handle(BufferT::create(m.gridSize, &buffer));
             Internal::read(is, handle, seg.header.codec);
-            handles.push_back(std::move(handle));// force move copy assignment
+            handles.push_back(std::move(handle)); // force move copy assignment
         }
     }
-    return handles;// is converted to r-value and return value is move constructed.
+    return handles; // is converted to r-value and return value is move constructed.
 }
 
 inline std::vector<GridMetaData> readGridMetaData(const std::string& fileName)
@@ -642,13 +647,13 @@ inline std::vector<GridMetaData> readGridMetaData(const std::string& fileName)
     if (!is.is_open()) {
         throw std::runtime_error("Unable to open file named \"" + fileName + "\" for input");
     }
-    return readGridMetaData(is);// is converted to r-value and return value is move constructed.
+    return readGridMetaData(is); // is converted to r-value and return value is move constructed.
 }
 
 inline std::vector<GridMetaData> readGridMetaData(std::istream& is)
 {
     std::vector<GridMetaData> meta;
-    Segment seg;
+    Segment                   seg;
     while (seg.read(is)) {
         std::streamoff seek = 0;
         for (auto& m : seg.meta) {
@@ -657,7 +662,7 @@ inline std::vector<GridMetaData> readGridMetaData(std::istream& is)
         }
         is.seekg(seek, std::ios_base::cur);
     }
-    return meta;// is converted to r-value and return value is move constructed.
+    return meta; // is converted to r-value and return value is move constructed.
 }
 
 inline bool hasGrid(const std::string& fileName, const std::string& gridName)
@@ -703,15 +708,15 @@ inline uint64_t stringHash(const char* cstr)
 inline std::string getStringForGridType(nanovdb::GridType t)
 {
     switch (t) {
-    case GridType::Float:  return "float"; break;
+    case GridType::Float: return "float"; break;
     case GridType::Double: return "double"; break;
-    case GridType::Int16:  return "int16"; break;
-    case GridType::Int32:  return "int32"; break;
+    case GridType::Int16: return "int16"; break;
+    case GridType::Int32: return "int32"; break;
     case GridType::UInt32: return "uint32"; break;
-    case GridType::Int64:  return "int64"; break;
-    case GridType::Vec3f:  return "Vec3f"; break;
-    case GridType::Vec3d:  return "Vec3d"; break;
-    case GridType::Mask:   return "Mask"; break;
+    case GridType::Int64: return "int64"; break;
+    case GridType::Vec3f: return "Vec3f"; break;
+    case GridType::Vec3d: return "Vec3d"; break;
+    case GridType::Mask: return "Mask"; break;
     default: return "?";
     }
 }
@@ -719,11 +724,11 @@ inline std::string getStringForGridType(nanovdb::GridType t)
 inline std::string getStringForGridClass(nanovdb::GridClass t)
 {
     switch (t) {
-    case GridClass::LevelSet:   return "SDF"; break;
-    case GridClass::FogVolume:  return "FOG"; break;
-    case GridClass::Staggered:  return "MAC"; break;
+    case GridClass::LevelSet: return "SDF"; break;
+    case GridClass::FogVolume: return "FOG"; break;
+    case GridClass::Staggered: return "MAC"; break;
     case GridClass::PointIndex: return "PNTIDX"; break;
-    case GridClass::PointData:  return "PNTDAT"; break;
+    case GridClass::PointData: return "PNTDAT"; break;
     default: return "?";
     }
 }
@@ -731,14 +736,14 @@ inline std::string getStringForGridClass(nanovdb::GridClass t)
 inline std::string getStringForCodec(nanovdb::io::Codec c)
 {
     switch (c) {
-    case Codec::NONE:  return "None"; break;
-    case Codec::ZIP:   return "Zip"; break;
+    case Codec::NONE: return "None"; break;
+    case Codec::ZIP: return "Zip"; break;
     case Codec::BLOSC: return "Blosc"; break;
     default: return "?";
     }
 }
 
-} // namespace io
-} // namespace nanovdb
+}
+} // namespace nanovdb::io
 
 #endif // NANOVDB_IO_H_HAS_BEEN_INCLUDED

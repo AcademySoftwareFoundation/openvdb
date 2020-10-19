@@ -339,7 +339,7 @@ TEST_F(Benchmark, OpenVDB_CPU)
 
     auto srcGrid = this->getSrcGrid();
     mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort=*/false, /*verbose=*/0);
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Disable, /*mortonSort=*/false, /*verbose=*/0);
     mTimer.restart("Writing NanoVDB grid");
 #if defined(NANOVDB_USE_BLOSC)
     nanovdb::io::writeGrid("data/test.nvdb", handle, nanovdb::io::Codec::BLOSC);

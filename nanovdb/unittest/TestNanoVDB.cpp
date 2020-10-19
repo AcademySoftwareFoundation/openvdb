@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <sstream> // for std::stringstream
 #include <vector>
+#include <limits.h> // CHAR_BIT
 #include <algorithm> // for std::is_sorted
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -26,7 +27,7 @@
 inline std::ostream&
 operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
 {
-    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") ->"
+    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
        << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
     return os;
 }
@@ -38,7 +39,7 @@ operator<<(std::ostream& os, const nanovdb::Coord& ijk)
     return os;
 }
 
-template <typename T>
+template<typename T>
 inline std::ostream&
 operator<<(std::ostream& os, const nanovdb::Vec3<T>& v)
 {
@@ -74,23 +75,30 @@ protected:
         const char* str = std::getenv(name.c_str());
         return str == nullptr ? std::string("") : std::string(str);
     }
-    /*
-    nanovdb::GridHandle<> getSrcGrid(int verbose = 1)
+
+    template<typename T>
+    void printType(const std::string& s)
     {
+        const auto n = sizeof(T);
+        std::cerr << "Size of " << s << ": " << n << " bytes which is" << (n % 32 == 0 ? " " : " NOT ") << "32 byte aligned" << std::endl;
     }
-*/
     nanovdb::CpuTimer<> mTimer;
 }; // TestNanoVDB
 
 TEST_F(TestNanoVDB, Basic)
 {
+    { // CHAR_BIT
+        EXPECT_EQ(8, CHAR_BIT);
+    }
     {
         std::vector<int> v = {3, 1, 7, 0};
         EXPECT_FALSE(std::is_sorted(v.begin(), v.end()));
         std::map<int, void*> m;
-        for (const auto& i : v) m[i] = nullptr;
+        for (const auto& i : v)
+            m[i] = nullptr;
         v.clear();
-        for (const auto& i : m) v.push_back(i.first);
+        for (const auto& i : m)
+            v.push_back(i.first);
         EXPECT_TRUE(std::is_sorted(v.begin(), v.end()));
     }
     {
@@ -126,7 +134,7 @@ TEST_F(TestNanoVDB, Assumptions)
 
 TEST_F(TestNanoVDB, Magic)
 {
-    EXPECT_EQ(27, NANOVDB_MAJOR_VERSION_NUMBER);
+    EXPECT_EQ(28, NANOVDB_MAJOR_VERSION_NUMBER);
     EXPECT_EQ(0, NANOVDB_MINOR_VERSION_NUMBER);
     EXPECT_EQ(0, NANOVDB_PATCH_VERSION_NUMBER);
     EXPECT_EQ(0x304244566f6e614eUL, NANOVDB_MAGIC_NUMBER); // Magic number: "NanoVDB0" in hex)
@@ -137,7 +145,7 @@ TEST_F(TestNanoVDB, Magic)
     EXPECT_EQ(8u, strlen(str));
     std::stringstream ss1;
     ss1 << "0x";
-    for (int i = 7; i>=0; --i)
+    for (int i = 7; i >= 0; --i)
         ss1 << std::hex << unsigned(str[i]);
     ss1 << "UL";
     //std::cerr << ss1.str() << std::endl;
@@ -160,28 +168,42 @@ TEST_F(TestNanoVDB, Magic)
     EXPECT_EQ(magic, nanovdb::io::reverseEndianness(NANOVDB_MAGIC_NUMBER));
 }
 
+TEST_F(TestNanoVDB, FindBits)
+{
+    for (uint32_t i = 0; i < 32; ++i) {
+        uint32_t word = uint32_t(1) << i;
+        EXPECT_EQ(i, nanovdb::FindLowestOn(word));
+        EXPECT_EQ(i, nanovdb::FindHighestOn(word));
+    }
+    for (uint32_t i = 0; i < 64; ++i) {
+        uint64_t word = uint64_t(1) << i;
+        EXPECT_EQ(i, nanovdb::FindLowestOn(word));
+        EXPECT_EQ(i, nanovdb::FindHighestOn(word));
+    }
+}
+
 TEST_F(TestNanoVDB, CRC32)
 {
-    {// test function that uses iterators
+    { // test function that uses iterators
         const std::string s{"The quick brown fox jumps over the lazy dog"};
         std::stringstream ss;
         ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.begin(), s.end());
         EXPECT_EQ("414fa339", ss.str());
     }
-    {// test the checksum for a modified string
+    { // test the checksum for a modified string
         const std::string s{"The quick brown Fox jumps over the lazy dog"};
         std::stringstream ss;
         ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.begin(), s.end());
         EXPECT_NE("414fa339", ss.str());
     }
-    {// test function that uses void pointer and byte size
+    { // test function that uses void pointer and byte size
         const std::string s{"The quick brown fox jumps over the lazy dog"};
         std::stringstream ss;
         ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.data(), s.size());
         EXPECT_EQ("414fa339", ss.str());
     }
-    {// test accumulation
-        nanovdb::CRC32 crc;
+    { // test accumulation
+        nanovdb::CRC32    crc;
         const std::string s1{"The quick brown fox jum"};
         crc(s1.begin(), s1.end());
         const std::string s2{"ps over the lazy dog"};
@@ -202,9 +224,9 @@ TEST_F(TestNanoVDB, Range1D)
     EXPECT_TRUE(r1.is_divisible());
     EXPECT_EQ(0U, r1.begin());
     EXPECT_EQ(20U, r1.end());
-        
+
     nanovdb::Range1D r2(r1, nanovdb::Split());
-        
+
     EXPECT_FALSE(r1.empty());
     EXPECT_EQ(2U, r1.grainsize());
     EXPECT_EQ(10U, r1.size());
@@ -225,7 +247,7 @@ TEST_F(TestNanoVDB, Range1D)
 TEST_F(TestNanoVDB, Range2D)
 {
     nanovdb::Range<2, int> r1(-20, 20, 1u, 0, 20, 2u);
-        
+
     EXPECT_FALSE(r1.empty());
     EXPECT_EQ(1U, r1[0].grainsize());
     EXPECT_EQ(40U, r1[0].size());
@@ -233,23 +255,23 @@ TEST_F(TestNanoVDB, Range2D)
     EXPECT_TRUE(r1[0].is_divisible());
     EXPECT_EQ(-20, r1[0].begin());
     EXPECT_EQ(20, r1[0].end());
-        
+
     EXPECT_EQ(2U, r1[1].grainsize());
     EXPECT_EQ(20U, r1[1].size());
     EXPECT_EQ(10, r1[1].middle());
     EXPECT_TRUE(r1[1].is_divisible());
     EXPECT_EQ(0, r1[1].begin());
     EXPECT_EQ(20, r1[1].end());
-        
+
     nanovdb::Range<2, int> r2(r1, nanovdb::Split());
-        
+
     EXPECT_FALSE(r1.empty());
     EXPECT_EQ(1U, r1[0].grainsize());
     EXPECT_EQ(20U, r1[0].size());
     EXPECT_EQ(-10, r1[0].middle());
     EXPECT_TRUE(r1[0].is_divisible());
     EXPECT_EQ(-20, r1[0].begin());
-    EXPECT_EQ(  0, r1[0].end());
+    EXPECT_EQ(0, r1[0].end());
 
     EXPECT_EQ(2U, r1[1].grainsize());
     EXPECT_EQ(20U, r1[1].size());
@@ -261,7 +283,7 @@ TEST_F(TestNanoVDB, Range2D)
     EXPECT_FALSE(r2.empty());
     EXPECT_EQ(1U, r2[0].grainsize());
     EXPECT_EQ(20U, r2[0].size());
-    EXPECT_EQ( 10, r2[0].middle());
+    EXPECT_EQ(10, r2[0].middle());
     EXPECT_TRUE(r2[0].is_divisible());
     EXPECT_EQ(0, r2[0].begin());
     EXPECT_EQ(20, r2[0].end());
@@ -278,7 +300,7 @@ TEST_F(TestNanoVDB, Range2D)
 TEST_F(TestNanoVDB, Range3D)
 {
     nanovdb::Range<3, int> r1(-20, 20, 1u, 0, 20, 2u, 0, 10, 5);
-        
+
     EXPECT_FALSE(r1.empty());
     EXPECT_EQ(1U, r1[0].grainsize());
     EXPECT_EQ(40U, r1[0].size());
@@ -286,7 +308,7 @@ TEST_F(TestNanoVDB, Range3D)
     EXPECT_TRUE(r1[0].is_divisible());
     EXPECT_EQ(-20, r1[0].begin());
     EXPECT_EQ(20, r1[0].end());
-        
+
     EXPECT_EQ(2U, r1[1].grainsize());
     EXPECT_EQ(20U, r1[1].size());
     EXPECT_EQ(10, r1[1].middle());
@@ -300,16 +322,16 @@ TEST_F(TestNanoVDB, Range3D)
     EXPECT_TRUE(r1[2].is_divisible());
     EXPECT_EQ(0, r1[2].begin());
     EXPECT_EQ(10, r1[2].end());
-        
+
     nanovdb::Range<3, int> r2(r1, nanovdb::Split());
-        
+
     EXPECT_FALSE(r1.empty());
     EXPECT_EQ(1U, r1[0].grainsize());
     EXPECT_EQ(20U, r1[0].size());
     EXPECT_EQ(-10, r1[0].middle());
     EXPECT_TRUE(r1[0].is_divisible());
     EXPECT_EQ(-20, r1[0].begin());
-    EXPECT_EQ(  0, r1[0].end());
+    EXPECT_EQ(0, r1[0].end());
 
     EXPECT_EQ(2U, r1[1].grainsize());
     EXPECT_EQ(20U, r1[1].size());
@@ -328,7 +350,7 @@ TEST_F(TestNanoVDB, Range3D)
     EXPECT_FALSE(r2.empty());
     EXPECT_EQ(1U, r2[0].grainsize());
     EXPECT_EQ(20U, r2[0].size());
-    EXPECT_EQ( 10, r2[0].middle());
+    EXPECT_EQ(10, r2[0].middle());
     EXPECT_TRUE(r2[0].is_divisible());
     EXPECT_EQ(0, r2[0].begin());
     EXPECT_EQ(20, r2[0].end());
@@ -352,11 +374,10 @@ TEST_F(TestNanoVDB, Range3D)
 
 TEST_F(TestNanoVDB, Coord)
 {
-    
     EXPECT_EQ(size_t(3 * 4), nanovdb::Coord::memUsage()); // due to padding
     {
         nanovdb::Coord ijk;
-        EXPECT_EQ( sizeof(ijk), size_t(3 * 4));
+        EXPECT_EQ(sizeof(ijk), size_t(3 * 4));
         EXPECT_EQ(0, ijk[0]);
         EXPECT_EQ(0, ijk[1]);
         EXPECT_EQ(0, ijk[2]);
@@ -399,10 +420,10 @@ TEST_F(TestNanoVDB, Coord)
 TEST_F(TestNanoVDB, BBox)
 {
     nanovdb::BBox<nanovdb::Vec3f> bbox;
-    EXPECT_EQ( sizeof(bbox), size_t(2*3*4) );
-    EXPECT_EQ( std::numeric_limits<float>::max(), bbox[0][0]);
-    EXPECT_EQ( std::numeric_limits<float>::max(), bbox[0][1]);
-    EXPECT_EQ( std::numeric_limits<float>::max(), bbox[0][2]);
+    EXPECT_EQ(sizeof(bbox), size_t(2 * 3 * 4));
+    EXPECT_EQ(std::numeric_limits<float>::max(), bbox[0][0]);
+    EXPECT_EQ(std::numeric_limits<float>::max(), bbox[0][1]);
+    EXPECT_EQ(std::numeric_limits<float>::max(), bbox[0][2]);
     EXPECT_EQ(-std::numeric_limits<float>::max(), bbox[1][0]);
     EXPECT_EQ(-std::numeric_limits<float>::max(), bbox[1][1]);
     EXPECT_EQ(-std::numeric_limits<float>::max(), bbox[1][2]);
@@ -411,28 +432,28 @@ TEST_F(TestNanoVDB, BBox)
     bbox.expand(nanovdb::Vec3f(57.0f, -31.0f, 60.0f));
     EXPECT_TRUE(bbox.empty());
     EXPECT_EQ(nanovdb::Vec3f(0.0f), bbox.dim());
-    EXPECT_EQ( 57.0f, bbox[0][0]);
+    EXPECT_EQ(57.0f, bbox[0][0]);
     EXPECT_EQ(-31.0f, bbox[0][1]);
-    EXPECT_EQ( 60.0f, bbox[0][2]);
-    EXPECT_EQ( 57.0f, bbox[1][0]);
+    EXPECT_EQ(60.0f, bbox[0][2]);
+    EXPECT_EQ(57.0f, bbox[1][0]);
     EXPECT_EQ(-31.0f, bbox[1][1]);
-    EXPECT_EQ( 60.0f, bbox[1][2]);
+    EXPECT_EQ(60.0f, bbox[1][2]);
 
     bbox.expand(nanovdb::Vec3f(58.0f, 0.0f, 62.0f));
     EXPECT_FALSE(bbox.empty());
     EXPECT_EQ(nanovdb::Vec3f(1.0f, 31.0f, 2.0f), bbox.dim());
-    EXPECT_EQ( 57.0f, bbox[0][0]);
+    EXPECT_EQ(57.0f, bbox[0][0]);
     EXPECT_EQ(-31.0f, bbox[0][1]);
-    EXPECT_EQ( 60.0f, bbox[0][2]);
-    EXPECT_EQ( 58.0f, bbox[1][0]);
-    EXPECT_EQ(  0.0f, bbox[1][1]);
-    EXPECT_EQ( 62.0f, bbox[1][2]);
+    EXPECT_EQ(60.0f, bbox[0][2]);
+    EXPECT_EQ(58.0f, bbox[1][0]);
+    EXPECT_EQ(0.0f, bbox[1][1]);
+    EXPECT_EQ(62.0f, bbox[1][2]);
 }
 
 TEST_F(TestNanoVDB, CoordBBox)
 {
     nanovdb::CoordBBox bbox;
-    EXPECT_EQ( sizeof(bbox), size_t(2*3*4) );
+    EXPECT_EQ(sizeof(bbox), size_t(2 * 3 * 4));
     EXPECT_EQ(std::numeric_limits<int32_t>::max(), bbox[0][0]);
     EXPECT_EQ(std::numeric_limits<int32_t>::max(), bbox[0][1]);
     EXPECT_EQ(std::numeric_limits<int32_t>::max(), bbox[0][2]);
@@ -461,14 +482,14 @@ TEST_F(TestNanoVDB, CoordBBox)
     EXPECT_EQ(0, bbox[1][1]);
     EXPECT_EQ(62, bbox[1][2]);
 
-    {// test convert
-      auto bbox2 = bbox.asReal<float>();
-      EXPECT_FALSE( bbox2.empty() );
-      EXPECT_EQ(nanovdb::Vec3f(57.0f,-31.0f,60.0f), bbox2.min());
-      EXPECT_EQ(nanovdb::Vec3f(59.0f,  1.0f,63.0f), bbox2.max());
+    { // test convert
+        auto bbox2 = bbox.asReal<float>();
+        EXPECT_FALSE(bbox2.empty());
+        EXPECT_EQ(nanovdb::Vec3f(57.0f, -31.0f, 60.0f), bbox2.min());
+        EXPECT_EQ(nanovdb::Vec3f(59.0f, 1.0f, 63.0f), bbox2.max());
     }
 
-    {// test prefix iterator
+    { // test prefix iterator
         auto iter = bbox.begin();
         EXPECT_TRUE(iter);
         for (int i = bbox.min()[0]; i <= bbox.max()[0]; ++i) {
@@ -476,37 +497,51 @@ TEST_F(TestNanoVDB, CoordBBox)
                 for (int k = bbox.min()[2]; k <= bbox.max()[2]; ++k) {
                     EXPECT_TRUE(bbox.isInside(*iter));
                     EXPECT_TRUE(iter);
-                    const auto &ijk = *iter;// note, copy by reference
-                    EXPECT_EQ( ijk[0] , i);
-                    EXPECT_EQ( ijk[1] , j);
-                    EXPECT_EQ( ijk[2] , k);
+                    const auto& ijk = *iter; // note, copy by reference
+                    EXPECT_EQ(ijk[0], i);
+                    EXPECT_EQ(ijk[1], j);
+                    EXPECT_EQ(ijk[2], k);
                     ++iter;
                 }
             }
         }
         EXPECT_FALSE(iter);
     }
-    
-    {// test postfix iterator 
+
+    { // test postfix iterator
         auto iter = bbox.begin();
         EXPECT_TRUE(iter);
         for (int i = bbox.min()[0]; i <= bbox.max()[0]; ++i) {
             for (int j = bbox.min()[1]; j <= bbox.max()[1]; ++j) {
                 for (int k = bbox.min()[2]; k <= bbox.max()[2]; ++k) {
                     EXPECT_TRUE(iter);
-                    const auto ijk = *iter++;// note, copy by value!
-                    EXPECT_EQ( ijk[0] , i);
-                    EXPECT_EQ( ijk[1] , j);
-                    EXPECT_EQ( ijk[2] , k);
+                    const auto ijk = *iter++; // note, copy by value!
+                    EXPECT_EQ(ijk[0], i);
+                    EXPECT_EQ(ijk[1], j);
+                    EXPECT_EQ(ijk[2], k);
                 }
-            }   
+            }
         }
         EXPECT_FALSE(iter);
     }
 }
 
-TEST_F(TestNanoVDB, Vec3R)
+TEST_F(TestNanoVDB, Vec3)
 {
+    bool test = nanovdb::is_specialization<double, nanovdb::Vec3>::value;
+    EXPECT_FALSE(test);
+    test = nanovdb::TensorTraits<double>::IsVector;
+    EXPECT_FALSE(test);
+    test = nanovdb::is_specialization<nanovdb::Vec3R, nanovdb::Vec3>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::Vec3R::ValueType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::TensorTraits<nanovdb::Vec3R>::IsVector;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::TensorTraits<nanovdb::Vec3R>::ElementType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::FloatTraits<nanovdb::Vec3R>::FloatType>::value;
+    EXPECT_TRUE(test);
     EXPECT_EQ(size_t(3 * 8), sizeof(nanovdb::Vec3R));
 
     nanovdb::Vec3R xyz(1.0, 2.0, 3.0);
@@ -523,6 +558,95 @@ TEST_F(TestNanoVDB, Vec3R)
     EXPECT_EQ(sqrt(1.0 + 4.0 + 9.0), xyz.length());
 }
 
+TEST_F(TestNanoVDB, Vec4)
+{
+    bool test = nanovdb::is_specialization<double, nanovdb::Vec4>::value;
+    EXPECT_FALSE(test);
+    test = nanovdb::TensorTraits<double>::IsVector;
+    EXPECT_FALSE(test);
+    test = nanovdb::TensorTraits<double>::IsScalar;
+    EXPECT_TRUE(test);
+    int rank = nanovdb::TensorTraits<double>::Rank;
+    EXPECT_EQ(0, rank);
+    rank = nanovdb::TensorTraits<nanovdb::Vec3R>::Rank;
+    EXPECT_EQ(1, rank);
+    test = nanovdb::is_same<double, nanovdb::FloatTraits<float>::FloatType>::value;
+    EXPECT_FALSE(test);
+    test = nanovdb::is_same<double, nanovdb::FloatTraits<double>::FloatType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<float, nanovdb::FloatTraits<uint32_t>::FloatType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::FloatTraits<uint64_t>::FloatType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_specialization<nanovdb::Vec4R, nanovdb::Vec4>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_specialization<nanovdb::Vec3R, nanovdb::Vec4>::value;
+    EXPECT_FALSE(test);
+    test = nanovdb::is_same<double, nanovdb::Vec4R::ValueType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::TensorTraits<nanovdb::Vec3R>::IsVector;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::TensorTraits<nanovdb::Vec4R>::ElementType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::TensorTraits<double>::ElementType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<float, nanovdb::TensorTraits<float>::ElementType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<uint32_t, nanovdb::TensorTraits<uint32_t>::ElementType>::value;
+    EXPECT_TRUE(test);
+    test = nanovdb::is_same<double, nanovdb::FloatTraits<nanovdb::Vec4R>::FloatType>::value;
+    EXPECT_TRUE(test);
+    EXPECT_EQ(size_t(4 * 8), sizeof(nanovdb::Vec4R));
+
+    nanovdb::Vec4R xyz(1.0, 2.0, 3.0, 4.0);
+    EXPECT_EQ(1.0, xyz[0]);
+    EXPECT_EQ(2.0, xyz[1]);
+    EXPECT_EQ(3.0, xyz[2]);
+    EXPECT_EQ(4.0, xyz[3]);
+
+    xyz[1] = -2.0;
+    EXPECT_EQ(1.0, xyz[0]);
+    EXPECT_EQ(-2.0, xyz[1]);
+    EXPECT_EQ(3.0, xyz[2]);
+    EXPECT_EQ(4.0, xyz[3]);
+
+    EXPECT_EQ(1.0 + 4.0 + 9.0 + 16.0, xyz.lengthSqr());
+    EXPECT_EQ(sqrt(1.0 + 4.0 + 9.0 + 16.0), xyz.length());
+}
+
+TEST_F(TestNanoVDB, Extrema)
+{
+    { // int
+        nanovdb::Extrema<int> e(-1);
+        EXPECT_EQ(-1, e.min());
+        EXPECT_EQ(-1, e.max());
+        e.add(-2);
+        e.add(5);
+        EXPECT_TRUE(e);
+        EXPECT_EQ(-2, e.min());
+        EXPECT_EQ(5, e.max());
+    }
+    { // float
+        nanovdb::Extrema<float> e(-1.0f);
+        EXPECT_EQ(-1.0f, e.min());
+        EXPECT_EQ(-1.0f, e.max());
+        e.add(-2.0f);
+        e.add(5.0f);
+        EXPECT_TRUE(e);
+        EXPECT_EQ(-2.0f, e.min());
+        EXPECT_EQ(5.0f, e.max());
+    }
+    { // Vec3f
+        nanovdb::Extrema<nanovdb::Vec3f> e(nanovdb::Vec3f(1.0f, 1.0f, 0.0f));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f, 1.0f, 0.0f), e.min());
+        EXPECT_EQ(nanovdb::Vec3f(1.0f, 1.0f, 0.0f), e.max());
+        e.add(nanovdb::Vec3f(1.0f, 0.0f, 0.0f));
+        e.add(nanovdb::Vec3f(1.0f, 1.0f, 1.0f));
+        EXPECT_TRUE(e);
+        EXPECT_EQ(nanovdb::Vec3f(1.0f, 0.0f, 0.0f), e.min());
+        EXPECT_EQ(nanovdb::Vec3f(1.0f, 1.0f, 1.0f), e.max());
+    }
+}
 TEST_F(TestNanoVDB, RayBasic)
 {
     using RealT = float;
@@ -533,23 +657,23 @@ TEST_F(TestNanoVDB, RayBasic)
     using RayT = nanovdb::Ray<RealT>;
 
     // test bbox clip
-    const Vec3T dir( 1.0, 0.0, 0.0);
+    const Vec3T dir(1.0, 0.0, 0.0);
     const Vec3T eye(-1.0, 0.5, 0.5);
     RealT       t0 = 0.0, t1 = 10000.0;
     RayT        ray(eye, dir, t0, t1);
 
-    const CoordBBoxT bbox(CoordT(0, 0, 0), CoordT(0, 0, 0));// only contains a single point (0,0,0)
-    EXPECT_FALSE( bbox.empty() );
-    EXPECT_EQ( bbox.dim(), CoordT(1,1,1) );
+    const CoordBBoxT bbox(CoordT(0, 0, 0), CoordT(0, 0, 0)); // only contains a single point (0,0,0)
+    EXPECT_FALSE(bbox.empty());
+    EXPECT_EQ(bbox.dim(), CoordT(1, 1, 1));
 
     const BBoxT bbox2(CoordT(0, 0, 0), CoordT(0, 0, 0));
-    EXPECT_EQ( bbox2, bbox.asReal<float>() );
-    EXPECT_FALSE( bbox2.empty() );
-    EXPECT_EQ( bbox2.dim(), Vec3T(1.0f, 1.0f, 1.0f) );
-    EXPECT_EQ( bbox2[0], Vec3T(0.0f, 0.0f, 0.0f) );
-    EXPECT_EQ( bbox2[1], Vec3T(1.0f, 1.0f, 1.0f) );
-    
-    EXPECT_TRUE(ray.clip(bbox));// ERROR: how can a non-empty bbox have no intersections!?
+    EXPECT_EQ(bbox2, bbox.asReal<float>());
+    EXPECT_FALSE(bbox2.empty());
+    EXPECT_EQ(bbox2.dim(), Vec3T(1.0f, 1.0f, 1.0f));
+    EXPECT_EQ(bbox2[0], Vec3T(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(bbox2[1], Vec3T(1.0f, 1.0f, 1.0f));
+
+    EXPECT_TRUE(ray.clip(bbox)); // ERROR: how can a non-empty bbox have no intersections!?
     //EXPECT_TRUE( ray.clip(bbox.asReal<float>()));// correct!
 
     // intersects the two faces of the box perpendicular to the x-axis!
@@ -557,7 +681,7 @@ TEST_F(TestNanoVDB, RayBasic)
     EXPECT_EQ(2.0f, ray.t1());
     EXPECT_EQ(ray(1.0f), Vec3T(0.0f, 0.5f, 0.5f)); //lower y component of intersection
     EXPECT_EQ(ray(2.0f), Vec3T(1.0f, 0.5f, 0.5f)); //higher y component of intersection
-}// RayBasic
+} // RayBasic
 
 TEST_F(TestNanoVDB, Ray)
 {
@@ -570,7 +694,7 @@ TEST_F(TestNanoVDB, Ray)
 
     // test bbox clip
     const Vec3T dir(-1.0, 2.0, 3.0);
-    const Vec3T eye( 2.0, 1.0, 1.0);
+    const Vec3T eye(2.0, 1.0, 1.0);
     RealT       t0 = 0.1, t1 = 12589.0;
     RayT        ray(eye, dir, t0, t1);
 
@@ -593,7 +717,7 @@ TEST_F(TestNanoVDB, Ray)
 
     ray.reset(eye, dir, t0, t1);
     // no intersections
-    EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6) )));
+    EXPECT_TRUE(!ray.clip(CoordBBoxT(CoordT(4, 2, 2), CoordT(6, 4, 6))));
     EXPECT_EQ(t0, ray.t0());
     EXPECT_EQ(t1, ray.t1());
 }
@@ -766,20 +890,31 @@ TEST_F(TestNanoVDB, Mask)
 TEST_F(TestNanoVDB, LeafNode)
 {
     using LeafT = nanovdb::LeafNode<float>;
-    EXPECT_FALSE(LeafT::IgnoreValues);
+    //EXPECT_FALSE(LeafT::IgnoreValues);
     EXPECT_EQ(8u, LeafT::dim());
     EXPECT_EQ(512u, LeafT::voxelCount());
+    EXPECT_EQ(size_t(
+                  3 * 4 + // mBBoxMin
+                  4 * 1 + // mBBoxDif[3] + mFlags
+                  8 * 8 + // mValueMask,
+                  2 * 4 + // mMinimum, mMaximum
+                  2 * 4 + // mAverage, mVariance
+                  512 * 4 // mValues[512]
+                  ),
+              sizeof(LeafT)); // this particular value type happens to be exatly 32B aligned!
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(
                   3 * 4 + // mBBoxMin
                   4 * 1 + // mBBoxDif[3] + mFlags
                   8 * 8 + // mValueMask,
-                  2 * 4 + // mValueMin, mValueMax
+                  2 * 4 + // mMinimum, mMaximum
+                  2 * 4 + // mAverage, mVariance
                   512 * 4 // mValues[512]
                   ),
               sizeof(LeafT));
 
     // allocate buffer
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[LeafT::memUsage()]);
+    std::memset(buffer.get(), 0, LeafT::memUsage());
     LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer.get());
 
     { // set members of the leaf node
@@ -792,8 +927,36 @@ TEST_F(TestNanoVDB, LeafNode)
             data.mValueMask.setOn(i);
             *values++ = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
+    }
+
+    { // compute BBox
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        EXPECT_EQ(8u, data.mValueMask.wordCount());
+
+        nanovdb::CoordBBox bbox(nanovdb::Coord(-1), nanovdb::Coord(-1));
+        uint64_t           word = 0u;
+        for (int i = 0; i < 8; ++i) {
+            if (uint64_t w = data.mValueMask.getWord<uint64_t>(i)) {
+                word |= w;
+                if (bbox[0][0] == -1)
+                    bbox[0][0] = i;
+                bbox[1][0] = i;
+            }
+        }
+        EXPECT_TRUE(word != 0u);
+        bbox[0][1] = nanovdb::FindLowestOn(word) >> 3;
+        bbox[1][1] = nanovdb::FindHighestOn(word) >> 3;
+
+        const uint8_t* p = reinterpret_cast<const uint8_t*>(&word);
+        uint32_t       b = p[0] | p[1] | p[2] | p[3] | p[4] | p[5] | p[6] | p[7];
+        EXPECT_TRUE(b != 0u);
+        bbox[0][2] = nanovdb::FindLowestOn(b);
+        bbox[1][2] = nanovdb::FindHighestOn(b);
+        //std::cerr << bbox << std::endl;
+        EXPECT_EQ(bbox[0], nanovdb::Coord(4, 0, 0));
+        EXPECT_EQ(bbox[1], nanovdb::Coord(7, 7, 7));
     }
 
     // check values
@@ -809,17 +972,72 @@ TEST_F(TestNanoVDB, LeafNode)
     }
     EXPECT_EQ(0.0f, leaf->valueMin());
     EXPECT_EQ(1.234f, leaf->valueMax());
+
+    { // test stand-alone implementation
+        auto localBBox = [](const LeafT* leaf) {
+            // static_assert(8u == LeafT::dim(), "Expected dim = 8");
+            nanovdb::CoordBBox bbox(nanovdb::Coord(-1, 0, 0), nanovdb::Coord(-1, 7, 7));
+            uint64_t           word64 = 0u;
+            for (int i = 0; i < 8; ++i) {
+                if (uint64_t w = leaf->valueMask().getWord<uint64_t>(i)) {
+                    word64 |= w;
+                    if (bbox[0][0] == -1)
+                        bbox[0][0] = i; // only set once
+                    bbox[1][0] = i;
+                }
+            }
+            assert(word64);
+            if (word64 == ~uint64_t(0))
+                return bbox; // early out of dense leaf
+            bbox[0][1] = nanovdb::FindLowestOn(word64) >> 3;
+            bbox[1][1] = nanovdb::FindHighestOn(word64) >> 3;
+            const uint32_t *p = reinterpret_cast<const uint32_t*>(&word64), word32 = p[0] | p[1];
+            const uint16_t *q = reinterpret_cast<const uint16_t*>(&word32), word16 = q[0] | q[1];
+            const uint8_t * b = reinterpret_cast<const uint8_t*>(&word16), byte = b[0] | b[1];
+            assert(byte);
+            bbox[0][2] = nanovdb::FindLowestOn(uint32_t(byte));
+            bbox[1][2] = nanovdb::FindHighestOn(uint32_t(byte));
+            return bbox;
+        }; // bboxOp
+
+        // test
+        leaf->data()->mValueMask.setOff();
+        const nanovdb::Coord min(1, 2, 3), max(5, 6, 7);
+        leaf->setValue(min, 1.0f);
+        leaf->setValue(max, 2.0f);
+        EXPECT_EQ(1.0f, leaf->getValue(min));
+        EXPECT_EQ(2.0f, leaf->getValue(max));
+        const auto bbox = localBBox(leaf);
+        //std::cerr << "bbox = " << bbox << std::endl;
+        EXPECT_EQ(bbox[0], min);
+        EXPECT_EQ(bbox[1], max);
+    }
+
+    { // test LeafNode::updateBBox
+        leaf->data()->mValueMask.setOff();
+        const nanovdb::Coord min(1, 2, 3), max(5, 6, 7);
+        leaf->setValue(min, 1.0f);
+        leaf->setValue(max, 2.0f);
+        EXPECT_EQ(1.0f, leaf->getValue(min));
+        EXPECT_EQ(2.0f, leaf->getValue(max));
+        leaf->updateBBox();
+        const auto bbox = leaf->bbox();
+        //std::cerr << "bbox = " << bbox << std::endl;
+        EXPECT_EQ(bbox[0], min);
+        EXPECT_EQ(bbox[1], max);
+    }
+
 } // LeafNode
 
 TEST_F(TestNanoVDB, LeafNodeValueMask)
 {
     using LeafT = nanovdb::LeafNode<nanovdb::ValueMask>;
-    EXPECT_TRUE(LeafT::IgnoreValues);
+    //EXPECT_TRUE(LeafT::IgnoreValues);
     EXPECT_EQ(8u, LeafT::dim());
     EXPECT_EQ(512u, LeafT::voxelCount());
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 * 8 + // mValueMask
                                                        3 * 4 + // mBBoxMin
-                                                       4 * 1), /// mBBoxDif[3] + mFalgs
+                                                       4 * 1), // mBBoxDif[3] + mFlags
               sizeof(LeafT));
 
     // allocate buffer
@@ -875,8 +1093,8 @@ TEST_F(TestNanoVDB, InternalNode)
             data.mValueMask.setOn(i);
             tiles->value = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
     }
 
     // check values
@@ -899,10 +1117,10 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
 {
     using LeafT = nanovdb::LeafNode<nanovdb::ValueMask>;
     using NodeT = nanovdb::InternalNode<LeafT>;
-    EXPECT_TRUE(LeafT::IgnoreValues);
-    EXPECT_TRUE(NodeT::IgnoreValues);
+    //EXPECT_TRUE(LeafT::IgnoreValues);
+    //EXPECT_TRUE(NodeT::IgnoreValues);
     EXPECT_EQ(8 * 16u, NodeT::dim());
-    
+
     /*
     BBox<CoordT> mBBox; // 24B. node bounding box.
     int32_t      mOffset; // 4B. number of node offsets till first tile
@@ -910,11 +1128,11 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
     MaskT        mValueMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B
     MaskT        mChildMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B
 
-    ValueT mValueMin;
-    ValueT mValueMax;
+    ValueT mMinimum;
+    ValueT mMaximum;
     alignas(32) Tile mTable[1u << (3 * LOG2DIM)];
     */
-    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(size_t(24 + 4 + 4 + 512 + 512 + 4 + 4 + (16*16*16)*4)), NodeT::memUsage()); 
+    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(size_t(24 + 4 + 4 + 512 + 512 + 4 + 4 + (16 * 16 * 16) * 4)), NodeT::memUsage());
 
     // an empty InternalNode
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[NodeT::memUsage()]);
@@ -932,8 +1150,8 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
             data.mValueMask.setOn(i);
             tiles->value = 1u;
         }
-        data.mValueMin = 0u;
-        data.mValueMax = 1u;
+        data.mMinimum = 0u;
+        data.mMaximum = 1u;
     }
 
     // check values
@@ -960,7 +1178,7 @@ TEST_F(TestNanoVDB, RootNode)
     using NodeT3 = nanovdb::RootNode<NodeT2>;
     using CoordT = NodeT3::CoordType;
 
-    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint64_t) + sizeof(uint32_t) + (3 * sizeof(float))), NodeT3::memUsage(0));
+    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint64_t) + sizeof(uint32_t) + (5 * sizeof(float))), NodeT3::memUsage(0));
 
     // an empty RootNode
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[NodeT3::memUsage(0)]);
@@ -968,7 +1186,7 @@ TEST_F(TestNanoVDB, RootNode)
 
     { // set members of the node
         auto& data = *reinterpret_cast<NodeT3::DataType*>(buffer.get());
-        data.mBackground = data.mValueMin = data.mValueMax = 1.234f;
+        data.mBackground = data.mMinimum = data.mMaximum = 1.234f;
         data.mTileCount = 0;
     }
 
@@ -1002,9 +1220,33 @@ TEST_F(TestNanoVDB, Grid)
     using GridT = nanovdb::Grid<TreeT>;
     using CoordT = LeafT::CoordType;
 
-   {// check GridData memory alignment
-    /*
-        static const int MaxNameSize = 256;
+    {
+        // This is just for visual insepction
+        /*
+        this->printType<GridT>("Grid");
+        this->printType<TreeT>("Tree");
+        this->printType<NodeT2>("Upper InternalNode");
+        this->printType<NodeT1>("Lower InternalNode");
+        this->printType<LeafT>("Leaf");
+        Old: W/O mAverage and mVariance
+            Size of Grid: 672 bytes which is 32 byte aligned
+            Size of Tree: 64 bytes which is 32 byte aligned
+            Size of Upper InternalNode: 139328 bytes which is 32 byte aligned
+            Size of Lower InternalNode: 17472 bytes which is 32 byte aligned
+            Size of Leaf: 2144 bytes which is 32 byte aligned
+        
+        New: WITH mAverage and mVariance
+            Size of Grid: 672 bytes which is 32 byte aligned
+            Size of Tree: 64 bytes which is 32 byte aligned
+            Size of Upper InternalNode: 139328 bytes which is 32 byte aligned
+            Size of Lower InternalNode: 17472 bytes which is 32 byte aligned
+            Size of Leaf: 2144 bytes which is 32 byte aligned
+        */
+    }
+
+    { // check GridData memory alignment
+        /*
+    static const int MaxNameSize = 256;
     uint64_t         mMagic; // 8B magic to validate it is valid grid data.
     uint64_t         mChecksum; // 8B. Checksum of grid buffer.
     uint32_t         mMajor;// 4B. major version number
@@ -1061,9 +1303,10 @@ TEST_F(TestNanoVDB, Grid)
         EXPECT_EQ(off, offset);
         offset += 4;
     }
-    
-    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 + 8 + 4 + 4 + 8 + nanovdb::GridData::MaxNameSize + 48 + sizeof(nanovdb::Map) + 24 + 4 + 4 + 8 + 4), sizeof(GridT));
-    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>((4 + 8) * (RootT::LEVEL + 1)), sizeof(TreeT));
+
+    EXPECT_EQ(sizeof(GridT), nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 + 8 + 4 + 4 + 8 + nanovdb::GridData::MaxNameSize + 48 + sizeof(nanovdb::Map) + 24 + 4 + 4 + 8 + 4));
+    EXPECT_EQ(sizeof(TreeT), nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>((2 * 4 + 8) * (RootT::LEVEL + 1)));
+    EXPECT_EQ(sizeof(TreeT), size_t((2 * 4 + 8) * (RootT::LEVEL + 1))); // should already be 32B aligned
 
     size_t bytes[6] = {GridT::memUsage(), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::memUsage()};
     for (int i = 1; i < 6; ++i)
@@ -1082,8 +1325,8 @@ TEST_F(TestNanoVDB, Grid)
             data.mValueMask.setOn(i);
             *voxels++ = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
     }
 
     // lower internal node
@@ -1101,8 +1344,8 @@ TEST_F(TestNanoVDB, Grid)
             data.mValueMask.setOn(i);
             tiles->value = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
         data.mOffset = 1;
         EXPECT_EQ(leaf, data.child(0));
     }
@@ -1122,8 +1365,8 @@ TEST_F(TestNanoVDB, Grid)
             data.mValueMask.setOn(i);
             tiles->value = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
         data.mOffset = 1;
         EXPECT_EQ(node1, data.child(0));
     }
@@ -1132,7 +1375,7 @@ TEST_F(TestNanoVDB, Grid)
     RootT* root = reinterpret_cast<RootT*>(buffer.get() + bytes[1]);
     { // set members of the root node
         auto& data = *reinterpret_cast<RootT::DataType*>(buffer.get() + bytes[1]);
-        data.mBackground = data.mValueMin = data.mValueMax = 1.234f;
+        data.mBackground = data.mMinimum = data.mMaximum = 1.234f;
         data.mTileCount = 1;
         auto& tile = data.tile(0);
         tile.setChild(RootT::CoordType(0), 0);
@@ -1325,7 +1568,7 @@ TEST_F(TestNanoVDB, GridBuilderBasic1)
         EXPECT_EQ(nanovdb::GridClass::Unknown, meta->gridClass());
         auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
-        EXPECT_EQ(nanovdb::Vec3R(1.0) , dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1u, dstGrid->activeVoxelCount());
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_EQ(1.0f, dstAcc.getValue(nanovdb::Coord(1, 2, 3)));
@@ -1359,11 +1602,11 @@ TEST_F(TestNanoVDB, GridBuilderBasic2)
         EXPECT_EQ(2.0f, dstAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
         const nanovdb::BBox<nanovdb::Vec3R> indexBBox = dstGrid->indexBBox();
-        EXPECT_DOUBLE_EQ( 1.0, indexBBox[0][0]);
+        EXPECT_DOUBLE_EQ(1.0, indexBBox[0][0]);
         EXPECT_DOUBLE_EQ(-2.0, indexBBox[0][1]);
-        EXPECT_DOUBLE_EQ( 3.0, indexBBox[0][2]);
-        EXPECT_DOUBLE_EQ( 3.0, indexBBox[1][0]);
-        EXPECT_DOUBLE_EQ( 3.0, indexBBox[1][1]);
+        EXPECT_DOUBLE_EQ(3.0, indexBBox[0][2]);
+        EXPECT_DOUBLE_EQ(3.0, indexBBox[1][0]);
+        EXPECT_DOUBLE_EQ(3.0, indexBBox[1][1]);
         EXPECT_DOUBLE_EQ(10.0, indexBBox[1][2]);
 
         EXPECT_EQ(nanovdb::Coord(1, -2, 3), dstGrid->indexBBox()[0]);
@@ -1514,6 +1757,45 @@ TEST_F(TestNanoVDB, GridBuilderSphere)
     EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
+
+    const auto& tree = dstGrid->tree();
+
+    uint32_t n = 0;
+
+    // check root node
+    EXPECT_EQ(1u, tree.nodeCount(3));
+    const auto* node = dstGrid->tree().getNode<3>(0);
+    EXPECT_TRUE(node != nullptr);
+    EXPECT_EQ(0u, tree.getNodeID(*node));
+    EXPECT_EQ(n++, tree.getLinearOffset(*node));
+
+    // check upper internal nodes
+    for (uint32_t i = 0; i < tree.nodeCount(2); ++i) {
+        const auto* node = dstGrid->tree().getNode<2>(i);
+        EXPECT_TRUE(node != nullptr);
+        EXPECT_EQ(i, tree.getNodeID(*node));
+        EXPECT_EQ(n++, tree.getLinearOffset(*node));
+    }
+
+    // check lower internal nodes
+    for (uint32_t i = 0; i < tree.nodeCount(1); ++i) {
+        const auto* node = dstGrid->tree().getNode<1>(i);
+        EXPECT_TRUE(node != nullptr);
+        EXPECT_EQ(i, tree.getNodeID(*node));
+        EXPECT_EQ(n++, tree.getLinearOffset(*node));
+    }
+
+    // Check leaf nodes
+    for (uint32_t i = 0; i < tree.nodeCount(0); ++i) {
+        const auto* node = dstGrid->tree().getNode<0>(i);
+        EXPECT_TRUE(node != nullptr);
+        EXPECT_EQ(i, tree.getNodeID(*node));
+        EXPECT_EQ(n++, tree.getLinearOffset(*node));
+    }
 
     //std::cerr << "bbox.min = (" << dstGrid->indexBBox()[0][0] << ", " <<  dstGrid->indexBBox()[0][1] << ", " <<  dstGrid->indexBBox()[0][2] << ")" << std::endl;
     //std::cerr << "bbox.max = (" << dstGrid->indexBBox()[1][0] << ", " <<  dstGrid->indexBBox()[1][1] << ", " <<  dstGrid->indexBBox()[1][2] << ")" << std::endl;
@@ -1558,6 +1840,20 @@ TEST_F(TestNanoVDB, createLevelSetSphere)
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
 
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
+
+    EXPECT_NEAR( -3.0f, dstGrid->tree().root().valueMin(), 0.04f);
+    EXPECT_NEAR(  3.0f, dstGrid->tree().root().valueMax(), 0.04f);
+    EXPECT_NEAR(  0.0f, dstGrid->tree().root().average(), 0.3f);
+    //std::cerr << dstGrid->tree().root().valueMin() << std::endl;
+    //std::cerr << dstGrid->tree().root().valueMax() << std::endl;
+    //std::cerr << dstGrid->tree().root().average() << std::endl;
+    //std::cerr << dstGrid->tree().root().stdDeviation() << std::endl;
+
+
     EXPECT_EQ(nanovdb::Coord(50 - 20 - 2), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(50 + 20 + 2), dstGrid->indexBBox()[1]);
 
@@ -1593,12 +1889,26 @@ TEST_F(TestNanoVDB, createFogVolumeSphere)
     EXPECT_EQ(nanovdb::GridClass::FogVolume, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
+
+    EXPECT_NEAR(  0.0f, dstGrid->tree().root().valueMin(),1e-5);
+    EXPECT_NEAR(  1.0f, dstGrid->tree().root().valueMax(), 1e-5);
+    EXPECT_NEAR(  0.8f, dstGrid->tree().root().average(), 1e-3);
+    EXPECT_NEAR(  0.3f, dstGrid->tree().root().stdDeviation(), 1e-2);
+    //std::cerr << dstGrid->tree().root().valueMin() << std::endl;
+    //std::cerr << dstGrid->tree().root().valueMax() << std::endl;
+    //std::cerr << dstGrid->tree().root().average() << std::endl;
+    //std::cerr << dstGrid->tree().root().stdDeviation() << std::endl;
+
+    //std::cerr << "bbox.min = (" << dstGrid->indexBBox()[0][0] << ", " <<  dstGrid->indexBBox()[0][1] << ", " <<  dstGrid->indexBBox()[0][2] << ")" << std::endl;
+    //std::cerr << "bbox.max = (" << dstGrid->indexBBox()[1][0] << ", " <<  dstGrid->indexBBox()[1][1] << ", " <<  dstGrid->indexBBox()[1][2] << ")" << std::endl;
 
     EXPECT_EQ(nanovdb::Coord(50 - 20), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(50 + 20), dstGrid->indexBBox()[1]);
 
-    //std::cerr << "bbox.min = (" << dstGrid->indexBBox()[0][0] << ", " <<  dstGrid->indexBBox()[0][1] << ", " <<  dstGrid->indexBBox()[0][2] << ")" << std::endl;
-    //std::cerr << "bbox.max = (" << dstGrid->indexBBox()[1][0] << ", " <<  dstGrid->indexBBox()[1][1] << ", " <<  dstGrid->indexBBox()[1][2] << ")" << std::endl;
     Sphere<float> sphere(nanovdb::Vec3<float>(50), 20.0f);
     uint64_t      count = 0;
     auto          dstAcc = dstGrid->getAccessor();
@@ -1632,7 +1942,12 @@ TEST_F(TestNanoVDB, createPointSphere)
     EXPECT_EQ(-1.0f, sphere(nanovdb::Coord(0, 0, 99)));
     EXPECT_EQ(1.0f, sphere(nanovdb::Coord(0, 0, 101)));
 
-    auto handle = nanovdb::createPointSphere<float>(1, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3d(0), "point_sphere");
+    auto handle = nanovdb::createPointSphere<float>(1,
+                                                    100.0f,
+                                                    nanovdb::Vec3d(0),
+                                                    1.0f,
+                                                    nanovdb::Vec3d(0),
+                                                    "point_sphere");
 
     const nanovdb::CoordBBox bbox(nanovdb::Coord(-100), nanovdb::Coord(100));
 
@@ -1644,6 +1959,10 @@ TEST_F(TestNanoVDB, createPointSphere)
     EXPECT_EQ(nanovdb::GridClass::PointData, meta->gridClass());
     auto* dstGrid = handle.grid<uint32_t>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_FALSE(dstGrid->hasAverage());
+    EXPECT_FALSE(dstGrid->hasStdDeviation());
 
     EXPECT_EQ(bbox[0], dstGrid->indexBBox()[0]);
     EXPECT_EQ(bbox[1], dstGrid->indexBBox()[1]);
@@ -1688,6 +2007,10 @@ TEST_F(TestNanoVDB, createLevelSetTorus)
     EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
 
     EXPECT_EQ(nanovdb::Coord(50 - 100 - 50 - 2, 50 - 50 - 2, 50 - 100 - 50 - 2), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(50 + 100 + 50 + 2, 50 + 50 + 2, 50 + 100 + 50 + 2), dstGrid->indexBBox()[1]);
@@ -1718,6 +2041,10 @@ TEST_F(TestNanoVDB, createFogVolumeTorus)
     EXPECT_EQ(nanovdb::GridClass::FogVolume, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
 
     //std::cerr << "bbox.min = (" << dstGrid->indexBBox()[0][0] << ", " <<  dstGrid->indexBBox()[0][1] << ", " <<  dstGrid->indexBBox()[0][2] << ")" << std::endl;
     //std::cerr << "bbox.max = (" << dstGrid->indexBBox()[1][0] << ", " <<  dstGrid->indexBBox()[1][1] << ", " <<  dstGrid->indexBBox()[1][2] << ")" << std::endl;
@@ -1751,6 +2078,10 @@ TEST_F(TestNanoVDB, createLevelSetBox)
     EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
 
     EXPECT_EQ(nanovdb::Coord(50 - 20 - 2, 50 - 30 - 2, 50 - 40 - 2), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(50 + 20 + 2, 50 + 30 + 2, 50 + 40 + 2), dstGrid->indexBBox()[1]);
@@ -1780,6 +2111,10 @@ TEST_F(TestNanoVDB, createFogVolumeBox)
     EXPECT_EQ(nanovdb::GridClass::FogVolume, meta->gridClass());
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
 
     EXPECT_EQ(nanovdb::Coord(50 - 20, 50 - 30, 50 - 40), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(50 + 20, 50 + 30, 50 + 40), dstGrid->indexBBox()[1]);
@@ -1826,188 +2161,194 @@ TEST_F(TestNanoVDB, CNanoVDBSize)
 TEST_F(TestNanoVDB, GridStats)
 {
     using GridT = nanovdb::NanoGrid<float>;
-    Sphere<float> sphere(nanovdb::Vec3<float>(50), 50.0f);
+    Sphere<float>               sphere(nanovdb::Vec3<float>(50), 50.0f);
     nanovdb::GridBuilder<float> builder(sphere.background());
-    const nanovdb::CoordBBox bbox(nanovdb::Coord(-100), nanovdb::Coord(100));
+    const nanovdb::CoordBBox    bbox(nanovdb::Coord(-100), nanovdb::Coord(100));
     //mTimer.start("GridBuilder");
     builder(sphere, bbox);
     //mTimer.stop();
     const auto handle1 = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test", nanovdb::GridClass::LevelSet);
-    auto handle2 = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test", nanovdb::GridClass::LevelSet);
+    auto       handle2 = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test", nanovdb::GridClass::LevelSet);
     EXPECT_TRUE(handle1);
     EXPECT_TRUE(handle2);
     const GridT* grid1 = handle1.grid<float>();
-    GridT *grid2 = handle2.grid<float>();
+    GridT*       grid2 = handle2.grid<float>();
     EXPECT_TRUE(grid1);
     EXPECT_TRUE(grid2);
 
     //std::cerr << "grid1 = " << grid1->indexBBox() << ", grid2 = " << grid2->indexBBox() << std::endl;
-    EXPECT_EQ( grid1->activeVoxelCount(), grid2->activeVoxelCount() );
-    EXPECT_EQ( grid1->worldBBox(), grid2->worldBBox() );
-    EXPECT_EQ( grid1->indexBBox(), grid2->indexBBox() );
+    EXPECT_EQ(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+    EXPECT_EQ(grid1->worldBBox(), grid2->worldBBox());
+    EXPECT_EQ(grid1->indexBBox(), grid2->indexBBox());
 
-    {// reset stats in grid2
+    { // reset stats in grid2
         grid2->tree().root().data()->mActiveVoxelCount = uint64_t(0);
         grid2->data()->mWorldBBox = nanovdb::BBox<nanovdb::Vec3R>();
         grid2->tree().root().data()->mBBox = nanovdb::BBox<nanovdb::Coord>();
-        for (uint32_t i=0; i< grid2->tree().nodeCount(0); ++i) {
-            auto *leaf = grid2->tree().getNode<0>(i);
-            auto *data = leaf->data();
-            data->mValueMin = data->mValueMax = 0.0f;
-            data->mBBoxMin &= ~nanovdb::NanoLeaf<float>::MASK;/// set to origin!
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(0); ++i) {
+            auto* leaf = grid2->tree().getNode<0>(i);
+            auto* data = leaf->data();
+            data->mMinimum = data->mMaximum = 0.0f;
+            data->mBBoxMin &= ~nanovdb::NanoLeaf<float>::MASK; /// set to origin!
             data->mBBoxDif[0] = data->mBBoxDif[1] = data->mBBoxDif[2] = uint8_t(255);
             EXPECT_EQ(data->mBBoxDif[0], uint8_t(255));
         }
-        for (uint32_t i=0; i< grid2->tree().nodeCount(1); ++i) {
-             auto *node = grid2->tree().getNode<1>(i);
-             auto *data = node->data();
-             data->mValueMin = data->mValueMax = 0.0f;
-             data->mBBox[0] &= ~nanovdb::NanoNode1<float>::MASK;/// set to origin!
-             data->mBBox[1] = nanovdb::Coord(0);
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(1); ++i) {
+            auto* node = grid2->tree().getNode<1>(i);
+            auto* data = node->data();
+            data->mMinimum = data->mMaximum = 0.0f;
+            data->mBBox[0] &= ~nanovdb::NanoNode1<float>::MASK; /// set to origin!
+            data->mBBox[1] = nanovdb::Coord(0);
         }
-        for (uint32_t i=0; i< grid2->tree().nodeCount(2); ++i) {
-             auto *node = grid2->tree().getNode<2>(i);
-             auto *data = node->data();
-             data->mValueMin = data->mValueMax = 0.0f;
-             data->mBBox[0] &= ~nanovdb::NanoNode2<float>::MASK;/// set to origin!
-             data->mBBox[1] = nanovdb::Coord(0);
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(2); ++i) {
+            auto* node = grid2->tree().getNode<2>(i);
+            auto* data = node->data();
+            data->mMinimum = data->mMaximum = 0.0f;
+            data->mBBox[0] &= ~nanovdb::NanoNode2<float>::MASK; /// set to origin!
+            data->mBBox[1] = nanovdb::Coord(0);
         }
     }
     //std::cerr << "grid1 = " << grid1->indexBBox() << ", grid2 = " << grid2->indexBBox() << std::endl;
-    EXPECT_NE( grid1->activeVoxelCount(), grid2->activeVoxelCount() );
-    EXPECT_NE( grid1->indexBBox(), grid2->indexBBox() );
-    EXPECT_NE( grid1->worldBBox(), grid2->worldBBox() );
+    EXPECT_NE(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+    EXPECT_NE(grid1->indexBBox(), grid2->indexBBox());
+    EXPECT_NE(grid1->worldBBox(), grid2->worldBBox());
 
-    {// check stats in grid2
-        EXPECT_EQ( grid1->tree().nodeCount(0), grid2->tree().nodeCount(0));
-       
-        for (uint32_t i=0; i< grid2->tree().nodeCount(0); ++i) {
-            auto *leaf1 = grid1->tree().getNode<0>(i);
-            auto *leaf2 = grid2->tree().getNode<0>(i);
+    { // check stats in grid2
+        EXPECT_EQ(grid1->tree().nodeCount(0), grid2->tree().nodeCount(0));
+
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(0); ++i) {
+            auto* leaf1 = grid1->tree().getNode<0>(i);
+            auto* leaf2 = grid2->tree().getNode<0>(i);
             EXPECT_NE(leaf1->valueMin(), leaf2->valueMin());
             EXPECT_NE(leaf1->valueMax(), leaf2->valueMax());
             EXPECT_NE(leaf1->bbox(), leaf2->bbox());
         }
-        
-        EXPECT_EQ( grid1->tree().nodeCount(1), grid2->tree().nodeCount(1));
-        for (uint32_t i=0; i< grid2->tree().nodeCount(1); ++i) {
-            auto *node1 = grid1->tree().getNode<1>(i);
-            auto *node2 = grid2->tree().getNode<1>(i);
+
+        EXPECT_EQ(grid1->tree().nodeCount(1), grid2->tree().nodeCount(1));
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(1); ++i) {
+            auto* node1 = grid1->tree().getNode<1>(i);
+            auto* node2 = grid2->tree().getNode<1>(i);
             EXPECT_NE(node1->valueMin(), node2->valueMin());
             EXPECT_NE(node1->valueMax(), node2->valueMax());
             EXPECT_NE(node1->bbox(), node2->bbox());
         }
-        EXPECT_EQ( grid1->tree().nodeCount(2), grid2->tree().nodeCount(2));
-        for (uint32_t i=0; i< grid2->tree().nodeCount(2); ++i) {
-            auto *node1 = grid1->tree().getNode<2>(i);
-            auto *node2 = grid2->tree().getNode<2>(i);
+        EXPECT_EQ(grid1->tree().nodeCount(2), grid2->tree().nodeCount(2));
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(2); ++i) {
+            auto* node1 = grid1->tree().getNode<2>(i);
+            auto* node2 = grid2->tree().getNode<2>(i);
             EXPECT_NE(node1->valueMin(), node2->valueMin());
             EXPECT_NE(node1->valueMax(), node2->valueMax());
             EXPECT_NE(node1->bbox(), node2->bbox());
         }
     }
-    
+
     //mTimer.start("GridStats");
-    nanovdb::gridStats( *grid2 );
+    nanovdb::gridStats(*grid2);
     //mTimer.stop();
 
-    {// check stats in grid2
-        EXPECT_EQ( grid1->tree().nodeCount(0), grid2->tree().nodeCount(0));
-        for (uint32_t i=0; i< grid2->tree().nodeCount(0); ++i) {
-            auto *leaf1 = grid1->tree().getNode<0>(i);
-            auto *leaf2 = grid2->tree().getNode<0>(i);
+    { // check stats in grid2
+        EXPECT_EQ(grid1->tree().nodeCount(0), grid2->tree().nodeCount(0));
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(0); ++i) {
+            auto* leaf1 = grid1->tree().getNode<0>(i);
+            auto* leaf2 = grid2->tree().getNode<0>(i);
             EXPECT_EQ(leaf1->valueMin(), leaf2->valueMin());
             EXPECT_EQ(leaf1->valueMax(), leaf2->valueMax());
             EXPECT_EQ(leaf1->bbox(), leaf2->bbox());
         }
-        EXPECT_EQ( grid1->tree().nodeCount(1), grid2->tree().nodeCount(1));
-        for (uint32_t i=0; i< grid2->tree().nodeCount(1); ++i) {
-            auto *node1 = grid1->tree().getNode<1>(i);
-            auto *node2 = grid2->tree().getNode<1>(i);
+        EXPECT_EQ(grid1->tree().nodeCount(1), grid2->tree().nodeCount(1));
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(1); ++i) {
+            auto* node1 = grid1->tree().getNode<1>(i);
+            auto* node2 = grid2->tree().getNode<1>(i);
             EXPECT_EQ(node1->valueMin(), node2->valueMin());
             EXPECT_EQ(node1->valueMax(), node2->valueMax());
             EXPECT_EQ(node1->bbox(), node2->bbox());
         }
-        EXPECT_EQ( grid1->tree().nodeCount(2), grid2->tree().nodeCount(2));
-        for (uint32_t i=0; i< grid2->tree().nodeCount(2); ++i) {
-            auto *node1 = grid1->tree().getNode<2>(i);
-            auto *node2 = grid2->tree().getNode<2>(i);
+        EXPECT_EQ(grid1->tree().nodeCount(2), grid2->tree().nodeCount(2));
+        for (uint32_t i = 0; i < grid2->tree().nodeCount(2); ++i) {
+            auto* node1 = grid1->tree().getNode<2>(i);
+            auto* node2 = grid2->tree().getNode<2>(i);
             EXPECT_EQ(node1->valueMin(), node2->valueMin());
             EXPECT_EQ(node1->valueMax(), node2->valueMax());
             EXPECT_EQ(node1->bbox(), node2->bbox());
         }
     }
 
-    //std::cerr << "grid1 = " << grid1->indexBBox() << ", grid2 = " << grid2->indexBBox() << std::endl; 
-    EXPECT_EQ( grid1->activeVoxelCount(), grid2->activeVoxelCount() );
-    EXPECT_EQ( grid1->indexBBox(), grid2->indexBBox() );
-    EXPECT_EQ( grid1->worldBBox(), grid2->worldBBox() );
+    //std::cerr << "grid1 = " << grid1->indexBBox() << ", grid2 = " << grid2->indexBBox() << std::endl;
+    EXPECT_EQ(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+    EXPECT_EQ(grid1->indexBBox(), grid2->indexBBox());
+    EXPECT_EQ(grid1->worldBBox(), grid2->worldBBox());
 
-}// GridStats
+} // GridStats
 
 TEST_F(TestNanoVDB, ScalarSampleFromVoxels)
 {
     // create a grid so sample from
-    const float dx = 0.5f;// voxel size
-    auto trilinearWorld = [&](const nanovdb::Vec3d& xyz) -> float {
+    const float dx = 0.5f; // voxel size
+    auto        trilinearWorld = [&](const nanovdb::Vec3d& xyz) -> float {
         return 0.34f + 1.6f * xyz[0] + 6.7f * xyz[1] - 3.5f * xyz[2]; // index coordinates
     };
     auto trilinearIndex = [&](const nanovdb::Coord& ijk) -> float {
-        return 0.34f + 1.6f * dx* ijk[0] + 6.7f * dx * ijk[1] - 3.5f * dx * ijk[2]; // index coordinates
+        return 0.34f + 1.6f * dx * ijk[0] + 6.7f * dx * ijk[1] - 3.5f * dx * ijk[2]; // index coordinates
     };
-    
+
     nanovdb::GridBuilder<float> builder(1.0f);
-    const nanovdb::CoordBBox bbox(nanovdb::Coord(0), nanovdb::Coord(128));
+    const nanovdb::CoordBBox    bbox(nanovdb::Coord(0), nanovdb::Coord(128));
     builder(trilinearIndex, bbox);
     auto handle = builder.getHandle<>(dx);
     EXPECT_TRUE(handle);
     auto* grid = handle.grid<float>();
     EXPECT_TRUE(grid);
 
-    const nanovdb::Vec3d ijk(13.4, 24.67, 5.23); // in index space
-    const auto exact = trilinearWorld(grid->indexToWorld(ijk));
-    const auto approx = trilinearIndex(nanovdb::Coord(13, 25, 5));
+    const nanovdb::Vec3d xyz(13.4, 24.67, 5.23); // in index space
+    const nanovdb::Coord ijk(13, 25, 5); // in index space (nearest)
+    const auto           exact = trilinearWorld(grid->indexToWorld(xyz));
+    const auto           approx = trilinearIndex(ijk);
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
 
     auto acc = grid->getAccessor();
-    auto sampler0 = nanovdb::createSampler<0>(acc);
-    //std::cerr << "0'th order: v = " << sampler0(ijk) << std::endl;
-    EXPECT_EQ(approx, sampler0(ijk));
-
-    auto sampler1 = nanovdb::createSampler<1>(acc); // faster since it's using an accessor!!!
-    //std::cerr << "1'th order: v = " << sampler1(ijk) << std::endl;
-    EXPECT_NEAR(exact, sampler1(ijk), 1e-5);
+    auto sampler0 = nanovdb::createSampler<0>(grid->tree());
+    auto sampler1 = nanovdb::createSampler<1>(acc);
+    auto sampler2 = nanovdb::createSampler<2>(acc);
+    auto sampler3 = nanovdb::createSampler<3>(acc);
+    //std::cerr << "0'th order: v = " << sampler0(xyz) << std::endl;
+    EXPECT_EQ(approx, sampler0(xyz));
+    EXPECT_NE(exact, sampler0(xyz));
+    //std::cerr << "1'th order: v = " << sampler1(xyz) << std::endl;
+    EXPECT_NEAR(exact, sampler1(xyz), 1e-5);
+    //std::cerr << "2'th order: v = " << sampler2(xyz) << std::endl;
+    EXPECT_NEAR(exact, sampler2(xyz), 1e-4);
+    //std::cerr << "3'rd order: v = " << sampler3(xyz) << std::endl;
+    EXPECT_NEAR(exact, sampler3(xyz), 1e-5);
 
     EXPECT_FALSE(sampler1.zeroCrossing());
-    const auto gradIndex = sampler1.gradient(ijk); //in index space
-    EXPECT_NEAR( 1.6f, gradIndex[0] / dx, 2e-5);
-    EXPECT_NEAR( 6.7f, gradIndex[1] / dx, 2e-5);
+    const auto gradIndex = sampler1.gradient(xyz); //in index space
+    EXPECT_NEAR(1.6f, gradIndex[0] / dx, 2e-5);
+    EXPECT_NEAR(6.7f, gradIndex[1] / dx, 2e-5);
     EXPECT_NEAR(-3.5f, gradIndex[2] / dx, 2e-5);
     const auto gradWorld = grid->indexToWorldGrad(gradIndex); // in world units
-    EXPECT_NEAR( 1.6f, gradWorld[0], 2e-5);
-    EXPECT_NEAR( 6.7f, gradWorld[1], 2e-5);
+    EXPECT_NEAR(1.6f, gradWorld[0], 2e-5);
+    EXPECT_NEAR(6.7f, gradWorld[1], 2e-5);
     EXPECT_NEAR(-3.5f, gradWorld[2], 2e-5);
 
-    nanovdb::SampleFromVoxels<nanovdb::NanoTree<float>, 3> sampler3(grid->tree());
-    //auto sampler3 = nanovdb::createSampler<3>( dstAcc );
-    //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
-    EXPECT_NEAR(exact, sampler3(ijk), 1e-5);
-    
+    EXPECT_EQ(grid->tree().getValue(ijk), sampler0.accessor().getValue(ijk));
+    EXPECT_EQ(grid->tree().getValue(ijk), sampler1.accessor().getValue(ijk));
+    EXPECT_EQ(grid->tree().getValue(ijk), sampler2.accessor().getValue(ijk));
+    EXPECT_EQ(grid->tree().getValue(ijk), sampler3.accessor().getValue(ijk));
 } // ScalarSampleFromVoxels
 
 TEST_F(TestNanoVDB, VectorSampleFromVoxels)
 {
     // create a grid so sample from
-    const float dx = 0.5f;// voxel size
-    auto trilinearWorld = [&](const nanovdb::Vec3d& xyz) -> nanovdb::Vec3f {
-        return nanovdb::Vec3f(0.34f, 1.6f * xyz[0] + 6.7f * xyz[1], - 3.5f * xyz[2]); // index coordinates
+    const float dx = 0.5f; // voxel size
+    auto        trilinearWorld = [&](const nanovdb::Vec3d& xyz) -> nanovdb::Vec3f {
+        return nanovdb::Vec3f(0.34f, 1.6f * xyz[0] + 6.7f * xyz[1], -3.5f * xyz[2]); // index coordinates
     };
     auto trilinearIndex = [&](const nanovdb::Coord& ijk) -> nanovdb::Vec3f {
-        return nanovdb::Vec3f(0.34f, 1.6f * dx* ijk[0] + 6.7f * dx * ijk[1], - 3.5f * dx * ijk[2]); // index coordinates
+        return nanovdb::Vec3f(0.34f, 1.6f * dx * ijk[0] + 6.7f * dx * ijk[1], -3.5f * dx * ijk[2]); // index coordinates
     };
-    
+
     nanovdb::GridBuilder<nanovdb::Vec3f> builder(nanovdb::Vec3f(1.0f));
-    const nanovdb::CoordBBox bbox(nanovdb::Coord(0), nanovdb::Coord(128));
+    const nanovdb::CoordBBox             bbox(nanovdb::Coord(0), nanovdb::Coord(128));
     builder(trilinearIndex, bbox);
     auto handle = builder.getHandle<>(dx);
     EXPECT_TRUE(handle);
@@ -2015,8 +2356,8 @@ TEST_F(TestNanoVDB, VectorSampleFromVoxels)
     EXPECT_TRUE(grid);
 
     const nanovdb::Vec3d ijk(13.4, 24.67, 5.23); // in index space
-    const auto exact = trilinearWorld(grid->indexToWorld(ijk));
-    const auto approx = trilinearIndex(nanovdb::Coord(13, 25, 5));
+    const auto           exact = trilinearWorld(grid->indexToWorld(ijk));
+    const auto           approx = trilinearIndex(nanovdb::Coord(13, 25, 5));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
 
     auto acc = grid->getAccessor();
@@ -2026,15 +2367,17 @@ TEST_F(TestNanoVDB, VectorSampleFromVoxels)
 
     auto sampler1 = nanovdb::createSampler<1>(acc); // faster since it's using an accessor!!!
     //std::cerr << "1'th order: v = " << sampler1(ijk) << std::endl;
-    for (int i=0; i<3; ++i) EXPECT_NEAR(exact[i], sampler1(ijk)[i], 1e-5);
+    for (int i = 0; i < 3; ++i)
+        EXPECT_NEAR(exact[i], sampler1(ijk)[i], 1e-5);
     //EXPECT_FALSE(sampler1.zeroCrossing());// triggeres a static_assert error
     //EXPECT_FALSE(sampler1.gradient(grid->indexToWorld(ijk)));// triggeres a static_assert error
 
     nanovdb::SampleFromVoxels<nanovdb::NanoTree<nanovdb::Vec3f>, 3> sampler3(grid->tree());
     //auto sampler3 = nanovdb::createSampler<3>( acc );
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
-    for (int i=0; i<3; ++i) EXPECT_NEAR(exact[i], sampler3(ijk)[i], 1e-5);
-    
+    for (int i = 0; i < 3; ++i)
+        EXPECT_NEAR(exact[i], sampler3(ijk)[i], 1e-5);
+
 } // VectorSampleFromVoxels
 
 TEST_F(TestNanoVDB, GridChecksum)
@@ -2052,14 +2395,21 @@ TEST_F(TestNanoVDB, GridChecksum)
 
     nanovdb::CpuTimer<> timer;
     //timer.start("nanovdb::createLevelSetSphere");
-    auto handle = nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3d(50), 1.0f, 3.0f, nanovdb::Vec3d(0), "sphere_20", nanovdb::ChecksumMode::Disable);
+    auto handle = nanovdb::createLevelSetSphere<float>(100.0f,
+                                                       nanovdb::Vec3d(50),
+                                                       1.0f,
+                                                       3.0f,
+                                                       nanovdb::Vec3d(0),
+                                                       "sphere_20",
+                                                       nanovdb::StatsMode::Disable,
+                                                       nanovdb::ChecksumMode::Disable);
     //timer.stop();
     EXPECT_TRUE(handle);
     auto* grid = handle.grid<float>();
     EXPECT_TRUE(grid);
 
     nanovdb::GridChecksum checksum1, checksum2, checksum3;
-    
+
     //timer.start("Full checksum");
     checksum1(*grid, nanovdb::ChecksumMode::Full);
     //timer.stop();
@@ -2070,77 +2420,139 @@ TEST_F(TestNanoVDB, GridChecksum)
 
     checksum2(*grid, nanovdb::ChecksumMode::Full);
 
-    EXPECT_EQ( checksum1, checksum2 );
+    EXPECT_EQ(checksum1, checksum2);
 
-    auto *leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
-    leaf->data()->mValues[0] += 0.00001f;// slightly modify a single voxel value 
-
-    checksum2(*grid, nanovdb::ChecksumMode::Full);
-    EXPECT_NE( checksum1, checksum2 );
-
-    leaf->data()->mValues[0] -= 0.00001f;// change back the single voxel value to it's original value
+    auto* leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
+    leaf->data()->mValues[0] += 0.00001f; // slightly modify a single voxel value
 
     checksum2(*grid, nanovdb::ChecksumMode::Full);
-    EXPECT_EQ( checksum1, checksum2 );
+    EXPECT_NE(checksum1, checksum2);
 
-    leaf->data()->mValueMask.toggle(0);// change a single bit in a value mask
+    leaf->data()->mValues[0] -= 0.00001f; // change back the single voxel value to it's original value
 
     checksum2(*grid, nanovdb::ChecksumMode::Full);
-    EXPECT_NE( checksum1, checksum2 );
+    EXPECT_EQ(checksum1, checksum2);
+
+    leaf->data()->mValueMask.toggle(0); // change a single bit in a value mask
+
+    checksum2(*grid, nanovdb::ChecksumMode::Full);
+    EXPECT_NE(checksum1, checksum2);
 
     //timer.start("Incomplete checksum");
     checksum2(*grid, nanovdb::ChecksumMode::Partial);
-    //timer.stop(); 
-    EXPECT_EQ( checksum2, checksum3 );
-}// GridChecksum
+    //timer.stop();
+    EXPECT_EQ(checksum2, checksum3);
+} // GridChecksum
 
 TEST_F(TestNanoVDB, GridValidator)
 {
     //nanovdb::CpuTimer<> timer;
     //timer.start("nanovdb::createLevelSetSphere");
-    auto handle = nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3d(50), 1.0f, 3.0f, nanovdb::Vec3d(0), "sphere_20", nanovdb::ChecksumMode::Full);
+    auto handle = nanovdb::createLevelSetSphere<float>(100.0f, 
+                                                       nanovdb::Vec3d(50), 
+                                                       1.0f, 3.0f, 
+                                                       nanovdb::Vec3d(0), 
+                                                       "sphere_20",
+                                                       nanovdb::StatsMode::All,
+                                                       nanovdb::ChecksumMode::Full);
     //timer.stop();
     EXPECT_TRUE(handle);
     auto* grid = handle.grid<float>();
     EXPECT_TRUE(grid);
-    
+
     //timer.start("isValid - detailed");
-    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+    EXPECT_TRUE(nanovdb::isValid(*grid, true, true));
     //timer.stop();
 
     //timer.start("isValid - not detailed");
-    EXPECT_TRUE( nanovdb::isValid(*grid, false, true ) );
+    EXPECT_TRUE(nanovdb::isValid(*grid, false, true));
     //timer.stop();
 
     //timer.start("Slow CRC");
     auto slowChecksum = nanovdb::crc32_slow(*grid);
     //timer.stop();
-    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
-    
+    EXPECT_EQ(slowChecksum, nanovdb::crc32_slow(*grid));
+
     //timer.start("Fast CRC");
     auto fastChecksum = nanovdb::crc32(*grid);
     //timer.stop();
-    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_EQ(fastChecksum, nanovdb::crc32(*grid));
 
-    auto *leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
-    leaf->data()->mValues[0] += 0.00001f;// slightly modify a single voxel value 
+    auto* leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
+    leaf->data()->mValues[0] += 0.00001f; // slightly modify a single voxel value
 
-    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
+    EXPECT_NE(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE(nanovdb::isValid(*grid, true, false));
 
-    leaf->data()->mValues[0] -= 0.00001f;// change back the single voxel value to it's original value
+    leaf->data()->mValues[0] -= 0.00001f; // change back the single voxel value to it's original value
 
-    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+    EXPECT_EQ(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_EQ(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_TRUE(nanovdb::isValid(*grid, true, true));
 
-    leaf->data()->mValueMask.toggle(0);// change a singel bit in a value mask
+    leaf->data()->mValueMask.toggle(0); // change a singel bit in a value mask
 
-    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
-}// GridValidator
+    EXPECT_NE(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE(nanovdb::isValid(*grid, true, false));
+} // GridValidator
+
+TEST_F(TestNanoVDB, ReadAccessor)
+{
+    nanovdb::GridBuilder<float> builder(0.5f);
+
+    {
+        auto acc = builder.getAccessor();
+        acc.setValue(nanovdb::Coord(-1), 1.0f);
+        acc.setValue(nanovdb::Coord(0), 2.0f);
+        acc.setValue(nanovdb::Coord(1), 3.0f);
+        acc.setValue(nanovdb::Coord(2), 0.0f);
+    }
+
+    auto gridHdl = builder.getHandle<>();
+    EXPECT_TRUE(gridHdl);
+    auto grid = gridHdl.grid<float>();
+    EXPECT_TRUE(grid);
+    nanovdb::gridStats(*grid);
+
+    auto acc  = grid->tree().getAccessor();
+    auto acc3 = nanovdb::createAccessor<>(*grid);
+    auto acc0 = nanovdb::createAccessor<0>(*grid);
+    {
+        EXPECT_EQ( 1.0f,  acc.getValue(nanovdb::Coord(-1)) );
+        EXPECT_EQ( 2.0f,  acc.getValue(nanovdb::Coord( 0)) );
+        EXPECT_EQ( 3.0f,  acc.getValue(nanovdb::Coord( 1)) );
+        EXPECT_EQ( 0.0f,  acc.getValue(nanovdb::Coord( 2)) );
+        EXPECT_EQ( 1.0f, acc3.getValue(nanovdb::Coord(-1)) );
+        EXPECT_EQ( 2.0f, acc3.getValue(nanovdb::Coord( 0)) );
+        EXPECT_EQ( 3.0f, acc3.getValue(nanovdb::Coord( 1)) );
+        EXPECT_EQ( 0.0f, acc3.getValue(nanovdb::Coord( 2)) );
+        EXPECT_EQ( 1.0f, acc0.getValue(nanovdb::Coord(-1)) );
+        EXPECT_EQ( 2.0f, acc0.getValue(nanovdb::Coord( 0)) );
+        EXPECT_EQ( 3.0f, acc0.getValue(nanovdb::Coord( 1)) );
+        EXPECT_EQ( 0.0f, acc0.getValue(nanovdb::Coord( 2)) );
+        auto nodeInfo = acc3.getNodeInfo(nanovdb::Coord(-1));
+        EXPECT_EQ(nodeInfo.mAverage, 1.f);
+        EXPECT_EQ(nodeInfo.mLevel, 0u);
+        EXPECT_EQ(nodeInfo.mDim, 8u);
+    }
+    {
+        auto nodeInfo = acc3.getNodeInfo(nanovdb::Coord(1));
+        EXPECT_EQ(nodeInfo.mAverage, (2.0f + 3.0f) / 3.0f);
+        auto getStdDev = [&](int n, float a, float b, float c) {
+            float m = (a + b + c) / n;
+            float sd = sqrtf(((a - m) * (a - m) +
+                              (b - m) * (b - m) +
+                              (c - m) * (c - m)) /
+                             n);
+            return sd;
+        };
+        EXPECT_NEAR(nodeInfo.mStdDevi, getStdDev(3.0f, 2.0f, 3.0f, 0), 1e-5);
+        EXPECT_EQ(nodeInfo.mLevel, 0u);
+        EXPECT_EQ(nodeInfo.mDim, 8u);
+    }
+} // ReadAccessor
 
 int main(int argc, char** argv)
 {

@@ -148,8 +148,8 @@ int main()
         std::vector<nanovdb::GridHandle<MapPoolBuffer>> gridHdls;
 
         // create two grids...
-        gridHdls.push_back(nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3R(-20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "spheref", nanovdb::ChecksumMode::Partial, bufferContext));
-        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0f, nanovdb::Vec3R(20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "sphered", nanovdb::ChecksumMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::createLevelSetSphere<float>(100.0f, nanovdb::Vec3R(-20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "spheref", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0f, nanovdb::Vec3R(20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "sphered", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
 
         // share grid[0]'s buffer into a parent-scope handle to prevent deletion.
         anotherHdl = nanovdb::GridHandle<MapPoolBuffer>(bufferContext.copy(gridHdls[0].buffer().mId));

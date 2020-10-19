@@ -54,6 +54,7 @@ option(NANOVDB_BUILD_DOCS "Build docs" OFF)
 option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 
+option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" ON)
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" ON)
 option(NANOVDB_USE_OPENGL "Build with OpenGL support" ON)
 option(NANOVDB_USE_OPENCL "Build with OpenCL support" ON)
@@ -71,7 +72,8 @@ option(NANOVDB_ALLOW_FETCHCONTENT
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -lpthread")
+  set(CMAKE_CXX_FLAGS
+      "${CMAKE_CXX_FLAGS} -Wno-invalid-offsetof -pthread -lpthread")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 endif()
 
@@ -144,6 +146,11 @@ if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
     set(NVRTC_LINK_LIBRARY ${CUDA_nvrtc_LIBRARY})
 
   endif()
+endif()
+
+# -----------------------------------------------------------------------
+if(NANOVDB_USE_INTRINSICS)
+  set(NANOVDB_USE_INTRINSICS_FLAG "NANOVDB_USE_INTRINSICS")
 endif()
 
 # -----------------------------------------------------------------------
@@ -266,7 +273,7 @@ add_library(libnanovdb INTERFACE)
 target_include_directories(libnanovdb INTERFACE ${NANOVDB_INCLUDE_DIR}
                                                 ${NANOVDB_INCLUDE_DIR}/nanovdb)
 
-target_compile_definitions(libnanovdb INTERFACE "-DNOMINMAX")
+target_compile_definitions(libnanovdb INTERFACE "-DNOMINMAX" "-D${NANOVDB_USE_INTRINSICS_FLAG}")
 
 add_custom_target(nanovdb SOURCES ${NANOVDB_HEADERS})
 
