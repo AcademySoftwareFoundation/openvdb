@@ -163,7 +163,7 @@ public:
 
     GridChecksum() : mCRC{CRC32::EMPTY, CRC32::EMPTY} {}
 
-    GridChecksum(uint32_t crc1, uint32_t crc2) : mCRC{crc1, crc2} {}
+    GridChecksum(uint32_t head, uint32_t tail) :  mCRC{head, tail} {}
 
     GridChecksum(uint64_t checksum, ChecksumMode mode = ChecksumMode::Full) : mChecksum{mode == ChecksumMode::Disable ? EMPTY : checksum}
     {
@@ -177,6 +177,12 @@ public:
     bool isFull() const { return mCRC[0] != CRC32::EMPTY && mCRC[1] != CRC32::EMPTY; }
 
     bool isEmpty() const { return mChecksum == EMPTY; }
+
+    ChecksumMode mode() const
+    { 
+        return mChecksum == EMPTY ? ChecksumMode::Disable :
+               mCRC[1] == CRC32::EMPTY ? ChecksumMode::Partial : ChecksumMode::Full; 
+    }
     
     template <typename ValueT>
     void operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Full);
@@ -270,7 +276,7 @@ template <typename ValueT>
 bool validateChecksum(const NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     GridChecksum cs1(grid.checksum(), mode), cs2;
-    cs2(grid, mode);
+    cs2(grid, cs1.mode() );
     return cs1 == cs2;
 }
 

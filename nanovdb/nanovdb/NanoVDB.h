@@ -42,7 +42,10 @@
     Overview: This file implements the following fundamental class that when combined
           forms the backbone of the VDB tree data structure:
 
+          Coord- a signed integer coordinate
           Vec3 - a 3D vector
+          Vec4 - a 4D vector
+          BBox - a bounding box
           Mask - a bitmask essential to the non-root tree nodes
           Map  - an affine coordinate transformation
           Grid - contains a Tree and a ma for world<->index transformations. Use
@@ -58,16 +61,45 @@
           denoted voxel values, and values associated with other tree nodes are referred
           to as tile values, which by design cover a larger coordinate index domain.
 
+
+    Memory layout:
+
+    GridData: 672 bytes (e.g. magic, checksum, major, flags, world bbox, grid name, and affine transformation)
+    
+    TreeData: 64 bytes (node counts and byte offsets)
+    
+    ... optional padding ...
+    
+    RootData: size depends on ValueType (index bbox, voxel count, tile count, min/max/avg/standard deviation)
+    
+    Array of: RootData::Tile
+    
+    ... optional padding ...
+    
+    Array of: Upper InternalNodes of size 32^3:  bbox, two bit masks, 32768 tile values, and min/max/avg/standard deviation values
+    
+    ... optional padding ...
+    
+    Array of: Lower InternalNodes of size 16^3:  bbox, two bit masks, 4096 tile values, and min/max/avg/standard deviation values
+    
+    ... optional padding ...
+    
+    Array of: LeafNodes of size 8^3: bbox, bit masks, 512 voxel values, and min/max/avg/standard deviation values
+
+
+    Example layout: ("---" implies it has a custom offset, "..." implies zero or more)
+    [GridData(672B)][TreeData(64B)]---[RootData][N x Root::Tile]---[NodeData<5>]---[ModeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
+
 */
 
 #ifndef NANOVDB_NANOVDB_H_HAS_BEEN_INCLUDED
 #define NANOVDB_NANOVDB_H_HAS_BEEN_INCLUDED
 
-#define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL// "NanoVDB0" in hex - little endian (uint64_t)
+#define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL // "NanoVDB0" in hex - little endian (uint64_t)
 
-#define NANOVDB_MAJOR_VERSION_NUMBER 27// reflects changes to the ABI
-#define NANOVDB_MINOR_VERSION_NUMBER  0// reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
+#define NANOVDB_MAJOR_VERSION_NUMBER 28 // reflects changes to the ABI
+#define NANOVDB_MINOR_VERSION_NUMBER 0 // reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER 0 // reflects bug-fixes with no ABI or API changes
 
 // This replaces a Coord key at the root level with a single uint64_t
 #define USE_SINGLE_ROOT_KEY
@@ -83,15 +115,15 @@
 
 #ifdef __CUDACC_RTC__
 
-typedef signed char         int8_t;
-typedef short               int16_t;
-typedef int                 int32_t;
-typedef long long           int64_t;
-typedef unsigned char       uint8_t;
-typedef unsigned int        uint32_t;
-typedef unsigned long long  uint64_t;
+typedef signed char        int8_t;
+typedef short              int16_t;
+typedef int                int32_t;
+typedef long long          int64_t;
+typedef unsigned char      uint8_t;
+typedef unsigned int       uint32_t;
+typedef unsigned long long uint64_t;
 
-#else
+#else // __CUDACC_RTC__
 
 #include <stdlib.h> //    for abs in clang7
 #include <stdint.h> //    for types like int32_t etc
@@ -99,7 +131,16 @@ typedef unsigned long long  uint64_t;
 #include <cassert> //     for assert
 #include <cmath> //       for sqrt and fma
 #include <limits> //      for numeric_limits
+
+#if defined(NANOVDB_USE_INTRINSICS) && defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(_BitScanReverse)
+#pragma intrinsic(_BitScanForward)
+#pragma intrinsic(_BitScanReverse64)
+#pragma intrinsic(_BitScanForward64)
 #endif
+
+#endif // __CUDACC_RTC__
 
 #ifdef __CUDACC__
 // Only define __hostdev__ when using NVIDIA CUDA compiler
@@ -110,23 +151,40 @@ typedef unsigned long long  uint64_t;
 
 namespace nanovdb {
 
-// Implementation of std::is_same
-template <typename T1, typename T2>
+/// @brief C++11 implementation of std::is_same
+template<typename T1, typename T2>
 struct is_same
 {
     static const bool value = false;
 };
 
-template <typename T>
+template<typename T>
 struct is_same<T, T>
 {
     static const bool value = true;
 };
 
-template <typename T>
+/// @brief C++11 implementation of std::is_floating_point
+template<typename T>
 struct is_floating_point
 {
-    static const bool value = is_same<T,float>::value || is_same<T,double>::value;
+    static const bool value = is_same<T, float>::value || is_same<T, double>::value;
+};
+
+/// @brief Metafunction used to determine if the first template
+///        parameter is a specialization of the class template
+///        given in the second template parameter.
+///
+/// @details is_specialization<Vec3<float>, Vec3>::value == true;
+template<typename T, template<typename...> class Template>
+struct is_specialization
+{
+    static const bool value = false;
+};
+template<typename... Args, template<typename...> class Template>
+struct is_specialization<Template<Args...>, Template>
+{
+    static const bool value = true;
 };
 
 // Dummy type for a voxel with a binary mask value, e.g. the active state
@@ -166,10 +224,12 @@ enum class GridClass : uint32_t { Unknown = 0,
 
 /// @brief Grid flags which indicate what extra information is present in the grid buffer.
 enum class GridFlags : uint32_t {
-    HAS_MIN_MAX = 1 << 0,
-    HAS_BBOX = 1 << 1,
-    HAS_TRUNCATED_GRIDNAME = 1 << 2,
-    // bits # 8, 16, 32, 64, 128, 256, ...  1 << 32 are available
+    HasTruncatedGridname = 1 << 0,
+    HasBBox = 1 << 1,
+    HasMinMax = 1 << 2,
+    HasAverage = 1 << 3,
+    HasStdDeviation = 1 << 4,
+    End = 1 << 5,
 };
 
 /// @brief Blind-data Classes that are currently supported by NanoVDB
@@ -232,6 +292,11 @@ template<>
 struct Maximum<int>
 {
     __hostdev__ static int value() { return 2147483647; }
+};
+template<>
+struct Maximum<uint32_t>
+{
+    __hostdev__ static uint32_t value() { return 4294967295; }
 };
 template<>
 struct Maximum<float>
@@ -337,13 +402,13 @@ __hostdev__ inline int32_t Ceil(double x)
     return int32_t(ceil(x));
 }
 
-template <typename T>
+template<typename T>
 __hostdev__ inline T Pow2(T x)
 {
     return x * x;
 }
 
-template <typename T>
+template<typename T>
 __hostdev__ inline T Abs(T x)
 {
     return x < 0 ? -x : x;
@@ -410,9 +475,12 @@ __hostdev__ inline int MinIndex(const Vec3T& v)
     const int        hashKey = ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]); // ?*4+?*2+?*1
     return hashTable[hashKey];
 #else
-    if (v[0] < v[1] && v[0] < v[2]) return 0;
-    if (v[1] < v[2]) return 1;
-    else return 2;
+    if (v[0] < v[1] && v[0] < v[2])
+        return 0;
+    if (v[1] < v[2])
+        return 1;
+    else
+        return 2;
 #endif
 }
 
@@ -424,9 +492,12 @@ __hostdev__ inline int MaxIndex(const Vec3T& v)
     const int        hashKey = ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]); // ?*4+?*2+?*1
     return hashTable[hashKey];
 #else
-    if (v[0] > v[1] && v[0] > v[2]) return 0;
-    if (v[1] > v[2]) return 1;
-    else return 2;
+    if (v[0] > v[1] && v[0] > v[2])
+        return 0;
+    if (v[1] > v[2])
+        return 1;
+    else
+        return 2;
 #endif
 }
 
@@ -476,7 +547,7 @@ public:
 
     __hostdev__ static Coord max() { return Coord(int32_t((1u << 31) - 1)); }
 
-    __hostdev__ static Coord min() { return Coord(-int32_t((1u << 31) - 1)-1); }
+    __hostdev__ static Coord min() { return Coord(-int32_t((1u << 31) - 1) - 1); }
 
     __hostdev__ static size_t memUsage() { return sizeof(Coord); }
 
@@ -536,22 +607,35 @@ public:
         mVec[2] += rhs[2];
         return *this;
     }
+    __hostdev__ Coord& operator-=(const Coord& rhs)
+    {
+        mVec[0] -= rhs[0];
+        mVec[1] -= rhs[1];
+        mVec[2] -= rhs[2];
+        return *this;
+    }
 
     /// @brief Perform a component-wise minimum with the other Coord.
     __hostdev__ Coord& minComponent(const Coord& other)
     {
-        if (other[0] < mVec[0]) mVec[0] = other[0];
-        if (other[1] < mVec[1]) mVec[1] = other[1];
-        if (other[2] < mVec[2]) mVec[2] = other[2];
+        if (other[0] < mVec[0])
+            mVec[0] = other[0];
+        if (other[1] < mVec[1])
+            mVec[1] = other[1];
+        if (other[2] < mVec[2])
+            mVec[2] = other[2];
         return *this;
     }
 
     /// @brief Perform a component-wise maximum with the other Coord.
     __hostdev__ Coord& maxComponent(const Coord& other)
     {
-        if (other[0] > mVec[0]) mVec[0] = other[0];
-        if (other[1] > mVec[1]) mVec[1] = other[1];
-        if (other[2] > mVec[2]) mVec[2] = other[2];
+        if (other[0] > mVec[0])
+            mVec[0] = other[0];
+        if (other[1] > mVec[1])
+            mVec[1] = other[1];
+        if (other[2] > mVec[2])
+            mVec[2] = other[2];
         return *this;
     }
 
@@ -579,13 +663,13 @@ public:
                                                 (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
 }; // Coord class
 
-// ----------------------------> Vec3R <--------------------------------------
+// ----------------------------> Vec3 <--------------------------------------
 
-/// @brief A simple vector class with three double components, simular to openvdb::math::Vec3<double>
+/// @brief A simple vector class with three double components, simular to openvdb::math::Vec3
 template<typename T>
 class Vec3
 {
-    static_assert(is_floating_point<T>::value,"Vec3: expected a floating point value");
+    static_assert(is_floating_point<T>::value, "Vec3: expected a floating point value");
     T mVec[3];
 
 public:
@@ -641,7 +725,7 @@ public:
     __hostdev__ Vec3 operator+(const Vec3& v) const { return Vec3(mVec[0] + v[0], mVec[1] + v[1], mVec[2] + v[2]); }
     __hostdev__ Vec3 operator-(const Vec3& v) const { return Vec3(mVec[0] - v[0], mVec[1] - v[1], mVec[2] - v[2]); }
     __hostdev__ Vec3 operator*(const T& s) const { return Vec3(s * mVec[0], s * mVec[1], s * mVec[2]); }
-    __hostdev__ Vec3 operator/(const T& s) const { return Vec3(mVec[0] / s, mVec[1] / s, mVec[2] / s); }
+    __hostdev__ Vec3 operator/(const T& s) const { return (T(1) / s) * (*this); }
     __hostdev__ Vec3& operator+=(const Vec3& v)
     {
         mVec[0] += v[0];
@@ -663,48 +747,42 @@ public:
         mVec[2] *= s;
         return *this;
     }
-    __hostdev__ Vec3& operator/=(const T& s)
-    {
-        mVec[0] /= s;
-        mVec[1] /= s;
-        mVec[2] /= s;
-        return *this;
-    }
-    __hostdev__ Vec3& normalize()
-    {
-        (*this) *= T(1) / this->length();
-        return *this;
-    }
+    __hostdev__ Vec3& operator/=(const T& s) { return (*this) *= T(1) / s; }
+    __hostdev__ Vec3& normalize() { return (*this) /= this->length(); }
     /// @brief Perform a component-wise minimum with the other Coord.
     __hostdev__ void minComponent(const Vec3& other)
     {
-        if (other[0] < mVec[0]) mVec[0] = other[0];
-        if (other[1] < mVec[1]) mVec[1] = other[1];
-        if (other[2] < mVec[2]) mVec[2] = other[2];
+        if (other[0] < mVec[0])
+            mVec[0] = other[0];
+        if (other[1] < mVec[1])
+            mVec[1] = other[1];
+        if (other[2] < mVec[2])
+            mVec[2] = other[2];
     }
 
     /// @brief Perform a component-wise maximum with the other Coord.
     __hostdev__ void maxComponent(const Vec3& other)
     {
-        if (other[0] > mVec[0]) mVec[0] = other[0];
-        if (other[1] > mVec[1]) mVec[1] = other[1];
-        if (other[2] > mVec[2]) mVec[2] = other[2];
+        if (other[0] > mVec[0])
+            mVec[0] = other[0];
+        if (other[1] > mVec[1])
+            mVec[1] = other[1];
+        if (other[2] > mVec[2])
+            mVec[2] = other[2];
     }
     /// @brief Retun the smallest vector component
     __hostdev__ ValueType min() const
     {
-        return mVec[0] < mVec[1] ? (mVec[0] < mVec[2] ? mVec[0] : mVec[2]) :
-                                   (mVec[1] < mVec[2] ? mVec[1] : mVec[2]) ;
+        return mVec[0] < mVec[1] ? (mVec[0] < mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] < mVec[2] ? mVec[1] : mVec[2]);
     }
     /// @brief Retun the largest vector component
     __hostdev__ ValueType max() const
     {
-        return mVec[0] > mVec[1] ? (mVec[0] > mVec[2] ? mVec[0] : mVec[2]) :
-                                   (mVec[1] > mVec[2] ? mVec[1] : mVec[2]) ;
+        return mVec[0] > mVec[1] ? (mVec[0] > mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] > mVec[2] ? mVec[1] : mVec[2]);
     }
-    __hostdev__ Coord floor() const { return Coord(Floor(mVec[0]),Floor(mVec[1]),Floor(mVec[2])); }
-    __hostdev__ Coord  ceil() const { return Coord( Ceil(mVec[0]), Ceil(mVec[1]), Ceil(mVec[2])); }
-    __hostdev__ Coord round() const { return Coord(Floor(mVec[0]+0.5),Floor(mVec[1]+0.5),Floor(mVec[2]+0.5)); }
+    __hostdev__ Coord floor() const { return Coord(Floor(mVec[0]), Floor(mVec[1]), Floor(mVec[2])); }
+    __hostdev__ Coord ceil() const { return Coord(Ceil(mVec[0]), Ceil(mVec[1]), Ceil(mVec[2])); }
+    __hostdev__ Coord round() const { return Coord(Floor(mVec[0] + 0.5), Floor(mVec[1] + 0.5), Floor(mVec[2] + 0.5)); }
 }; // Vec3<T>
 
 template<typename T1, typename T2>
@@ -721,6 +799,171 @@ inline __hostdev__ Vec3<T2> operator/(T1 scalar, const Vec3<T2>& vec)
 using Vec3R = Vec3<double>;
 using Vec3d = Vec3<double>;
 using Vec3f = Vec3<float>;
+
+// ----------------------------> Vec4 <--------------------------------------
+
+/// @brief A simple vector class with three double components, simular to openvdb::math::Vec4
+template<typename T>
+class Vec4
+{
+    static_assert(is_floating_point<T>::value, "Vec4: expected a floating point value");
+    T mVec[4];
+
+public:
+    static const int SIZE = 4;
+    using ValueType = T;
+    Vec4() = default;
+    __hostdev__ explicit Vec4(T x)
+        : mVec{x, x, x, x}
+    {
+    }
+    __hostdev__ Vec4(T x, T y, T z, T w)
+        : mVec{x, y, z, w}
+    {
+    }
+    template<typename T2>
+    __hostdev__ explicit Vec4(const Vec4<T2>& v)
+        : mVec{T(v[0]), T(v[1]), T(v[2]), T(v[3])}
+    {
+    }
+    __hostdev__ bool operator==(const Vec4& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2] && mVec[3] == rhs[3]; }
+    __hostdev__ bool operator!=(const Vec4& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2] != mVec[3] != rhs[3]; }
+    template<typename Vec4T>
+    __hostdev__ Vec4& operator=(const Vec4T& rhs)
+    {
+        mVec[0] = rhs[0];
+        mVec[1] = rhs[1];
+        mVec[2] = rhs[2];
+        mVec[3] = rhs[3];
+        return *this;
+    }
+    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
+    __hostdev__ T& operator[](int i) { return mVec[i]; }
+    template<typename Vec4T>
+    __hostdev__ T dot(const Vec4T& v) const { return mVec[0] * v[0] + mVec[1] * v[1] + mVec[2] * v[2] + mVec[3] * v[3]; }
+    __hostdev__ T lengthSqr() const
+    {
+        return mVec[0] * mVec[0] + mVec[1] * mVec[1] + mVec[2] * mVec[2] + mVec[3] * mVec[3]; // 7 flops
+    }
+    __hostdev__ T    length() const { return Sqrt(this->lengthSqr()); }
+    __hostdev__ Vec4 operator-() const { return Vec4(-mVec[0], -mVec[1], -mVec[2], -mVec[3]); }
+    __hostdev__ Vec4 operator*(const Vec4& v) const { return Vec4(mVec[0] * v[0], mVec[1] * v[1], mVec[2] * v[2], mVec[3] * v[3]); }
+    __hostdev__ Vec4 operator/(const Vec4& v) const { return Vec4(mVec[0] / v[0], mVec[1] / v[1], mVec[2] / v[2], mVec[3] / v[3]); }
+    __hostdev__ Vec4 operator+(const Vec4& v) const { return Vec4(mVec[0] + v[0], mVec[1] + v[1], mVec[2] + v[2], mVec[3] + v[3]); }
+    __hostdev__ Vec4 operator-(const Vec4& v) const { return Vec4(mVec[0] - v[0], mVec[1] - v[1], mVec[2] - v[2], mVec[3] - v[3]); }
+    __hostdev__ Vec4 operator*(const T& s) const { return Vec4(s * mVec[0], s * mVec[1], s * mVec[2], s * mVec[3]); }
+    __hostdev__ Vec4 operator/(const T& s) const { return (T(1) / s) * (*this); }
+    __hostdev__ Vec4& operator+=(const Vec4& v)
+    {
+        mVec[0] += v[0];
+        mVec[1] += v[1];
+        mVec[2] += v[2];
+        mVec[3] += v[3];
+        return *this;
+    }
+    __hostdev__ Vec4& operator-=(const Vec4& v)
+    {
+        mVec[0] -= v[0];
+        mVec[1] -= v[1];
+        mVec[2] -= v[2];
+        mVec[3] -= v[3];
+        return *this;
+    }
+    __hostdev__ Vec4& operator*=(const T& s)
+    {
+        mVec[0] *= s;
+        mVec[1] *= s;
+        mVec[2] *= s;
+        mVec[3] *= s;
+        return *this;
+    }
+    __hostdev__ Vec4& operator/=(const T& s) { return (*this) *= T(1) / s; }
+    __hostdev__ Vec4& normalize() { return (*this) /= this->length(); }
+    /// @brief Perform a component-wise minimum with the other Coord.
+    __hostdev__ void minComponent(const Vec4& other)
+    {
+        if (other[0] < mVec[0])
+            mVec[0] = other[0];
+        if (other[1] < mVec[1])
+            mVec[1] = other[1];
+        if (other[2] < mVec[2])
+            mVec[2] = other[2];
+        if (other[3] < mVec[3])
+            mVec[3] = other[3];
+    }
+
+    /// @brief Perform a component-wise maximum with the other Coord.
+    __hostdev__ void maxComponent(const Vec4& other)
+    {
+        if (other[0] > mVec[0])
+            mVec[0] = other[0];
+        if (other[1] > mVec[1])
+            mVec[1] = other[1];
+        if (other[2] > mVec[2])
+            mVec[2] = other[2];
+        if (other[3] > mVec[3])
+            mVec[3] = other[3];
+    }
+}; // Vec4<T>
+
+template<typename T1, typename T2>
+inline __hostdev__ Vec4<T2> operator*(T1 scalar, const Vec4<T2>& vec)
+{
+    return Vec4<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
+}
+template<typename T1, typename T2>
+inline __hostdev__ Vec4<T2> operator/(T1 scalar, const Vec3<T2>& vec)
+{
+    return Vec4<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
+}
+
+using Vec4R = Vec4<double>;
+using Vec4d = Vec4<double>;
+using Vec4f = Vec4<float>;
+
+// ----------------------------> TensorTraits <--------------------------------------
+
+template<typename T, int Rank = (is_specialization<T, Vec3>::value || 
+                                 is_specialization<T, Vec4>::value) ? 1 : 0>
+struct TensorTraits;
+
+template<typename T>
+struct TensorTraits<T, 0>
+{
+    static const int  Rank = 0; // i.e. scalar
+    static const bool IsScalar = true;
+    static const bool IsVector = false;
+    static const int  Size = 1;
+    using ElementType = T;
+    static T scalar(const T& s) { return s; }
+};
+
+template<typename T>
+struct TensorTraits<T, 1>
+{
+    static const int  Rank = 1; // i.e. vector
+    static const bool IsScalar = false;
+    static const bool IsVector = true;
+    static const int  Size = T::SIZE;
+    using ElementType = typename T::ValueType;
+    static ElementType scalar(const T& v) { return v.length(); }
+};
+
+// ----------------------------> FloatTraits <--------------------------------------
+
+template<typename T, int = sizeof(typename TensorTraits<T>::ElementType)>
+struct FloatTraits
+{
+    using FloatType = float;
+};
+
+template<typename T>
+struct FloatTraits<T, 8>
+{
+    using FloatType = double;
+};
+
+// ----------------------------> mapping ValueType -> GridType <--------------------------------------
 
 /// @brief Maps from a templated value type to a GridType enum
 template<typename ValueT>
@@ -816,14 +1059,13 @@ inline __hostdev__ Vec3T matMultT(const double* mat, const double* vec, const Ve
                  fma(static_cast<double>(xyz[0]), mat[2], fma(static_cast<double>(xyz[1]), mat[5], fma(static_cast<double>(xyz[2]), mat[8], vec[2])))); // 9 fma = 9 flops
 }
 
-
 // ----------------------------> BBox <-------------------------------------
 
 // Base-class for static polymorphism (cannot be constructed directly)
 template<typename Vec3T>
 struct BaseBBox
 {
-    Vec3T mCoord[2];
+    Vec3T             mCoord[2];
     __hostdev__ bool  operator==(const BaseBBox& rhs) const { return mCoord[0] == rhs.mCoord[0] && mCoord[1] == rhs.mCoord[1]; };
     __hostdev__ bool  operator!=(const BaseBBox& rhs) const { return mCoord[0] != rhs.mCoord[0] || mCoord[1] != rhs.mCoord[1]; };
     __hostdev__ const Vec3T& operator[](int i) const { return mCoord[i]; }
@@ -832,7 +1074,11 @@ struct BaseBBox
     __hostdev__ Vec3T& max() { return mCoord[1]; }
     __hostdev__ const Vec3T& min() const { return mCoord[0]; }
     __hostdev__ const Vec3T& max() const { return mCoord[1]; }
-    __hostdev__ void translate(const Vec3T &xyz) { mCoord[0] += xyz; mCoord[1] += xyz; }
+    __hostdev__ void         translate(const Vec3T& xyz)
+    {
+        mCoord[0] += xyz;
+        mCoord[1] += xyz;
+    }
     // @brief Expand this bounding box to enclose point (i, j, k).
     __hostdev__ void expand(const Vec3T& xyz)
     {
@@ -847,10 +1093,14 @@ struct BaseBBox
             return false;
         return true;
     }
+
 protected:
     __hostdev__ BaseBBox() {}
-    __hostdev__ BaseBBox(const Vec3T& min, const Vec3T& max) : mCoord{min, max} {}
-};// BaseBBox
+    __hostdev__ BaseBBox(const Vec3T& min, const Vec3T& max)
+        : mCoord{min, max}
+    {
+    }
+}; // BaseBBox
 
 template<typename Vec3T, bool = is_floating_point<typename Vec3T::ValueType>::value>
 struct BBox;
@@ -862,24 +1112,35 @@ struct BBox;
 template<typename Vec3T>
 struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
 {
-    using Vec3Type  = Vec3T;
+    using Vec3Type = Vec3T;
     using ValueType = typename Vec3T::ValueType;
     static_assert(is_floating_point<ValueType>::value, "Expected a floating point coordinate type");
     using BaseT = BaseBBox<Vec3T>;
     using BaseT::mCoord;
-    __hostdev__ BBox() : BaseT(Vec3T( Maximum<typename Vec3T::ValueType>::value()),
-                               Vec3T(-Maximum<typename Vec3T::ValueType>::value())) {}
-    __hostdev__ BBox(const Vec3T& min, const Vec3T& max) : BaseT(min, max) {}
+    __hostdev__ BBox()
+        : BaseT(Vec3T( Maximum<typename Vec3T::ValueType>::value()),
+                Vec3T(-Maximum<typename Vec3T::ValueType>::value()))
+    {
+    }
+    __hostdev__ BBox(const Vec3T& min, const Vec3T& max)
+        : BaseT(min, max)
+    {
+    }
     __hostdev__ BBox(const Coord& min, const Coord& max)
-        : BaseT(Vec3T(ValueType(min[0])  , ValueType(min[1])  , ValueType(min[2])),
-                Vec3T(ValueType(max[0]+1), ValueType(max[1]+1), ValueType(max[2]+1)) )
-    {}
-    __hostdev__ BBox(const BaseBBox<Coord> &bbox) : BBox(bbox[0], bbox[1]) {}
-    __hostdev__ bool empty() const { return mCoord[0][0] >= mCoord[1][0] ||
+        : BaseT(Vec3T(ValueType(min[0]), ValueType(min[1]), ValueType(min[2])),
+                Vec3T(ValueType(max[0] + 1), ValueType(max[1] + 1), ValueType(max[2] + 1)))
+    {
+    }
+    __hostdev__ BBox(const BaseBBox<Coord>& bbox)
+        : BBox(bbox[0], bbox[1])
+    {
+    }
+    __hostdev__ bool  empty() const { return mCoord[0][0] >= mCoord[1][0] ||
                                             mCoord[0][1] >= mCoord[1][1] ||
                                             mCoord[0][2] >= mCoord[1][2]; }
     __hostdev__ Vec3T dim() const { return this->empty() ? Vec3T(0) : this->max() - this->min(); }
-    __hostdev__ bool isInside(const Vec3T &p) const {
+    __hostdev__ bool  isInside(const Vec3T& p) const
+    {
         return p[0] > mCoord[0][0] && p[1] > mCoord[0][1] && p[2] > mCoord[0][2] &&
                p[0] < mCoord[1][0] && p[1] < mCoord[1][1] && p[2] < mCoord[1][2];
     }
@@ -897,27 +1158,55 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     using BaseT::mCoord;
     /// @brief Iterator over the domain covered by a BBox
     /// @details z is the fastest-moving coordinate.
-    class Iterator {
-        const BBox &mBBox;
-        CoordT mPos;
+    class Iterator
+    {
+        const BBox& mBBox;
+        CoordT      mPos;
+
     public:
-        __hostdev__ Iterator(const BBox& b): mBBox(b), mPos(b.min()) {}
-        __hostdev__ Iterator& operator++() {
-            if (mPos[2] < mBBox[1][2]) { ++mPos[2]; } // this is the most common case
-            else if (mPos[1] <  mBBox[1][1]) { mPos[2] = mBBox[0][2]; ++mPos[1]; }
-            else if (mPos[0] <= mBBox[1][0]) { mPos[2] = mBBox[0][2]; mPos[1] = mBBox[0][1]; ++mPos[0]; }
+        __hostdev__ Iterator(const BBox& b)
+            : mBBox(b)
+            , mPos(b.min())
+        {
+        }
+        __hostdev__ Iterator& operator++()
+        {
+            if (mPos[2] < mBBox[1][2]) {
+                ++mPos[2];
+            } // this is the most common case
+            else if (mPos[1] < mBBox[1][1]) {
+                mPos[2] = mBBox[0][2];
+                ++mPos[1];
+            } else if (mPos[0] <= mBBox[1][0]) {
+                mPos[2] = mBBox[0][2];
+                mPos[1] = mBBox[0][1];
+                ++mPos[0];
+            }
             return *this;
         }
-        __hostdev__ Iterator operator++(int) {auto tmp = *this; ++(*this); return tmp; }
+        __hostdev__ Iterator operator++(int)
+        {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
+        }
         /// @brief Return @c true if the iterator still points to a valid coordinate.
-        __hostdev__ operator bool() const { return mPos[0] <= mBBox[1][0]; }
+        __hostdev__       operator bool() const { return mPos[0] <= mBBox[1][0]; }
         __hostdev__ const CoordT& operator*() const { return mPos; }
-    };// Iterator
+    }; // Iterator
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
-    __hostdev__ BBox() : BaseT(CoordT::max(), CoordT::min()) {}
-    __hostdev__ BBox(const CoordT& min, const CoordT& max) : BaseT(min, max) {}
-    template <typename SplitT>
-    __hostdev__ BBox(BBox &other, const SplitT&) : BaseT(other.mCoord[0], other.mCoord[1]) {
+    __hostdev__          BBox()
+        : BaseT(CoordT::max(), CoordT::min())
+    {
+    }
+    __hostdev__ BBox(const CoordT& min, const CoordT& max)
+        : BaseT(min, max)
+    {
+    }
+    template<typename SplitT>
+    __hostdev__ BBox(BBox& other, const SplitT&)
+        : BaseT(other.mCoord[0], other.mCoord[1])
+    {
         assert(this->is_divisible());
         const int n = MaxIndex(this->dim());
         mCoord[1][n] = (mCoord[0][n] + mCoord[1][n]) >> 1;
@@ -926,27 +1215,134 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     __hostdev__ bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] &&
                                                    mCoord[0][1] < mCoord[1][1] &&
                                                    mCoord[0][2] < mCoord[1][2]; }
-    __hostdev__ bool empty() const { return mCoord[0][0] > mCoord[1][0] ||
+    /// @brief Return true if this bounding box is empty, i.e. uninitialized
+    __hostdev__ bool   empty() const { return mCoord[0][0] > mCoord[1][0] ||
                                             mCoord[0][1] > mCoord[1][1] ||
                                             mCoord[0][2] > mCoord[1][2]; }
-    __hostdev__ CoordT dim() const {return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1);}
-    __hostdev__ bool isInside(const CoordT &p) const { return !(CoordT::lessThan(p,this->min()) || CoordT::lessThan(this->max(),p)); }
-    __hostdev__ bool isInside(const BBox& b) const
+    __hostdev__ CoordT dim() const { return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1); }
+    __hostdev__ bool   isInside(const CoordT& p) const { return !(CoordT::lessThan(p, this->min()) || CoordT::lessThan(this->max(), p)); }
+    __hostdev__ bool   isInside(const BBox& b) const
     {
-        return !(CoordT::lessThan(b.min(),this->min()) || CoordT::lessThan(this->max(),b.max()));
+        return !(CoordT::lessThan(b.min(), this->min()) || CoordT::lessThan(this->max(), b.max()));
     }
 
     /// @warning This converts a CoordBBox into a floating-point bounding box which implies that max += 1 !
-    template <typename RealT>
-    __hostdev__  BBox<Vec3<RealT>> asReal() const {
+    template<typename RealT>
+    __hostdev__ BBox<Vec3<RealT>> asReal() const
+    {
         static_assert(is_floating_point<RealT>::value, "CoordBBox::asReal: Expected a floating point coordinate");
-        return BBox<Vec3<RealT>>(Vec3<RealT>(RealT(mCoord[0][0]    ), RealT(mCoord[0][1]    ), RealT(mCoord[0][2])   ),
+        return BBox<Vec3<RealT>>(Vec3<RealT>(RealT(mCoord[0][0]), RealT(mCoord[0][1]), RealT(mCoord[0][2])),
                                  Vec3<RealT>(RealT(mCoord[1][0] + 1), RealT(mCoord[1][1] + 1), RealT(mCoord[1][2] + 1)));
     }
 };
 
 using CoordBBox = BBox<Coord>;
 using BBoxR = BBox<Vec3R>;
+
+// -------------------> Find lowest and highest bit in a word <----------------------------
+
+/// @brief Returns the index of the lowest, i.e. least significant, on bit in the specified 32 bit word
+///
+/// @warning Assumes that at least one bit is set in the word, i.e. @a v != uint32_t(0)!
+__hostdev__ static inline uint32_t FindLowestOn(uint32_t v)
+{
+    assert(v);
+#if defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
+    unsigned long index;
+    _BitScanForward(&index, v);
+    return static_cast<uint32_t>(index);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
+    return static_cast<uint32_t>(__builtin_ctzl(v));
+#else
+    static const unsigned char DeBruijn[32] = {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9};
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    return DeBruijn[uint32_t((v & -v) * 0x077CB531U) >> 27];
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+#endif
+}
+
+/// @brief Returns the index of the highest, i.e. most significant, on bit in the specified 32 bit word
+///
+/// @warning Assumes that at least one bit is set in the word, i.e. @a v != uint32_t(0)!
+__hostdev__ static inline uint32_t FindHighestOn(uint32_t v)
+{
+    assert(v);
+#if defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
+    unsigned long index;
+    _BitScanReverse(&index, v);
+    return static_cast<uint32_t>(index);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
+    return sizeof(unsigned long) * 8 - 1 - __builtin_clzl(v);
+
+#else
+    static const unsigned char DeBruijn[32] = {
+        0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30, 8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31};
+    v |= v >> 1; // first round down to one less than a power of 2
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    return DeBruijn[uint32_t(v * 0x07C4ACDDU) >> 27];
+#endif
+}
+
+/// @brief Returns the index of the lowest, i.e. least significant, on bit in the specified 64 bit word
+///
+/// @warning Assumes that at least one bit is set in the word, i.e. @a v != uint32_t(0)!
+__hostdev__ static inline uint32_t FindLowestOn(uint64_t v)
+{
+    assert(v);
+#if defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
+    unsigned long index;
+    _BitScanForward64(&index, v);
+    return static_cast<uint32_t>(index);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
+    return static_cast<uint32_t>(__builtin_ctzll(v));
+#else
+    static const unsigned char DeBruijn[64] = {
+        0,   1,  2, 53,  3,  7, 54, 27, 4,  38, 41,  8, 34, 55, 48, 28,
+        62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
+        63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
+        51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
+    };
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    return DeBruijn[uint64_t((v & -v) * UINT64_C(0x022FDD63CC95386D)) >> 58];
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+#endif
+}
+
+/// @brief Returns the index of the highest, i.e. most significant, on bit in the specified 64 bit word
+///
+/// @warning Assumes that at least one bit is set in the word, i.e. @a v != uint32_t(0)!
+__hostdev__ static inline uint32_t FindHighestOn(uint64_t v)
+{
+    assert(v);
+#if defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
+    unsigned long index;
+    _BitScanReverse64(&index, v);
+    return static_cast<uint32_t>(index);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
+    return sizeof(unsigned long) * 8 - 1 - __builtin_clzll(v);
+#else
+    const uint32_t* p = reinterpret_cast<const uint32_t*>(&v);
+    return p[1] ? 32u + FindHighestOn(p[1]) : FindHighestOn(p[0]);
+#endif
+}
 
 // ----------------------------> Mask <--------------------------------------
 
@@ -972,22 +1368,36 @@ public:
     __hostdev__ uint32_t countOn() const
     {
         uint32_t sum = 0, n = WORD_COUNT;
-        for (const uint64_t* w = mWords; n--; ++w) sum += CountOn(*w);
+        for (const uint64_t* w = mWords; n--; ++w)
+            sum += CountOn(*w);
         return sum;
     }
 
     class Iterator
     {
     public:
-      __hostdev__ Iterator() : mPos(Mask::SIZE), mParent(nullptr) {}
-      __hostdev__ Iterator(uint32_t pos, const Mask* parent) : mPos(pos), mParent(parent) {}
-      Iterator& operator=(const Iterator&) = default;
-      __hostdev__ uint32_t operator*() const { return mPos; }
-      __hostdev__ operator bool() const { return mPos != Mask::SIZE;}
-      __hostdev__ Iterator& operator++() { mPos = mParent->findNextOn(mPos+1); return *this; }
+        __hostdev__ Iterator()
+            : mPos(Mask::SIZE)
+            , mParent(nullptr)
+        {
+        }
+        __hostdev__ Iterator(uint32_t pos, const Mask* parent)
+            : mPos(pos)
+            , mParent(parent)
+        {
+        }
+        Iterator&            operator=(const Iterator&) = default;
+        __hostdev__ uint32_t operator*() const { return mPos; }
+        __hostdev__          operator bool() const { return mPos != Mask::SIZE; }
+        __hostdev__ Iterator& operator++()
+        {
+            mPos = mParent->findNextOn(mPos + 1);
+            return *this;
+        }
+
     private:
-      uint32_t     mPos;
-      const Mask*  mParent;
+        uint32_t    mPos;
+        const Mask* mParent;
     }; // Memeber class MaskIterator
 
     /// @brief Initialize all bits to zero.
@@ -1010,6 +1420,14 @@ public:
             mWords[i] = other.mWords[i];
     }
 
+    /// @breif Return the <i>n</i>th word of the bit mask, for a word of arbitrary size.
+    template<typename WordT>
+    __hostdev__ WordT getWord(int n) const
+    {
+        assert(n * 8 * sizeof(WordT) < SIZE);
+        return reinterpret_cast<const WordT*>(mWords)[n];
+    }
+
     /// @brief Assignment operator from another Mask type
     __hostdev__ Mask& operator=(const Mask& other)
     {
@@ -1025,18 +1443,22 @@ public:
 
     __hostdev__ bool isOn() const
     {
-        for (uint32_t i = 0; i < WORD_COUNT; ++i) if (mWords[i] != ~uint64_t(0)) return false;
+        for (uint32_t i = 0; i < WORD_COUNT; ++i)
+            if (mWords[i] != ~uint64_t(0))
+                return false;
         return true;
     }
 
     __hostdev__ bool isOff() const
     {
-        for (uint32_t i = 0; i < WORD_COUNT; ++i) if (mWords[i] != uint64_t(0)) return false;
+        for (uint32_t i = 0; i < WORD_COUNT; ++i)
+            if (mWords[i] != uint64_t(0))
+                return false;
         return true;
     }
 
     /// @brief Set the given bit on.
-    __hostdev__ void setOn( uint32_t n) { mWords[n >> 6] |=   uint64_t(1) << (n & 63);  }
+    __hostdev__ void setOn(uint32_t n) { mWords[n >> 6] |= uint64_t(1) << (n & 63); }
     __hostdev__ void setOff(uint32_t n) { mWords[n >> 6] &= ~(uint64_t(1) << (n & 63)); }
 
     __hostdev__ void set(uint32_t n, bool On) { On ? this->setOn(n) : this->setOff(n); }
@@ -1059,9 +1481,11 @@ public:
     __hostdev__ void toggle()
     {
         uint32_t n = WORD_COUNT;
-        for (auto* w = mWords; n--; ++w) *w = ~*w;
+        for (auto* w = mWords; n--; ++w)
+            *w = ~*w;
     }
-    __hostdev__ void toggle(uint32_t n) { mWords[n >> 6] ^= uint64_t(1) << (n & 63);  }
+    __hostdev__ void toggle(uint32_t n) { mWords[n >> 6] ^= uint64_t(1) << (n & 63); }
+
 private:
     __hostdev__ static inline uint32_t CountOn(uint64_t v)
     {
@@ -1069,33 +1493,28 @@ private:
         v = (v & uint64_t(0x3333333333333333)) + ((v >> 2) & uint64_t(0x3333333333333333));
         return (((v + (v >> 4)) & uint64_t(0xF0F0F0F0F0F0F0F)) * uint64_t(0x101010101010101)) >> 56;
     }
-    __hostdev__ static inline uint32_t FindLowestOn(uint64_t v)
-    {
-      static const unsigned char DeBruijn[64] = {
-          0,   1,  2, 53,  3,  7, 54, 27, 4,  38, 41,  8, 34, 55, 48, 28,
-          62,  5, 39, 46, 44, 42, 22,  9, 24, 35, 59, 56, 49, 18, 29, 11,
-          63, 52,  6, 26, 37, 40, 33, 47, 61, 45, 43, 21, 23, 58, 17, 10,
-          51, 25, 36, 32, 60, 20, 57, 16, 50, 31, 19, 15, 30, 14, 13, 12,
-      };
-      return DeBruijn[uint64_t((v & -static_cast<int64_t>(v)) * uint64_t(0x022FDD63CC95386D)) >> 58];
-    }
+
     __hostdev__ uint32_t findFirstOn() const
     {
-        uint32_t n = 0;
+        uint32_t        n = 0;
         const uint64_t* w = mWords;
-        for (; n<WORD_COUNT && !*w; ++w, ++n) ;
-        return n==WORD_COUNT ? SIZE : (n << 6) + FindLowestOn(*w);
+        for (; n < WORD_COUNT && !*w; ++w, ++n)
+            ;
+        return n == WORD_COUNT ? SIZE : (n << 6) + FindLowestOn(*w);
     }
     __hostdev__ uint32_t findNextOn(uint32_t start) const
     {
-        uint32_t n = start >> 6;//initiate
-        if (n >= WORD_COUNT) return SIZE; // check for out of bounds
+        uint32_t n = start >> 6; // initiate
+        if (n >= WORD_COUNT)
+            return SIZE; // check for out of bounds
         uint32_t m = start & 63;
         uint64_t b = mWords[n];
-        if (b & (uint64_t(1) << m)) return start;//simpel case: start is on
-        b &= ~uint64_t(0) << m;// mask out lower bits
-        while(!b && ++n<WORD_COUNT) b = mWords[n];// find next none-zero word
-        return (!b ? SIZE : (n << 6) + FindLowestOn(b));//catch last word=0
+        if (b & (uint64_t(1) << m))
+            return start; //simple case: start is on
+        b &= ~uint64_t(0) << m; // mask out lower bits
+        while (!b && ++n < WORD_COUNT)
+            b = mWords[n]; // find next none-zero word
+        return (!b ? SIZE : (n << 6) + FindLowestOn(b)); // catch last word=0
     }
 }; // Mask class
 
@@ -1152,10 +1571,10 @@ struct Map
 template<typename Mat4T>
 void Map::set(const Mat4T& mat, const Mat4T& invMat, double taper)
 {
-    float  *mf = mMatF, *vf = mVecF;
-    float  *mif = mInvMatF;
+    float * mf = mMatF, *vf = mVecF;
+    float*  mif = mInvMatF;
     double *md = mMatD, *vd = mVecD;
-    double *mid = mInvMatD;
+    double* mid = mInvMatD;
     mTaperF = static_cast<float>(taper);
     mTaperD = taper;
     for (int i = 0; i < 3; ++i) {
@@ -1222,7 +1641,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     static const int MaxNameSize = 256;
     uint64_t         mMagic; // 8B magic to validate it is valid grid data.
     uint64_t         mChecksum; // 8B. Checksum of grid buffer.
-    uint32_t         mMajor;// 4B. major version number
+    uint32_t         mMajor; // 4B. major version number
     uint32_t         mFlags; // 4B. flags for grid.
     uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
     char             mGridName[MaxNameSize]; // 256B
@@ -1236,51 +1655,67 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
 
     // Set and unset various bit flags
     __hostdev__ void setFlagsOff() { mFlags = uint32_t(0); }
-    __hostdev__ void setMinMax(bool on)
+    __hostdev__ void setMinMaxOn(bool on = true)
     {
         if (on) {
-            mFlags |= static_cast<uint32_t>(GridFlags::HAS_MIN_MAX);
+            mFlags |= static_cast<uint32_t>(GridFlags::HasMinMax);
         } else {
-            mFlags &= ~static_cast<uint32_t>(GridFlags::HAS_MIN_MAX);
+            mFlags &= ~static_cast<uint32_t>(GridFlags::HasMinMax);
         }
     }
-    __hostdev__ void setBBox(bool on)
+    __hostdev__ void setBBoxOn(bool on = true)
     {
         if (on) {
-            mFlags |= static_cast<uint32_t>(GridFlags::HAS_BBOX);
+            mFlags |= static_cast<uint32_t>(GridFlags::HasBBox);
         } else {
-            mFlags &= ~static_cast<uint32_t>(GridFlags::HAS_BBOX);
+            mFlags &= ~static_cast<uint32_t>(GridFlags::HasBBox);
         }
     }
-    __hostdev__ void setTrunctedGridName(bool on)
+    __hostdev__ void setTruncatedGridNameOn(bool on = true)
     {
         if (on) {
-            mFlags |= static_cast<uint32_t>(GridFlags::HAS_TRUNCATED_GRIDNAME);
+            mFlags |= static_cast<uint32_t>(GridFlags::HasTruncatedGridname);
         } else {
-            mFlags &= ~static_cast<uint32_t>(GridFlags::HAS_TRUNCATED_GRIDNAME);
+            mFlags &= ~static_cast<uint32_t>(GridFlags::HasTruncatedGridname);
         }
-     }
+    }
+    __hostdev__ void setAverageOn(bool on = true)
+    {
+        if (on) {
+            mFlags |= static_cast<uint32_t>(GridFlags::HasAverage);
+        } else {
+            mFlags &= ~static_cast<uint32_t>(GridFlags::HasAverage);
+        }
+    }
+    __hostdev__ void setStdDeviationOn(bool on = true)
+    {
+        if (on) {
+            mFlags |= static_cast<uint32_t>(GridFlags::HasStdDeviation);
+        } else {
+            mFlags &= ~static_cast<uint32_t>(GridFlags::HasStdDeviation);
+        }
+    }
 
     // Affine transformations based on double precision
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return mMap.applyMap(xyz); }// Pos: index -> world
+    __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return mMap.applyMap(xyz); } // Pos: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const { return mMap.applyInverseMap(xyz); }// Pos: world -> index
+    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const { return mMap.applyInverseMap(xyz); } // Pos: world -> index
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobian(const Vec3T& xyz) const { return mMap.applyJacobian(xyz); }// Dir: index -> world
+    __hostdev__ Vec3T applyJacobian(const Vec3T& xyz) const { return mMap.applyJacobian(xyz); } // Dir: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return mMap.applyInverseJacobian(xyz); }// Dir: world -> index
+    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return mMap.applyInverseJacobian(xyz); } // Dir: world -> index
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return mMap.applyIJT(xyz); }
     // Affine transformations based on single precision
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMapF(const Vec3T& xyz) const { return mMap.applyMapF(xyz); }// Pos: index -> world
+    __hostdev__ Vec3T applyMapF(const Vec3T& xyz) const { return mMap.applyMapF(xyz); } // Pos: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const { return mMap.applyInverseMapF(xyz); }// Pos: world -> index
+    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const { return mMap.applyInverseMapF(xyz); } // Pos: world -> index
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobianF(const Vec3T& xyz) const { return mMap.applyJacobianF(xyz); }// Dir: index -> world
+    __hostdev__ Vec3T applyJacobianF(const Vec3T& xyz) const { return mMap.applyJacobianF(xyz); } // Dir: index -> world
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return mMap.applyInverseJacobianF(xyz); }// Dir: world -> index
+    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return mMap.applyInverseJacobianF(xyz); } // Dir: world -> index
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return mMap.applyIJTF(xyz); }
 
@@ -1308,7 +1743,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
 }; // GridData
 
 // Forward decleration of accelerated random access class
-template<typename>
+template<typename, int = 3>
 class ReadAccessor;
 
 /// @brief Highest level of the data structure. Contains a tree and a world->index
@@ -1325,7 +1760,7 @@ public:
     using CoordType = typename TreeT::CoordType;
     using AccessorType = ReadAccessor<typename TreeT::RootType>;
 
-    static constexpr bool IgnoreValues = TreeT::IgnoreValues;
+    //static constexpr bool IgnoreValues = TreeT::IgnoreValues;
 
     /// @brief Disallow constructions, copy and assignment
     ///
@@ -1339,7 +1774,7 @@ public:
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
     /// @brief return memory usage in bytes for the class (note this computes room for blindMetaData structures.)
-    __hostdev__ static uint64_t memUsage() {return sizeof(GridData);}
+    __hostdev__ static uint64_t memUsage() { return sizeof(GridData); }
 
     /// @brief return the memory footprint of the entire grid, i.e. including all nodes and blind data
     __hostdev__ uint64_t totalMemUsage() const { return DataType::mGridSize; }
@@ -1405,7 +1840,6 @@ public:
     template<typename Vec3T>
     __hostdev__ Vec3T indexToWorldGradF(const Vec3T& grad) const { return DataType::applyIJTF(grad); }
 
-
     /// @brief Computes a AABB of active values in world space
     __hostdev__ const BBox<Vec3R>& worldBBox() const { return DataType::mWorldBBox; }
 
@@ -1413,24 +1847,26 @@ public:
     ///
     /// @note This method is returning a floating point bounding box and not a CoordBBox. This makes
     ///       it more useful for clipping rays.
-    __hostdev__ const BBox<Coord>&  indexBBox() const { return this->tree().bbox(); }
+    __hostdev__ const BBox<CoordType>& indexBBox() const { return this->tree().bbox(); }
 
     /// @brief Return the total number of active voxels in this tree.
     __hostdev__ const uint64_t& activeVoxelCount() const { return this->tree().activeVoxelCount(); }
 
     /// @brief Methods related to the classification of this grid
-    __hostdev__ bool      isValid() const { return DataType::mMagic == NANOVDB_MAGIC_NUMBER; }
-    __hostdev__ const GridType&  gridType() const { return DataType::mGridType; }
+    __hostdev__ bool  isValid() const { return DataType::mMagic == NANOVDB_MAGIC_NUMBER; }
+    __hostdev__ const GridType& gridType() const { return DataType::mGridType; }
     __hostdev__ const GridClass& gridClass() const { return DataType::mGridClass; }
-    __hostdev__ bool      isLevelSet() const { return DataType::mGridClass == GridClass::LevelSet; }
-    __hostdev__ bool      isFogVolume() const { return DataType::mGridClass == GridClass::FogVolume; }
-    __hostdev__ bool      isStaggered() const { return DataType::mGridClass == GridClass::Staggered; }
-    __hostdev__ bool      isPointIndex() const { return DataType::mGridClass == GridClass::PointIndex; }
-    __hostdev__ bool      isPointData() const { return DataType::mGridClass == GridClass::PointData; }
-    __hostdev__ bool      isUnknown() const { return DataType::mGridClass == GridClass::Unknown; }
-    __hostdev__ bool      hasMinMax() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HAS_MIN_MAX); }
-    __hostdev__ bool      hasBBox() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HAS_BBOX); }
-    __hostdev__ bool      hasTrunctedGridName() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HAS_TRUNCATED_GRIDNAME); }
+    __hostdev__ bool             isLevelSet() const { return DataType::mGridClass == GridClass::LevelSet; }
+    __hostdev__ bool             isFogVolume() const { return DataType::mGridClass == GridClass::FogVolume; }
+    __hostdev__ bool             isStaggered() const { return DataType::mGridClass == GridClass::Staggered; }
+    __hostdev__ bool             isPointIndex() const { return DataType::mGridClass == GridClass::PointIndex; }
+    __hostdev__ bool             isPointData() const { return DataType::mGridClass == GridClass::PointData; }
+    __hostdev__ bool             isUnknown() const { return DataType::mGridClass == GridClass::Unknown; }
+    __hostdev__ bool             hasMinMax() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HasMinMax); }
+    __hostdev__ bool             hasBBox() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HasBBox); }
+    __hostdev__ bool             hasTrunctedGridName() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HasTruncatedGridname); }
+    __hostdev__ bool             hasAverage() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HasAverage); }
+    __hostdev__ bool             hasStdDeviation() const { return DataType::mFlags & static_cast<uint32_t>(GridFlags::HasStdDeviation); }
 
     /// @brief Return a c-string with the name of this grid
     __hostdev__ const char* gridName() const { return DataType::mGridName; }
@@ -1479,8 +1915,9 @@ template<int ROOT_LEVEL = 3>
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
 {
     static_assert(ROOT_LEVEL == 3, "Root level is a ssumed to be three");
-    uint64_t mBytes[ROOT_LEVEL+1]; // 32B. byte offsets to nodes of type: leaf, lower internal, upper internal, and root
-    uint32_t mCount[ROOT_LEVEL+1]; // 16B. total number of nodes of type: leaf, lower internal, upper internal, and root
+    uint64_t mBytes[ROOT_LEVEL + 1]; // 32B. byte offsets to nodes of type: leaf, lower internal, upper internal, and root
+    uint32_t mCount[ROOT_LEVEL + 1]; // 16B. total number of nodes of type: leaf, lower internal, upper internal, and root
+    uint32_t mPFSum[ROOT_LEVEL + 1]; // 16B. reversed prefix sum of mCount - useful for accessing blind data associated with nodes
 };
 
 /// @brief Struct to derive node type from its level in a given tree
@@ -1517,6 +1954,7 @@ class Tree : private TreeData<RootT::LEVEL>
     static_assert(RootT::ChildNodeType::LOG2DIM == 5, "Tree configuration is not supported");
     static_assert(RootT::ChildNodeType::ChildNodeType::LOG2DIM == 4, "Tree configuration is not supported");
     static_assert(RootT::LeafNodeType::LOG2DIM == 3, "Tree configuration is not supported");
+
 public:
     using DataType = TreeData<RootT::LEVEL>;
     using RootType = RootT;
@@ -1527,7 +1965,7 @@ public:
     template<int LEVEL>
     using NodeType = typename Node<Tree, LEVEL>::type;
 
-    static constexpr bool IgnoreValues = RootT::IgnoreValues;
+    //static constexpr bool IgnoreValues = RootT::IgnoreValues;
     static_assert(is_same<NodeType<0>, LeafNodeType>::value, "NodeType<0> error");
     static_assert(is_same<NodeType<3>, RootType>::value, "NodeType<3> error");
 
@@ -1591,6 +2029,18 @@ public:
     template<int LEVEL>
     __hostdev__ NodeType<LEVEL>* getNode(uint32_t i);
 
+    /// @brief Returns the linear index, i.e. 0 -> ( # of nodes of type NodeT - 1), of the specified node
+    template<typename NodeT>
+    __hostdev__ uint32_t getNodeID(const NodeT& node) const;
+
+    /// @brief Returns the linear index of the specified node. 0 corresponds to the root node, followed by all the upper
+    ///        internal nodes, then the lower internal nodes and finally the leaf nodes. So the highest linear index is
+    ///        is total number of tree nodes minus one.
+    ///
+    /// @details This is useful when accessing blind data associated with tree nodes, e.g. auxiliary value buffers
+    template<typename NodeT>
+    __hostdev__ uint32_t getLinearOffset(const NodeT& node) const;
+
 private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(TreeData) is misaligned");
 
@@ -1637,6 +2087,23 @@ typename Node<Tree<RootT>, LEVEL>::type* Tree<RootT>::getNode(uint32_t i)
     return reinterpret_cast<NodeType<LEVEL>*>(reinterpret_cast<uint8_t*>(this) + DataType::mBytes[LEVEL]) + i;
 }
 
+template<typename RootT>
+template<typename NodeT>
+uint32_t Tree<RootT>::getNodeID(const NodeT& node) const
+{
+    static_assert(is_same<NodeType<NodeT::LEVEL>, NodeT>::value, "Tree::getNodeID: unvalid node type");
+    const NodeT* first = reinterpret_cast<const NodeT*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[NodeT::LEVEL]);
+    assert(&node >= first);
+    return static_cast<uint32_t>(&node - first); //we know that there can never be more than 2^32 nodes of any type
+}
+
+template<typename RootT>
+template<typename NodeT>
+uint32_t Tree<RootT>::getLinearOffset(const NodeT& node) const
+{
+    return this->getNodeID(node) + DataType::mPFSum[NodeT::LEVEL];
+}
+
 // --------------------------> RootNode <------------------------------------
 
 /// @brief Stuct with all the member data of the RootNode (useful during serialization of an openvdb RootNode)
@@ -1647,6 +2114,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
 {
     using ValueT = typename ChildT::ValueType;
     using CoordT = typename ChildT::CoordType;
+    using StatsT = typename ChildT::FloatType;
     /// @brief Return a key based on the coordinates of a voxel
 #ifdef USE_SINGLE_ROOT_KEY
     using KeyT = uint64_t;
@@ -1660,13 +2128,13 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
     __hostdev__ static CoordT KeyToCoord(const KeyT& key)
     {
         static constexpr uint64_t MASK = (1u << 21) - 1;
-        return Coord(( key        & MASK) << ChildT::TOTAL,
+        return Coord((key & MASK) << ChildT::TOTAL,
                      ((key >> 21) & MASK) << ChildT::TOTAL,
                      ((key >> 42) & MASK) << ChildT::TOTAL);
     }
 #else
     using KeyT = CoordT;
-    __hostdev__ static KeyT CoordToKey(const CoordT& ijk) { return ijk & ~ChildT::MASK; }
+    __hostdev__ static KeyT   CoordToKey(const CoordT& ijk) { return ijk & ~ChildT::MASK; }
     __hostdev__ static CoordT KeyToCoord(const KeyT& key) { return key; }
 #endif
     BBox<CoordT> mBBox; // 24B. AABB if active values in index space.
@@ -1674,8 +2142,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
     uint32_t     mTileCount; // 4B. number of tiles and child pointers in the root node
 
     ValueT mBackground; // background value, i.e. value of any unset voxel
-    ValueT mValueMin; // min value
-    ValueT mValueMax; // max value
+    ValueT mMinimum; // typically 4B, minmum of all the active values
+    ValueT mMaximum; // typically 4B, maximum of all the active values
+    StatsT mAverage; // typically 4B, average of all the active values in this node and its child nodes
+    StatsT mStdDevi; // typically 4B, standard deviation of all the active values in this node and its child nodes
 
     struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) Tile
     {
@@ -1691,12 +2161,12 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
             value = v;
             childID = -1;
         }
-        __hostdev__ bool isChild() const { return childID >=0; }
+        __hostdev__ bool   isChild() const { return childID >= 0; }
         __hostdev__ CoordT origin() const { return KeyToCoord(key); }
-        KeyT     key; // (USE_SINGLE_ROOT_KEY)?8B:12B
-        int32_t  childID; // 4B. negative values indicate no child node, i.e. this is a value tile
-        uint32_t state; // 4B. state of tile value
-        ValueT   value; // value of tile (i.e. no child node)
+        KeyT               key; // (USE_SINGLE_ROOT_KEY)?8B:12B
+        int32_t            childID; // 4B. negative values indicate no child node, i.e. this is a value tile
+        uint32_t           state; // 4B. state of tile value
+        ValueT             value; // value of tile (i.e. no child node)
     }; // Tile
 
     /// @brief Returns a non-const reference to the tile at the specified linear offset.
@@ -1733,11 +2203,12 @@ public:
     using LeafNodeType = typename ChildT::LeafNodeType;
     using ChildNodeType = ChildT;
     using ValueType = typename ChildT::ValueType;
+    using FloatType = typename ChildT::FloatType;
     using CoordType = typename ChildT::CoordType;
     using Tile = typename DataType::Tile;
 
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
-    static constexpr bool IgnoreValues = ChildT::IgnoreValues;
+    //static constexpr bool     IgnoreValues = ChildT::IgnoreValues;
 
     /// @brief This class cannot be constructed or deleted
     RootNode() = delete;
@@ -1752,21 +2223,30 @@ public:
     /// @brief Return a const reference to the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
     __hostdev__ const BBox<CoordType>& bbox() const { return DataType::mBBox; }
 
-     /// @brief Return the total number of active voxels in the root and all its child nodes.
+    /// @brief Return the total number of active voxels in the root and all its child nodes.
     __hostdev__ const uint64_t& activeVoxelCount() const { return DataType::mActiveVoxelCount; }
 
     /// @brief Return a const reference to the background value, i.e. the value associated with
     ///        any coordinate location that has not been set explicitly.
     __hostdev__ const ValueType& background() const { return DataType::mBackground; }
 
-    /// @brief Return a const reference to the minimum active value encoded in this root node and any of its child nodes
-    __hostdev__ const ValueType& valueMin() const { return DataType::mValueMin; }
-
-    /// @brief Return a const reference to the maximum active value encoded in this root node and any of its child nodes
-    __hostdev__ const ValueType& valueMax() const { return DataType::mValueMax; }
-
     /// @brief Return the number of tiles encoded in this root node
     __hostdev__ const uint32_t& tileCount() const { return DataType::mTileCount; }
+
+    /// @brief Return a const reference to the minimum active value encoded in this root node and any of its child nodes
+    __hostdev__ const ValueType& valueMin() const { return DataType::mMinimum; }
+
+    /// @brief Return a const reference to the maximum active value encoded in this root node and any of its child nodes
+    __hostdev__ const ValueType& valueMax() const { return DataType::mMaximum; }
+
+    /// @brief Return a const reference to the average of all the active values encoded in this root node and any of its child nodes
+    __hostdev__ const FloatType& average() const { return DataType::mAverage; }
+
+    /// @brief Return a const reference to the variance of all the active values encoded in this root node and any of its child nodes
+    __hostdev__ const FloatType& variance() const { return DataType::mStdDevi * DataType::mStdDevi; }
+
+    /// @brief Return a const reference to the standard deviation of all the active values encoded in this root node and any of its child nodes
+    __hostdev__ const FloatType& stdDeviation() const { return DataType::mStdDevi; }
 
     /// @brief Return the expected memory footprint in bytes with the specified number of tiles
     __hostdev__ static uint64_t memUsage(uint32_t _tileCount) { return sizeof(RootNode) + _tileCount * sizeof(Tile); }
@@ -1816,7 +2296,7 @@ private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData) is misaligned");
     static_assert(sizeof(typename DataType::Tile) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData::Tile) is misaligned");
 
-    template<typename>
+    template<typename, int>
     friend class ReadAccessor;
     template<typename>
     friend class Tree;
@@ -1828,10 +2308,10 @@ private:
     __hostdev__ const Tile* findTile(const CoordType& ijk) const
     {
         // binary-search of pre-sorted elements
-        int32_t     low = 0, high = DataType::mTileCount; //low is inclusive and high is exclusive
+        int32_t     low = 0, high = DataType::mTileCount; // low is inclusive and high is exclusive
         const Tile* tiles = reinterpret_cast<const Tile*>(this + 1);
         const auto  key = DataType::CoordToKey(ijk);
-#if 1 //switch between linear and binary seach
+#if 1 // switch between linear and binary seach
         for (int i = low; i < high; i++) {
             const Tile* tile = &tiles[i];
             if (tile->key == key)
@@ -1853,7 +2333,25 @@ private:
         return nullptr;
     }
 
-    /// @brief Private method to retun a voxel value and update a ReadAccessor
+    /// @brief Private method to return node information and update a ReadAccessor
+    template<typename AccT>
+    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& ijk, const AccT& acc) const
+    {
+        using NodeInfoT = typename AccT::NodeInfo;
+        if (const Tile* tile = this->findTile(ijk)) {
+            if (tile->childID < 0) {
+                return NodeInfoT{LEVEL, ChildT::dim(), tile->value, tile->value, tile->value, 
+                                 0, tile->origin(), tile->origin() + CoordType(ChildT::DIM)};
+            }
+            const ChildT& child = this->child(*tile);
+            acc.insert(ijk, &child);
+            return child.getNodeInfoAndCache(ijk, acc);
+        }
+        return NodeInfoT{LEVEL, Maximum<uint32_t>::value(), this->valueMin(), this->valueMax(), 
+                         this->average(), this->stdDeviation(), this->bbox()[0], this->bbox()[1]};
+    }
+
+    /// @brief Private method to return a voxel value and update a ReadAccessor
     template<typename AccT>
     __hostdev__ const ValueType& getValueAndCache(const CoordType& ijk, const AccT& acc) const
     {
@@ -1933,6 +2431,7 @@ template<typename ChildT, uint32_t LOG2DIM>
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
 {
     using ValueT = typename ChildT::ValueType;
+    using StatsT = typename ChildT::FloatType;
     using CoordT = typename ChildT::CoordType;
     using MaskT = typename ChildT::template MaskType<LOG2DIM>;
 
@@ -1948,15 +2447,17 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
         ~Tile() = delete;
     }; // if ValueType is a float this has a footprint of only 4 bytes!
 
-    BBox<CoordT> mBBox; // 24B. node bounding box.
-    int32_t      mOffset; // 4B. number of node offsets till first tile
-    uint32_t     mFlags; // 4B. node flags.
-    MaskT        mValueMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B
-    MaskT        mChildMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B
+    BBox<CoordT> mBBox; // 24B. node bounding box.                       |
+    int32_t      mOffset; // 4B. number of node offsets till first child |  32B aligned
+    uint32_t     mFlags; // 4B. node flags.                              |
+    MaskT        mValueMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B  | 32B aligned
+    MaskT        mChildMask; // LOG2DIM(5): 4096B, LOG2DIM(4): 512B  | 32B aligned
 
-    ValueT mValueMin;// sizeof(ValueT)
-    ValueT mValueMax;// sizeof(ValueT)
-    alignas(32) Tile mTable[1u << (3 * LOG2DIM)];// sizeof(ValueT) x (16*16*16 or 32*32*32)
+    ValueT mMinimum; // typically 4B
+    ValueT mMaximum; // typically 4B
+    StatsT mAverage; // typically 4B,  average of all the active values in this node and its child nodes
+    StatsT mStdDevi; // typically 4B, standard deviation of all the active values in this node and its child nodes
+    alignas(32) Tile mTable[1u << (3 * LOG2DIM)]; // sizeof(ValueT) x (16*16*16 or 32*32*32)
 
     /// @brief Returns a const pointer to the child node at the specifed linear offset.
     __hostdev__ const ChildT* child(uint32_t n) const
@@ -1980,19 +2481,20 @@ public:
     using LeafNodeType = typename ChildT::LeafNodeType;
     using ChildNodeType = ChildT;
     using ValueType = typename ChildT::ValueType;
+    using FloatType = typename ChildT::FloatType;
     using CoordType = typename ChildT::CoordType;
     template<uint32_t LOG2>
     using MaskType = typename ChildT::template MaskType<LOG2>;
     using DataType = InternalData<ChildT, Log2Dim>;
 
     static constexpr uint32_t LOG2DIM = Log2Dim;
-    static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; //dimension in index space
-    static constexpr uint32_t DIM = 1u << TOTAL;// number of voxels along each axis of this node
-    static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); //number of tile values (or child pointers)
+    static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; // dimension in index space
+    static constexpr uint32_t DIM = 1u << TOTAL; // number of voxels along each axis of this node
+    static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); // number of tile values (or child pointers)
     static constexpr uint32_t MASK = (1u << TOTAL) - 1u;
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
-    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL);// total voxel count represented by this node
-    static constexpr bool IgnoreValues = ChildT::IgnoreValues;
+    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
+    //static constexpr bool     IgnoreValues = ChildT::IgnoreValues;
 
     /// @brief This class cannot be constructed or deleted
     InternalNode() = delete;
@@ -2004,10 +2506,10 @@ public:
 
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
-    /// @brief Return the dimnetion, in voxel units, of this internal node (typically 8*16 or 8*16*32)
+    /// @brief Return the dimension, in voxel units, of this internal node (typically 8*16 or 8*16*32)
     __hostdev__ static uint32_t dim() { return 1u << TOTAL; }
 
-    /// @brief return memory usage in bytes for the class
+    /// @brief Return memory usage in bytes for the class
     __hostdev__ static size_t memUsage() { return sizeof(DataType); }
 
     /// @brief Return a const reference to the bit mask of active voxels in this internal node
@@ -2020,10 +2522,19 @@ public:
     __hostdev__ CoordType origin() const { return DataType::mBBox.min() & ~MASK; }
 
     /// @brief Return a const reference to the minimum active value encoded in this internal node and any of its child nodes
-    __hostdev__ const ValueType& valueMin() const { return DataType::mValueMin; }
+    __hostdev__ const ValueType& valueMin() const { return DataType::mMinimum; }
 
     /// @brief Return a const reference to the maximum active value encoded in this internal node and any of its child nodes
-    __hostdev__ const ValueType& valueMax() const { return DataType::mValueMax; }
+    __hostdev__ const ValueType& valueMax() const { return DataType::mMaximum; }
+
+    /// @brief Return a const reference to the average of all the active values encoded in this internal node and any of its child nodes
+    __hostdev__ const FloatType& average() const { return DataType::mAverage; }
+
+    /// @brief Return a const reference to the variance of all the active values encoded in this internal node and any of its child nodes
+    __hostdev__ const FloatType& variance() const { return DataType::mStdDevi*DataType::mStdDevi; }
+
+    /// @brief Return a const reference to the standard deviation of all the active values encoded in this internal node and any of its child nodes
+    __hostdev__ const FloatType& stdDeviation() const { return DataType::mStdDevi; }
 
     /// @brief Return a const reference to the bounding box in index space of active values in this internal node and any of its child nodes
     __hostdev__ const BBox<CoordType>& bbox() const { return DataType::mBBox; }
@@ -2069,14 +2580,14 @@ public:
     __hostdev__ static Coord OffsetToLocalCoord(uint32_t n)
     {
         assert(n < SIZE);
-        const uint32_t m = n & ((1<<2*LOG2DIM)-1);
-        return Coord(n >> 2*LOG2DIM, m >> LOG2DIM, m & ((1<<LOG2DIM)-1));
+        const uint32_t m = n & ((1 << 2 * LOG2DIM) - 1);
+        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & ((1 << LOG2DIM) - 1));
     }
 
-    __hostdev__ void localToGlobalCoord(Coord &ijk) const
+    __hostdev__ void localToGlobalCoord(Coord& ijk) const
     {
         ijk <<= ChildT::TOTAL;
-        ijk  += this->origin();
+        ijk += this->origin();
     }
 
     __hostdev__ Coord offsetToGlobalCoord(uint32_t n) const
@@ -2090,7 +2601,7 @@ private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(InternalData) is misaligned");
     //static_assert(offsetof(DataType, mTable) % 32 == 0, "InternalData::mTable is misaligned");
 
-    template<typename>
+    template<typename, int>
     friend class ReadAccessor;
     template<typename>
     friend class RootNode;
@@ -2107,6 +2618,20 @@ private:
         const ChildT* child = this->child(n);
         acc.insert(ijk, child);
         return child->getValueAndCache(ijk, acc);
+    }
+
+    template<typename AccT>
+    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& ijk, const AccT& acc) const
+    {
+        using NodeInfoT = typename AccT::NodeInfo;
+        const uint32_t n = CoordToOffset(ijk);
+        if (!DataType::mChildMask.isOn(n)) {
+            return NodeInfoT{LEVEL, this->dim(), this->valueMin(), this->valueMax(), this->average(),
+                             this->stdDeviation(), this->bbox()[0], this->bbox()[1]};
+        }
+        const ChildT* child = this->child(n);
+        acc.insert(ijk, child);
+        return child->getNodeInfoAndCache(ijk, acc);
     }
 
     template<typename AccT>
@@ -2171,21 +2696,33 @@ template<typename ValueT, typename CoordT, template<uint32_t> class MaskT, uint3
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData
 {
     using ValueType = ValueT;
-    static constexpr bool IgnoreValues = false;
+    using FloatType = typename FloatTraits<ValueT>::FloatType;
+    //static constexpr bool IgnoreValues = false;
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
     uint8_t        mFlags; // 1B.
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
 
-    ValueType mValueMin;
-    ValueType mValueMax;
+    ValueType mMinimum; // typically 4B
+    ValueType mMaximum; // typically 4B
+    FloatType mAverage; // typically 4B, average of all the active values in this node and its child nodes
+    FloatType mStdDevi; //typically 4B, standard deviation of all the active values in this node and its child nodes
     alignas(32) ValueType mValues[1u << 3 * LOG2DIM];
 
     __hostdev__ const ValueType* values() const { return mValues; }
     __hostdev__ const ValueType& value(uint32_t i) const { return mValues[i]; }
-    __hostdev__ const ValueType& valueMin() const { return mValueMin; }
-    __hostdev__ const ValueType& valueMax() const { return mValueMax; }
+    __hostdev__ void             setValueOnly(uint32_t offset, const ValueType& value) { mValues[offset] = value; }
+    __hostdev__ void             setValue(uint32_t offset, const ValueType& value)
+    {
+        mValueMask.setOn(offset);
+        mValues[offset] = value;
+    }
+
+    __hostdev__ const ValueType& valueMin()     const { return mMinimum; }
+    __hostdev__ const ValueType& valueMax()     const { return mMaximum; }
+    __hostdev__ const FloatType& average()      const { return mAverage; }
+    __hostdev__ const FloatType& stdDeviation() const { return mStdDevi; }
 
     /// @brief This class cannot be constructed or deleted
     LeafData() = delete;
@@ -2198,8 +2735,9 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData
 template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueMask, CoordT, MaskT, LOG2DIM>
 {
-    using ValueType = uint32_t;// dummy value type
-    static constexpr bool IgnoreValues = true;
+    using ValueType = uint32_t; // dummy value type
+    using FloatType = uint32_t; // dummy value type
+    //static constexpr bool IgnoreValues = true;
     static const uint32_t mDummy;
 
     CoordT         mBBoxMin; // 12B.
@@ -2211,6 +2749,8 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueMask, CoordT, MaskT, 
     __hostdev__ const ValueType& value(uint32_t) const { return mDummy; }
     __hostdev__ const ValueType& valueMin() const { return mDummy; }
     __hostdev__ const ValueType& valueMax() const { return mDummy; }
+    __hostdev__ const FloatType& average() const { return mDummy; }
+    __hostdev__ const FloatType& stdDeviation() const { return mDummy; }
 
     /// @brief This class cannot be constructed or deleted
     LeafData() = delete;
@@ -2237,18 +2777,19 @@ public:
     using LeafNodeType = LeafNode<ValueT, CoordT, MaskT, Log2Dim>;
     using DataType = LeafData<ValueT, CoordT, MaskT, Log2Dim>;
     using ValueType = typename DataType::ValueType;
+    using FloatType = typename DataType::FloatType;
     using CoordType = CoordT;
     template<uint32_t LOG2>
     using MaskType = MaskT<LOG2>;
 
     static constexpr uint32_t LOG2DIM = Log2Dim;
     static constexpr uint32_t TOTAL = LOG2DIM; // needed by parent nodes
-    static constexpr uint32_t DIM = 1u << TOTAL;// number of voxels along each axis of this node
+    static constexpr uint32_t DIM = 1u << TOTAL; // number of voxels along each axis of this node
     static constexpr uint32_t SIZE = 1u << 3 * LOG2DIM; // total number of voxels represented by this node
     static constexpr uint32_t MASK = (1u << LOG2DIM) - 1u; // mask for bit operations
     static constexpr uint32_t LEVEL = 0; // level 0 = leaf
-    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL);// total voxel count represented by this node
-    static constexpr bool IgnoreValues = DataType::IgnoreValues;
+    static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
+    //static constexpr bool     IgnoreValues = DataType::IgnoreValues;
 
     __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
 
@@ -2266,6 +2807,15 @@ public:
     /// @brief Return a const reference to the maximum active value encoded in this leaf node
     __hostdev__ const ValueType& valueMax() const { return DataType::valueMax(); }
 
+    /// @brief Return a const reference to the average of all the active values encoded in this leaf node
+    __hostdev__ const FloatType& average() const { return DataType::average(); }
+
+    /// @brief Return a const reference to the variance of all the active values encoded in this leaf node
+    __hostdev__ const FloatType& variance() const { return DataType::stdDeviation()*DataType::stdDeviation(); }
+
+    /// @brief Return a const reference to the standard deviation of all the active values encoded in this leaf node
+    __hostdev__ const FloatType& stdDeviation() const { return DataType::stdDeviation(); }
+
     __hostdev__ uint8_t flags() const { return DataType::mFlags; }
 
     /// @brief Return the origin in index space of this leaf node
@@ -2274,12 +2824,12 @@ public:
     __hostdev__ static CoordT OffsetToLocalCoord(uint32_t n)
     {
         assert(n < SIZE);
-        const uint32_t m = n & ((1<<2*LOG2DIM)-1);
-        return CoordT(n >> 2*LOG2DIM, m >> LOG2DIM, m & MASK);
+        const uint32_t m = n & ((1 << 2 * LOG2DIM) - 1);
+        return CoordT(n >> 2 * LOG2DIM, m >> LOG2DIM, m & MASK);
     }
 
     /// @brief Converts (in place) a local index coordinate to a global index coordinate
-    __hostdev__ void localToGlobalCoord(Coord &ijk) const { ijk += this->origin(); }
+    __hostdev__ void localToGlobalCoord(Coord& ijk) const { ijk += this->origin(); }
 
     __hostdev__ CoordT offsetToGlobalCoord(uint32_t n) const
     {
@@ -2317,6 +2867,16 @@ public:
     /// @brief Return the voxel value at the given coordinate.
     __hostdev__ const ValueType& getValue(const CoordT& ijk) const { return DataType::value(CoordToOffset(ijk)); }
 
+    /// @brief Sets the value at the specified location and activate its state.
+    ///
+    /// @note This is safe since it does not change the topology of the tree (unlike setValue methods on the other nodes)
+    __hostdev__ void setValue(const CoordT& ijk, const ValueType& v) { DataType::setValue(CoordToOffset(ijk), v); }
+
+    /// @brief Sets the value at the specified location but leaves its state unchanged.
+    ///
+    /// @note This is safe since it does not change the topology of the tree (unlike setValue methods on the other nodes)
+    __hostdev__ void setValueOnly(const CoordT& ijk, const ValueType& v) { DataType::setValueOnly(CoordToOffset(ijk), v); }
+
     /// @brief Return @c true if the voxel value at the given coordinate is active.
     __hostdev__ bool isActive(const CoordT& ijk) const { return DataType::mValueMask.isOn(CoordToOffset(ijk)); }
     __hostdev__ bool isActive(uint32_t n) const { return DataType::mValueMask.isOn(n); }
@@ -2337,11 +2897,20 @@ public:
         return ((ijk[0] & MASK) << (2 * LOG2DIM)) + ((ijk[1] & MASK) << LOG2DIM) + (ijk[2] & MASK);
     }
 
+    /// @brief Updates the local bounding box of active voxels in this node.
+    ///
+    /// @warning It assumes that the origin and value mask have already been set.
+    ///
+    /// @details This method is based on few (intrinsic) bit operations and hence is relatively fast.
+    ///          However, it should only only be called of either the value mask has changed or if the
+    ///          active bounding box is still undefined. e.g. during constrution of this node.
+    __hostdev__ void updateBBox();
+
 private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(LeafData) is misaligned");
     //static_assert(offsetof(DataType, mValues) % 32 == 0, "LeafData::mValues is misaligned");
 
-    template<typename>
+    template<typename, int>
     friend class ReadAccessor;
     template<typename>
     friend class RootNode;
@@ -2351,6 +2920,14 @@ private:
     /// @brief Private method to retun a voxel value and update a (dummy) ReadAccessor
     template<typename AccT>
     __hostdev__ const ValueType& getValueAndCache(const CoordT& ijk, const AccT&) const { return this->getValue(ijk); }
+
+    /// @brief Return the node information.
+    template<typename AccT>
+    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& /*ijk*/, const AccT& /*acc*/) const { 
+        using NodeInfoT = typename AccT::NodeInfo;
+        return NodeInfoT{LEVEL, this->dim(), this->valueMin(), this->valueMax(), 
+                         this->average(), this->stdDeviation(), this->bbox()[0], this->bbox()[1]}; 
+    }
 
     template<typename AccT>
     __hostdev__ bool isActiveAndCache(const CoordT& ijk, const AccT&) const { return this->isActive(ijk); }
@@ -2372,6 +2949,35 @@ private:
 
 }; // LeafNode class
 
+template<typename ValueT, typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
+inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
+{
+    static_assert(LOG2DIM == 3, "LeafNode::updateBBox: only supports LOGDIM = 3!");
+    auto update = [&](uint32_t min, uint32_t max, int axis) {
+        assert(min <= max && max < 8);
+        DataType::mBBoxMin[axis] = (DataType::mBBoxMin[axis] & ~MASK) + int(min);
+        DataType::mBBoxDif[axis] = uint8_t(max - min);
+    };
+    uint64_t word64 = DataType::mValueMask.template getWord<uint64_t>(0);
+    uint32_t Xmin = word64 ? 0u : 8u, Xmax = Xmin;
+    for (int i = 1; i < 8; ++i) { // last loop over 8 64 words
+        if (uint64_t w = DataType::mValueMask.template getWord<uint64_t>(i)) { // skip if word has no set bits
+            word64 |= w; // union 8 x 64 bits words into one 64 bit word
+            if (Xmin == 8)
+                Xmin = i; // only set once
+            Xmax = i;
+        }
+    }
+    assert(word64); // we assume at least one active voxel in this node!
+    update(Xmin, Xmax, 0);
+    update(FindLowestOn(word64) >> 3, FindHighestOn(word64) >> 3, 1);
+    const uint32_t *p = reinterpret_cast<const uint32_t*>(&word64), word32 = p[0] | p[1];
+    const uint16_t *q = reinterpret_cast<const uint16_t*>(&word32), word16 = q[0] | q[1];
+    const uint8_t  *b = reinterpret_cast<const uint8_t* >(&word16), byte   = b[0] | b[1];
+    assert(byte);
+    update(FindLowestOn(static_cast<uint32_t>(byte)), FindHighestOn(static_cast<uint32_t>(byte)), 2);
+}
+
 // --------------------------> ReadAccessor <------------------------------------
 
 /// @brief A read-only value acessor with three levels of node caching. This allows for
@@ -2389,21 +2995,33 @@ private:
 ///          multiple threads on the same host or device. However, it's light-weight so simple
 ///          instantiate one per thread (on the host and/or device).
 ///
-/// @details Used to accelerated random access into a VDB tree. Provides on
-/// average O(1) random access operations by means of inverse tree traversal,
-/// which amortizes the non-const time complexity of the root node.
+/// @details Used to accelerated random access into a VDB tree. Provides on average
+///          O(1) random access operations by means of inverse tree traversal,
+///          which amortizes the non-const time complexity of the root node.
 
 template<typename RootT>
-class ReadAccessor
+class ReadAccessor<RootT, 3>
 {
 public:
     using ValueType = typename RootT::ValueType;
+    using FloatType = typename RootT::FloatType;
     using CoordType = typename RootT::CoordType;
     using CoordValueType = typename RootT::CoordType::ValueType;
     using NodeT3 = const RootT; //                    root node
     using NodeT2 = typename NodeT3::ChildNodeType; // upper internal node
     using NodeT1 = typename NodeT2::ChildNodeType; // lower internal node
     using NodeT0 = typename NodeT1::ChildNodeType; // Leaf node
+
+    struct NodeInfo {
+        uint32_t  mLevel; //   4B
+        uint32_t  mDim; //     4B
+        ValueType mMinimum; // typically 4B 
+        ValueType mMaximum; // typically 4B
+        FloatType mAverage; // typically 4B
+        FloatType mStdDevi; // typically 4B
+        CoordType mBBoxMin; // 3*4B
+        CoordType mBBoxMax; // 3*4B 
+    };
 
     /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
@@ -2477,6 +3095,23 @@ public:
             return ((NodeT2*)mNode[2])->getValueAndCache(ijk, *this);
         }
         return ((NodeT3*)mNode[3])->getValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached<NodeT0>(dirty)) {
+            return ((NodeT0*)mNode[0])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+        } else if (this->isCached<NodeT1>(dirty)) {
+            return ((NodeT1*)mNode[1])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+        } else if (this->isCached<NodeT2>(dirty)) {
+            return ((NodeT2*)mNode[2])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+        }
+        return ((NodeT3*)mNode[3])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
     }
 
     __hostdev__ bool isActive(const CoordType& ijk) const
@@ -2576,7 +3211,82 @@ private:
     mutable CoordType mKeys[3]; // 3*3*4 = 36 bytes
 #endif
     mutable const void* mNode[4]; // 4*8 = 32 bytes
-}; // ReadAccessor class
+}; // ReadAccessor<T, 3> class
+
+/// @brief ReadAccessor with NO node caching
+template<typename RootT>
+class ReadAccessor<RootT, 0>
+{
+public:
+    using ValueType = typename RootT::ValueType;
+    using FloatType = typename RootT::FloatType;
+    using CoordType = typename RootT::CoordType;
+    using CoordValueType = typename RootT::CoordType::ValueType;
+    using NodeT3 = const RootT; //                    root node
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper internal node
+    using NodeT1 = typename NodeT2::ChildNodeType; // lower internal node
+    using NodeT0 = typename NodeT1::ChildNodeType; // Leaf node
+
+    using NodeInfo = typename ReadAccessor<RootT, 3>::NodeInfo;
+
+    /// @brief Constructor from a root node
+    __hostdev__ ReadAccessor(const RootT& root) : mRoot{&root} {}
+
+    __hostdev__ const RootT& root() const { return *mRoot; }
+
+    /// @brief Defaults constructors
+    ReadAccessor(const ReadAccessor&) = default;
+    ~ReadAccessor() = default;
+    ReadAccessor& operator=(const ReadAccessor&) = default;
+
+    __hostdev__ const ValueType& getValue(const CoordType& ijk) const
+    {
+        return mRoot->getValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
+    {
+
+        return mRoot->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+    }
+
+    __hostdev__ bool isActive(const CoordType& ijk) const
+    {
+        return mRoot->isActiveAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
+    {
+        return mRoot->probeValueAndCache(ijk, v, *this);
+    }
+
+    __hostdev__ const NodeT0* probeLeaf(const CoordType& ijk) const
+    {
+        return mRoot->probeLeafAndCache(ijk, *this);
+    }
+
+    template<typename RayT>
+    __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
+    {        
+        return mRoot->getDimAndCache(ijk, ray, *this);
+    }
+
+private:
+    /// @brief Allow nodes to insert themselves into the cache.
+    template<typename>
+    friend class RootNode;
+    template<typename, uint32_t>
+    friend class InternalNode;
+    template<typename, typename, template<uint32_t> class, uint32_t>
+    friend class LeafNode;
+
+    /// @brief No-op
+    template<typename NodeT>
+    __hostdev__ void insert(const CoordType&, const NodeT*) const {}
+
+    // All member data are mutable to allow for access methods to be const
+    mutable const RootT* mRoot; // 8 bytes
+}; // ReadAccessor<T, 0> class
 
 /// @brief Default configuration used in OpenVDB: Root->32^3->16^3->8^3
 template<typename ValueT>
@@ -2591,6 +3301,24 @@ template<typename ValueT>
 using NanoTree = Tree<NanoRoot<ValueT>>;
 template<typename ValueT>
 using NanoGrid = Grid<NanoTree<ValueT>>;
+
+template <int CacheLevels = 3, typename ValueT = float>
+auto createAccessor(const NanoGrid<ValueT> &grid)
+{ 
+    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(grid.tree().root());
+}
+
+template <int CacheLevels = 3, typename ValueT = float>
+auto createAccessor(const NanoTree<ValueT> &tree)
+{ 
+    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(tree.root());
+}
+
+template <int CacheLevels = 3, typename ValueT = float>
+auto createAccessor(const NanoRoot<ValueT> &root)
+{ 
+    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(root);
+}
 
 using FloatTree = NanoTree<float>;
 using DoubleTree = NanoTree<double>;
@@ -2622,29 +3350,30 @@ class GridMetaData
     // memory-layout of the data structure and the reasons for why certain methods are safe
     // to call and others are not!
     using GridT = NanoGrid<int>;
-    __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>( this ); }
+    __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>(this); }
+
 public:
-    __hostdev__ bool isValid() const { return this->grid().isValid(); }
+    __hostdev__ bool        isValid() const { return this->grid().isValid(); }
     __hostdev__ const char* gridName() const { return this->grid().gridName(); }
-    __hostdev__ GridType gridType() const { return this->grid().gridType(); }
-    __hostdev__ GridClass gridClass() const { return this->grid().gridClass(); }
-    __hostdev__ bool isLevelSet() const { return this->grid().isLevelSet(); }
-    __hostdev__ bool isFogVolume() const { return this->grid().isFogVolume(); }
-    __hostdev__ bool isPointIndex() const { return this->grid().isPointIndex(); }
-    __hostdev__ bool isPointData() const { return this->grid().isPointData(); }
-    __hostdev__ bool isStaggered() const { return this->grid().isStaggered(); }
-    __hostdev__ bool isUnknown() const { return this->grid().isUnknown(); }
+    __hostdev__ GridType    gridType() const { return this->grid().gridType(); }
+    __hostdev__ GridClass   gridClass() const { return this->grid().gridClass(); }
+    __hostdev__ bool        isLevelSet() const { return this->grid().isLevelSet(); }
+    __hostdev__ bool        isFogVolume() const { return this->grid().isFogVolume(); }
+    __hostdev__ bool        isPointIndex() const { return this->grid().isPointIndex(); }
+    __hostdev__ bool        isPointData() const { return this->grid().isPointData(); }
+    __hostdev__ bool        isStaggered() const { return this->grid().isStaggered(); }
+    __hostdev__ bool        isUnknown() const { return this->grid().isUnknown(); }
     __hostdev__ const Map& map() const { return this->grid().map(); }
     __hostdev__ const BBox<Vec3R>& worldBBox() const { return this->grid().worldBBox(); }
     __hostdev__ const BBox<Coord>& indexBBox() const { return this->grid().indexBBox(); }
-    __hostdev__ Vec3R voxelSize() const { return this->grid().voxelSize(); }
-    __hostdev__ int blindDataCount() const { return this->grid().blindDataCount(); }
+    __hostdev__ Vec3R              voxelSize() const { return this->grid().voxelSize(); }
+    __hostdev__ int                blindDataCount() const { return this->grid().blindDataCount(); }
     __hostdev__ const GridBlindMetaData& blindMetaData(int n) const { return this->grid().blindMetaData(n); }
-    __hostdev__ uint64_t activeVoxelCount() const { return this->grid().activeVoxelCount(); }
-    __hostdev__ uint32_t nodeCount(uint32_t level) const { return this->grid().tree().nodeCount(level);}
-    __hostdev__ uint64_t checksum() const { return this->grid().checksum(); }
-    __hostdev__ bool isEmpty() const { return this->grid().isEmpty(); }
-};// GridMetaData
+    __hostdev__ uint64_t                 activeVoxelCount() const { return this->grid().activeVoxelCount(); }
+    __hostdev__ uint32_t                 nodeCount(uint32_t level) const { return this->grid().tree().nodeCount(level); }
+    __hostdev__ uint64_t                 checksum() const { return this->grid().checksum(); }
+    __hostdev__ bool                     isEmpty() const { return this->grid().isEmpty(); }
+}; // GridMetaData
 
 /// @brief Class to access points at a specefic voxel location
 template<typename AttT>
@@ -2655,6 +3384,8 @@ class PointAccessor : public ReadAccessor<NanoRoot<uint32_t>>
     const AttT*       mData;
 
 public:
+    using LeafNodeType = typename NanoRoot<uint32_t>::LeafNodeType;
+
     PointAccessor(const UInt32Grid& grid)
         : AccT(grid.tree().root())
         , mGrid(&grid)
@@ -2673,12 +3404,15 @@ public:
         end = begin + count;
         return count;
     }
-    /// @brief Return the number of point in the leaf node containing
+    /// @brief Return the number of points in the leaf node containing the coordinate @a ijk.
+    ///        If this return value is larger than zero then the iterators @a begin and @end
+    ///        will point to all the attributes contained within that leaf node.
     __hostdev__ uint64_t leafPoints(const Coord& ijk, const AttT*& begin, const AttT*& end) const
     {
         auto* leaf = this->probeLeaf(ijk);
-        if (leaf == nullptr)
+        if (leaf == nullptr) {
             return 0;
+        }
         begin = mData + leaf->valueMin();
         end = begin + leaf->valueMax();
         return leaf->valueMax();

@@ -23,6 +23,7 @@ USE_TBB := yes
 USE_JEMALLOC := no
 USE_OPENGL := yes
 USE_OPENCL := yes
+USE_INTRINSICS := yes
 
 BUILD_BENCHMARK := yes
 BUILD_UNITTESTS := yes
@@ -39,7 +40,12 @@ ifeq ("$(shell uname -s)","Darwin")
 endif
 
 #CC = clang -Wall -Wunused-parameter -march=native
-CC = g++ -Wall -Wunused-parameter -march=native
+CC = g++ -Wall -Wunused-parameter -Wno-invalid-offsetof -march=native
+
+ifeq (yes,$(USE_INTRINSICS))
+    CXXFLAGS += -DNANOVDB_USE_INTRINSICS
+endif 
+
 ifeq (yes,$(USE_OPENVDB))
     CXXFLAGS += -std=c++14
 else
@@ -54,7 +60,7 @@ BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 ARCHIVE = NanoVDB_$(shell date +%F_%Hh%Mm%Ss)_$(BRANCH)
 
 DEP = Makefile nanovdb/*.h nanovdb/util/*.h
-CMD = release/nanovdb_print release/nanovdb_convert release/nanovdb_viewer
+CMD = release/nanovdb_print release/nanovdb_convert release/nanovdb_viewer release/nanovdb_validate
 EXA = debug/bump_pool_buffer debug/make_custom_nanovdb debug/make_nanovdb_sphere debug/make_typed_grids \
       debug/map_pool_buffer debug/read_nanovdb_sphere debug/read_nanovdb_sphere_accessor
 ALL = $(CMD) $(EXA)
@@ -283,6 +289,8 @@ endif
 
 nanovdb_viewer: release/nanovdb_viewer
 
+nanovdb_validate: release/nanovdb_validate
+
 # build object files
 
 release/TestNanoVDB.o: unittest/TestNanoVDB.cpp $(DEP)
@@ -378,6 +386,10 @@ release/nanovdb_print.o: cmd/print/nanovdb_print.cpp $(DEP)
 	$(BUILD_RELEASE) $(INCLUDES) -o $@ -c $<
 
 release/nanovdb_convert.o: cmd/convert/nanovdb_convert.cpp $(DEP)
+	@mkdir -p release
+	$(BUILD_RELEASE) $(INCLUDES) -o $@ -c $<
+
+release/nanovdb_validate.o: cmd/validate/nanovdb_validate.cpp $(DEP)
 	@mkdir -p release
 	$(BUILD_RELEASE) $(INCLUDES) -o $@ -c $<
 
@@ -521,6 +533,9 @@ else
 release/nanovdb_convert:
 	$(warning WARNING: nanovdb_convert requires OpenVDB. Set USE_OPENVDB := yes)
 endif
+
+release/nanovdb_validate: release/nanovdb_validate.o
+	$(BUILD_RELEASE) $(LIBRARY) -o $@ $^ $(LIBS)
 
 release/nanovdb_viewer: release/nanovdb_viewer.o \
                         release/FrameBuffer.o \

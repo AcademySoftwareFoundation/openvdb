@@ -31,6 +31,23 @@
 
 namespace nanovdb {
 
+// Forward declaration of sampler with specific polynomial orders
+template<typename TreeT, int Order, bool UseCache = true>
+class SampleFromVoxels;
+
+/// @brief Factory free-function for a sampler of specific polynomial orders
+///
+/// @details This allows for the compact syntax:
+/// @code
+///   auto acc = grid.getAccessor();
+///   auto smp = nanovdb::createSampler<1>( acc );
+/// @endcode
+template<int Order, typename TreeOrAccT, bool UseCache = true>
+__hostdev__ SampleFromVoxels<TreeOrAccT, Order, UseCache> createSampler(const TreeOrAccT& acc)
+{
+    return SampleFromVoxels<TreeOrAccT, Order, UseCache>(acc);
+}
+
 /// @brief Utility function that returns the Coord of the round-down of @a xyz
 ///        and redefined @xyz as the frational part, ie xyz-in = return-value + xyz-out
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
@@ -58,183 +75,350 @@ __hostdev__ inline CoordT Floor(Vec3T<double>& xyz)
     return CoordT(int32_t(ijk[0]), int32_t(ijk[1]), int32_t(ijk[2]));
 }
 
-// Forward declaration of sampler with specific polynomial orders
-template<typename TreeT, int Order, bool WithCache = true>
-struct SampleFromVoxels;
-
-/// @brief Factory free-function for a sampler of specific polynomial orders
-///
-/// @details This allows for the compact syntax:
-/// @code
-///   auto acc = grid.getAccessor();
-///   auto smp = nanovdb::createSampler<1>( acc );
-/// @endcode
-template<int Order, typename TreeOrAccT>
-__hostdev__ SampleFromVoxels<TreeOrAccT, Order, true> createSampler(const TreeOrAccT& acc)
-{
-    return SampleFromVoxels<TreeOrAccT, Order, true>(acc);
-}
-
 // ------------------------------> NearestNeighborSampler <--------------------------------------
 
-/// @brief Neigherest neighbor, i.e. zero order, interpolator
-template<typename TreeOrAccT, bool WithCache = true>
-class NearestNeighborSampler;
-
+/// @brief Neigherest neighbor, i.e. zero order, interpolator with caching
 template<typename TreeOrAccT>
-class NearestNeighborSampler<TreeOrAccT, true>
+class SampleFromVoxels<TreeOrAccT, 0, true>
 {
+public:
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
 
-public:
+    static const int ORDER = 0;
     /// @brief Construction from a Tree or ReadAccessor
-    __hostdev__ NearestNeighborSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc)
+        : mAcc(acc)
         , mPos(CoordT::max())
     {
     }
 
+    __hostdev__ const TreeOrAccT& accessor() const { return mAcc; }
+
     /// @note xyz is in index space space
     template<typename Vec3T>
-    inline __hostdev__ ValueT operator()(const Vec3T& xyz);
+    inline __hostdev__ ValueT operator()(const Vec3T& xyz) const;
+
+    inline __hostdev__ ValueT operator()(const CoordT& ijk) const;
 
 private:
-    const TreeOrAccT* mAcc;
-    CoordT            mPos;
-    ValueT            mVal; // private cache
-}; // NearestNeighborSampler
+    const TreeOrAccT& mAcc;
+    mutable CoordT    mPos;
+    mutable ValueT    mVal; // private cache
+}; // SampleFromVoxels<TreeOrAccT, 0, true>
 
+/// @brief Neigherest neighbor, i.e. zero order, interpolator without caching
 template<typename TreeOrAccT>
-class NearestNeighborSampler<TreeOrAccT, false>
+class SampleFromVoxels<TreeOrAccT, 0, false>
 {
+public:
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
-
-public:
+    static const int ORDER = 0; 
+    
     /// @brief Construction from a Tree or ReadAccessor
-    __hostdev__ NearestNeighborSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc)
+        : mAcc(acc)
     {
     }
 
+    __hostdev__ const TreeOrAccT& accessor() const { return mAcc; }
+
     /// @note xyz is in index space space
     template<typename Vec3T>
-    inline __hostdev__ ValueT operator()(const Vec3T& xyz);
+    inline __hostdev__ ValueT operator()(const Vec3T& xyz) const;
+
+    inline __hostdev__ ValueT operator()(const CoordT& ijk) const { return mAcc.getValue(ijk);}
 
 private:
-    const TreeOrAccT* mAcc;
-}; // NearestNeighborSampler
+    const TreeOrAccT& mAcc;
+}; // SampleFromVoxels<TreeOrAccT, 0, false>
 
 template<typename TreeOrAccT>
 template<typename Vec3T>
-typename TreeOrAccT::ValueType NearestNeighborSampler<TreeOrAccT, true>::operator()(const Vec3T& xyz)
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 0, true>::operator()(const Vec3T& xyz) const
 {
     const CoordT ijk = Round<CoordT>(xyz);
     if (ijk != mPos) {
         mPos = ijk;
-        mVal = mAcc->getValue(mPos);
+        mVal = mAcc.getValue(mPos);
+    }
+    return mVal;
+}
+
+template<typename TreeOrAccT>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 0, true>::operator()(const CoordT& ijk) const
+{
+    if (ijk != mPos) {
+        mPos = ijk;
+        mVal = mAcc.getValue(mPos);
     }
     return mVal;
 }
 
 template<typename TreeOrAccT>
 template<typename Vec3T>
-typename TreeOrAccT::ValueType NearestNeighborSampler<TreeOrAccT, false>::operator()(const Vec3T& xyz)
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 0, false>::operator()(const Vec3T& xyz) const
 {
-    return mAcc->getValue(Round<CoordT>(xyz));
+    return mAcc.getValue(Round<CoordT>(xyz));
 }
 
 // ------------------------------> TrilinearSampler <--------------------------------------
 
 /// @brief Tri-linear sampler, i.e. first order, interpolator
-template<typename TreeOrAccT, bool WithCache = true>
-class TrilinearSampler;
-
 template<typename TreeOrAccT>
-class TrilinearSampler<TreeOrAccT, true>
+class TrilinearSampler
 {
-    using ValueT = typename TreeOrAccT::ValueType;
-    using CoordT = typename TreeOrAccT::CoordType;
+protected:
+    const TreeOrAccT& mAcc;
 
 public:
-    /// @brief Construction from a Tree or ReadAccessor
-    __hostdev__ TrilinearSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
-        , mPos(CoordT::max())
-    {
-    }
-
-    /// @note xyz is in index space space
-    template<typename RealT, template<typename...> class Vec3T>
-    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz);
-
-    /// @brief Return the gradient in index space.
-    ///
-    /// @warning Will only compile with floating point value types
-    template<typename RealT, template<typename...> class Vec3T>
-    inline __hostdev__ Vec3T<ValueT> gradient(Vec3T<RealT> xyz);
-
-    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
-    ///
-    /// @warning Will only compile with floating point value types
-    template<typename RealT, template<typename...> class Vec3T>
-    inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz);
-
-    /// @brief Return true if the cached tri-linear stencil has a zero crossing.
-    ///
-    /// @warning Will only compile with floating point value types
-    inline __hostdev__ bool zeroCrossing();
-
-private:
-    const TreeOrAccT* mAcc;
-    CoordT            mPos;
-    ValueT            mVal[2][2][2];
-
-    template<typename Vec3T>
-    __hostdev__ bool update(Vec3T& xyz);
-}; // TrilinearSampler
-
-template<typename TreeOrAccT>
-class TrilinearSampler<TreeOrAccT, false>
-{
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
+    static const int ORDER = 1;
 
-public:
-    /// @brief Construction from a Tree or ReadAccessor
-    __hostdev__ TrilinearSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
-    {
-    }
+    /// @brief Protected constructor from a Tree or ReadAccessor
+    __hostdev__ TrilinearSampler(const TreeOrAccT& acc) : mAcc(acc) {}
 
-    /// @note xyz is in index space space
+    __hostdev__ const TreeOrAccT& accessor() const { return mAcc; }
+
+    /// @brief Extract the stencil of 8 values
+    inline __hostdev__ void stencil(CoordT& ijk, ValueT (&v)[2][2][2]) const;
+
     template<typename RealT, template<typename...> class Vec3T>
-    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz);
+    static inline __hostdev__ ValueT sample(const Vec3T<RealT> &uvw, const ValueT (&v)[2][2][2]);
 
-private:
-    const TreeOrAccT* mAcc;
-}; // TrilinearSampler
+    template<typename RealT, template<typename...> class Vec3T>
+    static inline __hostdev__ Vec3T<ValueT> gradient(const Vec3T<RealT> &uvw, const ValueT (&v)[2][2][2]);
+
+    static inline __hostdev__ bool zeroCrossing(const ValueT (&v)[2][2][2]);
+}; // TrilinearSamplerBase
+
+template<typename TreeOrAccT>
+void TrilinearSampler<TreeOrAccT>::stencil(CoordT& ijk, ValueT (&v)[2][2][2]) const
+{
+    v[0][0][0] = mAcc.getValue(ijk); // i, j, k
+
+    ijk[2] += 1;
+    v[0][0][1] = mAcc.getValue(ijk); // i, j, k + 1
+
+    ijk[1] += 1;
+    v[0][1][1] = mAcc.getValue(ijk); // i, j+1, k + 1
+
+    ijk[2] -= 1;
+    v[0][1][0] = mAcc.getValue(ijk); // i, j+1, k
+
+    ijk[0] += 1;
+    ijk[1] -= 1;
+    v[1][0][0] = mAcc.getValue(ijk); // i+1, j, k
+
+    ijk[2] += 1;
+    v[1][0][1] = mAcc.getValue(ijk); // i+1, j, k + 1
+
+    ijk[1] += 1;
+    v[1][1][1] = mAcc.getValue(ijk); // i+1, j+1, k + 1
+
+    ijk[2] -= 1;
+    v[1][1][0] = mAcc.getValue(ijk); // i+1, j+1, k
+}
 
 template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
-typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT, true>::operator()(Vec3T<RealT> xyz)
+typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT>::sample(const Vec3T<RealT> &uvw, const ValueT (&v)[2][2][2])
 {
-    this->update(xyz);
 #if 0
   auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
   //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
 #else
     auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
 #endif
-    return lerp(lerp(lerp(mVal[0][0][0], mVal[0][0][1], xyz[2]), lerp(mVal[0][1][0], mVal[0][1][1], xyz[2]), xyz[1]),
-                lerp(lerp(mVal[1][0][0], mVal[1][0][1], xyz[2]), lerp(mVal[1][1][0], mVal[1][1][1], xyz[2]), xyz[1]),
-                xyz[0]);
+    return lerp(lerp(lerp(v[0][0][0], v[0][0][1], uvw[2]), lerp(v[0][1][0], v[0][1][1], uvw[2]), uvw[1]),
+                lerp(lerp(v[1][0][0], v[1][0][1], uvw[2]), lerp(v[1][1][0], v[1][1][1], uvw[2]), uvw[1]),
+                uvw[0]);
 }
 
 template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
-typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT, false>::operator()(Vec3T<RealT> xyz)
+Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(const Vec3T<RealT> &uvw, const ValueT (&v)[2][2][2])
+{
+    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::gradient requires a floating-point type");
+#if 0
+  auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
+  //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
+#else
+    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
+#endif
+
+    ValueT D[4] = {v[0][0][1] - v[0][0][0], v[0][1][1] - v[0][1][0], v[1][0][1] - v[1][0][0], v[1][1][1] - v[1][1][0]};
+
+    // Z component
+    Vec3T<ValueT> grad(0, 0, lerp(lerp(D[0], D[1], uvw[1]), lerp(D[2], D[3], uvw[1]), uvw[0]));
+
+    const ValueT w = ValueT(uvw[2]);
+    D[0] = v[0][0][0] + D[0] * w;
+    D[1] = v[0][1][0] + D[1] * w;
+    D[2] = v[1][0][0] + D[2] * w;
+    D[3] = v[1][1][0] + D[3] * w;
+
+    // X component
+    grad[0] = lerp(D[2], D[3], uvw[1]) - lerp(D[0], D[1], uvw[1]);
+
+    // Y component
+    grad[1] = lerp(D[1] - D[0], D[3] - D[2], uvw[0]);
+
+    return grad;
+}
+
+template<typename TreeOrAccT>
+bool TrilinearSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[2][2][2])
+{
+    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
+    const bool less = v[0][0][0] < ValueT(0);
+    return (less ^ (v[0][0][1] < ValueT(0))) ||
+           (less ^ (v[0][1][1] < ValueT(0))) ||
+           (less ^ (v[0][1][0] < ValueT(0))) ||
+           (less ^ (v[1][0][0] < ValueT(0))) ||
+           (less ^ (v[1][0][1] < ValueT(0))) ||
+           (less ^ (v[1][1][1] < ValueT(0))) ||
+           (less ^ (v[1][1][0] < ValueT(0)));
+}
+
+/// @brief Template specializaton that does not use caching of stencil points
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 1, false> : public TrilinearSampler<TreeOrAccT>
+{
+    using BaseT = TrilinearSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+
+public:
+
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc) : BaseT(acc) {}
+
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
+
+    /// @note ijk is in index space space
+    __hostdev__ ValueT operator()(const CoordT &ijk) const {return BaseT::mAcc.getValue(ijk);}
+
+    /// @brief Return the gradient in index space.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ Vec3T<ValueT> gradient(Vec3T<RealT> xyz) const;
+
+    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz) const;
+
+}; // SampleFromVoxels<TreeOrAccT, 1, false>
+
+/// @brief Template specialization with caching of stencil values
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 1, true> : public TrilinearSampler<TreeOrAccT>
+{
+    using BaseT = TrilinearSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+
+    mutable CoordT mPos;
+    mutable ValueT mVal[2][2][2];
+
+    template<typename RealT, template<typename...> class Vec3T>
+    void cache(Vec3T<RealT>& xyz) const;
+public:
+
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc) : BaseT(acc), mPos(CoordT::max()){}
+
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
+
+    // @note ijk is in index space space
+    __hostdev__ ValueT operator()(const CoordT &ijk) const;
+
+    /// @brief Return the gradient in index space.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ Vec3T<ValueT> gradient(Vec3T<RealT> xyz) const;
+
+    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz) const;
+
+    /// @brief Return true if the cached tri-linear stencil has a zero crossing.
+    ///
+    /// @warning Will only compile with floating point value types
+    __hostdev__ bool zeroCrossing() const { return BaseT::zeroCrossing(mVal); }
+
+}; // SampleFromVoxels<TreeOrAccT, 1, true>
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 1, true>::operator()(Vec3T<RealT> xyz) const
+{
+    this->cache(xyz);
+    return BaseT::sample(xyz, mVal);
+}
+
+template<typename TreeOrAccT>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 1, true>::operator()(const CoordT &ijk) const
+{
+    return  ijk == mPos ? mVal[0][0][0] : BaseT::mAcc.getValue(ijk);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+Vec3T<typename TreeOrAccT::ValueType> SampleFromVoxels<TreeOrAccT, 1, true>::gradient(Vec3T<RealT> xyz) const
+{
+    this->cache(xyz);
+    return BaseT::gradient(xyz, mVal);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+__hostdev__ bool SampleFromVoxels<TreeOrAccT, 1, true>::zeroCrossing(Vec3T<RealT> xyz) const
+{
+    this->cache(xyz);
+    return BaseT::zeroCrossing(mVal);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+void SampleFromVoxels<TreeOrAccT, 1, true>::cache(Vec3T<RealT>& xyz) const
+{
+    CoordT ijk = Floor<CoordT>(xyz);
+    if (ijk != mPos) {
+        mPos = ijk;
+        BaseT::stencil(ijk, mVal);
+    }
+}
+
+#if 0
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 1, false>::operator()(Vec3T<RealT> xyz) const
+{
+    ValueT val[2][2][2];
+    CoordT ijk = Floor<CoordT>(xyz);
+    BaseT::stencil(ijk, val);
+    return BaseT::sample(xyz, val);
+}
+
+#else
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 1, false>::operator()(Vec3T<RealT> xyz) const
 {
     auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
 
@@ -242,142 +426,254 @@ typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT, false>::operator()(V
 
     ValueT vx, vx1, vy, vy1, vz, vz1;
 
-    vz = mAcc->getValue(coord);
+    vz = BaseT::mAcc.getValue(coord);
     coord[2] += 1;
-    vz1 = mAcc->getValue(coord);
+    vz1 = BaseT::mAcc.getValue(coord);
     vy = lerp(vz, vz1, xyz[2]);
 
     coord[1] += 1;
 
-    vz1 = mAcc->getValue(coord);
+    vz1 = BaseT::mAcc.getValue(coord);
     coord[2] -= 1;
-    vz = mAcc->getValue(coord);
+    vz = BaseT::mAcc.getValue(coord);
     vy1 = lerp(vz, vz1, xyz[2]);
 
     vx = lerp(vy, vy1, xyz[1]);
 
     coord[0] += 1;
 
-    vz = mAcc->getValue(coord);
+    vz = BaseT::mAcc.getValue(coord);
     coord[2] += 1;
-    vz1 = mAcc->getValue(coord);
+    vz1 = BaseT::mAcc.getValue(coord);
     vy1 = lerp(vz, vz1, xyz[2]);
 
     coord[1] -= 1;
 
-    vz1 = mAcc->getValue(coord);
+    vz1 = BaseT::mAcc.getValue(coord);
     coord[2] -= 1;
-    vz = mAcc->getValue(coord);
+    vz = BaseT::mAcc.getValue(coord);
     vy = lerp(vz, vz1, xyz[2]);
 
     vx1 = lerp(vy, vy1, xyz[1]);
 
     return lerp(vx, vx1, xyz[0]);
 }
-
-template<typename TreeOrAccT>
-template<typename RealT, template<typename...> class Vec3T>
-Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(Vec3T<RealT> xyz)
-{
-    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::gradient requires a floating-point type");
-    this->update(xyz);
-#if 0
-  auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
-  //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
-#else
-    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
 #endif
 
-    ValueT D[4] = {mVal[0][0][1] - mVal[0][0][0], mVal[0][1][1] - mVal[0][1][0], mVal[1][0][1] - mVal[1][0][0], mVal[1][1][1] - mVal[1][1][0]};
-
-    // Z component
-    Vec3T<ValueT> grad(0, 0, lerp(lerp(D[0], D[1], xyz[1]), lerp(D[2], D[3], xyz[1]), xyz[0]));
-
-    const ValueT w = ValueT(xyz[2]);
-    D[0] = mVal[0][0][0] + D[0] * w;
-    D[1] = mVal[0][1][0] + D[1] * w;
-    D[2] = mVal[1][0][0] + D[2] * w;
-    D[3] = mVal[1][1][0] + D[3] * w;
-
-    // X component
-    grad[0] = lerp(D[2], D[3], xyz[1]) - lerp(D[0], D[1], xyz[1]);
-
-    // Y component
-    grad[1] = lerp(D[1] - D[0], D[3] - D[2], xyz[0]);
-
-    return grad;
-}
 
 template<typename TreeOrAccT>
-bool TrilinearSampler<TreeOrAccT>::zeroCrossing()
+template<typename RealT, template<typename...> class Vec3T>
+inline Vec3T<typename TreeOrAccT::ValueType> SampleFromVoxels<TreeOrAccT, 1, false>::gradient(Vec3T<RealT> xyz) const
 {
-    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
-    const bool less = mVal[0][0][0] < ValueT(0);
-    return (less ^ (mVal[0][0][1] < ValueT(0))) ||
-           (less ^ (mVal[0][1][1] < ValueT(0))) ||
-           (less ^ (mVal[0][1][0] < ValueT(0))) ||
-           (less ^ (mVal[1][0][0] < ValueT(0))) ||
-           (less ^ (mVal[1][0][1] < ValueT(0))) ||
-           (less ^ (mVal[1][1][1] < ValueT(0))) ||
-           (less ^ (mVal[1][1][0] < ValueT(0)));
+    ValueT val[2][2][2];
+    CoordT ijk = Floor<CoordT>(xyz);
+    BaseT::stencil(ijk, val);
+    return BaseT::gradient(xyz, val);
 }
 
 template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
-bool TrilinearSampler<TreeOrAccT>::zeroCrossing(Vec3T<RealT> xyz)
+bool SampleFromVoxels<TreeOrAccT, 1, false>::zeroCrossing(Vec3T<RealT> xyz) const
 {
-    this->update(xyz);
-    return this->zeroCrossing();
-}
-
-template<typename TreeOrAccT>
-template<typename Vec3T>
-bool TrilinearSampler<TreeOrAccT>::update(Vec3T& xyz)
-{
+    ValueT val[2][2][2];
     CoordT ijk = Floor<CoordT>(xyz);
-
-    if (ijk == mPos)
-        return false; // early out - reuse cached values
-
-    mPos = ijk;
-
-    mVal[0][0][0] = mAcc->getValue(ijk); // i, j, k
-
-    ijk[2] += 1;
-    mVal[0][0][1] = mAcc->getValue(ijk); // i, j, k + 1
-
-    ijk[1] += 1;
-    mVal[0][1][1] = mAcc->getValue(ijk); // i, j+1, k + 1
-
-    ijk[2] -= 1;
-    mVal[0][1][0] = mAcc->getValue(ijk); // i, j+1, k
-
-    ijk[0] += 1;
-    ijk[1] -= 1;
-    mVal[1][0][0] = mAcc->getValue(ijk); // i+1, j, k
-
-    ijk[2] += 1;
-    mVal[1][0][1] = mAcc->getValue(ijk); // i+1, j, k + 1
-
-    ijk[1] += 1;
-    mVal[1][1][1] = mAcc->getValue(ijk); // i+1, j+1, k + 1
-
-    ijk[2] -= 1;
-    mVal[1][1][0] = mAcc->getValue(ijk); // i+1, j+1, k
-
-    return true;
+    BaseT::stencil(ijk, val);
+    return BaseT::zeroCrossing(val);
 }
 
 // ------------------------------> TriquadraticSampler <--------------------------------------
 
 /// @brief Tri-quadratic sampler, i.e. second order, interpolator
-///
-/// @warning TriquadraticSampler has not implemented yet!
-template<typename TreeT, bool WithCache = true>
+template<typename TreeOrAccT>
 class TriquadraticSampler
 {
-    // TriquadraticSampler has not implemented yet!
-};
+protected:
+    const TreeOrAccT& mAcc;
+
+public:
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+    static const int ORDER = 1;
+
+    /// @brief Protected constructor from a Tree or ReadAccessor
+    __hostdev__ TriquadraticSampler(const TreeOrAccT& acc) : mAcc(acc) {}
+
+    __hostdev__ const TreeOrAccT& accessor() const { return mAcc; }
+
+    /// @brief Extract the stencil of 27 values
+    inline __hostdev__ void stencil(const CoordT &ijk, ValueT (&v)[3][3][3]) const;
+
+    template<typename RealT, template<typename...> class Vec3T>
+    static inline __hostdev__ ValueT sample(const Vec3T<RealT> &uvw, const ValueT (&v)[3][3][3]);
+
+    static inline __hostdev__ bool zeroCrossing(const ValueT (&v)[3][3][3]);
+}; // TriquadraticSamplerBase
+
+template<typename TreeOrAccT>
+void TriquadraticSampler<TreeOrAccT>::stencil(const CoordT &ijk, ValueT (&v)[3][3][3]) const
+{
+    CoordT p(ijk[0] - 1, 0, 0);
+    for (int dx = 0; dx < 3; ++dx, ++p[0]) {
+        p[1] = ijk[1] - 1;
+        for (int dy = 0; dy < 3; ++dy, ++p[1]) {
+            p[2] = ijk[2] - 1;
+            for (int dz = 0; dz < 3; ++dz, ++p[2]) {
+                v[dx][dy][dz] = mAcc.getValue(p);// extract the stencil of 27 values
+            }
+        }
+    }
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType TriquadraticSampler<TreeOrAccT>::sample(const Vec3T<RealT> &uvw, const ValueT (&v)[3][3][3])
+{
+    auto kernel = [](const ValueT* value, double weight)->ValueT {
+        return weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) + 
+                        0.5f * (value[2] - value[0])) + value[1];
+    };
+
+    ValueT vx[3];
+    for (int dx = 0; dx < 3; ++dx) {
+        ValueT vy[3];
+        for (int dy = 0; dy < 3; ++dy) {
+            vy[dy] = kernel(&v[dx][dy][0], uvw[2]);
+        }//loop over y
+        vx[dx] = kernel(vy, uvw[1]);
+    }//loop over x
+    return kernel(vx, uvw[0]);
+}
+
+template<typename TreeOrAccT>
+bool TriquadraticSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[3][3][3])
+{
+    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
+    const bool less = v[0][0][0] < ValueT(0);
+    for (int dx = 0; dx < 3; ++dx) {
+        for (int dy = 0; dy < 3; ++dy) {
+            for (int dz = 0; dz < 3; ++dz) {
+                if (less ^ (v[dx][dy][dz] < ValueT(0))) return true;
+            }
+        }
+    }
+    return false;
+}
+
+/// @brief Template specializaton that does not use caching of stencil points
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 2, false> : public TriquadraticSampler<TreeOrAccT>
+{
+    using BaseT = TriquadraticSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+public:
+
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc) : BaseT(acc) {}
+
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
+
+    __hostdev__ ValueT operator()(const CoordT &ijk) const {return BaseT::mAcc.getValue(ijk);}
+
+    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz) const;
+
+}; // SampleFromVoxels<TreeOrAccT, 2, false>
+
+/// @brief Template specialization with caching of stencil values
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 2, true> : public TriquadraticSampler<TreeOrAccT>
+{
+    using BaseT = TriquadraticSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+
+    mutable CoordT mPos;
+    mutable ValueT mVal[3][3][3];
+
+    template<typename RealT, template<typename...> class Vec3T>
+    void cache(Vec3T<RealT>& xyz) const;
+public:
+
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc) : BaseT(acc), mPos(CoordT::max()){}
+
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
+
+    inline __hostdev__ ValueT operator()(const CoordT &ijk) const;
+
+    /// @brief Return true if the tr-linear stencil has a zero crossing at the specified index position.
+    ///
+    /// @warning Will only compile with floating point value types
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ bool zeroCrossing(Vec3T<RealT> xyz) const;
+
+    /// @brief Return true if the cached tri-linear stencil has a zero crossing.
+    ///
+    /// @warning Will only compile with floating point value types
+    __hostdev__ bool zeroCrossing() const { return BaseT::zeroCrossing(mVal); }
+
+}; // SampleFromVoxels<TreeOrAccT, 2, true>
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 2, true>::operator()(Vec3T<RealT> xyz) const
+{
+    this->cache(xyz);
+    return BaseT::sample(xyz, mVal);
+}
+
+template<typename TreeOrAccT>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 2, true>::operator()(const CoordT &ijk) const
+{
+    return  ijk == mPos ? mVal[1][1][1] : BaseT::mAcc.getValue(ijk);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+__hostdev__ bool SampleFromVoxels<TreeOrAccT, 2, true>::zeroCrossing(Vec3T<RealT> xyz) const
+{
+    this->cache(xyz);
+    return BaseT::zeroCrossing(mVal);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+void SampleFromVoxels<TreeOrAccT, 2, true>::cache(Vec3T<RealT>& xyz) const
+{
+    CoordT ijk = Floor<CoordT>(xyz);
+    if (ijk != mPos) {
+        mPos = ijk;
+        BaseT::stencil(ijk, mVal);
+    }
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 2, false>::operator()(Vec3T<RealT> xyz) const
+{
+    ValueT val[3][3][3];
+    CoordT ijk = Floor<CoordT>(xyz);
+    BaseT::stencil(ijk, val);
+    return BaseT::sample(xyz, val);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+bool SampleFromVoxels<TreeOrAccT, 2, false>::zeroCrossing(Vec3T<RealT> xyz) const
+{
+    ValueT val[3][3][3];
+    CoordT ijk = Floor<CoordT>(xyz);
+    BaseT::stencil(ijk, val);
+    return BaseT::zeroCrossing(val);
+}
 
 // ------------------------------> TricubicSampler <--------------------------------------
 
@@ -387,105 +683,44 @@ class TriquadraticSampler
 /// Lekien, F. and Marsden, J.: Tricubic interpolation in three dimensions.
 ///                         In: International Journal for Numerical Methods
 ///                         in Engineering (2005), No. 63, p. 455-471
-template<typename TreeOrAccT, bool WithCache = true>
-class TricubicSampler;
 
 template<typename TreeOrAccT>
-class TricubicSampler<TreeOrAccT, true>
+class TricubicSampler
 {
+protected:
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
+
+    const TreeOrAccT& mAcc;
 
 public:
     /// @brief Construction from a Tree or ReadAccessor
     __hostdev__ TricubicSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
-        , mPos(CoordT::max())
+        : mAcc(acc)
     {
     }
 
-    /// @note xyz is in index space space
-    template<typename Vec3T>
-    inline __hostdev__ ValueT operator()(Vec3T xyz);
+    __hostdev__ const TreeOrAccT& accessor() const { return mAcc; }
 
-private:
-    const TreeOrAccT* mAcc;
-    CoordT            mPos;
-    ValueT            mC[64]; //private cache
+     /// @brief Extract the stencil of 8 values
+    inline __hostdev__ void stencil(const CoordT& ijk, ValueT (&c)[64]) const;
 
-    template<typename Vec3T>
-    __hostdev__ bool update(Vec3T& xyz);
+    template<typename RealT, template<typename...> class Vec3T>
+    static inline __hostdev__ ValueT sample(const Vec3T<RealT> &uvw, const ValueT (&c)[64]);
 }; // TricubicSampler
 
 template<typename TreeOrAccT>
-class TricubicSampler<TreeOrAccT, false>
+void TricubicSampler<TreeOrAccT>::stencil(const CoordT& ijk, ValueT (&C)[64]) const
 {
-    using ValueT = typename TreeOrAccT::ValueType;
-    using CoordT = typename TreeOrAccT::CoordType;
-
-public:
-    /// @brief Construction from a Tree or ReadAccessor
-    __hostdev__ TricubicSampler(const TreeOrAccT& acc)
-        : mAcc(&acc)
-    {
-    }
-
-    /// @note xyz is in index space space
-    template<typename Vec3T>
-    inline __hostdev__ ValueT operator()(Vec3T xyz);
-
-private:
-    const TreeOrAccT* mAcc;
-}; // TricubicSampler
-
-template<typename TreeOrAccT>
-template<typename Vec3T>
-__hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT, true>::operator()(Vec3T xyz)
-{
-    this->update(xyz); // modifies xyz and re-computes mC and mPos if required
-
-    ValueT zPow(1), sum(0);
-    for (int k = 0, n = 0; k < 4; ++k) {
-        ValueT yPow(1);
-        for (int j = 0; j < 4; ++j, n += 4) {
-#if 0
-            sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], mC[n + 3], mC[n + 2]), mC[n + 1]), mC[n]), sum);
-#else
-            sum += yPow * zPow * (mC[n] + xyz[0] * (mC[n + 1] + xyz[0] * (mC[n + 2] + xyz[0] * mC[n + 3])));
-#endif
-            yPow *= xyz[1];
-        }
-        zPow *= xyz[2];
-    }
-    return sum;
-}
-
-template<typename TreeOrAccT>
-template<typename Vec3T>
-__hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT, false>::operator()(Vec3T xyz)
-{
-    return TricubicSampler<TreeOrAccT, true>(*mAcc)(xyz);
-}
-
-template<typename TreeOrAccT>
-template<typename Vec3T>
-bool TricubicSampler<TreeOrAccT>::update(Vec3T& xyz)
-{
-    const CoordT ijk = Floor<CoordT>(xyz);
-
-    if (ijk == mPos)
-        return false; // early out - reuse cached values
-    mPos = ijk;
-
-    auto fetch = [&](int i, int j, int k) -> ValueT& { return mC[((i + 1) << 4) + ((j + 1) << 2) + k + 1]; };
+    auto fetch = [&](int i, int j, int k) -> ValueT& { return C[((i + 1) << 4) + ((j + 1) << 2) + k + 1]; };
 
     // fetch 64 point stencil values
     for (int i = -1; i < 3; ++i) {
         for (int j = -1; j < 3; ++j) {
-            fetch(i, j, -1) = mAcc->getValue(mPos + CoordT(i, j, -1));
-            fetch(i, j, 0) = mAcc->getValue(mPos + CoordT(i, j, 0));
-            fetch(i, j, 1) = mAcc->getValue(mPos + CoordT(i, j, 1));
-            fetch(i, j, 2) = mAcc->getValue(mPos + CoordT(i, j, 2));
+            fetch(i, j, -1) = mAcc.getValue(ijk + CoordT(i, j, -1));
+            fetch(i, j,  0) = mAcc.getValue(ijk + CoordT(i, j,  0));
+            fetch(i, j,  1) = mAcc.getValue(ijk + CoordT(i, j,  1));
+            fetch(i, j,  2) = mAcc.getValue(ijk + CoordT(i, j,  2));
         }
     }
     const ValueT half(0.5), quarter(0.25), eighth(0.125);
@@ -630,58 +865,118 @@ bool TricubicSampler<TreeOrAccT>::update(Vec3T& xyz)
         {8, -8, -8, 8, -8, 8, 8, -8, 4, 4, -4, -4, -4, -4, 4, 4, 4, -4, 4, -4, -4, 4, -4, 4, 4, -4, -4, 4, 4, -4, -4, 4, 2, 2, 2, 2, -2, -2, -2, -2, 2, 2, -2, -2, 2, 2, -2, -2, 2, -2, 2, -2, 2, -2, 2, -2, 1, 1, 1, 1, 1, 1, 1, 1}};
 
     for (int i = 0; i < 64; ++i) { // C = A * X
-        mC[i] = ValueT(0);
+        C[i] = ValueT(0);
 #if 0
     for (int j = 0; j < 64; j += 4) {
-      mC[i] = fma(A[i][j], X[j], fma(A[i][j+1], X[j+1], fma(A[i][j+2], X[j+2], fma(A[i][j+3], X[j+3], mC[i]))));
+      C[i] = fma(A[i][j], X[j], fma(A[i][j+1], X[j+1], fma(A[i][j+2], X[j+2], fma(A[i][j+3], X[j+3], C[i]))));
     }
 #else
         for (int j = 0; j < 64; j += 4) {
-            mC[i] += A[i][j] * X[j] + A[i][j + 1] * X[j + 1] + A[i][j + 2] * X[j + 2] + A[i][j + 3] * X[j + 3];
+            C[i] += A[i][j] * X[j] + A[i][j + 1] * X[j + 1] + A[i][j + 2] * X[j + 2] + A[i][j + 3] * X[j + 3];
         }
 #endif
     }
-
-    return true;
 }
 
-// ------------------------------> Sampler <--------------------------------------
-
-template<typename TreeOrAccT, bool WithCache>
-struct SampleFromVoxels<TreeOrAccT, 0, WithCache> : public NearestNeighborSampler<TreeOrAccT, WithCache>
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+__hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT>::sample(const Vec3T<RealT> &xyz, const ValueT (&C)[64])
 {
-    __hostdev__ SampleFromVoxels(const TreeOrAccT& tree)
-        : NearestNeighborSampler<TreeOrAccT, WithCache>(tree)
+    ValueT zPow(1), sum(0);
+    for (int k = 0, n = 0; k < 4; ++k) {
+        ValueT yPow(1);
+        for (int j = 0; j < 4; ++j, n += 4) {
+#if 0
+            sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], C[n + 3], C[n + 2]), C[n + 1]), C[n]), sum);
+#else
+            sum += yPow * zPow * (C[n] + xyz[0] * (C[n + 1] + xyz[0] * (C[n + 2] + xyz[0] * C[n + 3])));
+#endif
+            yPow *= xyz[1];
+        }
+        zPow *= xyz[2];
+    }
+    return sum;
+}
+
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 3, true> : public TricubicSampler<TreeOrAccT>
+{
+    using BaseT  = TricubicSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+
+    mutable CoordT mPos;
+    mutable ValueT mC[64];
+
+    template<typename RealT, template<typename...> class Vec3T>
+    void cache(Vec3T<RealT>& xyz) const;
+
+public:
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc)
+        : BaseT(acc)
     {
     }
-};
 
-template<typename TreeOrAccT, bool WithCache>
-struct SampleFromVoxels<TreeOrAccT, 1, WithCache> : public TrilinearSampler<TreeOrAccT, WithCache>
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
+
+    // @brief Return value at the coordinate @a ijk in index space space
+    __hostdev__ ValueT operator()(const CoordT &ijk) const {return BaseT::mAcc.getValue(ijk);}
+
+}; // SampleFromVoxels<TreeOrAccT, 3, true>
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 3, true>::operator()(Vec3T<RealT> xyz) const
 {
-    __hostdev__ SampleFromVoxels(const TreeOrAccT& tree)
-        : TrilinearSampler<TreeOrAccT, WithCache>(tree)
+    this->cache(xyz);
+    return BaseT::sample(xyz, mC);
+}
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+void SampleFromVoxels<TreeOrAccT, 3, true>::cache(Vec3T<RealT>& xyz) const
+{
+    CoordT ijk = Floor<CoordT>(xyz);
+    if (ijk != mPos) {
+        mPos = ijk;
+        BaseT::stencil(ijk, mC);
+    }
+}
+
+template<typename TreeOrAccT>
+class SampleFromVoxels<TreeOrAccT, 3, false> : public TricubicSampler<TreeOrAccT>
+{
+    using BaseT  = TricubicSampler<TreeOrAccT>;
+    using ValueT = typename TreeOrAccT::ValueType;
+    using CoordT = typename TreeOrAccT::CoordType;
+
+public:
+    /// @brief Construction from a Tree or ReadAccessor
+    __hostdev__ SampleFromVoxels(const TreeOrAccT& acc)
+        : BaseT(acc)
     {
     }
-};
 
-template<typename TreeOrAccT, bool WithCache>
-struct SampleFromVoxels<TreeOrAccT, 2, WithCache> : public TriquadraticSampler<TreeOrAccT, WithCache>
-{
-    __hostdev__ SampleFromVoxels(const TreeOrAccT& tree)
-        : TriquadraticSampler<TreeOrAccT, WithCache>(tree)
-    {
-    }
-};
+    /// @note xyz is in index space space
+    template<typename RealT, template<typename...> class Vec3T>
+    inline __hostdev__ ValueT operator()(Vec3T<RealT> xyz) const;
 
-template<typename TreeOrAccT, bool WithCache>
-struct SampleFromVoxels<TreeOrAccT, 3, WithCache> : public TricubicSampler<TreeOrAccT, WithCache>
+    __hostdev__ ValueT operator()(const CoordT &ijk) const {return BaseT::mAcc.getValue(ijk);}
+
+}; // SampleFromVoxels<TreeOrAccT, 3, true>
+
+template<typename TreeOrAccT>
+template<typename RealT, template<typename...> class Vec3T>
+__hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 3, false>::operator()(Vec3T<RealT> xyz) const
 {
-    __hostdev__ SampleFromVoxels(const TreeOrAccT& tree)
-        : TricubicSampler<TreeOrAccT, WithCache>(tree)
-    {
-    }
-};
+    ValueT C[64];
+    CoordT ijk = Floor<CoordT>(xyz);
+    BaseT::stencil(ijk, C);
+    return BaseT::sample(xyz, C);
+}
 
 } // namespace nanovdb
 

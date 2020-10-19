@@ -31,6 +31,29 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_invoke.h>
 
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
+{
+    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
+       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
+    return os;
+}
+
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::Coord& ijk)
+{
+    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
+    return os;
+}
+
+template<typename T>
+inline std::ostream&
+operator<<(std::ostream& os, const nanovdb::Vec3<T>& v)
+{
+    os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
+    return os;
+}
+
 // define the enviroment variable VDB_DATA_PATH to use models from the web
 // e.g. setenv VDB_DATA_PATH /home/kmu/dev/data/vdb
 // or   export VDB_DATA_PATH=/Users/ken/dev/data/vdb
@@ -103,6 +126,14 @@ protected:
     openvdb::util::CpuTimer mTimer;
 }; // TestOpenVDB
 
+TEST_F(TestOpenVDB, Basic)
+{
+    { // openvdb::VEc3::operator<
+        openvdb::Vec3f a(1.0f, 0.0f, 0.0f), b(2.0f, 0.0f, 0.0f);
+        EXPECT_TRUE(a < b);
+    }
+}
+
 TEST_F(TestOpenVDB, Grid)
 {
     using LeafT = nanovdb::LeafNode<float>;
@@ -133,8 +164,8 @@ TEST_F(TestOpenVDB, Grid)
             data.mValueMask.setOn(i);
             *voxels++ = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
     }
 
     // lower internal node
@@ -152,8 +183,8 @@ TEST_F(TestOpenVDB, Grid)
             data.mValueMask.setOn(i);
             tiles->value = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
         data.mOffset = 1;
         EXPECT_EQ(leaf, data.child(0));
     }
@@ -173,8 +204,8 @@ TEST_F(TestOpenVDB, Grid)
             data.mValueMask.setOn(i);
             tiles->value = 1.234f;
         }
-        data.mValueMin = 0.0f;
-        data.mValueMax = 1.234f;
+        data.mMinimum = 0.0f;
+        data.mMaximum = 1.234f;
         data.mOffset = 1;
         EXPECT_EQ(node1, data.child(0));
     }
@@ -183,7 +214,7 @@ TEST_F(TestOpenVDB, Grid)
     RootT* root = reinterpret_cast<RootT*>(buffer.get() + bytes[1]);
     { // set members of the root node
         auto& data = *reinterpret_cast<RootT::DataType*>(buffer.get() + bytes[1]);
-        data.mBackground = data.mValueMin = data.mValueMax = 1.234f;
+        data.mBackground = data.mMinimum = data.mMaximum = 1.234f;
         data.mTileCount = 1;
         auto& tile = data.tile(0);
         tile.setChild(RootT::CoordType(0), 0);
@@ -446,12 +477,12 @@ TEST_F(TestOpenVDB, Conversion)
                 const ValueT* src = srcLeaf->buffer().data();
                 ValueT*       dst = data->mValues;
 #if 0
-        data->mValueMin = data->mValueMax = *src; *dst++ = *src++;// process first element
+        data->mMinimum = data->mMaximum = *src; *dst++ = *src++;// process first element
         for (int j=1; j<SrcNode0::size(); ++j) {
-          if (*src < data->mValueMin) {
-            data->mValueMin = *src; 
-          } else if (*src > data->mValueMax) {
-            data->mValueMax = *src;
+          if (*src < data->mMinimum) {
+            data->mMinimum = *src; 
+          } else if (*src > data->mMaximum) {
+            data->mMaximum = *src;
           }
           *dst++ = *src++;
         }
@@ -460,15 +491,15 @@ TEST_F(TestOpenVDB, Conversion)
                     *dst++ = *src++; //copy all voxel values
                 auto iter = srcLeaf->cbeginValueOn(); // iterate over active voxels
                 assert(iter); //these should be at least one active voxel
-                data->mValueMin = *iter, data->mValueMax = data->mValueMin;
+                data->mMinimum = *iter, data->mMaximum = data->mMinimum;
                 openvdb::CoordBBox bbox;
                 for (; iter; ++iter) {
                     bbox.expand(srcLeaf->offsetToLocalCoord(iter.pos()));
                     const ValueT& v = *iter;
-                    if (v < data->mValueMin) {
-                        data->mValueMin = v;
-                    } else if (v > data->mValueMax) {
-                        data->mValueMax = v;
+                    if (v < data->mMinimum) {
+                        data->mMinimum = v;
+                    } else if (v > data->mMaximum) {
+                        data->mMaximum = v;
                     }
                 }
                 bbox.translate(srcLeaf->origin());
@@ -509,8 +540,8 @@ TEST_F(TestOpenVDB, Conversion)
                 data->mTable[iter.pos()].childID = childID; // set child id
                 const_cast<openvdb::Coord&>(iter->origin())[0] = cache0[childID]; // restore coordinate
                 auto* dstChild = data->child(iter.pos());
-                data->mValueMin = dstChild->valueMin();
-                data->mValueMax = dstChild->valueMax();
+                data->mMinimum = dstChild->valueMin();
+                data->mMaximum = dstChild->valueMax();
                 data->mBBox = dstChild->bbox();
 #if 1
                 for (++iter; iter; ++iter) {
@@ -519,10 +550,10 @@ TEST_F(TestOpenVDB, Conversion)
                     data->mTable[n].childID = childID;
                     const_cast<openvdb::Coord&>(iter->origin())[0] = cache0[childID]; // restore origin[0]
                     auto* dstChild = data->child(n);
-                    if (dstChild->valueMin() < data->mValueMin)
-                        data->mValueMin = dstChild->valueMin();
-                    if (dstChild->valueMax() > data->mValueMax)
-                        data->mValueMax = dstChild->valueMax();
+                    if (dstChild->valueMin() < data->mMinimum)
+                        data->mMinimum = dstChild->valueMin();
+                    if (dstChild->valueMax() > data->mMaximum)
+                        data->mMaximum = dstChild->valueMax();
                     const auto& bbox = dstChild->bbox();
                     data->mBBox.min().minComponent(bbox.min());
                     data->mBBox.max().maxComponent(bbox.max());
@@ -531,10 +562,10 @@ TEST_F(TestOpenVDB, Conversion)
                     data->mTable[iter.pos()].value = *iter;
                 for (auto iter = srcNode->cbeginValueOn(); iter; ++iter) { // typically there are few active tiles
                     const auto& value = *iter;
-                    if (value < data->mValueMin) {
-                        data->mValueMin = value;
-                    } else if (value > data->mValueMax) {
-                        data->mValueMax = value;
+                    if (value < data->mMinimum) {
+                        data->mMinimum = value;
+                    } else if (value > data->mMaximum) {
+                        data->mMaximum = value;
                     }
                     data->mBBox.min().minComponent(iter.getCoord());
                     data->mBBox.max().maxComponent(iter.getCoord().offsetBy(SrcNode0::DIM - 1));
@@ -593,8 +624,8 @@ TEST_F(TestOpenVDB, Conversion)
                 data->mTable[iter.pos()].childID = childID;
                 const_cast<openvdb::Coord&>(iter->origin())[0] = cache1[childID];
                 auto* dstChild = data->child(iter.pos());
-                data->mValueMin = dstChild->valueMin();
-                data->mValueMax = dstChild->valueMax();
+                data->mMinimum = dstChild->valueMin();
+                data->mMaximum = dstChild->valueMax();
                 data->mBBox = dstChild->bbox();
 #if 1
                 for (++iter; iter; ++iter) {
@@ -603,10 +634,10 @@ TEST_F(TestOpenVDB, Conversion)
                     data->mTable[n].childID = childID;
                     const_cast<openvdb::Coord&>(iter->origin())[0] = cache1[childID]; // restore cached coordinate
                     auto* dstChild = data->child(n);
-                    if (dstChild->valueMin() < data->mValueMin)
-                        data->mValueMin = dstChild->valueMin();
-                    if (dstChild->valueMax() > data->mValueMax)
-                        data->mValueMax = dstChild->valueMax();
+                    if (dstChild->valueMin() < data->mMinimum)
+                        data->mMinimum = dstChild->valueMin();
+                    if (dstChild->valueMax() > data->mMaximum)
+                        data->mMaximum = dstChild->valueMax();
                     const auto& bbox = dstChild->bbox();
                     data->mBBox.min().minComponent(bbox.min());
                     data->mBBox.max().maxComponent(bbox.max());
@@ -615,10 +646,10 @@ TEST_F(TestOpenVDB, Conversion)
                     data->mTable[iter.pos()].value = *iter;
                 for (auto iter = srcNode->cbeginValueOn(); iter; ++iter) { // typically there are few active tiles
                     const auto& value = *iter;
-                    if (value < data->mValueMin) {
-                        data->mValueMin = value;
-                    } else if (value > data->mValueMax) {
-                        data->mValueMax = value;
+                    if (value < data->mMinimum) {
+                        data->mMinimum = value;
+                    } else if (value > data->mMaximum) {
+                        data->mMaximum = value;
                     }
                     data->mBBox.min().minComponent(iter.getCoord());
                     data->mBBox.max().maxComponent(iter.getCoord().offsetBy(SrcNode1::DIM - 1));
@@ -668,7 +699,7 @@ TEST_F(TestOpenVDB, Conversion)
         // since openvdb::RootNode internally uses a std::map for child nodes its iterator
         // visits elements in the stored order required by the nanovdb::RootNode
         if (data.mTileCount == 0) { // empty root node
-            data.mValueMin = data.mValueMax = data.mBackground;
+            data.mMinimum = data.mMaximum = data.mBackground;
             data.mBBox.min() = openvdb::Coord::max(); // set to an empty bounding box
             data.mBBox.max() = openvdb::Coord::min();
             data.mActiveVoxelCount = 0;
@@ -680,8 +711,8 @@ TEST_F(TestOpenVDB, Conversion)
             const_cast<openvdb::Coord&>(node->origin())[0] = cache2[childID]; // restore cached coordinate
             tile.setChild(node->origin(), childID);
             auto& dstChild = data.child(tile);
-            data.mValueMin = dstChild.valueMin();
-            data.mValueMax = dstChild.valueMax();
+            data.mMinimum = dstChild.valueMin();
+            data.mMaximum = dstChild.valueMax();
             data.mBBox = dstChild.bbox();
             for (size_t i = 1; i < array2.size(); ++i) {
                 node = array2[i];
@@ -691,10 +722,10 @@ TEST_F(TestOpenVDB, Conversion)
                 const_cast<openvdb::Coord&>(node->origin())[0] = cache2[childID]; // restore cached coordinate
                 tile.setChild(node->origin(), childID);
                 auto& dstChild = data.child(tile);
-                if (dstChild.valueMin() < data.mValueMin)
-                    data.mValueMin = dstChild.valueMin();
-                if (dstChild.valueMax() > data.mValueMax)
-                    data.mValueMax = dstChild.valueMax();
+                if (dstChild.valueMin() < data.mMinimum)
+                    data.mMinimum = dstChild.valueMin();
+                if (dstChild.valueMax() > data.mMaximum)
+                    data.mMaximum = dstChild.valueMax();
                 data.mBBox.min().minComponent(dstChild.bbox().min());
                 data.mBBox.max().maxComponent(dstChild.bbox().max());
             }
@@ -703,10 +734,10 @@ TEST_F(TestOpenVDB, Conversion)
                 auto& tile = data.tile(iter.pos());
                 tile.setValue(iter.getCoord(), iter.isValueOn(), *iter);
                 if (iter.isValueOn()) {
-                    if (tile.value < data.mValueMin) {
-                        data.mValueMin = tile.value;
-                    } else if (tile.value > data.mValueMax) {
-                        data.mValueMax = tile.value;
+                    if (tile.value < data.mMinimum) {
+                        data.mMinimum = tile.value;
+                    } else if (tile.value > data.mMaximum) {
+                        data.mMaximum = tile.value;
                     }
                     data.mBBox.min().minComponent(iter.getCoord());
                     data.mBBox.max().maxComponent(iter.getCoord().offsetBy(SrcNode2::DIM - 1));
@@ -934,7 +965,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB)
 {
     auto srcGrid = this->getSrcGrid();
     mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort*/ false, 2);
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full, false, 2);
     mTimer.restart("Writing NanoVDB grid");
 #if defined(NANOVDB_USE_BLOSC)
     nanovdb::io::writeGrid("data/test.nvdb", handle, nanovdb::io::Codec::BLOSC);
@@ -1047,7 +1078,7 @@ TEST_F(TestOpenVDB, PointIndex)
     EXPECT_EQ(pointCount, count);
 
     mTimer.start("Generating NanoVDB grid from PointIndexGrid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort*/ false, 2);
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full, /*mortonSort*/ false, 2);
     mTimer.stop();
     EXPECT_TRUE(handle);
     auto* meta = handle.gridMetaData();
@@ -1102,6 +1133,7 @@ TEST_F(TestOpenVDB, PointIndex)
 
     mTimer.start("Testing bounding box");
     const auto dstBBox = dstGrid->indexBBox();
+    std::cerr << "\nBBox = " << dstBBox << std::endl;
     const auto srcBBox = srcGrid->evalActiveVoxelBoundingBox();
     EXPECT_EQ(dstBBox.min()[0], srcBBox.min()[0]);
     EXPECT_EQ(dstBBox.min()[1], srcBBox.min()[1]);
@@ -1307,7 +1339,7 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinear)
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
 
-    const cnanovdb_griddata*  gridData = (const cnanovdb_griddata*)(handle.data());
+    const cnanovdb_griddata* gridData = (const cnanovdb_griddata*)(handle.data());
     EXPECT_TRUE(cnanovdb_griddata_valid(gridData));
     EXPECT_TRUE(cnanovdb_griddata_validF(gridData));
     EXPECT_FALSE(cnanovdb_griddata_validF3(gridData));
@@ -1319,7 +1351,7 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinear)
         cnanovdb_readaccessor_init(&dstAcc, rootData);
         auto srcAcc = srcGrid->getUnsafeAccessor(); // not registered
         for (auto it = bbox.begin(); it; ++it) {
-            auto          ijk = *it;
+            auto           ijk = *it;
             cnanovdb_Vec3F cn_xyz;
             cn_xyz.mVec[0] = ijk[0] + 0.3;
             cn_xyz.mVec[1] = ijk[1] + 0.7;
@@ -1360,7 +1392,7 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinearStencil)
         cnanovdb_stencil1F_clear(&stencil);
         auto srcAcc = srcGrid->getUnsafeAccessor(); // not registered
         for (auto it = bbox.begin(); it; ++it) {
-            auto          ijk = *it;
+            auto           ijk = *it;
             cnanovdb_Vec3F cn_xyz;
             cn_xyz.mVec[0] = ijk[0] + 0.3;
             cn_xyz.mVec[1] = ijk[1] + 0.7;
@@ -1689,7 +1721,8 @@ TEST_F(TestOpenVDB, MultiFile2)
         file.open(false); //disable delayed loading
         auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(file.beginName().gridName()));
         mTimer.restart("Generating NanoVDB grid");
-        auto handle = nanovdb::openToNanoVDB(*srcGrid, /*mortonSort*/ false, /* verbose */ 1);
+        auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Partial, false, 1);
+        //auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::Disable, nanovdb::ChecksumMode::Disable, false, 1);
         mTimer.restart("Writing NanoVDB grid");
 #if defined(NANOVDB_USE_BLOSC)
         nanovdb::io::writeGrid(os, handle, nanovdb::io::Codec::BLOSC);
@@ -1796,10 +1829,70 @@ TEST_F(TestOpenVDB, Trilinear)
     EXPECT_EQ(exact, sampler3(ijk));
 } // Trilinear
 
+TEST_F(TestOpenVDB, Triquadratic)
+{
+    // create a grid so sample from
+    auto triquadratic = [](const openvdb::Vec3R& xyz) -> double {
+        return 0.34 + 1.6 * xyz[0] + 2.7 * xyz[1] + 1.5 * xyz[2] +
+               0.025 * xyz[0] * xyz[1] * xyz[2] - 0.013 * xyz[0] * xyz[0]; // world coordinates
+    };
+
+    mTimer.start("Generating a dense tri-cubic openvdb grid");
+    auto srcGrid = openvdb::createGrid<openvdb::DoubleGrid>(/*background=*/1.0);
+    srcGrid->setName("Tri-Quadratic");
+    srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/0.5));
+    const openvdb::CoordBBox bbox(openvdb::Coord(0), openvdb::Coord(128));
+    auto                     acc = srcGrid->getAccessor();
+    for (auto iter = bbox.begin(); iter; ++iter) {
+        auto ijk = *iter;
+        acc.setValue(ijk, triquadratic(srcGrid->indexToWorld(ijk)));
+    }
+    mTimer.restart("Generating NanoVDB grid");
+    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    mTimer.restart("Writing NanoVDB grid");
+    nanovdb::io::writeGrid("data/tmp.nvdb", handle);
+    mTimer.stop();
+
+    { //test File::hasGrid
+        EXPECT_TRUE(nanovdb::io::hasGrid("data/tmp.nvdb", "Tri-Quadratic"));
+        EXPECT_FALSE(nanovdb::io::hasGrid("data/tmp.nvdb", "Tri-Linear"));
+    }
+
+    mTimer.start("Reading NanoVDB from file");
+    auto handles = nanovdb::io::readGrids("data/tmp.nvdb", 1);
+    mTimer.stop();
+    auto* dstGrid = handles[0].grid<double>();
+    EXPECT_TRUE(dstGrid);
+
+    const openvdb::Vec3R ijk(3.4, 4.67, 5.23); // in index space
+    const float          exact = triquadratic(srcGrid->indexToWorld(ijk));
+    const float          approx = triquadratic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
+    //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
+    auto dstAcc = dstGrid->getAccessor();
+
+    auto sampler0 = nanovdb::createSampler<0>(dstAcc);
+    //std::cerr << "0'th order: v = " << sampler0(ijk) << std::endl;
+    EXPECT_NEAR(approx, sampler0(ijk), 1e-6);
+
+    auto sampler1 = nanovdb::createSampler<1>(dstAcc);
+    //std::cerr << "1'rd order: nanovdb = " << sampler1(ijk) << ", openvdb: " << openvdb::tools::Sampler<1>::sample(srcGrid->tree(), ijk) << std::endl;
+    EXPECT_NE(exact, sampler1(ijk)); // it's non-linear
+    EXPECT_NEAR(sampler1(ijk), openvdb::tools::Sampler<1>::sample(srcGrid->tree(), ijk), 1e-6);
+
+    auto sampler2 = nanovdb::createSampler<2>(dstAcc);
+    //std::cerr << "2'rd order: nanovdb = " << sampler2(ijk) << ", openvdb: " << openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk) << std::endl;
+    EXPECT_NEAR(sampler2(ijk), openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk), 1e-6);
+    EXPECT_NEAR(exact, sampler2(ijk), 1e-5); // it's a 2nd order polynomial
+
+    auto sampler3 = nanovdb::createSampler<3>(dstAcc);
+    //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
+    EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 2nd order polynomial
+} // Triquadratic
+
 TEST_F(TestOpenVDB, Tricubic)
 {
     // create a grid so sample from
-    auto trilinear = [](const openvdb::Vec3R& xyz) -> double {
+    auto tricubic = [](const openvdb::Vec3R& xyz) -> double {
         return 0.34 + 1.6 * xyz[0] + 2.7 * xyz[1] + 1.5 * xyz[2] + 0.025 * xyz[0] * xyz[1] * xyz[2] - 0.013 * xyz[0] * xyz[0] * xyz[0]; // world coordinates
     };
 
@@ -1811,7 +1904,7 @@ TEST_F(TestOpenVDB, Tricubic)
     auto                     acc = srcGrid->getAccessor();
     for (auto iter = bbox.begin(); iter; ++iter) {
         auto ijk = *iter;
-        acc.setValue(ijk, trilinear(srcGrid->indexToWorld(ijk)));
+        acc.setValue(ijk, tricubic(srcGrid->indexToWorld(ijk)));
     }
     mTimer.restart("Generating NanoVDB grid");
     auto handle = nanovdb::openToNanoVDB(*srcGrid);
@@ -1831,8 +1924,8 @@ TEST_F(TestOpenVDB, Tricubic)
     EXPECT_TRUE(dstGrid);
 
     const openvdb::Vec3R ijk(3.4, 4.67, 5.23); // in index space
-    const float          exact = trilinear(srcGrid->indexToWorld(ijk));
-    const float          approx = trilinear(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
+    const float          exact = tricubic(srcGrid->indexToWorld(ijk));
+    const float          approx = tricubic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
     auto dstAcc = dstGrid->getAccessor();
 
@@ -1840,62 +1933,68 @@ TEST_F(TestOpenVDB, Tricubic)
     //std::cerr << "0'th order: v = " << sampler0(ijk) << std::endl;
     EXPECT_NEAR(approx, sampler0(ijk), 1e-6);
 
-    //nanovdb::SampleFromVoxels<TreeT, 1> sampler1( dstGrid->tree());
-    //std::cerr << "1'th order: v = " << sampler1(ijk) << std::endl;
-    //EXPECT_EQ( exact, sampler1(ijk) );
+    auto sampler1 = nanovdb::createSampler<1>(dstAcc);
+    //std::cerr << "1'rd order: nanovdb = " << sampler1(ijk) << ", openvdb: " << openvdb::tools::Sampler<1>::sample(srcGrid->tree(), ijk) << std::endl;
+    EXPECT_NE(exact, sampler1(ijk)); // it's non-linear
+    EXPECT_NEAR(sampler1(ijk), openvdb::tools::Sampler<1>::sample(srcGrid->tree(), ijk), 1e-6);
+
+    auto sampler2 = nanovdb::createSampler<2>(dstAcc);
+    //std::cerr << "2'rd order: nanovdb = " << sampler2(ijk) << ", openvdb: " << openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk) << std::endl;
+    EXPECT_NEAR(sampler2(ijk), openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk), 1e-6);
+    EXPECT_NE(exact, sampler2(ijk)); // it's a 3nd order polynomial
 
     auto sampler3 = nanovdb::createSampler<3>(dstAcc);
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
-    EXPECT_NEAR(exact, sampler3(ijk), 1e-4);
+    EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 3nd order polynomial
 } // Tricubic
 
 TEST_F(TestOpenVDB, GridValidator)
 {
     auto srcGrid = this->getSrcGrid();
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, false, 0, nanovdb::ChecksumMode::Full);
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full, false, 0);
     mTimer.stop();
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
     auto* grid = handle.grid<float>();
     EXPECT_TRUE(grid);
-    
+
     //mTimer.start("isValid - detailed");
-    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+    EXPECT_TRUE(nanovdb::isValid(*grid, true, true));
     //mTimer.stop();
 
     //mTimer.start("isValid - not detailed");
-    EXPECT_TRUE( nanovdb::isValid(*grid, false, true ) );
+    EXPECT_TRUE(nanovdb::isValid(*grid, false, true));
     //mTimer.stop();
 
     //mTimer.start("Slow CRC");
     auto slowChecksum = nanovdb::crc32_slow(*grid);
     //mTimer.stop();
-    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
-    
+    EXPECT_EQ(slowChecksum, nanovdb::crc32_slow(*grid));
+
     //mTimer.start("Fast CRC");
     auto fastChecksum = nanovdb::crc32(*grid);
     //mTimer.stop();
-    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_EQ(fastChecksum, nanovdb::crc32(*grid));
 
-    auto *leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
-    leaf->data()->mValues[512>>1] += 0.00001f;// slightly modify a single voxel value 
+    auto* leaf = const_cast<nanovdb::NanoLeaf<float>*>(grid->tree().getNode<0>(0));
+    leaf->data()->mValues[512 >> 1] += 0.00001f; // slightly modify a single voxel value
 
-    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
+    EXPECT_NE(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE(nanovdb::isValid(*grid, true, false));
 
-    leaf->data()->mValues[512>>1] -= 0.00001f;// change back the single voxel value to it's original value
+    leaf->data()->mValues[512 >> 1] -= 0.00001f; // change back the single voxel value to it's original value
 
-    EXPECT_EQ( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_EQ( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_TRUE( nanovdb::isValid(*grid, true, true ) );
+    EXPECT_EQ(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_EQ(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_TRUE(nanovdb::isValid(*grid, true, true));
 
-    leaf->data()->mValueMask.toggle(512>>1);// change a single bit in a value mask
+    leaf->data()->mValueMask.toggle(512 >> 1); // change a single bit in a value mask
 
-    EXPECT_NE( slowChecksum, nanovdb::crc32_slow(*grid));
-    EXPECT_NE( fastChecksum, nanovdb::crc32(*grid));
-    EXPECT_FALSE( nanovdb::isValid(*grid, true, false ) );
-}// GridValidator
+    EXPECT_NE(slowChecksum, nanovdb::crc32_slow(*grid));
+    EXPECT_NE(fastChecksum, nanovdb::crc32(*grid));
+    EXPECT_FALSE(nanovdb::isValid(*grid, true, false));
+} // GridValidator
 
 int main(int argc, char** argv)
 {

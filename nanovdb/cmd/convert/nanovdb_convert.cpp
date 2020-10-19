@@ -31,6 +31,7 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "-f,--force\tOverwrite output file if it already exists\n"
               << "-g,--grid name\tConvert all grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
+              << "-s,--stats mode\t where mode={none, bbox, extrema, all}\n"
               << "-v,--verbose\tPrint verbose information to the terminal\n"
               << "-z,--zip\tUse ZIP compression on the output file\n";
     exit(exitStatus);
@@ -41,7 +42,8 @@ int main(int argc, char* argv[])
     int exitStatus = EXIT_SUCCESS;
 
     nanovdb::io::Codec       codec = nanovdb::io::Codec::NONE;
-    nanovdb::ChecksumMode    mode = nanovdb::ChecksumMode::Default;
+    nanovdb::StatsMode       sMode = nanovdb::StatsMode::Default;
+    nanovdb::ChecksumMode    cMode = nanovdb::ChecksumMode::Default;
     bool                     verbose = false, overwrite = false;
     std::string              gridName;
     std::vector<std::string> fileNames;
@@ -66,16 +68,36 @@ int main(int argc, char* argv[])
                     std::string str(argv[++i]);
                     std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){ return std::tolower(c); });
                     if (str == "none") {
-                       mode = nanovdb::ChecksumMode::Disable;
+                       cMode = nanovdb::ChecksumMode::Disable;
                     } else if (str == "partial") {
-                       mode = nanovdb::ChecksumMode::Partial;
+                       cMode = nanovdb::ChecksumMode::Partial;
                     } else if (str == "full") {
-                       mode = nanovdb::ChecksumMode::Full;
+                       cMode = nanovdb::ChecksumMode::Full;
                     } else {
                       std::cerr << "Expected one of the following checksum modes: {none, partial, full}\n" << std::endl;
                       usage(argv[0]);
                     }
                 }
+            } else if (arg == "-s" || arg == "--stats") {
+                if (i + 1 == argc) {
+                    std::cerr << "Expected a mode to follow the -s,--stats option\n" << std::endl;
+                    usage(argv[0]);
+                } else {
+                    std::string str(argv[++i]);
+                    std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){ return std::tolower(c); });
+                    if (str == "none") {
+                       sMode = nanovdb::StatsMode::Disable;
+                    } else if (str == "bbox") {
+                       sMode = nanovdb::StatsMode::BBox;
+                    } else if (str == "extrema") {
+                       sMode = nanovdb::StatsMode::MinMax;
+                    } else if (str == "all") {
+                       sMode = nanovdb::StatsMode::All;
+                    } else {
+                      std::cerr << "Expected one of the following stats modes: {none, bbox, extrema, all}\n" << std::endl;
+                      usage(argv[0]);
+                    }
+                }    
             } else if (arg == "-g" || arg == "--grid") {
                 if (i + 1 == argc) {
                     std::cerr << "Expected a grid name to follow the -g,--grid option\n" << std::endl;
@@ -144,7 +166,7 @@ int main(int argc, char* argv[])
                         if (verbose) {
                             std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                         }
-                        auto handle = nanovdb::openToNanoVDB(grid, false, verbose ? 1 : 0, mode);
+                        auto handle = nanovdb::openToNanoVDB(grid, sMode, cMode, false, verbose ? 1 : 0);
                         nanovdb::io::writeGrid(os, handle, codec);
                     } // loop over OpenVDB grids in file
                 } else {
@@ -152,7 +174,7 @@ int main(int argc, char* argv[])
                     if (verbose) {
                         std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                     }
-                    auto handle = nanovdb::openToNanoVDB(grid, false, verbose ? 1 : 0, mode);
+                    auto handle = nanovdb::openToNanoVDB(grid, sMode, cMode, false, verbose ? 1 : 0);
                     nanovdb::io::writeGrid(os, handle, codec);
                 }
             } // loop over input files

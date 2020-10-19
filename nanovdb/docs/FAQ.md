@@ -36,9 +36,5 @@
 
   That very much depends on your application and requirements. While the core NanoVDB data structure is robust and unlikely to change, its API (and ABI) might change based on the feedback we are soliciting from clients. The file format, on the other hand, is almost certainly going to change in order to support multiple grids and vector types. However, if your question is simply "is NanoVDB working today", then the answer is "yes to the best of our knowledge"! While the NanoVDB project is only a few months old, its underlying VDB data structure is over a decade old and more to the point it has been battle-tested since it was open-sourced in 2012. However, if you encounter any bugs please please let us know :)
 
-* **Will NanoVDB be open-sourced?**
-
-  While NanoVDB is currently shared with a restrictive license under NDA, there is consensus at NVIDIA to eventually contribute parts of NanoVDB back into to the OpenVDB library. When this happens and exactly what parts of NanoVDB depends on the feedback we receive from the few vendors we have decided to share it with. As such, it is important that you let us know if you continue to be interested in adopting NanoVDB and of course if there are missing features or blocking issues (including licensing concerns).
-
 ### Copyright Contributors to the OpenVDB Project
 ### SPDX-License-Identifier: MPL-2.0
