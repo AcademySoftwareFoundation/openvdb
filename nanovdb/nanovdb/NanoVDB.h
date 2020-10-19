@@ -3303,19 +3303,19 @@ template<typename ValueT>
 using NanoGrid = Grid<NanoTree<ValueT>>;
 
 template <int CacheLevels = 3, typename ValueT = float>
-auto createAccessor(const NanoGrid<ValueT> &grid)
+ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoGrid<ValueT> &grid)
 { 
     return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(grid.tree().root());
 }
 
 template <int CacheLevels = 3, typename ValueT = float>
-auto createAccessor(const NanoTree<ValueT> &tree)
+ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoTree<ValueT> &tree)
 { 
     return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(tree.root());
 }
 
 template <int CacheLevels = 3, typename ValueT = float>
-auto createAccessor(const NanoRoot<ValueT> &root)
+ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoRoot<ValueT> &root)
 { 
     return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(root);
 }
