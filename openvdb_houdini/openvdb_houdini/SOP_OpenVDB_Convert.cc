@@ -1017,8 +1017,12 @@ SOP_OpenVDB_Convert::Cache::convertVDBType(
     const UT_String& outPrecStr,
     hvdb::Interrupter& boss)
 {
+    GA_RWHandleS name_h(gdp, GA_ATTRIB_PRIMITIVE, "name");
     for (hvdb::VdbPrimIterator it(&dst, group); it; ++it) {
         if (boss.wasInterrupted()) return;
+
+        if (name_h.isValid())
+            it->getGrid().setName(static_cast<const char *> (name_h.get(it->getMapOffset())));
 
         const UT_VDBType inType = it->getStorageType();
         const UT_String inTypeName = getVDBTypeName(inType);

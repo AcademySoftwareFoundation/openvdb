@@ -18,6 +18,12 @@ Houdini:
   packed geometry were also being converted.
 - Fixed a bug where a Houdini SOP's verb would not be correctly associated
   with the corresponding node if the node's internal name was changed.
+- Fixed bug where OpenVDB Convert SOP could revert the name attribute.
+
+@par
+Bug Fixes:
+- Fixed a bug which could cause recursive compile time instantiations of
+  TypeList objects, manifesting in longer compile times.
 
 @par
 Build:
@@ -32,6 +38,9 @@ Build:
   doxygen documentation.
 - Added USE_ZLIB compiler flag that enables zlib compression and defaults
   to on.
+- Added the OPENVDB_STATICLIB define to all static builds to fix builds on
+  Windows which use the multithread/DLL-specific version of the CRT.
+  <I>[Reported&nbsp;by&nbsp;Tobias&nbsp;Rittig]</I>
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly
