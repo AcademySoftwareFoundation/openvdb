@@ -371,9 +371,7 @@ public:
     using NonConstChildNodeType = typename NodeT::ChildNodeType;
     using ChildNodeType = typename CopyConstness<NodeT, NonConstChildNodeType>::Type;
 
-    NodeManagerLink() {}
-
-    virtual ~NodeManagerLink() {}
+    NodeManagerLink() = default;
 
     void clear() { mList.clear(); mNext.clear(); }
 
@@ -442,9 +440,7 @@ template<typename NodeT>
 class NodeManagerLink<NodeT, 0>
 {
 public:
-    NodeManagerLink() {}
-
-    virtual ~NodeManagerLink() {}
+    NodeManagerLink() = default;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList.clear(); }
@@ -515,7 +511,7 @@ public:
         this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mChain.clear(); }
@@ -682,9 +678,6 @@ public:
 protected:
     RootNodeType& mRoot;
     NodeManagerLink<ChildNodeType, LEVELS-1> mChain;
-
-private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
 };// NodeManager class
 
 
@@ -894,7 +887,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree, bool /*serial*/ = false) : mRoot(tree.root()) { }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() {}
@@ -925,9 +918,6 @@ public:
 
 protected:
     RootNodeType& mRoot;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<0>
 
 
@@ -951,7 +941,7 @@ public:
         this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); }
@@ -1006,9 +996,6 @@ protected:
 
     NodeT1& mRoot;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<1>
 
 
@@ -1031,7 +1018,7 @@ public:
         this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); }
@@ -1102,9 +1089,6 @@ protected:
     NodeT2& mRoot;
     ListT1 mList1;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<2>
 
 
@@ -1127,7 +1111,7 @@ public:
         this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); mList2.clear(); }
@@ -1208,9 +1192,6 @@ protected:
     ListT2 mList2;
     ListT1 mList1;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<3>
 
 
@@ -1233,7 +1214,7 @@ public:
         this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete; // disallow copy-construction
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear(); }
@@ -1327,9 +1308,6 @@ protected:
     ListT2  mList2;
     ListT1  mList1;
     ListT0  mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<4>
 
 
