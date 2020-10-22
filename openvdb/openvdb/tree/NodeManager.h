@@ -30,6 +30,8 @@ template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNod
 class NodeManager;
 
 
+// Produce linear arrays of all tree nodes lazily, to facilitate efficient threading
+// of topology-changing top-down workflows.
 template<typename TreeOrLeafManagerT, Index _LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
 class DynamicNodeManager;
 
@@ -37,6 +39,8 @@ class DynamicNodeManager;
 ////////////////////////////////////////
 
 
+// This is a dummy node filtering class used by the NodeManager class to match
+// the internal filtering interface used by the DynamicNodeManager.
 struct NodeFilter
 {
     static bool valid(size_t) { return true; }
@@ -112,6 +116,9 @@ public:
         } else {
             nodeCounts.resize(parents.nodeCount());
             tbb::parallel_for(
+                // with typical node sizes and SSE enabled, there are only a handful
+                // of instructions executed per-operation with a default grainsize
+                // of 1, so increase to 64 to reduce parallel scheduling overhead
                 tbb::blocked_range<Index64>(0, parents.nodeCount(), /*grainsize=*/64),
                 [&](tbb::blocked_range<Index64>& range)
                 {
@@ -271,6 +278,7 @@ public:
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
+    // identical to foreach except the operator() method has a node index
     template<typename NodeOp>
     void foreachWithIndex(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
@@ -278,6 +286,7 @@ public:
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
+    // identical to reduce except the operator() method has a node index
     template<typename NodeOp>
     void reduceWithIndex(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
@@ -287,12 +296,16 @@ public:
 
 private:
 
+    // default execution in the NodeManager ignores the node index
+    // given by the iterator position
     struct OpWithoutIndex
     {
         template <typename T>
         static void eval(T& node, typename NodeRange::Iterator& iter) { node(*iter); }
     };
 
+    // execution in the DynamicNodeManager matches that of the LeafManager in
+    // passing through the node index given by the iterator position
     struct OpWithIndex
     {
         template <typename T>
@@ -684,6 +697,8 @@ protected:
 ////////////////////////////////////////////
 
 
+// Wraps a user-supplied DynamicNodeManager operator and stores the return
+// value of the operator() method to the index of the node in a bool array
 template <typename OpT>
 struct ForeachFilterOp
 {
@@ -713,6 +728,8 @@ private:
 }; // struct ForeachFilterOp
 
 
+// Wraps a user-supplied DynamicNodeManager operator and stores the return
+// value of the operator() method to the index of the node in a bool array
 template <typename OpT>
 struct ReduceFilterOp
 {
@@ -853,12 +870,129 @@ public:
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
+    //@{
+    /// @brief   Threaded method that applies a user-supplied functor
+    ///          to all the nodes in the tree.
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @note There are two key differences to the interface of the
+    /// user-supplied functor to the NodeManager class - (1) the operator()
+    /// method aligns with the LeafManager class in expecting the index of the
+    /// node in a linear array of identical node types, (2) the operator()
+    /// method returns a boolean termination value with true indicating that
+    /// children of this node should be processed, false indicating the
+    /// early-exit termination should occur.
+    ///
+    /// @par Example:
+    /// @code
+    /// // Functor to densify the first child node in a linear array. Note
+    /// // this implementation also illustrates how different
+    /// // computation can be applied to the different node types.
+    ///
+    /// template<typename TreeT>
+    /// struct DensifyOp
+    /// {
+    ///     using RootT = typename TreeT::RootNodeType;
+    ///     using LeafT = typename TreeT::LeafNodeType;
+    ///
+    ///     DensifyOp() = default;
+    ///
+    ///     // Processes the root node. Required by the DynamicNodeManager
+    ///     bool operator()(RootT&, size_t) const { return true; }
+    ///
+    ///     // Processes the internal nodes. Required by the DynamicNodeManager
+    ///     template<typename NodeT>
+    ///     bool operator()(NodeT& node, size_t idx) const
+    ///     {
+    ///         // densify child
+    ///         for (auto iter = node.cbeginValueAll(); iter; ++iter) {
+    ///             const openvdb::Coord ijk = iter.getCoord();
+    ///             node.addChild(new typename NodeT::ChildNodeType(iter.getCoord(), NodeT::LEVEL, true));
+    ///         }
+    ///         // early-exit termination for all non-zero index children
+    ///         return idx == 0;
+    ///     }
+    ///     // Processes the leaf nodes. Required by the DynamicNodeManager
+    ///     bool operator()(LeafT&, size_t) const
+    ///     {
+    ///         return true;
+    ///     }
+    /// };// DensifyOp
+    ///
+    /// // usage:
+    /// DensifyOp<FloatTree> op;
+    /// tree::DynamicNodeManager<FloatTree> nodes(tree);
+    /// nodes.foreachTopDown(op);
+    ///
+    /// @endcode
     template<typename NodeOp>
     void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mChain.foreachTopDown(op, mRoot, threaded, grainSize);
     }
 
+    /// @brief   Threaded method that processes nodes with a user supplied functor
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @note There are two key differences to the interface of the
+    /// user-supplied functor to the NodeManager class - (1) the operator()
+    /// method aligns with the LeafManager class in expecting the index of the
+    /// node in a linear array of identical node types, (2) the operator()
+    /// method returns a boolean termination value with true indicating that
+    /// children of this node should be processed, false indicating the
+    /// early-exit termination should occur.
+    ///
+    /// @par Example:
+    /// @code
+    ///  // Functor to count nodes in a tree
+    ///  template<typename TreeType>
+    ///  struct NodeCountOp
+    ///  {
+    ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///          nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      void join(const NodeCountOp& other)
+    ///      {
+    ///          for (size_t i = 0; i < nodeCount.size(); ++i) {
+    ///              nodeCount[i] += other.nodeCount[i];
+    ///          }
+    ///          totalCount += other.totalCount;
+    ///      }
+    ///      // do nothing for the root node
+    ///      bool operator()(const typename TreeT::RootNodeType& node, size_t)
+    ///      {
+    ///          return true;
+    ///      }
+    ///      // count the internal and leaf nodes
+    ///      template<typename NodeT>
+    ///      bool operator()(const NodeT& node, size_t)
+    ///      {
+    ///          ++(nodeCount[NodeT::LEVEL]);
+    ///          ++totalCount;
+    ///          return true;
+    ///      }
+    ///      std::vector<openvdb::Index64> nodeCount;
+    ///      openvdb::Index64 totalCount;
+    /// };
+    ///
+    /// // usage:
+    /// NodeCountOp<FloatTree> op;
+    /// tree::DynamicNodeManager<FloatTree> nodes(tree);
+    /// nodes.reduceTopDown(op);
+    ///
+    /// @endcode
     template<typename NodeOp>
     void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {

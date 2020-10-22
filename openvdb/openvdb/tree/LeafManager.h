@@ -637,6 +637,9 @@ private:
         } else {
             leafCounts.resize(leafParents.size());
             tbb::parallel_for(
+                // with typical node sizes and SSE enabled, there are only a handful
+                // of instructions executed per-operation with a default grainsize
+                // of 1, so increase to 64 to reduce parallel scheduling overhead
                 tbb::blocked_range<size_t>(0, leafParents.size(), /*grainsize=*/64),
                 [&](tbb::blocked_range<size_t>& range)
                 {
